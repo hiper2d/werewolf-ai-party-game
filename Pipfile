@@ -9,6 +9,8 @@ python-dotenv = "*"
 redis = "*"
 
 [dev-packages]
+fastapi = "*"
+uvicorn = {extras = ["standard"], version = "*"}
 
 [requires]
 python_version = "3.11"

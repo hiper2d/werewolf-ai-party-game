@@ -37,6 +37,11 @@ class RoleDto(ABC):
 
 
 class DoctorDto(RoleDto):
+
+    def __init__(self, role, order):
+        self.role = role
+        self.order = order
+
     def process_response(self, response_str: str) -> str:
         response_json = {
             "player_to_save": "John",
@@ -56,13 +61,27 @@ class DoctorDto(RoleDto):
     def get_command(self) -> str:
         return GAME_MASTER_NIGHT_DOCTOR_COMMAND  # ask to return a name and a reason (for debugging)
 
-
 class WerewolfDto(RoleDto):
+
+    def process_response(self, response_str: str) -> str:
+        pass
+
+    def __init__(self, role, order):
+        self.role = role
+        self.order = order
+
     def get_command(self) -> str:
         return GAME_MASTER_NIGHT_WEREWOLF_COMMAND  # ask to return a name
 
 
 class DetectiveDto(RoleDto):
+
+    def process_response(self, response_str: str) -> str:
+        pass
+
+    def __init__(self, role, order):
+        self.role = role
+        self.order = order
 
     def get_command(self) -> str:
         return GAME_MASTER_NIGHT_DETECTIVE_COMMAND  # ask to return a name

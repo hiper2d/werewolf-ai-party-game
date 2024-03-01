@@ -54,7 +54,7 @@ def _setup_logger(log_level=logging.DEBUG):
 logger = _setup_logger(log_level=logging.DEBUG)
 
 
-def init_game(human_player_name: str, theme: str, reply_language_instruction: str = ''):
+def init_game(human_player_name: str, theme: str, reply_language_instruction: str = '') -> Tuple[str, WerewolfRole]:
     logger.info("*** Starting new game! ***\n")
     load_dotenv(find_dotenv())
 
