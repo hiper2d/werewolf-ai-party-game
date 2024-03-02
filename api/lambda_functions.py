@@ -368,7 +368,7 @@ def start_game_night(game_id, user_action: str = None):
                 # todo: This is not implemented yet, I stopped here
                 # current_player.current_offset = new_offset
         else:
-            print("Well, you messed up something is the code of the forming role map very badly if you are seeing this")
+            print("Well, you messed something up in the role map if you are seeing this")
 
 
 

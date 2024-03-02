@@ -5,3 +5,9 @@ services:
     image: redis:latest
     ports:
       - "6379:6379"
+  dynamodb:
+    image: amazon/dynamodb-local
+    container_name: werewolfdb
+    ports:
+      - "8000:8000"
+    command: "-jar DynamoDBLocal.jar -sharedDb"
