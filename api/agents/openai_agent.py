@@ -1,21 +1,21 @@
-import os
 from typing import List
 
 from dotenv import load_dotenv, find_dotenv
-from groq import Groq
-from groq.types.chat import ChatCompletion
+from openai import OpenAI
+from openai.types.chat import ChatCompletion
 
 from agents.generic_agent import GenericAgent
 from ai.assistant_prompts import PLAYER_PROMPT
 from dynamodb.dynamo_message import DynamoChatMessage, MessageRole
 
 
-class GroqAgent(GenericAgent):
+class OpenAiAgent(GenericAgent):
 
     def __init__(self, name):
-        self.client: Groq = Groq()
+        self.client: OpenAI = OpenAI()
         self.name = name
-        self.model = "mixtral-8x7b-32768"
+        self.model = "gpt-4-turbo-preview"  # Currently points to gpt-4-0125-preview
+        # Available models: https://platform.openai.com/docs/models/gpt-4-and-gpt-4-turbo
 
     def ask(self, chat_messages: List[DynamoChatMessage]) -> str | None:
         chat_completion: ChatCompletion = self.client.chat.completions.create(
@@ -36,7 +36,7 @@ class GroqAgent(GenericAgent):
 
 if __name__ == '__main__':
     load_dotenv(find_dotenv())
-    agent = GroqAgent()
+    agent = OpenAiAgent(name="Player")
     messages = [
         DynamoChatMessage(role=MessageRole.SYSTEM, msg=PLAYER_PROMPT),
         DynamoChatMessage(role=MessageRole.USER, msg="Game master: Introduce yourself")

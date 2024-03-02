@@ -49,10 +49,11 @@ class BotPlayer(BaseModel):
 class Game(BaseModel):
     id: str
     story: str
-    arbiter_assistant_id: str
-    arbiter_thread_id: str
-    bot_players: dict[str, BotPlayer]
-    human_player: HumanPlayer
+    # arbiter_assistant_id: str
+    # arbiter_thread_id: str
+    # bot_players: dict[str, BotPlayer]
+    # human_player: HumanPlayer
+    player_ids: list[str]
     current_offset: int = 0
     current_day: int = 1
     user_moves_day_counter: int = 0

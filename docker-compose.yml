@@ -3,11 +3,12 @@ version: '3.8'
 services:
   redis:
     image: redis:latest
+    container_name: werewolf-redis
     ports:
       - "6379:6379"
   dynamodb:
     image: amazon/dynamodb-local
-    container_name: werewolfdb
+    container_name: werewolf-dynamodb
     ports:
       - "8000:8000"
     command: "-jar DynamoDBLocal.jar -sharedDb"
