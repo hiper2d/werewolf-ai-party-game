@@ -1,10 +1,11 @@
-from ai.agents.groq_agent import GroqAgent
+from ai.agents.openai_agent import OpenAiAgent
 from ai.prompts.assistant_prompts import PLAYER_PROMPT
+from constants import GM_ID, GM_NAME
 from models import BotPlayerDto, GameDto, WerewolfRole, role_alies, role_enemies, MessageDto, \
     MessageRole
 
 
-class BotPlayerAgent(GroqAgent):
+class BotPlayerAgent(OpenAiAgent):
     def __init__(self, me: BotPlayerDto, game: GameDto):
         self.me = me
         self.game = game
@@ -42,7 +43,8 @@ class BotPlayerAgent(GroqAgent):
 
         return MessageDto(
             recipient=self.me.id,
-            author="Game Master",
+            author_id=GM_ID,
+            author_name=GM_NAME,
             role=MessageRole.SYSTEM.value,
             msg=instruction_prompt
         )

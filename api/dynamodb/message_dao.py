@@ -1,9 +1,8 @@
-import time
 from typing import List
 
-import boto3
 from dotenv import load_dotenv, find_dotenv
 
+from dynamodb.dynamo_helper import get_dynamo_resource
 from dynamodb.dynamo_message import DynamoChatMessage, MessageRole
 from dynamodb.generic_dao import GenericDao
 from models import MessageDto
@@ -35,8 +34,11 @@ class MessageDao(GenericDao):
             'msg': {
                 'S': dto.msg,
             },
-            'author': {
-                'S': dto.author,
+            'author_id': {
+                'S': dto.author_id,
+            },
+            'author_name': {
+                'S': dto.author_name,
             }
         }
 
@@ -47,9 +49,9 @@ class MessageDao(GenericDao):
     def convert_records_to_dto_list(records: List[dict]) -> List[MessageDto]:
         return [
             MessageDto(
-                author=record['author']['S'],
+                author_id=record['author_id']['S'],
+                author_name=record['author_name']['S'],
                 recipient=record['recipient']['S'],
-                ts=int(record['ts']['N']),
                 role=MessageRole(record['role']['S']).value,
                 msg=record['msg']['S'],
             ) for record in records
@@ -71,44 +73,11 @@ class MessageDao(GenericDao):
         except Exception as e:
             self.logger.error(e)
 
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     load_dotenv(find_dotenv())
-    dyn_resource = boto3.client(
-        "dynamodb",
-        endpoint_url="http://localhost:8000"
-    )
-    msg_dao = MessageDao(dyn_resource=dyn_resource)
-    msg_dao.delete_table()
-    print(f"Table exists: {msg_dao.exists_table()}")
-    msg_dao.create_table()
-
-    message1 = MessageDto(
-        recipient="1_1",
-        role=MessageRole.SYSTEM,
-        msg="hi",
-        author="bot_1",
-        ts=time.time_ns()
-    )
-
-    message2 = MessageDto(
-        recipient="1_1",
-        role=MessageRole.USER,
-        msg="hey",
-        author="user_1",
-        ts=time.time_ns()
-    )
-
-    message3 = MessageDto(
-        recipient="1_2",
-        role=MessageRole.USER,
-        msg="hey",
-        author="bot_1",
-        ts=time.time_ns()
-    )
-    msg_dao.save_dto(dto=message1)
-    msg_dao.save_dto(dto=message2)
-    msg_dao.save_dto(dto=message3)
-    res1 = msg_dao.get_last_records(recipient=f"1_1", limit=10)
-    res2 = msg_dao.get_last_records(recipient=f"1_2", limit=10)
-    print(sorted(res1 + res2, key=lambda x: x.ts, reverse=True))
+    dynamo_resource = get_dynamo_resource()
+    dao = MessageDao(dyn_resource=dynamo_resource)
+    game_id = 'd19c5d54-2af6-4970-9101-9071c1da6fe3'
+    messages = dao.get_last_records(f"{game_id}_all")
+    for message in messages:
+        print(f"{message.author_name}: {message.msg}")

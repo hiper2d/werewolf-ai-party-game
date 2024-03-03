@@ -45,9 +45,6 @@ class BotPlayerDao(GenericDao):
             'is_alive': {
                 'BOOL': bot.is_alive
             },
-            'current_offset': {
-                'N': str(bot.current_offset)
-            },
             'created_at': {
                 'N': str(bot.ts),
             },
@@ -68,7 +65,6 @@ class BotPlayerDao(GenericDao):
             known_ally_names=record['known_ally_names']['S'],
             other_player_names=record['other_player_names']['S'],
             is_alive=record['is_alive']['BOOL'],
-            current_offset=record['current_offset']['N'],
             ts=int(record['created_at']['N'])
         )
 

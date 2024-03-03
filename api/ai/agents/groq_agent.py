@@ -12,7 +12,8 @@ class GroqAgent(GenericAgent):
     def __init__(self, name):
         self.client: Groq = Groq()
         self.name = name
-        self.model = "mixtral-8x7b-32768"
+        self.model = "mixtral-8x7b-32768" # Supported Models: https://console.groq.com/docs/models
+        # API docs: https://console.groq.com/docs/text-chat
 
     def ask(self, chat_messages: List[MessageDto]) -> str | None:
         self.logger.debug(f"Asking {self.name} agent: {chat_messages[-1].msg}")

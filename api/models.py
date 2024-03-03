@@ -58,26 +58,33 @@ class BotPlayerDto(BaseModel):
     backstory: str
     role_motivation: str
     temperament: str
-    known_ally_names: str = None # fixme: add to dao
-    other_player_names: str = None # fixme: add to dao
+    known_ally_names: str = None
+    other_player_names: str = None
     is_alive: bool = True
-    current_offset: int = -1
-    ts: int = time.time_ns()
+
+    @property
+    def ts(self) -> int:
+        return time.time_ns()
+
 
 
 class GameDto(BaseModel):
     id: str = (uuid.uuid4())
     story: str
     bot_player_ids: list[str]
+    bot_player_name_to_id: dict[str, str]
     dead_player_names_with_roles: str
+    players_names_with_roles_and_stories: str
     human_player: HumanPlayerDto
     reply_language_instruction: str
-    current_offset: int = 0
     current_day: int = 1
     user_moves_day_counter: int = 0
     user_moves_total_counter: int = 0
     is_active: bool = True
-    ts: int = time.time_ns()
+
+    @property
+    def ts(self) -> int:
+        return time.time_ns()
 
 
 class MessageRole(Enum):
@@ -88,10 +95,14 @@ class MessageRole(Enum):
 
 class MessageDto(BaseModel):
     recipient: str
-    author: str
+    author_id: str
+    author_name: str
     msg: str
     role: MessageRole
-    ts: int = time.time_ns()
+
+    @property
+    def ts(self) -> int:
+        return time.time_ns()
 
 
 class ArbiterReply(BaseModel):

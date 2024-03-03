@@ -9,6 +9,7 @@ from typing import List, Tuple, Optional
 
 from dotenv import load_dotenv, find_dotenv
 
+from ai.agents.gm_agent import GmAgent
 from ai.agents.player_agent import BotPlayerAgent
 from ai.prompts.assistant_prompts import GAME_MASTER_VOTING_FIRST_ROUND_COMMAND, GAME_MASTER_VOTING_FIRST_ROUND_RESULT, \
     GAME_MASTER_VOTING_FIRST_ROUND_DEFENCE_COMMAND, GAME_MASTER_VOTING_SECOND_ROUND_COMMAND, \
@@ -22,42 +23,37 @@ from api.redis.redis_helper import connect_to_redis, save_game_to_redis, load_ga
     add_message_to_game_history_redis_list, delete_game_history_redis_list, read_messages_from_game_history_redis_list, \
     delete_game_from_redis, read_newest_game_from_redis
 from api.utils import get_top_items_within_range
+from constants import NO_ALIES, RECIPIENT_ALL, GM_NAME, GM_ID
 from dynamodb.bot_player_dao import BotPlayerDao
 from dynamodb.dynamo_helper import get_dynamo_resource
 from dynamodb.game_dao import GameDao
 from dynamodb.message_dao import MessageDao
 
-NO_NEW_MESSAGES = 'no new messages'
-NO_ELIMINATED_PLAYERS = 'no eliminated players yet'
-NO_ALIES = "you don't know any alies"
-RECIPIENT_ALL = 'all'
 
 
 def _setup_logger(log_level=logging.DEBUG):
-    logger = logging.getLogger('my_application')
-    logger.setLevel(log_level)
+    log = logging.getLogger('my_application')
+    log.setLevel(log_level)
 
-    # Create console handler and set level to debug
     console_handler = logging.StreamHandler()
     console_handler.setLevel(log_level)
 
-    # Create file handler which logs even debug messages
     file_handler = logging.handlers.RotatingFileHandler(
         'log.txt', maxBytes=20 * 1024 * 1024, backupCount=5
     )
     file_handler.setLevel(logging.INFO)
 
-    # Create formatter and add it to the handlers
-    console_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(filename)s - %(lineno)d - %(message)s')
+    console_formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(filename)s - %(lineno)d - %(message)s'
+    )
     file_formatter = logging.Formatter('[%(asctime)s] %(message)s', datefmt='%H:%M:%S')
     console_handler.setFormatter(console_formatter)
     file_handler.setFormatter(file_formatter)
 
     # Add the handlers to the logger
-    logger.addHandler(console_handler)
-    logger.addHandler(file_handler)
-
-    return logger
+    log.addHandler(console_handler)
+    log.addHandler(file_handler)
+    return log
 
 
 load_dotenv(find_dotenv())
@@ -82,8 +78,10 @@ def init_game(human_player_name: str, theme: str, reply_language_instruction: st
         id=str(uuid.uuid4()),
         story=game_scene,
         bot_player_ids=[player.id for player in bot_players],
+        bot_player_name_to_id={player.name: player.id for player in bot_players},
         human_player=human_player,
         dead_player_names_with_roles='no eliminated players yet',
+        players_names_with_roles_and_stories=','.join([f"{bot.name} ({bot.role.value})" for bot in bot_players]),
         reply_language_instruction=reply_language_instruction
     )
     game_dao.create_or_update_dto(game)
@@ -100,7 +98,6 @@ def init_game(human_player_name: str, theme: str, reply_language_instruction: st
         names.append(human_player.name)
         return ','.join(names)
 
-
     for current_bot_player in bot_players:
         current_bot_player.known_ally_names=get_alies_names(current_bot_player.id)
         current_bot_player.other_player_names=get_other_player_names(current_bot_player.id)
@@ -108,6 +105,7 @@ def init_game(human_player_name: str, theme: str, reply_language_instruction: st
 
     if not message_dao.exists_table():
         message_dao.create_table()
+
     return game.id, human_player.role
 
 
@@ -129,22 +127,21 @@ def get_welcome_messages_from_all_players(game_id: str):
         bot_player_agent = BotPlayerAgent(me=bot_player, game=game)
         instruction_message: MessageDto = bot_player_agent.create_instruction_message()
 
-        messages_to_all: List[MessageDto] = message_dao.get_last_records(recipient=RECIPIENT_ALL)
-        messages_to_bot_player = message_dao.get_last_records(recipient=bot_player.id)
+        messages_to_all: List[MessageDto] = message_dao.get_last_records(recipient=f"{game_id}_{RECIPIENT_ALL}")
+        messages_to_bot_player = message_dao.get_last_records(recipient=f"{game_id}_{bot_player.id}")
         messages_to_all.extend(messages_to_bot_player) # merging messages from common chat and bot personal commands
         messages_to_all.sort(key=lambda x: x.ts, reverse=True)
 
         command_message = MessageDto(
-            recipient=bot_player.id, author='Game Master',
+            recipient=f"{game_id}_{bot_player.id}", author_name=GM_NAME, author_id=GM_ID,
             msg="Please introduce yourself to the other players.", role=MessageRole.USER
         )
         message_dao.save_dto(command_message)
 
         answer = bot_player_agent.ask([instruction_message, *messages_to_all, command_message])
-        logger.info(f"{bot_player.name}: {answer}")
         answer_message = MessageDto(
-            recipient=RECIPIENT_ALL, author=bot_player.id,
-            msg=answer, role=MessageRole.ASSISTANT
+            recipient=f"{game_id}_{RECIPIENT_ALL}", author_id=bot_player.id, author_name=bot_player.name,
+            msg=answer, role=MessageRole.USER
         )
         message_dao.save_dto(answer_message)
         introductions.append({"name": bot_player.name, "introduction": answer})
@@ -152,66 +149,66 @@ def get_welcome_messages_from_all_players(game_id: str):
     return introductions
 
 
-def ask_everybody_to_introduce_themself_in_order(game_id: str):
-    r = connect_to_redis()
-    game: GameDto = load_game_from_redis(r, game_id)
-
-    for bot_player in game.bot_players.values():
-        new_messages_concatenated, _ = _get_new_messages_as_str(r, game_id, bot_player.current_offset)
-        message = f"Game Master: Introduce yourself to other players."
-        if new_messages_concatenated != NO_NEW_MESSAGES:
-            message += f"There are few new messages in the chat:\n{new_messages_concatenated}"
-        player_assistant = PlayerAssistantDecorator.load_player_by_assistant_id_and_thread_id(
-            assistant_id=bot_player.assistant_id, thread_id=bot_player.thread_id
-        )
-        player_reply = player_assistant.ask(message)
-        player_reply_message = f"{bot_player.name}: {player_reply}"
-        _, new_offset = add_message_to_game_history_redis_list(r, game_id, [player_reply_message])
-        bot_player.current_offset = new_offset
-        save_game_to_redis(r, game)
-
-
 def talk_to_all(game_id: str, user_message: str):
-    load_dotenv(find_dotenv())
-    r = connect_to_redis()
-    game: GameDto = load_game_from_redis(r, game_id)
+    game = game_dao.get_by_id(game_id)
+    if not game or not game.bot_player_ids:
+        logger.debug(f"Game with id {game_id} not found in Redis or it doesn't have bots")
+        return
     logger.info('%s: %s', game.human_player.name, user_message)
-
-    arbiter = ArbiterAssistantDecorator.load_arbiter_by_assistant_id_and_thread_id(
-        assistant_id=game.arbiter_assistant_id, thread_id=game.arbiter_thread_id
+    user_message = MessageDto(
+        recipient=f"{game_id}_{RECIPIENT_ALL}", author_id=game.human_player.id, author_name=game.human_player.name,
+        msg=user_message, role=MessageRole.USER
     )
-    add_message_to_game_history_redis_list(r, game_id, [
-        f"{game.human_player.name}: " + user_message])
+    message_dao.save_dto(user_message)
 
-    new_messages_concatenated, new_offset = _get_new_messages_as_str(r, game_id, game.current_offset)
-    arbiter_reply = arbiter.ask(new_messages_concatenated)
-    game.current_offset = new_offset
+    gm_agent = GmAgent(game=game)
+    instruction_message = gm_agent.create_instruction_message()
+    history_messages = message_dao.get_last_records(
+        recipient=f"{game_id}_{RECIPIENT_ALL}", limit=10
+    ) # read last 10 messages
+
+    for history_message in history_messages:
+        history_message.msg = f"{history_message.author_name}: {history_message.msg}"
+    user_message.msg = f"{user_message.author_name}: {user_message.msg}"
+
+    gm_reply = gm_agent.ask([instruction_message, *history_messages, user_message])
+
     game.user_moves_total_counter += 1
     game.user_moves_day_counter += 1
-    save_game_to_redis(r, game)
-    arbiter_reply_json = json.loads(arbiter_reply)
+    arbiter_reply_json = json.loads(gm_reply)
     reply_obj: ArbiterReply = ArbiterReply(players_to_reply=arbiter_reply_json['players_to_reply'])
     return reply_obj.players_to_reply
 
 
 def talk_to_certain_player(game_id: str, name: str):
-    r = connect_to_redis()
-    game: GameDto = load_game_from_redis(r, game_id)
-    if name not in game.bot_players:
+    game = game_dao.get_by_id(game_id)
+    if name not in game.bot_player_name_to_id:
+        logger.error("Player with name %s not found in the game", name)
         return None
-    bot_player = game.bot_players[name]
+    bot_player_id = game.bot_player_name_to_id[name]
+    bot_player = bot_player_dao.get_by_id(bot_player_id)
+    bot_player_agent = BotPlayerAgent(me=bot_player, game=game)
+    instruction_message = bot_player_agent.create_instruction_message()
 
-    new_messages_concatenated, _ = _get_new_messages_as_str(r, game_id, bot_player.current_offset)
-    message = f"Game Master: Reply to these few messages from other players:\n{new_messages_concatenated}"
-    player_assistant = PlayerAssistantDecorator.load_player_by_assistant_id_and_thread_id(
-        assistant_id=bot_player.assistant_id, thread_id=bot_player.thread_id
+    messages_to_all: List[MessageDto] = message_dao.get_last_records(recipient=f"{game_id}_{RECIPIENT_ALL}")
+    messages_to_bot_player = message_dao.get_last_records(recipient=f"{game_id}_{bot_player.id}")
+    messages_to_all.extend(messages_to_bot_player) # merging messages from common chat and bot personal commands
+    messages_to_all.sort(key=lambda x: x.ts, reverse=True)
+
+    for message in messages_to_all:
+        if message.author_id == bot_player.id:
+            message.role = MessageRole.SYSTEM # message from bot to itself should be SYSTEM
+        else:
+            message.msg = f"{message.author_name}: {message.msg}"
+
+    answer = bot_player_agent.ask([instruction_message, *messages_to_all])
+    logger.info(f"{bot_player.name}: {answer}")
+    answer_message = MessageDto(
+        recipient=f"{game_id}_{RECIPIENT_ALL}", author_id=bot_player.id, author_name=bot_player.name,
+        msg=answer, role=MessageRole.USER
     )
-    player_reply = player_assistant.ask(message)
-    player_reply_message = f"{bot_player.name}: {player_reply}"
-    _, new_offset = add_message_to_game_history_redis_list(r, game_id, [player_reply_message])
-    bot_player.current_offset = new_offset
-    save_game_to_redis(r, game)
-    return player_reply
+    message_dao.save_dto(answer_message)
+    return answer
 
 
 def start_elimination_vote_round_one_async(game_id: str, user_vote: str) -> List[str]:

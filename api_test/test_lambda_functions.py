@@ -23,12 +23,12 @@ class TestGameFunctions(unittest.TestCase):
         get_welcome_messages_from_all_players(game_id='')
 
     def test_talk_to_all(self):
-        game_id = get_latest_game().id
+        game_id = 'd19c5d54-2af6-4970-9101-9071c1da6fe3'
         players_to_reply = talk_to_all(
             game_id=game_id,
             user_message=
 """\
-Hi, I'm Peeta. I'm the baker's son. I'm from District 12
+Hi, I'm Peeta. I'm the baker's son. I'm from District 12. Is Katniss here? Oh boy, I'm so scared.
 """
         )
         for player_name in players_to_reply:
