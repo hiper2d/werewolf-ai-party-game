@@ -1,12 +1,12 @@
 import logging
 import time
-from typing import Optional, List, Tuple, Set
+from typing import Optional, List
 
 from openai import OpenAI
 from openai.types.beta import Assistant, Thread
 
-from api.ai.assistant_prompts import PLAYER_PROMPT, ARBITER_PROMPT
-from api.models import BotPlayer, WerewolfRole, HumanPlayer
+from ai.prompts.assistant_prompts import PLAYER_PROMPT, ARBITER_PROMPT
+from api.models import BotPlayerDto, WerewolfRole, HumanPlayerDto
 
 logger = logging.getLogger('my_application')
 
@@ -113,11 +113,11 @@ class ArbiterAssistantDecorator(RawAssistant):
     def __init__(self, assistant: Assistant, thread: Thread):
         super().__init__(assistant, thread)
 
-    def update_arbiter_instruction(self, players: List[BotPlayer], game_story: str, human_player_name: str):
+    def update_arbiter_instruction(self, players: List[BotPlayerDto], game_story: str, human_player_name: str):
         super().update_instruction(self._prepare_prompt(players, game_story, human_player_name))
 
     @staticmethod
-    def create_arbiter(players: List[BotPlayer], game_story: str, human_player_name: str) -> "ArbiterAssistantDecorator":
+    def create_arbiter(players: List[BotPlayerDto], game_story: str, human_player_name: str) -> "ArbiterAssistantDecorator":
         formatted_prompt = ArbiterAssistantDecorator._prepare_prompt(players, game_story, human_player_name)
         instance = RawAssistant.create_with_new_assistant(
             assistant_name='Arbiter', prompt=formatted_prompt
@@ -135,7 +135,7 @@ class ArbiterAssistantDecorator(RawAssistant):
         return ArbiterAssistantDecorator(instance.assistant, instance.thread)
 
     @staticmethod
-    def _prepare_prompt(players: List[BotPlayer], game_story: str, human_player_name: str) -> str:
+    def _prepare_prompt(players: List[BotPlayerDto], game_story: str, human_player_name: str) -> str:
         players_names_with_roles_and_stories = ""
         for player in players:
             player_info = f"Name: {player.name}\nRole: {player.role}\nStory: {player.backstory}\n\n"
@@ -153,8 +153,8 @@ class PlayerAssistantDecorator(RawAssistant):
     def __init__(self, assistant: Assistant, thread: Thread):
         super().__init__(assistant, thread)
 
-    def update_player_instruction(self, player: BotPlayer, game_story: str, other_players: List[BotPlayer],
-                                  human_player: HumanPlayer, dead_players_names_with_roles: str,
+    def update_player_instruction(self, player: BotPlayerDto, game_story: str, other_players: List[BotPlayerDto],
+                                  human_player: HumanPlayerDto, dead_players_names_with_roles: str,
                                   reply_language_instruction: str):
         new_instruction = self._prepare_prompt(
             player=player, game_story=game_story, other_players=other_players,
@@ -164,8 +164,8 @@ class PlayerAssistantDecorator(RawAssistant):
         super().update_instruction(new_instruction)
 
     @classmethod
-    def create_player(cls, player: BotPlayer, game_story: str, other_players: List[BotPlayer],
-                      human_player: HumanPlayer, reply_language_instruction: str) -> "PlayerAssistantDecorator":
+    def create_player(cls, player: BotPlayerDto, game_story: str, other_players: List[BotPlayerDto],
+                      human_player: HumanPlayerDto, reply_language_instruction: str) -> "PlayerAssistantDecorator":
         formatted_prompt = cls._prepare_prompt(
             player=player, game_story=game_story, other_players=other_players, human_player=human_player,
             dead_players_names_with_roles="Empty", reply_language_instruction=reply_language_instruction
@@ -185,7 +185,7 @@ class PlayerAssistantDecorator(RawAssistant):
         return cls(raw_assistant.assistant, raw_assistant.thread)
 
     @staticmethod
-    def _prepare_prompt(player: BotPlayer, game_story: str, other_players: List[BotPlayer], human_player: HumanPlayer,
+    def _prepare_prompt(player: BotPlayerDto, game_story: str, other_players: List[BotPlayerDto], human_player: HumanPlayerDto,
                         dead_players_names_with_roles: str, reply_language_instruction: str) -> str:
         other_player_names = set([op.name for op in other_players if op.name != player.name])
         other_player_names.add(human_player.name)
@@ -193,25 +193,25 @@ class PlayerAssistantDecorator(RawAssistant):
         if human_player.role != WerewolfRole.WEREWOLF:
             other_players_roles_but_werewolf.add(WerewolfRole.WEREWOLF.value)
 
-        def get_win_condition(p: BotPlayer):
+        def get_win_condition(p: BotPlayerDto):
             if p.role == WerewolfRole.WEREWOLF:
                 return "You win if the Werewolves are the majority of the remaining players."
             else:
                 return "You win if all the Werewolves are eliminated."
 
-        def get_ally_roles_as_str(p: BotPlayer) -> str:
+        def get_ally_roles_as_str(p: BotPlayerDto) -> str:
             if p.role == WerewolfRole.WEREWOLF:
                 return WerewolfRole.WEREWOLF.value
             else:
                 return ', '.join(other_players_roles_but_werewolf)
 
-        def get_enemy_roles_as_str(p: BotPlayer) -> str:
+        def get_enemy_roles_as_str(p: BotPlayerDto) -> str:
             if p.role == WerewolfRole.WEREWOLF:
                 return ', '.join(other_players_roles_but_werewolf)
             else:
                 return WerewolfRole.WEREWOLF.value
 
-        def get_known_allies_as_str(p: BotPlayer) -> str:
+        def get_known_allies_as_str(p: BotPlayerDto) -> str:
             if p.role == WerewolfRole.WEREWOLF:
                 other_wolf_names = [op.name for op in other_players if op.role == WerewolfRole.WEREWOLF]
                 if human_player == WerewolfRole.WEREWOLF:

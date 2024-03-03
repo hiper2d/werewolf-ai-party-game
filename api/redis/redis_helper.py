@@ -2,7 +2,7 @@ import os
 import time
 from typing import Optional, List, Tuple
 from redis import Redis
-from api.models import Game
+from api.models import GameDto
 import logging
 
 logger = logging.getLogger('my_application')
@@ -17,7 +17,7 @@ def connect_to_redis() -> Redis:
         logger.error("Failed to connect to Redis: %s", e)
 
 
-def save_game_to_redis(r: Redis, game: Game):
+def save_game_to_redis(r: Redis, game: GameDto):
     game_json = game.model_dump_json()
     timestamp = time.time()
 
@@ -41,7 +41,7 @@ def save_game_to_redis(r: Redis, game: Game):
         logger.warning(f"Failed to save game data for ID {game.id}")
 
 
-def delete_game_from_redis(r: Redis, game: Game):
+def delete_game_from_redis(r: Redis, game: GameDto):
     deleted = r.delete(game.id)
     if deleted:
         logger.debug(f"Game ID {game.id} deleted successfully from Redis")
@@ -55,17 +55,17 @@ def delete_game_from_redis(r: Redis, game: Game):
         logger.warning(f"Failed to remove game ID {game.id} from sorted set")
 
 
-def load_game_from_redis(r: Redis, game_id: str) -> Optional[Game]:
+def load_game_from_redis(r: Redis, game_id: str) -> Optional[GameDto]:
     game_json = r.get(game_id)
     if game_json:
         logger.debug(f"Game with id {game_id} found in Redis")
-        return Game.model_validate_json(game_json.decode('utf-8'))
+        return GameDto.model_validate_json(game_json.decode('utf-8'))
     else:
         logger.warning(f"Game with id {game_id} not found in Redis")
         return None
 
 
-def read_newest_game_from_redis(r: Redis) -> Optional[Game]:
+def read_newest_game_from_redis(r: Redis) -> Optional[GameDto]:
     try:
         # Get the ID of the newest game from the sorted set, using ZREVRANGE to get the last item
         newest_game_id = r.zrevrange('games', 0, 0)
@@ -80,7 +80,7 @@ def read_newest_game_from_redis(r: Redis) -> Optional[Game]:
         game_json = r.get(newest_game_id)
         if game_json:
             logger.debug(f"Game with id {newest_game_id} found in Redis")
-            return Game.model_validate_json(game_json.decode('utf-8'))
+            return GameDto.model_validate_json(game_json.decode('utf-8'))
         else:
             logger.warning(f"Game with id {newest_game_id} not found in Redis")
             return None

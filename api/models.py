@@ -1,3 +1,5 @@
+import time
+import uuid
 from enum import Enum
 
 from pydantic import BaseModel
@@ -28,38 +30,68 @@ role_motivations = {
     are their main weapons in the quest for safety and order."
 }
 
+role_alies = {
+    WerewolfRole.WEREWOLF: [WerewolfRole.WEREWOLF],
+    WerewolfRole.DOCTOR: [WerewolfRole.VILLAGER, WerewolfRole.DETECTIVE],
+    WerewolfRole.DETECTIVE: [WerewolfRole.VILLAGER, WerewolfRole.DOCTOR],
+    WerewolfRole.VILLAGER: [WerewolfRole.DOCTOR, WerewolfRole.DETECTIVE]
+}
 
-class HumanPlayer(BaseModel):
+role_enemies = {
+    WerewolfRole.WEREWOLF: [WerewolfRole.DOCTOR, WerewolfRole.DETECTIVE, WerewolfRole.VILLAGER],
+    WerewolfRole.DOCTOR: [WerewolfRole.WEREWOLF],
+    WerewolfRole.DETECTIVE: [WerewolfRole.WEREWOLF],
+    WerewolfRole.VILLAGER: [WerewolfRole.WEREWOLF]
+}
+
+
+class HumanPlayerDto(BaseModel):
+    id: str = str(uuid.uuid4())
     name: str
     role: WerewolfRole
 
 
-class BotPlayer(BaseModel):
+class BotPlayerDto(BaseModel):
+    id: str = (uuid.uuid4())
     name: str
-    assistant_id: str
-    thread_id: str
     role: WerewolfRole
     backstory: str
     role_motivation: str
     temperament: str
+    known_ally_names: str = None # fixme: add to dao
+    other_player_names: str = None # fixme: add to dao
     is_alive: bool = True
     current_offset: int = -1
+    ts: int = time.time_ns()
 
 
-class Game(BaseModel):
-    id: str
+class GameDto(BaseModel):
+    id: str = (uuid.uuid4())
     story: str
-    # arbiter_assistant_id: str
-    # arbiter_thread_id: str
-    # bot_players: dict[str, BotPlayer]
-    # human_player: HumanPlayer
-    player_ids: list[str]
+    bot_player_ids: list[str]
+    dead_player_names_with_roles: str
+    human_player: HumanPlayerDto
+    reply_language_instruction: str
     current_offset: int = 0
     current_day: int = 1
     user_moves_day_counter: int = 0
     user_moves_total_counter: int = 0
     is_active: bool = True
-    reply_language_instruction: str
+    ts: int = time.time_ns()
+
+
+class MessageRole(Enum):
+    USER = "user"
+    ASSISTANT = "assistant"
+    SYSTEM = "system"
+
+
+class MessageDto(BaseModel):
+    recipient: str
+    author: str
+    msg: str
+    role: MessageRole
+    ts: int = time.time_ns()
 
 
 class ArbiterReply(BaseModel):

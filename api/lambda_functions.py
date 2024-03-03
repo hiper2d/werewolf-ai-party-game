@@ -9,19 +9,28 @@ from typing import List, Tuple, Optional
 
 from dotenv import load_dotenv, find_dotenv
 
-from api.ai.actions.role.role_dictionary import ROLE_DICTIONARY
-from api.ai.assistant_prompts import GAME_MASTER_VOTING_FIRST_ROUND_COMMAND, GAME_MASTER_VOTING_FIRST_ROUND_RESULT, \
+from ai.agents.player_agent import BotPlayerAgent
+from ai.prompts.assistant_prompts import GAME_MASTER_VOTING_FIRST_ROUND_COMMAND, GAME_MASTER_VOTING_FIRST_ROUND_RESULT, \
     GAME_MASTER_VOTING_FIRST_ROUND_DEFENCE_COMMAND, GAME_MASTER_VOTING_SECOND_ROUND_COMMAND, \
     GAME_MASTER_VOTING_SECOND_ROUND_RESULT
+from api.ai.actions.role.role_dictionary import ROLE_DICTIONARY
 from api.ai.assistants import ArbiterAssistantDecorator, PlayerAssistantDecorator, RawAssistant
-from api.ai.text_generators import generate_scene_and_players, generate_human_player
-from api.models import Game, ArbiterReply, VotingResponse, WerewolfRole, HumanPlayer, BotPlayer
+from api.ai.text_generators import generate_scene_and_players
+from api.models import GameDto, ArbiterReply, VotingResponse, WerewolfRole, HumanPlayerDto, BotPlayerDto, MessageDto, \
+    MessageRole
 from api.redis.redis_helper import connect_to_redis, save_game_to_redis, load_game_from_redis, \
     add_message_to_game_history_redis_list, delete_game_history_redis_list, read_messages_from_game_history_redis_list, \
     delete_game_from_redis, read_newest_game_from_redis
 from api.utils import get_top_items_within_range
+from dynamodb.bot_player_dao import BotPlayerDao
+from dynamodb.dynamo_helper import get_dynamo_resource
+from dynamodb.game_dao import GameDao
+from dynamodb.message_dao import MessageDao
 
 NO_NEW_MESSAGES = 'no new messages'
+NO_ELIMINATED_PLAYERS = 'no eliminated players yet'
+NO_ALIES = "you don't know any alies"
+RECIPIENT_ALL = 'all'
 
 
 def _setup_logger(log_level=logging.DEBUG):
@@ -39,7 +48,7 @@ def _setup_logger(log_level=logging.DEBUG):
     file_handler.setLevel(logging.INFO)
 
     # Create formatter and add it to the handlers
-    console_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    console_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(filename)s - %(lineno)d - %(message)s')
     file_formatter = logging.Formatter('[%(asctime)s] %(message)s', datefmt='%H:%M:%S')
     console_handler.setFormatter(console_formatter)
     file_handler.setFormatter(file_formatter)
@@ -51,84 +60,101 @@ def _setup_logger(log_level=logging.DEBUG):
     return logger
 
 
+load_dotenv(find_dotenv())
 logger = _setup_logger(log_level=logging.DEBUG)
+dynamo_resource = get_dynamo_resource()
 
+game_dao = GameDao(dyn_resource=dynamo_resource)
+bot_player_dao = BotPlayerDao(dyn_resource=dynamo_resource)
+message_dao = MessageDao(dyn_resource=dynamo_resource)
 
 def init_game(human_player_name: str, theme: str, reply_language_instruction: str = '') -> Tuple[str, WerewolfRole]:
     logger.info("*** Starting new game! ***\n")
-    load_dotenv(find_dotenv())
 
     game_scene, human_player_role, bot_players = generate_scene_and_players(
         6, 2, [WerewolfRole.DOCTOR, WerewolfRole.DETECTIVE],
         theme=theme, human_player_name=human_player_name
     )
     logger.info("Game Scene: %s\n", game_scene)
-    human_player: HumanPlayer = generate_human_player(name=human_player_name, role=human_player_role)
+    human_player: HumanPlayerDto = HumanPlayerDto(name=human_player_name, role=human_player_role)
 
-    for current_player_name, current_player in bot_players.items():
-        other_players = [bot_player for bot_player in bot_players.values() if bot_player.name != current_player_name]
-        new_player_assistant = PlayerAssistantDecorator.create_player(
-            player=current_player,
-            game_story=game_scene,
-            other_players=other_players,
-            human_player=human_player,
-            reply_language_instruction=reply_language_instruction
-        )
-        current_player.assistant_id = new_player_assistant.assistant.id
-        current_player.thread_id = new_player_assistant.thread.id
-
-    new_arbiter = ArbiterAssistantDecorator.create_arbiter(
-        players=list(bot_players.values()), game_story=game_scene, human_player_name=human_player_name)
-
-    game = Game(
+    game = GameDto(
         id=str(uuid.uuid4()),
         story=game_scene,
-        bot_players=bot_players,
+        bot_player_ids=[player.id for player in bot_players],
         human_player=human_player,
-        arbiter_assistant_id=new_arbiter.assistant.id,
-        arbiter_thread_id=new_arbiter.thread.id,
+        dead_player_names_with_roles='no eliminated players yet',
         reply_language_instruction=reply_language_instruction
     )
+    game_dao.create_or_update_dto(game)
 
-    r = connect_to_redis()
-    save_game_to_redis(r, game)
+    def get_alies_names(current_player_id: str):
+        if current_bot_player.role == WerewolfRole.WEREWOLF:
+            alies = [bot for bot in bot_players if bot.role == WerewolfRole.WEREWOLF and bot.id != current_player_id]
+            return ','.join([f"{bot.name} (role: {bot.role.value})" for bot in alies]) if alies else NO_ALIES
+        else:
+            return NO_ALIES
+
+    def get_other_player_names(current_bot_player_id: str):
+        names = [bot.name for bot in bot_players if bot.id != current_bot_player_id]
+        names.append(human_player.name)
+        return ','.join(names)
+
+
+    for current_bot_player in bot_players:
+        current_bot_player.known_ally_names=get_alies_names(current_bot_player.id)
+        current_bot_player.other_player_names=get_other_player_names(current_bot_player.id)
+        bot_player_dao.create_or_update_dto(current_bot_player)
+
+    if not message_dao.exists_table():
+        message_dao.create_table()
     return game.id, human_player.role
 
 
-# This function for local testing only. When deployed to AWS Lambda, it should call other lambdas for each player
-# rather than using threads
-# todo: change the welcoming logic:
-# randomly pick the order in which players will introduce themselves
-# ask players to introduce themselves in the order, and make them hear what other players said before them
-def get_welcome_messages_from_all_players_async(game_id: str):
+def get_welcome_messages_from_all_players(game_id: str):
     logger.info('Players introduction:')
     load_dotenv(find_dotenv())
 
-    r = connect_to_redis()
-    game: Game = load_game_from_redis(r, game_id)
-    if not game or not game.bot_players:
-        logger.debug(f"Game with id {game_id} not found in Redis")
+    game = game_dao.get_by_id(game_id)
+    if not game or not game.bot_player_ids:
+        logger.debug(f"Game with id {game_id} not found in Redis or it doesn't have bots")
         return
 
-    def get_player_introduction(player):
-        player_assistant = PlayerAssistantDecorator.load_player_by_assistant_id_with_new_thread(
-            assistant_id=player.assistant_id, old_thread_id=player.thread_id
+    introductions = []
+    for bot_player_id in game.bot_player_ids:
+        bot_player = bot_player_dao.get_by_id(bot_player_id)
+        if not bot_player:
+            logger.debug(f"Bot player with id {bot_player_id} not found in Redis")
+            continue
+        bot_player_agent = BotPlayerAgent(me=bot_player, game=game)
+        instruction_message: MessageDto = bot_player_agent.create_instruction_message()
+
+        messages_to_all: List[MessageDto] = message_dao.get_last_records(recipient=RECIPIENT_ALL)
+        messages_to_bot_player = message_dao.get_last_records(recipient=bot_player.id)
+        messages_to_all.extend(messages_to_bot_player) # merging messages from common chat and bot personal commands
+        messages_to_all.sort(key=lambda x: x.ts, reverse=True)
+
+        command_message = MessageDto(
+            recipient=bot_player.id, author='Game Master',
+            msg="Please introduce yourself to the other players.", role=MessageRole.USER
         )
-        answer = player_assistant.ask("Game Master: Please introduce yourself to the other players.")
-        return f"{player.name}: {answer}"
+        message_dao.save_dto(command_message)
 
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        futures = [executor.submit(get_player_introduction, player) for player in game.bot_players.values()]
-        all_introductions = [future.result() for future in concurrent.futures.as_completed(futures)]
+        answer = bot_player_agent.ask([instruction_message, *messages_to_all, command_message])
+        logger.info(f"{bot_player.name}: {answer}")
+        answer_message = MessageDto(
+            recipient=RECIPIENT_ALL, author=bot_player.id,
+            msg=answer, role=MessageRole.ASSISTANT
+        )
+        message_dao.save_dto(answer_message)
+        introductions.append({"name": bot_player.name, "introduction": answer})
 
-    add_message_to_game_history_redis_list(r, game_id, all_introductions)
-    logger.info("*** Day 1 begins! ***")
-    return all_introductions
+    return introductions
 
 
 def ask_everybody_to_introduce_themself_in_order(game_id: str):
     r = connect_to_redis()
-    game: Game = load_game_from_redis(r, game_id)
+    game: GameDto = load_game_from_redis(r, game_id)
 
     for bot_player in game.bot_players.values():
         new_messages_concatenated, _ = _get_new_messages_as_str(r, game_id, bot_player.current_offset)
@@ -148,7 +174,7 @@ def ask_everybody_to_introduce_themself_in_order(game_id: str):
 def talk_to_all(game_id: str, user_message: str):
     load_dotenv(find_dotenv())
     r = connect_to_redis()
-    game: Game = load_game_from_redis(r, game_id)
+    game: GameDto = load_game_from_redis(r, game_id)
     logger.info('%s: %s', game.human_player.name, user_message)
 
     arbiter = ArbiterAssistantDecorator.load_arbiter_by_assistant_id_and_thread_id(
@@ -170,7 +196,7 @@ def talk_to_all(game_id: str, user_message: str):
 
 def talk_to_certain_player(game_id: str, name: str):
     r = connect_to_redis()
-    game: Game = load_game_from_redis(r, game_id)
+    game: GameDto = load_game_from_redis(r, game_id)
     if name not in game.bot_players:
         return None
     bot_player = game.bot_players[name]
@@ -192,7 +218,7 @@ def start_elimination_vote_round_one_async(game_id: str, user_vote: str) -> List
     logger.info("*** Time to vote! ***")
     load_dotenv(find_dotenv())
     r = connect_to_redis()
-    game: Game = load_game_from_redis(r, game_id)
+    game: GameDto = load_game_from_redis(r, game_id)
 
     names = Counter([user_vote])
 
@@ -229,7 +255,7 @@ def start_elimination_vote_round_one_async(game_id: str, user_vote: str) -> List
 
 def ask_bot_player_to_speak_for_themselves_after_first_round_voting(game_id: str, name: str) -> str:
     r = connect_to_redis()
-    game: Game = load_game_from_redis(r, game_id)
+    game: GameDto = load_game_from_redis(r, game_id)
     if name not in game.bot_players:
         return None
     player = game.bot_players[name]
@@ -251,7 +277,7 @@ def ask_bot_player_to_speak_for_themselves_after_first_round_voting(game_id: str
 
 def let_human_player_to_speak_for_themselves(game_id: str, user_message: str) -> None:
     r = connect_to_redis()
-    game: Game = load_game_from_redis(r, game_id)
+    game: GameDto = load_game_from_redis(r, game_id)
     add_message_to_game_history_redis_list(r, game_id, [user_message])
     logger.info("%s: %s", game.human_player.name, user_message)
 
@@ -260,7 +286,7 @@ def start_elimination_vote_round_two(game_id: str, leaders: List[str], user_vote
     logger.info("*** Time to vote again! ***")
     load_dotenv(find_dotenv())
     r = connect_to_redis()
-    game: Game = load_game_from_redis(r, game_id)
+    game: GameDto = load_game_from_redis(r, game_id)
 
     names = Counter([user_vote])
     bot_assistants = {}
@@ -336,7 +362,7 @@ def start_game_night(game_id, user_action: str = None):
     logger.info("*** Night begins! ***")
     load_dotenv(find_dotenv())
     r = connect_to_redis()
-    game: Game = load_game_from_redis(r, game_id)
+    game: GameDto = load_game_from_redis(r, game_id)
 
     alive_bot_players = [bot_player for bot_player in game.bot_players.values() if bot_player.is_alive]
     role_to_player_map = defaultdict(list)
@@ -346,7 +372,7 @@ def start_game_night(game_id, user_action: str = None):
         role_to_player_map[game.human_player.role].append(game.human_player)
     print([f"{role}: {[p.name for p in players]}" for role, players in role_to_player_map.items()])
 
-    def get_random_role_group_member(role: WerewolfRole) -> Optional[BotPlayer]:
+    def get_random_role_group_member(role: WerewolfRole) -> Optional[BotPlayerDto]:
         if role in role_to_player_map:
             return random.choice(role_to_player_map[role]) if len(role_to_player_map[role]) > 1 else role_to_player_map[role][0]
         else:
@@ -375,7 +401,7 @@ def start_game_night(game_id, user_action: str = None):
 def delete_assistants_from_openai_and_game_from_redis(game_id: str):
     load_dotenv(find_dotenv())
     r = connect_to_redis()
-    game: Game = load_game_from_redis(r, game_id)
+    game: GameDto = load_game_from_redis(r, game_id)
 
     arbiter = ArbiterAssistantDecorator.load_arbiter_by_assistant_id_and_thread_id(
         assistant_id=game.arbiter_assistant_id, thread_id=game.arbiter_thread_id
@@ -393,6 +419,11 @@ def delete_assistants_from_openai_and_game_from_redis(game_id: str):
     delete_game_history_redis_list(r, game_id)
     delete_game_from_redis(r, game)
 
+
+def cleanup_dynamodb():
+    bot_player_dao.delete_table()
+    message_dao.delete_table()
+    game_dao.delete_table()
 
 def delete_assistants_from_openai_by_name(name: str):
     load_dotenv(find_dotenv())

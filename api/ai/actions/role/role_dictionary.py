@@ -1,7 +1,7 @@
 from abc import abstractmethod, ABC
 from typing import List
 
-from api.ai.assistant_prompts import GAME_MASTER_NIGHT_WEREWOLF_COMMAND, GAME_MASTER_NIGHT_DETECTIVE_COMMAND, \
+from ai.prompts.assistant_prompts import GAME_MASTER_NIGHT_WEREWOLF_COMMAND, GAME_MASTER_NIGHT_DETECTIVE_COMMAND, \
     GAME_MASTER_NIGHT_DOCTOR_COMMAND
 from api.models import WerewolfRole
 

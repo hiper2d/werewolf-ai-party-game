@@ -1,9 +1,8 @@
+import logging
 from abc import ABC, abstractmethod
 from typing import List
 
 from pydantic import BaseModel
-
-from models import Game
 
 
 class GenericDao(ABC, BaseModel):
@@ -11,6 +10,18 @@ class GenericDao(ABC, BaseModel):
     key_schema: List[object]
     attribute_definitions: List[object]
     table_name: str
+
+    @property
+    def logger(self) -> logging.Logger:
+        return logging.getLogger('my_application')
+
+    @abstractmethod
+    def convert_dto_to_record(self, dto) -> dict:
+        pass
+
+    @abstractmethod
+    def convert_record_to_dto(self, dto):
+        pass
 
     def create_table(self):
         try:
@@ -25,9 +36,9 @@ class GenericDao(ABC, BaseModel):
             )
             resp_metadata = result['ResponseMetadata']
             table_desc = result['TableDescription']
-            print(f"Created {self.table_name} table...")
+            self.logger.debug(f"Created {self.table_name} table.")
         except Exception as e:
-            print(e)
+            self.logger.error(e)
 
     def delete_table(self):
         try:
@@ -35,9 +46,9 @@ class GenericDao(ABC, BaseModel):
                 TableName=self.table_name
             )
 
-            print(f"Deleted {self.table_name} table...")
+            self.logger.debug(f"Deleted {self.table_name} table.")
         except Exception as e:
-            print(e)
+            self.logger.error(e)
 
     def exists_table(self):
         try:
@@ -47,7 +58,7 @@ class GenericDao(ABC, BaseModel):
             if e.response['Error']['Code'] == 'ResourceNotFoundException':
                 return False
             else:
-                print(e)
+                self.logger.error(e)
                 return False
 
     def save_dto(self, dto):
@@ -56,8 +67,9 @@ class GenericDao(ABC, BaseModel):
                 TableName=self.table_name,
                 Item=self.convert_dto_to_record(dto)
             )
+            self.logger.debug(f"Created/Updated record in {self.table_name} table.")
         except Exception as e:
-            print(e)
+            self.logger.error(e)
 
     def remove_dto(self, dto):
         try:
@@ -65,14 +77,26 @@ class GenericDao(ABC, BaseModel):
                 TableName=self.table_name,
                 Key=self.convert_dto_to_key(dto)
             )
+            self.logger.debug(f"Deleted {dto.id} record from {self.table_name} table.")
         except Exception as e:
-            print(e)
+            self.logger.error(e)
 
-    @abstractmethod
-    def convert_dto_to_record(self, dto):
-        pass
+    def get_by_id(self, id: str):
+        try:
+            result: dict = self.dyn_resource.get_item(
+                TableName=self.table_name,
+                Key=self._convert_id_to_key(id)
+            )
+            self.logger.debug(f"Pulled {id} record from {self.table_name} table.")
+            return self.convert_record_to_dto(result['Item'])
+        except Exception as e:
+            self.logger.error(e)
 
-    @abstractmethod
-    def convert_dto_to_key(self, dto):
-        pass
+    @staticmethod
+    def _convert_id_to_key(id: str) -> dict:
+        return {
+            'id': {
+                'S': id,
+            }
+        }
 

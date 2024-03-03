@@ -6,6 +6,7 @@ from dotenv import load_dotenv, find_dotenv
 
 from dynamodb.dynamo_message import DynamoChatMessage, MessageRole
 from dynamodb.generic_dao import GenericDao
+from models import MessageDto
 
 
 class MessageDao(GenericDao):
@@ -39,29 +40,22 @@ class MessageDao(GenericDao):
             }
         }
 
-    # has no sense to this dto
-    def convert_dto_to_key(self, dto: DynamoChatMessage) -> dict:
-        return {
-            'recipient': {
-                'S': dto.to,
-            },
-            'ts': {
-                'N': str(dto.ts),
-            }
-        }
+    def convert_record_to_dto(self, dto) -> dict:
+        pass
+
     @staticmethod
-    def convert_records_to_dto_list(records: List[dict]) -> List[DynamoChatMessage]:
+    def convert_records_to_dto_list(records: List[dict]) -> List[MessageDto]:
         return [
-            DynamoChatMessage(
+            MessageDto(
                 author=record['author']['S'],
                 recipient=record['recipient']['S'],
                 ts=int(record['ts']['N']),
-                role=MessageRole(record['role']['S']),
+                role=MessageRole(record['role']['S']).value,
                 msg=record['msg']['S'],
             ) for record in records
         ]
 
-    def get_last_records(self, recipient: str, limit: int = 10) -> List[DynamoChatMessage]:
+    def get_last_records(self, recipient: str, limit: int = 10_000) -> List[MessageDto]:
         try:
             result: dict = self.dyn_resource.query(
                 TableName=self.table_name,
@@ -75,7 +69,7 @@ class MessageDao(GenericDao):
             )
             return self.convert_records_to_dto_list(result['Items'])
         except Exception as e:
-            print(e)
+            self.logger.error(e)
 
 
 if __name__ == "__main__":
@@ -89,7 +83,7 @@ if __name__ == "__main__":
     print(f"Table exists: {msg_dao.exists_table()}")
     msg_dao.create_table()
 
-    message1 = DynamoChatMessage(
+    message1 = MessageDto(
         recipient="1_1",
         role=MessageRole.SYSTEM,
         msg="hi",
@@ -97,7 +91,7 @@ if __name__ == "__main__":
         ts=time.time_ns()
     )
 
-    message2 = DynamoChatMessage(
+    message2 = MessageDto(
         recipient="1_1",
         role=MessageRole.USER,
         msg="hey",
@@ -105,7 +99,7 @@ if __name__ == "__main__":
         ts=time.time_ns()
     )
 
-    message3 = DynamoChatMessage(
+    message3 = MessageDto(
         recipient="1_2",
         role=MessageRole.USER,
         msg="hey",
