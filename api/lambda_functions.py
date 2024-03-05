@@ -165,7 +165,7 @@ def talk_to_all(game_id: str, user_message: str):
     instruction_message = gm_agent.create_instruction_message()
     history_messages = message_dao.get_last_records(
         recipient=f"{game_id}_{RECIPIENT_ALL}", limit=10
-    ) # read last 10 messages
+    )
 
     for history_message in history_messages:
         history_message.msg = f"{history_message.author_name}: {history_message.msg}"
@@ -177,13 +177,15 @@ def talk_to_all(game_id: str, user_message: str):
     game.user_moves_day_counter += 1
     arbiter_reply_json = json.loads(gm_reply)
     reply_obj: ArbiterReply = ArbiterReply(players_to_reply=arbiter_reply_json['players_to_reply'])
+
+    game_dao.create_or_update_dto(game)
     return reply_obj.players_to_reply
 
 
 def talk_to_certain_player(game_id: str, name: str):
     game = game_dao.get_by_id(game_id)
     if name not in game.bot_player_name_to_id:
-        logger.error("Player with name %s not found in the game", name)
+        logger.error("Player with name %s not found in the game or it is a human player", name)
         return None
     bot_player_id = game.bot_player_name_to_id[name]
     bot_player = bot_player_dao.get_by_id(bot_player_id)

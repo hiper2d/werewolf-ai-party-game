@@ -21,7 +21,7 @@ This information is crucial for understanding the dynamics and interactions with
 {players_names_with_roles_and_stories}
 [END OF PLAYERS NAMES AND ROLES]
 
-There is one more player with the {human_player_name} role. You should not include this player in your responses. \
+There is one more player with the {human_player_name} name. You should not include this player in your responses. \
 This player is unique and can make a turn whenever they want. But you should be aware that this player also \
 participates in the game.\
 
@@ -133,7 +133,10 @@ who have the same win conditions as you do. Try to kill enemies during vote phas
 Keep your goal in secret, nobody should know it.
 
 Reply with a plain text without any formatting. Don't use new lines, lists, or any other formatting. \
-Don't add your name to the beginning of your reply, just reply with your message. 
+Don't use markdown, only the plain text. Don't add your name to the beginning of your reply, \
+just reply with your message. For example:
+"Hello, I think we should vote for John. He is suspicious."
+ 
 {reply_language_instruction}"""
 
 GAME_MASTER_VOTING_FIRST_ROUND_COMMAND = """Game master: It's time to vote! Choose one player to eliminate. \

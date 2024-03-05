@@ -8,6 +8,7 @@ from api.lambda_functions import init_game, delete_assistants_from_openai_and_ga
     let_human_player_to_speak_for_themselves, start_game_night, \
     cleanup_dynamodb, get_welcome_messages_from_all_players
 
+GAME_ID = '6b274781-5ee8-460a-9913-54712a7bc924'
 
 class TestGameFunctions(unittest.TestCase):
     def test_init_game_and_welcome(self):
@@ -16,23 +17,23 @@ class TestGameFunctions(unittest.TestCase):
             theme='Hunger Games',
             # reply_language_instruction='Reply in russian to me but keep original names (in English). Отвечай на русском, но сохрани оригинальные имена на английском.'
         )
+        print(f"Game Id: {game_id}")
         print(f"Human Player Role: {human_player_role.value}")
         get_welcome_messages_from_all_players(game_id=game_id)  # second slow approach
 
     def test_get_welcome_messages_from_all_players(self):
-        get_welcome_messages_from_all_players(game_id='')
+        get_welcome_messages_from_all_players(game_id=GAME_ID)
 
     def test_talk_to_all(self):
-        game_id = 'd19c5d54-2af6-4970-9101-9071c1da6fe3'
         players_to_reply = talk_to_all(
-            game_id=game_id,
+            game_id=GAME_ID,
             user_message=
 """\
-Hi, I'm Peeta. I'm the baker's son. I'm from District 12. Is Katniss here? Oh boy, I'm so scared.
+Should we pick somebody to lynching?
 """
         )
         for player_name in players_to_reply:
-            talk_to_certain_player(game_id=game_id, name=player_name)
+            talk_to_certain_player(game_id=GAME_ID, name=player_name)
 
     def test_start_elimination_vote_round_one_async(self):
         game_id = get_latest_game().id
@@ -70,7 +71,6 @@ Hi, I'm Peeta. I'm the baker's son. I'm from District 12. Is Katniss here? Oh bo
 
     def test_cleanup_dynamodb(self):
         """Cleanup function. Drop all tables."""
-
         cleanup_dynamodb()
 
     def test_all_delete(self):

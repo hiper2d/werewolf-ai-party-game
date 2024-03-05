@@ -73,11 +73,12 @@ class MessageDao(GenericDao):
         except Exception as e:
             self.logger.error(e)
 
+
 if __name__ == '__main__':
     load_dotenv(find_dotenv())
     dynamo_resource = get_dynamo_resource()
     dao = MessageDao(dyn_resource=dynamo_resource)
-    game_id = 'd19c5d54-2af6-4970-9101-9071c1da6fe3'
+    game_id = '6b274781-5ee8-460a-9913-54712a7bc924'
     messages = dao.get_last_records(f"{game_id}_all")
     for message in messages:
         print(f"{message.author_name}: {message.msg}")
