@@ -199,12 +199,12 @@ def talk_to_certain_player(game_id: str, name: str):
 
     for message in messages_to_all:
         if message.author_id == bot_player.id:
-            message.role = MessageRole.SYSTEM # message from bot to itself should be SYSTEM
+            message.role = MessageRole.ASSISTANT # message from bot to itself should be ASSISTANT
         else:
+            message.role = MessageRole.USER # other messages are from outside, i.e. from USER
             message.msg = f"{message.author_name}: {message.msg}"
 
     answer = bot_player_agent.ask([instruction_message, *messages_to_all])
-    logger.info(f"{bot_player.name}: {answer}")
     answer_message = MessageDto(
         recipient=f"{game_id}_{RECIPIENT_ALL}", author_id=bot_player.id, author_name=bot_player.name,
         msg=answer, role=MessageRole.USER

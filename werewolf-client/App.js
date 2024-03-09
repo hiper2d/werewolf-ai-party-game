@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, Image, TextInput, Pressable, ScrollView, StyleSheet, SafeAreaView, Keyboard } from 'react-native';
+
+import { View, Text, Image, TextInput, Pressable, ScrollView, StyleSheet, SafeAreaView, Keyboard, Modal, Button } from 'react-native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome'
 import { faUser } from '@fortawesome/free-solid-svg-icons/faUser'
 const logoIcon = require('./assets/logo.png');

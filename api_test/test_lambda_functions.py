@@ -10,6 +10,7 @@ from api.lambda_functions import init_game, delete_assistants_from_openai_and_ga
 
 GAME_ID = '6b274781-5ee8-460a-9913-54712a7bc924'
 
+
 class TestGameFunctions(unittest.TestCase):
     def test_init_game_and_welcome(self):
         game_id, human_player_role = init_game(
@@ -29,7 +30,7 @@ class TestGameFunctions(unittest.TestCase):
             game_id=GAME_ID,
             user_message=
 """\
-Should we pick somebody to lynching?
+Why Katniss is so silent? What are you hiding Katniss?
 """
         )
         for player_name in players_to_reply:

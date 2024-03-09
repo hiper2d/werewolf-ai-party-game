@@ -1,3 +1,4 @@
+from ai.agents.claude_agent import ClaudeAgent
 from ai.agents.groq_agent import GroqAgent
 from ai.agents.openai_agent import OpenAiAgent
 from ai.prompts.assistant_prompts import ARBITER_PROMPT
@@ -6,7 +7,7 @@ from models import GameDto, MessageDto, \
     MessageRole
 
 
-class GmAgent(OpenAiAgent):
+class GmAgent(ClaudeAgent):
     def __init__(self, game: GameDto):
         self.game = game
         super().__init__("Game Master")

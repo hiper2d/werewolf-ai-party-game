@@ -4,7 +4,9 @@ import random
 import uuid
 from typing import List, Tuple
 
+from ai.agents.claude_agent import ClaudeAgent
 from ai.agents.groq_agent import GroqAgent
+from ai.agents.openai_agent import OpenAiAgent
 from ai.prompts.text_generator_prompts import GAME_GENERATION_PROMPT
 from api.models import BotPlayerDto, WerewolfRole, role_motivations
 
@@ -21,9 +23,9 @@ def generate_scene_and_players(num_players, wolf_count: int, additional_roles: L
 
     instruction = GAME_GENERATION_PROMPT.format(theme=theme, num_players=num_players-1,
                                                 human_player_name=human_player_name)
-    ai_agent = GroqAgent(name="Game Master")
+    ai_agent = ClaudeAgent(name="Game Master")
     response = ai_agent.ask_wth_text(instruction)
-    logger.debug(f"Received response from OpenAI: {response}")
+    logger.debug(f"Received response from AI: {response}")
 
     try:
         response_json = json.loads(response)

@@ -66,7 +66,7 @@ class MessageDao(GenericDao):
                 ExpressionAttributeValues={
                     ':recipient': {'S': recipient}
                 },
-                ScanIndexForward=False,
+                ScanIndexForward=True,
                 Limit=limit
             )
             return self.convert_records_to_dto_list(result['Items'])

@@ -1,3 +1,4 @@
+from ai.agents.claude_agent import ClaudeAgent
 from ai.agents.openai_agent import OpenAiAgent
 from ai.prompts.assistant_prompts import PLAYER_PROMPT
 from constants import GM_ID, GM_NAME
