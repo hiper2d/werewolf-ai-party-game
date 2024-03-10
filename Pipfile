@@ -13,6 +13,7 @@ redis = "*"
 
 [dev-packages]
 fastapi = "*"
+fastapi-cors = "*"
 uvicorn = {extras = ["standard"], version = "*"}
 
 [requires]

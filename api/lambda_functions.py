@@ -64,7 +64,8 @@ game_dao = GameDao(dyn_resource=dynamo_resource)
 bot_player_dao = BotPlayerDao(dyn_resource=dynamo_resource)
 message_dao = MessageDao(dyn_resource=dynamo_resource)
 
-def init_game(human_player_name: str, theme: str, reply_language_instruction: str = '') -> Tuple[str, WerewolfRole]:
+def init_game(human_player_name: str, theme: str, reply_language_instruction: str = '') \
+        -> Tuple[str, WerewolfRole, List[str], str]:
     logger.info("*** Starting new game! ***\n")
 
     game_scene, human_player_role, bot_players = generate_scene_and_players(
@@ -106,7 +107,7 @@ def init_game(human_player_name: str, theme: str, reply_language_instruction: st
     if not message_dao.exists_table():
         message_dao.create_table()
 
-    return game.id, human_player.role
+    return game.id, human_player.role, [bot.name for bot in bot_players], game_scene
 
 
 def get_welcome_messages_from_all_players(game_id: str):

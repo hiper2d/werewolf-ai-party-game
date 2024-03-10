@@ -1,16 +1,38 @@
-import React, { useState, useRef } from 'react';
+import React, {useRef, useState} from 'react';
+import {
+  ActivityIndicator,
+  Image,
+  Keyboard,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View
+} from 'react-native';
+import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
+import {faUser} from '@fortawesome/free-solid-svg-icons/faUser';
+import {faFish} from '@fortawesome/free-solid-svg-icons/faFish';
 
-import { View, Text, Image, TextInput, Pressable, ScrollView, StyleSheet, SafeAreaView, Keyboard, Modal, Button } from 'react-native';
-import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome'
-import { faUser } from '@fortawesome/free-solid-svg-icons/faUser'
 const logoIcon = require('./assets/logo.png');
+const BACKEND_URL = 'http://127.0.0.1:8000'
 
 const SplitScreenChat = () => {
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const scrollViewRef = useRef(null);
+  const [participants, setParticipants] = useState([]);
+  const [tooltipStyle, setTooltipStyle] = useState(styles.gameMasterTooltip);
 
-  const participants = ['Cersei_Lannister', 'General_Zod', 'Harley_Quinn', 'Joker', 'Lex_Luthor', 'Thanos'];
+  const [isLoading, setIsLoading] = useState(false);
+
+  const Loader = () => (
+      <View style={styles.loaderContainer}>
+        <ActivityIndicator size="large" color="#61dafb" />
+        <Text style={styles.loaderText}>Loading...</Text>
+      </View>
+  );
 
   const sendMessage = () => {
     if (inputText.trim()) {
@@ -18,8 +40,9 @@ const SplitScreenChat = () => {
         id: Math.random().toString(36).substring(7),
         text: inputText.trim(),
         timestamp: new Date(),
+        isUserMessage: true, // Add this flag to identify user messages
       };
-      setMessages(previousMessages => [...previousMessages, newMessage]);
+      setMessages((previousMessages) => [...previousMessages, newMessage]);
       setInputText('');
       Keyboard.dismiss();
     }
@@ -31,6 +54,47 @@ const SplitScreenChat = () => {
     // Here you can add your navigation or any other interaction
   };
 
+  const handleMenuPress = (menuItem) => {
+    if (menuItem === 'New Game') {
+      // Send a request to the backend for the JSON data
+      fetchNewGameData();
+    } else if (menuItem === 'All Games') {
+      // Handle navigation to the All Games screen
+      console.log('Navigate to All Games screen');
+    }
+  };
+
+  const fetchNewGameData = async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch(`${BACKEND_URL}/init_game`);
+      const data = await response.json();
+      console.log('New Game data:', data);
+      // Update the participants state with the received player names
+      setParticipants(data.player_names);
+
+      // Extract the story and human player role from the response
+      const story = data.story;
+      const humanPlayerRole = data.human_player_role;
+
+      // Add the story and role as messages to the chat
+      setMessages((previousMessages) => [
+        ...previousMessages,
+        { id: Math.random().toString(36).substring(7), text: story, timestamp: new Date(), isUserMessage: false },
+        {
+          id: Math.random().toString(36).substring(7),
+          text: `Your role is ${humanPlayerRole}`,
+          timestamp: new Date(),
+          isUserMessage: false,
+        },
+      ]);
+    } catch (error) {
+      console.error('Error fetching New Game data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.menuBar}>
@@ -38,9 +102,31 @@ const SplitScreenChat = () => {
             <Image source={logoIcon} style={styles.logoIcon} />
             <Text style={styles.headerTitle}>AI Werewolf</Text>
           </View>
-          <Pressable onPress={() => handleIconPress('ellipsis-v')}>
-            <FontAwesomeIcon icon={ faUser } size={24} color="#fff" />
-          </Pressable>
+          <View style={styles.menuItems}>
+            <Pressable
+                onPress={() => handleMenuPress('All Games')}
+                style={({ hovered, pressed }) => [
+                  styles.menuItem,
+                  hovered && styles.menuItemHover,
+                  pressed && styles.menuItemPressed,
+                ]}
+            >
+              <Text style={styles.menuItem}>All Games</Text>
+            </Pressable>
+            <Pressable
+                onPress={() => handleMenuPress('New Game')}
+                style={({ hovered, pressed }) => [
+                  styles.menuItem,
+                  hovered && styles.menuItemHover,
+                  pressed && styles.menuItemPressed,
+                ]}
+            >
+              <Text style={styles.menuItem}>New Game</Text>
+            </Pressable>
+            <Pressable onPress={() => handleIconPress('ellipsis-v')}>
+              <FontAwesomeIcon icon={faUser} size={24} color="#fff" />
+            </Pressable>
+          </View>
         </View>
         <View style={styles.container}>
           <View style={styles.participantsList}>
@@ -52,14 +138,23 @@ const SplitScreenChat = () => {
             ))}
           </View>
           <View style={styles.chatContainer}>
-            <ScrollView
-                style={styles.chatMessages}
-                ref={scrollViewRef}
-                onContentSizeChange={() => scrollViewRef.current.scrollToEnd({ animated: true })}
-            >
-              {messages.map(message => (
-                  <View key={message.id} style={styles.messageBubble}>
-                    <Text style={styles.messageText}>{message.text}</Text>
+            <ScrollView style={styles.chatMessages} ref={scrollViewRef} onContentSizeChange={() => scrollViewRef.current.scrollToEnd({ animated: true })}>
+              {messages.map((message) => (
+                  <View key={message.id} style={[styles.messageContainer, message.isUserMessage && styles.userMessageContainer]}>
+                    {!message.isUserMessage && (
+                        <View style={styles.iconContainer}>
+                          <FontAwesomeIcon icon={faFish} style={styles.gameMasterIcon} />
+                          <Text style={styles.gameMasterTooltip}>Game Master</Text>
+                        </View>
+                    )}
+                    <View style={[styles.messageBubble, message.isUserMessage && styles.userMessageBubble]}>
+                      <Text style={styles.messageText}>{message.text}</Text>
+                    </View>
+                    {message.isUserMessage && (
+                        <View style={styles.userIconContainer}>
+                          <FontAwesomeIcon icon={faFish} style={styles.userIcon} />
+                        </View>
+                    )}
                   </View>
               ))}
             </ScrollView>
@@ -82,6 +177,7 @@ const SplitScreenChat = () => {
             </View>
           </View>
         </View>
+        {isLoading && <Loader />}
       </SafeAreaView>
   );
 };
@@ -98,6 +194,24 @@ const styles = StyleSheet.create({
     padding: 10,
     backgroundColor: '#21252b', // Slightly lighter dark shade for the menu bar
     boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)', // x-offset, y-offset, blur-radius, color
+  },
+  menuItems: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  menuItem: {
+    color: '#fff',
+    fontSize: 16,
+    marginRight: 20,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 5,
+  },
+  menuItemHover: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  menuItemPressed: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
   headerTitle: {
     color: '#61dafb', // React blue color
@@ -132,11 +246,38 @@ const styles = StyleSheet.create({
   chatMessages: {
     flex: 1,
   },
+  messageContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 5,
+  },
+  iconContainer: {
+    position: 'relative',
+    marginRight: 10,
+  },
+  gameMasterIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#61dafb',
+    padding: 5,
+  },
+  gameMasterTooltip: {
+    position: 'absolute',
+    top: -25,
+    left: -10,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    color: '#fff',
+    padding: 5,
+    borderRadius: 5,
+    fontSize: 12,
+    opacity: 0,
+  },
   messageBubble: {
     backgroundColor: '#333',
     padding: 10,
     borderRadius: 5,
-    marginVertical: 5,
+    maxWidth: '80%',
   },
   messageText: {
     color: '#fff',
@@ -170,7 +311,40 @@ const styles = StyleSheet.create({
   logoIcon: {
     width: 60,
     height: 60,
-  }
+  },
+  loaderContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  loaderText: {
+    color: '#fff',
+    fontSize: 18,
+    marginTop: 10,
+  },
+  userMessageContainer: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  userMessageBubble: {
+    backgroundColor: '#61dafb',
+    marginRight: 10,
+  },
+  userIconContainer: {
+    marginLeft: 10,
+  },
+  userIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#333',
+    padding: 5,
+  },
 });
 
 export default SplitScreenChat;
