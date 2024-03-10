@@ -28,6 +28,7 @@ class OpenAiAgent(GenericAgent):
 
             # If set, partial message deltas will be sent.
             stream=False,
+            response_format={"type": "json_object"},
         )
         resp = chat_completion.choices[0].message.content
         self.logger.info(f"{self.name}: {resp}")

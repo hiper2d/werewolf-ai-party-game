@@ -44,4 +44,5 @@ in confrontations and strategy"}},
 harmed. Tends to avoid the spotlight and feels uncomfortable around aggressive players"}}
 ]
 }}\
+You answer must include only the JSON and nothing else. I.e. the whole response must be a valid JSON.
 """

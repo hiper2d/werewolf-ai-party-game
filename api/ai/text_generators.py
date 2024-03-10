@@ -28,9 +28,16 @@ def generate_scene_and_players(num_players, wolf_count: int, additional_roles: L
     logger.debug(f"Received response from AI: {response}")
 
     try:
-        response_json = json.loads(response)
+        stripped = response.strip()
+        stripped = stripped.replace("\n", " ")
+        first_brace_position = stripped.find("{")
+        if first_brace_position != -1:
+            stripped = stripped[first_brace_position:]
+        else:
+            raise ValueError("This is an invalid JSON")
+        response_json = json.loads(stripped)
     except json.JSONDecodeError:
-        raise ValueError("Failed to decode JSON from OpenAI response.")
+        raise ValueError("Failed to decode JSON from OpenAI response")
 
     game_scene = response_json.get('game_scene')
     players_data = response_json.get('players')
