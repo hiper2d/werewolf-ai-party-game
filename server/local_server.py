@@ -1,8 +1,8 @@
 from fastapi import FastAPI, Request
 from starlette.middleware.cors import CORSMiddleware
 
-from dto.request_dtos import InitGameRequest
-from lambda_functions import init_game
+from dto.request_dtos import InitGameRequest, WelcomeRequest
+from lambda_functions import init_game, get_welcome_message
 
 app = FastAPI()
 
@@ -31,7 +31,7 @@ def read_root():
 async def init_game_endpoint(request: Request):
     data = await request.json()
     init_game_request = InitGameRequest(**data)
-    game_id, human_player_role, player_names, story = init_game(
+    game_id, human_player_role, bot_players, story = init_game(
         human_player_name=init_game_request.userName,
         theme=init_game_request.gameTheme
     )
@@ -40,5 +40,14 @@ async def init_game_endpoint(request: Request):
         "game_id": game_id,
         "story": story,
         "human_player_role": human_player_role.value,
-        "player_names": player_names
+        "bot_players": bot_players
     }
+
+
+@app.post("/get_welcome_message/")
+async def init_game_endpoint(request: Request):
+    data = await request.json()
+    request = WelcomeRequest(**data)
+    return get_welcome_message(
+        game_id=request.gameId, bot_player_id=request.id
+    )

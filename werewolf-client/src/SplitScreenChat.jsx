@@ -14,12 +14,30 @@ const SplitScreenChat = () => {
     const [messages, setMessages] = useState([]);
     const [inputText, setInputText] = useState('');
     const scrollViewRef = useRef(null);
-    const [participants, setParticipants] = useState([]);
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [userName, setUserName] = useState('');
     const [gameName, setGameName] = useState('');
     const [gameTheme, setGameTheme] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [playerMap, setPlayerMap] = useState(new Map());
+
+    const participantColors = [
+        '#61dafb', // React blue
+        '#a0f0ed', // Light blue
+        '#50e3c2', // Turquoise
+        '#f8c555', // Yellow
+        '#f76b1c', // Orange
+        '#e44d26', // Red
+        '#cd84f1', // Pink
+        '#c56cf0', // Purple
+        '#ffcc00', // Gold
+        '#67e480', // Green
+    ];
+
+    const getRandomColor = () => {
+        const randomIndex = Math.floor(Math.random() * participantColors.length);
+        return participantColors[randomIndex];
+    };
 
     const sendMessage = () => {
         if (inputText.trim()) {
@@ -68,9 +86,17 @@ const SplitScreenChat = () => {
             if (response.ok) {
                 const data = await response.json();
                 console.log('New Game data:', data);
-                setParticipants(data.player_names);
+                const botPlayers = data.bot_players;
+                const gameId = data.game_id;
                 const story = data.story;
                 const humanPlayerRole = data.human_player_role;
+
+                const newPlayerMap = new Map();
+                botPlayers.forEach(([playerId, playerName]) => {
+                    newPlayerMap.set(playerId, { name: playerName, color: getRandomColor() });
+                });
+                setPlayerMap(newPlayerMap);
+
                 setMessages((previousMessages) => [
                     ...previousMessages,
                     {
@@ -90,6 +116,38 @@ const SplitScreenChat = () => {
                         authorColor: GAME_MASTER_COLOR,
                     },
                 ]);
+
+                for (const [playerId, playerName] of botPlayers) {
+                    const welcomeResponse = await fetch(`${BACKEND_URL}/get_welcome_message`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            'gameId': gameId,
+                            'id': playerId
+                        }),
+                    });
+                    if (welcomeResponse.ok) {
+                        const welcomeMessageRaw = await welcomeResponse.text();
+                        const welcomeMessage = welcomeMessageRaw.replace(/^"|"$/g, '');
+                        const playerColor = newPlayerMap.get(playerId).color;
+                        setMessages((previousMessages) => [
+                            ...previousMessages,
+                            {
+                                id: Math.random().toString(36).substring(7),
+                                text: welcomeMessage,
+                                timestamp: new Date(),
+                                isUserMessage: false,
+                                author: playerName,
+                                authorColor: playerColor,
+                            },
+                        ]);
+                    } else {
+                        console.error('Error getting welcome message:', welcomeResponse.status);
+                    }
+                }
+
                 setUserName('');
                 setGameName('');
                 setGameTheme('');
@@ -107,7 +165,7 @@ const SplitScreenChat = () => {
         <SafeAreaView style={styles.safeArea}>
             <MenuBar onMenuPress={handleMenuPress} onIconPress={handleIconPress}/>
             <View style={styles.container}>
-                <ParticipantsList participants={participants}/>
+                <ParticipantsList participants={Array.from(playerMap.values())}/>
                 <View style={styles.chatContainer}>
                     <ChatMessages messages={messages} scrollViewRef={scrollViewRef}/>
                     <InputArea

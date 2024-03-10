@@ -26,14 +26,14 @@ const ParticipantsList = ({ participants }) => {
         <View style={styles.participantsList}>
             <Text style={styles.sidebarHeader}>Participants</Text>
             {participants.map((participant) => (
-                <View key={participant} style={styles.participantItem}>
+                <View key={participant.name} style={styles.participantItem}>
                     <FontAwesomeIcon
                         icon={faUser}
                         size={16}
-                        color={getRandomColor()}
+                        color={participant.color}
                         style={styles.participantIcon}
                     />
-                    <Text style={styles.participantName}>{participant}</Text>
+                    <Text style={styles.participantName}>{participant.name}</Text>
                 </View>
             ))}
         </View>

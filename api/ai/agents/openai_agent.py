@@ -15,7 +15,7 @@ class OpenAiAgent(GenericAgent):
         self.model = "gpt-4-turbo-preview"  # Currently points to gpt-4-0125-preview
         # Available models: https://platform.openai.com/docs/models/gpt-4-and-gpt-4-turbo
 
-    def ask(self, chat_messages: List[MessageDto]) -> str | None:
+    def ask(self, chat_messages: List[MessageDto], is_json: bool = False) -> str | None:
         self.logger.debug(f"Asking {self.name} agent: {chat_messages[-1].msg}")
         chat_completion: ChatCompletion = self.client.chat.completions.create(
             messages=[{"role": msg.role.value, "content": msg.msg} for msg in chat_messages],
@@ -28,7 +28,7 @@ class OpenAiAgent(GenericAgent):
 
             # If set, partial message deltas will be sent.
             stream=False,
-            response_format={"type": "json_object"},
+            response_format={"type": "json_object"} if is_json else {"type": "text"},
         )
         resp = chat_completion.choices[0].message.content
         self.logger.info(f"{self.name}: {resp}")

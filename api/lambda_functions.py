@@ -65,7 +65,7 @@ bot_player_dao = BotPlayerDao(dyn_resource=dynamo_resource)
 message_dao = MessageDao(dyn_resource=dynamo_resource)
 
 def init_game(human_player_name: str, theme: str, reply_language_instruction: str = '') \
-        -> Tuple[str, WerewolfRole, List[str], str]:
+        -> Tuple[str, WerewolfRole, List[List[str]], str]:
     logger.info("*** Starting new game! ***\n")
 
     game_scene, human_player_role, bot_players = generate_scene_and_players(
@@ -107,7 +107,7 @@ def init_game(human_player_name: str, theme: str, reply_language_instruction: st
     if not message_dao.exists_table():
         message_dao.create_table()
 
-    return game.id, human_player.role, [bot.name for bot in bot_players], game_scene
+    return game.id, human_player.role, [[bot.id, bot.name] for bot in bot_players], game_scene
 
 
 def get_welcome_messages_from_all_players(game_id: str):
@@ -148,6 +148,42 @@ def get_welcome_messages_from_all_players(game_id: str):
         introductions.append({"name": bot_player.name, "introduction": answer})
 
     return introductions
+
+
+def get_welcome_message(game_id: str, bot_player_id: str) -> str:
+    load_dotenv(find_dotenv())
+
+    game = game_dao.get_by_id(game_id)
+    if not game or not game.bot_player_ids:
+        logger.debug(f"Game with id {game_id} not found in Redis or it doesn't have bots")
+        return
+
+    bot_player = bot_player_dao.get_by_id(bot_player_id)
+    if not bot_player:
+        logger.debug(f"Bot player with id {bot_player_id} not found in Redis")
+        return
+
+    bot_player_agent = BotPlayerAgent(me=bot_player, game=game)
+    instruction_message: MessageDto = bot_player_agent.create_instruction_message()
+
+    messages_to_all: List[MessageDto] = message_dao.get_last_records(recipient=f"{game_id}_{RECIPIENT_ALL}")
+    messages_to_bot_player = message_dao.get_last_records(recipient=f"{game_id}_{bot_player.id}")
+    messages_to_all.extend(messages_to_bot_player) # merging messages from common chat and bot personal commands
+    messages_to_all.sort(key=lambda x: x.ts, reverse=True)
+
+    command_message = MessageDto(
+        recipient=f"{game_id}_{bot_player.id}", author_name=GM_NAME, author_id=GM_ID,
+        msg="Please introduce yourself to the other players.", role=MessageRole.USER
+    )
+    message_dao.save_dto(command_message)
+
+    answer = bot_player_agent.ask([instruction_message, *messages_to_all, command_message])
+    answer_message = MessageDto(
+        recipient=f"{game_id}_{RECIPIENT_ALL}", author_id=bot_player.id, author_name=bot_player.name,
+        msg=answer, role=MessageRole.USER
+    )
+    message_dao.save_dto(answer_message)
+    return answer
 
 
 def talk_to_all(game_id: str, user_message: str):
