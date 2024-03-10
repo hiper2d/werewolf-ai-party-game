@@ -3,7 +3,7 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { faUser } from '@fortawesome/free-solid-svg-icons/faUser';
 
-const logoIcon = require('./assets/logo.png');
+const logoIcon = require('../../assets/logo.png');
 
 const MenuBar = ({ onMenuPress, onIconPress }) => {
     return (

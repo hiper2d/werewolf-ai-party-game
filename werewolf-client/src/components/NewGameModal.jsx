@@ -1,55 +1,129 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
-const InputArea = ({ inputText, onChangeText, onSendMessage }) => {
+const NewGameModal = ({
+                          isVisible,
+                          onClose,
+                          onOkPress,
+                          userName,
+                          onUserNameChange,
+                          gameName,
+                          onGameNameChange,
+                          gameTheme,
+                          onGameThemeChange,
+                      }) => {
     return (
-        <View style={styles.inputArea}>
-            <TextInput
-                style={styles.input}
-                value={inputText}
-                onChangeText={onChangeText}
-                placeholder="Type your message..."
-                placeholderTextColor="#999"
-                onSubmitEditing={onSendMessage}
-                enterKeyHint="send"
-            />
-            <Pressable
-                onPress={onSendMessage}
-                style={({ pressed }) => [styles.sendButton, pressed && styles.buttonPressed]}
-            >
-                <Text style={styles.sendButtonText}>Send</Text>
-            </Pressable>
-        </View>
+        <Modal visible={isVisible} animationType="slide" transparent={true}>
+            <View style={styles.modalContainer}>
+                <View style={styles.modalContent}>
+                    <Text style={styles.modalTitle}>New Game</Text>
+                    <TextInput
+                        style={styles.modalInput}
+                        placeholder="User Name"
+                        value={userName}
+                        onChangeText={onUserNameChange}
+                        placeholderTextColor="#999"
+                    />
+                    <TextInput
+                        style={styles.modalInput}
+                        placeholder="Game Name"
+                        value={gameName}
+                        onChangeText={onGameNameChange}
+                        placeholderTextColor="#999"
+                    />
+                    <TextInput
+                        style={styles.modalInput}
+                        placeholder="Game Theme"
+                        value={gameTheme}
+                        onChangeText={onGameThemeChange}
+                        placeholderTextColor="#999"
+                    />
+                    <View style={styles.modalButtonContainer}>
+                        <Pressable
+                            onPress={onClose}
+                            style={({ pressed }) => [
+                                styles.modalButton,
+                                styles.cancelButton,
+                                pressed && styles.buttonPressed,
+                            ]}
+                        >
+                            <Text style={styles.modalButtonText}>Cancel</Text>
+                        </Pressable>
+                        <Pressable
+                            onPress={onOkPress}
+                            style={({ pressed }) => [
+                                styles.modalButton,
+                                styles.okButton,
+                                (!userName || !gameName || !gameTheme) && styles.disabledButton,
+                                pressed && styles.buttonPressed,
+                            ]}
+                            disabled={!userName || !gameName || !gameTheme}
+                        >
+                            <Text style={styles.modalButtonText}>OK</Text>
+                        </Pressable>
+                    </View>
+                </View>
+            </View>
+        </Modal>
     );
 };
 
 const styles = StyleSheet.create({
-    inputArea: {
-        flexDirection: 'row',
-        borderTopWidth: 1,
-        borderTopColor: '#333',
-        padding: 10,
-    },
-    input: {
+    modalContainer: {
         flex: 1,
-        padding: 10,
-        backgroundColor: '#333',
-        color: '#fff',
-        borderRadius: 5,
-        marginRight: 10,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
     },
-    sendButton: {
+    modalContent: {
+        backgroundColor: '#282c34',
+        padding: 20,
+        borderRadius: 10,
+        width: '80%',
+        alignItems: 'center',
+    },
+    modalTitle: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        marginBottom: 20,
+        color: '#61dafb',
+    },
+    modalInput: {
+        borderWidth: 1,
+        borderColor: '#61dafb',
+        borderRadius: 5,
+        padding: 10,
+        marginBottom: 10,
+        color: '#fff',
+        width: '100%',
+    },
+    modalButtonContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        width: '100%',
+        marginTop: 20,
+    },
+    modalButton: {
         paddingVertical: 10,
         paddingHorizontal: 20,
-        backgroundColor: '#61dafb',
         borderRadius: 5,
     },
-    sendButtonText: {
-        color: '#003366',
+    cancelButton: {
+        backgroundColor: '#61dafb',
+    },
+    okButton: {
+        backgroundColor: '#61dafb',
+    },
+    modalButtonText: {
+        color: '#282c34',
+        fontSize: 16,
+    },
+    disabledButton: {
+        opacity: 0.5,
     },
     buttonPressed: {
         opacity: 0.5,
     },
 });
 
-export default InputArea;
+export default NewGameModal;

@@ -30,6 +30,9 @@ const ChatMessages = ({ messages, scrollViewRef }) => {
                             message.isUserMessage && styles.userMessageBubble,
                         ]}
                     >
+                        {message.author && (
+                            <Text style={styles.authorName}>{message.author}</Text>
+                        )}
                         <Text style={styles.messageText}>{message.text}</Text>
                     </View>
                     {message.isUserMessage && (
@@ -44,6 +47,12 @@ const ChatMessages = ({ messages, scrollViewRef }) => {
 };
 
 const styles = StyleSheet.create({
+    authorName: {
+        fontSize: 12,
+        fontWeight: 'bold',
+        color: '#999',
+        marginBottom: 4,
+    },
     chatMessages: {
         flex: 1,
     },

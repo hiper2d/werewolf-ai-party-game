@@ -1,7 +1,6 @@
 {
   "expo": {
     "name": "werewolf-client",
-    "entryPoint": "./src/SplitScreenChat.jsx",
     "slug": "werewolf-client",
     "version": "1.0.0",
     "orientation": "portrait",
