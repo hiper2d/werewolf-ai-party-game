@@ -24,16 +24,20 @@ const ChatMessages = ({ messages, scrollViewRef }) => {
                             <Text style={styles.gameMasterTooltip}>Game Master</Text>
                         </View>
                     )}
-                    <View
-                        style={[
-                            styles.messageBubble,
-                            message.isUserMessage && styles.userMessageBubble,
-                        ]}
-                    >
+                    <View>
                         {message.author && (
-                            <Text style={styles.authorName}>{message.author}</Text>
+                            <Text style={[styles.authorName, { color: message.authorColor }]}>
+                                {message.author}
+                            </Text>
                         )}
-                        <Text style={styles.messageText}>{message.text}</Text>
+                        <View
+                            style={[
+                                styles.messageBubble,
+                                message.isUserMessage && styles.userMessageBubble,
+                            ]}
+                        >
+                            <Text style={styles.messageText}>{message.text}</Text>
+                        </View>
                     </View>
                     {message.isUserMessage && (
                         <View style={styles.userIconContainer}>

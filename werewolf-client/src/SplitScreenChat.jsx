@@ -8,6 +8,7 @@ import NewGameModal from './components/NewGameModal';
 import Loader from './components/Loader';
 
 const BACKEND_URL = 'http://127.0.0.1:8000';
+const GAME_MASTER_COLOR = '#61dafb';
 
 const SplitScreenChat = () => {
     const [messages, setMessages] = useState([]);
@@ -77,12 +78,16 @@ const SplitScreenChat = () => {
                         text: story,
                         timestamp: new Date(),
                         isUserMessage: false,
+                        author: 'Game Master',
+                        authorColor: GAME_MASTER_COLOR
                     },
                     {
                         id: Math.random().toString(36).substring(7),
                         text: `Your role is ${humanPlayerRole}`,
                         timestamp: new Date(),
                         isUserMessage: false,
+                        author: 'Game Master',
+                        authorColor: GAME_MASTER_COLOR,
                     },
                 ]);
                 setUserName('');
