@@ -15,7 +15,16 @@ import {
 } from "./Constants";
 
 const SplitScreenChat = () => {
-    const [messages, setMessages] = useState([]);
+    const [messages, setMessages] = useState([
+        {
+            id: Math.random().toString(36).substring(7),
+            text: 'Welcome to the game! Welcome to the game! Welcome to the game! Welcome to the game! Welcome to the game! Welcome to the game! Welcome to the game! Welcome to the game!',
+            timestamp: new Date(),
+            isUserMessage: false,
+            author: 'Game Master',
+            authorColor: GAME_MASTER_COLOR
+        }
+    ]);
     const [inputText, setInputText] = useState('');
     const scrollViewRef = useRef(null);
     const [isModalVisible, setIsModalVisible] = useState(false);
@@ -52,6 +61,7 @@ const SplitScreenChat = () => {
                 text: inputText.trim(),
                 timestamp: new Date(),
                 isUserMessage: true,
+                author: userName,
             };
             setMessages((previousMessages) => [...previousMessages, newMessage]);
             setInputText('');
@@ -212,7 +222,7 @@ const SplitScreenChat = () => {
                     }
                 }
 
-                setUserName('');
+                // setUserName('');
                 setGameName('');
                 setGameTheme('');
             } else {

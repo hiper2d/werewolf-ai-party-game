@@ -23,12 +23,16 @@ def generate_scene_and_players(num_players, wolf_count: int, additional_roles: L
 
     instruction = GAME_GENERATION_PROMPT.format(theme=theme, num_players=num_players-1,
                                                 human_player_name=human_player_name)
-    ai_agent = ClaudeAgent(name="Game Master")
-    response = ai_agent.ask_wth_text(instruction)
+    ai_agent = OpenAiAgent(name="Game Master")
+    response = ai_agent.ask_wth_text(question=instruction, is_json=False)
     logger.debug(f"Received response from AI: {response}")
 
     try:
         stripped = response.strip()
+        if stripped.startswith("```json"):
+            stripped = stripped[7:]
+        if stripped.endswith("```"):
+            stripped = stripped[:-3]
         stripped = stripped.replace("\n", " ")
         first_brace_position = stripped.find("{") # a hack to remove a prefix OpenAI agent tends to add
         if first_brace_position != -1:

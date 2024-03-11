@@ -34,7 +34,7 @@ class OpenAiAgent(GenericAgent):
         self.logger.info(f"{self.name}: {resp}")
         return resp
 
-    def ask_wth_text(self, question: str) -> str | None:
+    def ask_wth_text(self, question: str, is_json: bool = False) -> str | None:
         self.logger.debug(f"Asking {self.name} agent: {question}")
         chat_completion: ChatCompletion = self.client.chat.completions.create(
             messages=[{"role": "user", "content": question}],
@@ -47,6 +47,7 @@ class OpenAiAgent(GenericAgent):
 
             # If set, partial message deltas will be sent.
             stream=False,
+            response_format={"type": "json_object"} if is_json else {"type": "text"},
         )
         resp = chat_completion.choices[0].message.content
         return resp
