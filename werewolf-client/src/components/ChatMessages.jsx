@@ -64,6 +64,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         marginVertical: 5,
+        flexWrap: 'wrap',
     },
     iconContainer: {
         position: 'relative',
@@ -89,12 +90,15 @@ const styles = StyleSheet.create({
     },
     messageBubble: {
         backgroundColor: '#333',
-        padding: 10,
         borderRadius: 5,
-        maxWidth: '80%',
+        flexShrink: 1,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        marginBottom: 4,
     },
     messageText: {
         color: '#fff',
+        fontSize: 16,
     },
     userMessageContainer: {
         flexDirection: 'row',

@@ -6,20 +6,26 @@ import ChatMessages from './components/ChatMessages';
 import InputArea from './components/InputArea';
 import NewGameModal from './components/NewGameModal';
 import Loader from './components/Loader';
-
-const BACKEND_URL = 'http://127.0.0.1:8000';
-const GAME_MASTER_COLOR = '#61dafb';
+import {
+    GAME_MASTER_COLOR,
+    URL_API_GET_WELCOME_MESSAGE,
+    URL_API_INIT_GAME,
+    URL_API_TALK_TO_ALL,
+    URL_API_TALK_TO_CERTAIN_PLAYER
+} from "./Constants";
 
 const SplitScreenChat = () => {
     const [messages, setMessages] = useState([]);
     const [inputText, setInputText] = useState('');
     const scrollViewRef = useRef(null);
     const [isModalVisible, setIsModalVisible] = useState(false);
+    const [gameId, setGameId] = useState('');
     const [userName, setUserName] = useState('');
     const [gameName, setGameName] = useState('');
     const [gameTheme, setGameTheme] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const [playerMap, setPlayerMap] = useState(new Map());
+    const [playerIdMap, setPlayerIdMap] = useState(new Map());
+    const [playerNameMap, setPlayerNameMap] = useState(new Map());
 
     const participantColors = [
         '#61dafb', // React blue
@@ -39,7 +45,7 @@ const SplitScreenChat = () => {
         return participantColors[randomIndex];
     };
 
-    const sendMessage = () => {
+    const sendMessage = async () => {
         if (inputText.trim()) {
             const newMessage = {
                 id: Math.random().toString(36).substring(7),
@@ -49,6 +55,60 @@ const SplitScreenChat = () => {
             };
             setMessages((previousMessages) => [...previousMessages, newMessage]);
             setInputText('');
+
+            try {
+                const response = await fetch(URL_API_TALK_TO_ALL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        gameId: gameId,
+                        message: newMessage.text,
+                    }),
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    const playersToReply = data.players_to_reply;
+
+                    for (const playerName of playersToReply) {
+                        const replyResponse = await fetch(URL_API_TALK_TO_CERTAIN_PLAYER, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                gameId: gameId,
+                                name: playerName
+                            }),
+                        });
+
+                        if (replyResponse.ok) {
+                            const replyMessage = await replyResponse.text();
+                            const playerColor = playerNameMap.get(playerName)?.color;
+
+                            setMessages((previousMessages) => [
+                                ...previousMessages,
+                                {
+                                    id: Math.random().toString(36).substring(7),
+                                    text: replyMessage,
+                                    timestamp: new Date(),
+                                    isUserMessage: false,
+                                    author: playerName,
+                                    authorColor: playerColor,
+                                },
+                            ]);
+                        } else {
+                            console.error('Error getting reply:', replyResponse.status);
+                        }
+                    }
+                } else {
+                    console.error('Error getting players to reply:', response.status);
+                }
+            } catch (error) {
+                console.error('Error sending message:', error);
+            }
         }
     };
 
@@ -72,7 +132,7 @@ const SplitScreenChat = () => {
         setIsModalVisible(false);
         setIsLoading(true);
         try {
-            const response = await fetch(`${BACKEND_URL}/init_game`, {
+            const response = await fetch(URL_API_INIT_GAME, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -88,14 +148,18 @@ const SplitScreenChat = () => {
                 console.log('New Game data:', data);
                 const botPlayers = data.bot_players;
                 const gameId = data.game_id;
+                setGameId(gameId)
                 const story = data.story;
                 const humanPlayerRole = data.human_player_role;
 
-                const newPlayerMap = new Map();
+                const newPlayerIdMap = new Map();
+                const newPlayerNameMap = new Map();
                 botPlayers.forEach(([playerId, playerName]) => {
-                    newPlayerMap.set(playerId, { name: playerName, color: getRandomColor() });
+                    newPlayerIdMap.set(playerId, { id: playerId, name: playerName, color: getRandomColor() });
+                    newPlayerNameMap.set(playerName, { id: playerId, name: playerName, color: getRandomColor() });
                 });
-                setPlayerMap(newPlayerMap);
+                setPlayerIdMap(newPlayerIdMap);
+                setPlayerNameMap(newPlayerNameMap);
 
                 setMessages((previousMessages) => [
                     ...previousMessages,
@@ -118,7 +182,7 @@ const SplitScreenChat = () => {
                 ]);
 
                 for (const [playerId, playerName] of botPlayers) {
-                    const welcomeResponse = await fetch(`${BACKEND_URL}/get_welcome_message`, {
+                    const welcomeResponse = await fetch(URL_API_GET_WELCOME_MESSAGE, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -131,7 +195,7 @@ const SplitScreenChat = () => {
                     if (welcomeResponse.ok) {
                         const welcomeMessageRaw = await welcomeResponse.text();
                         const welcomeMessage = welcomeMessageRaw.replace(/^"|"$/g, '');
-                        const playerColor = newPlayerMap.get(playerId).color;
+                        const playerColor = newPlayerIdMap.get(playerId).color;
                         setMessages((previousMessages) => [
                             ...previousMessages,
                             {
@@ -165,7 +229,7 @@ const SplitScreenChat = () => {
         <SafeAreaView style={styles.safeArea}>
             <MenuBar onMenuPress={handleMenuPress} onIconPress={handleIconPress}/>
             <View style={styles.container}>
-                <ParticipantsList participants={Array.from(playerMap.values())}/>
+                <ParticipantsList participants={Array.from(playerIdMap.values())}/>
                 <View style={styles.chatContainer}>
                     <ChatMessages messages={messages} scrollViewRef={scrollViewRef}/>
                     <InputArea

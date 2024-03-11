@@ -186,7 +186,7 @@ def get_welcome_message(game_id: str, bot_player_id: str) -> str:
     return answer
 
 
-def talk_to_all(game_id: str, user_message: str):
+def talk_to_all(game_id: str, user_message: str) -> ArbiterReply:
     game = game_dao.get_by_id(game_id)
     if not game or not game.bot_player_ids:
         logger.debug(f"Game with id {game_id} not found in Redis or it doesn't have bots")
@@ -216,7 +216,7 @@ def talk_to_all(game_id: str, user_message: str):
     reply_obj: ArbiterReply = ArbiterReply(players_to_reply=arbiter_reply_json['players_to_reply'])
 
     game_dao.create_or_update_dto(game)
-    return reply_obj.players_to_reply
+    return reply_obj
 
 
 def talk_to_certain_player(game_id: str, name: str):
