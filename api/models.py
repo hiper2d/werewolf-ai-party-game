@@ -2,7 +2,7 @@ import time
 import uuid
 from enum import Enum
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class WerewolfRole(Enum):
@@ -61,10 +61,7 @@ class BotPlayerDto(BaseModel):
     known_ally_names: str = None
     other_player_names: str = None
     is_alive: bool = True
-
-    @property
-    def ts(self) -> int:
-        return time.time_ns()
+    ts: int = Field(default_factory=time.time_ns)
 
 
 
@@ -81,10 +78,7 @@ class GameDto(BaseModel):
     user_moves_day_counter: int = 0
     user_moves_total_counter: int = 0
     is_active: bool = True
-
-    @property
-    def ts(self) -> int:
-        return time.time_ns()
+    ts: int = Field(default_factory=time.time_ns)
 
 
 class MessageRole(Enum):
@@ -99,10 +93,7 @@ class MessageDto(BaseModel):
     author_name: str
     msg: str
     role: MessageRole
-
-    @property
-    def ts(self) -> int:
-        return time.time_ns()
+    ts: int = Field(default_factory=time.time_ns)
 
 
 class ArbiterReply(BaseModel):

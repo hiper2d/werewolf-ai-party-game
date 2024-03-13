@@ -13,7 +13,7 @@ GAME_ID = '6b274781-5ee8-460a-9913-54712a7bc924'
 
 class TestGameFunctions(unittest.TestCase):
     def test_init_game_and_welcome(self):
-        game_id, human_player_role = init_game(
+        game_id, human_player_role, bots, scene = init_game(
             human_player_name='Peeta',
             theme='Hunger Games',
             # reply_language_instruction='Reply in russian to me but keep original names (in English). Отвечай на русском, но сохрани оригинальные имена на английском.'

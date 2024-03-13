@@ -7,7 +7,7 @@ from models import GameDto, MessageDto, \
     MessageRole
 
 
-class GmAgent(ClaudeAgent):
+class GmAgent(OpenAiAgent):
     def __init__(self, game: GameDto):
         self.game = game
         super().__init__("Game Master")

@@ -54,6 +54,7 @@ class MessageDao(GenericDao):
                 recipient=record['recipient']['S'],
                 role=MessageRole(record['role']['S']).value,
                 msg=record['msg']['S'],
+                ts=int(record['ts']['N'])
             ) for record in records
         ]
 
@@ -78,7 +79,13 @@ if __name__ == '__main__':
     load_dotenv(find_dotenv())
     dynamo_resource = get_dynamo_resource()
     dao = MessageDao(dyn_resource=dynamo_resource)
-    game_id = '6b274781-5ee8-460a-9913-54712a7bc924'
+    game_id = '693c7eee-5284-4af7-b06b-c775fb9ca078'
     messages = dao.get_last_records(f"{game_id}_all")
+    messages_to_n = dao.get_last_records(f"{game_id}_8f0ca87a-3457-4dd2-be16-9d3a4c18f023")
+    messages.extend(messages_to_n)
+    messages.sort(key=lambda x: x.ts)
     for message in messages:
-        print(f"{message.author_name}: {message.msg}")
+        print(f"{message.author_name}, {message.ts}: {message.msg}")
+
+# {"Neville": "8f0ca87a-3457-4dd2-be16-9d3a4c18f023", "Luna": "b9a7a58e-0d3d-41ca-986f-7b82a9b5a90b", "Cedric": "1b2c0c80-bf29-496f-b440-546f033d155b", "Draco": "34a67817-5687-42a5-8377-b293584b37fe", "Ginny": "e8ff9ce8-405f-460d-bcce-c204fe036f81"}
+# {"players_to_reply": ["Luna", "Neville", "Draco"]}

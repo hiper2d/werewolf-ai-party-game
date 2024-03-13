@@ -169,7 +169,7 @@ def get_welcome_message(game_id: str, bot_player_id: str) -> str:
     messages_to_all: List[MessageDto] = message_dao.get_last_records(recipient=f"{game_id}_{RECIPIENT_ALL}")
     messages_to_bot_player = message_dao.get_last_records(recipient=f"{game_id}_{bot_player.id}")
     messages_to_all.extend(messages_to_bot_player) # merging messages from common chat and bot personal commands
-    messages_to_all.sort(key=lambda x: x.ts, reverse=True)
+    messages_to_all.sort(key=lambda x: x.ts)
 
     command_message = MessageDto(
         recipient=f"{game_id}_{bot_player.id}", author_name=GM_NAME, author_id=GM_ID,
@@ -191,6 +191,7 @@ def talk_to_all(game_id: str, user_message: str) -> ArbiterReply:
     if not game or not game.bot_player_ids:
         logger.debug(f"Game with id {game_id} not found in Redis or it doesn't have bots")
         return
+
     logger.info('%s: %s', game.human_player.name, user_message)
     user_message = MessageDto(
         recipient=f"{game_id}_{RECIPIENT_ALL}", author_id=game.human_player.id, author_name=game.human_player.name,
@@ -232,7 +233,7 @@ def talk_to_certain_player(game_id: str, name: str):
     messages_to_all: List[MessageDto] = message_dao.get_last_records(recipient=f"{game_id}_{RECIPIENT_ALL}")
     messages_to_bot_player = message_dao.get_last_records(recipient=f"{game_id}_{bot_player.id}")
     messages_to_all.extend(messages_to_bot_player) # merging messages from common chat and bot personal commands
-    messages_to_all.sort(key=lambda x: x.ts, reverse=True)
+    messages_to_all.sort(key=lambda x: x.ts) # fixme: for some reason the first message from Game Master is the last
 
     for message in messages_to_all:
         if message.author_id == bot_player.id:

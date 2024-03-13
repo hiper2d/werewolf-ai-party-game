@@ -42,7 +42,7 @@ const ParticipantsList = ({ participants }) => {
 
 const styles = StyleSheet.create({
     participantsList: {
-        width: '30%',
+        width: '20%',
         backgroundColor: '#21252b',
         padding: 10,
     },

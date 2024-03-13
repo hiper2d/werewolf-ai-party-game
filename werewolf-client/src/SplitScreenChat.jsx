@@ -165,8 +165,9 @@ const SplitScreenChat = () => {
                 const newPlayerIdMap = new Map();
                 const newPlayerNameMap = new Map();
                 botPlayers.forEach(([playerId, playerName]) => {
-                    newPlayerIdMap.set(playerId, { id: playerId, name: playerName, color: getRandomColor() });
-                    newPlayerNameMap.set(playerName, { id: playerId, name: playerName, color: getRandomColor() });
+                    const randomColor = getRandomColor();
+                    newPlayerIdMap.set(playerId, { id: playerId, name: playerName, color: randomColor });
+                    newPlayerNameMap.set(playerName, { id: playerId, name: playerName, color: randomColor });
                 });
                 setPlayerIdMap(newPlayerIdMap);
                 setPlayerNameMap(newPlayerNameMap);
@@ -275,7 +276,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
     },
     chatContainer: {
-        width: '70%',
+        width: '80%',
         padding: 10,
     },
 });

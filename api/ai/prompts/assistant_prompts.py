@@ -32,8 +32,8 @@ being crucial for gameplay.
 You will also receive game events in the following format:
 Game Master: game event
 
-Your response should also be in JSON format, \
-listing the names of up to three selected players in the order they should reply.
+Your response should be in JSON format, \
+listing the names of up to three selected players in the order they should reply. Always include at least one name.
 Your response format: {{"players_to_reply": ["player_name1", "player_name2", "player_name3"]}}
 """
 
