@@ -1,41 +1,39 @@
-import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { faUser } from '@fortawesome/free-solid-svg-icons/faUser';
+import VotingModal from './VotingModal';
+import { URL_HOST } from '../Constants';
 
-const participantColors = [
-    '#61dafb', // React blue
-    '#a0f0ed', // Light blue
-    '#50e3c2', // Turquoise
-    '#f8c555', // Yellow
-    '#f76b1c', // Orange
-    '#e44d26', // Red
-    '#cd84f1', // Pink
-    '#c56cf0', // Purple
-    '#ffcc00', // Gold
-    '#67e480', // Green
-];
+const ParticipantsList = ({ participants, gameId }) => {
+    const [isModalVisible, setIsModalVisible] = useState(false);
 
-const getRandomColor = () => {
-    const randomIndex = Math.floor(Math.random() * participantColors.length);
-    return participantColors[randomIndex];
-};
+    const startVoting = () => {
+        setIsModalVisible(true);
+    };
 
-const ParticipantsList = ({ participants }) => {
+    const handleVote = (participantId) => {
+        onVote(participantId);
+    };
+
     return (
         <View style={styles.participantsList}>
             <Text style={styles.sidebarHeader}>Participants</Text>
             {participants.map((participant) => (
                 <View key={participant.name} style={styles.participantItem}>
-                    <FontAwesomeIcon
-                        icon={faUser}
-                        size={16}
-                        color={participant.color}
-                        style={styles.participantIcon}
-                    />
+                    <FontAwesomeIcon icon={faUser} size={16} color={participant.color} style={styles.participantIcon} />
                     <Text style={styles.participantName}>{participant.name}</Text>
                 </View>
             ))}
+            <TouchableOpacity onPress={startVoting} style={styles.startVotingButton}>
+                <Text style={styles.startVotingButtonText}>Start Voting</Text>
+            </TouchableOpacity>
+            <VotingModal
+                isVisible={isModalVisible}
+                onClose={() => setIsModalVisible(false)}
+                participants={participants}
+                onVote={handleVote}
+            />
         </View>
     );
 };
@@ -45,6 +43,8 @@ const styles = StyleSheet.create({
         width: '20%',
         backgroundColor: '#21252b',
         padding: 10,
+        position: 'relative',
+        height: '100%',
     },
     sidebarHeader: {
         color: '#61dafb',
@@ -63,6 +63,23 @@ const styles = StyleSheet.create({
     participantName: {
         color: '#abb2bf',
         fontSize: 16,
+    },
+    participantsListContainer: {
+        flex: 1,
+        justifyContent: 'space-between',
+    },
+    startVotingButton: {
+        backgroundColor: '#61dafb',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 5,
+        alignSelf: 'center',
+        bottom: 20,
+        position: 'absolute',
+    },
+    startVotingButtonText: {
+        color: '#000000',
+        fontWeight: 'bold',
     },
 });
 

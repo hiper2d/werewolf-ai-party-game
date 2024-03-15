@@ -1,5 +1,5 @@
-import React, { useRef, useState } from 'react';
-import { SafeAreaView, StyleSheet, View } from 'react-native';
+import React, {useRef, useState} from 'react';
+import {SafeAreaView, StyleSheet, View} from 'react-native';
 import MenuBar from './components/MenuBar';
 import ParticipantsList from './components/ParticipantsList';
 import ChatMessages from './components/ChatMessages';
@@ -236,11 +236,36 @@ const SplitScreenChat = () => {
         }
     };
 
+    const handleVote = async (participantId) => {
+        try {
+            const response = await fetch(`${URL_HOST}/start_voting`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ gameId, participantId }),
+            });
+
+            if (response.ok) {
+                // Handle successful voting
+                console.log('Voting successful');
+            } else {
+                console.error('Error voting:', response.status);
+            }
+        } catch (error) {
+            console.error('Error voting:', error);
+        }
+    };
+
     return (
         <SafeAreaView style={styles.safeArea}>
             <MenuBar onMenuPress={handleMenuPress} onIconPress={handleIconPress}/>
             <View style={styles.container}>
-                <ParticipantsList participants={Array.from(playerIdMap.values())}/>
+                <ParticipantsList
+                    participants={Array.from(playerIdMap.values())}
+                    gameId={gameId}
+                    onVote={handleVote}
+                />
                 <View style={styles.chatContainer}>
                     <ChatMessages messages={messages} scrollViewRef={scrollViewRef}/>
                     <InputArea

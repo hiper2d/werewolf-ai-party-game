@@ -8,6 +8,10 @@ All projects registry: [Builds](https://backdropbuild.com/builds)
 
 The event project page: [ai-werewolf](https://backdropbuild.com/v3/ai-werewolf)
 
+# Gameplay
+
+<img src="images/screen1.png">
+
 # Setup
 
 ### Run Redis
