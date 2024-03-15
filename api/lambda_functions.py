@@ -233,7 +233,7 @@ def talk_to_certain_player(game_id: str, name: str):
     messages_to_all: List[MessageDto] = message_dao.get_last_records(recipient=f"{game_id}_{RECIPIENT_ALL}")
     messages_to_bot_player = message_dao.get_last_records(recipient=f"{game_id}_{bot_player.id}")
     messages_to_all.extend(messages_to_bot_player) # merging messages from common chat and bot personal commands
-    messages_to_all.sort(key=lambda x: x.ts) # fixme: for some reason the first message from Game Master is the last
+    messages_to_all.sort(key=lambda x: x.ts)
 
     for message in messages_to_all:
         if message.author_id == bot_player.id:
@@ -250,7 +250,43 @@ def talk_to_certain_player(game_id: str, name: str):
     message_dao.save_dto(answer_message)
     return answer
 
+def ask_certain_player_to_vote(game_id: str, name: str):
+    game = game_dao.get_by_id(game_id)
+    if name not in game.bot_player_name_to_id:
+        logger.error("Player with name %s not found in the game or it is a human player", name)
+        return None
+    bot_player_id = game.bot_player_name_to_id[name]
+    bot_player = bot_player_dao.get_by_id(bot_player_id)
+    bot_player_agent = BotPlayerAgent(me=bot_player, game=game)
+    instruction_message = bot_player_agent.create_instruction_message()
 
+    messages_to_all: List[MessageDto] = message_dao.get_last_records(recipient=f"{game_id}_{RECIPIENT_ALL}")
+    messages_to_bot_player = message_dao.get_last_records(recipient=f"{game_id}_{bot_player.id}")
+    messages_to_all.extend(messages_to_bot_player) # merging messages from common chat and bot personal commands
+    messages_to_all.sort(key=lambda x: x.ts)
+
+    for message in messages_to_all:
+        if message.author_id == bot_player.id:
+            message.role = MessageRole.ASSISTANT # message from bot to itself should be ASSISTANT
+        else:
+            message.role = MessageRole.USER # other messages are from outside, i.e. from USER
+            message.msg = f"{message.author_name}: {message.msg}"
+
+    voting_instruction = GAME_MASTER_VOTING_FIRST_ROUND_COMMAND.format()
+    voting_instruction_msg = MessageDto(
+        recipient=f"{game_id}_{bot_player_id}", author_id=GM_ID, author_name=GM_NAME,
+        msg=voting_instruction, role=MessageRole.USER
+    )
+    answer = bot_player_agent.ask([instruction_message, *messages_to_all, voting_instruction_msg])
+    answer_message = MessageDto(
+        recipient=f"{game_id}_{bot_player_id}", author_id=bot_player.id, author_name=bot_player.name,
+        msg=answer, role=MessageRole.USER
+    )
+    message_dao.save_dto(answer_message)
+    return answer
+
+
+# todo: split into separate api calls from UI
 def start_elimination_vote_round_one_async(game_id: str, user_vote: str) -> List[str]:
     logger.info("*** Time to vote! ***")
     load_dotenv(find_dotenv())

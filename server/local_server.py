@@ -2,7 +2,8 @@ from fastapi import FastAPI, Request
 from starlette.middleware.cors import CORSMiddleware
 
 from dto.request_dtos import InitGameRequest, WelcomeRequest, TalkToAllRequest, TalkToPlayer
-from lambda_functions import init_game, get_welcome_message, talk_to_all, talk_to_certain_player
+from lambda_functions import init_game, get_welcome_message, talk_to_all, talk_to_certain_player, \
+    ask_certain_player_to_vote
 from models import ArbiterReply
 
 app = FastAPI()
@@ -69,6 +70,16 @@ async def init_game_endpoint(request: Request):
     data = await request.json()
     request = TalkToPlayer(**data)
     arbiter_reply: ArbiterReply = talk_to_certain_player(
+        game_id=request.gameId, name=request.name
+    )
+    return arbiter_reply
+
+
+@app.post("/ask_certain_player_to_vote/")
+async def init_game_endpoint(request: Request):
+    data = await request.json()
+    request = TalkToPlayer(**data)
+    arbiter_reply: ArbiterReply = ask_certain_player_to_vote(
         game_id=request.gameId, name=request.name
     )
     return arbiter_reply

@@ -143,9 +143,6 @@ GAME_MASTER_VOTING_FIRST_ROUND_COMMAND = """Game master: It's time to vote! Choo
 You must to vote, you must pick somebody even if you don't see a reason. You cannot choose yourself or nobody. \
 Your response format: {{"player_to_eliminate": "player_name", "reason": "your_reason"}}
 
-Latest messages from other players you might have missed:
-{latest_messages}
-
 Make sure your response is a valid JSON. For example:
 {{"player_to_eliminate": "John", "reason": "I don't trust him."}}"""
 
