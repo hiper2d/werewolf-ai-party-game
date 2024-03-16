@@ -10,7 +10,19 @@ The event project page: [ai-werewolf](https://backdropbuild.com/v3/ai-werewolf)
 
 # Gameplay
 
-<img src="images/screen1.png">
+What is nice about this game is complete freedom in the themes and roleplay. You can create any setting you want. A movie, a book, any historical period, or even a completely new world. The game is very flexible and can be adapted to any setting. 
+
+Here is an example of the "Terminator" theme:
+<img src="images/screen2.png">
+
+Or "Lord of the Rings":
+<img src="images/screen3.png">
+
+I really like these thematic dialogs and how creative the bots are. 
+
+UI is chunky and ugly yet but I'm working on it. It's a very early stage of the project.
+
+It is only possible to create a new game, to chat with bot players and to initiate a first round of voting. I have more things in the API but UI is not ready yet.
 
 # Setup
 

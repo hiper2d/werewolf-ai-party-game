@@ -17,3 +17,11 @@ class TalkToAllRequest(BaseModel):
 class TalkToPlayer(BaseModel):
     gameId: str
     name: str
+
+class VoteRoundOne(BaseModel):
+    gameId: str
+    participantId: str
+
+class VoteRoundOneResponse(BaseModel):
+    player_to_eliminate: str
+    reason: str

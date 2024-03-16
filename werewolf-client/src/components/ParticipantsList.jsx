@@ -5,7 +5,7 @@ import { faUser } from '@fortawesome/free-solid-svg-icons/faUser';
 import VotingModal from './VotingModal';
 import { URL_HOST } from '../Constants';
 
-const ParticipantsList = ({ participants, gameId }) => {
+const ParticipantsList = ({ participants, onVote }) => {
     const [isModalVisible, setIsModalVisible] = useState(false);
 
     const startVoting = () => {

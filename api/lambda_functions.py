@@ -250,12 +250,11 @@ def talk_to_certain_player(game_id: str, name: str):
     message_dao.save_dto(answer_message)
     return answer
 
-def ask_certain_player_to_vote(game_id: str, name: str):
+def ask_certain_player_to_vote(game_id: str, bot_player_id: str) -> VotingResponse:
     game = game_dao.get_by_id(game_id)
-    if name not in game.bot_player_name_to_id:
-        logger.error("Player with name %s not found in the game or it is a human player", name)
+    if not bot_player_id:
+        logger.error("Player with id %s not found in the game or it is a human player", bot_player_id)
         return None
-    bot_player_id = game.bot_player_name_to_id[name]
     bot_player = bot_player_dao.get_by_id(bot_player_id)
     bot_player_agent = BotPlayerAgent(me=bot_player, game=game)
     instruction_message = bot_player_agent.create_instruction_message()
@@ -282,8 +281,10 @@ def ask_certain_player_to_vote(game_id: str, name: str):
         recipient=f"{game_id}_{bot_player_id}", author_id=bot_player.id, author_name=bot_player.name,
         msg=answer, role=MessageRole.USER
     )
-    message_dao.save_dto(answer_message)
-    return answer
+    # message_dao.save_dto(answer_message) fixme: temporary disable this, also if we save this, then we need to save the GM instruction
+    answer_json = json.loads(answer)
+    reply_obj: VotingResponse = VotingResponse(name=answer_json['player_to_eliminate'], reason=answer_json['reason'])
+    return reply_obj
 
 
 # todo: split into separate api calls from UI

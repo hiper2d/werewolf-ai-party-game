@@ -5,7 +5,7 @@ import useGame from "./useGame";
 
 const useInitGame = (isModalVisible, setIsModalVisible, setMessages) => {
     const handleNewGameModalOkPress = async (
-        setIsLoading, userName, gameName, gameTheme, setGameId, setPlayerIdMap, setPlayerNameMap
+        setIsLoading, userName, gameName, gameTheme, setGameId, setPlayerIdMap, setPlayerNameMap, setGameName, setGameTheme
     ) => {
 
 

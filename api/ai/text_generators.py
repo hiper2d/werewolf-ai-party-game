@@ -35,7 +35,7 @@ def generate_scene_and_players(num_players, wolf_count: int, additional_roles: L
             stripped = stripped[:-3]
         stripped = stripped.replace("\n", " ")
         first_brace_position = stripped.find("{") # a hack to remove a prefix OpenAI agent tends to add
-        if first_brace_position != -1:
+        if first_brace_position != -1 and first_brace_position != 0:
             stripped = stripped[first_brace_position:]
         else:
             raise ValueError("This is an invalid JSON")
