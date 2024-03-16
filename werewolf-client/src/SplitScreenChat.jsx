@@ -6,10 +6,10 @@ import ChatMessages from './components/ChatMessages';
 import InputArea from './components/InputArea';
 import NewGameModal from './components/NewGameModal';
 import Loader from './components/Loader';
-import {URL_API_ASK_CERTAIN_PLAYER_TO_VOTE,} from "./Constants";
 import useChatMessages from "././hooks/useChatMessages";
 import useGame from "././hooks/useGame";
 import useInitGame from "././hooks/useInitGame";
+import useVoting from "./hooks/useVoting";
 
 const SplitScreenChat = () => {
     const [inputText, setInputText] = useState('');
@@ -32,8 +32,22 @@ const SplitScreenChat = () => {
         setPlayerNameMap,
     } = useGame();
 
-    const {messages, setMessages, sendMessage} = useChatMessages();
-    const {handleNewGameModalOkPress} = useInitGame(isModalVisible, setIsModalVisible, setMessages);
+    const {messages, setMessages, sendMessage} = useChatMessages(setIsLoading, gameId, userName, playerNameMap);
+    const {handleNewGameModalOkPress} = useInitGame(
+        setIsLoading,
+        isModalVisible,
+        setIsModalVisible,
+        setMessages,
+        userName,
+        gameName,
+        gameTheme,
+        setGameId,
+        setPlayerIdMap,
+        setPlayerNameMap,
+        setGameName,
+        setGameTheme
+    );
+    const {handleVotingPress} = useVoting(setIsLoading, setMessages, playerIdMap, gameId);
 
     const handleIconPress = (iconName) => {
         console.log(`Icon pressed: ${iconName}`);
@@ -51,69 +65,27 @@ const SplitScreenChat = () => {
         setIsModalVisible(true);
     };
 
-    const handleVote = async (participantId) => {
-        const votingResults = new Map();
-        const participantIds = Array.from(playerIdMap.keys()); // Assuming you have a map of participant IDs
-        for (let participantId of participantIds) {
-            try {
-                const response = await fetch(URL_API_ASK_CERTAIN_PLAYER_TO_VOTE, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({gameId, participantId}),
-                });
-
-                if (response.ok) {
-                    const jsonResponse = await response.json();
-                    console.log(jsonResponse);
-
-                    const { name, reason } = jsonResponse; // Extract fields from the stored response
-
-                    if (name) {
-                        if (votingResults.has(name)) {
-                            votingResults.set(name, votingResults.get(name) + 1);
-                        } else {
-                            votingResults.set(name, 1);
-                        }
-                        console.log(`Voting result for ${participantId}: ${name} - ${reason}`);
-                    } else {
-                        console.log(`No player_to_eliminate field in response for participant ID ${participantId}`);
-                    }
-                } else {
-                    console.error('Error voting:', response.status);
-                }
-            } catch (error) {
-                console.error('Error voting:', error);
-            }
-        }
-        console.log(votingResults);
-    };
-
     return (
         <SafeAreaView style={styles.safeArea}>
             <MenuBar onMenuPress={handleMenuPress} onIconPress={handleIconPress}/>
             <View style={styles.container}>
                 <ParticipantsList
                     participants={Array.from(playerIdMap.values())}
-                    onVote={handleVote}
+                    onVote={() => handleVotingPress()}
                 />
                 <View style={styles.chatContainer}>
                     <ChatMessages messages={messages} scrollViewRef={scrollViewRef}/>
                     <InputArea
                         inputText={inputText}
                         onChangeText={setInputText}
-                        onSendMessage={() => sendMessage(inputText, gameId, userName, playerNameMap)}
+                        onSendMessage={() => sendMessage(inputText)}
                     />
                 </View>
             </View>
             <NewGameModal
                 isVisible={isModalVisible}
                 onClose={() => setIsModalVisible(false)}
-                onOkPress={() => handleNewGameModalOkPress(
-                    setIsLoading, userName, gameName, gameTheme, setGameId, setPlayerIdMap, setPlayerNameMap,
-                    setGameName, setGameTheme
-                )}
+                onOkPress={() => handleNewGameModalOkPress()}
                 userName={userName}
                 onUserNameChange={setUserName}
                 gameName={gameName}

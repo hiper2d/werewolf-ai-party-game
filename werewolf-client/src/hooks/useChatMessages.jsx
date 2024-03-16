@@ -1,11 +1,12 @@
 import {URL_API_TALK_TO_ALL, URL_API_TALK_TO_CERTAIN_PLAYER} from "../Constants";
 import {useState} from "react";
 
-const useChatMessages = () => {
+const useChatMessages = (setIsLoading, gameId, userName, playerNameMap) => {
     const [messages, setMessages] = useState([
     ]);
 
-    const sendMessage = async (inputText, gameId, userName, playerNameMap) => {
+    const sendMessage = async (inputText) => {
+        setIsLoading(true);
         if (inputText.trim()) {
             const newMessage = {
                 id: Math.random().toString(36).substring(7),
@@ -71,6 +72,7 @@ const useChatMessages = () => {
                 console.error('Error sending message:', error);
             }
         }
+        setIsLoading(false);
     };
 
     return {

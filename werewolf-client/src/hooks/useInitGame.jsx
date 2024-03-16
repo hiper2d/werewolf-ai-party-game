@@ -3,12 +3,23 @@ import {GAME_MASTER_COLOR, URL_API_GET_WELCOME_MESSAGE, URL_API_INIT_GAME} from 
 import {getRandomColor} from "./colors";
 import useGame from "./useGame";
 
-const useInitGame = (isModalVisible, setIsModalVisible, setMessages) => {
+const useInitGame = (
+    setIsLoading,
+    isModalVisible,
+    setIsModalVisible,
+    setMessages,
+    userName,
+    gameName,
+    gameTheme,
+    setGameId,
+    setPlayerIdMap,
+    setPlayerNameMap,
+    setGameName,
+    setGameTheme
+) => {
     const handleNewGameModalOkPress = async (
-        setIsLoading, userName, gameName, gameTheme, setGameId, setPlayerIdMap, setPlayerNameMap, setGameName, setGameTheme
+
     ) => {
-
-
         setIsModalVisible(false);
         setIsLoading(true);
         try {
