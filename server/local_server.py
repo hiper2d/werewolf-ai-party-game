@@ -1,10 +1,12 @@
+from typing import List
+
 from fastapi import FastAPI, Request
 from starlette.middleware.cors import CORSMiddleware
 
 from dto.request_dtos import InitGameRequest, WelcomeRequest, TalkToAllRequest, TalkToPlayer, VoteRoundOne
 from lambda_functions import init_game, get_welcome_message, talk_to_all, talk_to_certain_player, \
-    ask_certain_player_to_vote
-from models import ArbiterReply, VotingResponse
+    ask_certain_player_to_vote, get_all_games
+from models import ArbiterReply, VotingResponse, GameListDto
 
 app = FastAPI()
 
@@ -45,6 +47,10 @@ async def init_game_endpoint(request: Request):
         "bot_players": bot_players
     }
 
+@app.post("/get_all_games/")
+async def init_game_endpoint(request: Request):
+    games: List[GameListDto] = get_all_games()
+    return games
 
 @app.post("/get_welcome_message/")
 async def init_game_endpoint(request: Request):

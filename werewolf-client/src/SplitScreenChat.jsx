@@ -4,17 +4,18 @@ import MenuBar from './components/MenuBar';
 import ParticipantsList from './components/ParticipantsList';
 import ChatMessages from './components/ChatMessages';
 import InputArea from './components/InputArea';
-import NewGameModal from './components/NewGameModal';
+import NewGameModal from './components/modals/NewGameModal';
 import Loader from './components/Loader';
 import useChatMessages from "././hooks/useChatMessages";
 import useGame from "././hooks/useGame";
-import useInitGame from "././hooks/useInitGame";
+import useNewGame from "./hooks/useNewGame";
 import useVoting from "./hooks/useVoting";
+import AllGamesModal from "./components/modals/AllGamesModal";
 
 const SplitScreenChat = () => {
     const [inputText, setInputText] = useState('');
     const scrollViewRef = useRef(null);
-    const [isModalVisible, setIsModalVisible] = useState(false);
+    const [isNewGameModalVisible, setNewGameModalVisible] = useState(false);
     const {
         gameId,
         setGameId,
@@ -25,18 +26,18 @@ const SplitScreenChat = () => {
         gameTheme,
         setGameTheme,
         isLoading,
-        setIsLoading,
+        setLoading,
         playerIdMap,
         setPlayerIdMap,
         playerNameMap,
         setPlayerNameMap,
     } = useGame();
 
-    const {messages, setMessages, sendMessage} = useChatMessages(setIsLoading, gameId, userName, playerNameMap);
-    const {handleNewGameModalOkPress} = useInitGame(
-        setIsLoading,
-        isModalVisible,
-        setIsModalVisible,
+    const {messages, setMessages, sendMessage} = useChatMessages(setLoading, gameId, userName, playerNameMap);
+    const {handleNewGameModalOkPress} = useNewGame(
+        setLoading,
+        isNewGameModalVisible,
+        setNewGameModalVisible,
         setMessages,
         userName,
         gameName,
@@ -47,7 +48,7 @@ const SplitScreenChat = () => {
         setGameName,
         setGameTheme
     );
-    const {handleVotingPress} = useVoting(setIsLoading, setMessages, playerIdMap, gameId);
+    const {handleVotingPress} = useVoting(setLoading, setMessages, playerIdMap, gameId);
 
     const handleIconPress = (iconName) => {
         console.log(`Icon pressed: ${iconName}`);
@@ -62,7 +63,7 @@ const SplitScreenChat = () => {
     };
 
     const handleNewGamePress = () => {
-        setIsModalVisible(true);
+        setNewGameModalVisible(true);
     };
 
     return (
@@ -83,8 +84,8 @@ const SplitScreenChat = () => {
                 </View>
             </View>
             <NewGameModal
-                isVisible={isModalVisible}
-                onClose={() => setIsModalVisible(false)}
+                isVisible={isNewGameModalVisible}
+                onClose={() => setNewGameModalVisible(false)}
                 onOkPress={() => handleNewGameModalOkPress()}
                 userName={userName}
                 onUserNameChange={setUserName}
@@ -93,6 +94,11 @@ const SplitScreenChat = () => {
                 gameTheme={gameTheme}
                 onGameThemeChange={setGameTheme}
             />
+            {/*<AllGamesModal
+                isVisible={isNewGameModalVisible}
+                onClose={() => setNewGameModalVisible(false)}
+                onGameSelect={handleGameSelect}
+            />*/}
             {isLoading && <Loader/>}
         </SafeAreaView>
     );

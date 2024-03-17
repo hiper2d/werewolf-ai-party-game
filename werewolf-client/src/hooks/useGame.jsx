@@ -19,7 +19,7 @@ const useGame = () => {
         gameTheme,
         setGameTheme,
         isLoading,
-        setIsLoading,
+        setLoading: setIsLoading,
         playerIdMap,
         setPlayerIdMap,
         playerNameMap,

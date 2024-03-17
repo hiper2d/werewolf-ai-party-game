@@ -86,6 +86,3 @@ if __name__ == '__main__':
     messages.sort(key=lambda x: x.ts)
     for message in messages:
         print(f"{message.author_name}, {message.ts}: {message.msg}")
-
-# {"Neville": "8f0ca87a-3457-4dd2-be16-9d3a4c18f023", "Luna": "b9a7a58e-0d3d-41ca-986f-7b82a9b5a90b", "Cedric": "1b2c0c80-bf29-496f-b440-546f033d155b", "Draco": "34a67817-5687-42a5-8377-b293584b37fe", "Ginny": "e8ff9ce8-405f-460d-bcce-c204fe036f81"}
-# {"players_to_reply": ["Luna", "Neville", "Draco"]}

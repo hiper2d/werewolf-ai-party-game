@@ -20,9 +20,7 @@ Or "Lord of the Rings":
 
 I really like these thematic dialogs and how creative the bots are. 
 
-UI is chunky and ugly yet but I'm working on it. It's a very early stage of the project.
-
-It is only possible to create a new game, to chat with bot players and to initiate a first round of voting. I have more things in the API but UI is not ready yet.
+UI is chunky and ugly yet but I'm working on it. It's a very early stage of the project. It is only possible to create a new game, to chat with bot players and to initiate a first round of voting. I have more things in the API but UI is not ready yet.
 
 # Setup
 
@@ -35,10 +33,18 @@ and docker-compose installed.
 docker-compose up
 ```
 
-### Run Python functions
+### Frontend and Backend
 
-Before running Python code, rename the [.env.template](.env.template) file into `.env` and fill in the values. All
-environmental variables from it will be loaded by functions and used to talk to the external APIs (Redis, OpenAI).
+I use FastAPI Python web server and React Native frontend application. Here are my Intellij Idea run configurations:
+
+<img src="images/backend-run-config.png" width="300">
+<img src="images/frontend-run-config.png" width="300">
+
+> **Note:** Before running Python code, rename the [.env.template](.env.template) file into `.env` and fill in the values. All
+environmental variables from it will be loaded by functions and used to talk to the external APIs (DynamoDB, OpenAI).
+
+
+### Run Python functions [deprecated as I already have UI]
 
 I don't have any better runner than Python junit tests for now. In future, I'll use a web server with UI in React Native
 for the local development. I'll deploy functions to Lambdas and host UI somewhere separately.

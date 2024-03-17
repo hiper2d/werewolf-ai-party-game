@@ -7,6 +7,7 @@ import uuid
 from collections import Counter, defaultdict
 from typing import List, Tuple, Optional
 
+from boto3.resources.base import ServiceResource
 from dotenv import load_dotenv, find_dotenv
 
 from ai.agents.gm_agent import GmAgent
@@ -58,7 +59,7 @@ def _setup_logger(log_level=logging.DEBUG):
 
 load_dotenv(find_dotenv())
 logger = _setup_logger(log_level=logging.DEBUG)
-dynamo_resource = get_dynamo_resource()
+dynamo_resource: ServiceResource = get_dynamo_resource()
 
 game_dao = GameDao(dyn_resource=dynamo_resource)
 bot_player_dao = BotPlayerDao(dyn_resource=dynamo_resource)
@@ -109,6 +110,10 @@ def init_game(human_player_name: str, theme: str, reply_language_instruction: st
 
     return game.id, human_player.role, [[bot.id, bot.name] for bot in bot_players], game_scene
 
+
+def get_all_games():
+    load_dotenv(find_dotenv())
+    return game_dao.get_all()
 
 def get_welcome_messages_from_all_players(game_id: str):
     logger.info('Players introduction:')

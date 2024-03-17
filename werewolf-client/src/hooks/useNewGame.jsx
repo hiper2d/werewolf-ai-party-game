@@ -3,10 +3,10 @@ import {GAME_MASTER_COLOR, URL_API_GET_WELCOME_MESSAGE, URL_API_INIT_GAME} from 
 import {getRandomColor} from "./colors";
 import useGame from "./useGame";
 
-const useInitGame = (
+const useNewGame = (
     setIsLoading,
     isModalVisible,
-    setIsModalVisible,
+    setModalVisible,
     setMessages,
     userName,
     gameName,
@@ -20,7 +20,7 @@ const useInitGame = (
     const handleNewGameModalOkPress = async (
 
     ) => {
-        setIsModalVisible(false);
+        setModalVisible(false);
         setIsLoading(true);
         try {
             const response = await fetch(URL_API_INIT_GAME, {
@@ -122,4 +122,4 @@ const useInitGame = (
     };
 };
 
-export default useInitGame;
+export default useNewGame;

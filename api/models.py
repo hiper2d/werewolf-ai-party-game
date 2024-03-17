@@ -66,7 +66,7 @@ class BotPlayerDto(BaseModel):
 
 
 class GameDto(BaseModel):
-    id: str = (uuid.uuid4())
+    id: str = Field(default_factory=uuid.uuid4)
     story: str
     bot_player_ids: list[str]
     bot_player_name_to_id: dict[str, str]
@@ -79,6 +79,14 @@ class GameDto(BaseModel):
     user_moves_total_counter: int = 0
     is_active: bool = True
     ts: int = Field(default_factory=time.time_ns)
+
+
+class GameListDto(BaseModel):
+    id: str
+    name: str
+    theme: str
+    current_day: int
+
 
 
 class MessageRole(Enum):

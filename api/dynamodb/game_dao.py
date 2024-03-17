@@ -1,10 +1,8 @@
 import logging
 import time
-import uuid
 from typing import List
 
-import boto3
-from dotenv import load_dotenv, find_dotenv
+from boto3.resources.base import ServiceResource
 
 from dynamodb.generic_dao import GenericDao
 from models import GameDto, HumanPlayerDto, WerewolfRole
@@ -13,7 +11,7 @@ logger = logging.getLogger('my_application')
 
 
 class GameDao(GenericDao):
-    dyn_resource: object
+    dyn_resource: ServiceResource
     key_schema: List[object] = [
         {'AttributeName': "id", 'KeyType': 'HASH'},  # Partition key
     ]
@@ -80,8 +78,7 @@ class GameDao(GenericDao):
             },
         }
 
-    @staticmethod
-    def convert_record_to_dto(record: dict) -> GameDto:
+    def convert_record_to_dto(self, record: dict) -> GameDto:
         bot_player_ids = [bot_player_id['S'] for bot_player_id in record['bot_player_ids']['L']]
         bot_player_name_to_id = {
             name: bot_player_id['S'] for name, bot_player_id in record['bot_player_name_to_id']['M'].items()
@@ -109,4 +106,25 @@ class GameDao(GenericDao):
         if not self.exists_table():
             self.create_table()
         self.save_dto(dto)
+
+    def get_all_games(self) -> List[GameDto]:
+        if not self.exists_table():
+            logging.error("Table does not exist.")
+            return []
+
+        try:
+            response = self.dyn_resource.Table(self.table_name).scan()
+            games_records = response['Items']
+
+            # Handling pagination if the scanned data exceeds 1MB limit
+            while 'LastEvaluatedKey' in response:
+                response = self.dyn_resource.Table(self.table_name).scan(ExclusiveStartKey=response['LastEvaluatedKey'])
+                games_records.extend(response['Items'])
+
+            games_dtos = [self.convert_record_to_dto(record) for record in games_records]
+            return games_dtos
+        except Exception as e:
+            logging.error(f"Failed to get all games: {str(e)}")
+            return []
+
 
