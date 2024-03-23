@@ -64,7 +64,6 @@ class BotPlayerDto(BaseModel):
     ts: int = Field(default_factory=time.time_ns)
 
 
-
 class GameDto(BaseModel):
     id: str = Field(default_factory=uuid.uuid4)
     story: str

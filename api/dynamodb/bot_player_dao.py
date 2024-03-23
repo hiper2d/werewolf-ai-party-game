@@ -6,8 +6,7 @@ from models import BotPlayerDto, WerewolfRole
 
 
 class BotPlayerDao(GenericDao):
-
-    dyn_resource: object
+    dyn_client: object
     key_schema: List[object] = [
         {'AttributeName': "id", 'KeyType': 'HASH'},  # Partition key
     ]

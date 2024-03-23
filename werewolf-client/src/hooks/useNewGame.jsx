@@ -1,7 +1,5 @@
-import { useState } from 'react';
 import {GAME_MASTER_COLOR, URL_API_GET_WELCOME_MESSAGE, URL_API_INIT_GAME} from "../Constants";
 import {getRandomColor} from "./colors";
-import useGame from "./useGame";
 
 const useNewGame = (
     setIsLoading,

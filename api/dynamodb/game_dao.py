@@ -2,8 +2,6 @@ import logging
 import time
 from typing import List
 
-from boto3.resources.base import ServiceResource
-
 from dynamodb.generic_dao import GenericDao
 from models import GameDto, HumanPlayerDto, WerewolfRole
 
@@ -11,7 +9,8 @@ logger = logging.getLogger('my_application')
 
 
 class GameDao(GenericDao):
-    dyn_resource: ServiceResource
+    dyn_client: object
+    dyn_resource: object
     key_schema: List[object] = [
         {'AttributeName': "id", 'KeyType': 'HASH'},  # Partition key
     ]
@@ -107,24 +106,41 @@ class GameDao(GenericDao):
             self.create_table()
         self.save_dto(dto)
 
-    def get_all_games(self) -> List[GameDto]:
+    @staticmethod
+    def _convert_record_to_summary(record) -> dict:
+        return {
+            "id": record['id'],
+            "story": record['story'],
+            "current_day": int(record['current_day']),
+        }
+
+    def get_active_games_summary(self) -> List[dict]:
         if not self.exists_table():
             logging.error("Table does not exist.")
             return []
 
         try:
-            response = self.dyn_resource.Table(self.table_name).scan()
+            response = self.dyn_resource.Table(self.table_name).scan(
+                FilterExpression="is_active = :active",
+                ExpressionAttributeValues={":active": True},
+                ProjectionExpression="id, story, current_day"
+            )
             games_records = response['Items']
 
             # Handling pagination if the scanned data exceeds 1MB limit
             while 'LastEvaluatedKey' in response:
-                response = self.dyn_resource.Table(self.table_name).scan(ExclusiveStartKey=response['LastEvaluatedKey'])
+                response = self.dyn_resource.Table(self.table_name).scan(
+                    FilterExpression="is_active = :active",
+                    ExpressionAttributeValues={":active": True},
+                    ProjectionExpression="id, story, current_day",
+                    ExclusiveStartKey=response['LastEvaluatedKey']
+                )
                 games_records.extend(response['Items'])
 
-            games_dtos = [self.convert_record_to_dto(record) for record in games_records]
-            return games_dtos
+            games_summary = [self._convert_record_to_summary(record) for record in games_records]
+            return games_summary
         except Exception as e:
-            logging.error(f"Failed to get all games: {str(e)}")
+            logging.error(f"Failed to get active games summary: {str(e)}")
             return []
 
 

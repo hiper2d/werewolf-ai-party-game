@@ -2,14 +2,14 @@ from typing import List
 
 from dotenv import load_dotenv, find_dotenv
 
-from dynamodb.dynamo_helper import get_dynamo_resource
+from dynamodb.dynamo_helper import get_dynamo_client
 from dynamodb.dynamo_message import DynamoChatMessage, MessageRole
 from dynamodb.generic_dao import GenericDao
 from models import MessageDto
 
 
 class MessageDao(GenericDao):
-    dyn_resource: object
+    dyn_client: object
     key_schema: List[object] = [
         {'AttributeName': "recipient", 'KeyType': 'HASH'},  # Partition key
         {"AttributeName": "ts", "KeyType": "RANGE"},  # Sort key
@@ -77,7 +77,7 @@ class MessageDao(GenericDao):
 
 if __name__ == '__main__':
     load_dotenv(find_dotenv())
-    dynamo_resource = get_dynamo_resource()
+    dynamo_resource = get_dynamo_client()
     dao = MessageDao(dyn_resource=dynamo_resource)
     game_id = '693c7eee-5284-4af7-b06b-c775fb9ca078'
     messages = dao.get_last_records(f"{game_id}_all")

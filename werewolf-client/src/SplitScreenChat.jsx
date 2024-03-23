@@ -1,21 +1,23 @@
-import React, {useRef, useState} from 'react';
-import {SafeAreaView, StyleSheet, View} from 'react-native';
+import React, { useRef, useState } from 'react';
+import { SafeAreaView, StyleSheet, View } from 'react-native';
 import MenuBar from './components/MenuBar';
 import ParticipantsList from './components/ParticipantsList';
 import ChatMessages from './components/ChatMessages';
 import InputArea from './components/InputArea';
 import NewGameModal from './components/modals/NewGameModal';
 import Loader from './components/Loader';
-import useChatMessages from "././hooks/useChatMessages";
-import useGame from "././hooks/useGame";
-import useNewGame from "./hooks/useNewGame";
-import useVoting from "./hooks/useVoting";
-import AllGamesModal from "./components/modals/AllGamesModal";
+import useChatMessages from './hooks/useChatMessages';
+import useGame from './hooks/useGame';
+import useNewGame from './hooks/useNewGame';
+import useVoting from './hooks/useVoting';
+import AllGamesModal from './components/modals/AllGamesModal';
 
 const SplitScreenChat = () => {
     const [inputText, setInputText] = useState('');
     const scrollViewRef = useRef(null);
     const [isNewGameModalVisible, setNewGameModalVisible] = useState(false);
+    const [isAllGamesModalVisible, setAllGamesModalVisible] = useState(false);
+
     const {
         gameId,
         setGameId,
@@ -33,8 +35,14 @@ const SplitScreenChat = () => {
         setPlayerNameMap,
     } = useGame();
 
-    const {messages, setMessages, sendMessage} = useChatMessages(setLoading, gameId, userName, playerNameMap);
-    const {handleNewGameModalOkPress} = useNewGame(
+    const { messages, setMessages, sendMessage } = useChatMessages(
+        setLoading,
+        gameId,
+        userName,
+        playerNameMap
+    );
+
+    const { handleNewGameModalOkPress } = useNewGame(
         setLoading,
         isNewGameModalVisible,
         setNewGameModalVisible,
@@ -48,7 +56,8 @@ const SplitScreenChat = () => {
         setGameName,
         setGameTheme
     );
-    const {handleVotingPress} = useVoting(setLoading, setMessages, playerIdMap, gameId);
+
+    const { handleVotingPress } = useVoting(setLoading, setMessages, playerIdMap, gameId);
 
     const handleIconPress = (iconName) => {
         console.log(`Icon pressed: ${iconName}`);
@@ -58,7 +67,7 @@ const SplitScreenChat = () => {
         if (menuItem === 'New Game') {
             handleNewGamePress();
         } else if (menuItem === 'All Games') {
-            console.log('Navigate to All Games screen');
+            setAllGamesModalVisible(true);
         }
     };
 
@@ -66,16 +75,21 @@ const SplitScreenChat = () => {
         setNewGameModalVisible(true);
     };
 
+    const handleGameSelect = (gameId) => {
+        setGameId(gameId);
+        // Additional logic for handling game selection, if needed
+    };
+
     return (
         <SafeAreaView style={styles.safeArea}>
-            <MenuBar onMenuPress={handleMenuPress} onIconPress={handleIconPress}/>
+            <MenuBar onMenuPress={handleMenuPress} onIconPress={handleIconPress} />
             <View style={styles.container}>
                 <ParticipantsList
                     participants={Array.from(playerIdMap.values())}
                     onVote={() => handleVotingPress()}
                 />
                 <View style={styles.chatContainer}>
-                    <ChatMessages messages={messages} scrollViewRef={scrollViewRef}/>
+                    <ChatMessages messages={messages} scrollViewRef={scrollViewRef} />
                     <InputArea
                         inputText={inputText}
                         onChangeText={setInputText}
@@ -94,15 +108,15 @@ const SplitScreenChat = () => {
                 gameTheme={gameTheme}
                 onGameThemeChange={setGameTheme}
             />
-            {/*<AllGamesModal
-                isVisible={isNewGameModalVisible}
-                onClose={() => setNewGameModalVisible(false)}
+            <AllGamesModal
+                isVisible={isAllGamesModalVisible}
+                onClose={() => setAllGamesModalVisible(false)}
                 onGameSelect={handleGameSelect}
-            />*/}
-            {isLoading && <Loader/>}
+            />
+            {isLoading && <Loader />}
         </SafeAreaView>
     );
-}
+};
 
 const styles = StyleSheet.create({
     safeArea: {

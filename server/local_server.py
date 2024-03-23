@@ -47,10 +47,12 @@ async def init_game_endpoint(request: Request):
         "bot_players": bot_players
     }
 
-@app.post("/get_all_games/")
+
+@app.get("/all_games/")
 async def init_game_endpoint(request: Request):
-    games: List[GameListDto] = get_all_games()
+    games = get_all_games()
     return games
+
 
 @app.post("/get_welcome_message/")
 async def init_game_endpoint(request: Request):

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import {Modal, Pressable, StyleSheet, Text, TextInput, View} from 'react-native';
 
 const NewGameModal = ({
                           isVisible,

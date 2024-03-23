@@ -7,7 +7,6 @@ import uuid
 from collections import Counter, defaultdict
 from typing import List, Tuple, Optional
 
-from boto3.resources.base import ServiceResource
 from dotenv import load_dotenv, find_dotenv
 
 from ai.agents.gm_agent import GmAgent
@@ -26,10 +25,9 @@ from api.redis.redis_helper import connect_to_redis, save_game_to_redis, load_ga
 from api.utils import get_top_items_within_range
 from constants import NO_ALIES, RECIPIENT_ALL, GM_NAME, GM_ID
 from dynamodb.bot_player_dao import BotPlayerDao
-from dynamodb.dynamo_helper import get_dynamo_resource
+from dynamodb.dynamo_helper import get_dynamo_client, get_dynamo_resource
 from dynamodb.game_dao import GameDao
 from dynamodb.message_dao import MessageDao
-
 
 
 def _setup_logger(log_level=logging.DEBUG):
@@ -59,11 +57,13 @@ def _setup_logger(log_level=logging.DEBUG):
 
 load_dotenv(find_dotenv())
 logger = _setup_logger(log_level=logging.DEBUG)
-dynamo_resource: ServiceResource = get_dynamo_resource()
+dyn_client = get_dynamo_client()
+dyn_resource = get_dynamo_resource()
 
-game_dao = GameDao(dyn_resource=dynamo_resource)
-bot_player_dao = BotPlayerDao(dyn_resource=dynamo_resource)
-message_dao = MessageDao(dyn_resource=dynamo_resource)
+game_dao = GameDao(dyn_client=dyn_client, dyn_resource=dyn_resource)
+bot_player_dao = BotPlayerDao(dyn_client=dyn_client)
+message_dao = MessageDao(dyn_client=dyn_client)
+
 
 def init_game(human_player_name: str, theme: str, reply_language_instruction: str = '') \
         -> Tuple[str, WerewolfRole, List[List[str]], str]:
@@ -113,7 +113,8 @@ def init_game(human_player_name: str, theme: str, reply_language_instruction: st
 
 def get_all_games():
     load_dotenv(find_dotenv())
-    return game_dao.get_all()
+    return game_dao.get_active_games_summary()
+
 
 def get_welcome_messages_from_all_players(game_id: str):
     logger.info('Players introduction:')
@@ -254,6 +255,7 @@ def talk_to_certain_player(game_id: str, name: str):
     )
     message_dao.save_dto(answer_message)
     return answer
+
 
 def ask_certain_player_to_vote(game_id: str, bot_player_id: str) -> VotingResponse:
     game = game_dao.get_by_id(game_id)
@@ -477,7 +479,6 @@ def start_game_night(game_id, user_action: str = None):
             print("Well, you messed something up in the role map if you are seeing this")
 
 
-
 def delete_assistants_from_openai_and_game_from_redis(game_id: str):
     load_dotenv(find_dotenv())
     r = connect_to_redis()
@@ -504,6 +505,7 @@ def cleanup_dynamodb():
     bot_player_dao.delete_table()
     message_dao.delete_table()
     game_dao.delete_table()
+
 
 def delete_assistants_from_openai_by_name(name: str):
     load_dotenv(find_dotenv())

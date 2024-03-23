@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 
 class GenericDao(ABC, BaseModel):
-    dyn_resource: object
+    dyn_client: object
     key_schema: List[object]
     attribute_definitions: List[object]
     table_name: str
@@ -25,7 +25,7 @@ class GenericDao(ABC, BaseModel):
 
     def create_table(self):
         try:
-            result = self.dyn_resource.create_table(
+            result = self.dyn_client.create_table(
                 TableName=self.table_name,
                 KeySchema=self.key_schema,
                 AttributeDefinitions=self.attribute_definitions,
@@ -42,7 +42,7 @@ class GenericDao(ABC, BaseModel):
 
     def delete_table(self):
         try:
-            self.dyn_resource.delete_table(
+            self.dyn_client.delete_table(
                 TableName=self.table_name
             )
 
@@ -52,7 +52,7 @@ class GenericDao(ABC, BaseModel):
 
     def exists_table(self):
         try:
-            self.dyn_resource.describe_table(TableName=self.table_name)
+            self.dyn_client.describe_table(TableName=self.table_name)
             return True
         except Exception as e:
             if e.response['Error']['Code'] == 'ResourceNotFoundException':
@@ -73,7 +73,7 @@ class GenericDao(ABC, BaseModel):
 
     def remove_dto(self, dto):
         try:
-            self.dyn_resource.delete_item(
+            self.dyn_client.delete_item(
                 TableName=self.table_name,
                 Key=self.convert_dto_to_key(dto)
             )
@@ -83,7 +83,7 @@ class GenericDao(ABC, BaseModel):
 
     def get_by_id(self, id: str):
         try:
-            result: dict = self.dyn_resource.get_item(
+            result: dict = self.dyn_client.get_item(
                 TableName=self.table_name,
                 Key=self._convert_id_to_key(id)
             )
