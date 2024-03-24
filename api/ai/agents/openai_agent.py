@@ -16,7 +16,9 @@ class OpenAiAgent(GenericAgent):
         # Available models: https://platform.openai.com/docs/models/gpt-4-and-gpt-4-turbo
 
     def ask(self, chat_messages: List[MessageDto], is_json: bool = False) -> str | None:
-        self.logger.debug(f"Asking {self.name} agent: {chat_messages[-1].msg}")
+        self.logger.debug(f"Asking {self.name} agent. Message history for this player: {chat_messages[-1].msg}")
+        for msg in chat_messages[1:]:  # Skip the first message because it's too long
+            self.logger.debug(f"{msg.role}: {msg.msg}")
         chat_completion: ChatCompletion = self.client.chat.completions.create(
             messages=[{"role": msg.role.value, "content": msg.msg} for msg in chat_messages],
             model=self.model,

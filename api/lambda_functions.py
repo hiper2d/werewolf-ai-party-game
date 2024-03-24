@@ -65,7 +65,7 @@ bot_player_dao = BotPlayerDao(dyn_client=dyn_client)
 message_dao = MessageDao(dyn_client=dyn_client)
 
 
-def init_game(human_player_name: str, theme: str, reply_language_instruction: str = '') \
+def init_game(human_player_name: str, game_name: str, theme: str, reply_language_instruction: str = '') \
         -> Tuple[str, WerewolfRole, List[List[str]], str]:
     logger.info("*** Starting new game! ***\n")
 
@@ -78,6 +78,7 @@ def init_game(human_player_name: str, theme: str, reply_language_instruction: st
 
     game = GameDto(
         id=str(uuid.uuid4()),
+        name=game_name,
         story=game_scene,
         bot_player_ids=[player.id for player in bot_players],
         bot_player_name_to_id={player.name: player.id for player in bot_players},
@@ -107,6 +108,11 @@ def init_game(human_player_name: str, theme: str, reply_language_instruction: st
 
     if not message_dao.exists_table():
         message_dao.create_table()
+    into_message = MessageDto(
+        recipient=f"{game.id}_{RECIPIENT_ALL}", author_name=GM_NAME, author_id=GM_ID,
+        msg=game.story, role=MessageRole.USER
+    )
+    message_dao.save_dto(into_message)
 
     return game.id, human_player.role, [[bot.id, bot.name] for bot in bot_players], game_scene
 
@@ -136,7 +142,7 @@ def get_welcome_messages_from_all_players(game_id: str):
 
         messages_to_all: List[MessageDto] = message_dao.get_last_records(recipient=f"{game_id}_{RECIPIENT_ALL}")
         messages_to_bot_player = message_dao.get_last_records(recipient=f"{game_id}_{bot_player.id}")
-        messages_to_all.extend(messages_to_bot_player) # merging messages from common chat and bot personal commands
+        messages_to_all.extend(messages_to_bot_player)  # merging messages from common chat and bot personal commands
         messages_to_all.sort(key=lambda x: x.ts, reverse=True)
 
         command_message = MessageDto(
@@ -161,12 +167,12 @@ def get_welcome_message(game_id: str, bot_player_id: str) -> str:
 
     game = game_dao.get_by_id(game_id)
     if not game or not game.bot_player_ids:
-        logger.debug(f"Game with id {game_id} not found in Redis or it doesn't have bots")
+        logger.debug(f"Game with id {game_id} not found in the database or it doesn't have bots")
         return
 
     bot_player = bot_player_dao.get_by_id(bot_player_id)
     if not bot_player:
-        logger.debug(f"Bot player with id {bot_player_id} not found in Redis")
+        logger.debug(f"Bot player with id {bot_player_id} not found in the database")
         return
 
     bot_player_agent = BotPlayerAgent(me=bot_player, game=game)

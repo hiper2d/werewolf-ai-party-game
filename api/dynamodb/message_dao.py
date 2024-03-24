@@ -60,14 +60,13 @@ class MessageDao(GenericDao):
 
     def get_last_records(self, recipient: str, limit: int = 10_000) -> List[MessageDto]:
         try:
-            result: dict = self.dyn_resource.query(
+            result: dict = self.dyn_client.query(
                 TableName=self.table_name,
                 Select='ALL_ATTRIBUTES',
                 KeyConditionExpression='recipient = :recipient',
                 ExpressionAttributeValues={
                     ':recipient': {'S': recipient}
                 },
-                ScanIndexForward=True,
                 Limit=limit
             )
             return self.convert_records_to_dto_list(result['Items'])

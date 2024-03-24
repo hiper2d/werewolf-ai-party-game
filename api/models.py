@@ -66,6 +66,7 @@ class BotPlayerDto(BaseModel):
 
 class GameDto(BaseModel):
     id: str = Field(default_factory=uuid.uuid4)
+    name: str
     story: str
     bot_player_ids: list[str]
     bot_player_name_to_id: dict[str, str]

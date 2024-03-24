@@ -63,7 +63,7 @@ class GenericDao(ABC, BaseModel):
 
     def save_dto(self, dto):
         try:
-            self.dyn_resource.put_item(
+            self.dyn_client.put_item(
                 TableName=self.table_name,
                 Item=self.convert_dto_to_record(dto)
             )

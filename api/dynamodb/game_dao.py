@@ -25,6 +25,9 @@ class GameDao(GenericDao):
             'id': {
                 'S': game.id,
             },
+            'game_name': {
+                'S': game.name,
+            },
             'story': {
                 'S': game.story,
             },
@@ -87,6 +90,7 @@ class GameDao(GenericDao):
         )
         return GameDto(
             id=record['id']['S'],
+            name=record['game_name']['S'],
             story=record['story']['S'],
             bot_player_ids=bot_player_ids,
             bot_player_name_to_id=bot_player_name_to_id,
@@ -110,8 +114,9 @@ class GameDao(GenericDao):
     def _convert_record_to_summary(record) -> dict:
         return {
             "id": record['id'],
-            "story": record['story'],
+            "name": record['game_name'],
             "current_day": int(record['current_day']),
+            "ts": int(record['updated_at']),
         }
 
     def get_active_games_summary(self) -> List[dict]:
@@ -123,7 +128,7 @@ class GameDao(GenericDao):
             response = self.dyn_resource.Table(self.table_name).scan(
                 FilterExpression="is_active = :active",
                 ExpressionAttributeValues={":active": True},
-                ProjectionExpression="id, story, current_day"
+                ProjectionExpression="id, game_name, current_day, updated_at",
             )
             games_records = response['Items']
 
@@ -132,7 +137,7 @@ class GameDao(GenericDao):
                 response = self.dyn_resource.Table(self.table_name).scan(
                     FilterExpression="is_active = :active",
                     ExpressionAttributeValues={":active": True},
-                    ProjectionExpression="id, story, current_day",
+                    ProjectionExpression="id, game_name, current_day, updated_at",
                     ExclusiveStartKey=response['LastEvaluatedKey']
                 )
                 games_records.extend(response['Items'])

@@ -41,9 +41,9 @@ const AllGamesModal = ({ isVisible, onClose, onGameSelect }) => {
                 selectedGameId === item.id && styles.selectedGameContainer,
             ]}
         >
-            <Text style={styles.gameText}>{item.game_name}</Text>
-            <Text style={styles.gameText}>Day {item.current_day}</Text>
-            <Text style={styles.gameText}>{item.theme}</Text>
+            <Text style={styles.gameText}>{item.name}</Text>
+            <Text style={styles.gameText}>{item.current_day}</Text>
+            <Text style={styles.gameText}>Day {item.ts}</Text>
         </Pressable>
     );
 

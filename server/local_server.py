@@ -37,6 +37,7 @@ async def init_game_endpoint(request: Request):
     init_game_request = InitGameRequest(**data)
     game_id, human_player_role, bot_players, story = init_game(
         human_player_name=init_game_request.userName,
+        game_name=init_game_request.gameName,
         theme=init_game_request.gameTheme
     )
 
