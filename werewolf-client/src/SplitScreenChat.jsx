@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { SafeAreaView, StyleSheet, View } from 'react-native';
 import MenuBar from './components/MenuBar';
 import ParticipantsList from './components/ParticipantsList';
@@ -14,7 +14,6 @@ import AllGamesModal from './components/modals/AllGamesModal';
 
 const SplitScreenChat = () => {
     const [inputText, setInputText] = useState('');
-    const scrollViewRef = useRef(null);
     const [isNewGameModalVisible, setNewGameModalVisible] = useState(false);
     const [isAllGamesModalVisible, setAllGamesModalVisible] = useState(false);
 
@@ -77,7 +76,6 @@ const SplitScreenChat = () => {
 
     const handleGameSelect = (gameId) => {
         setGameId(gameId);
-        // Additional logic for handling game selection, if needed
     };
 
     return (
@@ -89,7 +87,7 @@ const SplitScreenChat = () => {
                     onVote={() => handleVotingPress()}
                 />
                 <View style={styles.chatContainer}>
-                    <ChatMessages messages={messages} scrollViewRef={scrollViewRef} />
+                    <ChatMessages messages={messages}/>
                     <InputArea
                         inputText={inputText}
                         onChangeText={setInputText}
@@ -112,6 +110,8 @@ const SplitScreenChat = () => {
                 isVisible={isAllGamesModalVisible}
                 onClose={() => setAllGamesModalVisible(false)}
                 onGameSelect={handleGameSelect}
+                onChatMessagesLoaded={(messages) => setMessages(messages)}
+                onPlayerNameMapUpdated={(newPlayerNameMap) => setPlayerNameMap(newPlayerNameMap)}
             />
             {isLoading && <Loader />}
         </SafeAreaView>

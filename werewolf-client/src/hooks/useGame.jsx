@@ -5,7 +5,7 @@ const useGame = () => {
     const [userName, setUserName] = useState('');
     const [gameName, setGameName] = useState('');
     const [gameTheme, setGameTheme] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
+    const [isLoading, setLoading] = useState(false);
     const [playerIdMap, setPlayerIdMap] = useState(new Map());
     const [playerNameMap, setPlayerNameMap] = useState(new Map());
 
@@ -19,7 +19,7 @@ const useGame = () => {
         gameTheme,
         setGameTheme,
         isLoading,
-        setLoading: setIsLoading,
+        setLoading,
         playerIdMap,
         setPlayerIdMap,
         playerNameMap,

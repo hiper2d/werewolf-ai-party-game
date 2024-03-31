@@ -5,7 +5,7 @@ from starlette.middleware.cors import CORSMiddleware
 
 from dto.request_dtos import InitGameRequest, WelcomeRequest, TalkToAllRequest, TalkToPlayer, VoteRoundOne
 from lambda_functions import init_game, get_welcome_message, talk_to_all, talk_to_certain_player, \
-    ask_certain_player_to_vote, get_all_games
+    ask_certain_player_to_vote, get_all_games, get_chat_history
 from models import ArbiterReply, VotingResponse, GameListDto
 
 app = FastAPI()
@@ -53,6 +53,12 @@ async def init_game_endpoint(request: Request):
 async def init_game_endpoint(request: Request):
     games = get_all_games()
     return games
+
+
+@app.get("/chat_history/{game_id}")
+async def get_chat_history_endpoint(game_id: str):
+    messages = get_chat_history(game_id)
+    return [message.dict() for message in messages]
 
 
 @app.post("/get_welcome_message/")

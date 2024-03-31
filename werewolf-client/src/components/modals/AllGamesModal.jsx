@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import {URL_API_GET_ALL_GAMES} from "../../Constants";
+import {URL_API_GET_ALL_GAMES, URL_API_GET_CHAT_HISTORY} from "../../Constants";
+import {getRandomColor} from "../../hooks/colors";
 
-const AllGamesModal = ({ isVisible, onClose, onGameSelect }) => {
+const AllGamesModal = ({ isVisible, onClose, onGameSelect, onChatMessagesLoaded, onPlayerNameMapUpdated }) => {
     const [games, setGames] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
@@ -27,9 +28,36 @@ const AllGamesModal = ({ isVisible, onClose, onGameSelect }) => {
         fetchGames();
     }, [isVisible]);
 
-    const handleGameSelect = (gameId) => {
+    const handleGameSelect = async (gameId) => {
         setSelectedGameId(gameId);
         onGameSelect(gameId);
+
+        try {
+            const response = await fetch(`${URL_API_GET_CHAT_HISTORY}/${gameId}`);
+            const data = await response.json();
+
+            const newPlayerNameMap = new Map();
+            const playerNames = [...new Set(data.map((message) => message.author_name))];
+            playerNames.forEach((playerName) => {
+                const randomColor = getRandomColor();
+                newPlayerNameMap.set(playerName, { name: playerName, color: randomColor });
+            });
+
+            const formattedMessages = data.map((message, index) => ({
+                key: `${index}`,
+                text: message.msg,
+                timestamp: new Date(message.ts),
+                isUserMessage: message.role === 'USER',
+                author: message.author_name,
+                authorColor: newPlayerNameMap.get(message.author_name).color
+            }));
+
+            onChatMessagesLoaded(formattedMessages);
+            onPlayerNameMapUpdated(newPlayerNameMap);
+        } catch (error) {
+            console.error('Error fetching chat messages:', error);
+        }
+
         onClose();
     };
 

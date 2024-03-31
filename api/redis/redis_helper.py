@@ -7,7 +7,7 @@ import logging
 
 logger = logging.getLogger('my_application')
 
-
+# todo: remove this file since I don't use re
 def connect_to_redis() -> Redis:
     try:
         r = Redis(host=os.getenv("REDIS_HOST"), port=os.getenv("REDIS_PORT"), db=0)

@@ -4,9 +4,7 @@ import random
 import uuid
 from typing import List, Tuple
 
-from ai.agents.claude_agent import ClaudeAgent
-from ai.agents.groq_agent import GroqAgent
-from ai.agents.openai_agent import OpenAiAgent
+from ai.agents.providers.openai_agent import OpenAiAgent
 from ai.prompts.text_generator_prompts import GAME_GENERATION_PROMPT
 from api.models import BotPlayerDto, WerewolfRole, role_motivations
 

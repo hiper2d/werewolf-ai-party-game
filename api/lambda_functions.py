@@ -7,6 +7,9 @@ import uuid
 from collections import Counter, defaultdict
 from typing import List, Tuple, Optional
 
+from api.redis.redis_helper import connect_to_redis, save_game_to_redis, load_game_from_redis, \
+    add_message_to_game_history_redis_list, delete_game_history_redis_list, read_messages_from_game_history_redis_list, \
+    delete_game_from_redis, read_newest_game_from_redis
 from dotenv import load_dotenv, find_dotenv
 
 from ai.agents.gm_agent import GmAgent
@@ -19,9 +22,6 @@ from api.ai.assistants import ArbiterAssistantDecorator, PlayerAssistantDecorato
 from api.ai.text_generators import generate_scene_and_players
 from api.models import GameDto, ArbiterReply, VotingResponse, WerewolfRole, HumanPlayerDto, BotPlayerDto, MessageDto, \
     MessageRole
-from api.redis.redis_helper import connect_to_redis, save_game_to_redis, load_game_from_redis, \
-    add_message_to_game_history_redis_list, delete_game_history_redis_list, read_messages_from_game_history_redis_list, \
-    delete_game_from_redis, read_newest_game_from_redis
 from api.utils import get_top_items_within_range
 from constants import NO_ALIES, RECIPIENT_ALL, GM_NAME, GM_ID
 from dynamodb.bot_player_dao import BotPlayerDao
@@ -299,6 +299,11 @@ def ask_certain_player_to_vote(game_id: str, bot_player_id: str) -> VotingRespon
     answer_json = json.loads(answer)
     reply_obj: VotingResponse = VotingResponse(name=answer_json['player_to_eliminate'], reason=answer_json['reason'])
     return reply_obj
+
+
+def get_chat_history(game_id: str, limit: int = 10_000) -> List[MessageDto]:
+    messages: List[MessageDto] = message_dao.get_last_records(recipient=f"{game_id}_{RECIPIENT_ALL}", limit=limit)
+    return messages
 
 
 # todo: split into separate api calls from UI

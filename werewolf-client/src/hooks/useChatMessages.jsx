@@ -9,7 +9,7 @@ const useChatMessages = (setIsLoading, gameId, userName, playerNameMap) => {
         setIsLoading(true);
         if (inputText.trim()) {
             const newMessage = {
-                id: Math.random().toString(36).substring(7),
+                key: Math.random().toString(36).substring(7),
                 text: inputText.trim(),
                 timestamp: new Date(),
                 isUserMessage: true,
