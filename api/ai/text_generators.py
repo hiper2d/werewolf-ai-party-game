@@ -4,9 +4,10 @@ import random
 import uuid
 from typing import List, Tuple
 
-from ai.agents.providers.openai_agent import OpenAiAgent
+from ai.agents.agent_factory import AgentFactory
 from ai.prompts.text_generator_prompts import GAME_GENERATION_PROMPT
 from api.models import BotPlayerDto, WerewolfRole, role_motivations
+from constants import DEFAULT_GM_AGENT, GM_NAME
 
 logger = logging.getLogger('my_application')
 
@@ -21,8 +22,8 @@ def generate_scene_and_players(num_players, wolf_count: int, additional_roles: L
 
     instruction = GAME_GENERATION_PROMPT.format(theme=theme, num_players=num_players-1,
                                                 human_player_name=human_player_name)
-    ai_agent = OpenAiAgent(name="Game Master")
-    response = ai_agent.ask_wth_text(question=instruction, is_json=False)
+    ai_agent = AgentFactory.create_agent(agent_type=DEFAULT_GM_AGENT, name=GM_NAME)
+    response = ai_agent.ask_wth_text(question=instruction)
     logger.debug(f"Received response from AI: {response}")
 
     try:

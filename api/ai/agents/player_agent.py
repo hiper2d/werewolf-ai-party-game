@@ -1,15 +1,18 @@
-from ai.agents.providers.openai_agent import OpenAiAgent
+from typing import List
+
+from ai.agents.agent_factory import AgentFactory
+from ai.agents.generic_agent import GenericAgent
 from ai.prompts.assistant_prompts import PLAYER_PROMPT
-from constants import GM_ID, GM_NAME
+from constants import GM_ID, GM_NAME, DEFAULT_PLAYER_AGENT
 from models import BotPlayerDto, GameDto, WerewolfRole, role_alies, role_enemies, MessageDto, \
     MessageRole
 
 
-class BotPlayerAgent(OpenAiAgent):
+class BotPlayerAgent(GenericAgent):
     def __init__(self, me: BotPlayerDto, game: GameDto):
         self.me = me
         self.game = game
-        super().__init__(me.name)
+        self.agent = AgentFactory.create_agent(agent_type=DEFAULT_PLAYER_AGENT, name=me.name)
 
     def create_instruction_message(self) -> MessageDto:
         def get_win_condition(p: BotPlayerDto):
@@ -48,3 +51,9 @@ class BotPlayerAgent(OpenAiAgent):
             role=MessageRole.SYSTEM.value,
             msg=instruction_prompt
         )
+
+    def ask(self, chat_messages: List[MessageDto]) -> str | None:
+        return self.agent.ask(chat_messages)
+
+    def ask_wth_text(self, question: str) -> str | None:
+        return self.agent.ask_wth_text(question)
