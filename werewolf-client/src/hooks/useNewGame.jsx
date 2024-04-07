@@ -13,7 +13,9 @@ const useNewGame = (
     setPlayerIdMap,
     setPlayerNameMap,
     setGameName,
-    setGameTheme
+    setGameTheme,
+    gameMasterLLM,
+    botPlayersLLM,
 ) => {
     const handleNewGameModalOkPress = async (
 
@@ -30,6 +32,8 @@ const useNewGame = (
                     userName,
                     gameName,
                     gameTheme,
+                    gameMasterLLM,
+                    botPlayersLLM
                 }),
             });
             if (response.ok) {

@@ -1,16 +1,19 @@
+import random
+
 from ai.agents.generic_agent import GenericAgent
 from ai.agents.providers.claude_agent import ClaudeAgent
 from ai.agents.providers.openai_agent import OpenAiAgent
+from models import LLMType
 
 
 class AgentFactory:
     @staticmethod
-    def create_agent(agent_type: str, name: str) -> GenericAgent:
-        agent_type = agent_type.lower()
-
-        if agent_type == "gpt":
+    def create_agent(llm_type: LLMType, name: str) -> GenericAgent:
+        if llm_type == LLMType.GPT4:
             return OpenAiAgent(name)
-        elif agent_type == "claude":
+        elif llm_type == LLMType.CLAUDE3_OPUS:
             return ClaudeAgent(name)
+        elif llm_type == LLMType.MIXED:
+            return random.choice([OpenAiAgent(name), ClaudeAgent(name)])
         else:
-            raise ValueError(f"Unknown agent name: {agent_type}")
+            raise ValueError(f"Unknown agent name: {llm_type}")

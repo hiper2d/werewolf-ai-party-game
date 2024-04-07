@@ -5,13 +5,14 @@ from ai.agents.generic_agent import GenericAgent
 from ai.prompts.assistant_prompts import ARBITER_PROMPT
 from constants import RECIPIENT_ALL, GM_NAME, GM_ID, DEFAULT_GM_AGENT
 from models import GameDto, MessageDto, \
-    MessageRole
+    MessageRole, LLMType
 
 
 class GmAgent(GenericAgent):
     def __init__(self, game: GameDto):
         self.game = game
-        self.agent = AgentFactory.create_agent(agent_type=DEFAULT_GM_AGENT, name=GM_NAME)
+        self.agent = AgentFactory.create_agent(llm_type=LLMType(game.gm_llm_type_str), name=GM_NAME)
+        self.llm_type = game.llm_tyle_str
 
     def create_instruction_message(self) -> MessageDto:
         instruction_prompt = ARBITER_PROMPT.format(

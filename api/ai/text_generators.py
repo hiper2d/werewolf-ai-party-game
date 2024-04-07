@@ -6,15 +6,16 @@ from typing import List, Tuple
 
 from ai.agents.agent_factory import AgentFactory
 from ai.prompts.text_generator_prompts import GAME_GENERATION_PROMPT
-from api.models import BotPlayerDto, WerewolfRole, role_motivations
+from api.models import BotPlayerDto, WerewolfRole, role_motivations, LLMType
 from constants import DEFAULT_GM_AGENT, GM_NAME
 
 logger = logging.getLogger('my_application')
 
 
-def generate_scene_and_players(num_players, wolf_count: int, additional_roles: List[WerewolfRole],
-                               human_player_name: str, theme: str = 'Western') \
-        -> Tuple[str, WerewolfRole, List[BotPlayerDto]]:
+def generate_scene_and_players(
+        num_players, wolf_count: int, additional_roles: List[WerewolfRole],
+        human_player_name: str, gm_llm: LLMType, bot_player_llm: LLMType, theme: str = 'Western'
+) -> Tuple[str, WerewolfRole, List[BotPlayerDto]]:
     logger.debug(f"Generating {num_players} players for a new game. Theme: {theme}.")
 
     roles: List[WerewolfRole] = _generate_random_roles_for_bot_players(num_players, wolf_count, additional_roles)
@@ -22,7 +23,7 @@ def generate_scene_and_players(num_players, wolf_count: int, additional_roles: L
 
     instruction = GAME_GENERATION_PROMPT.format(theme=theme, num_players=num_players-1,
                                                 human_player_name=human_player_name)
-    ai_agent = AgentFactory.create_agent(agent_type=DEFAULT_GM_AGENT, name=GM_NAME)
+    ai_agent = AgentFactory.create_agent(llm_type=gm_llm, name=GM_NAME)
     response = ai_agent.ask_wth_text(question=instruction)
     logger.debug(f"Received response from AI: {response}")
 
@@ -32,12 +33,12 @@ def generate_scene_and_players(num_players, wolf_count: int, additional_roles: L
             stripped = stripped[7:]
         if stripped.endswith("```"):
             stripped = stripped[:-3]
-        stripped = stripped.replace("\n", " ")
-        first_brace_position = stripped.find("{") # a hack to remove a prefix OpenAI agent tends to add
-        if first_brace_position != -1 and first_brace_position != 0:
-            stripped = stripped[first_brace_position:]
-        else:
-            raise ValueError("This is an invalid JSON")
+        stripped = stripped.replace("\\n", " ")
+        # first_brace_position = stripped.find("{") # a hack to remove a prefix OpenAI agent tends to add
+        # if first_brace_position != -1 and first_brace_position != 0:
+        #     stripped = stripped[first_brace_position:]
+        # else:
+        #     raise ValueError("This is an invalid JSON")
         response_json = json.loads(stripped)
     except json.JSONDecodeError:
         raise ValueError("Failed to decode JSON from OpenAI response")

@@ -1,17 +1,22 @@
-import React from 'react';
+import React, {useState} from 'react';
 import {Modal, Pressable, StyleSheet, Text, TextInput, View} from 'react-native';
+import {Picker} from "react-native-web";
 
 const NewGameModal = ({
-                          isVisible,
-                          onClose,
-                          onOkPress,
-                          userName,
-                          onUserNameChange,
-                          gameName,
-                          onGameNameChange,
-                          gameTheme,
-                          onGameThemeChange,
-                      }) => {
+      isVisible,
+      onClose,
+      onOkPress,
+      userName,
+      onUserNameChange,
+      gameName,
+      onGameNameChange,
+      gameTheme,
+      onGameThemeChange,
+      gameMasterLLM,
+      setGameMasterLLM,
+      botPlayersLLM,
+      setBotPlayersLLM
+  }) => {
     return (
         <Modal visible={isVisible} animationType="slide" transparent={true}>
             <View style={styles.modalContainer}>
@@ -38,6 +43,33 @@ const NewGameModal = ({
                         onChangeText={onGameThemeChange}
                         placeholderTextColor="#999"
                     />
+
+                    <View style={styles.dropdownContainer}>
+                        <View style={styles.dropdownWrapper}>
+                            <Text style={styles.dropdownLabel}>Game Master LLM:</Text>
+                            <Picker
+                                style={styles.dropdown}
+                                selectedValue={gameMasterLLM}
+                                onValueChange={(itemValue) => setGameMasterLLM(itemValue)}
+                            >
+                                <Picker.Item label="GPT-4" value="GPT-4" />
+                                <Picker.Item label="Claude3 Opus" value="Claude3 Opus" />
+                            </Picker>
+                        </View>
+                        <View style={styles.dropdownWrapper}>
+                            <Text style={styles.dropdownLabel}>Bot Players LLM:</Text>
+                            <Picker
+                                style={styles.dropdown}
+                                selectedValue={botPlayersLLM}
+                                onValueChange={(itemValue) => setBotPlayersLLM(itemValue)}
+                            >
+                                <Picker.Item label="GPT-4" value="GPT-4" />
+                                <Picker.Item label="Claude3 Opus" value="Claude3 Opus" />
+                                <Picker.Item label="Mixed" value="Mixed" />
+                            </Picker>
+                        </View>
+                    </View>
+
                     <View style={styles.modalButtonContainer}>
                         <Pressable
                             onPress={onClose}
@@ -88,6 +120,8 @@ const styles = StyleSheet.create({
         marginBottom: 20,
         color: '#61dafb',
     },
+
+    // inputs
     modalInput: {
         borderWidth: 1,
         borderColor: '#61dafb',
@@ -97,6 +131,30 @@ const styles = StyleSheet.create({
         color: '#fff',
         width: '100%',
     },
+
+    // dropdowns
+    dropdownContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        width: '100%',
+        marginBottom: 20,
+    },
+    dropdownWrapper: {
+        flex: 1,
+        marginHorizontal: 5,
+    },
+    dropdownLabel: {
+        color: '#fff',
+        marginBottom: 5,
+    },
+    dropdown: {
+        color: '#999',
+        backgroundColor: '#282c34',
+        borderRadius: 5,
+        paddingHorizontal: 10,
+    },
+
+    // buttons
     modalButtonContainer: {
         flexDirection: 'row',
         justifyContent: 'space-around',

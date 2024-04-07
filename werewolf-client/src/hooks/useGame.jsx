@@ -8,6 +8,8 @@ const useGame = () => {
     const [isLoading, setLoading] = useState(false);
     const [playerIdMap, setPlayerIdMap] = useState(new Map());
     const [playerNameMap, setPlayerNameMap] = useState(new Map());
+    const [gameMasterLLM, setGameMasterLLM] = useState('GPT-4');
+    const [botPlayersLLM, setBotPlayersLLM] = useState('GPT-4');
 
     return {
         gameId,
@@ -24,6 +26,10 @@ const useGame = () => {
         setPlayerIdMap,
         playerNameMap,
         setPlayerNameMap,
+        gameMasterLLM,
+        setGameMasterLLM,
+        botPlayersLLM,
+        setBotPlayersLLM
         // Export game-related functions
     };
 };

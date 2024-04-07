@@ -21,7 +21,7 @@ from api.ai.actions.role.role_dictionary import ROLE_DICTIONARY
 from api.ai.assistants import ArbiterAssistantDecorator, PlayerAssistantDecorator, RawAssistant
 from api.ai.text_generators import generate_scene_and_players
 from api.models import GameDto, ArbiterReply, VotingResponse, WerewolfRole, HumanPlayerDto, BotPlayerDto, MessageDto, \
-    MessageRole, AllGamesRecordDto
+    MessageRole, AllGamesRecordDto, LLMType
 from api.utils import get_top_items_within_range
 from constants import NO_ALIES, RECIPIENT_ALL, GM_NAME, GM_ID
 from dynamodb.bot_player_dao import BotPlayerDao
@@ -65,13 +65,16 @@ bot_player_dao = BotPlayerDao(dyn_client=dyn_client)
 message_dao = MessageDao(dyn_client=dyn_client)
 
 
-def init_game(human_player_name: str, game_name: str, theme: str, reply_language_instruction: str = '') \
+def init_game(human_player_name: str, game_name: str, theme: str,
+              gm_llm: LLMType, bot_player_llm: LLMType,
+              reply_language_instruction: str = '') \
         -> Tuple[str, WerewolfRole, List[List[str]], str]:
     logger.info("*** Starting new game! ***\n")
 
     game_scene, human_player_role, bot_players = generate_scene_and_players(
-        6, 2, [WerewolfRole.DOCTOR, WerewolfRole.DETECTIVE],
-        theme=theme, human_player_name=human_player_name
+        num_players=6, wolf_count=2, additional_roles=[WerewolfRole.DOCTOR, WerewolfRole.DETECTIVE],
+        theme=theme, human_player_name=human_player_name,
+        gm_llm=gm_llm, bot_player_llm=bot_player_llm
     )
     logger.info("Game Scene: %s\n", game_scene)
     human_player: HumanPlayerDto = HumanPlayerDto(name=human_player_name, role=human_player_role)
@@ -85,7 +88,9 @@ def init_game(human_player_name: str, game_name: str, theme: str, reply_language
         human_player=human_player,
         dead_player_names_with_roles='no eliminated players yet',
         players_names_with_roles_and_stories=','.join([f"{bot.name} ({bot.role.value})" for bot in bot_players]),
-        reply_language_instruction=reply_language_instruction
+        reply_language_instruction=reply_language_instruction,
+        gm_llm_type_str=gm_llm.value,
+        bot_player_llm_type_str=bot_player_llm.value
     )
     game_dao.create_or_update_dto(game)
 

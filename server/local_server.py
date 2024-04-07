@@ -6,7 +6,7 @@ from starlette.middleware.cors import CORSMiddleware
 from dto.request_dtos import InitGameRequest, WelcomeRequest, TalkToAllRequest, TalkToPlayer, VoteRoundOne
 from lambda_functions import init_game, get_welcome_message, talk_to_all, talk_to_certain_player, \
     ask_certain_player_to_vote, get_all_games, get_chat_history
-from models import ArbiterReply, VotingResponse, GameListDto, AllGamesRecordDto
+from models import ArbiterReply, VotingResponse, GameListDto, AllGamesRecordDto, LLMType
 
 app = FastAPI()
 
@@ -38,7 +38,9 @@ async def init_game_endpoint(request: Request):
     game_id, human_player_role, bot_players, story = init_game(
         human_player_name=init_game_request.userName,
         game_name=init_game_request.gameName,
-        theme=init_game_request.gameTheme
+        theme=init_game_request.gameTheme,
+        bot_player_llm=LLMType(init_game_request.botPlayersLLM),
+        gm_llm=LLMType(init_game_request.gameMasterLLM)
     )
 
     return {

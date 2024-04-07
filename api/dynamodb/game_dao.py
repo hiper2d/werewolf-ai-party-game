@@ -72,6 +72,12 @@ class GameDao(GenericDao):
             'reply_language_instruction': {
                 'S': game.reply_language_instruction,
             },
+            'gm_llm_type_str': {
+                'S': game.gm_llm_type_str,
+            },
+            'bot_player_llm_type_str': {
+                'S': game.bot_player_llm_type_str,
+            },
             'created_at': {
                 'N': str(game.ts),
             },
@@ -102,6 +108,8 @@ class GameDao(GenericDao):
             user_moves_total_counter=int(record['user_moves_total_counter']['N']),
             is_active=record['is_active']['BOOL'],
             reply_language_instruction=record['reply_language_instruction']['S'],
+            gm_llm_type_str=record['gm_llm_type_str']['S'],
+            bot_player_llm_type_str=record['bot_player_llm_type_str']['S'],
             ts=int(record['created_at']['N'])
         )
 

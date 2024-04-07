@@ -32,6 +32,10 @@ const SplitScreenChat = () => {
         setPlayerIdMap,
         playerNameMap,
         setPlayerNameMap,
+        gameMasterLLM,
+        setGameMasterLLM,
+        botPlayersLLM,
+        setBotPlayersLLM
     } = useGame();
 
     const { messages, setMessages, sendMessage } = useChatMessages(
@@ -53,7 +57,9 @@ const SplitScreenChat = () => {
         setPlayerIdMap,
         setPlayerNameMap,
         setGameName,
-        setGameTheme
+        setGameTheme,
+        gameMasterLLM,
+        botPlayersLLM,
     );
 
     const { handleVotingPress } = useVoting(setLoading, setMessages, playerIdMap, gameId);
@@ -64,14 +70,10 @@ const SplitScreenChat = () => {
 
     const handleMenuPress = (menuItem) => {
         if (menuItem === 'New Game') {
-            handleNewGamePress();
+            setNewGameModalVisible(true);
         } else if (menuItem === 'All Games') {
             setAllGamesModalVisible(true);
         }
-    };
-
-    const handleNewGamePress = () => {
-        setNewGameModalVisible(true);
     };
 
     const handleGameSelect = (gameId) => {
@@ -98,13 +100,17 @@ const SplitScreenChat = () => {
             <NewGameModal
                 isVisible={isNewGameModalVisible}
                 onClose={() => setNewGameModalVisible(false)}
-                onOkPress={() => handleNewGameModalOkPress()}
+                onOkPress={handleNewGameModalOkPress}
                 userName={userName}
                 onUserNameChange={setUserName}
                 gameName={gameName}
                 onGameNameChange={setGameName}
                 gameTheme={gameTheme}
                 onGameThemeChange={setGameTheme}
+                gameMasterLLM={gameMasterLLM}
+                setGameMasterLLM={setGameMasterLLM}
+                botPlayersLLM={botPlayersLLM}
+                setBotPlayersLLM={setBotPlayersLLM}
             />
             <AllGamesModal
                 isVisible={isAllGamesModalVisible}

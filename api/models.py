@@ -77,6 +77,8 @@ class GameDto(BaseModel):
     current_day: int = 1
     user_moves_day_counter: int = 0
     user_moves_total_counter: int = 0
+    gm_llm_type_str: str
+    bot_player_llm_type_str: str
     is_active: bool = True
     ts: int = Field(default_factory=time.time_ns)
 
@@ -117,3 +119,9 @@ class AllGamesRecordDto(BaseModel):
     name: str
     current_day: int
     ts: int
+
+
+class LLMType(Enum):
+    GPT4 = "GPT-4"
+    CLAUDE3_OPUS = "Claude3 Opus"
+    MIXED = "Mixed"

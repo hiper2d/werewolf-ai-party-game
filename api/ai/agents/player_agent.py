@@ -5,14 +5,14 @@ from ai.agents.generic_agent import GenericAgent
 from ai.prompts.assistant_prompts import PLAYER_PROMPT
 from constants import GM_ID, GM_NAME, DEFAULT_PLAYER_AGENT
 from models import BotPlayerDto, GameDto, WerewolfRole, role_alies, role_enemies, MessageDto, \
-    MessageRole
+    MessageRole, LLMType
 
 
 class BotPlayerAgent(GenericAgent):
     def __init__(self, me: BotPlayerDto, game: GameDto):
         self.me = me
         self.game = game
-        self.agent = AgentFactory.create_agent(agent_type=DEFAULT_PLAYER_AGENT, name=me.name)
+        self.agent = AgentFactory.create_agent(llm_type=LLMType(game.bot_player_llm_type_str), name=me.name)
 
     def create_instruction_message(self) -> MessageDto:
         def get_win_condition(p: BotPlayerDto):
