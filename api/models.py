@@ -88,7 +88,6 @@ class GameListDto(BaseModel):
     current_day: int
 
 
-
 class MessageRole(Enum):
     USER = "user"
     ASSISTANT = "assistant"
@@ -111,3 +110,10 @@ class ArbiterReply(BaseModel):
 class VotingResponse(BaseModel):
     name: str
     reason: str
+
+
+class AllGamesRecordDto(BaseModel):
+    id: str
+    name: str
+    current_day: int
+    ts: int

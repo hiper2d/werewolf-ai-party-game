@@ -69,9 +69,12 @@ const AllGamesModal = ({ isVisible, onClose, onGameSelect, onChatMessagesLoaded,
                 selectedGameId === item.id && styles.selectedGameContainer,
             ]}
         >
-            <Text style={styles.gameText}>{item.name}</Text>
-            <Text style={styles.gameText}>{item.current_day}</Text>
-            <Text style={styles.gameText}>Day {item.ts}</Text>
+            <View style={styles.gameDetails}>
+                <Text style={[styles.gameText, styles.gameId]}>{item.id}</Text>
+                <Text style={[styles.gameText, styles.gameName]}>{item.name}</Text>
+                <Text style={[styles.gameText, styles.gameDay]}>Day {item.current_day}</Text>
+                <Text style={[styles.gameText, styles.gameTimestamp]}>{item.ts}</Text>
+            </View>
         </Pressable>
     );
 
@@ -80,6 +83,12 @@ const AllGamesModal = ({ isVisible, onClose, onGameSelect, onChatMessagesLoaded,
             <View style={styles.modalContainer}>
                 <View style={styles.modalContent}>
                     <Text style={styles.modalTitle}>All Games</Text>
+                    <View style={styles.headerContainer}>
+                        <Text style={[styles.headerText, styles.gameId]}>ID</Text>
+                        <Text style={[styles.headerText, styles.gameName]}>Name</Text>
+                        <Text style={[styles.headerText, styles.gameDay]}>Day</Text>
+                        <Text style={[styles.headerText, styles.gameTimestamp]}>Timestamp</Text>
+                    </View>
                     {isLoading ? (
                         <Text style={styles.loadingText}>Loading...</Text>
                     ) : error ? (
@@ -134,9 +143,42 @@ const styles = StyleSheet.create({
         padding: 10,
         marginVertical: 5,
         borderRadius: 5,
+        width: '100%'
     },
     selectedGameContainer: {
         backgroundColor: 'rgba(97, 218, 251, 0.2)',
+    },
+    headerContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        borderBottomWidth: 1,
+        borderBottomColor: '#61dafb',
+        paddingBottom: 10,
+        marginBottom: 10,
+        width: '100%'
+    },
+    headerText: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#fff',
+    },
+    gameId: {
+        width: '20%',
+    },
+    gameName: {
+        width: '30%',
+    },
+    gameDay: {
+        width: '15%',
+    },
+    gameTimestamp: {
+        width: '35%',
+    },
+    gameDetails: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
     },
     gameText: {
         fontSize: 16,

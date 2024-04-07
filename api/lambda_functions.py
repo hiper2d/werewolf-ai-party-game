@@ -21,7 +21,7 @@ from api.ai.actions.role.role_dictionary import ROLE_DICTIONARY
 from api.ai.assistants import ArbiterAssistantDecorator, PlayerAssistantDecorator, RawAssistant
 from api.ai.text_generators import generate_scene_and_players
 from api.models import GameDto, ArbiterReply, VotingResponse, WerewolfRole, HumanPlayerDto, BotPlayerDto, MessageDto, \
-    MessageRole
+    MessageRole, AllGamesRecordDto
 from api.utils import get_top_items_within_range
 from constants import NO_ALIES, RECIPIENT_ALL, GM_NAME, GM_ID
 from dynamodb.bot_player_dao import BotPlayerDao
@@ -117,7 +117,7 @@ def init_game(human_player_name: str, game_name: str, theme: str, reply_language
     return game.id, human_player.role, [[bot.id, bot.name] for bot in bot_players], game_scene
 
 
-def get_all_games():
+def get_all_games() -> List[AllGamesRecordDto]:
     load_dotenv(find_dotenv())
     return game_dao.get_active_games_summary()
 

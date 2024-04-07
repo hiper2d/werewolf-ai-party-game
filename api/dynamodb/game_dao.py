@@ -3,7 +3,7 @@ import time
 from typing import List
 
 from dynamodb.generic_dao import GenericDao
-from models import GameDto, HumanPlayerDto, WerewolfRole
+from models import GameDto, HumanPlayerDto, WerewolfRole, AllGamesRecordDto
 
 logger = logging.getLogger('my_application')
 
@@ -111,15 +111,15 @@ class GameDao(GenericDao):
         self.save_dto(dto)
 
     @staticmethod
-    def _convert_record_to_summary(record) -> dict:
-        return {
-            "id": record['id'],
-            "name": record['game_name'],
-            "current_day": int(record['current_day']),
-            "ts": int(record['updated_at']),
-        }
+    def _convert_record_to_summary(record) -> AllGamesRecordDto:
+        return AllGamesRecordDto(
+            id=record['id'],
+            name=record['game_name'],
+            current_day=int(record['current_day']),
+            ts=int(record['updated_at']),
+        )
 
-    def get_active_games_summary(self) -> List[dict]:
+    def get_active_games_summary(self) -> List[AllGamesRecordDto]:
         if not self.exists_table():
             logging.error("Table does not exist.")
             return []
