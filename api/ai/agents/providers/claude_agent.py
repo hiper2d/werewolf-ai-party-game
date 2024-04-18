@@ -25,26 +25,30 @@ class ClaudeAgent(GenericAgent):
     def ask(self, chat_messages: List[MessageDto]) -> str | None:
         self.logger.debug(f"Asking {self.name} agent: {chat_messages[-1].msg}")
 
-        # Squash user messages between assistant messages
         squashed_messages = []
-        user_messages = []
+        prev_role = None
+        prev_messages = ""
 
-        for msg in chat_messages:
-            if msg.role == MessageRole.USER:
-                user_messages.append(f"{msg.author_name}: {msg.msg}")
+        # todo: simplify this
+        for i, msg in enumerate(chat_messages[1:]):
+            if msg.role == prev_role:
+                if prev_messages:
+                    prev_messages += "\n" + f"{msg.author_name}: {msg.msg}"
+                else:
+                    prev_messages = f"{msg.author_name}: {msg.msg}"
             else:
-                if user_messages:
-                    squashed_messages.append({"role": "user", "content": "\n".join(user_messages)})
-                    user_messages = []
-                squashed_messages.append({"role": msg.role.value, "content": msg.msg})
-
-        if user_messages:
-            squashed_messages.append({"role": "user", "content": "\n".join(user_messages)})
+                prev_role = msg.role
+                if prev_messages:
+                    squashed_messages.append({"role": prev_role.value, "content": prev_messages})
+                else:
+                    prev_messages = f"{msg.author_name}: {msg.msg}"
+            if i == len(chat_messages) - 1 and prev_messages:
+                squashed_messages.append({"role": prev_role.value, "content": prev_messages})
 
         system_message = chat_messages[0].msg
         resp_msg: Message = self.client.messages.create(
             system=system_message,
-            messages=squashed_messages[1:],  # Exclude the system message from messages
+            messages=squashed_messages,  # Exclude the system message from messages
             model=self.model,
             max_tokens=MAX_OUTPUT_TOKENS
         )
