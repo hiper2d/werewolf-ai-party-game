@@ -1,3 +1,4 @@
+import os
 from typing import List
 
 from groq import Groq
@@ -11,7 +12,7 @@ from models import MessageDto
 class GroqAgent(GenericAgent):
 
     def __init__(self, name):
-        self.client: Groq = Groq()
+        self.client: Groq = Groq(api_key=os.environ.get("GROQ_API_KEY"))
         self.name = name
         self.model = MODEL_GROQ
         # API docs: https://console.groq.com/docs/text-chat

@@ -31,7 +31,7 @@ class ClaudeAgent(GenericAgent):
 
         # todo: simplify this
         for i, msg in enumerate(chat_messages[1:]):
-            if msg.role == prev_role:
+            if prev_role and msg.role.value == prev_role.value:
                 if prev_messages:
                     prev_messages += "\n" + f"{msg.author_name}: {msg.msg}"
                 else:
@@ -42,7 +42,7 @@ class ClaudeAgent(GenericAgent):
                     squashed_messages.append({"role": prev_role.value, "content": prev_messages})
                 else:
                     prev_messages = f"{msg.author_name}: {msg.msg}"
-            if i == len(chat_messages) - 1 and prev_messages:
+            if i == len(chat_messages) - 2 and prev_messages:
                 squashed_messages.append({"role": prev_role.value, "content": prev_messages})
 
         system_message = chat_messages[0].msg

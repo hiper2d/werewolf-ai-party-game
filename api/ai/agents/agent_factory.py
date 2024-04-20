@@ -20,6 +20,7 @@ class AgentFactory:
         elif llm_type == LLMType.GROQ_LLAMA3:
             return GroqAgent(name)
         elif llm_type == LLMType.MIXED:
+            # Groq LLAMA3 is not included because its servers are unstable right now
             return random.choice([OpenAiAgent(name), ClaudeAgent(name), MistralAgent(name)])
         else:
             raise ValueError(f"Unknown agent name: {llm_type}")
