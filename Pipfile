@@ -10,6 +10,7 @@ groq = "*"
 openai = "*"
 python-dotenv = "*"
 redis = "*"
+mistralai = "*"
 
 [dev-packages]
 fastapi = "*"

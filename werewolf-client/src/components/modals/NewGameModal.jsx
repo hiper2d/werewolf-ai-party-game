@@ -54,6 +54,8 @@ const NewGameModal = ({
                             >
                                 <Picker.Item label="GPT-4" value="GPT-4" />
                                 <Picker.Item label="Claude3 Opus" value="Claude3 Opus" />
+                                <Picker.Item label="Mistral Large" value="Mistral Large" />
+                                <Picker.Item label="Groq LLaMA3" value="Groq LLaMA3" />
                             </Picker>
                         </View>
                         <View style={styles.dropdownWrapper}>
@@ -65,6 +67,8 @@ const NewGameModal = ({
                             >
                                 <Picker.Item label="GPT-4" value="GPT-4" />
                                 <Picker.Item label="Claude3 Opus" value="Claude3 Opus" />
+                                <Picker.Item label="Mistral Large" value="Mistral Large" />
+                                <Picker.Item label="Groq LLaMA3" value="Groq LLaMA3" />
                                 <Picker.Item label="Mixed" value="Mixed" />
                             </Picker>
                         </View>

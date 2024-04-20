@@ -124,4 +124,6 @@ class AllGamesRecordDto(BaseModel):
 class LLMType(Enum):
     GPT4 = "GPT-4"
     CLAUDE3_OPUS = "Claude3 Opus"
+    MISTRAL_LARGE = "Mistral Large"
+    GROQ_LLAMA3 = "Groq LLaMA3"
     MIXED = "Mixed"

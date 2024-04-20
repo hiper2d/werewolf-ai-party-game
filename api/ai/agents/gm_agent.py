@@ -12,7 +12,7 @@ class GmAgent(GenericAgent):
     def __init__(self, game: GameDto):
         self.game = game
         self.agent = AgentFactory.create_agent(llm_type=LLMType(game.gm_llm_type_str), name=GM_NAME)
-        self.llm_type = game.llm_tyle_str
+        self.llm_type = LLMType(game.gm_llm_type_str)
 
     def create_instruction_message(self) -> MessageDto:
         instruction_prompt = ARBITER_PROMPT.format(

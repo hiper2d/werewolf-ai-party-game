@@ -4,6 +4,7 @@ from groq import Groq
 from groq.types.chat import ChatCompletion
 
 from ai.agents.generic_agent import GenericAgent
+from constants import MODEL_GROQ
 from models import MessageDto
 
 
@@ -12,7 +13,7 @@ class GroqAgent(GenericAgent):
     def __init__(self, name):
         self.client: Groq = Groq()
         self.name = name
-        self.model = "mixtral-8x7b-32768" # Supported Models: https://console.groq.com/docs/models
+        self.model = MODEL_GROQ
         # API docs: https://console.groq.com/docs/text-chat
 
     def ask(self, chat_messages: List[MessageDto]) -> str | None:
