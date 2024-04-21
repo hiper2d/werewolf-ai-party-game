@@ -29,28 +29,27 @@ class ClaudeAgent(GenericAgent):
         prev_role = None
         prev_messages = ""
 
-        # todo: simplify this
+        first_msg = chat_messages[0]
+        curr_message = f"{first_msg.author_name}: {first_msg.msg}"
         for i, msg in enumerate(chat_messages[1:]):
-            if prev_role and msg.role.value == prev_role.value:
-                if prev_messages:
-                    prev_messages += "\n" + f"{msg.author_name}: {msg.msg}"
-                else:
-                    prev_messages = f"{msg.author_name}: {msg.msg}"
-            else:
-                prev_role = msg.role
-                if prev_messages:
-                    squashed_messages.append({"role": prev_role.value, "content": prev_messages})
-                else:
-                    prev_messages = f"{msg.author_name}: {msg.msg}"
-            if i == len(chat_messages) - 2 and prev_messages:
-                squashed_messages.append({"role": prev_role.value, "content": prev_messages})
+            if msg.author_name == self.name:  # this is me, the current bot player agent
+                if curr_message:
+                    squashed_messages.append({"role": MessageRole.USER.value, "content": curr_message})
+                    curr_message = ""
+                squashed_messages.append({"role": MessageRole.ASSISTANT.value, "content": msg.msg})
+            else:  # this is someone else (GM or other player)
+                curr_message += "\n" if curr_message else ""
+            curr_message += f"{msg.author_name}: {msg.msg}"
+        if curr_message:
+            squashed_messages.append({"role": MessageRole.USER.value, "content": curr_message})
 
-        system_message = chat_messages[0].msg
+        system_message = first_msg.msg
         resp_msg: Message = self.client.messages.create(
             system=system_message,
-            messages=squashed_messages,  # Exclude the system message from messages
+            messages=squashed_messages,
             model=self.model,
-            max_tokens=MAX_OUTPUT_TOKENS
+            max_tokens=MAX_OUTPUT_TOKENS,
+            temperature=0.2
         )
         resp = resp_msg.content[0].text
         self.logger.info(f"{self.name}: {resp}")

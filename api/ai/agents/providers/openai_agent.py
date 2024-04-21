@@ -27,7 +27,7 @@ class OpenAiAgent(GenericAgent):
             # Controls randomness: lowering results in less random completions.
             # As the temperature approaches zero, the model will become deterministic
             # and repetitive.
-            temperature=0.5,
+            temperature=0.2,
 
             # If set, partial message deltas will be sent.
             stream=False,

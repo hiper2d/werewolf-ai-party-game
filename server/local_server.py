@@ -96,7 +96,7 @@ async def init_game_endpoint(request: Request):
 async def init_game_endpoint(request: Request):
     data = await request.json()
     request = VoteRoundOne(**data)
-    voting_response: VotingResponse = ask_certain_player_to_vote(
+    voting_response: str = ask_certain_player_to_vote(
         game_id=request.gameId, bot_player_id=request.participantId
     )
     return voting_response

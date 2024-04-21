@@ -141,10 +141,10 @@ just reply with your message. For example:
 
 GAME_MASTER_VOTING_FIRST_ROUND_COMMAND = """Game master: It's time to vote! Choose one player to eliminate. \
 You must to vote, you must pick somebody even if you don't see a reason. You cannot choose yourself or nobody. \
-Your response format: {{"player_to_eliminate": "player_name", "reason": "your_reason"}}
+Your response format: Name: "Player name you want to eliminate". Reason: "Your reason to vote for this player".
 
-Make sure your response is a valid JSON. For example:
-{{"player_to_eliminate": "John", "reason": "I don't trust him."}}"""
+For example:
+Name: Alice. Reason: I don't trust her. She protected Bob who is clearly a werewolf."""
 
 GAME_MASTER_VOTING_FIRST_ROUND_RESULT = """\
 Game Master: There are few leaders in this first round of voting: {leaders}.

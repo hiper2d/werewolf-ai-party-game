@@ -24,6 +24,7 @@ class MistralAgent(GenericAgent):
         chat_response = self.client.chat(
             model=self.model,
             messages=[ChatMessage(role=msg.role.value, content=msg.msg) for msg in chat_messages],
+            temperature=0.2
         )
         resp = chat_response.choices[0].message.content
         self.logger.info(f"{self.name}: {resp}")

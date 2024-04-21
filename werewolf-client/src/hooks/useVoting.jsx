@@ -4,7 +4,6 @@ const useVoting = (setIsLoading, setMessages, playerIdMap, gameId) => {
     const handleVotingPress = async () => {
         try {
             setIsLoading(true);
-            const votingResults = new Map();
             const participantIds = Array.from(playerIdMap.keys());
             for (let participantId of participantIds) {
                 try {
@@ -20,29 +19,19 @@ const useVoting = (setIsLoading, setMessages, playerIdMap, gameId) => {
                         const jsonResponse = await response.json();
                         console.log(jsonResponse);
 
-                        const { name, reason } = jsonResponse;
+                        const voteMessage = jsonResponse;
 
-                        if (name) {
-                            setMessages((previousMessages) => [
-                                ...previousMessages,
-                                {
-                                    id: Math.random().toString(36).substring(7),
-                                    text: `I vote for ${name}. Reason: ${reason}`,
-                                    timestamp: new Date(),
-                                    isUserMessage: false,
-                                    author: playerIdMap.get(participantId).name,
-                                    authorColor: playerIdMap.get(participantId).color,
-                                },
-                            ]);
-                            if (votingResults.has(name)) {
-                                votingResults.set(name, votingResults.get(name) + 1);
-                            } else {
-                                votingResults.set(name, 1);
-                            }
-                            console.log(`Voting result for ${participantId}: ${name} - ${reason}`);
-                        } else {
-                            console.log(`No player_to_eliminate field in response for participant ID ${participantId}`);
-                        }
+                        setMessages((previousMessages) => [
+                            ...previousMessages,
+                            {
+                                id: Math.random().toString(36).substring(7),
+                                text: voteMessage,
+                                timestamp: new Date(),
+                                isUserMessage: false,
+                                author: playerIdMap.get(participantId).name,
+                                authorColor: playerIdMap.get(participantId).color,
+                            },
+                        ]);
                     } else {
                         console.error('Error voting:', response.status);
                     }
@@ -50,7 +39,6 @@ const useVoting = (setIsLoading, setMessages, playerIdMap, gameId) => {
                     console.error('Error voting:', error);
                 }
             }
-            console.log(votingResults);
         } finally {
             setIsLoading(false)
         }

@@ -126,45 +126,46 @@ def get_all_games() -> List[AllGamesRecordDto]:
     load_dotenv(find_dotenv())
     return game_dao.get_active_games_summary()
 
-
-def get_welcome_messages_from_all_players(game_id: str):
-    logger.info('Players introduction:')
-    load_dotenv(find_dotenv())
-
-    game = game_dao.get_by_id(game_id)
-    if not game or not game.bot_player_ids:
-        logger.debug(f"Game with id {game_id} not found in Redis or it doesn't have bots")
-        return
-
-    introductions = []
-    for bot_player_id in game.bot_player_ids:
-        bot_player = bot_player_dao.get_by_id(bot_player_id)
-        if not bot_player:
-            logger.debug(f"Bot player with id {bot_player_id} not found in Redis")
-            continue
-        bot_player_agent = BotPlayerAgent(me=bot_player, game=game)
-        instruction_message: MessageDto = bot_player_agent.create_instruction_message()
-
-        messages_to_all: List[MessageDto] = message_dao.get_last_records(recipient=f"{game_id}_{RECIPIENT_ALL}")
-        messages_to_bot_player = message_dao.get_last_records(recipient=f"{game_id}_{bot_player.id}")
-        messages_to_all.extend(messages_to_bot_player)  # merging messages from common chat and bot personal commands
-        messages_to_all.sort(key=lambda x: x.ts, reverse=True)
-
-        command_message = MessageDto(
-            recipient=f"{game_id}_{bot_player.id}", author_name=GM_NAME, author_id=GM_ID,
-            msg="Please introduce yourself to the other players.", role=MessageRole.USER
-        )
-        message_dao.save_dto(command_message)
-
-        answer = bot_player_agent.ask([instruction_message, *messages_to_all, command_message])
-        answer_message = MessageDto(
-            recipient=f"{game_id}_{RECIPIENT_ALL}", author_id=bot_player.id, author_name=bot_player.name,
-            msg=answer, role=MessageRole.USER
-        )
-        message_dao.save_dto(answer_message)
-        introductions.append({"name": bot_player.name, "introduction": answer})
-
-    return introductions
+#
+# # not used
+# def get_welcome_messages_from_all_players(game_id: str):
+#     logger.info('Players introduction:')
+#     load_dotenv(find_dotenv())
+#
+#     game = game_dao.get_by_id(game_id)
+#     if not game or not game.bot_player_ids:
+#         logger.debug(f"Game with id {game_id} not found in Redis or it doesn't have bots")
+#         return
+#
+#     introductions = []
+#     for bot_player_id in game.bot_player_ids:
+#         bot_player = bot_player_dao.get_by_id(bot_player_id)
+#         if not bot_player:
+#             logger.debug(f"Bot player with id {bot_player_id} not found in Redis")
+#             continue
+#         bot_player_agent = BotPlayerAgent(me=bot_player, game=game)
+#         instruction_message: MessageDto = bot_player_agent.create_instruction_message()
+#
+#         messages_to_all: List[MessageDto] = message_dao.get_last_records(recipient=f"{game_id}_{RECIPIENT_ALL}")
+#         messages_to_bot_player = message_dao.get_last_records(recipient=f"{game_id}_{bot_player.id}")
+#         messages_to_all.extend(messages_to_bot_player)  # merging messages from common chat and bot personal commands
+#         messages_to_all.sort(key=lambda x: x.ts, reverse=True)
+#
+#         command_message = MessageDto(
+#             recipient=f"{game_id}_{bot_player.id}", author_name=GM_NAME, author_id=GM_ID,
+#             msg="Please introduce yourself to the other players.", role=MessageRole.USER
+#         )
+#         message_dao.save_dto(command_message)
+#
+#         answer = bot_player_agent.ask([instruction_message, *messages_to_all, command_message])
+#         answer_message = MessageDto(
+#             recipient=f"{game_id}_{RECIPIENT_ALL}", author_id=bot_player.id, author_name=bot_player.name,
+#             msg=answer, role=MessageRole.USER
+#         )
+#         message_dao.save_dto(answer_message)
+#         introductions.append({"name": bot_player.name, "introduction": answer})
+#
+#     return introductions
 
 
 def get_welcome_message(game_id: str, bot_player_id: str) -> str:
@@ -203,6 +204,7 @@ def get_welcome_message(game_id: str, bot_player_id: str) -> str:
     return answer
 
 
+# ask the router of who should speak next
 def talk_to_all(game_id: str, user_message: str) -> ArbiterReply:
     game = game_dao.get_by_id(game_id)
     if not game or not game.bot_player_ids:
@@ -237,6 +239,7 @@ def talk_to_all(game_id: str, user_message: str) -> ArbiterReply:
     return reply_obj
 
 
+# ask a certain bot player to speak after the router decided on speakers
 def talk_to_certain_player(game_id: str, name: str):
     game = game_dao.get_by_id(game_id)
     if name not in game.bot_player_name_to_id:
@@ -268,7 +271,7 @@ def talk_to_certain_player(game_id: str, name: str):
     return answer
 
 
-def ask_certain_player_to_vote(game_id: str, bot_player_id: str) -> VotingResponse:
+def ask_certain_player_to_vote(game_id: str, bot_player_id: str) -> str:
     game = game_dao.get_by_id(game_id)
     if not bot_player_id:
         logger.error("Player with id %s not found in the game or it is a human player", bot_player_id)
@@ -301,9 +304,9 @@ def ask_certain_player_to_vote(game_id: str, bot_player_id: str) -> VotingRespon
     )
     message_dao.save_dto(voting_instruction_msg)
     message_dao.save_dto(answer_message)
-    answer_json = json.loads(answer)
-    reply_obj: VotingResponse = VotingResponse(name=answer_json['player_to_eliminate'], reason=answer_json['reason'])
-    return reply_obj
+    # answer_json = json.loads(answer)
+    # reply_obj: VotingResponse = VotingResponse(name=answer_json['player_to_eliminate'], reason=answer_json['reason'])
+    return answer
 
 
 def get_chat_history(game_id: str, limit: int = 10_000) -> List[MessageDto]:
