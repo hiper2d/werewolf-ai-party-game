@@ -42,14 +42,14 @@ const useChatMessages = (setIsLoading, gameId, userName, playerNameMap) => {
                             },
                             body: JSON.stringify({
                                 gameId: gameId,
-                                name: playerName  // todo: replace with player id
+                                playerId: playerNameMap.get(playerName).id  // todo: check if a name is in the map
                             }),
                         });
 
                         if (replyResponse.ok) {
                             let replyMessage = await replyResponse.text();
                             const player = Array.from(playerNameMap.values()).find(p => p.name === playerName);
-                            const playerColor = player?.color; // todo: get the color from the player id
+                            const playerColor = player?.color;
 
                             replyMessage = replyMessage.replace(/^"|"$/g, '');
                             setMessages((previousMessages) => [

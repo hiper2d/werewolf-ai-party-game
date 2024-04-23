@@ -241,12 +241,11 @@ def talk_to_all(game_id: str, user_message: str) -> ArbiterReply:
 
 
 # ask a certain bot player to speak after the router decided on speakers
-def talk_to_certain_player(game_id: str, name: str):
-    game = game_dao.get_by_id(game_id)
-    if name not in game.bot_player_name_to_id:
-        logger.error("Player with name %s not found in the game or it is a human player", name)
+def talk_to_certain_player(game_id: str, bot_player_id: str):
+    game: GameDto = game_dao.get_by_id(game_id)
+    if bot_player_id not in game.bot_player_ids:
+        logger.error("Player with id %s not found in the game or it is a human player", bot_player_id)
         return None
-    bot_player_id = game.bot_player_name_to_id[name]
     bot_player = bot_player_dao.get_by_id(bot_player_id)
     bot_player_agent = BotPlayerAgent(me=bot_player, game=game)
     instruction_message = bot_player_agent.create_instruction_message()

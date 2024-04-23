@@ -35,7 +35,7 @@ class TalkToAllRequest(BaseModel):
 
 class TalkToPlayer(BaseModel):
     gameId: str
-    name: str
+    playerId: str
 
 
 class VoteRoundOne(BaseModel):

@@ -45,7 +45,7 @@ const AllGamesModal = ({
             data.bot_players.forEach((player, index) => {
                 const uniqueColor = getUniqueColor(usedColors);
                 usedColors.push(uniqueColor);
-                newPlayerNameMap.set(player.name, { name: player.name, color: uniqueColor });
+                newPlayerNameMap.set(player.name, { id: player.id, name: player.name, color: uniqueColor });
                 newPlayerIdMap.set(player.id, { id: player.id, name: player.name, color: uniqueColor });
             });
 

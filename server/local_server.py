@@ -104,7 +104,7 @@ async def init_game_endpoint(request: Request):
     data = await request.json()
     request = TalkToPlayer(**data)
     arbiter_reply: ArbiterReply = talk_to_certain_player(
-        game_id=request.gameId, name=request.name
+        game_id=request.gameId, bot_player_id=request.playerId
     )
     return arbiter_reply
 
