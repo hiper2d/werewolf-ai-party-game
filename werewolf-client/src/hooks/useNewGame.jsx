@@ -1,5 +1,5 @@
 import {GAME_MASTER_COLOR, URL_API_GET_WELCOME_MESSAGE, URL_API_INIT_GAME} from "../Constants";
-import {getRandomColor} from "./colors";
+import {getRandomColor, getUniqueColor} from "./colors";
 
 const useNewGame = (
     setIsLoading,
@@ -47,18 +47,20 @@ const useNewGame = (
 
                 const newPlayerIdMap = new Map();
                 const newPlayerNameMap = new Map();
+                const usedColors = [];
+
                 botPlayers.forEach(([playerId, playerName]) => {
-                    const randomColor = getRandomColor();
-                    newPlayerIdMap.set(playerId, { id: playerId, name: playerName, color: randomColor });
-                    newPlayerNameMap.set(playerName, { id: playerId, name: playerName, color: randomColor });
+                    const uniqueColor = getUniqueColor(usedColors);
+                    newPlayerIdMap.set(playerId, { id: playerId, name: playerName, color: uniqueColor });
+                    newPlayerNameMap.set(playerName, { id: playerId, name: playerName, color: uniqueColor });
+                    usedColors.push(uniqueColor);
                 });
                 setPlayerIdMap(newPlayerIdMap);
                 setPlayerNameMap(newPlayerNameMap);
 
                 setMessages((previousMessages) => [
-                    ...previousMessages,
                     {
-                        id: Math.random().toString(36).substring(7),
+                        key: Math.random().toString(36).substring(7),
                         text: story,
                         timestamp: new Date(),
                         isUserMessage: false,
@@ -66,7 +68,7 @@ const useNewGame = (
                         authorColor: GAME_MASTER_COLOR
                     },
                     {
-                        id: Math.random().toString(36).substring(7),
+                        key: Math.random().toString(36).substring(7),
                         text: `Your role is ${humanPlayerRole}`,
                         timestamp: new Date(),
                         isUserMessage: false,
@@ -93,7 +95,7 @@ const useNewGame = (
                         setMessages((previousMessages) => [
                             ...previousMessages,
                             {
-                                id: Math.random().toString(36).substring(7),
+                                key: Math.random().toString(36).substring(7),
                                 text: welcomeMessage,
                                 timestamp: new Date(),
                                 isUserMessage: false,

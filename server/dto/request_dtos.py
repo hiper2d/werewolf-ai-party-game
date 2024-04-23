@@ -9,6 +9,20 @@ class InitGameRequest(BaseModel):
     botPlayersLLM: str
 
 
+class GetBotPlayerResponse(BaseModel):
+    id: str
+    name: str
+    color: str
+
+
+class GetGameResponse(BaseModel):
+    game_id: str
+    story: str
+    human_player_role: str
+    bot_players: list[GetBotPlayerResponse]
+    messages: list[dict]
+
+
 class WelcomeRequest(BaseModel):
     gameId: str
     id: str

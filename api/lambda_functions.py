@@ -24,6 +24,7 @@ from api.models import GameDto, ArbiterReply, VotingResponse, WerewolfRole, Huma
     MessageRole, AllGamesRecordDto, LLMType
 from api.utils import get_top_items_within_range
 from constants import NO_ALIES, RECIPIENT_ALL, GM_NAME, GM_ID
+from dto.request_dtos import GetGameResponse
 from dynamodb.bot_player_dao import BotPlayerDao
 from dynamodb.dynamo_helper import get_dynamo_client, get_dynamo_resource
 from dynamodb.game_dao import GameDao
@@ -307,6 +308,12 @@ def ask_certain_player_to_vote(game_id: str, bot_player_id: str) -> str:
     # answer_json = json.loads(answer)
     # reply_obj: VotingResponse = VotingResponse(name=answer_json['player_to_eliminate'], reason=answer_json['reason'])
     return answer
+
+
+def load_game(game_id: str) -> Tuple[GameDto, List[MessageDto]]:
+    game: GameDto = game_dao.get_by_id(game_id)
+    messages: List[MessageDto] = message_dao.get_last_records(recipient=f"{game_id}_{RECIPIENT_ALL}", limit=1_000)
+    return game, messages
 
 
 def get_chat_history(game_id: str, limit: int = 10_000) -> List[MessageDto]:

@@ -3,10 +3,11 @@ from typing import List
 from fastapi import FastAPI, Request
 from starlette.middleware.cors import CORSMiddleware
 
-from dto.request_dtos import InitGameRequest, WelcomeRequest, TalkToAllRequest, TalkToPlayer, VoteRoundOne
+from dto.request_dtos import InitGameRequest, WelcomeRequest, TalkToAllRequest, TalkToPlayer, VoteRoundOne, \
+    GetGameResponse, GetBotPlayerResponse
 from lambda_functions import init_game, get_welcome_message, talk_to_all, talk_to_certain_player, \
-    ask_certain_player_to_vote, get_all_games, get_chat_history
-from models import ArbiterReply, VotingResponse, GameListDto, AllGamesRecordDto, LLMType
+    ask_certain_player_to_vote, get_all_games, get_chat_history, load_game
+from models import ArbiterReply, AllGamesRecordDto, LLMType
 
 app = FastAPI()
 
@@ -55,6 +56,22 @@ async def init_game_endpoint(request: Request):
 async def init_game_endpoint():
     games: List[AllGamesRecordDto] = get_all_games()
     return games
+
+
+@app.get("/game/{game_id}")
+async def load_game_endpoint(game_id: str):
+    game, messages = load_game(game_id=game_id)
+    return GetGameResponse(
+        game_id=game.id,
+        story=game.story,
+        human_player_role=game.human_player.role.value,
+        bot_players=[GetBotPlayerResponse(
+            id=id,
+            name=name,
+            color=""  # todo: generate colors on UI
+        ) for name, id in game.bot_player_name_to_id.items()],
+        messages=[message.dict() for message in messages]
+    )
 
 
 @app.get("/chat_history/{game_id}")

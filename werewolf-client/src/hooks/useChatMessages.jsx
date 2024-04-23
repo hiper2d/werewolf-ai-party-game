@@ -34,7 +34,7 @@ const useChatMessages = (setIsLoading, gameId, userName, playerNameMap) => {
                     const data = await response.json();
                     const playersToReply = data.players_to_reply;
 
-                    for (const playerName of playersToReply) {
+                    for (const playerId of playersToReply) {
                         const replyResponse = await fetch(URL_API_TALK_TO_CERTAIN_PLAYER, {
                             method: 'POST',
                             headers: {
@@ -42,22 +42,24 @@ const useChatMessages = (setIsLoading, gameId, userName, playerNameMap) => {
                             },
                             body: JSON.stringify({
                                 gameId: gameId,
-                                name: playerName
+                                playerId: playerId
                             }),
                         });
 
                         if (replyResponse.ok) {
-                            const replyMessage = await replyResponse.text();
-                            const playerColor = playerNameMap.get(playerName)?.color;
+                            let replyMessage = await replyResponse.text();
+                            const player = Array.from(playerNameMap.values()).find(p => p.id === playerId);
+                            const playerColor = player?.color;
 
+                            replyMessage = replyMessage.replace(/^"|"$/g, '');
                             setMessages((previousMessages) => [
                                 ...previousMessages,
                                 {
-                                    id: Math.random().toString(36).substring(7),
+                                    key: Math.random().toString(36).substring(7),
                                     text: replyMessage,
                                     timestamp: new Date(),
                                     isUserMessage: false,
-                                    author: playerName,
+                                    author: player?.name || 'Unknown',
                                     authorColor: playerColor,
                                 },
                             ]);

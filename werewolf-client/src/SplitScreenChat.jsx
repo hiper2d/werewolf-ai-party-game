@@ -118,6 +118,7 @@ const SplitScreenChat = () => {
                 onGameSelect={handleGameSelect}
                 onChatMessagesLoaded={(messages) => setMessages(messages)}
                 onPlayerNameMapUpdated={(newPlayerNameMap) => setPlayerNameMap(newPlayerNameMap)}
+                onPlayerIdMapUpdated={(newPlayerIdMap) => setPlayerIdMap(newPlayerIdMap)}
             />
             {isLoading && <Loader />}
         </SafeAreaView>

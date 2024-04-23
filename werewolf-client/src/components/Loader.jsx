@@ -1,11 +1,24 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 const Loader = () => {
+    const [loadingText, setLoadingText] = useState('');
+
+    useEffect(() => {
+        const loadingOptions = [
+            'Thinking...',
+            'Chewing...',
+            'Being busy with generating stuff...',
+        ];
+
+        const randomIndex = Math.floor(Math.random() * loadingOptions.length);
+        setLoadingText(loadingOptions[randomIndex]);
+    }, []);
+
     return (
         <View style={styles.loaderContainer}>
             <ActivityIndicator size="large" color="#61dafb" />
-            <Text style={styles.loaderText}>Thinking...</Text>
+            <Text style={styles.loaderText}>{loadingText}</Text>
         </View>
     );
 };

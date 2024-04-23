@@ -1,29 +1,17 @@
 # test_game.py
 import unittest
 
-from api.lambda_functions import init_game, delete_assistants_from_openai_and_game_from_redis, \
+from api.lambda_functions import delete_assistants_from_openai_and_game_from_redis, \
     talk_to_all, delete_assistants_from_openai_by_name, get_latest_game, \
     start_elimination_vote_round_one_async, talk_to_certain_player, \
     ask_bot_player_to_speak_for_themselves_after_first_round_voting, start_elimination_vote_round_two, \
     let_human_player_to_speak_for_themselves, start_game_night, \
-    cleanup_dynamodb, get_welcome_messages_from_all_players
+    cleanup_dynamodb
 
 GAME_ID = '6b274781-5ee8-460a-9913-54712a7bc924'
 
 
 class TestGameFunctions(unittest.TestCase):
-    def test_init_game_and_welcome(self):
-        game_id, human_player_role, bots, scene = init_game(
-            human_player_name='Peeta',
-            theme='Hunger Games',
-            # reply_language_instruction='Reply in russian to me but keep original names (in English). Отвечай на русском, но сохрани оригинальные имена на английском.'
-        )
-        print(f"Game Id: {game_id}")
-        print(f"Human Player Role: {human_player_role.value}")
-        get_welcome_messages_from_all_players(game_id=game_id)  # second slow approach
-
-    def test_get_welcome_messages_from_all_players(self):
-        get_welcome_messages_from_all_players(game_id=GAME_ID)
 
     def test_talk_to_all(self):
         players_to_reply = talk_to_all(

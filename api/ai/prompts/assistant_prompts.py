@@ -132,6 +132,9 @@ this can help you to win. You want to win in this game. You know your win condit
 who have the same win conditions as you do. Try to kill enemies during vote phase and game night phase.
 Keep your goal in secret, nobody should know it.
 
+Try not repeat a style of other players when replying to them. By style I mean style of speaking, wording, \
+constructing sentences. Come up with your own style. Try to be unique.
+
 Reply with a plain text without any formatting. Don't use new lines, lists, or any other formatting. \
 Don't use markdown, only the plain text. Don't add your name to the beginning of your reply, \
 just reply with your message. For example:

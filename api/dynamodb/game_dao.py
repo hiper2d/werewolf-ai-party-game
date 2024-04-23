@@ -16,6 +16,8 @@ class GameDao(GenericDao):
     ]
     attribute_definitions: List[object] = [
         {'AttributeName': 'id', 'AttributeType': 'S'},
+        {'AttributeName': 'is_active', 'AttributeType': 'S'},
+        {'AttributeName': 'updated_at', 'AttributeType': 'S'}
     ]
     table_name: str = "Games"
 
@@ -67,7 +69,7 @@ class GameDao(GenericDao):
                 'N': str(game.user_moves_total_counter),
             },
             'is_active': {
-                'BOOL': game.is_active,
+                'S': str(game.is_active),
             },
             'reply_language_instruction': {
                 'S': game.reply_language_instruction,
@@ -79,12 +81,46 @@ class GameDao(GenericDao):
                 'S': game.bot_player_llm_type_str,
             },
             'created_at': {
-                'N': str(game.ts),
+                'S': str(game.ts),
             },
             'updated_at': {
-                'N': str(time.time_ns()),
+                'S': str(time.time_ns()),
             },
         }
+
+    def create_table(self):
+        try:
+            result = self.dyn_client.create_table(
+                TableName=self.table_name,
+                KeySchema=self.key_schema,
+                AttributeDefinitions=self.attribute_definitions,
+                ProvisionedThroughput={
+                    'ReadCapacityUnits': 1,
+                    'WriteCapacityUnits': 1
+                },
+                GlobalSecondaryIndexes=[
+                    {
+                        'IndexName': 'IsActiveUpdatedAtIndex',
+                        'KeySchema': [
+                            {'AttributeName': 'is_active', 'KeyType': 'HASH'},
+                            {'AttributeName': 'updated_at', 'KeyType': 'RANGE'}
+                        ],
+                        'Projection': {
+                            'ProjectionType': 'INCLUDE',
+                            'NonKeyAttributes': ['id', 'game_name', 'current_day']
+                        },
+                        'ProvisionedThroughput': {
+                            'ReadCapacityUnits': 1,
+                            'WriteCapacityUnits': 1
+                        }
+                    }
+                ]
+            )
+            resp_metadata = result['ResponseMetadata']
+            table_desc = result['TableDescription']
+            self.logger.debug(f"Created {self.table_name} table.")
+        except Exception as e:
+            self.logger.error(e)
 
     def convert_record_to_dto(self, record: dict) -> GameDto:
         bot_player_ids = [bot_player_id['S'] for bot_player_id in record['bot_player_ids']['L']]
@@ -106,11 +142,11 @@ class GameDao(GenericDao):
             current_day=int(record['current_day']['N']),
             user_moves_day_counter=int(record['user_moves_day_counter']['N']),
             user_moves_total_counter=int(record['user_moves_total_counter']['N']),
-            is_active=record['is_active']['BOOL'],
+            is_active=bool(record['is_active']['S']),
             reply_language_instruction=record['reply_language_instruction']['S'],
             gm_llm_type_str=record['gm_llm_type_str']['S'],
             bot_player_llm_type_str=record['bot_player_llm_type_str']['S'],
-            ts=int(record['created_at']['N'])
+            ts=int(record['created_at']['S'])
         )
 
     def create_or_update_dto(self, dto):
@@ -133,20 +169,21 @@ class GameDao(GenericDao):
             return []
 
         try:
-            response = self.dyn_resource.Table(self.table_name).scan(
-                FilterExpression="is_active = :active",
-                ExpressionAttributeValues={":active": True},
-                ProjectionExpression="id, game_name, current_day, updated_at",
+            response = self.dyn_resource.Table(self.table_name).query(
+                IndexName='IsActiveUpdatedAtIndex',
+                KeyConditionExpression='is_active = :active',
+                ExpressionAttributeValues={':active': 'True'},
+                ScanIndexForward=False,
             )
             games_records = response['Items']
 
-            # Handling pagination if the scanned data exceeds 1MB limit
             while 'LastEvaluatedKey' in response:
-                response = self.dyn_resource.Table(self.table_name).scan(
-                    FilterExpression="is_active = :active",
-                    ExpressionAttributeValues={":active": True},
-                    ProjectionExpression="id, game_name, current_day, updated_at",
-                    ExclusiveStartKey=response['LastEvaluatedKey']
+                response = self.dyn_resource.Table(self.table_name).query(
+                    IndexName='IsActiveUpdatedAtIndex',
+                    KeyConditionExpression='is_active = :active',
+                    ExpressionAttributeValues={':active': 'True'},
+                    ExclusiveStartKey=response['LastEvaluatedKey'],
+                    ScanIndexForward=False,
                 )
                 games_records.extend(response['Items'])
 

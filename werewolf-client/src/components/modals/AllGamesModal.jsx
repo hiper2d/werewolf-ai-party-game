@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import {URL_API_GET_ALL_GAMES, URL_API_GET_CHAT_HISTORY} from "../../Constants";
-import {getRandomColor} from "../../hooks/colors";
+import {URL_API_GET_ALL_GAMES, URL_API_GET_CHAT_HISTORY, URL_API_LOAD_GAME} from "../../Constants";
+import {getRandomColor, getUniqueColor} from "../../hooks/colors";
 
-const AllGamesModal = ({ isVisible, onClose, onGameSelect, onChatMessagesLoaded, onPlayerNameMapUpdated }) => {
+const AllGamesModal = ({
+    isVisible, onClose, onGameSelect, onChatMessagesLoaded, onPlayerNameMapUpdated, onPlayerIdMapUpdated
+}) => {
     const [games, setGames] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
@@ -33,29 +35,34 @@ const AllGamesModal = ({ isVisible, onClose, onGameSelect, onChatMessagesLoaded,
         onGameSelect(gameId);
 
         try {
-            const response = await fetch(`${URL_API_GET_CHAT_HISTORY}/${gameId}`);
+            const response = await fetch(`${URL_API_LOAD_GAME}/${gameId}`);
             const data = await response.json();
 
             const newPlayerNameMap = new Map();
-            const playerNames = [...new Set(data.map((message) => message.author_name))];
-            playerNames.forEach((playerName) => {
-                const randomColor = getRandomColor();
-                newPlayerNameMap.set(playerName, { name: playerName, color: randomColor });
+            const newPlayerIdMap = new Map();
+
+            const usedColors = [];
+            data.bot_players.forEach((player, index) => {
+                const uniqueColor = getUniqueColor(usedColors);
+                usedColors.push(uniqueColor);
+                newPlayerNameMap.set(player.name, { name: player.name, color: uniqueColor });
+                newPlayerIdMap.set(player.id, { id: player.id, name: player.name, color: uniqueColor });
             });
 
-            const formattedMessages = data.map((message, index) => ({
+            const formattedMessages = data.messages.map((message, index) => ({
                 key: `${index}`,
                 text: message.msg,
                 timestamp: new Date(message.ts),
                 isUserMessage: message.role === 'USER',
                 author: message.author_name,
-                authorColor: newPlayerNameMap.get(message.author_name).color
+                authorColor: newPlayerNameMap.get(message.author_name)?.color || '#fff',
             }));
 
             onChatMessagesLoaded(formattedMessages);
             onPlayerNameMapUpdated(newPlayerNameMap);
+            onPlayerIdMapUpdated(newPlayerIdMap);
         } catch (error) {
-            console.error('Error fetching chat messages:', error);
+            console.error('Error fetching game data:', error);
         }
 
         onClose();
