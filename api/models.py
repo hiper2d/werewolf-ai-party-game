@@ -79,7 +79,7 @@ class GameDto(BaseModel):
     user_moves_total_counter: int = 0
     gm_llm_type_str: str
     bot_player_llm_type_str: str
-    is_active: bool = True
+    is_active: int = 1
     ts: int = Field(default_factory=time.time_ns)
 
 

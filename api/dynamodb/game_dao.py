@@ -16,8 +16,8 @@ class GameDao(GenericDao):
     ]
     attribute_definitions: List[object] = [
         {'AttributeName': 'id', 'AttributeType': 'S'},
-        {'AttributeName': 'is_active', 'AttributeType': 'S'},
-        {'AttributeName': 'updated_at', 'AttributeType': 'S'}
+        {'AttributeName': 'is_active', 'AttributeType': 'N'},
+        {'AttributeName': 'updated_at', 'AttributeType': 'N'}
     ]
     table_name: str = "Games"
 
@@ -69,7 +69,7 @@ class GameDao(GenericDao):
                 'N': str(game.user_moves_total_counter),
             },
             'is_active': {
-                'S': str(game.is_active),
+                'N': str(game.is_active),
             },
             'reply_language_instruction': {
                 'S': game.reply_language_instruction,
@@ -81,10 +81,10 @@ class GameDao(GenericDao):
                 'S': game.bot_player_llm_type_str,
             },
             'created_at': {
-                'S': str(game.ts),
+                'N': str(game.ts),
             },
             'updated_at': {
-                'S': str(time.time_ns()),
+                'N': str(time.time_ns()),
             },
         }
 
@@ -142,11 +142,11 @@ class GameDao(GenericDao):
             current_day=int(record['current_day']['N']),
             user_moves_day_counter=int(record['user_moves_day_counter']['N']),
             user_moves_total_counter=int(record['user_moves_total_counter']['N']),
-            is_active=bool(record['is_active']['S']),
+            is_active=int(record['is_active']['N']),
             reply_language_instruction=record['reply_language_instruction']['S'],
             gm_llm_type_str=record['gm_llm_type_str']['S'],
             bot_player_llm_type_str=record['bot_player_llm_type_str']['S'],
-            ts=int(record['created_at']['S'])
+            ts=int(record['created_at']['N'])
         )
 
     def create_or_update_dto(self, dto):
@@ -172,7 +172,7 @@ class GameDao(GenericDao):
             response = self.dyn_resource.Table(self.table_name).query(
                 IndexName='IsActiveUpdatedAtIndex',
                 KeyConditionExpression='is_active = :active',
-                ExpressionAttributeValues={':active': 'True'},
+                ExpressionAttributeValues={':active': 1},
                 ScanIndexForward=False,
             )
             games_records = response['Items']
@@ -181,7 +181,7 @@ class GameDao(GenericDao):
                 response = self.dyn_resource.Table(self.table_name).query(
                     IndexName='IsActiveUpdatedAtIndex',
                     KeyConditionExpression='is_active = :active',
-                    ExpressionAttributeValues={':active': 'True'},
+                    ExpressionAttributeValues={':active': 1},
                     ExclusiveStartKey=response['LastEvaluatedKey'],
                     ScanIndexForward=False,
                 )
