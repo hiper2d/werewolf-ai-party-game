@@ -34,7 +34,7 @@ const useChatMessages = (setIsLoading, gameId, userName, playerNameMap) => {
                     const data = await response.json();
                     const playersToReply = data.players_to_reply;
 
-                    for (const playerId of playersToReply) {
+                    for (const playerName of playersToReply) {
                         const replyResponse = await fetch(URL_API_TALK_TO_CERTAIN_PLAYER, {
                             method: 'POST',
                             headers: {
@@ -42,14 +42,14 @@ const useChatMessages = (setIsLoading, gameId, userName, playerNameMap) => {
                             },
                             body: JSON.stringify({
                                 gameId: gameId,
-                                playerId: playerId
+                                name: playerName  // todo: replace with player id
                             }),
                         });
 
                         if (replyResponse.ok) {
                             let replyMessage = await replyResponse.text();
-                            const player = Array.from(playerNameMap.values()).find(p => p.id === playerId);
-                            const playerColor = player?.color;
+                            const player = Array.from(playerNameMap.values()).find(p => p.name === playerName);
+                            const playerColor = player?.color; // todo: get the color from the player id
 
                             replyMessage = replyMessage.replace(/^"|"$/g, '');
                             setMessages((previousMessages) => [
