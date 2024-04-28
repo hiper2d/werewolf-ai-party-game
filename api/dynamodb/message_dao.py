@@ -2,6 +2,7 @@ from typing import List
 
 from dotenv import load_dotenv, find_dotenv
 
+from constants import RECIPIENT_ALL
 from dynamodb.dynamo_helper import get_dynamo_client
 from dynamodb.dynamo_message import DynamoChatMessage, MessageRole
 from dynamodb.generic_dao import GenericDao
@@ -10,6 +11,7 @@ from models import MessageDto
 
 class MessageDao(GenericDao):
     dyn_client: object
+    dyn_resource: object
     key_schema: List[object] = [
         {'AttributeName': "recipient", 'KeyType': 'HASH'},  # Partition key
         {"AttributeName": "ts", "KeyType": "RANGE"},  # Sort key
@@ -72,6 +74,24 @@ class MessageDao(GenericDao):
             return self.convert_records_to_dto_list(result['Items'])
         except Exception as e:
             self.logger.error(e)
+
+    def delete_messages_by_game_id(self, game_id: str):
+        try:
+            # Query the messages table to get all items with the specified game_id
+            response = self.dyn_resource.Table(self.table_name).query(
+                KeyConditionExpression='recipient = :recipient',
+                ExpressionAttributeValues={':recipient': f"{game_id}_{RECIPIENT_ALL}"}
+            )
+
+            # Delete each item one by one
+            with self.dyn_resource.Table(self.table_name).batch_writer() as batch:
+                for item in response['Items']:
+                    batch.delete_item(Key={'recipient': item['recipient'], 'ts': item['ts']})
+
+            self.logger.debug(f"Deleted messages for game with ID {game_id} from {self.table_name} table.")
+        except Exception as e:
+            self.logger.error(e)
+            raise e
 
 
 if __name__ == '__main__':

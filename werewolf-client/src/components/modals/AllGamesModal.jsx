@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import {URL_API_GET_ALL_GAMES, URL_API_GET_CHAT_HISTORY, URL_API_LOAD_GAME} from "../../Constants";
+import {URL_API_DELETE_GAME, URL_API_GET_ALL_GAMES, URL_API_GET_CHAT_HISTORY, URL_API_LOAD_GAME} from "../../Constants";
 import {getRandomColor, getUniqueColor} from "../../hooks/colors";
 
 const AllGamesModal = ({
@@ -11,23 +11,23 @@ const AllGamesModal = ({
     const [error, setError] = useState(null);
     const [selectedGameId, setSelectedGameId] = useState(null);
 
-    useEffect(() => {
-        const fetchGames = async () => {
-            if (isVisible) {
-                setIsLoading(true);
-                try {
-                    const response = await fetch(URL_API_GET_ALL_GAMES);
-                    const data = await response.json();
-                    setGames(data);
-                    setError(null);
-                } catch (error) {
-                    setError(error.message);
-                }
-                setIsLoading(false);
-            }
-        };
+    const fetchGames = async () => {
+        setIsLoading(true);
+        try {
+            const response = await fetch(URL_API_GET_ALL_GAMES);
+            const data = await response.json();
+            setGames(data);
+            setError(null);
+        } catch (error) {
+            setError(error.message);
+        }
+        setIsLoading(false);
+    }
 
-        fetchGames();
+    useEffect(() => {
+        if (isVisible) {
+            fetchGames();
+        }
     }, [isVisible]);
 
     const handleGameSelect = async (gameId) => {
@@ -68,6 +68,23 @@ const AllGamesModal = ({
         onClose();
     };
 
+    const handleDeleteGame = async (gameId) => {
+        try {
+            const response = await fetch(`${URL_API_DELETE_GAME}/${gameId}`, {
+                method: 'DELETE',
+            });
+
+            if (response.ok) {
+                // Refresh the game list after deleting the game
+                fetchGames();
+            } else {
+                console.error('Error deleting game:', response.statusText);
+            }
+        } catch (error) {
+            console.error('Error deleting game:', error);
+        }
+    };
+
     const renderGame = ({ item }) => (
         <Pressable
             onPress={() => handleGameSelect(item.id)}
@@ -81,6 +98,11 @@ const AllGamesModal = ({
                 <Text style={[styles.gameText, styles.gameName]}>{item.name}</Text>
                 <Text style={[styles.gameText, styles.gameDay]}>Day {item.current_day}</Text>
                 <Text style={[styles.gameText, styles.gameTimestamp]}>{item.ts}</Text>
+                <View style={styles.deleteButtonContainer}>
+                    <Pressable onPress={() => handleDeleteGame(item.id)} style={styles.deleteButton}>
+                        <Text style={styles.deleteIcon}>X</Text>
+                    </Pressable>
+                </View>
             </View>
         </Pressable>
     );
@@ -95,6 +117,7 @@ const AllGamesModal = ({
                         <Text style={[styles.headerText, styles.gameName]}>Name</Text>
                         <Text style={[styles.headerText, styles.gameDay]}>Day</Text>
                         <Text style={[styles.headerText, styles.gameTimestamp]}>Timestamp</Text>
+                        <Text style={[styles.headerText, styles.deleteHeader]}>Delete</Text>
                     </View>
                     {isLoading ? (
                         <Text style={styles.loadingText}>Loading...</Text>
@@ -171,16 +194,16 @@ const styles = StyleSheet.create({
         color: '#fff',
     },
     gameId: {
-        width: '20%',
-    },
-    gameName: {
-        width: '30%',
-    },
-    gameDay: {
         width: '15%',
     },
+    gameName: {
+        width: '25%',
+    },
+    gameDay: {
+        width: '10%',
+    },
     gameTimestamp: {
-        width: '35%',
+        width: '30%',
     },
     gameDetails: {
         flexDirection: 'row',
@@ -218,6 +241,27 @@ const styles = StyleSheet.create({
     buttonText: {
         color: '#282c34',
         fontSize: 16,
+        fontWeight: 'bold',
+    },
+    // delete header and column
+    deleteHeader: {
+        width: '10%',
+        textAlign: 'center',
+    },
+    deleteButtonContainer: {
+        width: '10%',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    deleteButton: {
+        backgroundColor: '#ff0000',
+        borderRadius: 5,
+        paddingHorizontal: 5,
+        paddingVertical: 2,
+    },
+    deleteIcon: {
+        color: '#fff',
+        fontSize: 14,
         fontWeight: 'bold',
     },
 });

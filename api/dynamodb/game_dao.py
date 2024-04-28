@@ -193,4 +193,22 @@ class GameDao(GenericDao):
             logging.error(f"Failed to get active games summary: {str(e)}")
             return []
 
+    def remove_by_game_id(self, game_id: str):
+        try:
+            self.dyn_client.delete_item(
+                TableName=self.table_name,
+                Key=self._convert_id_to_key(game_id)
+            )
+            self.logger.debug(f"Deleted game with ID {game_id} from {self.table_name} table.")
+        except Exception as e:
+            self.logger.error(e)
+            raise e
 
+
+    @staticmethod
+    def _convert_id_to_key(game_id: str) -> dict:
+        return {
+            'id': {
+                'S': game_id,
+            }
+        }

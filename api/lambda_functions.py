@@ -63,7 +63,7 @@ dyn_resource = get_dynamo_resource()
 
 game_dao = GameDao(dyn_client=dyn_client, dyn_resource=dyn_resource)
 bot_player_dao = BotPlayerDao(dyn_client=dyn_client)
-message_dao = MessageDao(dyn_client=dyn_client)
+message_dao = MessageDao(dyn_client=dyn_client, dyn_resource=dyn_resource)
 
 
 def init_game(human_player_name: str, game_name: str, theme: str,
@@ -127,46 +127,15 @@ def get_all_games() -> List[AllGamesRecordDto]:
     load_dotenv(find_dotenv())
     return game_dao.get_active_games_summary()
 
-#
-# # not used
-# def get_welcome_messages_from_all_players(game_id: str):
-#     logger.info('Players introduction:')
-#     load_dotenv(find_dotenv())
-#
-#     game = game_dao.get_by_id(game_id)
-#     if not game or not game.bot_player_ids:
-#         logger.debug(f"Game with id {game_id} not found in Redis or it doesn't have bots")
-#         return
-#
-#     introductions = []
-#     for bot_player_id in game.bot_player_ids:
-#         bot_player = bot_player_dao.get_by_id(bot_player_id)
-#         if not bot_player:
-#             logger.debug(f"Bot player with id {bot_player_id} not found in Redis")
-#             continue
-#         bot_player_agent = BotPlayerAgent(me=bot_player, game=game)
-#         instruction_message: MessageDto = bot_player_agent.create_instruction_message()
-#
-#         messages_to_all: List[MessageDto] = message_dao.get_last_records(recipient=f"{game_id}_{RECIPIENT_ALL}")
-#         messages_to_bot_player = message_dao.get_last_records(recipient=f"{game_id}_{bot_player.id}")
-#         messages_to_all.extend(messages_to_bot_player)  # merging messages from common chat and bot personal commands
-#         messages_to_all.sort(key=lambda x: x.ts, reverse=True)
-#
-#         command_message = MessageDto(
-#             recipient=f"{game_id}_{bot_player.id}", author_name=GM_NAME, author_id=GM_ID,
-#             msg="Please introduce yourself to the other players.", role=MessageRole.USER
-#         )
-#         message_dao.save_dto(command_message)
-#
-#         answer = bot_player_agent.ask([instruction_message, *messages_to_all, command_message])
-#         answer_message = MessageDto(
-#             recipient=f"{game_id}_{RECIPIENT_ALL}", author_id=bot_player.id, author_name=bot_player.name,
-#             msg=answer, role=MessageRole.USER
-#         )
-#         message_dao.save_dto(answer_message)
-#         introductions.append({"name": bot_player.name, "introduction": answer})
-#
-#     return introductions
+
+def delete_game(game_id: str):
+    try:
+        game_dao.remove_by_game_id(game_id)
+        message_dao.delete_messages_by_game_id(game_id)
+        logger.info(f"Game with ID {game_id} and associated messages have been deleted.")
+    except Exception as e:
+        logger.error(f"Error deleting game: {str(e)}")
+        raise e
 
 
 def get_welcome_message(game_id: str, bot_player_id: str) -> str:

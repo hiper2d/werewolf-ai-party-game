@@ -75,7 +75,7 @@ class GenericDao(ABC, BaseModel):
         try:
             self.dyn_client.delete_item(
                 TableName=self.table_name,
-                Key=self.convert_dto_to_key(dto)
+                Key=self.convert_dto_to_record(dto)
             )
             self.logger.debug(f"Deleted {dto.id} record from {self.table_name} table.")
         except Exception as e:
