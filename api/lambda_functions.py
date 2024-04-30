@@ -268,7 +268,7 @@ def ask_certain_player_to_vote(game_id: str, bot_player_id: str) -> str:
     )
     answer = bot_player_agent.ask([instruction_message, *messages_to_all, voting_instruction_msg])
     answer_message = MessageDto(
-        recipient=f"{game_id}_{bot_player_id}", author_id=bot_player.id, author_name=bot_player.name,
+        recipient=f"{game_id}_{RECIPIENT_ALL}", author_id=bot_player.id, author_name=bot_player.name,
         msg=answer, role=MessageRole.USER
     )
     message_dao.save_dto(voting_instruction_msg)

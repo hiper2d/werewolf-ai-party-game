@@ -11,6 +11,7 @@ import useGame from './hooks/useGame';
 import useNewGame from './hooks/useNewGame';
 import useVoting from './hooks/useVoting';
 import AllGamesModal from './components/modals/AllGamesModal';
+import VotingModal from "./components/VotingModal";
 
 const SplitScreenChat = () => {
     const [inputText, setInputText] = useState('');
@@ -62,7 +63,12 @@ const SplitScreenChat = () => {
         botPlayersLLM,
     );
 
-    const { handleVotingPress } = useVoting(setLoading, setMessages, playerIdMap, gameId);
+    const {
+        isVotingModalVisible,
+        setVotingModalVisible,
+        startVoting,
+        handleVote
+    } = useVoting(setLoading, setMessages, playerIdMap, gameId);
 
     const handleIconPress = (iconName) => {
         console.log(`Icon pressed: ${iconName}`);
@@ -84,10 +90,7 @@ const SplitScreenChat = () => {
         <SafeAreaView style={styles.safeArea}>
             <MenuBar onMenuPress={handleMenuPress} onIconPress={handleIconPress} />
             <View style={styles.container}>
-                <ParticipantsList
-                    participants={Array.from(playerIdMap.values())}
-                    onVote={() => handleVotingPress()}
-                />
+                <ParticipantsList participants={Array.from(playerIdMap.values())}  onStartVoting={startVoting}/>
                 <View style={styles.chatContainer}>
                     <ChatMessages messages={messages}/>
                     <InputArea
@@ -119,6 +122,12 @@ const SplitScreenChat = () => {
                 onChatMessagesLoaded={(messages) => setMessages(messages)}
                 onPlayerNameMapUpdated={(newPlayerNameMap) => setPlayerNameMap(newPlayerNameMap)}
                 onPlayerIdMapUpdated={(newPlayerIdMap) => setPlayerIdMap(newPlayerIdMap)}
+            />
+            <VotingModal
+                isVisible={isVotingModalVisible}
+                onClose={() => setVotingModalVisible(false)}
+                participants={Array.from(playerIdMap.values())}
+                onVote={handleVote}
             />
             {isLoading && <Loader />}
         </SafeAreaView>

@@ -1,21 +1,9 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { faUser } from '@fortawesome/free-solid-svg-icons/faUser';
-import VotingModal from './VotingModal';
-import { URL_HOST } from '../Constants';
 
-const ParticipantsList = ({ participants, onVote }) => {
-    const [isModalVisible, setIsModalVisible] = useState(false);
-
-    const startVoting = () => {
-        setIsModalVisible(true);
-    };
-
-    const handleVote = (participantId) => {
-        onVote(participantId);
-    };
-
+const ParticipantsList = ({ participants, onStartVoting }) => {
     return (
         <View style={styles.participantsList}>
             <Text style={styles.sidebarHeader}>Participants</Text>
@@ -25,15 +13,9 @@ const ParticipantsList = ({ participants, onVote }) => {
                     <Text style={styles.participantName}>{participant.name}</Text>
                 </View>
             ))}
-            <TouchableOpacity onPress={startVoting} style={styles.startVotingButton}>
+            <TouchableOpacity onPress={onStartVoting} style={styles.startVotingButton}>
                 <Text style={styles.startVotingButtonText}>Start Voting</Text>
             </TouchableOpacity>
-            <VotingModal
-                isVisible={isModalVisible}
-                onClose={() => setIsModalVisible(false)}
-                participants={participants}
-                onVote={handleVote}
-            />
         </View>
     );
 };
