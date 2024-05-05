@@ -18,6 +18,7 @@ class GetBotPlayerResponse(BaseModel):
 class GetGameResponse(BaseModel):
     game_id: str
     story: str
+    human_player_name: str
     human_player_role: str
     bot_players: list[GetBotPlayerResponse]
     messages: list[dict]

@@ -142,7 +142,11 @@ just reply with your message. For example:
  
 {reply_language_instruction}"""
 
-GAME_MASTER_VOTING_FIRST_ROUND_COMMAND = """Game master: It's time to vote! Choose one player to eliminate. \
+GAME_MASTER_VOTING_FIRST_ROUND_MESSAGE = """It's time to vote! Choose one player to eliminate. \
+You must to vote, you must pick somebody even if you don't see a reason. You cannot choose yourself or nobody. \
+Your response format: Name: Player name you want to eliminate. Reason: Your reason to vote for this player."""
+
+GAME_MASTER_VOTING_FIRST_ROUND_PROMPT = """It's time to vote! Choose one player to eliminate. \
 You must to vote, you must pick somebody even if you don't see a reason. You cannot choose yourself or nobody. \
 Your response format: Name: "Player name you want to eliminate". Reason: "Your reason to vote for this player".
 

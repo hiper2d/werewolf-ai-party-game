@@ -67,8 +67,8 @@ const SplitScreenChat = () => {
         isVotingModalVisible,
         setVotingModalVisible,
         startVoting,
-        handleVote
-    } = useVoting(setLoading, setMessages, playerIdMap, gameId);
+        handleVote // fixme: this function is not returned
+    } = useVoting(setLoading, setMessages, userName, playerIdMap, gameId);
 
     const handleIconPress = (iconName) => {
         console.log(`Icon pressed: ${iconName}`);
@@ -119,6 +119,7 @@ const SplitScreenChat = () => {
                 isVisible={isAllGamesModalVisible}
                 onClose={() => setAllGamesModalVisible(false)}
                 onGameSelect={handleGameSelect}
+                onUserNameChange={(name) => setUserName(name)}
                 onChatMessagesLoaded={(messages) => setMessages(messages)}
                 onPlayerNameMapUpdated={(newPlayerNameMap) => setPlayerNameMap(newPlayerNameMap)}
                 onPlayerIdMapUpdated={(newPlayerIdMap) => setPlayerIdMap(newPlayerIdMap)}

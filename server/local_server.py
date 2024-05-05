@@ -6,7 +6,7 @@ from starlette.middleware.cors import CORSMiddleware
 from dto.request_dtos import InitGameRequest, WelcomeRequest, TalkToAllRequest, TalkToPlayer, VoteRoundOne, \
     GetGameResponse, GetBotPlayerResponse
 from lambda_functions import init_game, get_welcome_message, talk_to_all, talk_to_certain_player, \
-    ask_certain_player_to_vote, get_all_games, get_chat_history, load_game, delete_game
+    ask_certain_player_to_vote, get_all_games, get_chat_history, load_game, delete_game, start_voting
 from models import ArbiterReply, AllGamesRecordDto, LLMType
 
 app = FastAPI()
@@ -64,6 +64,7 @@ async def load_game_endpoint(game_id: str):
     return GetGameResponse(
         game_id=game.id,
         story=game.story,
+        human_player_name=game.human_player.name,
         human_player_role=game.human_player.role.value,
         bot_players=[GetBotPlayerResponse(
             id=id,
@@ -122,3 +123,11 @@ async def init_game_endpoint(request: Request):
         game_id=request.gameId, bot_player_id=request.participantId
     )
     return voting_response
+
+
+@app.post("/start_voting/")
+async def start_voting_endpoint(request: Request):
+    data = await request.json()
+    game_id = data["gameId"]
+    start_voting_message = start_voting(game_id)
+    return start_voting_message

@@ -4,7 +4,7 @@ import {URL_API_DELETE_GAME, URL_API_GET_ALL_GAMES, URL_API_GET_CHAT_HISTORY, UR
 import {getRandomColor, getUniqueColor} from "../../hooks/colors";
 
 const AllGamesModal = ({
-    isVisible, onClose, onGameSelect, onChatMessagesLoaded, onPlayerNameMapUpdated, onPlayerIdMapUpdated
+    isVisible, onClose, onGameSelect, onUserNameChange, onChatMessagesLoaded, onPlayerNameMapUpdated, onPlayerIdMapUpdated
 }) => {
     const [games, setGames] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -42,6 +42,7 @@ const AllGamesModal = ({
             const newPlayerIdMap = new Map();
 
             const usedColors = [];
+            onUserNameChange(data.human_player_name);
             data.bot_players.forEach((player, index) => {
                 const uniqueColor = getUniqueColor(usedColors);
                 usedColors.push(uniqueColor);
@@ -61,6 +62,7 @@ const AllGamesModal = ({
             onChatMessagesLoaded(formattedMessages);
             onPlayerNameMapUpdated(newPlayerNameMap);
             onPlayerIdMapUpdated(newPlayerIdMap);
+            onUserNameChange(data.user_name);
         } catch (error) {
             console.error('Error fetching game data:', error);
         }

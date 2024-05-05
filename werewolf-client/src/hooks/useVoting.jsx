@@ -1,14 +1,12 @@
 import { useState } from 'react';
 import { URL_API_START_VOTING, URL_API_ASK_CERTAIN_PLAYER_TO_VOTE, URL_API_SAVE_VOTING_RESULT } from '../Constants';
 
-const useVoting = (setLoading, setMessages, playerIdMap, gameId) => {
+const useVoting = (setLoading, setMessages, userName, playerIdMap, gameId) => {
     const [isVotingModalVisible, setVotingModalVisible] = useState(false);
-    const [votingOrder, setVotingOrder] = useState([]);
-    const [currentVoterIndex, setCurrentVoterIndex] = useState(0);
-    const [votes, setVotes] = useState([]);
 
     const startVoting = async () => {
         setLoading(true);
+        console.log("Starting voting... Username: ", userName);
         try {
             const response = await fetch(URL_API_START_VOTING, {
                 method: 'POST',
@@ -35,14 +33,14 @@ const useVoting = (setLoading, setMessages, playerIdMap, gameId) => {
                 ]);
 
                 const playerIds = [...playerIdMap.values()];
-                const humanPlayer = { id: 'human', name: 'Human' };
+                const humanPlayer = { id: 'human_id', name: userName };
                 const votingOrderWithHuman = [...playerIds, humanPlayer];
-                setVotingOrder(shuffleArray(votingOrderWithHuman));
-                setCurrentVoterIndex(0);
-                setVotes([]);
+                const votingOrder = shuffleArray(votingOrderWithHuman);
+                console.log("Voting Order: ", votingOrder);
 
                 // Start bot voting
-                await botVoting();
+                const votes = await botVoting(votingOrder);
+                await countVotes(votes);
             } else {
                 console.error('Error starting voting:', response.statusText);
             }
@@ -53,15 +51,32 @@ const useVoting = (setLoading, setMessages, playerIdMap, gameId) => {
         }
     };
 
-    const botVoting = async () => {
-        for (let i = currentVoterIndex; i < votingOrder.length; i++) {
+    const botVoting = async (votingOrder) => {
+        const votes = [];
+        for (let i = 0; i < votingOrder.length; i++) {
             const voter = votingOrder[i];
             const voterId = voter.id;
+            console.log("Voter: ", voter);
 
-            if (voterId === 'human') {
+            if (voterId === 'human_id') {
                 // Show voting modal for human player
                 setVotingModalVisible(true);
-                break;
+                // Wait for human player to vote
+                const humanVote = await new Promise((resolve) => {
+                    const handleVote = (selectedParticipantId, reason) => { // fixme: This part doesn't work. Need to return it so it can be used in the voting dialog
+                        const vote = {
+                            voter: userName,
+                            votedFor: playerIdMap.get(selectedParticipantId).name,
+                            reason,
+                        };
+                        resolve(vote);
+                    };
+                    // Pass the handleVote function to the voting modal
+                    // You may need to modify the voting modal component to accept the handleVote function as a prop
+                });
+                votes.push(humanVote);
+                addVoteToMessages(humanVote);
+                setVotingModalVisible(false);
             } else {
                 // Bot player voting
                 setLoading(true);
@@ -84,39 +99,19 @@ const useVoting = (setLoading, setMessages, playerIdMap, gameId) => {
                             votedFor: extractVotedForName(votingResponse),
                             reason: extractReason(votingResponse),
                         };
-                        setVotes((prevVotes) => [...prevVotes, vote]);
+                        votes.push(vote);
                         addVoteToMessages(vote);
-                        setCurrentVoterIndex(i + 1);
                     } else {
                         console.error('Error asking bot to vote:', response.statusText);
-                        break;
                     }
                 } catch (error) {
                     console.error('Error asking bot to vote:', error);
-                    break;
                 } finally {
                     setLoading(false);
                 }
             }
         }
-
-        // Voting completed
-        if (currentVoterIndex === votingOrder.length) {
-            await countVotes();
-        }
-    };
-
-    const handleVote = async (selectedParticipantId, reason) => {
-        const vote = {
-            voter: 'Human',
-            votedFor: playerIdMap.get(selectedParticipantId).name,
-            reason,
-        };
-        setVotes((prevVotes) => [...prevVotes, vote]);
-        addVoteToMessages(vote);
-        setVotingModalVisible(false);
-        setCurrentVoterIndex((prevIndex) => prevIndex + 1);
-        await botVoting();
+        return votes;
     };
 
     const addVoteToMessages = (vote) => {
@@ -133,15 +128,19 @@ const useVoting = (setLoading, setMessages, playerIdMap, gameId) => {
 
     const extractVotedForName = (votingResponse) => {
         // Extract the voted-for name from the bot's voting response
-        // Implement the logic based on the structure of the voting response
+        const regex = /Name: (.+)\. Reason:/;
+        const match = votingResponse.match(regex);
+        return match ? match[1] : '';
     };
 
     const extractReason = (votingResponse) => {
         // Extract the reason from the bot's voting response
-        // Implement the logic based on the structure of the voting response
+        const regex = /Reason: (.+)/;
+        const match = votingResponse.match(regex);
+        return match ? match[1] : '';
     };
 
-    const countVotes = async () => {
+    const countVotes = async (votes) => {
         // Count the votes and determine the leaders
         const voteCount = votes.reduce((count, vote) => {
             count[vote.votedFor] = (count[vote.votedFor] || 0) + 1;
@@ -186,7 +185,6 @@ const useVoting = (setLoading, setMessages, playerIdMap, gameId) => {
         isVotingModalVisible,
         setVotingModalVisible,
         startVoting,
-        handleVote,
     };
 };
 

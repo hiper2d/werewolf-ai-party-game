@@ -14,9 +14,9 @@ from dotenv import load_dotenv, find_dotenv
 
 from ai.agents.gm_agent import GmAgent
 from ai.agents.player_agent import BotPlayerAgent
-from ai.prompts.assistant_prompts import GAME_MASTER_VOTING_FIRST_ROUND_COMMAND, GAME_MASTER_VOTING_FIRST_ROUND_RESULT, \
+from ai.prompts.assistant_prompts import GAME_MASTER_VOTING_FIRST_ROUND_PROMPT, GAME_MASTER_VOTING_FIRST_ROUND_RESULT, \
     GAME_MASTER_VOTING_FIRST_ROUND_DEFENCE_COMMAND, GAME_MASTER_VOTING_SECOND_ROUND_COMMAND, \
-    GAME_MASTER_VOTING_SECOND_ROUND_RESULT
+    GAME_MASTER_VOTING_SECOND_ROUND_RESULT, GAME_MASTER_VOTING_FIRST_ROUND_MESSAGE
 from api.ai.actions.role.role_dictionary import ROLE_DICTIONARY
 from api.ai.assistants import ArbiterAssistantDecorator, PlayerAssistantDecorator, RawAssistant
 from api.ai.text_generators import generate_scene_and_players
@@ -161,7 +161,8 @@ def get_welcome_message(game_id: str, bot_player_id: str) -> str:
 
     command_message = MessageDto(
         recipient=f"{game_id}_{bot_player.id}", author_name=GM_NAME, author_id=GM_ID,
-        msg="Please introduce yourself to the other players.", role=MessageRole.USER
+        msg="Please introduce yourself to the other players. Be creative, do not repeat the text style "
+            "and structure of other players", role=MessageRole.USER
     )
     message_dao.save_dto(command_message)
 
@@ -261,7 +262,7 @@ def ask_certain_player_to_vote(game_id: str, bot_player_id: str) -> str:
             message.role = MessageRole.USER # other messages are from outside, i.e. from USER
             message.msg = f"{message.author_name}: {message.msg}"
 
-    voting_instruction = GAME_MASTER_VOTING_FIRST_ROUND_COMMAND.format()
+    voting_instruction = GAME_MASTER_VOTING_FIRST_ROUND_PROMPT.format()
     voting_instruction_msg = MessageDto(
         recipient=f"{game_id}_{bot_player_id}", author_id=GM_ID, author_name=GM_NAME,
         msg=voting_instruction, role=MessageRole.USER
@@ -289,6 +290,23 @@ def get_chat_history(game_id: str, limit: int = 10_000) -> List[MessageDto]:
     return messages
 
 
+def start_voting(game_id: str) -> str:
+    game = game_dao.get_by_id(game_id)
+    if not game:
+        logger.debug(f"Game with id {game_id} not found in the database")
+        return None
+
+    start_voting_message_dto = MessageDto(
+        recipient=f"{game_id}_{RECIPIENT_ALL}",
+        author_name=GM_NAME,
+        author_id=GM_ID,
+        msg=GAME_MASTER_VOTING_FIRST_ROUND_MESSAGE,
+        role=MessageRole.ASSISTANT,
+    )
+    message_dao.save_dto(start_voting_message_dto)
+    return GAME_MASTER_VOTING_FIRST_ROUND_MESSAGE
+
+
 # todo: split into separate api calls from UI
 def start_elimination_vote_round_one_async(game_id: str, user_vote: str) -> List[str]:
     logger.info("*** Time to vote! ***")
@@ -300,7 +318,7 @@ def start_elimination_vote_round_one_async(game_id: str, user_vote: str) -> List
 
     def get_voting_result(player):
         new_messages_concatenated, _ = _get_new_messages_as_str(r, game_id, player.current_offset)
-        voting_instruction = GAME_MASTER_VOTING_FIRST_ROUND_COMMAND.format(
+        voting_instruction = GAME_MASTER_VOTING_FIRST_ROUND_PROMPT.format(
             latest_messages=new_messages_concatenated
         )
         player_assistant = PlayerAssistantDecorator.load_player_by_assistant_id_with_new_thread(
