@@ -24,6 +24,13 @@ UI is chunky and ugly yet but I'm working on it. It's a very early stage of the 
 
 # Setup
 
+To runt the project locally, you need:
+- Install Docker and Docker Compose, run local DynamoDb with `docker-compose up`
+- Frontend: install node.js and npm, install dependencies with `npm install`, and run the app by `npm run web`
+- Backend: install Python 3.11+ and Pypenv, install dependencies with `pipenv install`, and run the FastAPI server
+
+# Setup (outdated)
+
 ### Run Redis
 
 I prefer to run it with Docker Compose. There is a config in the root directory, just run it. You need to have docker
