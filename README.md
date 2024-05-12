@@ -29,9 +29,7 @@ To runt the project locally, you need:
 - Frontend: install node.js and npm, install dependencies with `npm install`, and run the app by `npm run web`
 - Backend: install Python 3.11+ and Pypenv, install dependencies with `pipenv install`, and run the FastAPI server
 
-# Setup (outdated)
-
-### Run Redis
+### DynamoDB
 
 I prefer to run it with Docker Compose. There is a config in the root directory, just run it. You need to have docker
 and docker-compose installed.
@@ -40,7 +38,9 @@ and docker-compose installed.
 docker-compose up
 ```
 
-### Frontend and Backend
+### Backend
+
+Install Python 3.11+ and Pipenv.
 
 I use FastAPI Python web server and React Native frontend application. Here are my Intellij Idea run configurations:
 
@@ -49,7 +49,6 @@ I use FastAPI Python web server and React Native frontend application. Here are 
 
 > **Note:** Before running Python code, rename the [.env.template](.env.template) file into `.env` and fill in the values. All
 environmental variables from it will be loaded by functions and used to talk to the external APIs (DynamoDB, OpenAI).
-
 
 ### Run Python functions [deprecated as I already have UI]
 
@@ -103,3 +102,14 @@ I use `pipenv` to manage dependencies. Install it, create a virtual environment,
     cd <virtualenv dir>/bin
     source activate
     ```
+
+### Frontend
+
+Install node.js and npm. Navigate to the `werewolf-client` and run:
+
+```bash
+npm install
+npm run web
+```
+
+This will start the frontend on the `localhost:8081` address. 
