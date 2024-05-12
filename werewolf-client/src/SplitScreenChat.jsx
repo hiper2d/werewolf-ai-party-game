@@ -67,7 +67,7 @@ const SplitScreenChat = () => {
         isVotingModalVisible,
         setVotingModalVisible,
         startVoting,
-        handleVote // fixme: this function is not returned
+        onHumanPlayerVote,
     } = useVoting(setLoading, setMessages, userName, playerIdMap, gameId);
 
     const handleIconPress = (iconName) => {
@@ -128,7 +128,7 @@ const SplitScreenChat = () => {
                 isVisible={isVotingModalVisible}
                 onClose={() => setVotingModalVisible(false)}
                 participants={Array.from(playerIdMap.values())}
-                onVote={handleVote}
+                onHumanPlayerVote={onHumanPlayerVote}
             />
             {isLoading && <Loader />}
         </SafeAreaView>

@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import CustomDropdown from './CustomDropdown';
 
-const VotingModal = ({ isVisible, onClose, participants, onVote }) => {
+const VotingModal = ({ isVisible, onClose, participants, onHumanPlayerVote }) => {
     const [selectedParticipant, setSelectedParticipant] = useState(null);
 
     const handleVote = () => {
-        onVote(selectedParticipant.value);
+        if (selectedParticipant) {
+            onHumanPlayerVote(selectedParticipant.value);
+        }
         onClose();
     };
 

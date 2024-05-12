@@ -3,6 +3,7 @@ import { URL_API_START_VOTING, URL_API_ASK_CERTAIN_PLAYER_TO_VOTE, URL_API_SAVE_
 
 const useVoting = (setLoading, setMessages, userName, playerIdMap, gameId) => {
     const [isVotingModalVisible, setVotingModalVisible] = useState(false);
+    const [resolve, setResolve] = useState(null);
 
     const startVoting = async () => {
         setLoading(true);
@@ -62,18 +63,14 @@ const useVoting = (setLoading, setMessages, userName, playerIdMap, gameId) => {
                 // Show voting modal for human player
                 setVotingModalVisible(true);
                 // Wait for human player to vote
-                const humanVote = await new Promise((resolve) => {
-                    const handleVote = (selectedParticipantId, reason) => { // fixme: This part doesn't work. Need to return it so it can be used in the voting dialog
-                        const vote = {
-                            voter: userName,
-                            votedFor: playerIdMap.get(selectedParticipantId).name,
-                            reason,
-                        };
-                        resolve(vote);
-                    };
-                    // Pass the handleVote function to the voting modal
-                    // You may need to modify the voting modal component to accept the handleVote function as a prop
+                const selectedParticipantId = await new Promise((resolve) => {
+                    setResolve(() => resolve);
                 });
+                const humanVote = {
+                    voter: userName,
+                    votedFor: playerIdMap.get(selectedParticipantId).name,
+                    reason: 'No reason provided',
+                };
                 votes.push(humanVote);
                 addVoteToMessages(humanVote);
                 setVotingModalVisible(false);
@@ -185,6 +182,7 @@ const useVoting = (setLoading, setMessages, userName, playerIdMap, gameId) => {
         isVotingModalVisible,
         setVotingModalVisible,
         startVoting,
+        resolve,
     };
 };
 
