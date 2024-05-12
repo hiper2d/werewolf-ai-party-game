@@ -4,9 +4,9 @@ from typing import List
 from groq import Groq
 from groq.types.chat import ChatCompletion
 
-from ai.agents.generic_agent import GenericAgent
-from constants import MODEL_GROQ
-from models import MessageDto
+from api.ai.agents.generic_agent import GenericAgent
+from api.constants import MODEL_GROQ
+from api.models import MessageDto
 
 
 class GroqAgent(GenericAgent):

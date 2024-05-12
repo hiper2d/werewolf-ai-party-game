@@ -1,10 +1,10 @@
 from typing import List
 
-from ai.agents.agent_factory import AgentFactory
-from ai.agents.generic_agent import GenericAgent
-from ai.prompts.assistant_prompts import PLAYER_PROMPT
-from constants import GM_ID, GM_NAME, DEFAULT_PLAYER_AGENT
-from models import BotPlayerDto, GameDto, WerewolfRole, role_alies, role_enemies, MessageDto, \
+from api.ai.agents.agent_factory import AgentFactory
+from api.ai.agents.generic_agent import GenericAgent
+from api.ai.prompts.assistant_prompts import PLAYER_PROMPT
+from api.constants import GM_ID, GM_NAME, DEFAULT_PLAYER_AGENT
+from api.models import BotPlayerDto, GameDto, WerewolfRole, role_alies, role_enemies, MessageDto, \
     MessageRole, LLMType
 
 

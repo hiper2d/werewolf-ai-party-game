@@ -2,11 +2,11 @@ from typing import List
 
 from dotenv import load_dotenv, find_dotenv
 
-from constants import RECIPIENT_ALL
-from dynamodb.dynamo_helper import get_dynamo_client
-from dynamodb.dynamo_message import DynamoChatMessage, MessageRole
-from dynamodb.generic_dao import GenericDao
-from models import MessageDto
+from api.constants import RECIPIENT_ALL
+from api.dynamodb.dynamo_helper import get_dynamo_client
+from api.dynamodb.dynamo_message import DynamoChatMessage, MessageRole
+from api.dynamodb.generic_dao import GenericDao
+from api.models import MessageDto
 
 
 class MessageDao(GenericDao):

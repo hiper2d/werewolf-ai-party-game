@@ -4,9 +4,9 @@ from typing import List
 from anthropic import Anthropic
 from anthropic.types import Message
 
-from ai.agents.generic_agent import GenericAgent
-from constants import MODEL_CLAUDE
-from models import MessageDto, MessageRole
+from api.ai.agents.generic_agent import GenericAgent
+from api.constants import MODEL_CLAUDE
+from api.models import MessageDto, MessageRole
 
 MAX_OUTPUT_TOKENS = 4096
 

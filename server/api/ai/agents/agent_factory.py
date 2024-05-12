@@ -1,11 +1,11 @@
 import random
 
-from ai.agents.generic_agent import GenericAgent
-from ai.agents.providers.claude_agent import ClaudeAgent
-from ai.agents.providers.groq_agent import GroqAgent
-from ai.agents.providers.mistral_agent import MistralAgent
-from ai.agents.providers.openai_agent import OpenAiAgent
-from models import LLMType
+from api.ai.agents.generic_agent import GenericAgent
+from api.ai.agents.providers.claude_agent import ClaudeAgent
+from api.ai.agents.providers.groq_agent import GroqAgent
+from api.ai.agents.providers.mistral_agent import MistralAgent
+from api.ai.agents.providers.openai_agent import OpenAiAgent
+from api.models import LLMType
 
 
 class AgentFactory:

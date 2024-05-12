@@ -5,7 +5,7 @@ from typing import Optional, List
 from openai import OpenAI
 from openai.types.beta import Assistant, Thread
 
-from ai.prompts.assistant_prompts import PLAYER_PROMPT, ARBITER_PROMPT
+from api.ai.prompts.assistant_prompts import PLAYER_PROMPT, ARBITER_PROMPT
 from api.models import BotPlayerDto, WerewolfRole, HumanPlayerDto
 
 logger = logging.getLogger('my_application')

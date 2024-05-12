@@ -7,14 +7,11 @@ import uuid
 from collections import Counter, defaultdict
 from typing import List, Tuple, Optional
 
-from api.redis.redis_helper import connect_to_redis, save_game_to_redis, load_game_from_redis, \
-    add_message_to_game_history_redis_list, delete_game_history_redis_list, read_messages_from_game_history_redis_list, \
-    delete_game_from_redis, read_newest_game_from_redis
 from dotenv import load_dotenv, find_dotenv
 
-from ai.agents.gm_agent import GmAgent
-from ai.agents.player_agent import BotPlayerAgent
-from ai.prompts.assistant_prompts import GAME_MASTER_VOTING_FIRST_ROUND_PROMPT, GAME_MASTER_VOTING_FIRST_ROUND_RESULT, \
+from api.ai.agents.gm_agent import GmAgent
+from api.ai.agents.player_agent import BotPlayerAgent
+from api.ai.prompts.assistant_prompts import GAME_MASTER_VOTING_FIRST_ROUND_PROMPT, GAME_MASTER_VOTING_FIRST_ROUND_RESULT, \
     GAME_MASTER_VOTING_FIRST_ROUND_DEFENCE_COMMAND, GAME_MASTER_VOTING_SECOND_ROUND_COMMAND, \
     GAME_MASTER_VOTING_SECOND_ROUND_RESULT, GAME_MASTER_VOTING_FIRST_ROUND_MESSAGE
 from api.ai.actions.role.role_dictionary import ROLE_DICTIONARY
@@ -22,13 +19,15 @@ from api.ai.assistants import ArbiterAssistantDecorator, PlayerAssistantDecorato
 from api.ai.text_generators import generate_scene_and_players
 from api.models import GameDto, ArbiterReply, VotingResponse, WerewolfRole, HumanPlayerDto, BotPlayerDto, MessageDto, \
     MessageRole, AllGamesRecordDto, LLMType
+from api.redis.redis_helper import connect_to_redis, save_game_to_redis, load_game_from_redis, \
+    add_message_to_game_history_redis_list, delete_game_history_redis_list, read_messages_from_game_history_redis_list, \
+    delete_game_from_redis, read_newest_game_from_redis
 from api.utils import get_top_items_within_range
-from constants import NO_ALIES, RECIPIENT_ALL, GM_NAME, GM_ID
-from dto.request_dtos import GetGameResponse
-from dynamodb.bot_player_dao import BotPlayerDao
-from dynamodb.dynamo_helper import get_dynamo_client, get_dynamo_resource
-from dynamodb.game_dao import GameDao
-from dynamodb.message_dao import MessageDao
+from api.constants import NO_ALIES, RECIPIENT_ALL, GM_NAME, GM_ID
+from api.dynamodb.bot_player_dao import BotPlayerDao
+from api.dynamodb.dynamo_helper import get_dynamo_client, get_dynamo_resource
+from api.dynamodb.game_dao import GameDao
+from api.dynamodb.message_dao import MessageDao
 
 
 def _setup_logger(log_level=logging.DEBUG):

@@ -5,9 +5,9 @@ from starlette.middleware.cors import CORSMiddleware
 
 from dto.request_dtos import InitGameRequest, WelcomeRequest, TalkToAllRequest, TalkToPlayer, VoteRoundOne, \
     GetGameResponse, GetBotPlayerResponse
-from lambda_functions import init_game, get_welcome_message, talk_to_all, talk_to_certain_player, \
+from api.lambda_functions import init_game, get_welcome_message, talk_to_all, talk_to_certain_player, \
     ask_certain_player_to_vote, get_all_games, get_chat_history, load_game, delete_game, start_voting
-from models import ArbiterReply, AllGamesRecordDto, LLMType
+from api.models import ArbiterReply, AllGamesRecordDto, LLMType
 
 app = FastAPI()
 

@@ -1,10 +1,10 @@
 from typing import List
 
-from ai.agents.agent_factory import AgentFactory
-from ai.agents.generic_agent import GenericAgent
-from ai.prompts.assistant_prompts import ARBITER_PROMPT
-from constants import RECIPIENT_ALL, GM_NAME, GM_ID, DEFAULT_GM_AGENT
-from models import GameDto, MessageDto, \
+from api.ai.agents.agent_factory import AgentFactory
+from api.ai.agents.generic_agent import GenericAgent
+from api.ai.prompts.assistant_prompts import ARBITER_PROMPT
+from api.constants import RECIPIENT_ALL, GM_NAME, GM_ID, DEFAULT_GM_AGENT
+from api.models import GameDto, MessageDto, \
     MessageRole, LLMType
 
 

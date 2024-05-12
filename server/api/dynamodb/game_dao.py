@@ -2,8 +2,8 @@ import logging
 import time
 from typing import List
 
-from dynamodb.generic_dao import GenericDao
-from models import GameDto, HumanPlayerDto, WerewolfRole, AllGamesRecordDto
+from api.dynamodb.generic_dao import GenericDao
+from api.models import GameDto, HumanPlayerDto, WerewolfRole, AllGamesRecordDto
 
 logger = logging.getLogger('my_application')
 

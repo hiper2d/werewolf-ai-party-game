@@ -3,9 +3,9 @@ from typing import List
 from openai import OpenAI
 from openai.types.chat import ChatCompletion
 
-from ai.agents.generic_agent import GenericAgent
-from constants import MODEL_GPT
-from models import MessageDto
+from api.ai.agents.generic_agent import GenericAgent
+from api.constants import MODEL_GPT
+from api.models import MessageDto
 
 
 class OpenAiAgent(GenericAgent):

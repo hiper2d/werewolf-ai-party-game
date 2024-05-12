@@ -2,7 +2,7 @@ import logging
 from abc import ABC, abstractmethod
 from typing import List
 
-from models import MessageDto, LLMType
+from api.models import MessageDto, LLMType
 
 
 class GenericAgent(ABC):

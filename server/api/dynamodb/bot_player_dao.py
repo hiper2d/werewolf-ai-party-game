@@ -1,8 +1,8 @@
 import time
 from typing import List
 
-from dynamodb.generic_dao import GenericDao
-from models import BotPlayerDto, WerewolfRole
+from api.dynamodb.generic_dao import GenericDao
+from api.models import BotPlayerDto, WerewolfRole
 
 
 class BotPlayerDao(GenericDao):

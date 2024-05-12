@@ -4,9 +4,9 @@ from typing import List
 from mistralai.client import MistralClient
 from mistralai.models.chat_completion import ChatMessage
 
-from ai.agents.generic_agent import GenericAgent
-from constants import MODEL_MISTRAL
-from models import MessageDto
+from api.ai.agents.generic_agent import GenericAgent
+from api.constants import MODEL_MISTRAL
+from api.models import MessageDto
 
 
 class MistralAgent(GenericAgent):
