@@ -3,7 +3,7 @@ from typing import List
 from api.ai.agents.agent_factory import AgentFactory
 from api.ai.agents.generic_agent import GenericAgent
 from api.ai.prompts.assistant_prompts import PLAYER_PROMPT
-from api.constants import GM_ID, GM_NAME, DEFAULT_PLAYER_AGENT
+from api.constants import GM_ID, GM_NAME
 from api.models import BotPlayerDto, GameDto, WerewolfRole, role_alies, role_enemies, MessageDto, \
     MessageRole, LLMType
 

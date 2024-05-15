@@ -199,6 +199,10 @@ def talk_to_all(game_id: str, user_message: str) -> ArbiterReply:
     user_message.msg = f"{user_message.author_name}: {user_message.msg}"
 
     gm_reply = gm_agent.ask([instruction_message, *history_messages, user_message])
+    if gm_reply.startswith("```json"):
+        gm_reply = gm_reply[7:]
+    if gm_reply.endswith("```"):
+        gm_reply = gm_reply[:-3]
 
     game.user_moves_total_counter += 1
     game.user_moves_day_counter += 1
@@ -306,7 +310,24 @@ def start_voting(game_id: str) -> str:
     return GAME_MASTER_VOTING_FIRST_ROUND_MESSAGE
 
 
-# todo: split into separate api calls from UI
+def process_voting_result(game_id: str, votes: List[dict]) -> str:
+    # Process the voting result and generate a response message
+    response_message = "The voting results have been processed. Stay tuned for the next round!"
+
+    # Save the response message to the database
+    message_dto = MessageDto(
+        recipient=f"{game_id}_{RECIPIENT_ALL}",
+        author_name="Game Master",
+        author_id=GM_ID,
+        msg=response_message,
+        role=MessageRole.ASSISTANT,
+    )
+    message_dao.save_dto(message_dto)
+
+    return response_message
+
+
+# todo: unused, remove
 def start_elimination_vote_round_one_async(game_id: str, user_vote: str) -> List[str]:
     logger.info("*** Time to vote! ***")
     load_dotenv(find_dotenv())

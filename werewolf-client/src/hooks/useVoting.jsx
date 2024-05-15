@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { URL_API_START_VOTING, URL_API_ASK_CERTAIN_PLAYER_TO_VOTE, URL_API_SAVE_VOTING_RESULT } from '../Constants';
+import { URL_API_START_VOTING, URL_API_ASK_CERTAIN_PLAYER_TO_VOTE, URL_API_PROCESS_VOTING_RESULT } from '../Constants';
 
 const useVoting = (setLoading, setMessages, userName, playerIdMap, gameId) => {
     const [isVotingModalVisible, setVotingModalVisible] = useState(false);
@@ -149,23 +149,46 @@ const useVoting = (setLoading, setMessages, userName, playerIdMap, gameId) => {
             .map(([name, count]) => `${name}: ${count} vote(s)`)
             .join(', ');
 
-        const resultMessage = `Voting Results:\n${leaders}`;
-        setMessages((prevMessages) => [...prevMessages, { text: resultMessage, isUserMessage: false }]);
+        const resultMessage = `Leaders: ${leaders}`;
+        setMessages((prevMessages) => [
+            ...prevMessages,
+            {
+                text: resultMessage,
+                isUserMessage: false
+            } // todo: add all message fields
+        ]);
 
-        // Save voting result to chat history
+        // Send voting results to the backend
         try {
-            await fetch(URL_API_SAVE_VOTING_RESULT, {
+            const response = await fetch(URL_API_PROCESS_VOTING_RESULT, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
                     gameId,
-                    resultMessage,
+                    votes,
                 }),
             });
+
+            if (response.ok) {
+                const backendResponse = await response.text();
+                setMessages((prevMessages) => [
+                    ...prevMessages,
+                    {
+                        key: Math.random().toString(36).substring(7),
+                        text: backendResponse,
+                        timestamp: new Date(),
+                        isUserMessage: false,
+                        author: 'Game Master',
+                        authorColor: '#fff',
+                    },
+                ]);
+            } else {
+                console.error('Error processing voting result:', response.statusText);
+            }
         } catch (error) {
-            console.error('Error saving voting result:', error);
+            console.error('Error processing voting result:', error);
         }
     };
 

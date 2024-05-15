@@ -7,7 +7,7 @@ from typing import List, Tuple
 from api.ai.agents.agent_factory import AgentFactory
 from api.ai.prompts.text_generator_prompts import GAME_GENERATION_PROMPT
 from api.models import BotPlayerDto, WerewolfRole, role_motivations, LLMType
-from api.constants import DEFAULT_GM_AGENT, GM_NAME
+from api.constants import GM_NAME
 
 logger = logging.getLogger('my_application')
 
