@@ -14,15 +14,14 @@ logger = logging.getLogger('my_application')
 
 def generate_scene_and_players(
         num_players, wolf_count: int, additional_roles: List[WerewolfRole],
-        human_player_name: str, gm_llm: LLMType, bot_player_llm: LLMType, theme: str = 'Western'
+        human_player_name: str, gm_llm: LLMType, bot_player_llm: LLMType, theme: str = 'Western', reply_language_instruction: str = 'Russian'
 ) -> Tuple[str, WerewolfRole, List[BotPlayerDto]]:
     logger.debug(f"Generating {num_players} players for a new game. Theme: {theme}.")
 
     roles: List[WerewolfRole] = _generate_random_roles_for_bot_players(num_players, wolf_count, additional_roles)
     human_player_role = _pick_and_remove_role(roles)
-
     instruction = GAME_GENERATION_PROMPT.format(theme=theme, num_players=num_players-1,
-                                                human_player_name=human_player_name)
+                                                human_player_name=human_player_name, reply_language_instruction=reply_language_instruction)
     ai_agent = AgentFactory.create_agent(llm_type=gm_llm, name=GM_NAME)
     response = ai_agent.ask_wth_text(question=instruction)
     logger.debug(f"Received response from AI: {response}")

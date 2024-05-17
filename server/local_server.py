@@ -42,6 +42,7 @@ async def init_game_endpoint(request: Request):
         game_name=init_game_request.gameName,
         theme=init_game_request.gameTheme,
         bot_player_llm=LLMType(init_game_request.botPlayersLLM),
+        reply_language_instruction=init_game_request.selectedLanguage,
         gm_llm=LLMType(init_game_request.gameMasterLLM)
     )
 

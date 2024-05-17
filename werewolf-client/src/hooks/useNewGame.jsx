@@ -16,6 +16,7 @@ const useNewGame = (
     setGameTheme,
     gameMasterLLM,
     botPlayersLLM,
+    selectedLanguage,
 ) => {
     const handleNewGameModalOkPress = async (
 
@@ -33,7 +34,8 @@ const useNewGame = (
                     gameName,
                     gameTheme,
                     gameMasterLLM,
-                    botPlayersLLM
+                    botPlayersLLM,
+                    selectedLanguage,
                 }),
             });
             if (response.ok) {

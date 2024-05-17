@@ -7,6 +7,7 @@ class InitGameRequest(BaseModel):
     gameTheme: str
     gameMasterLLM: str
     botPlayersLLM: str
+    selectedLanguage: str
 
 
 class GetBotPlayerResponse(BaseModel):

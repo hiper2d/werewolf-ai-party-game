@@ -24,7 +24,7 @@ UI is chunky and ugly yet but I'm working on it. It's a very early stage of the 
 
 # Setup
 
-To runt the project locally, you need:
+To run the project locally, you need:
 - Install Docker and Docker Compose, run local DynamoDb with `docker-compose up`
 - Frontend: install node.js and npm, install dependencies with `npm install`, and run the app by `npm run web`
 - Backend: install Python 3.11+ and Pypenv, install dependencies with `pipenv install`, and run the FastAPI server
@@ -113,3 +113,24 @@ npm run web
 ```
 
 This will start the frontend on the `localhost:8081` address. 
+
+# Setup(Windows)
+
+To run the project locally, you need:
+- Install Docker and Docker Compose, run local DynamoDb with `docker-compose up`
+- Backend: install Python 3.11+
+- Frontend: install node.js and npm, navigate to the `werewolf-client` install dependencies with `npm install`, and run the app by `npm run web` 
+- Edit environment variables in control panel and add two environment variables to python in PATH, for example: 
+```bash
+..\AppData\Local\Programs\Python\Python312
+..\AppData\Local\Programs\Python\Python312\Scripts
+```
+- Install dependencies in root directory `pip install -r requirements.txt`
+- Inside `.env` file add keys and add AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY, remove AWS_PROFILE:
+
+```bash
+AWS_ACCESS_KEY_ID=DUMMYIDEXAMPLE
+AWS_SECRET_ACCESS_KEY=DUMMYEXAMPLEKEY
+```
+- From `server` folder run web server: `uvicorn local_server:app --reload`
+

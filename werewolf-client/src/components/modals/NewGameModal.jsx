@@ -3,20 +3,22 @@ import {Modal, Pressable, StyleSheet, Text, TextInput, View} from 'react-native'
 import {Picker} from "react-native-web";
 
 const NewGameModal = ({
-      isVisible,
-      onClose,
-      onOkPress,
-      userName,
-      onUserNameChange,
-      gameName,
-      onGameNameChange,
-      gameTheme,
-      onGameThemeChange,
-      gameMasterLLM,
-      setGameMasterLLM,
-      botPlayersLLM,
-      setBotPlayersLLM
-  }) => {
+    isVisible,
+    onClose,
+    onOkPress,
+    userName,
+    onUserNameChange,
+    gameName,
+    onGameNameChange,
+    gameTheme,
+    onGameThemeChange,
+    gameMasterLLM,
+    setGameMasterLLM,
+    botPlayersLLM,
+    setBotPlayersLLM,
+    selectedLanguage,
+    setSelectedLanguage,
+}) => {
     return (
         <Modal visible={isVisible} animationType="slide" transparent={true}>
             <View style={styles.modalContainer}>
@@ -72,8 +74,23 @@ const NewGameModal = ({
                                 <Picker.Item label="Mixed" value="Mixed" />
                             </Picker>
                         </View>
+                        <View style={styles.dropdownWrapper}>
+                            <Text style={styles.dropdownLabel}>Language</Text>
+                            <Picker
+                                style={styles.dropdown}
+                                selectedValue={selectedLanguage}
+                                onValueChange={(itemValue) => setSelectedLanguage(itemValue)}
+                            >
+                                <Picker.Item label="English" value="english" />
+                                <Picker.Item label="French" value="french" />
+                                <Picker.Item label="German" value="german" />
+                                <Picker.Item label="Spanish" value="spanish" />
+                                <Picker.Item label="Italian" value="italian" />
+                                <Picker.Item label="Russian" value="russian" />
+                                <Picker.Item label="Portuguese" value="portuguese" />
+                            </Picker>
+                        </View>
                     </View>
-
                     <View style={styles.modalButtonContainer}>
                         <Pressable
                             onPress={onClose}

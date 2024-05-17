@@ -67,14 +67,14 @@ message_dao = MessageDao(dyn_client=dyn_client, dyn_resource=dyn_resource)
 
 def init_game(human_player_name: str, game_name: str, theme: str,
               gm_llm: LLMType, bot_player_llm: LLMType,
-              reply_language_instruction: str = '') \
+              reply_language_instruction: str) \
         -> Tuple[str, WerewolfRole, List[List[str]], str]:
     logger.info("*** Starting new game! ***\n")
 
     game_scene, human_player_role, bot_players = generate_scene_and_players(
         num_players=6, wolf_count=2, additional_roles=[WerewolfRole.DOCTOR, WerewolfRole.DETECTIVE],
         theme=theme, human_player_name=human_player_name,
-        gm_llm=gm_llm, bot_player_llm=bot_player_llm
+        gm_llm=gm_llm, bot_player_llm=bot_player_llm, reply_language_instruction=reply_language_instruction
     )
     logger.info("Game Scene: %s\n", game_scene)
     human_player: HumanPlayerDto = HumanPlayerDto(name=human_player_name, role=human_player_role)

@@ -45,4 +45,4 @@ harmed. Tends to avoid the spotlight and feels uncomfortable around aggressive p
 ]
 }}
 You answer must include only the JSON and nothing else. I.e. the whole response must be a valid JSON.
-"""
+Reply in {reply_language_instruction} language."""

@@ -10,7 +10,7 @@ const useGame = () => {
     const [playerNameMap, setPlayerNameMap] = useState(new Map());
     const [gameMasterLLM, setGameMasterLLM] = useState('GPT-4');
     const [botPlayersLLM, setBotPlayersLLM] = useState('GPT-4');
-
+    const [selectedLanguage, setSelectedLanguage] = useState('english');
     return {
         gameId,
         setGameId,
@@ -29,7 +29,9 @@ const useGame = () => {
         gameMasterLLM,
         setGameMasterLLM,
         botPlayersLLM,
-        setBotPlayersLLM
+        setBotPlayersLLM,
+        selectedLanguage,
+        setSelectedLanguage,
         // Export game-related functions
     };
 };

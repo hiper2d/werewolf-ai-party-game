@@ -36,7 +36,9 @@ const SplitScreenChat = () => {
         gameMasterLLM,
         setGameMasterLLM,
         botPlayersLLM,
-        setBotPlayersLLM
+        setBotPlayersLLM,
+        selectedLanguage,
+        setSelectedLanguage,
     } = useGame();
 
     const { messages, setMessages, sendMessage } = useChatMessages(
@@ -61,6 +63,7 @@ const SplitScreenChat = () => {
         setGameTheme,
         gameMasterLLM,
         botPlayersLLM,
+        selectedLanguage,
     );
 
     const {
@@ -114,6 +117,8 @@ const SplitScreenChat = () => {
                 setGameMasterLLM={setGameMasterLLM}
                 botPlayersLLM={botPlayersLLM}
                 setBotPlayersLLM={setBotPlayersLLM}
+                selectedLanguage={selectedLanguage}
+                setSelectedLanguage={setSelectedLanguage}
             />
             <AllGamesModal
                 isVisible={isAllGamesModalVisible}

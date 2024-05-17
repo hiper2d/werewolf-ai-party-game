@@ -140,7 +140,7 @@ Don't use markdown, only the plain text. Don't add your name to the beginning of
 just reply with your message. For example:
 "Hello, I think we should vote for John. He is suspicious."
  
-{reply_language_instruction}"""
+Reply in {reply_language_instruction} language."""
 
 GAME_MASTER_VOTING_FIRST_ROUND_MESSAGE = """It's time to vote! Choose one player to eliminate. \
 You must to vote, you must pick somebody even if you don't see a reason. You cannot choose yourself or nobody. \
