@@ -46,12 +46,14 @@ async def init_game_endpoint(request: Request):
         gm_llm=LLMType(init_game_request.gameMasterLLM)
     )
 
-    return {
-        "game_id": game_id,
-        "story": story,
-        "human_player_role": human_player_role.value,
-        "bot_players": bot_players
-    }
+    return GetGameResponse(
+        game_id=game_id,
+        story=story,
+        human_player_name=init_game_request.userName,
+        human_player_role=human_player_role.value,
+        bot_players=bot_players,
+        messages=[]
+    )
 
 
 @app.get("/all_games/")
@@ -62,17 +64,13 @@ async def init_game_endpoint():
 
 @app.get("/game/{game_id}")
 async def load_game_endpoint(game_id: str):
-    game, messages = load_game(game_id=game_id)
+    game, messages, bot_players = load_game(game_id=game_id)
     return GetGameResponse(
         game_id=game.id,
         story=game.story,
         human_player_name=game.human_player.name,
         human_player_role=game.human_player.role.value,
-        bot_players=[GetBotPlayerResponse(
-            id=id,
-            name=name,
-            color=""  # todo: generate colors on UI
-        ) for name, id in game.bot_player_name_to_id.items()],
+        bot_players=[GetBotPlayerResponse(id=bot_player.id, name=bot_player.name, color=bot_player.color) for bot_player in bot_players],
         messages=[message.dict() for message in messages]
     )
 

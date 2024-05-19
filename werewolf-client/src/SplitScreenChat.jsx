@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { SafeAreaView, StyleSheet, View } from 'react-native';
+import React, {useState} from 'react';
+import {SafeAreaView, StyleSheet, View} from 'react-native';
 import MenuBar from './components/MenuBar';
 import ParticipantsList from './components/ParticipantsList';
 import ChatMessages from './components/ChatMessages';
@@ -12,6 +12,8 @@ import useNewGame from './hooks/useNewGame';
 import useVoting from './hooks/useVoting';
 import AllGamesModal from './components/modals/AllGamesModal';
 import VotingModal from "./components/VotingModal";
+import {connect} from "react-redux";
+import {updateGame} from "./redux/actions";
 
 const SplitScreenChat = () => {
     const [inputText, setInputText] = useState('');
@@ -30,9 +32,6 @@ const SplitScreenChat = () => {
         isLoading,
         setLoading,
         playerIdMap,
-        setPlayerIdMap,
-        playerNameMap,
-        setPlayerNameMap,
         gameMasterLLM,
         setGameMasterLLM,
         botPlayersLLM,
@@ -41,24 +40,18 @@ const SplitScreenChat = () => {
         setSelectedLanguage,
     } = useGame();
 
-    const { messages, setMessages, sendMessage } = useChatMessages(
-        setLoading,
-        gameId,
-        userName,
-        playerNameMap
+    const {  sendMessage } = useChatMessages(
+        setLoading
     );
 
     const { handleNewGameModalOkPress } = useNewGame(
         setLoading,
         isNewGameModalVisible,
         setNewGameModalVisible,
-        setMessages,
         userName,
         gameName,
         gameTheme,
         setGameId,
-        setPlayerIdMap,
-        setPlayerNameMap,
         setGameName,
         setGameTheme,
         gameMasterLLM,
@@ -71,7 +64,7 @@ const SplitScreenChat = () => {
         setVotingModalVisible,
         startVoting,
         onHumanPlayerVote,
-    } = useVoting(setLoading, setMessages, userName, playerIdMap, gameId);
+    } = useVoting(setLoading);
 
     const handleIconPress = (iconName) => {
         console.log(`Icon pressed: ${iconName}`);
@@ -93,9 +86,9 @@ const SplitScreenChat = () => {
         <SafeAreaView style={styles.safeArea}>
             <MenuBar onMenuPress={handleMenuPress} onIconPress={handleIconPress} />
             <View style={styles.container}>
-                <ParticipantsList participants={Array.from(playerIdMap.values())}  onStartVoting={startVoting}/>
+                <ParticipantsList onStartVoting={startVoting}/>
                 <View style={styles.chatContainer}>
-                    <ChatMessages messages={messages}/>
+                    <ChatMessages />
                     <InputArea
                         inputText={inputText}
                         onChangeText={setInputText}
@@ -124,10 +117,6 @@ const SplitScreenChat = () => {
                 isVisible={isAllGamesModalVisible}
                 onClose={() => setAllGamesModalVisible(false)}
                 onGameSelect={handleGameSelect}
-                onUserNameChange={(name) => setUserName(name)}
-                onChatMessagesLoaded={(messages) => setMessages(messages)}
-                onPlayerNameMapUpdated={(newPlayerNameMap) => setPlayerNameMap(newPlayerNameMap)}
-                onPlayerIdMapUpdated={(newPlayerIdMap) => setPlayerIdMap(newPlayerIdMap)}
             />
             <VotingModal
                 isVisible={isVotingModalVisible}
@@ -155,4 +144,12 @@ const styles = StyleSheet.create({
     },
 });
 
-export default SplitScreenChat;
+const mapStateToProps = (state) => ({
+    game: state.game,
+});
+
+const mapDispatchToProps = {
+    updateGame,
+};
+
+export default connect(mapStateToProps, mapDispatchToProps)(SplitScreenChat);

@@ -58,6 +58,7 @@ class BotPlayerDto(BaseModel):
     backstory: str
     role_motivation: str
     temperament: str
+    color: str
     known_ally_names: str = None
     other_player_names: str = None
     is_alive: bool = True

@@ -22,12 +22,13 @@ from api.models import GameDto, ArbiterReply, VotingResponse, WerewolfRole, Huma
 from api.redis.redis_helper import connect_to_redis, save_game_to_redis, load_game_from_redis, \
     add_message_to_game_history_redis_list, delete_game_history_redis_list, read_messages_from_game_history_redis_list, \
     delete_game_from_redis, read_newest_game_from_redis
-from api.utils import get_top_items_within_range
+from api.utils import get_top_items_within_range, get_unique_color
 from api.constants import NO_ALIES, RECIPIENT_ALL, GM_NAME, GM_ID
 from api.dynamodb.bot_player_dao import BotPlayerDao
 from api.dynamodb.dynamo_helper import get_dynamo_client, get_dynamo_resource
 from api.dynamodb.game_dao import GameDao
 from api.dynamodb.message_dao import MessageDao
+from dto.request_dtos import GetGameResponse, GetBotPlayerResponse
 
 
 def _setup_logger(log_level=logging.DEBUG):
@@ -68,7 +69,7 @@ message_dao = MessageDao(dyn_client=dyn_client, dyn_resource=dyn_resource)
 def init_game(human_player_name: str, game_name: str, theme: str,
               gm_llm: LLMType, bot_player_llm: LLMType,
               reply_language_instruction: str) \
-        -> Tuple[str, WerewolfRole, List[List[str]], str]:
+        -> Tuple[str, WerewolfRole, List[GetBotPlayerResponse], str]:
     logger.info("*** Starting new game! ***\n")
 
     game_scene, human_player_role, bot_players = generate_scene_and_players(
@@ -90,7 +91,7 @@ def init_game(human_player_name: str, game_name: str, theme: str,
         players_names_with_roles_and_stories=','.join([f"{bot.name} ({bot.role.value})" for bot in bot_players]),
         reply_language_instruction=reply_language_instruction,
         gm_llm_type_str=gm_llm.value,
-        bot_player_llm_type_str=bot_player_llm.value
+        bot_player_llm_type_str=bot_player_llm.value,
     )
     game_dao.create_or_update_dto(game)
 
@@ -113,13 +114,14 @@ def init_game(human_player_name: str, game_name: str, theme: str,
 
     if not message_dao.exists_table():
         message_dao.create_table()
-    into_message = MessageDto(
+    intro_message = MessageDto(
         recipient=f"{game.id}_{RECIPIENT_ALL}", author_name=GM_NAME, author_id=GM_ID,
         msg=game.story, role=MessageRole.USER
     )
-    message_dao.save_dto(into_message)
+    message_dao.save_dto(intro_message)
 
-    return game.id, human_player.role, [[bot.id, bot.name] for bot in bot_players], game_scene
+    bots = [GetBotPlayerResponse(id=bot_player.id, name=bot_player.name, color=bot_player.color) for bot_player in bot_players]
+    return game.id, human_player.role, bots, game_scene
 
 
 def get_all_games() -> List[AllGamesRecordDto]:
@@ -282,10 +284,11 @@ def ask_certain_player_to_vote(game_id: str, bot_player_id: str) -> str:
     return answer
 
 
-def load_game(game_id: str) -> Tuple[GameDto, List[MessageDto]]:
+def load_game(game_id: str) -> Tuple[GameDto, List[MessageDto], List[BotPlayerDto]]:
     game: GameDto = game_dao.get_by_id(game_id)
+    players: List[BotPlayerDto] = bot_player_dao.get_by_ids(game.bot_player_ids)
     messages: List[MessageDto] = message_dao.get_last_records(recipient=f"{game_id}_{RECIPIENT_ALL}", limit=1_000)
-    return game, messages
+    return game, messages, players
 
 
 def get_chat_history(game_id: str, limit: int = 10_000) -> List[MessageDto]:

@@ -2,15 +2,17 @@ import React, {useEffect, useRef} from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { faFish } from '@fortawesome/free-solid-svg-icons/faFish';
+import {useSelector} from "react-redux";
 
-const ChatMessages = ({ messages }) => {
+const ChatMessages = () => {
     const scrollViewRef = useRef(null);
+    const game = useSelector((state) => state.game);
 
     useEffect(() => {
         if (scrollViewRef.current) {
             scrollViewRef.current.scrollToEnd({ animated: true });
         }
-    }, [messages]);
+    }, [game?.messages]);
 
     return (
         <ScrollView
@@ -22,7 +24,7 @@ const ChatMessages = ({ messages }) => {
                 }
             }}
         >
-            {messages.map((message) => (
+            {game?.messages?.map((message) => (
                 <View key={message.key} style={styles.messageContainer}>
                     <View style={styles.iconContainer}>
                         <FontAwesomeIcon

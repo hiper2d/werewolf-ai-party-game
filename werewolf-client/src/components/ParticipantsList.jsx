@@ -2,12 +2,15 @@ import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { faUser } from '@fortawesome/free-solid-svg-icons/faUser';
+import {useSelector} from "react-redux";
 
-const ParticipantsList = ({ participants, onStartVoting }) => {
+const ParticipantsList = ({ onStartVoting }) => {
+    const game = useSelector((state) => state.game);
+
     return (
         <View style={styles.participantsList}>
             <Text style={styles.sidebarHeader}>Participants</Text>
-            {participants.map((participant) => (
+            {game.bots?.map((participant) => (
                 <View key={participant.name} style={styles.participantItem}>
                     <FontAwesomeIcon icon={faUser} size={16} color={participant.color} style={styles.participantIcon} />
                     <Text style={styles.participantName}>{participant.name}</Text>

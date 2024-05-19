@@ -41,6 +41,9 @@ class BotPlayerDao(GenericDao):
             'other_player_names': {
                 'S': bot.other_player_names
             },
+            'color': {
+                'S': bot.color
+            },
             'is_alive': {
                 'BOOL': bot.is_alive
             },
@@ -63,6 +66,7 @@ class BotPlayerDao(GenericDao):
             temperament=record['temperament']['S'],
             known_ally_names=record['known_ally_names']['S'],
             other_player_names=record['other_player_names']['S'],
+            color=record['color']['S'],
             is_alive=record['is_alive']['BOOL'],
             ts=int(record['created_at']['N'])
         )
@@ -71,3 +75,6 @@ class BotPlayerDao(GenericDao):
         if not self.exists_table():
             self.create_table()
         self.save_dto(dto)
+
+    def get_by_ids(self, ids: List[str]) -> List[BotPlayerDto]:
+        return super().get_by_ids(ids)

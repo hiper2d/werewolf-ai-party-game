@@ -1,15 +1,17 @@
-import React, { useEffect, useState } from 'react';
-import { FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import {URL_API_DELETE_GAME, URL_API_GET_ALL_GAMES, URL_API_GET_CHAT_HISTORY, URL_API_LOAD_GAME} from "../../Constants";
-import {getRandomColor, getUniqueColor} from "../../hooks/colors";
+import React, {useEffect, useState} from 'react';
+import {FlatList, Modal, Pressable, StyleSheet, Text, View} from 'react-native';
+import {URL_API_DELETE_GAME, URL_API_GET_ALL_GAMES} from "../../Constants";
+import {fetchGame, setGame} from "../../redux/actions";
+import {connect, useDispatch} from "react-redux";
 
 const AllGamesModal = ({
-    isVisible, onClose, onGameSelect, onUserNameChange, onChatMessagesLoaded, onPlayerNameMapUpdated, onPlayerIdMapUpdated
+    isVisible, onClose, onGameSelect
 }) => {
     const [games, setGames] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
     const [selectedGameId, setSelectedGameId] = useState(null);
+    const dispatch = useDispatch();
 
     const fetchGames = async () => {
         setIsLoading(true);
@@ -33,40 +35,7 @@ const AllGamesModal = ({
     const handleGameSelect = async (gameId) => {
         setSelectedGameId(gameId);
         onGameSelect(gameId);
-
-        try {
-            const response = await fetch(`${URL_API_LOAD_GAME}/${gameId}`);
-            const data = await response.json();
-
-            const newPlayerNameMap = new Map();
-            const newPlayerIdMap = new Map();
-
-            const usedColors = [];
-            onUserNameChange(data.human_player_name);
-            data.bot_players.forEach((player, index) => {
-                const uniqueColor = getUniqueColor(usedColors);
-                usedColors.push(uniqueColor);
-                newPlayerNameMap.set(player.name, { id: player.id, name: player.name, color: uniqueColor });
-                newPlayerIdMap.set(player.id, { id: player.id, name: player.name, color: uniqueColor });
-            });
-
-            const formattedMessages = data.messages.map((message, index) => ({
-                key: `${index}`,
-                text: message.msg,
-                timestamp: new Date(message.ts),
-                isUserMessage: message.role === 'USER',
-                author: message.author_name,
-                authorColor: newPlayerNameMap.get(message.author_name)?.color || '#fff',
-            }));
-
-            onChatMessagesLoaded(formattedMessages);
-            onPlayerNameMapUpdated(newPlayerNameMap);
-            onPlayerIdMapUpdated(newPlayerIdMap);
-            onUserNameChange(data.user_name);
-        } catch (error) {
-            console.error('Error fetching game data:', error);
-        }
-
+        dispatch(fetchGame(gameId));
         onClose();
     };
 
@@ -78,7 +47,7 @@ const AllGamesModal = ({
 
             if (response.ok) {
                 // Refresh the game list after deleting the game
-                fetchGames();
+                await fetchGames();
             } else {
                 console.error('Error deleting game:', response.statusText);
             }
@@ -268,4 +237,8 @@ const styles = StyleSheet.create({
     },
 });
 
-export default AllGamesModal;
+const mapDispatchToProps = {
+    setGame,
+};
+
+export default connect(null, mapDispatchToProps)(AllGamesModal);

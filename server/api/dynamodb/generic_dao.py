@@ -92,6 +92,24 @@ class GenericDao(ABC, BaseModel):
         except Exception as e:
             self.logger.error(e)
 
+    def get_by_ids(self, ids: List[str]):
+        try:
+            keys = [self._convert_id_to_key(id) for id in ids]
+            result = self.dyn_client.batch_get_item(
+                RequestItems={
+                    self.table_name: {
+                        'Keys': keys
+                    }
+                }
+            )
+            records = result['Responses'][self.table_name]
+            dtos = [self.convert_record_to_dto(record) for record in records]
+            self.logger.debug(f"Pulled {len(dtos)} records from {self.table_name} table.")
+            return dtos
+        except Exception as e:
+            self.logger.error(e)
+            return []
+
     @staticmethod
     def _convert_id_to_key(id: str) -> dict:
         return {

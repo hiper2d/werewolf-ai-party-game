@@ -50,3 +50,36 @@ def get_top_items_within_range(counter: Counter, min_count: int, max_count: int)
     selected_keys_from_ties = [item for item, count in selected_from_ties]
 
     return guaranteed_keys + selected_keys_from_ties
+
+
+unique_colors = [
+    '#ff0000',  # Red
+    '#00ff00',  # Green
+    '#0000ff',  # Blue
+    '#ffff00',  # Yellow
+    '#ff00ff',  # Magenta
+    '#00ffff',  # Cyan
+    '#800000',  # Maroon
+    '#808000',  # Olive
+    '#008000',  # Dark Green
+    '#008080',  # Teal
+    '#000080',  # Navy
+    '#800080',  # Purple
+    '#ffa500',  # Orange
+    '#ffc0cb',  # Pink
+    '#800080',  # Dark Purple
+    # Add more unique colors as needed
+]
+
+
+def get_random_color():
+    random_index = random.randint(0, len(unique_colors) - 1)
+    return unique_colors[random_index]
+
+
+def get_unique_color(used_colors):
+    available_colors = [color for color in unique_colors if color not in used_colors]
+    if not available_colors:
+        raise ValueError('No more unique colors available')
+    random_index = random.randint(0, len(available_colors) - 1)
+    return available_colors[random_index]

@@ -1,9 +1,8 @@
 import {URL_API_TALK_TO_ALL, URL_API_TALK_TO_CERTAIN_PLAYER} from "../Constants";
-import {useState} from "react";
+import {useSelector} from "react-redux";
 
-const useChatMessages = (setIsLoading, gameId, userName, playerNameMap) => {
-    const [messages, setMessages] = useState([
-    ]);
+const useChatMessages = (setIsLoading) => {
+    const game = useSelector((state) => state.game);
 
     const sendMessage = async (inputText) => {
         setIsLoading(true);
@@ -13,11 +12,10 @@ const useChatMessages = (setIsLoading, gameId, userName, playerNameMap) => {
                 text: inputText.trim(),
                 timestamp: new Date(),
                 isUserMessage: true,
-                author: userName,
+                author: game.userName,
             };
 
-            setMessages((previousMessages) => [...previousMessages, newMessage]);
-
+            game?.messages?.push(newMessage);
             try {
                 const response = await fetch(URL_API_TALK_TO_ALL, {
                     method: 'POST',
@@ -25,7 +23,7 @@ const useChatMessages = (setIsLoading, gameId, userName, playerNameMap) => {
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        gameId: gameId,
+                        gameId: game.gameId,
                         message: newMessage.text,
                     }),
                 });
@@ -34,6 +32,16 @@ const useChatMessages = (setIsLoading, gameId, userName, playerNameMap) => {
                     const data = await response.json();
                     const playersToReply = data.players_to_reply;
 
+                    console.log(game)
+                    const nameToId = game.bots?.reduce((map, obj) => {
+                        map[obj.name] = obj.id;
+                        return map;
+                    }, new Map());
+                    const nameToColor = game.bots?.reduce((map, obj) => {
+                        map[obj.name] = obj.color;
+                        return map;
+                    }, new Map());
+
                     for (const playerName of playersToReply) {
                         const replyResponse = await fetch(URL_API_TALK_TO_CERTAIN_PLAYER, {
                             method: 'POST',
@@ -41,28 +49,22 @@ const useChatMessages = (setIsLoading, gameId, userName, playerNameMap) => {
                                 'Content-Type': 'application/json',
                             },
                             body: JSON.stringify({
-                                gameId: gameId,
-                                playerId: playerNameMap.get(playerName).id  // todo: check if a name is in the map
+                                gameId: game.gameId,
+                                playerId: nameToId[playerName]
                             }),
                         });
 
                         if (replyResponse.ok) {
                             let replyMessage = await replyResponse.text();
-                            const player = Array.from(playerNameMap.values()).find(p => p.name === playerName);
-                            const playerColor = player?.color;
 
                             replyMessage = replyMessage.replace(/^"|"$/g, '');
-                            setMessages((previousMessages) => [
-                                ...previousMessages,
-                                {
-                                    key: Math.random().toString(36).substring(7),
-                                    text: replyMessage,
-                                    timestamp: new Date(),
-                                    isUserMessage: false,
-                                    author: player?.name || 'Unknown',
-                                    authorColor: playerColor,
-                                },
-                            ]);
+                            game?.messages?.push({
+                                key: Math.random().toString(36).substring(7),
+                                text: replyMessage,
+                                isUserMessage: false,
+                                author: playerName,
+                                authorColor: nameToColor[playerName] || '#fff',
+                            });
                         } else {
                             console.error('Error getting reply:', replyResponse.status);
                         }
@@ -78,8 +80,6 @@ const useChatMessages = (setIsLoading, gameId, userName, playerNameMap) => {
     };
 
     return {
-        messages,
-        setMessages,
         sendMessage,
     };
 };
