@@ -1,4 +1,4 @@
-import {useDispatch} from "react-redux";
+import {useDispatch, useSelector} from "react-redux";
 import {createGame} from "../redux/actions";
 
 const useNewGame = (
@@ -8,7 +8,6 @@ const useNewGame = (
     userName,
     gameName,
     gameTheme,
-    setGameId,
     setGameName,
     setGameTheme,
     gameMasterLLM,
@@ -16,6 +15,7 @@ const useNewGame = (
     selectedLanguage,
 ) => {
     const dispatch = useDispatch();
+    const game = useSelector((state) => state.game);
 
     const handleNewGameModalOkPress = async (
 
@@ -24,7 +24,7 @@ const useNewGame = (
         setIsLoading(true);
         try {
             dispatch(createGame(
-                userName,
+                game.userName,
                 gameName,
                 gameTheme,
                 gameMasterLLM,

@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import CustomDropdown from './CustomDropdown';
+import {useSelector} from "react-redux";
 
-const VotingModal = ({ isVisible, onClose, participants, onHumanPlayerVote }) => {
+const VotingModal = ({ isVisible, onClose, onHumanPlayerVote }) => {
     const [selectedParticipant, setSelectedParticipant] = useState(null);
+    const game = useSelector((state) => state.game);
 
     const handleVote = () => {
         if (selectedParticipant) {
@@ -12,10 +14,12 @@ const VotingModal = ({ isVisible, onClose, participants, onHumanPlayerVote }) =>
         onClose();
     };
 
-    const participantOptions = participants.map((participant) => ({
-        label: participant.name,
-        value: participant.id,
-    }));
+    const participantOptions = game?.bots?.map(bot => {
+        return {
+            label: bot.name,
+            value: bot.id,
+        }
+    });
 
     return (
         <Modal visible={isVisible} animationType="slide" transparent={true}>

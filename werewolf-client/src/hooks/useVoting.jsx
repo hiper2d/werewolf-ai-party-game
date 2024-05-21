@@ -33,9 +33,8 @@ const useVoting = (setLoading) => {
                     authorColor: '#fff',
                 });
 
-                const playerIds = game.bots.map((bot) => bot.id);
-                const humanPlayer = { id: 'human_id', name: userName };
-                const votingOrderWithHuman = [...playerIds, humanPlayer];
+                const humanPlayer = { id: 'human_id', name: game.userName };
+                const votingOrderWithHuman = [...game.bots, humanPlayer];
                 const votingOrder = shuffleArray(votingOrderWithHuman);
                 console.log("Voting Order: ", votingOrder);
 
@@ -152,11 +151,13 @@ const useVoting = (setLoading) => {
             .join(', ');
 
         // todo: send leaders to the backend to add vote results to DB and to return a message from GM
-
         const resultMessage = `Leaders: ${leaders}`;
         game?.messages?.push({
+            key: Math.random().toString(36).substring(7),
             text: resultMessage,
-            isUserMessage: false
+            isUserMessage: false,
+            author: 'Game Master',
+            authorColor: '#fff',
         });
 
         // Send voting results to the backend
@@ -177,7 +178,6 @@ const useVoting = (setLoading) => {
                 game?.messages?.push({
                     key: Math.random().toString(36).substring(7),
                     text: backendResponse,
-                    timestamp: new Date(),
                     isUserMessage: false,
                     author: 'Game Master',
                     authorColor: '#fff',
@@ -199,11 +199,15 @@ const useVoting = (setLoading) => {
         return shuffledArray;
     };
 
+    const onHumanPlayerVote = (selectedParticipantId) => {
+        resolve(selectedParticipantId);
+    };
+
     return {
         isVotingModalVisible,
         setVotingModalVisible,
         startVoting,
-        resolve,
+        onHumanPlayerVote,
     };
 };
 

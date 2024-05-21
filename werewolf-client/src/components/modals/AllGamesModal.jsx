@@ -5,7 +5,7 @@ import {fetchGame, setGame} from "../../redux/actions";
 import {connect, useDispatch} from "react-redux";
 
 const AllGamesModal = ({
-    isVisible, onClose, onGameSelect
+    isVisible, onClose
 }) => {
     const [games, setGames] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -34,7 +34,6 @@ const AllGamesModal = ({
 
     const handleGameSelect = async (gameId) => {
         setSelectedGameId(gameId);
-        onGameSelect(gameId);
         dispatch(fetchGame(gameId));
         onClose();
     };

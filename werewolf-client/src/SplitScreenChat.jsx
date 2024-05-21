@@ -21,7 +21,6 @@ const SplitScreenChat = () => {
     const [isAllGamesModalVisible, setAllGamesModalVisible] = useState(false);
 
     const {
-        gameId,
         setGameId,
         userName,
         setUserName,
@@ -31,7 +30,6 @@ const SplitScreenChat = () => {
         setGameTheme,
         isLoading,
         setLoading,
-        playerIdMap,
         gameMasterLLM,
         setGameMasterLLM,
         botPlayersLLM,
@@ -51,7 +49,6 @@ const SplitScreenChat = () => {
         userName,
         gameName,
         gameTheme,
-        setGameId,
         setGameName,
         setGameTheme,
         gameMasterLLM,
@@ -76,10 +73,6 @@ const SplitScreenChat = () => {
         } else if (menuItem === 'All Games') {
             setAllGamesModalVisible(true);
         }
-    };
-
-    const handleGameSelect = (gameId) => {
-        setGameId(gameId);
     };
 
     return (
@@ -116,12 +109,10 @@ const SplitScreenChat = () => {
             <AllGamesModal
                 isVisible={isAllGamesModalVisible}
                 onClose={() => setAllGamesModalVisible(false)}
-                onGameSelect={handleGameSelect}
             />
             <VotingModal
                 isVisible={isVotingModalVisible}
                 onClose={() => setVotingModalVisible(false)}
-                participants={Array.from(playerIdMap.values())}
                 onHumanPlayerVote={onHumanPlayerVote}
             />
             {isLoading && <Loader />}
