@@ -17,14 +17,12 @@ const useNewGame = (
     const dispatch = useDispatch();
     const game = useSelector((state) => state.game);
 
-    const handleNewGameModalOkPress = async (
-
-    ) => {
+    const handleNewGameModalOkPress = async () => {
         setModalVisible(false);
         setIsLoading(true);
         try {
             dispatch(createGame(
-                game.userName,
+                userName,
                 gameName,
                 gameTheme,
                 gameMasterLLM,

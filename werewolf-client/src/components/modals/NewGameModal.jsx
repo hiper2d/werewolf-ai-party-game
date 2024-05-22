@@ -1,6 +1,7 @@
 import React, {useState} from 'react';
 import {Modal, Pressable, StyleSheet, Text, TextInput, View} from 'react-native';
 import {Picker} from "react-native-web";
+import {useSelector} from "react-redux";
 
 const NewGameModal = ({
     isVisible,

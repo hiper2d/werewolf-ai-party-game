@@ -1,5 +1,4 @@
 import {URL_API_GET_WELCOME_MESSAGE, URL_API_INIT_GAME, URL_API_LOAD_GAME} from "../Constants";
-import {getUniqueColor} from "../hooks/colors";
 
 export const setGame = (game) => ({
     type: 'SET_GAME',
