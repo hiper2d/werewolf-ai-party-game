@@ -85,7 +85,7 @@ const SplitScreenChat = () => {
                     <InputArea
                         inputText={inputText}
                         onChangeText={setInputText}
-                        onSendMessage={() => sendMessage(inputText)}
+                        onSendMessage={() => sendMessage(inputText,setInputText)}
                     />
                 </View>
             </View>

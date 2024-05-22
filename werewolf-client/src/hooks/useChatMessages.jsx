@@ -4,7 +4,7 @@ import {useSelector} from "react-redux";
 const useChatMessages = (setIsLoading) => {
     const game = useSelector((state) => state.game);
 
-    const sendMessage = async (inputText) => {
+    const sendMessage = async (inputText, setInputtext) => {
         setIsLoading(true);
         if (inputText.trim()) {
             const newMessage = {
@@ -14,8 +14,8 @@ const useChatMessages = (setIsLoading) => {
                 isUserMessage: true,
                 author: game.userName,
             };
-
             game?.messages?.push(newMessage);
+            setInputtext('');
             try {
                 const response = await fetch(URL_API_TALK_TO_ALL, {
                     method: 'POST',
