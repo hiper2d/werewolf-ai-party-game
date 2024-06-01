@@ -4,7 +4,7 @@ from fastapi import FastAPI, Request
 from starlette.middleware.cors import CORSMiddleware
 
 from dto.request_dtos import InitGameRequest, WelcomeRequest, TalkToAllRequest, TalkToPlayer, VoteRoundOne, \
-    GetGameResponse, GetBotPlayerResponse
+    GetGameResponse, GetBotPlayerResponse, ProcessVotingResultRequest
 from api.lambda_functions import init_game, get_welcome_message, talk_to_all, talk_to_certain_player, \
     ask_certain_player_to_vote, get_all_games, get_chat_history, load_game, delete_game, start_voting, \
     process_voting_result
@@ -115,6 +115,14 @@ async def init_game_endpoint(request: Request):
     return arbiter_reply
 
 
+@app.post("/start_voting/")
+async def start_voting_endpoint(request: Request):
+    data = await request.json()
+    game_id = data["gameId"]
+    start_voting_message = start_voting(game_id)
+    return start_voting_message
+
+
 @app.post("/ask_certain_player_to_vote/")
 async def init_game_endpoint(request: Request):
     data = await request.json()
@@ -125,18 +133,9 @@ async def init_game_endpoint(request: Request):
     return voting_response
 
 
-@app.post("/start_voting/")
-async def start_voting_endpoint(request: Request):
-    data = await request.json()
-    game_id = data["gameId"]
-    start_voting_message = start_voting(game_id)
-    return start_voting_message
-
-
 @app.post("/process_voting_result/")
-async def start_voting_endpoint(request: Request):
-    data = await request.json()
-    game_id = data["gameId"]
-    votes = data["votes"]
+async def process_voting_result_endpoint(request: ProcessVotingResultRequest):
+    game_id = request.gameId
+    votes = request.votes
     backend_response = process_voting_result(game_id, votes)
     return backend_response

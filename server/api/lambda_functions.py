@@ -28,7 +28,7 @@ from api.dynamodb.bot_player_dao import BotPlayerDao
 from api.dynamodb.dynamo_helper import get_dynamo_client, get_dynamo_resource
 from api.dynamodb.game_dao import GameDao
 from api.dynamodb.message_dao import MessageDao
-from dto.request_dtos import GetGameResponse, GetBotPlayerResponse
+from dto.request_dtos import GetGameResponse, GetBotPlayerResponse, VoteEntry
 
 
 def _setup_logger(log_level=logging.DEBUG):
@@ -313,9 +313,15 @@ def start_voting(game_id: str) -> str:
     return GAME_MASTER_VOTING_FIRST_ROUND_MESSAGE
 
 
-def process_voting_result(game_id: str, votes: List[dict]) -> str:
+def process_voting_result(game_id: str, votes: List[VoteEntry]) -> str:
     # Process the voting result and generate a response message
     response_message = "The voting results have been processed. Stay tuned for the next round!"
+
+    # todo: I stopped here
+
+    # calculate leaders
+    # construct GM message and save it to DB
+    # return the message to the client
 
     # Save the response message to the database
     message_dto = MessageDto(

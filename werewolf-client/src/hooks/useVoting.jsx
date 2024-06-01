@@ -150,15 +150,7 @@ const useVoting = (setLoading) => {
             .map(([name, count]) => `${name}: ${count} vote(s)`)
             .join(', ');
 
-        // todo: send leaders to the backend to add vote results to DB and to return a message from GM
-        const resultMessage = `Leaders: ${leaders}`;
-        game?.messages?.push({
-            key: Math.random().toString(36).substring(7),
-            text: resultMessage,
-            isUserMessage: false,
-            author: 'Game Master',
-            authorColor: '#fff',
-        });
+        // const resultMessage = `Leaders: ${leaders}`;
 
         // Send voting results to the backend
         try {
@@ -182,6 +174,8 @@ const useVoting = (setLoading) => {
                     author: 'Game Master',
                     authorColor: '#fff',
                 });
+
+
             } else {
                 console.error('Error processing voting result:', response.statusText);
             }

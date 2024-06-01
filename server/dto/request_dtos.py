@@ -1,3 +1,5 @@
+from typing import List
+
 from pydantic import BaseModel
 
 
@@ -48,3 +50,12 @@ class VoteRoundOne(BaseModel):
 class VoteRoundOneResponse(BaseModel):
     player_to_eliminate: str
     reason: str
+
+class VoteEntry(BaseModel):
+    voter: str
+    votedFor: str
+    reason: str
+
+class ProcessVotingResultRequest(BaseModel):
+    gameId: str
+    votes: List[VoteEntry]
