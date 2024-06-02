@@ -16,9 +16,10 @@ from api.ai.prompts.assistant_prompts import GAME_MASTER_VOTING_FIRST_ROUND_PROM
     GAME_MASTER_VOTING_SECOND_ROUND_RESULT, GAME_MASTER_VOTING_FIRST_ROUND_MESSAGE
 from api.ai.actions.role.role_dictionary import ROLE_DICTIONARY
 from api.ai.assistants import ArbiterAssistantDecorator, PlayerAssistantDecorator, RawAssistant
+from api.ai.prompts.gm_commands import VOTING_ROUND_ONE_RESULTS
 from api.ai.text_generators import generate_scene_and_players
 from api.models import GameDto, ArbiterReply, VotingResponse, WerewolfRole, HumanPlayerDto, BotPlayerDto, MessageDto, \
-    MessageRole, AllGamesRecordDto, LLMType
+    MessageRole, AllGamesRecordDto, LLMType, DayPhase
 from api.redis.redis_helper import connect_to_redis, save_game_to_redis, load_game_from_redis, \
     add_message_to_game_history_redis_list, delete_game_history_redis_list, read_messages_from_game_history_redis_list, \
     delete_game_from_redis, read_newest_game_from_redis
@@ -310,30 +311,52 @@ def start_voting(game_id: str) -> str:
         role=MessageRole.ASSISTANT,
     )
     message_dao.save_dto(start_voting_message_dto)
+
+    game.current_day_phase = DayPhase.VOTING_ROUND_ONE
+    game_dao.create_or_update_dto(game)
     return GAME_MASTER_VOTING_FIRST_ROUND_MESSAGE
 
 
 def process_voting_result(game_id: str, votes: List[VoteEntry]) -> str:
-    # Process the voting result and generate a response message
-    response_message = "The voting results have been processed. Stay tuned for the next round!"
+    game = game_dao.get_by_id(game_id)
+    if not game:
+        logger.debug(f"Game with id {game_id} not found in the database")
+        return None
 
-    # todo: I stopped here
+    # Count the votes
+    vote_count = {}
+    for vote in votes:
+        voted_for = vote.votedFor
+        vote_count[voted_for] = vote_count.get(voted_for, 0) + 1
 
-    # calculate leaders
-    # construct GM message and save it to DB
-    # return the message to the client
+    # Sort the players by vote count in descending order
+    sorted_players = sorted(vote_count.items(), key=lambda x: x[1], reverse=True)
+
+    # Select the top 2 leaders
+    leaders = sorted_players[:2]
+
+    # Check for a tie
+    if len(sorted_players) > 2 and sorted_players[1][1] == sorted_players[2][1]:
+        # Include the third player in case of a tie
+        leaders.append(sorted_players[2])
+
+    gm_vote_round_one_result_message = VOTING_ROUND_ONE_RESULTS.format(
+        leaders=', '.join([f"{name}: {count} vote(s)" for name, count in leaders]),
+        leaders_count=len(leaders)
+    )
 
     # Save the response message to the database
     message_dto = MessageDto(
         recipient=f"{game_id}_{RECIPIENT_ALL}",
         author_name="Game Master",
         author_id=GM_ID,
-        msg=response_message,
+        msg=gm_vote_round_one_result_message,
         role=MessageRole.ASSISTANT,
     )
     message_dao.save_dto(message_dto)
-
-    return response_message
+    game.current_day_phase = DayPhase.DAY_DISCUSSION
+    game_dao.create_or_update_dto(game)
+    return gm_vote_round_one_result_message
 
 
 # todo: unused, remove

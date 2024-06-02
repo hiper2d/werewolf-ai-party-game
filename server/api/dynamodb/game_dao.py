@@ -3,7 +3,7 @@ import time
 from typing import List
 
 from api.dynamodb.generic_dao import GenericDao
-from api.models import GameDto, HumanPlayerDto, WerewolfRole, AllGamesRecordDto
+from api.models import GameDto, HumanPlayerDto, WerewolfRole, AllGamesRecordDto, DayPhase
 
 logger = logging.getLogger('my_application')
 
@@ -61,6 +61,9 @@ class GameDao(GenericDao):
             },
             'current_day': {
                 'N': str(game.current_day),
+            },
+            'current_day_phase': {
+                'S': game.current_day_phase.value,
             },
             'user_moves_day_counter': {
                 'N': str(game.user_moves_day_counter),
@@ -140,6 +143,7 @@ class GameDao(GenericDao):
             players_names_with_roles_and_stories=record['players_names_with_roles_and_stories']['S'],
             human_player=human_player,
             current_day=int(record['current_day']['N']),
+            current_day_phase=DayPhase(record['current_day_phase']['S']),
             user_moves_day_counter=int(record['user_moves_day_counter']['N']),
             user_moves_total_counter=int(record['user_moves_total_counter']['N']),
             is_active=int(record['is_active']['N']),

@@ -64,6 +64,9 @@ class BotPlayerDto(BaseModel):
     is_alive: bool = True
     ts: int = Field(default_factory=time.time_ns)
 
+class DayPhase(str, Enum):
+    DAY_DISCUSSION = 'day_discussion'
+    VOTING_ROUND_ONE = 'voting_round_one'
 
 class GameDto(BaseModel):
     id: str = Field(default_factory=uuid.uuid4)
@@ -76,6 +79,7 @@ class GameDto(BaseModel):
     human_player: HumanPlayerDto
     reply_language_instruction: str
     current_day: int = 1
+    current_day_phase: DayPhase = DayPhase.DAY_DISCUSSION
     user_moves_day_counter: int = 0
     user_moves_total_counter: int = 0
     gm_llm_type_str: str
