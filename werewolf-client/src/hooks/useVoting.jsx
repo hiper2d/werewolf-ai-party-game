@@ -38,9 +38,9 @@ const useVoting = (setLoading) => {
                 const votingOrder = shuffleArray(votingOrderWithHuman);
                 console.log("Voting Order: ", votingOrder);
 
-                // Start bot voting
-                const votes = await botVoting(votingOrder);
-                await countVotes(votes);
+                const votes = await askPlayersToVote(votingOrder);
+                await countVotesAndFinishRoundOneVoting(votes);
+                // todo: update the game state on UI (Voting Button should change it's name)
             } else {
                 console.error('Error starting voting:', response.statusText);
             }
@@ -51,7 +51,7 @@ const useVoting = (setLoading) => {
         }
     };
 
-    const botVoting = async (votingOrder) => {
+    const askPlayersToVote = async (votingOrder) => {
         const playerIdMap = new Map(game.bots.map((bot) => [bot.id, bot]));
         const votes = [];
         for (let i = 0; i < votingOrder.length; i++) {
@@ -72,7 +72,7 @@ const useVoting = (setLoading) => {
                     reason: 'No reason provided',
                 };
                 votes.push(humanVote);
-                addVoteToMessages(humanVote);
+                postVoteToChat(humanVote);
                 setVotingModalVisible(false);
             } else {
                 // Bot player voting
@@ -97,7 +97,7 @@ const useVoting = (setLoading) => {
                             reason: extractReason(votingResponse),
                         };
                         votes.push(vote);
-                        addVoteToMessages(vote);
+                        postVoteToChat(vote);
                     } else {
                         console.error('Error asking bot to vote:', response.statusText);
                     }
@@ -111,7 +111,7 @@ const useVoting = (setLoading) => {
         return votes;
     };
 
-    const addVoteToMessages = (vote) => {
+    const postVoteToChat = (vote) => {
         const playerIdMap = new Map(game.bots.map((bot) => [bot.id, bot]));
         const voteMessage = {
             key: Math.random().toString(36).substring(7),
@@ -138,19 +138,12 @@ const useVoting = (setLoading) => {
         return match ? match[1] : '';
     };
 
-    const countVotes = async (votes) => {
+    const countVotesAndFinishRoundOneVoting = async (votes) => {
         // Count the votes and determine the leaders
         const voteCount = votes.reduce((count, vote) => {
             count[vote.votedFor] = (count[vote.votedFor] || 0) + 1;
             return count;
         }, {});
-
-        const leaders = Object.entries(voteCount)
-            .sort((a, b) => b[1] - a[1])
-            .map(([name, count]) => `${name}: ${count} vote(s)`)
-            .join(', ');
-
-        // const resultMessage = `Leaders: ${leaders}`;
 
         // Send voting results to the backend
         try {
@@ -174,8 +167,6 @@ const useVoting = (setLoading) => {
                     author: 'Game Master',
                     authorColor: '#fff',
                 });
-
-
             } else {
                 console.error('Error processing voting result:', response.statusText);
             }

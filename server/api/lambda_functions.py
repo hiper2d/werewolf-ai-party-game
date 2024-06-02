@@ -354,7 +354,7 @@ def process_voting_result(game_id: str, votes: List[VoteEntry]) -> str:
         role=MessageRole.ASSISTANT,
     )
     message_dao.save_dto(message_dto)
-    game.current_day_phase = DayPhase.DAY_DISCUSSION
+    game.current_day_phase = DayPhase.VOTING_ROUND_TWO
     game_dao.create_or_update_dto(game)
     return gm_vote_round_one_result_message
 
