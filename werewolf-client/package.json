@@ -1,35 +1,27 @@
 {
   "name": "werewolf-client",
-  "version": "1.0.0",
-  "main": "index.js",
+  "version": "0.1.0",
+  "private": true,
   "scripts": {
-    "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
   },
   "dependencies": {
-    "expo": "50.0.*",
-    "expo-status-bar": "1.11.*",
-    "react": "18.2.*",
-    "react-dom": "18.2.*",
-    "react-native": "0.73.*",
-    "react-native-modal": "13.0.*",
-    "react-native-svg": "15.0.*",
-    "react-native-vector-icons": "10.0.*",
-    "react-native-web": "0.19.*",
-    "react-scripts": "5.0.*",
-    "redux": "5.0.*",
-    "react-redux": "9.1.*",
-    "redux-thunk": "3.1.*",
-    "@reduxjs/toolkit": "2.2.*",
-    "@expo/metro-runtime": "3.1.*",
-    "@fortawesome/react-native-fontawesome": "0.3.0",
-    "@fortawesome/fontawesome-svg-core": "6.5.1",
-    "@fortawesome/free-solid-svg-icons": "6.5.1"
+    "firebase": "^10.12.2",
+    "react": "^18",
+    "react-dom": "^18",
+    "next": "14.2.4"
   },
   "devDependencies": {
-    "@babel/core": "^7.24.0"
-  },
-  "private": true
+    "typescript": "^5",
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "postcss": "^8",
+    "tailwindcss": "^3.4.1",
+    "eslint": "^8",
+    "eslint-config-next": "14.2.4"
+  }
 }
