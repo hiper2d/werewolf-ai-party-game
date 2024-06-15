@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { URL_API_START_VOTING, URL_API_ASK_CERTAIN_PLAYER_TO_VOTE, URL_API_PROCESS_VOTING_RESULT } from '../Constants';
-import {useSelector} from "react-redux";
+import {useSelector, useDispatch} from "react-redux";
+import {updateGame} from "../redux/actions";
 
 const useVoting = (setLoading) => {
     const [isVotingModalVisible, setVotingModalVisible] = useState(false);
     const [resolve, setResolve] = useState(null);
 
     const game = useSelector((state) => state.game);
+    const dispatch = useDispatch();
 
     const startVoting = async () => {
         setLoading(true);
@@ -23,7 +25,10 @@ const useVoting = (setLoading) => {
             });
 
             if (response.ok) {
-                const startVotingMessage = await response.text();
+                const data = await response.json();
+                const startVotingMessage = data.start_voting_message;
+                const current_day_phase = data.current_day_phase;
+
                 game?.messages?.push({
                     key: Math.random().toString(36).substring(7),
                     text: startVotingMessage,
@@ -32,6 +37,7 @@ const useVoting = (setLoading) => {
                     author: 'Game Master',
                     authorColor: '#fff',
                 });
+                dispatch(updateGame({ current_day_phase: current_day_phase }));
 
                 const humanPlayer = { id: 'human_id', name: game.userName };
                 const votingOrderWithHuman = [...game.bots, humanPlayer];
@@ -40,7 +46,8 @@ const useVoting = (setLoading) => {
 
                 const votes = await askPlayersToVote(votingOrder);
                 await countVotesAndFinishRoundOneVoting(votes);
-                // todo: update the game state on UI (Voting Button should change it's name)
+
+                dispatch(updateGame({ current_day_phase: current_day_phase }));
             } else {
                 console.error('Error starting voting:', response.statusText);
             }
@@ -139,12 +146,6 @@ const useVoting = (setLoading) => {
     };
 
     const countVotesAndFinishRoundOneVoting = async (votes) => {
-        // Count the votes and determine the leaders
-        const voteCount = votes.reduce((count, vote) => {
-            count[vote.votedFor] = (count[vote.votedFor] || 0) + 1;
-            return count;
-        }, {});
-
         // Send voting results to the backend
         try {
             const response = await fetch(URL_API_PROCESS_VOTING_RESULT, {

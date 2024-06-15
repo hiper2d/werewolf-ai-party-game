@@ -110,6 +110,7 @@ async function extractGameFromResponse(response) {
         gameId: data.game_id,
         userName: data.user_name,
         bots: data.bot_players,
+        current_day_phase: data.current_day_phase,
         messages: formattedMessages,
     };
 }

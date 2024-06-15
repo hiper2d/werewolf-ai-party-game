@@ -297,7 +297,7 @@ def get_chat_history(game_id: str, limit: int = 10_000) -> List[MessageDto]:
     return messages
 
 
-def start_voting(game_id: str) -> str:
+def start_voting(game_id: str) -> Tuple[str, str]:
     game = game_dao.get_by_id(game_id)
     if not game:
         logger.debug(f"Game with id {game_id} not found in the database")
@@ -314,7 +314,7 @@ def start_voting(game_id: str) -> str:
 
     game.current_day_phase = DayPhase.VOTING_ROUND_ONE
     game_dao.create_or_update_dto(game)
-    return GAME_MASTER_VOTING_FIRST_ROUND_MESSAGE
+    return GAME_MASTER_VOTING_FIRST_ROUND_MESSAGE, game.current_day_phase
 
 
 def process_voting_result(game_id: str, votes: List[VoteEntry]) -> str:

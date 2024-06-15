@@ -23,6 +23,7 @@ class GetGameResponse(BaseModel):
     story: str
     human_player_name: str
     human_player_role: str
+    current_day_phase: str
     bot_players: list[GetBotPlayerResponse]
     messages: list[dict]
 

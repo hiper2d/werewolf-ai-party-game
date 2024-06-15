@@ -64,10 +64,12 @@ class BotPlayerDto(BaseModel):
     is_alive: bool = True
     ts: int = Field(default_factory=time.time_ns)
 
+
 class DayPhase(str, Enum):
     DAY_DISCUSSION = 'day_discussion'
     VOTING_ROUND_ONE = 'voting_round_one'
     VOTING_ROUND_TWO = 'voting_round_two'
+
 
 class GameDto(BaseModel):
     id: str = Field(default_factory=uuid.uuid4)
