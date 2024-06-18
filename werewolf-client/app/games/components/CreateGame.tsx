@@ -1,38 +1,29 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import db from "@/config/firebase";
+import {useState} from 'react';
+import {create} from "@/app/games/actions";
+import {useRouter} from "next/navigation";
+import {revalidatePath} from "next/cache";
 
-import {doc, addDoc, setDoc, collection} from 'firebase/firestore'
-import {randomBytes} from "crypto";
-
-export default function CreateNote() {
+export default function CreateGame() {
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
-
     const router = useRouter();
 
-    const create = async() => {
-        console.log(`creating game ${name}`)
-        const docRef = await addDoc(
-            collection(db, "games"),
-            {name: name, description: description}
-        );
-        console.log("Document written with ID: ", docRef.id);
+    async function submit() {
+        await create(name, description);
 
         setName('');
         setDescription('');
 
-        router.refresh();
+        // router.push("/games");
+        router.refresh(); // this doesn't reload the component for some reason. But it does work for delete
+        router.push("/games");
+        // revalidatePath('/games')
     }
 
-    const generateSecureRandomString = (length: number): string => {
-        return randomBytes(length).toString('hex').slice(0, length);
-    };
-
     return (
-        <form className="grid grid-cols-6 items-center text-black" onSubmit={create}>
+        <form className="grid grid-cols-6 items-center text-black" onSubmit={submit}>
             <input
                 className="col-span-2 p-3 border"
                 type="text"

@@ -4,14 +4,18 @@ import styles from './Games.module.css';
 import Link from 'next/link';
 import {collection, getDocs} from 'firebase/firestore'
 import CreateGame from './components/CreateGame';
+import {remove} from "@/app/games/actions";
+import RemoveGame from "@/app/games/components/RemoveGame";
 
 
-/*export const dynamic = 'auto',
+/*
+export const dynamic = 'auto',
     dynamicParams = true,
-    revalidate = 0,
+    revalidate = 60,
     fetchCache = 'auto',
     runtime = 'nodejs',
-    preferredRegion = 'auto'*/
+    preferredRegion = 'auto'
+*/
 
 
 export default async function GamePages() {
@@ -34,15 +38,13 @@ export default async function GamePages() {
                     <ul>
                         {documents?.map((game) => (
                             <li key={game.id} className="my-4 w-full flex justify-between bg-slate-950">
-
-                                    <div className="p-4 w-full flex justify-between">
-                                        <Link href={`/games/${game.id}`}>
-                                            <span className="capitalize">{game.name}</span>
-                                        </Link>
-                                        <span>{game.description}</span>
-                                    </div>
-                                <button className="ml-8 p-4 border-l-2 border-slate-900 hover:bg-slate-900 w-16">X
-                                </button>
+                                <div className="p-4 w-full flex justify-between">
+                                    <Link href={`/games/${game.id}`}>
+                                        <span className="capitalize">{game.name}</span>
+                                    </Link>
+                                    <span>{game.description}</span>
+                                </div>
+                                <RemoveGame gameId={game.id}/>
                             </li>
                         ))}
                     </ul>
