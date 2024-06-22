@@ -1,33 +1,12 @@
-import db from "@/config/firebase";
-import styles from './Games.module.css';
-
 import Link from 'next/link';
-import {collection, getDocs} from 'firebase/firestore'
 import CreateGame from './components/CreateGame';
-import {remove} from "@/app/games/actions";
 import RemoveGame from "@/app/games/components/RemoveGame";
-
-
-/*
-export const dynamic = 'auto',
-    dynamicParams = true,
-    revalidate = 60,
-    fetchCache = 'auto',
-    runtime = 'nodejs',
-    preferredRegion = 'auto'
-*/
+import {getAllGames} from "@/app/games/actions";
+import {Game} from "@/models/game";
 
 
 export default async function GamePages() {
-
-    const collectionRef = collection(db, 'games')
-    const q = await getDocs(collectionRef)
-
-    const documents = q.docs.map((doc) => ({
-        id: doc.id,
-        name: doc.data().name,
-        description: doc.data().description,
-    }));
+    const games: Game[] = await getAllGames();
 
     return(
         <main className="flex min-h-screen flex-col items-center justify-between sm:p-24 p-4">
@@ -36,7 +15,7 @@ export default async function GamePages() {
                 <div className="bg-slate-800 p-4 rounded-lg">
                     <CreateGame/>
                     <ul>
-                        {documents?.map((game) => (
+                        {games.map((game) => (
                             <li key={game.id} className="my-4 w-full flex justify-between bg-slate-950">
                                 <div className="p-4 w-full flex justify-between">
                                     <Link href={`/games/${game.id}`}>
@@ -51,18 +30,5 @@ export default async function GamePages() {
                 </div>
             </div>
         </main>
-    );
-}
-
-function GameDetails({game}: any) {
-    const {id, name} = game || {};
-
-    return (
-        <Link href={`/games/${id}`}>
-            <div className={styles.game}>
-                <h2>{id}</h2>
-                <h5>{name}</h5>
-            </div>
-        </Link>
     );
 }

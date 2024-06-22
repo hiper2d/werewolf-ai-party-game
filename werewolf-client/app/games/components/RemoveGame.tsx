@@ -1,6 +1,6 @@
 'use client';
 
-import {remove} from "@/app/games/actions";
+import {removeGame} from "@/app/games/actions";
 import {useRouter} from "next/navigation";
 
 interface RemoveGameProps {
@@ -11,7 +11,7 @@ export default function RemoveGame({gameId}: RemoveGameProps) {
     const router = useRouter();
 
     async function removeGame() {
-        await remove(gameId);
+        await removeGame(gameId);
         router.refresh();
     }
 

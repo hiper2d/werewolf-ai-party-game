@@ -1,27 +1,19 @@
-import styles from '../Games.module.css';
-import db from "@/config/firebase";
-
-import {doc, getDoc, collection, where} from 'firebase/firestore'
-
-async function getGame(gameId: string) {
-    const gameRef = doc(db, "games", gameId);
-    const gameSnap = await getDoc(gameRef);
-
-    if (gameSnap.exists()) {
-        return gameSnap.data();
-    } else {
-        return null;
-    }
-}
+import {getGame} from "@/app/games/actions";
+import GameChat from "@/app/games/[id]/components/GameChat";
 
 export default async function GamePage({ params }: any) {
-    const game: any = await getGame(params.id);
+    const game = await getGame(params.id);
+
+    if (!game) {
+        return <div>Game not found</div>;
+    }
 
     return (
-        <div>
-            <h1>games/{game.id}</h1>
-            <div className={styles.game}>
-                <p>{game.name}</p>
+        <div className="min-h-screen bg-gray-900 text-white p-4">
+            <div className="max-w-4xl mx-auto">
+                <h1 className="text-3xl font-bold mb-4">{game.name}</h1>
+                <p className="mb-6">{game.description}</p>
+                <GameChat gameId={game.id}/>
             </div>
         </div>
     );

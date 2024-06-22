@@ -1,25 +1,30 @@
 'use client';
 
 import {useState} from 'react';
-import {create} from "@/app/games/actions";
+import {createGame} from "@/app/games/actions";
 import {useRouter} from "next/navigation";
-import {revalidatePath} from "next/cache";
+import {Game} from "@/models/game";
 
 export default function CreateGame() {
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
+    const [error, setError] = useState<string | null>(null);
     const router = useRouter();
 
     async function submit() {
-        await create(name, description);
+        try {
+            const newGame = new Game('', name, description);
+            await createGame(newGame.toFirestore());
 
-        setName('');
-        setDescription('');
+            setName('');
+            setDescription('');
 
-        // router.push("/games");
-        router.refresh(); // this doesn't reload the component for some reason. But it does work for delete
-        router.push("/games");
-        // revalidatePath('/games')
+            router.refresh();
+            router.push("/games");
+        } catch (err: any) {
+            setError(err.message);
+            console.error("Error creating game:", err);
+        }
     }
 
     return (
@@ -38,6 +43,7 @@ export default function CreateGame() {
                 onChange={(e) => setDescription(e.target.value)}
             />
             <button className="text-white bg-slate-950 hover:bg-slate-900 p-3 text-xl" type="submit">+</button>
+            {error && <p className="col-span-6 text-red-500 mt-2">{error}</p>}
         </form>
     );
 }
