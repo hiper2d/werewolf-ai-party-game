@@ -3,8 +3,6 @@
 import {useEffect, useState} from 'react';
 import {Message} from "@/models/messages";
 import {createMessage} from "@/app/games/actions";
-import {collection, onSnapshot, orderBy, query, Timestamp} from "firebase/firestore";
-import db from "@/config/firebase";
 
 interface GameChatProps {
     gameId: string;
@@ -15,17 +13,13 @@ export default function GameChat({gameId}: GameChatProps) {
     const [newMessage, setNewMessage] = useState('');
 
     useEffect(() => {
-        const q = query(collection(db, `messages`), orderBy('timestamp', 'asc'));
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            snapshot.docChanges().forEach((change) => {
-                if (change.type === "added" && !change.doc.metadata.hasPendingWrites) {
-                    const message = Message.fromFirestore(change.doc.id, change.doc.data());
-                    console.info(change.doc.metadata.hasPendingWrites)
-                    setMessages((prevMessages) => [...prevMessages, message]);
-                }
-            });
-        });
-        return () => unsubscribe();
+        const eventSource = new EventSource(`/api/games/${gameId}/messages/sse`);
+        eventSource.onmessage = (event) => {
+            const message = JSON.parse(event.data);
+            setMessages(prev => [...prev, message]);
+        };
+
+        return () => eventSource.close();
     }, [gameId]);
 
     const sendMessage = async (e: React.FormEvent) => {
@@ -54,9 +48,9 @@ export default function GameChat({gameId}: GameChatProps) {
                     <div key={message.id} className="mb-2">
                         <span className="font-bold text-blue-300">{message.sender}: </span>
                         <span className="text-white">{message.text}</span>
-                        <span className="text-xs text-gray-400 ml-2">
+                        {/*<span className="text-xs text-gray-400 ml-2">
                             {message.timestamp?.toDate().toLocaleDateString()}
-                        </span>
+                        </span>*/}
                     </div>
                 ))}
             </div>
