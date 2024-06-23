@@ -17,7 +17,7 @@ export async function createGame(game: any): Promise<string> {
     }
 }
 
-export async function removeGame(id: string) {
+export async function removeGameById(id: string) {
     await deleteDoc(doc(db, "games", id));
 }
 
