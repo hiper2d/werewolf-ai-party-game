@@ -1,8 +1,8 @@
 'use server'
 
 import {addDoc, collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp} from "firebase/firestore";
-import db from "@/config/firebase";
-import { Game } from '@/models/game';
+import {db} from "@/config/firebase";
+import {Game} from '@/models/game';
 
 export async function createGame(game: any): Promise<string> {
     try {

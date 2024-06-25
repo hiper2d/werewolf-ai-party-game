@@ -11,7 +11,9 @@ export default function CreateGame() {
     const [error, setError] = useState<string | null>(null);
     const router = useRouter();
 
-    async function submit() {
+    async function submit(e: React.FormEvent) {
+        e.preventDefault()
+
         try {
             const newGame = new Game('', name, description);
             await createGame(newGame.toFirestore());

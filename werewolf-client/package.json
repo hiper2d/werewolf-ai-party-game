@@ -3,13 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "NEXT_PUBLIC_APP_ENV='emulator' next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "emulators": "firebase emulators:start"
   },
   "dependencies": {
     "firebase": "^10.12.2",
+    "firebaseui": "^6.1.0",
     "react": "^18",
     "react-dom": "^18",
     "next": "14.2.4"

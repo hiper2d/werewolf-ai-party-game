@@ -1,5 +1,5 @@
 import {NextRequest} from 'next/server';
-import db from "@/config/firebase";
+import {db}  from "@/config/firebase";
 import {collection, onSnapshot, orderBy, query, where} from "firebase/firestore";
 
 
