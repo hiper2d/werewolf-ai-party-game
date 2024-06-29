@@ -1,6 +1,5 @@
 import {NextRequest} from 'next/server';
-import {db}  from "@/config/firebase";
-import {collection, onSnapshot, orderBy, query, where} from "firebase/firestore";
+import {db} from "@/firebase/server";
 
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
@@ -9,13 +8,15 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
     const stream = new ReadableStream({
         async start(controller) {
-            const q = query(
-                collection(db, `messages`),
-                where('gameId', '==', gameId),
-                orderBy('timestamp', 'asc')
-            );
+            if (!db) {
+                throw new Error('Firestore is not initialized');
+            }
 
-            const unsubscribe = onSnapshot(q, (snapshot) => {
+            const q = db.collection('messages')
+                .where('gameId', '==', gameId)
+                .orderBy('timestamp', 'asc');
+
+            const unsubscribe = q.onSnapshot( (snapshot) => {
                 snapshot.docChanges().forEach((change) => {
                     if (change.type === 'added') {
                         const message = { id: change.doc.id, ...change.doc.data() };

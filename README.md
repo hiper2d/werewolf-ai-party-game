@@ -31,7 +31,7 @@ To run the project locally, you need:
 
 ### DynamoDB
 
-I prefer to run it with Docker Compose. There is a config in the root directory, just run it. You need to have docker
+I prefer to run it with Docker Compose. There is a firebase in the root directory, just run it. You need to have docker
 and docker-compose installed.
 
 ```bash

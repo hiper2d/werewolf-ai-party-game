@@ -1,15 +1,15 @@
 import Link from 'next/link';
-import CreateGame from './components/CreateGame';
-import RemoveGame from "@/app/games/components/RemoveGame";
 import {getAllGames} from "@/app/games/actions";
 import {Game} from "@/models/game";
+import CreateGame from "@/app/games/components/CreateGame";
+import RemoveGame from "@/app/games/components/RemoveGame";
 
 
 export default async function GamePages() {
     const games: Game[] = await getAllGames();
 
     return(
-        <main className="flex min-h-screen flex-col items-center justify-between sm:p-24 p-4">
+        <div className="flex min-h-screen flex-col items-center justify-between sm:p-24 p-4">
             <div className="z-10 w-full max-w-4xl items-center justify-between text-sm lg:flex">
                 <h1 className="text-4xl p-4 text-center">Game List</h1>
                 <div className="bg-slate-800 p-4 rounded-lg">
@@ -29,6 +29,7 @@ export default async function GamePages() {
                     </ul>
                 </div>
             </div>
-        </main>
+        </div>
+
     );
 }

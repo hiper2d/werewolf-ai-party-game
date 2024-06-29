@@ -35,4 +35,5 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-config/firebase-keys.js
+firebase/firebase-keys.js
+firebase/serviceAccount.json
