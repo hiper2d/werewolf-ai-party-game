@@ -1,4 +1,5 @@
 import React from 'react';
+import {buttonBlackStyle} from "@/constants";
 
 export default function UserProfilePage() {
     // Placeholder user data - replace this with actual user data fetching logic
@@ -13,7 +14,7 @@ export default function UserProfilePage() {
         <div className="flex flex-col w-full h-full p-4 sm:p-6">
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-bold text-white">User Profile</h1>
-                <button className="text-white bg-slate-950 hover:bg-slate-900 p-3 text-xl">
+                <button className={buttonBlackStyle}>
                     Edit Profile
                 </button>
             </div>

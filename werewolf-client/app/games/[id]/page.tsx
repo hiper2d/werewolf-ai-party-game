@@ -1,5 +1,6 @@
 import { getGame } from "@/app/games/actions";
 import GameChat from "@/app/games/[id]/components/GameChat";
+import {buttonTransparentStyle} from "@/constants";
 
 export default async function GamePage({ params }: any) {
     const game = await getGame(params.id);
@@ -16,13 +17,13 @@ export default async function GamePage({ params }: any) {
             {/* Left column */}
             <div className="w-1/4 flex flex-col pr-4 overflow-auto">
                 {/* Game info */}
-                <div className="bg-gray-800 rounded-lg p-4 mb-4">
+                <div className="bg-black bg-opacity-30 border border-white border-opacity-30 rounded p-4 mb-4">
                     <h1 className="text-2xl font-bold mb-2">{game.name}</h1>
                     <p className="text-sm text-gray-300 mb-4">{game.description}</p>
                 </div>
 
                 {/* Participants list */}
-                <div className="bg-gray-800 rounded-lg p-4 mb-4 flex-grow overflow-auto">
+                <div className="bg-black bg-opacity-30 border border-white border-opacity-30 rounded p-4 mb-4 flex-grow overflow-auto">
                     <h2 className="text-xl font-bold mb-2">Participants</h2>
                     <ul>
                         {participants.map((participant, index) => (
@@ -32,13 +33,13 @@ export default async function GamePage({ params }: any) {
                 </div>
 
                 {/* Game controls */}
-                <div className="bg-gray-800 rounded-lg p-4">
+                <div className="bg-black bg-opacity-30 border border-white border-opacity-30 rounded p-4">
                     {/*<h2 className="text-xl font-bold mb-2">Game Controls</h2>*/}
                     <div className="flex gap-2 justify-evenly">
-                        <button className="text-white bg-slate-950 hover:bg-slate-900 p-3 text-xl">
+                        <button className={buttonTransparentStyle}>
                             Start
                         </button>
-                        <button className="text-white bg-slate-950 hover:bg-slate-900 p-3 text-xl">
+                        <button className={buttonTransparentStyle}>
                             Pause
                         </button>
                     </div>

@@ -1,7 +1,8 @@
 "use client"
 
 import React from 'react';
-import { useAuth } from "@/components/auth-provider";
+import {useAuth} from "@/components/auth-provider";
+import {buttonTransparentStyle} from "@/constants";
 
 const AuthButtons = () => {
     const auth = useAuth();
@@ -26,18 +27,16 @@ const AuthButtons = () => {
             })
     }
 
-    const buttonStyle = "bg-gray-900 text-gray-300 border border-white px-3 py-2 rounded hover:bg-gray-700 transition-colors";
-
     if (!auth?.currentUser) {
         return (
-            <button onClick={loginGoogle} className={buttonStyle}>
+            <button onClick={loginGoogle} className={buttonTransparentStyle}>
                 Login
             </button>
         );
     }
 
     return (
-        <button onClick={logout} className={buttonStyle}>
+        <button onClick={logout} className={buttonTransparentStyle}>
             <span>Logout</span>
         </button>
     );
