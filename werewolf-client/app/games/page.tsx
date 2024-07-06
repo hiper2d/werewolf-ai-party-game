@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import {getAllGames} from "@/app/games/actions";
 import {Game} from "@/models/game";
-import CreateGame from "@/app/games/newgame/components/CreateGameForm";
 import RemoveGame from "@/app/games/components/RemoveGame";
 
 

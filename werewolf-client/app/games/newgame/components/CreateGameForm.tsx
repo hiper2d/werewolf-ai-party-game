@@ -29,16 +29,16 @@ export default function CreateGameForm() {
 
     return (
         <form id="create-game-form" onSubmit={handleSubmit} className="mt-8 space-y-4">
-            <div className="grid grid-cols-1 gap-4 text-black">
+            <div className="grid grid-cols-1 gap-4">
                 <input
-                    className="p-3 border rounded"
+                    className="p-3 rounded bg-gray-700 text-white placeholder-gray-400 border border-gray-600 focus:outline-none focus:border-gray-500"
                     type="text"
                     placeholder="Name"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                 />
                 <input
-                    className="p-3 border rounded"
+                    className="p-3 rounded bg-gray-700 text-white placeholder-gray-400 border border-gray-600 focus:outline-none focus:border-gray-500"
                     placeholder="Description"
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}

@@ -1,14 +1,14 @@
 'use client';
 
-import {useEffect, useState} from 'react';
-import {Message} from "@/models/messages";
-import {createMessage} from "@/app/games/actions";
+import { useEffect, useState } from 'react';
+import { Message } from "@/models/messages";
+import { createMessage } from "@/app/games/actions";
 
 interface GameChatProps {
     gameId: string;
 }
 
-export default function GameChat({gameId}: GameChatProps) {
+export default function GameChat({ gameId }: GameChatProps) {
     const [messages, setMessages] = useState<Message[]>([]);
     const [newMessage, setNewMessage] = useState('');
 
@@ -26,31 +26,24 @@ export default function GameChat({gameId}: GameChatProps) {
         e.preventDefault();
         if (newMessage.trim() === '') return;
 
-        // setError(null);
         try {
             const result = await createMessage(gameId, newMessage, 'User');
             if (result) {
                 setNewMessage('');
-            } else {
-                // setError(result.error || 'Failed to send message');
             }
         } catch (err) {
-            // setError(err.message);
             console.error("Error sending message:", err);
         }
     };
 
     return (
-        <div className="bg-gray-800 rounded-lg shadow-xl p-4">
+        <div className="bg-gray-800 rounded-lg shadow-xl p-4 flex flex-col min-h-full">
             <h2 className="text-xl font-bold mb-4 text-white">Game Chat</h2>
-            <div className="h-80 overflow-y-auto mb-4 p-2 bg-gray-700 rounded">
+            <div className="flex-grow overflow-y-auto mb-4 p-2 bg-gray-700 rounded">
                 {messages.map((message) => (
                     <div key={message.id} className="mb-2">
                         <span className="font-bold text-blue-300">{message.sender}: </span>
                         <span className="text-white">{message.text}</span>
-                        {/*<span className="text-xs text-gray-400 ml-2">
-                            {message.timestamp?.toDate().toLocaleDateString()}
-                        </span>*/}
                     </div>
                 ))}
             </div>
@@ -59,10 +52,10 @@ export default function GameChat({gameId}: GameChatProps) {
                     type="text"
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
-                    className="flex-grow p-2 rounded-l text-black"
+                    className="flex-grow p-3 rounded-l bg-gray-700 text-white placeholder-gray-400 border border-gray-600 focus:outline-none focus:border-gray-500"
                     placeholder="Type a message..."
                 />
-                <button type="submit" className="bg-blue-500 text-white p-2 rounded-r">Send</button>
+                <button type="submit" className="text-white bg-slate-950 hover:bg-slate-900 p-3 text-xl rounded-r">Send</button>
             </form>
         </div>
     );
