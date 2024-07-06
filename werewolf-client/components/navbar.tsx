@@ -1,48 +1,32 @@
-"use client"
-
 import React from 'react';
-import Link from 'next/link';
-import {useAuth} from "@/components/auth-provider";
+import Image from 'next/image';
+import AuthButtons from '@/components/auth-buttons';
 
 const NavBar = () => {
-    const auth = useAuth();
-
-    const loginGoogle = () => {
-        auth?.loginGoogle()
-            .then(() => {
-                console.log('Logged in');
-            })
-            .catch(() => {
-                console.log('Failed to log in');
-            })
-    }
-
-    const logout = () => {
-        auth?.logout()
-            .then(() => {
-                console.log('Logged out');
-            })
-            .catch(() => {
-                console.log('Failed to log out');
-            })
-    }
-
     return (
-        <nav className="flex items-center bg-gray-950 text-emerald-100">
-            <div className="flex-none">
-                Hello,&nbsp;
-                {auth?.currentUser?.displayName}
+        <header className="bg-gray-900 text-white py-4 px-6 flex items-center justify-between h-16">
+            <div className="flex items-center">
+                <div className="mr-8">
+                    <Image
+                        src="/werewolf-ai-logo-2.png"
+                        alt="Werewolf AI Logo"
+                        width={50}
+                        height={50}
+                        className="object-contain"
+                    />
+                </div>
+
+                <nav>
+                    <ul className="flex space-x-4">
+                        <li><a href="/games" className="hover:text-gray-300">All games</a></li>
+                        <li className="mx-2 text-gray-500">|</li>
+                        <li><a href="/profile" className="hover:text-gray-300">User Profile</a></li>
+                    </ul>
+                </nav>
             </div>
-            <div className="flex-1"></div>
-            <div className="flex-none">
-                {!auth?.currentUser && (
-                    <button onClick={loginGoogle}>Login</button>
-                )}
-                {auth?.currentUser && (
-                    <button onClick={logout}>Logout</button>
-                )}
-            </div>
-        </nav>
+
+            <AuthButtons />
+        </header>
     );
 };
 

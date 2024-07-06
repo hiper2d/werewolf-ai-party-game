@@ -23,7 +23,7 @@ export async function removeGameById(id: string) {
         throw new Error('Firestore is not initialized');
     }
     const response = await db.collection('games').doc(id).delete();
-    return response.writeTime
+    return "ok"
 }
 
 export async function getGame(gameId: string): Promise<Game | null> {

@@ -27,13 +27,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-      <html lang="en" className={`${inter.variable} ${roboto_mono.variable}`}>
-        <body className="font-inter">
+      <html lang="en" className={`${inter.variable} ${roboto_mono.variable} h-full`}>
+        <body className="font-inter m-0 p-0 h-screen">
           <AuthProvider>
-            <main className="bg-gradient-to-r from-black to-gray-700">
+            <div className="flex flex-col m-0 p-0 h-full">
               <NavBar></NavBar>
-              {children}
-            </main>
+              <main className="flex-1 min-h-0 flex items-start justify-center overflow-auto bg-gradient-to-t from-black to-gray-800">
+                <div className="w-full max-w-4xl p-4 sm:p-6">
+                  {children}
+                </div>
+              </main>
+            </div>
           </AuthProvider>
         </body>
       </html>
