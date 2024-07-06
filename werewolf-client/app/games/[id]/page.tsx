@@ -33,8 +33,8 @@ export default async function GamePage({ params }: any) {
 
                 {/* Game controls */}
                 <div className="bg-gray-800 rounded-lg p-4">
-                    <h2 className="text-xl font-bold mb-2">Game Controls</h2>
-                    <div className="flex gap-2">
+                    {/*<h2 className="text-xl font-bold mb-2">Game Controls</h2>*/}
+                    <div className="flex gap-2 justify-evenly">
                         <button className="text-white bg-slate-950 hover:bg-slate-900 p-3 text-xl">
                             Start
                         </button>
