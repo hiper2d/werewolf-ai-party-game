@@ -10,7 +10,7 @@ export default async function GamePages() {
         <div className="flex flex-col h-full text-white overflow-hidden">
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-bold text-white">Game List</h1>
-                <Link href="/games/new" className="text-white bg-slate-950 hover:bg-slate-900 p-3 text-xl rounded">
+                <Link href="/games/newgame" className="text-white bg-slate-950 hover:bg-slate-900 p-3 text-xl rounded">
                     Create Game
                 </Link>
             </div>

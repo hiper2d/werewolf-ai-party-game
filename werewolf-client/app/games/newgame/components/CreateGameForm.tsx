@@ -20,7 +20,9 @@ export default function CreateGameForm() {
 
             setName('');
             setDescription('');
+
             router.push("/games");
+            router.refresh();
         } catch (err: any) {
             setError(err.message);
             console.error("Error creating game:", err);
