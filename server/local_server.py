@@ -1,7 +1,7 @@
 from typing import List
 
 from fastapi import FastAPI, Request
-from starlette.middleware.cors import CORSMiddleware
+from starlette._middleware.cors import CORSMiddleware
 
 from dto.request_dtos import InitGameRequest, WelcomeRequest, TalkToAllRequest, TalkToPlayer, VoteRoundOne, \
     GetGameResponse, GetBotPlayerResponse, ProcessVotingResultRequest

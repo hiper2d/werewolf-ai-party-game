@@ -1,9 +1,9 @@
 import Link from 'next/link';
-import { getAllGames } from "@/app/games/actions";
-import { Game } from "@/models/game";
+import {getAllGames} from "@/app/games/actions";
+import {Game} from "@/models/game";
 import RemoveGame from "@/app/games/components/RemoveGame";
 
-export default async function GamePages() {
+const GamePages = async () => {
     const games: Game[] = await getAllGames();
 
     return (
@@ -33,3 +33,5 @@ export default async function GamePages() {
         </div>
     );
 }
+
+export default GamePages;
