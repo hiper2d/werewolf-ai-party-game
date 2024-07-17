@@ -1,8 +1,10 @@
 import {cert, getApps, ServiceAccount, initializeApp} from "firebase-admin/app";
 import serviceAccount from "./serviceAccount.json";
 import {Firestore, getFirestore } from "firebase-admin/firestore";
-import {credentials} from "@grpc/grpc-js";
-// import { getAuth } from "firebase/auth";
+import {headers} from "next/headers";
+import {initializeServerApp} from "@firebase/app";
+import {getAuth} from "firebase/auth";
+import {firebaseConfig} from "@/firebase/firebase-keys";
 
 let db: Firestore | undefined = undefined;
 const currentApps = getApps();
@@ -17,4 +19,22 @@ if (currentApps.length <= 0) {
     db = getFirestore(currentApps[0]);
 }
 
-export { db };
+async function getAuthenticatedAppForUser() {
+    const idToken = headers().get("Authorization")?.split("Bearer ")[1];
+
+    const firebaseServerApp = initializeServerApp(
+        firebaseConfig,
+        idToken
+            ? {
+                authIdToken: idToken,
+            }
+            : {}
+    );
+
+    const auth = getAuth(firebaseServerApp);
+    await auth.authStateReady();
+
+    return { firebaseServerApp, currentUser: auth.currentUser };
+}
+
+export { db, getAuthenticatedAppForUser };

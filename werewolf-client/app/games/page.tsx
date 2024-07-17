@@ -2,8 +2,10 @@ import Link from 'next/link';
 import {getAllGames} from "@/app/games/actions";
 import {Game} from "@/models/game";
 import RemoveGame from "@/app/games/components/RemoveGame";
+import {getAuthenticatedAppForUser} from "@/firebase/server";
 
 const GamePages = async () => {
+    const { currentUser } = await getAuthenticatedAppForUser();
     const games: Game[] = await getAllGames();
 
     return (

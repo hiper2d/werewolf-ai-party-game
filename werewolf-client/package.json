@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "NEXT_PUBLIC_APP_ENV='emulator' next dev",
     "pre-prod": "next dev",
-    "build": "next build",
+    "build": "npm run build-service-worker && next build",
+    "build-service-worker": "npx esbuild auth-service-worker.js --bundle --outfile=public/auth-service-worker.js",
     "start": "next start",
     "lint": "next lint",
     "emulators": "firebase emulators:start"
