@@ -1,42 +1,22 @@
 "use client"
 
 import React from 'react';
-import {useAuth} from "@/components/auth-provider";
 import {buttonTransparentStyle} from "@/constants";
+import {signIn, signOut, useSession} from "next-auth/react";
 
 const AuthButtons = () => {
-    const auth = useAuth();
+    const { data: session, status } = useSession();
 
-    const loginGoogle = () => {
-        auth?.loginGoogle()
-            .then(() => {
-                console.log('Logged in');
-            })
-            .catch(() => {
-                console.log('Failed to log in');
-            })
-    }
-
-    const logout = () => {
-        auth?.logout()
-            .then(() => {
-                console.log('Logged out');
-            })
-            .catch(() => {
-                console.log('Failed to log out');
-            })
-    }
-
-    if (!auth?.currentUser) {
+    if (status === 'unauthenticated') {
         return (
-            <button onClick={loginGoogle} className={buttonTransparentStyle}>
+            <button onClick={() => signIn()} className={buttonTransparentStyle}>
                 Login
             </button>
         );
     }
 
     return (
-        <button onClick={logout} className={buttonTransparentStyle}>
+        <button onClick={() => signOut()} className={buttonTransparentStyle}>
             <span>Logout</span>
         </button>
     );

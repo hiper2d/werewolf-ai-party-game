@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { Inter, Roboto_Mono } from "next/font/google";
 import "./globals.css";
-import {AuthProvider} from "@/components/auth-provider";
 import NavBar from "@/components/navbar";
+import React from "react";
+import AuthProvider from "@/components/auth-provider";
 
 const inter = Inter({
   subsets: ['latin'],

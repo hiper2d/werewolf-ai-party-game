@@ -2,12 +2,16 @@ import Link from 'next/link';
 import {getAllGames} from "@/app/games/actions";
 import {Game} from "@/models/game";
 import RemoveGame from "@/app/games/components/RemoveGame";
-import {getAuthenticatedAppForUser} from "@/firebase/server";
+import {getServerSession} from "next-auth";
+import {redirect} from "next/navigation";
 
 const GamePages = async () => {
-    const { currentUser } = await getAuthenticatedAppForUser();
-    const games: Game[] = await getAllGames();
+    const session = await getServerSession();
+    if (!session) {
+        redirect('/api/auth/signin');
+    }
 
+    const games: Game[] = await getAllGames();
     return (
         <div className="flex flex-col h-full text-white overflow-hidden">
             <div className="flex justify-between items-center mb-6">

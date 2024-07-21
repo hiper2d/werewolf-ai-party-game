@@ -4,6 +4,7 @@ import {db} from "@/firebase/server";
 import {Game} from '@/models/game';
 import {firestore} from "firebase-admin";
 import FieldValue = firestore.FieldValue;
+import {serverTimestamp} from "@firebase/firestore";
 
 export async function createGame(game: any): Promise<string|undefined> {
     if (!db) {
@@ -68,5 +69,36 @@ export async function createMessage(gameId: string, text: string, sender: string
     } catch (error: any) {
         console.error("Error adding message: ", error);
         return { success: false, error: error.message };
+    }
+}
+
+
+export async function upsertUser(user: any) {
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+
+    const userRef = db.collection('users').doc(user.email);
+
+    try {
+        // Try to get the user document
+        const doc = await userRef.get();
+
+        if (!doc.exists) {
+            // If the document doesn't exist, create a new user
+            await userRef.set({
+                email: user.email,
+                created_at: new Date(),
+                last_login_timestamp: new Date()
+            });
+            console.log(`New user created for ${user.name}`);
+        } else {
+            await userRef.update({
+                last_login_timestamp: new Date()
+            });
+            console.log(`Updated last_login_timestamp for existing user ${user.name}`);
+        }
+    } catch (error) {
+        console.error("Error processing user:", error);
     }
 }

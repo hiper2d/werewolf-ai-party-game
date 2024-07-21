@@ -3,11 +3,11 @@
 import React from 'react';
 import Image from 'next/image';
 import AuthButtons from '@/components/auth-buttons';
-import {useAuth} from "@/components/auth-provider";
 import Link from "next/link";
+import {useSession} from "next-auth/react";
 
 const NavBar = () => {
-    const auth = useAuth();
+    const { data: session, status } = useSession();
 
     return (
         <header className="bg-gray-900 text-white py-4 px-6 flex items-center justify-between h-16">
@@ -21,9 +21,9 @@ const NavBar = () => {
                         className="object-contain"
                     />
                 </div>
-                {auth?.currentUser && (
+                {status === 'authenticated' && (
                     <span className="text-white">
-                        {auth.currentUser.displayName}
+                        {session.user?.name}
                     </span>
                 )}
             </div>
