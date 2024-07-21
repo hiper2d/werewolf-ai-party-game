@@ -88,14 +88,14 @@ export async function upsertUser(user: any) {
             // If the document doesn't exist, create a new user
             await userRef.set({
                 email: user.email,
-                created_at: new Date(),
-                last_login_timestamp: new Date()
+                created_at:  FieldValue.serverTimestamp(),
+                last_login_timestamp:  FieldValue.serverTimestamp()
             });
             console.log(`New user created for ${user.name}`);
         } else {
-            await userRef.update({
-                last_login_timestamp: new Date()
-            });
+            const res = await userRef.update({
+                last_login_timestamp: FieldValue.serverTimestamp()
+            })
             console.log(`Updated last_login_timestamp for existing user ${user.name}`);
         }
     } catch (error) {

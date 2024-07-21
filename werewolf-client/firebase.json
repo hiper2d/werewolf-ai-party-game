@@ -4,9 +4,6 @@
     "indexes": "firestore.indexes.json"
   },
   "emulators": {
-    "auth": {
-      "port": 9099
-    },
     "firestore": {
       "port": 8080
     },
@@ -14,31 +11,11 @@
       "enabled": true
     },
     "singleProjectMode": true,
-    "functions": {
-      "port": 5001
-    },
     "storage": {
       "port": 9199
     }
   },
   "storage": {
     "rules": "storage.rules"
-  },
-  "functions": [
-    {
-      "source": "firebase/functions",
-      "codebase": "default",
-      "ignore": [
-        "node_modules",
-        ".git",
-        "firebase-debug.log",
-        "firebase-debug.*.log",
-        "*.local"
-      ],
-      "predeploy": [
-        "npm --prefix \"$RESOURCE_DIR\" run lint",
-        "npm --prefix \"$RESOURCE_DIR\" run build"
-      ]
-    }
-  ]
+  }
 }
