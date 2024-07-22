@@ -1,8 +1,14 @@
 import { getGame } from "@/app/games/actions";
 import GameChat from "@/app/games/[id]/components/GameChat";
 import {buttonTransparentStyle} from "@/constants";
+import {getServerSession} from "next-auth";
+import {redirect} from "next/navigation";
 
 export default async function GamePage({ params }: any) {
+    const session = await getServerSession();
+    if (!session) {
+        redirect('/api/auth/signin');
+    }
     const game = await getGame(params.id);
 
     if (!game) {
