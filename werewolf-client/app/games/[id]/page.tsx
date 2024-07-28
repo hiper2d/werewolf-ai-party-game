@@ -1,4 +1,4 @@
-import { getGame } from "@/app/games/actions";
+import { getGame } from "@/app/api/actions";
 import GameChat from "@/app/games/[id]/components/GameChat";
 import {buttonTransparentStyle} from "@/constants";
 import {getServerSession} from "next-auth";

@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from "next/navigation";
-import { createGame } from "@/app/games/actions";
+import { createGame } from "@/app/api/actions";
 import { Game } from "@/models/game";
 
 export default function CreateGameForm() {

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Message } from "@/models/messages";
-import { createMessage } from "@/app/games/actions";
+import { createMessage } from "@/app/api/actions";
 import {buttonTransparentStyle} from "@/constants";
 
 interface GameChatProps {

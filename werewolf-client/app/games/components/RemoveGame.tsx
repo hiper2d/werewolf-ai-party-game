@@ -1,6 +1,6 @@
 'use client';
 
-import {removeGameById} from "@/app/games/actions";
+import {removeGameById} from "@/app/api/actions";
 import {useRouter} from "next/navigation";
 
 interface RemoveGameProps {

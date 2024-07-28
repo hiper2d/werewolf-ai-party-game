@@ -4,7 +4,6 @@ import {db} from "@/firebase/server";
 import {Game} from '@/models/game';
 import {firestore} from "firebase-admin";
 import FieldValue = firestore.FieldValue;
-import {serverTimestamp} from "@firebase/firestore";
 
 export async function createGame(game: any): Promise<string|undefined> {
     if (!db) {
@@ -100,5 +99,69 @@ export async function upsertUser(user: any) {
         }
     } catch (error) {
         console.error("Error processing user:", error);
+    }
+}
+
+
+export async function getUserApiKeys(userId: string): Promise<any[]> {
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+    try {
+        const apiKeysRef = db.collection('users').doc(userId).collection('apiKeys');
+        const snapshot = await apiKeysRef.get();
+        return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        }));
+    } catch (error: any) {
+        console.error("Error fetching API keys: ", error);
+        throw new Error(`Failed to fetch API keys: ${error.message}`);
+    }
+}
+
+export async function addApiKey(userId: string, type: string, value: string): Promise<string> {
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+    try {
+        const apiKeysRef = db.collection('users').doc(userId).collection('apiKeys');
+        const response = await apiKeysRef.add({
+            type,
+            value,
+            createdAt: FieldValue.serverTimestamp()
+        });
+        return response.id;
+    } catch (error: any) {
+        console.error("Error adding API key: ", error);
+        throw new Error(`Failed to add API key: ${error.message}`);
+    }
+}
+
+export async function updateApiKey(userId: string, keyId: string, newValue: string): Promise<void> {
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+    try {
+        const keyRef = db.collection('users').doc(userId).collection('apiKeys').doc(keyId);
+        await keyRef.update({
+            value: newValue,
+            updatedAt: FieldValue.serverTimestamp()
+        });
+    } catch (error: any) {
+        console.error("Error updating API key: ", error);
+        throw new Error(`Failed to update API key: ${error.message}`);
+    }
+}
+
+export async function deleteApiKey(userId: string, keyId: string): Promise<void> {
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+    try {
+        await db.collection('users').doc(userId).collection('apiKeys').doc(keyId).delete();
+    } catch (error: any) {
+        console.error("Error deleting API key: ", error);
+        throw new Error(`Failed to delete API key: ${error.message}`);
     }
 }

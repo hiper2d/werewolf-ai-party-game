@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import {getAllGames} from "@/app/games/actions";
+import {getAllGames} from "@/app/api/actions";
 import {Game} from "@/models/game";
 import RemoveGame from "@/app/games/components/RemoveGame";
 import {getServerSession} from "next-auth";

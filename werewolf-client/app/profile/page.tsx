@@ -1,15 +1,19 @@
 import React from 'react';
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
-import ApiKeyManager from './components/ApiKeyManager';
 import { buttonTransparentStyle } from "@/constants";
 import Image from 'next/image';
+import ApiKeyList from './components/ApiKeyList';
+import AddApiKeyForm from './components/AddApiKeyForm';
+import {getUserApiKeys} from "@/app/api/actions";
 
 export default async function UserProfilePage() {
     const session = await getServerSession();
     if (!session) {
         redirect('/api/auth/signin');
     }
+
+    const apiKeys = await getUserApiKeys(session.user?.email!);
 
     return (
         <div className="flex h-full text-white overflow-hidden">
@@ -46,9 +50,21 @@ export default async function UserProfilePage() {
                 </div>
             </div>
 
-            {/* Right column - API Key Manager */}
+            {/* Right column - API Key Management */}
             <div className="w-3/4 h-full overflow-hidden">
-                <ApiKeyManager />
+                <div className="h-full flex flex-col bg-black bg-opacity-30 border border-white border-opacity-30 rounded">
+                    <div className="p-4">
+                        <h2 className="text-2xl font-bold mb-4">API Keys</h2>
+                    </div>
+
+                    <div className="flex-grow overflow-auto p-4">
+                        <ApiKeyList initialApiKeys={apiKeys} userId={session.user?.email!}/>
+                    </div>
+
+                    <div className="p-4 border-t border-white border-opacity-30">
+                        <AddApiKeyForm userId={session.user?.email!}/>
+                    </div>
+                </div>
             </div>
         </div>
     );
