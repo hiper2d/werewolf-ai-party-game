@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Message } from "@/models/messages";
 import { createMessage } from "@/app/api/actions";
-import {buttonTransparentStyle} from "@/constants";
+import {buttonTransparentStyle} from "@/app/constants";
+import {Message} from "@/app/api/models";
 
 interface GameChatProps {
     gameId: string;

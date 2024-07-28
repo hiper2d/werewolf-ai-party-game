@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { buttonTransparentStyle } from "@/constants";
+import { buttonTransparentStyle } from "@/app/constants";
 
 type ApiKey = {
     id: string;

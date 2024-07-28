@@ -1,7 +1,7 @@
 import React from 'react';
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
-import { buttonTransparentStyle } from "@/constants";
+import { buttonTransparentStyle } from "@/app/constants";
 import Image from 'next/image';
 import ApiKeyList from './components/ApiKeyList';
 import AddApiKeyForm from './components/AddApiKeyForm';

@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { buttonTransparentStyle } from "@/constants";
+import { buttonTransparentStyle } from "@/app/constants";
 import {addApiKey} from "@/app/api/actions";
 
 export default function AddApiKeyForm({ userId }: { userId: string }) {

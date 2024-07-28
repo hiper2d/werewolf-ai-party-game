@@ -1,7 +1,7 @@
 "use client"
 
 import React from 'react';
-import {buttonTransparentStyle} from "@/constants";
+import {buttonTransparentStyle} from "@/app/constants";
 import {signIn, signOut, useSession} from "next-auth/react";
 
 const AuthButtons = () => {

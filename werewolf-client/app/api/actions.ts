@@ -1,11 +1,11 @@
 'use server'
 
 import {db} from "@/firebase/server";
-import {Game} from '@/models/game';
 import {firestore} from "firebase-admin";
 import FieldValue = firestore.FieldValue;
+import {Game, gameFromFirestore, GamePreview} from "@/app/api/models";
 
-export async function createGame(game: any): Promise<string|undefined> {
+export async function createGame(game: Game): Promise<string|undefined> {
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
@@ -16,6 +16,21 @@ export async function createGame(game: any): Promise<string|undefined> {
         console.error("Error adding document: ", error);
         throw new Error(`Failed to create game: ${error.message}`);
     }
+}
+
+export async function previewGame(gamePreview: GamePreview): Promise<Game> {
+    // fixme: implement logic
+    return {
+        id: '',
+        name: gamePreview.name,
+        theme: gamePreview.theme,
+        playerCount: gamePreview.playerCount,
+        werewolfCount: gamePreview.werewolfCount,
+        specialRoles: gamePreview.specialRoles,
+        aiModel: gamePreview.aiModel,
+        story: 'This is a story',
+        players: []
+    };
 }
 
 export async function removeGameById(id: string) {
@@ -35,7 +50,7 @@ export async function getGame(gameId: string): Promise<Game | null> {
     const gameSnap = await gameRef.get();
 
     if (gameSnap.exists) {
-        return Game.fromFirestore(gameSnap.id, gameSnap.data());
+        return gameFromFirestore(gameSnap.id, gameSnap.data());
     } else {
         return null;
     }
@@ -48,7 +63,7 @@ export async function getAllGames(): Promise<Game[]> {
     const collectionRef = db.collection('games');
     const snapshot = await collectionRef.get();
 
-    return snapshot.docs.map((doc) => Game.fromFirestore(doc.id, doc.data()));
+    return snapshot.docs.map((doc) => gameFromFirestore(doc.id, doc.data()));
 }
 
 export async function createMessage(gameId: string, text: string, sender: string) {
@@ -70,7 +85,6 @@ export async function createMessage(gameId: string, text: string, sender: string
         return { success: false, error: error.message };
     }
 }
-
 
 export async function upsertUser(user: any) {
     if (!db) {
@@ -101,7 +115,6 @@ export async function upsertUser(user: any) {
         console.error("Error processing user:", error);
     }
 }
-
 
 export async function getUserApiKeys(userId: string): Promise<any[]> {
     if (!db) {
