@@ -28,7 +28,7 @@ const GamePages = async () => {
                             <div className="flex justify-between items-center">
                                 <Link href={`/games/${game.id}`} className="flex-grow">
                                     <h2 className="text-lg capitalize text-white font-semibold mb-1">{game.name}</h2>
-                                    <p className="text-sm text-gray-300">{game.description}</p>
+                                    <p className="text-sm text-gray-300">{game.theme}</p>
                                 </Link>
                                 <RemoveGame gameId={game.id} />
                             </div>

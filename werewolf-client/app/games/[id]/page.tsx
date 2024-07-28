@@ -25,7 +25,7 @@ export default async function GamePage({ params }: any) {
                 {/* Game info */}
                 <div className="bg-black bg-opacity-30 border border-white border-opacity-30 rounded p-4 mb-4">
                     <h1 className="text-2xl font-bold mb-2">{game.name}</h1>
-                    <p className="text-sm text-gray-300 mb-4">{game.description}</p>
+                    <p className="text-sm text-gray-300 mb-4">{game.theme}</p>
                 </div>
 
                 {/* Participants list */}

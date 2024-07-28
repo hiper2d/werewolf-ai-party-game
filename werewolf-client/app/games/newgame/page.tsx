@@ -129,7 +129,7 @@ export default function CreateNewGamePage() {
                         onChange={(e) => setWerewolfCount(Number(e.target.value))}
                         required
                     >
-                        {Array.from({ length: playerCount - 1 }, (_, i) => (
+                        {Array.from({length: playerCount - 1}, (_, i) => (
                             <option key={i} value={i}>{i} werewolves</option>
                         ))}
                     </select>
@@ -173,17 +173,45 @@ export default function CreateNewGamePage() {
             {error && <p className="text-red-500 mt-2">{error}</p>}
 
             {gameData && (
-                <div className="mt-8 p-4 bg-gray-800 rounded">
-                    <h2 className="text-xl font-bold text-white mb-4">Preview</h2>
-                    <p className="text-white mb-2"><strong>Story:</strong> {gameData.story}</p>
-                    <h3 className="text-lg font-bold text-white mt-4 mb-2">Players:</h3>
-                    {gameData.players.map((player, index) => (
-                        <div key={index} className="mb-4 p-2 bg-gray-700 rounded">
-                            <p className="text-white"><strong>Name:</strong> {player.name}</p>
-                            <p className="text-white"><strong>Story:</strong> {player.story}</p>
-                            <p className="text-white"><strong>Personality:</strong> {player.personality}</p>
+                <div className="mt-8">
+                    <h2 className="text-2xl font-bold text-white mb-6">Preview</h2>
+                    <div className="flex h-full text-white overflow-hidden">
+                        {/* Left column */}
+                        <div className="w-1/4 flex flex-col pr-4 overflow-auto">
+                            {/* Game info */}
+                            <div className="bg-black bg-opacity-30 border border-white border-opacity-30 rounded p-4 mb-4">
+                                <h3 className="text-2xl font-bold mb-2">{gameData.name}</h3>
+                                <p className="text-sm text-gray-300 mb-4">{gameData.theme}</p>
+                                <p className="text-white"><strong>Story:</strong> {gameData.story}</p>
+                            </div>
+
+                            {/* Participants list */}
+                            <div className="bg-black bg-opacity-30 border border-white border-opacity-30 rounded p-4 mb-4 flex-grow overflow-auto">
+                                <h3 className="text-xl font-bold mb-2">Participants</h3>
+                                <ul>
+                                    {gameData.players.map((player, index) => (
+                                        <li key={index} className="mb-1">{player.name}</li>
+                                    ))}
+                                </ul>
+                            </div>
                         </div>
-                    ))}
+
+                        {/* Right column - Players */}
+                        <div className="w-3/4 overflow-auto">
+                            <div className="bg-black bg-opacity-30 border border-white border-opacity-30 rounded p-4">
+                                <h3 className="text-xl font-bold text-white mb-4">Players:</h3>
+                                <div className="space-y-4">
+                                    {gameData.players.map((player, index) => (
+                                        <div key={index} className="bg-black bg-opacity-30 rounded p-3">
+                                            <p className="text-white"><strong>Name:</strong> {player.name}</p>
+                                            <p className="text-white"><strong>Story:</strong> {player.story}</p>
+                                            <p className="text-white"><strong>Personality:</strong> {player.personality}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>
