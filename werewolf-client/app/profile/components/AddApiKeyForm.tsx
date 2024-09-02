@@ -2,22 +2,22 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { buttonTransparentStyle } from "@/app/constants";
+import {buttonTransparentStyle, supportedAi} from "@/app/constants";
 import {addApiKey} from "@/app/api/actions";
+import {revalidatePath} from "next/cache";
 
 export default function AddApiKeyForm({ userId }: { userId: string }) {
     const [newKeyType, setNewKeyType] = useState('');
     const [newKeyValue, setNewKeyValue] = useState('');
     const router = useRouter();
 
-    const keyTypes = ['Claude 3.5 Sonnet', 'GPT-4o', 'GPT-4', 'Gemini Pro 1.5'];
-
-    const addNewKey = async () => {
+    const addNewKey = async (e: React.FormEvent) => {
+        e.preventDefault();
         if (newKeyType && newKeyValue) {
-            await addApiKey(userId, newKeyType, newKeyValue);
+            const id = await addApiKey(userId, newKeyType, newKeyValue);
             setNewKeyType('');
             setNewKeyValue('');
-            router.refresh(); // This will trigger a re-fetch of the server component
+            router.refresh();
         }
     };
 
@@ -32,7 +32,7 @@ export default function AddApiKeyForm({ userId }: { userId: string }) {
                     className="appearance-none bg-gray-700 text-white px-3 py-2 pr-8 rounded w-full"
                 >
                     <option value="">Select Key Type</option>
-                    {keyTypes.map(type => (
+                    {supportedAi.map(type => (
                         <option key={type} value={type}>{type}</option>
                     ))}
                 </select>

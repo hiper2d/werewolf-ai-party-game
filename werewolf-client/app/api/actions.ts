@@ -3,7 +3,16 @@
 import {db} from "@/firebase/server";
 import {firestore} from "firebase-admin";
 import FieldValue = firestore.FieldValue;
-import {Game, gameFromFirestore, GamePreview} from "@/app/api/models";
+import {
+    ApiKey,
+    ApiKeyFirestore,
+    apiKeyFromFirestore,
+    Game,
+    gameFromFirestore,
+    GamePreview,
+    Player
+} from "@/app/api/models";
+import {revalidatePath} from "next/cache";
 
 export async function createGame(game: Game): Promise<string|undefined> {
     if (!db) {
@@ -21,15 +30,9 @@ export async function createGame(game: Game): Promise<string|undefined> {
 export async function previewGame(gamePreview: GamePreview): Promise<Game> {
     // fixme: implement logic
     return {
-        id: '',
-        name: gamePreview.name,
-        theme: gamePreview.theme,
-        playerCount: gamePreview.playerCount,
-        werewolfCount: gamePreview.werewolfCount,
-        specialRoles: gamePreview.specialRoles,
-        aiModel: gamePreview.aiModel,
+        ...gamePreview,
         story: 'This is a story',
-        players: []
+        players: Array<Player>()
     };
 }
 
@@ -116,17 +119,14 @@ export async function upsertUser(user: any) {
     }
 }
 
-export async function getUserApiKeys(userId: string): Promise<any[]> {
+export async function getUserApiKeys(userId: string): Promise<ApiKey[]> {
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
     try {
         const apiKeysRef = db.collection('users').doc(userId).collection('apiKeys');
         const snapshot = await apiKeysRef.get();
-        return snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-        }));
+        return snapshot.docs.map(doc => apiKeyFromFirestore(doc.id, doc.data() as ApiKeyFirestore));
     } catch (error: any) {
         console.error("Error fetching API keys: ", error);
         throw new Error(`Failed to fetch API keys: ${error.message}`);
@@ -139,11 +139,14 @@ export async function addApiKey(userId: string, type: string, value: string): Pr
     }
     try {
         const apiKeysRef = db.collection('users').doc(userId).collection('apiKeys');
-        const response = await apiKeysRef.add({
+        const newApiKey: ApiKeyFirestore = {
             type,
             value,
-            createdAt: FieldValue.serverTimestamp()
-        });
+            createdAt: FieldValue.serverTimestamp() as any,
+            updatedAt: null
+        };
+        const response = await apiKeysRef.add(newApiKey);
+        // revalidatePath('/profile');
         return response.id;
     } catch (error: any) {
         console.error("Error adding API key: ", error);
@@ -157,10 +160,11 @@ export async function updateApiKey(userId: string, keyId: string, newValue: stri
     }
     try {
         const keyRef = db.collection('users').doc(userId).collection('apiKeys').doc(keyId);
-        await keyRef.update({
+        const updateData: Partial<ApiKeyFirestore> = {
             value: newValue,
-            updatedAt: FieldValue.serverTimestamp()
-        });
+            updatedAt: FieldValue.serverTimestamp() as any
+        };
+        await keyRef.update(updateData);
     } catch (error: any) {
         console.error("Error updating API key: ", error);
         throw new Error(`Failed to update API key: ${error.message}`);

@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { buttonBlackStyle } from "@/app/constants";
+import {buttonBlackStyle, botPlayerPersonalities, supportedAi, gameRoles} from "@/app/constants";
 import { previewGame, createGame } from '@/app/api/actions';
-import {Game, GamePreview} from "@/app/api/models";
+import { Game, GamePreview } from "@/app/api/models";
 
 export default function CreateNewGamePage() {
     const [name, setName] = useState('');
@@ -12,7 +12,8 @@ export default function CreateNewGamePage() {
     const [playerCount, setPlayerCount] = useState(8);
     const [werewolfCount, setWerewolfCount] = useState(3);
     const [specialRoles, setSpecialRoles] = useState(['doctor', 'sherif']);
-    const [aiModel, setAiModel] = useState('Mixed');
+    const [gameMasterAiType, setGameMasterAiType] = useState('Mixed');
+    const [playersAiType, setPlayersAiType] = useState('Mixed');
     const [isFormValid, setIsFormValid] = useState(false);
     const [gameData, setGameData] = useState<Game | null>(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -20,8 +21,7 @@ export default function CreateNewGamePage() {
     const router = useRouter();
 
     const playerOptions = Array.from({ length: 7 }, (_, i) => i + 6);
-    const specialRoleOptions = ['doctor', 'sherif', 'geisha'];
-    const aiModelOptions = ['GPT-4o', 'Claude 3.5 Sonnet', 'Mistral Large', 'Groq Llama 3.1 405B', 'Mixed'];
+    const supportedPlayerAi = ['Mixed', ...supportedAi];
 
     useEffect(() => {
         if (werewolfCount >= playerCount) {
@@ -35,9 +35,10 @@ export default function CreateNewGamePage() {
             theme.trim() !== '' &&
             playerCount > 0 &&
             werewolfCount >= 0 &&
-            aiModel !== ''
+            gameMasterAiType !== '' &&
+            playersAiType !== ''
         );
-    }, [name, theme, playerCount, werewolfCount, aiModel]);
+    }, [name, theme, playerCount, werewolfCount, gameMasterAiType, playersAiType]);
 
     const handleButtonClick = async () => {
         const gamePreviewData: GamePreview = {
@@ -47,7 +48,8 @@ export default function CreateNewGamePage() {
             playerCount,
             werewolfCount,
             specialRoles,
-            aiModel
+            gameMasterAiType,
+            playersAiType
         };
 
         if (!gameData) {
@@ -68,7 +70,7 @@ export default function CreateNewGamePage() {
             setIsLoading(true);
             setError(null);
             try {
-                // fixme: implement this: await createGame(previewData);
+                await createGame(gameData);
                 router.push("/games");
             } catch (err: any) {
                 setError(err.message);
@@ -79,7 +81,19 @@ export default function CreateNewGamePage() {
         }
     };
 
-    const buttonText = isLoading ? 'Processing...' : (gameData ? 'Create' : 'Preview');
+    const handleStoryChange = (story: string) => {
+        if (gameData) {
+            setGameData({ ...gameData, story });
+        }
+    };
+
+    const handlePlayerChange = (index: number, field: string, value: string) => {
+        if (gameData) {
+            const updatedPlayers = [...gameData.players];
+            updatedPlayers[index] = { ...updatedPlayers[index], [field]: value };
+            setGameData({ ...gameData, players: updatedPlayers });
+        }
+    };
 
     return (
         <div className="flex flex-col w-full h-full p-4 sm:p-6">
@@ -90,7 +104,7 @@ export default function CreateNewGamePage() {
                     onClick={handleButtonClick}
                     disabled={!isFormValid || isLoading}
                 >
-                    {buttonText}
+                    {isLoading ? 'Processing...' : (gameData ? 'Create' : 'Preview')}
                 </button>
             </div>
 
@@ -133,22 +147,41 @@ export default function CreateNewGamePage() {
                             <option key={i} value={i}>{i} werewolves</option>
                         ))}
                     </select>
-                    <select
-                        className="flex-1 p-3 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:border-gray-500"
-                        value={aiModel}
-                        onChange={(e) => setAiModel(e.target.value)}
-                        required
-                    >
-                        {aiModelOptions.map(model => (
-                            <option key={model} value={model}>{model}</option>
-                        ))}
-                    </select>
+                </div>
+
+                <div className="flex space-x-4">
+                    <div className="flex-1">
+                        <label className="block text-white mb-2">Game Master AI Type:</label>
+                        <select
+                            className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:border-gray-500"
+                            value={gameMasterAiType}
+                            onChange={(e) => setGameMasterAiType(e.target.value)}
+                            required
+                        >
+                            {supportedAi.map(model => (
+                                <option key={model} value={model}>{model}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="flex-1">
+                        <label className="block text-white mb-2">Players AI Type:</label>
+                        <select
+                            className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:border-gray-500"
+                            value={playersAiType}
+                            onChange={(e) => setPlayersAiType(e.target.value)}
+                            required
+                        >
+                            {supportedPlayerAi.map(model => (
+                                <option key={model} value={model}>{model}</option>
+                            ))}
+                        </select>
+                    </div>
                 </div>
 
                 <div>
                     <label className="text-white">Special Roles:</label>
                     <div className="flex flex-wrap gap-4 mt-2">
-                        {specialRoleOptions.map(role => (
+                        {gameRoles.map(role => (
                             <div key={role} className="flex items-center">
                                 <input
                                     type="checkbox"
@@ -175,43 +208,59 @@ export default function CreateNewGamePage() {
             {gameData && (
                 <div className="mt-8">
                     <h2 className="text-2xl font-bold text-white mb-6">Preview</h2>
-                    <div className="flex h-full text-white overflow-hidden">
-                        {/* Left column */}
-                        <div className="w-1/4 flex flex-col pr-4 overflow-auto">
-                            {/* Game info */}
-                            <div className="bg-black bg-opacity-30 border border-white border-opacity-30 rounded p-4 mb-4">
-                                <h3 className="text-2xl font-bold mb-2">{gameData.name}</h3>
-                                <p className="text-sm text-gray-300 mb-4">{gameData.theme}</p>
-                                <p className="text-white"><strong>Story:</strong> {gameData.story}</p>
-                            </div>
 
-                            {/* Participants list */}
-                            <div className="bg-black bg-opacity-30 border border-white border-opacity-30 rounded p-4 mb-4 flex-grow overflow-auto">
-                                <h3 className="text-xl font-bold mb-2">Participants</h3>
-                                <ul>
-                                    {gameData.players.map((player, index) => (
-                                        <li key={index} className="mb-1">{player.name}</li>
-                                    ))}
-                                </ul>
-                            </div>
-                        </div>
-
-                        {/* Right column - Players */}
-                        <div className="w-3/4 overflow-auto">
-                            <div className="bg-black bg-opacity-30 border border-white border-opacity-30 rounded p-4">
-                                <h3 className="text-xl font-bold text-white mb-4">Players:</h3>
-                                <div className="space-y-4">
-                                    {gameData.players.map((player, index) => (
-                                        <div key={index} className="bg-black bg-opacity-30 rounded p-3">
-                                            <p className="text-white"><strong>Name:</strong> {player.name}</p>
-                                            <p className="text-white"><strong>Story:</strong> {player.story}</p>
-                                            <p className="text-white"><strong>Personality:</strong> {player.personality}</p>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
+                    <div className="mb-4">
+                        <label htmlFor="gameStory" className="block text-white mb-2">Game Story:</label>
+                        <textarea
+                            id="gameStory"
+                            className="w-full p-3 rounded bg-gray-700 text-white placeholder-gray-400 border border-gray-600 focus:outline-none focus:border-gray-500"
+                            rows={5}
+                            value={gameData.story}
+                            onChange={(e) => handleStoryChange(e.target.value)}
+                        />
                     </div>
+
+                    <h3 className="text-xl font-bold text-white mb-4">Players:</h3>
+                    {gameData.players.map((player, index) => (
+                        <div key={index} className="mb-4 p-4 bg-gray-800 rounded">
+                            <div className="flex items-center space-x-4 mb-2">
+                                <input
+                                    type="text"
+                                    className="flex-grow p-2 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:border-gray-500"
+                                    value={player.name}
+                                    onChange={(e) => handlePlayerChange(index, 'name', e.target.value)}
+                                    placeholder="Player Name"
+                                />
+                                <select
+                                    className="p-2 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:border-gray-500"
+                                    value={player.personality || ''}
+                                    onChange={(e) => handlePlayerChange(index, 'personality', e.target.value)}
+                                >
+                                    <option value="">Select Personality</option>
+                                    {botPlayerPersonalities.map(p => (
+                                        <option key={p} value={p}>{p}</option>
+                                    ))}
+                                </select>
+                                <select
+                                    className="p-2 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:border-gray-500"
+                                    value={player.aiType || ''}
+                                    onChange={(e) => handlePlayerChange(index, 'aiType', e.target.value)}
+                                >
+                                    <option value="">Select AI Type</option>
+                                    {supportedAi.map(ai => (
+                                        <option key={ai} value={ai}>{ai}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <textarea
+                                className="w-full p-2 rounded bg-gray-700 text-white placeholder-gray-400 border border-gray-600 focus:outline-none focus:border-gray-500"
+                                rows={3}
+                                value={player.story}
+                                onChange={(e) => handlePlayerChange(index, 'story', e.target.value)}
+                                placeholder="Player's Story"
+                            />
+                        </div>
+                    ))}
                 </div>
             )}
         </div>
