@@ -4,12 +4,12 @@ from typing import List
 from groq import Groq
 from groq.types.chat import ChatCompletion
 
-from api.ai.agents.generic_agent import GenericAgent
+from api.ai.agents.generic_agent import AbstractAgent
 from api.constants import MODEL_GROQ
 from api.models import MessageDto
 
 
-class GroqAgent(GenericAgent):
+class GroqAgent(AbstractAgent):
 
     def __init__(self, name):
         self.client: Groq = Groq(api_key=os.environ.get("GROQ_API_KEY"))

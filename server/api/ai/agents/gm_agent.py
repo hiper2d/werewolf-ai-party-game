@@ -1,14 +1,14 @@
 from typing import List
 
 from api.ai.agents.agent_factory import AgentFactory
-from api.ai.agents.generic_agent import GenericAgent
+from api.ai.agents.generic_agent import AbstractAgent
 from api.ai.prompts.assistant_prompts import ARBITER_PROMPT
 from api.constants import RECIPIENT_ALL, GM_NAME, GM_ID
 from api.models import GameDto, MessageDto, \
     MessageRole, LLMType
 
 
-class GmAgent(GenericAgent):
+class GmAgent(AbstractAgent):
     def __init__(self, game: GameDto):
         self.game = game
         self.agent = AgentFactory.create_agent(llm_type=LLMType(game.gm_llm_type_str), name=GM_NAME)

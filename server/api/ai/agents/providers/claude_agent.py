@@ -4,14 +4,14 @@ from typing import List
 from anthropic import Anthropic
 from anthropic.types import Message
 
-from api.ai.agents.generic_agent import GenericAgent
+from api.ai.agents.generic_agent import AbstractAgent
 from api.constants import MODEL_CLAUDE
 from api.models import MessageDto, MessageRole
 
 MAX_OUTPUT_TOKENS = 4096
 
 
-class ClaudeAgent(GenericAgent):
+class ClaudeAgent(AbstractAgent):
 
     def __init__(self, name):
         self.client: Anthropic = Anthropic(

@@ -5,7 +5,7 @@ from typing import List
 from api.models import MessageDto, LLMType
 
 
-class GenericAgent(ABC):
+class AbstractAgent(ABC):
     name: str
     model: str
     client: object

@@ -3,12 +3,12 @@ from typing import List
 from openai import OpenAI
 from openai.types.chat import ChatCompletion
 
-from api.ai.agents.generic_agent import GenericAgent
+from api.ai.agents.generic_agent import AbstractAgent
 from api.constants import MODEL_GPT
 from api.models import MessageDto
 
 
-class OpenAiAgent(GenericAgent):
+class OpenAIAgent(AbstractAgent):
 
     def __init__(self, name):
         self.client: OpenAI = OpenAI()

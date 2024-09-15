@@ -2,19 +2,19 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import {buttonTransparentStyle, supportedAi} from "@/app/constants";
-import {addApiKey} from "@/app/api/actions";
-import {revalidatePath} from "next/cache";
+import { buttonTransparentStyle } from "@/app/constants";
+import { addApiKey } from "@/app/api/actions";
+import { LLMModel, SupportedAiModelNames } from "@/app/ai/models";
 
 export default function AddApiKeyForm({ userId }: { userId: string }) {
-    const [newKeyType, setNewKeyType] = useState('');
+    const [newKeyType, setNewKeyType] = useState<LLMModel | ''>('');
     const [newKeyValue, setNewKeyValue] = useState('');
     const router = useRouter();
 
     const addNewKey = async (e: React.FormEvent) => {
         e.preventDefault();
         if (newKeyType && newKeyValue) {
-            const id = await addApiKey(userId, newKeyType, newKeyValue);
+            await addApiKey(userId, newKeyType, newKeyValue);
             setNewKeyType('');
             setNewKeyValue('');
             router.refresh();
@@ -28,12 +28,12 @@ export default function AddApiKeyForm({ userId }: { userId: string }) {
             <div className="relative w-64">
                 <select
                     value={newKeyType}
-                    onChange={(e) => setNewKeyType(e.target.value)}
+                    onChange={(e) => setNewKeyType(e.target.value as LLMModel)}
                     className="appearance-none bg-gray-700 text-white px-3 py-2 pr-8 rounded w-full"
                 >
                     <option value="">Select Key Type</option>
-                    {supportedAi.map(type => (
-                        <option key={type} value={type}>{type}</option>
+                    {Object.entries(SupportedAiModelNames).map(([model, name]) => (
+                        <option key={model} value={model}>{model} - {name}</option>
                     ))}
                 </select>
                 <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-white">

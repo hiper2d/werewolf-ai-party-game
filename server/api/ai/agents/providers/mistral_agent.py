@@ -4,12 +4,12 @@ from typing import List
 from mistralai.client import MistralClient
 from mistralai.models.chat_completion import ChatMessage
 
-from api.ai.agents.generic_agent import GenericAgent
+from api.ai.agents.generic_agent import AbstractAgent
 from api.constants import MODEL_MISTRAL
 from api.models import MessageDto
 
 
-class MistralAgent(GenericAgent):
+class MistralAgent(AbstractAgent):
 
     def __init__(self, name):
         self.client: MistralClient = MistralClient(api_key=os.environ.get("MISTRAL_API_KEY"))
