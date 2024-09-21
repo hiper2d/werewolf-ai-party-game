@@ -52,6 +52,7 @@ export default function CreateNewGamePage() {
             playersAiType
         };
 
+        // Generate preview
         setIsLoading(true);
         setError(null);
         try {
@@ -67,10 +68,9 @@ export default function CreateNewGamePage() {
 
     const handleCreateGame = async () => {
         if (!gameData) {
-            setError("Please generate a game preview first.");
             return;
         }
-
+        // Create game
         setIsLoading(true);
         setError(null);
         try {
@@ -102,24 +102,32 @@ export default function CreateNewGamePage() {
         <div className="flex flex-col w-full h-full p-4 sm:p-6">
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-bold text-white">Create New Game</h1>
-                <div className="space-x-4">
+                {!gameData ? (
                     <button
                         className={`${buttonBlackStyle} ${(!isFormValid || isLoading) ? 'opacity-50 cursor-not-allowed' : ''}`}
                         onClick={handleGeneratePreview}
                         disabled={!isFormValid || isLoading}
                     >
-                        {isLoading ? 'Processing...' : (gameData ? 'Generate Game Preview Again' : 'Generate Game Preview')}
+                        {isLoading ? 'Processing...' : 'Generate Game Preview'}
                     </button>
-                    {gameData && (
+                ) : (
+                    <div className="flex space-x-4">
+                        <button
+                            className={`${buttonBlackStyle} ${(!isFormValid || isLoading) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            onClick={handleGeneratePreview}
+                            disabled={!isFormValid || isLoading}
+                        >
+                            {isLoading ? 'Processing...' : 'Generate Game Preview Again'}
+                        </button>
                         <button
                             className={`${buttonBlackStyle} ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                             onClick={handleCreateGame}
                             disabled={isLoading}
                         >
-                            Create Game from Preview
+                            {isLoading ? 'Processing...' : 'Create Game from Preview'}
                         </button>
-                    )}
-                </div>
+                    </div>
+                )}
             </div>
 
             <form id="create-game-form" className="space-y-4">
