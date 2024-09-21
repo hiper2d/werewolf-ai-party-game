@@ -16,7 +16,7 @@ export interface GamePreview {
     playerCount: number;
     werewolfCount: number;
     specialRoles: string[];
-    gameMasterAiType: string;
+    gameMasterAiType: LLMModel;
     playersAiType: string;
 }
 

@@ -14,6 +14,8 @@ import {
 import FieldValue = firestore.FieldValue;
 import {getServerSession} from "next-auth";
 import {LLMModel} from "@/app/ai/models";
+import {AgentFactory} from "@/app/ai/agent-factory";
+import {AbstractAgent} from "@/app/ai/abstract-agent";
 
 export async function createGame(game: Game): Promise<string|undefined> {
     if (!db) {
@@ -45,6 +47,7 @@ export async function previewGame(gamePreview: GamePreview): Promise<Game> {
     // const apiKeysRef = db.collection('users').doc(userId).collection('apiKeys');
 
     // fixme: implement logic
+    // storyTellAgent: AbstractAgent = AgentFactory.createAnonymousAgent("", gamePreview.gameMasterAiType, user)
     return {
         ...gamePreview,
         story: 'This is a story',

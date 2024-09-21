@@ -8,7 +8,7 @@ from api.constants import MODEL_GPT
 from api.models import MessageDto
 
 
-class OpenAIAgent(AbstractAgent):
+class OpenAiAgent(AbstractAgent):
 
     def __init__(self, name):
         self.client: OpenAI = OpenAI()
