@@ -9,7 +9,8 @@ export enum LLMModel {
     GPT_4O = 'GPT-4o',
     GPT_O1 = 'GPT-o1',
     GEMINI_PRO_15 = 'Gemini Pro 1.5',
-    MISTRAL_LARGE_2 = 'Mistral Large 2'
+    MISTRAL_LARGE_2 = 'Mistral Large 2',
+    MIXED = 'Mixed'
 }
 
 export const SupportedAiModelNames: Record<LLMModel, string> = {
@@ -17,7 +18,8 @@ export const SupportedAiModelNames: Record<LLMModel, string> = {
     [LLMModel.GPT_4O]: '4o',
     [LLMModel.GPT_O1]: 'o1',
     [LLMModel.GEMINI_PRO_15]: '1.5',
-    [LLMModel.MISTRAL_LARGE_2]: '2'
+    [LLMModel.MISTRAL_LARGE_2]: '2',
+    [LLMModel.MIXED]: 'Mixed'
 };
 
 export interface AgentMessageDto {

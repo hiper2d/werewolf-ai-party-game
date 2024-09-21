@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import {buttonBlackStyle, botPlayerPersonalities, supportedAi, gameRoles} from "@/app/constants";
-import { previewGame, createGame } from '@/app/api/actions';
-import { Game, GamePreview } from "@/app/api/models";
+import React, {useEffect, useState} from 'react';
+import {useRouter} from 'next/navigation';
+import {botPlayerPersonalities, buttonBlackStyle, gameRoles} from "@/app/constants";
+import {createGame, previewGame} from '@/app/api/actions';
+import {Game, GamePreview} from "@/app/api/models";
+import {LLMModel} from "@/app/ai/models";
 
 export default function CreateNewGamePage() {
     const [name, setName] = useState('');
@@ -12,8 +13,8 @@ export default function CreateNewGamePage() {
     const [playerCount, setPlayerCount] = useState(8);
     const [werewolfCount, setWerewolfCount] = useState(3);
     const [specialRoles, setSpecialRoles] = useState(['doctor', 'sherif']);
-    const [gameMasterAiType, setGameMasterAiType] = useState('Mixed');
-    const [playersAiType, setPlayersAiType] = useState('Mixed');
+    const [gameMasterAiType, setGameMasterAiType] = useState<LLMModel>(LLMModel.MIXED);
+    const [playersAiType, setPlayersAiType] = useState<string>(LLMModel.MIXED);
     const [isFormValid, setIsFormValid] = useState(false);
     const [gameData, setGameData] = useState<Game | null>(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -21,7 +22,8 @@ export default function CreateNewGamePage() {
     const router = useRouter();
 
     const playerOptions = Array.from({ length: 7 }, (_, i) => i + 6);
-    const supportedPlayerAi = ['Mixed', ...supportedAi];
+    const supportedAi = Object.values(LLMModel);
+    const supportedPlayerAi = Object.values(LLMModel);
 
     useEffect(() => {
         if (werewolfCount >= playerCount) {
@@ -35,8 +37,8 @@ export default function CreateNewGamePage() {
             theme.trim() !== '' &&
             playerCount > 0 &&
             werewolfCount >= 0 &&
-            gameMasterAiType !== '' &&
-            playersAiType !== ''
+            gameMasterAiType !== LLMModel.MIXED &&
+            playersAiType !== LLMModel.MIXED
         );
     }, [name, theme, playerCount, werewolfCount, gameMasterAiType, playersAiType]);
 
@@ -124,7 +126,7 @@ export default function CreateNewGamePage() {
                             onClick={handleCreateGame}
                             disabled={isLoading}
                         >
-                            {isLoading ? 'Processing...' : 'Create Game from Preview'}
+                            {isLoading ? 'Processing...' : 'Create Game'}
                         </button>
                     </div>
                 )}
@@ -177,7 +179,7 @@ export default function CreateNewGamePage() {
                         <select
                             className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:border-gray-500"
                             value={gameMasterAiType}
-                            onChange={(e) => setGameMasterAiType(e.target.value)}
+                            onChange={(e) => setGameMasterAiType(e.target.value as LLMModel)}
                             required
                         >
                             {supportedAi.map(model => (
@@ -194,7 +196,9 @@ export default function CreateNewGamePage() {
                             required
                         >
                             {supportedPlayerAi.map(model => (
-                                <option key={model} value={model}>{model}</option>
+                                <option key={model} value={model}>
+                                    {model}
+                                </option>
                             ))}
                         </select>
                     </div>
@@ -266,7 +270,7 @@ export default function CreateNewGamePage() {
                                 <select
                                     className="p-2 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:border-gray-500"
                                     value={player.aiType || ''}
-                                    onChange={(e) => handlePlayerChange(index, 'aiType', e.target.value)}
+                                    onChange={(e) => handlePlayerChange(index, 'aiType', e.target.value as LLMModel)}
                                 >
                                     <option value="">Select AI Type</option>
                                     {supportedAi.map(ai => (
