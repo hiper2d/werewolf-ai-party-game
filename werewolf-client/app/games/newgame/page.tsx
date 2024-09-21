@@ -40,7 +40,7 @@ export default function CreateNewGamePage() {
         );
     }, [name, theme, playerCount, werewolfCount, gameMasterAiType, playersAiType]);
 
-    const handleButtonClick = async () => {
+    const handleGeneratePreview = async () => {
         const gamePreviewData: GamePreview = {
             id: '',
             name,
@@ -52,32 +52,35 @@ export default function CreateNewGamePage() {
             playersAiType
         };
 
+        setIsLoading(true);
+        setError(null);
+        try {
+            const game: Game = await previewGame(gamePreviewData);
+            setGameData(game);
+        } catch (err: any) {
+            setError(err.message);
+            console.error("Error previewing game:", err);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleCreateGame = async () => {
         if (!gameData) {
-            // Generate preview
-            setIsLoading(true);
-            setError(null);
-            try {
-                const game: Game = await previewGame(gamePreviewData);
-                setGameData(game);
-            } catch (err: any) {
-                setError(err.message);
-                console.error("Error previewing game:", err);
-            } finally {
-                setIsLoading(false);
-            }
-        } else {
-            // Create game
-            setIsLoading(true);
-            setError(null);
-            try {
-                await createGame(gameData);
-                router.push("/games");
-            } catch (err: any) {
-                setError(err.message);
-                console.error("Error creating game:", err);
-            } finally {
-                setIsLoading(false);
-            }
+            setError("Please generate a game preview first.");
+            return;
+        }
+
+        setIsLoading(true);
+        setError(null);
+        try {
+            await createGame(gameData);
+            router.push("/games");
+        } catch (err: any) {
+            setError(err.message);
+            console.error("Error creating game:", err);
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -99,13 +102,24 @@ export default function CreateNewGamePage() {
         <div className="flex flex-col w-full h-full p-4 sm:p-6">
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-bold text-white">Create New Game</h1>
-                <button
-                    className={`${buttonBlackStyle} ${(!isFormValid || isLoading) ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    onClick={handleButtonClick}
-                    disabled={!isFormValid || isLoading}
-                >
-                    {isLoading ? 'Processing...' : (gameData ? 'Create' : 'Preview')}
-                </button>
+                <div className="space-x-4">
+                    <button
+                        className={`${buttonBlackStyle} ${(!isFormValid || isLoading) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        onClick={handleGeneratePreview}
+                        disabled={!isFormValid || isLoading}
+                    >
+                        {isLoading ? 'Processing...' : (gameData ? 'Generate Game Preview Again' : 'Generate Game Preview')}
+                    </button>
+                    {gameData && (
+                        <button
+                            className={`${buttonBlackStyle} ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            onClick={handleCreateGame}
+                            disabled={isLoading}
+                        >
+                            Create Game from Preview
+                        </button>
+                    )}
+                </div>
             </div>
 
             <form id="create-game-form" className="space-y-4">
