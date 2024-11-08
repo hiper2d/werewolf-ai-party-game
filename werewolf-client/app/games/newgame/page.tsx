@@ -5,7 +5,7 @@ import {useRouter} from 'next/navigation';
 import {botPlayerPersonalities, buttonBlackStyle, gameRoles} from "@/app/constants";
 import {createGame, previewGame} from '@/app/api/actions';
 import {Game, GamePreview} from "@/app/api/models";
-import {LLMModel} from "@/app/ai/models";
+import {LLM_CONSTANTS} from "@/app/ai/models";
 
 export default function CreateNewGamePage() {
     const [name, setName] = useState('');
@@ -13,8 +13,8 @@ export default function CreateNewGamePage() {
     const [playerCount, setPlayerCount] = useState(8);
     const [werewolfCount, setWerewolfCount] = useState(3);
     const [specialRoles, setSpecialRoles] = useState(['doctor', 'sherif']);
-    const [gameMasterAiType, setGameMasterAiType] = useState<LLMModel>(LLMModel.MIXED);
-    const [playersAiType, setPlayersAiType] = useState<string>(LLMModel.MIXED);
+    const [gameMasterAiType, setGameMasterAiType] = useState<string>(LLM_CONSTANTS.RANDOM);
+    const [playersAiType, setPlayersAiType] = useState<string>(LLM_CONSTANTS.RANDOM);
     const [isFormValid, setIsFormValid] = useState(false);
     const [gameData, setGameData] = useState<Game | null>(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -22,8 +22,8 @@ export default function CreateNewGamePage() {
     const router = useRouter();
 
     const playerOptions = Array.from({ length: 7 }, (_, i) => i + 6);
-    const supportedAi = Object.values(LLMModel);
-    const supportedPlayerAi = Object.values(LLMModel);
+    const supportedAi = Object.values(LLM_CONSTANTS);
+    const supportedPlayerAi = Object.values(LLM_CONSTANTS);
 
     useEffect(() => {
         if (werewolfCount >= playerCount) {
@@ -34,11 +34,7 @@ export default function CreateNewGamePage() {
     useEffect(() => {
         setIsFormValid(
             name.trim() !== '' &&
-            theme.trim() !== '' &&
-            playerCount > 0 &&
-            werewolfCount >= 0 &&
-            gameMasterAiType !== LLMModel.MIXED &&
-            playersAiType !== LLMModel.MIXED
+            theme.trim() !== ''
         );
     }, [name, theme, playerCount, werewolfCount, gameMasterAiType, playersAiType]);
 
@@ -179,7 +175,7 @@ export default function CreateNewGamePage() {
                         <select
                             className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:border-gray-500"
                             value={gameMasterAiType}
-                            onChange={(e) => setGameMasterAiType(e.target.value as LLMModel)}
+                            onChange={(e) => setGameMasterAiType(e.target.value as string)}
                             required
                         >
                             {supportedAi.map(model => (
@@ -270,7 +266,7 @@ export default function CreateNewGamePage() {
                                 <select
                                     className="p-2 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:border-gray-500"
                                     value={player.aiType || ''}
-                                    onChange={(e) => handlePlayerChange(index, 'aiType', e.target.value as LLMModel)}
+                                    onChange={(e) => handlePlayerChange(index, 'aiType', e.target.value as string)}
                                 >
                                     <option value="">Select AI Type</option>
                                     {supportedAi.map(ai => (

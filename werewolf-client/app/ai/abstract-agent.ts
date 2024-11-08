@@ -1,4 +1,4 @@
-import {AgentMessageDto, LLMModel} from "@/app/ai/models";
+import {AgentMessageDto} from "@/app/ai/models";
 
 export abstract class AbstractAgent {
     id: string;
@@ -6,7 +6,7 @@ export abstract class AbstractAgent {
     instruction: string;
     temperature: number;
 
-    constructor(id: string, name: string, instruction: string, temperature: number) {
+    protected constructor(id: string, name: string, instruction: string, temperature: number) {
         this.id = id;
         this.name = name;
         this.instruction = instruction;

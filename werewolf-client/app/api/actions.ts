@@ -2,20 +2,11 @@
 
 import {db} from "@/firebase/server";
 import {firestore} from "firebase-admin";
-import {
-    ApiKey,
-    ApiKeyFirestore,
-    apiKeyFromFirestore,
-    Game,
-    gameFromFirestore,
-    GamePreview,
-    Player, User
-} from "@/app/api/models";
-import FieldValue = firestore.FieldValue;
+import {ApiKeyMap, Game, gameFromFirestore, GamePreview, Player, User} from "@/app/api/models";
 import {getServerSession} from "next-auth";
-import {LLMModel} from "@/app/ai/models";
 import {AgentFactory} from "@/app/ai/agent-factory";
 import {AbstractAgent} from "@/app/ai/abstract-agent";
+import FieldValue = firestore.FieldValue;
 
 export async function createGame(game: Game): Promise<string|undefined> {
     if (!db) {
@@ -40,14 +31,20 @@ export async function previewGame(gamePreview: GamePreview): Promise<Game> {
         throw new Error('Firestore is not initialized');
     }
 
-    const user = await getUserFromFirestore(session.user.email);
-    if (!user) {
-        throw new Error('User not found in database');
-    }
-    // const apiKeysRef = db.collection('users').doc(userId).collection('apiKeys');
+    const apiKeys = await getUserFromFirestore(session.user.email)
+        .then((user) => getUserApiKeys(user!.email));
+
 
     // fixme: implement logic
-    // storyTellAgent: AbstractAgent = AgentFactory.createAnonymousAgent("", gamePreview.gameMasterAiType, user)
+    const storyTellAgent: AbstractAgent = AgentFactory.createAnonymousAgent("", gamePreview.gameMasterAiType, apiKeys)
+    const ans = await storyTellAgent.ask([{
+        recipientId: "all",
+        authorId: "gm",
+        authorName: "gm",
+        role: "system",
+        msg: "How are you?"
+    }])
+
     return {
         ...gamePreview,
         story: 'This is a story',
@@ -142,7 +139,7 @@ export async function upsertUser(user: any) {
     }
 }
 
-export async function getUserApiKeys(userId: string): Promise<Partial<Record<LLMModel, string>>> {
+export async function getUserApiKeys(userId: string): Promise<ApiKeyMap> {
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
@@ -152,14 +149,14 @@ export async function getUserApiKeys(userId: string): Promise<Partial<Record<LLM
             throw new Error('User not found');
         }
         const user = userDoc.data() as User;
-        return user.apiKeys || {};
+        return user?.apiKeys || {};
     } catch (error: any) {
         console.error("Error fetching API keys: ", error);
         throw new Error(`Failed to fetch API keys: ${error.message}`);
     }
 }
 
-export async function addApiKey(userId: string, model: LLMModel, value: string): Promise<void> {
+export async function addApiKey(userId: string, model: string, value: string): Promise<void> {
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
@@ -174,7 +171,7 @@ export async function addApiKey(userId: string, model: LLMModel, value: string):
     }
 }
 
-export async function updateApiKey(userId: string, model: LLMModel, newValue: string): Promise<void> {
+export async function updateApiKey(userId: string, model: string, newValue: string): Promise<void> {
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
@@ -189,7 +186,7 @@ export async function updateApiKey(userId: string, model: LLMModel, newValue: st
     }
 }
 
-export async function deleteApiKey(userId: string, model: LLMModel): Promise<void> {
+export async function deleteApiKey(userId: string, model: string): Promise<void> {
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
@@ -213,7 +210,15 @@ async function getUserFromFirestore(email: string) {
     const userSnap = await userRef.get();
 
     if (userSnap.exists) {
-        return { id: userSnap.id, ...userSnap.data() };
+        const userData = userSnap.data();
+
+        const user: User = {
+            name: userData?.name,
+            email: userData?.email,
+            apiKeys: userData?.ApiKeys || []
+        };
+
+        return user;
     } else {
         return null;
     }

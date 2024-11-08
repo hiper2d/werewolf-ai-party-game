@@ -4,10 +4,10 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { buttonTransparentStyle } from "@/app/constants";
 import { addApiKey } from "@/app/api/actions";
-import { LLMModel, SupportedAiModelNames } from "@/app/ai/models";
+import { SupportedAiModelNames } from "@/app/ai/models";
 
 export default function AddApiKeyForm({ userId }: { userId: string }) {
-    const [newKeyType, setNewKeyType] = useState<LLMModel | ''>('');
+    const [newKeyType, setNewKeyType] = useState<string | ''>('');
     const [newKeyValue, setNewKeyValue] = useState('');
     const router = useRouter();
 
@@ -28,7 +28,7 @@ export default function AddApiKeyForm({ userId }: { userId: string }) {
             <div className="relative w-64">
                 <select
                     value={newKeyType}
-                    onChange={(e) => setNewKeyType(e.target.value as LLMModel)}
+                    onChange={(e) => setNewKeyType(e.target.value as string)}
                     className="appearance-none bg-gray-700 text-white px-3 py-2 pr-8 rounded w-full"
                 >
                     <option value="">Select Key Type</option>

@@ -1,17 +1,18 @@
 import {AbstractAgent} from "@/app/ai/abstract-agent";
 import {OpenAI} from "openai";
-import {User} from "@/app/api/models";
-import {AgentMessageDto, LLMModel, SupportedAiModelNames} from "@/app/ai/models";
+import {AgentMessageDto} from "@/app/ai/models";
 import ChatCompletion = OpenAI.Chat.Completions.ChatCompletion;
+import ChatCompletionMessageParam = OpenAI.Chat.Completions.ChatCompletionMessageParam;
 
 export class OpenAiAgent extends AbstractAgent {
-    private client: OpenAI;
-    private model = SupportedAiModelNames[LLMModel.GPT_4O];
+    private readonly client: OpenAI;
+    private readonly model: string;
 
-    constructor(id: string, name: string, instruction: string, user: User) {
+    constructor(id: string, name: string, instruction: string, model: string, apiKey: string) {
         super(id, name, instruction, 0.2);
+        this.model = model;
         this.client = new OpenAI({
-            apiKey: user.apiKeys[LLMModel.GPT_4O],
+            apiKey: apiKey,
         })
     }
 
@@ -26,7 +27,7 @@ export class OpenAiAgent extends AbstractAgent {
                 messages: messages.map(msg => ({
                     role: msg.role,
                     content: msg.msg
-                })),
+                })) as Array<ChatCompletionMessageParam>,
                 temperature: this.temperature,
             });
 

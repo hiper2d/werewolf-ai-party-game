@@ -1,24 +1,22 @@
 'use client';
 
-import React, { useState } from 'react';
-import { deleteApiKey, updateApiKey } from "@/app/api/actions";
-import { LLMModel } from "@/app/ai/models";
+import React, {useState} from 'react';
+import {deleteApiKey, updateApiKey} from "@/app/api/actions";
+import {ApiKeyMap} from "@/app/api/models";
 
-type ApiKeys = Partial<Record<LLMModel, string>>;
-
-export default function ApiKeyList({ initialApiKeys, userId }: { initialApiKeys: ApiKeys, userId: string }) {
-    const [apiKeys, setApiKeys] = useState<ApiKeys>(initialApiKeys);
-    const [editingKey, setEditingKey] = useState<LLMModel | null>(null);
+export default function ApiKeyList({ initialApiKeys, userId }: { initialApiKeys: ApiKeyMap, userId: string }) {
+    const [apiKeys, setApiKeys] = useState<ApiKeyMap>(initialApiKeys);
+    const [editingKey, setEditingKey] = useState<string | null>(null);
     const [editValue, setEditValue] = useState('');
 
-    const startEditing = (model: LLMModel, value: string) => {
+    const startEditing = (model: string, value: string) => {
         setEditingKey(model);
         setEditValue(value);
     };
 
-    const confirmEdit = async (model: LLMModel) => {
+    const confirmEdit = async (model: string) => {
         await updateApiKey(userId, model, editValue);
-        setApiKeys(prev => ({ ...prev, [model]: editValue }));
+        setApiKeys(prev => ({ ...prev, [model]: { ...prev[model], key: editValue } }));
         setEditingKey(null);
     };
 
@@ -27,7 +25,7 @@ export default function ApiKeyList({ initialApiKeys, userId }: { initialApiKeys:
         setEditValue('');
     };
 
-    const deleteKey = async (model: LLMModel) => {
+    const deleteKey = async (model: string) => {
         await deleteApiKey(userId, model);
         setApiKeys(prev => {
             const newKeys = { ...prev };
@@ -38,7 +36,7 @@ export default function ApiKeyList({ initialApiKeys, userId }: { initialApiKeys:
 
     return (
         <ul className="space-y-4">
-            {Object.entries(apiKeys).map(([model, value]) => (
+            {Object.entries(apiKeys).map(([model, apiKey]) => (
                 <li key={model} className="bg-black bg-opacity-30 p-3 rounded">
                     <div className="flex items-center justify-between">
                         <div className="flex-grow mr-4 flex items-center">
@@ -52,14 +50,14 @@ export default function ApiKeyList({ initialApiKeys, userId }: { initialApiKeys:
                                         className="bg-gray-700 text-white px-2 py-1 rounded w-full"
                                     />
                                 ) : (
-                                    <span className="text-white">{value}</span>
+                                    <span className="text-white">{apiKey.id}</span>
                                 )}
                             </div>
                         </div>
                         <div className="flex items-center">
                             {editingKey === model ? (
                                 <>
-                                    <button onClick={() => confirmEdit(model as LLMModel)} className="text-green-400 mr-2">
+                                    <button onClick={() => confirmEdit(model as string)} className="text-green-400 mr-2">
                                         <span className="sr-only">Confirm</span>
                                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
                                              xmlns="http://www.w3.org/2000/svg">
@@ -77,7 +75,7 @@ export default function ApiKeyList({ initialApiKeys, userId }: { initialApiKeys:
                                     </button>
                                 </>
                             ) : (
-                                <button onClick={() => startEditing(model as LLMModel, value)} className="text-blue-400 mr-2">
+                                <button onClick={() => startEditing(model as string, apiKey.id)} className="text-blue-400 mr-2">
                                     <span className="sr-only">Edit</span>
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
                                          xmlns="http://www.w3.org/2000/svg">
@@ -86,7 +84,7 @@ export default function ApiKeyList({ initialApiKeys, userId }: { initialApiKeys:
                                     </svg>
                                 </button>
                             )}
-                            <button onClick={() => deleteKey(model as LLMModel)} className="text-red-400">
+                            <button onClick={() => deleteKey(model as string)} className="text-red-400">
                                 <span className="sr-only">Delete</span>
                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
                                      xmlns="http://www.w3.org/2000/svg">

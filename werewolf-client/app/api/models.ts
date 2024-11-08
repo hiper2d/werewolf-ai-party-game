@@ -1,12 +1,14 @@
 import {Timestamp} from "firebase/firestore";
-import {LLMModel} from "@/app/ai/models";
+import {LLM_CONSTANTS} from "@/app/ai/models";
+
+export interface ApiKeyMap {
+    [id: string]: ApiKey
+}
 
 export interface User {
     name: string;
     email: string;
-    apiKeys: {
-        [key in LLMModel]?: string;
-    };
+    apiKeys: ApiKeyMap;
 }
 
 export interface GamePreview {
@@ -16,7 +18,7 @@ export interface GamePreview {
     playerCount: number;
     werewolfCount: number;
     specialRoles: string[];
-    gameMasterAiType: LLMModel;
+    gameMasterAiType: string;
     playersAiType: string;
 }
 
@@ -42,7 +44,7 @@ export interface Message {
 
 export interface ApiKey {
     id: string;
-    type: LLMModel;
+    type: string;
     value: string;
     createdAt: string | null;
     updatedAt: string | null;
@@ -78,10 +80,10 @@ export function gameFromFirestore(id: string, data: any): Game {
 
 export function apiKeyFromFirestore(id: string, data: ApiKeyFirestore): ApiKey {
     // Cast or validate that the string from Firestore corresponds to the enum value
-    const llmModel = data.type as LLMModel; // Ensure that data.type is cast to the correct enum type
+    const llmModel = data.type as string; // Ensure that data.type is cast to the correct enum type
 
     // Optional: You can add validation if you're concerned about invalid types.
-    if (!Object.values(LLMModel).includes(llmModel)) {
+    if (!Object.values(LLM_CONSTANTS).includes(llmModel)) {
         throw new Error(`Invalid LLM model type: ${data.type}`);
     }
 
