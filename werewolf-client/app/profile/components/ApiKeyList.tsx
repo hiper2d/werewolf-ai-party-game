@@ -2,7 +2,7 @@
 
 import React, {useState} from 'react';
 import {deleteApiKey, updateApiKey} from "@/app/api/actions";
-import {ApiKeyMap} from "@/app/api/models";
+import {ApiKey, ApiKeyMap} from "@/app/api/models";
 
 export default function ApiKeyList({ initialApiKeys, userId }: { initialApiKeys: ApiKeyMap, userId: string }) {
     const [apiKeys, setApiKeys] = useState<ApiKeyMap>(initialApiKeys);
@@ -16,7 +16,10 @@ export default function ApiKeyList({ initialApiKeys, userId }: { initialApiKeys:
 
     const confirmEdit = async (model: string) => {
         await updateApiKey(userId, model, editValue);
-        setApiKeys(prev => ({ ...prev, [model]: { ...prev[model], key: editValue } }));
+        setApiKeys(prev => {
+            prev[model] = editValue
+            return prev;
+        });
         setEditingKey(null);
     };
 
@@ -50,7 +53,7 @@ export default function ApiKeyList({ initialApiKeys, userId }: { initialApiKeys:
                                         className="bg-gray-700 text-white px-2 py-1 rounded w-full"
                                     />
                                 ) : (
-                                    <span className="text-white">{apiKey.id}</span>
+                                    <span className="text-white">{apiKey}</span>
                                 )}
                             </div>
                         </div>
@@ -75,7 +78,7 @@ export default function ApiKeyList({ initialApiKeys, userId }: { initialApiKeys:
                                     </button>
                                 </>
                             ) : (
-                                <button onClick={() => startEditing(model as string, apiKey.id)} className="text-blue-400 mr-2">
+                                <button onClick={() => startEditing(model as string, apiKey)} className="text-blue-400 mr-2">
                                     <span className="sr-only">Edit</span>
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
                                          xmlns="http://www.w3.org/2000/svg">

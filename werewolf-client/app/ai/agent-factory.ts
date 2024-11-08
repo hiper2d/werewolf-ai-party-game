@@ -1,7 +1,7 @@
 import {ApiKeyMap} from '@/app/api/models';
 import {AbstractAgent} from "@/app/ai/abstract-agent";
 import {OpenAiAgent} from "@/app/ai/open-ai-agent";
-import {LLM_CONSTANTS, SupportedAiModelNames} from "@/app/ai/models";
+import {LLM_CONSTANTS, SupportedAiModels} from "@/app/ai/models";
 
 export class AgentFactory {
 
@@ -12,15 +12,16 @@ export class AgentFactory {
         llmType: string,
         apiKeys: ApiKeyMap
     ): AbstractAgent {
-        const validatedLlmType = this.validateLlmTypeAndGet(llmType)
-        const modelName = SupportedAiModelNames[validatedLlmType]
-        const key = apiKeys[validatedLlmType].value
-        switch (validatedLlmType) {
-            case LLM_CONSTANTS.GPT_4O:
+        const modelName = this.validateLlmTypeAndGet(llmType)
+        const model = SupportedAiModels[modelName]
+        const apiKeyName = model.apiKeyName
+        const key = apiKeys[apiKeyName]
+        switch (modelName) {
             case LLM_CONSTANTS.GPT_4O_MINI:
-                return new OpenAiAgent(id, name, instruction, modelName, key);
+            case LLM_CONSTANTS.GPT_4O:
+                return new OpenAiAgent(id, name, instruction, model.modelApiName, key);
             default:
-                throw new Error(`Unknown LLMType: ${llmType}`);
+                throw new Error(`Unknown Key: ${modelName}`);
         }
     }
 
@@ -29,20 +30,21 @@ export class AgentFactory {
         llmType: string,
         apiKeys: ApiKeyMap
     ): AbstractAgent {
-        const validatedLlmType = this.validateLlmTypeAndGet(llmType)
-        const modelName = SupportedAiModelNames[validatedLlmType]
-        const key = apiKeys[validatedLlmType].value
-        switch (validatedLlmType) {
-            case LLM_CONSTANTS.GPT_4O:
+        const modelName = this.validateLlmTypeAndGet(llmType)
+        const model = SupportedAiModels[modelName]
+        const apiKeyName = model.apiKeyName
+        const key = apiKeys[apiKeyName]
+        switch (modelName) {
             case LLM_CONSTANTS.GPT_4O_MINI:
-                return new OpenAiAgent("anonymous", "anonymous", instruction, modelName, key);
+            case LLM_CONSTANTS.GPT_4O:
+                return new OpenAiAgent("anonymous", "anonymous", instruction, model.modelApiName, key);
             default:
-                throw new Error(`Unknown LLMType: ${llmType}`);
+                throw new Error(`Unknown LLMType: ${modelName}`);
         }
     }
 
     private static validateLlmTypeAndGet(llmType: string): string {
-        const llmValues = Object.values(LLM_CONSTANTS);
+        const llmValues = Object.values(LLM_CONSTANTS) as string[];
 
         // Check if llmType is one of the constants
         if (!llmValues.includes(llmType)) {

@@ -2,7 +2,7 @@ import {Timestamp} from "firebase/firestore";
 import {LLM_CONSTANTS} from "@/app/ai/models";
 
 export interface ApiKeyMap {
-    [id: string]: ApiKey
+    [id: string]: string
 }
 
 export interface User {
@@ -44,7 +44,7 @@ export interface Message {
 
 export interface ApiKey {
     id: string;
-    type: string;
+    apiKeyType: string;
     value: string;
     createdAt: string | null;
     updatedAt: string | null;
@@ -89,7 +89,7 @@ export function apiKeyFromFirestore(id: string, data: ApiKeyFirestore): ApiKey {
 
     return {
         id,
-        type: llmModel,  // Use the casted or validated enum value here
+        apiKeyType: llmModel,  // Use the casted or validated enum value here
         value: data.value,
         createdAt: data.createdAt ? data.createdAt.toDate().toISOString() : null,
         updatedAt: data.updatedAt ? data.updatedAt.toDate().toISOString() : null

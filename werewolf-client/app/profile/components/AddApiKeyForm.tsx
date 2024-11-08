@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { buttonTransparentStyle } from "@/app/constants";
-import { addApiKey } from "@/app/api/actions";
-import { SupportedAiModelNames } from "@/app/ai/models";
+import React, {useState} from 'react';
+import {useRouter} from 'next/navigation';
+import {buttonTransparentStyle} from "@/app/constants";
+import {addApiKey} from "@/app/api/actions";
+import {SupportedAiKeyNames} from "@/app/ai/models";
 
 export default function AddApiKeyForm({ userId }: { userId: string }) {
     const [newKeyType, setNewKeyType] = useState<string | ''>('');
@@ -32,7 +32,7 @@ export default function AddApiKeyForm({ userId }: { userId: string }) {
                     className="appearance-none bg-gray-700 text-white px-3 py-2 pr-8 rounded w-full"
                 >
                     <option value="">Select Key Type</option>
-                    {Object.entries(SupportedAiModelNames).map(([model, name]) => (
+                    {Object.entries(SupportedAiKeyNames).map(([model, name]) => (
                         <option key={model} value={model}>{model} - {name}</option>
                     ))}
                 </select>
