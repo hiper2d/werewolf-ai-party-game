@@ -1,0 +1,1 @@
+export const STORY_PROMPT: string = `You are master of stories. Tell me a story for the following theme: %theme%`;

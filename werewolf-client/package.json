@@ -12,6 +12,9 @@
     "emulators": "firebase emulators:start"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1",
+    "@google/generative-ai": "^0.21.0",
+    "@mistralai/mistralai": "^1.3.0",
     "firebase": "^10.12.2",
     "firebase-admin": "^12.2.0",
     "react": "^18",

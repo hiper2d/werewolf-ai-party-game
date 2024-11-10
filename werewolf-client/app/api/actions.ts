@@ -7,7 +7,9 @@ import {getServerSession} from "next-auth";
 import {AgentFactory} from "@/app/ai/agent-factory";
 import {AbstractAgent} from "@/app/ai/abstract-agent";
 import FieldValue = firestore.FieldValue;
-import {MESSAGE_ROLE} from "@/app/ai/models";
+import {GM_ID, MESSAGE_ROLE, RECIPIENT_ALL} from "@/app/ai/models";
+import {STORY_PROMPT} from "@/app/ai/prompts/story-gen-prompts";
+import {format} from "@/app/ai/prompts/utils";
 
 export async function createGame(game: Game): Promise<string|undefined> {
     if (!db) {
@@ -36,12 +38,16 @@ export async function previewGame(gamePreview: GamePreview): Promise<Game> {
         .then((user) => getUserApiKeys(user!.email));
 
     // fixme: implement logic
-    const storyTellAgent: AbstractAgent = AgentFactory.createAnonymousAgent("", gamePreview.gameMasterAiType, apiKeys)
+    const instruction = format(STORY_PROMPT, { theme: gamePreview.theme });
+
+    const storyTellAgent: AbstractAgent = AgentFactory.createAgent(
+        GM_ID, GM_ID, instruction, gamePreview.gameMasterAiType, apiKeys
+    )
     const ans = await storyTellAgent.ask([{
-        recipientId: "all",
-        authorId: "gm",
-        authorName: "gm",
-        role: MESSAGE_ROLE.SYSTEM, // works with GPT-4o but O1 doesn't support system role
+        recipientId: RECIPIENT_ALL,
+        authorId: GM_ID,
+        authorName: GM_ID,
+        role: MESSAGE_ROLE.USER,
         msg: "How are you?"
     }])
 
