@@ -29,7 +29,7 @@ export class ClaudeAgent extends AbstractAgent {
 
             const params: Anthropic.MessageCreateParams = {
                 max_tokens: 1024,
-                //system: systemMessage,
+                system: this.instruction,
                 messages: messages.map(msg => ({
                     role: msg.role,
                     content: msg.msg
@@ -37,8 +37,6 @@ export class ClaudeAgent extends AbstractAgent {
                 model: this.model,
                 temperature: this.temperature,
             }
-            // const message: Anthropic.Message = await this.client.messages.create(params)
-            // const reply = message.content[0].text
 
             const response = await this.client.messages.create(params);
 

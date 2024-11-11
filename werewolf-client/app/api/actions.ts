@@ -8,7 +8,7 @@ import {AgentFactory} from "@/app/ai/agent-factory";
 import {AbstractAgent} from "@/app/ai/abstract-agent";
 import FieldValue = firestore.FieldValue;
 import {GM_ID, MESSAGE_ROLE, RECIPIENT_ALL} from "@/app/ai/models";
-import {STORY_PROMPT} from "@/app/ai/prompts/story-gen-prompts";
+import {STORY_SYSTEM_PROMPT, STORY_USER_PROMPT} from "@/app/ai/prompts/story-gen-prompts";
 import {format} from "@/app/ai/prompts/utils";
 
 export async function createGame(game: Game): Promise<string|undefined> {
@@ -38,17 +38,21 @@ export async function previewGame(gamePreview: GamePreview): Promise<Game> {
         .then((user) => getUserApiKeys(user!.email));
 
     // fixme: implement logic
-    const instruction = format(STORY_PROMPT, { theme: gamePreview.theme });
+    const userPrompt = format(STORY_USER_PROMPT, {
+        theme: gamePreview.theme,
+        description: '',
+        number_of_players: gamePreview.playerCount
+    });
 
     const storyTellAgent: AbstractAgent = AgentFactory.createAgent(
-        GM_ID, GM_ID, instruction, gamePreview.gameMasterAiType, apiKeys
+        GM_ID, GM_ID, STORY_SYSTEM_PROMPT, gamePreview.gameMasterAiType, apiKeys
     )
     const ans = await storyTellAgent.ask([{
         recipientId: RECIPIENT_ALL,
         authorId: GM_ID,
         authorName: GM_ID,
         role: MESSAGE_ROLE.USER,
-        msg: "How are you?"
+        msg: userPrompt
     }])
 
     return {

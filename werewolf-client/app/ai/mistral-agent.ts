@@ -1,5 +1,4 @@
 import {AbstractAgent} from "@/app/ai/abstract-agent";
-import {OpenAI} from "openai";
 import {AgentMessageDto} from "@/app/ai/models";
 import {Mistral} from "@mistralai/mistralai";
 import {ChatCompletionResponse} from "@mistralai/mistralai/models/components";

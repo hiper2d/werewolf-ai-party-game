@@ -5,6 +5,7 @@ import {LLM_CONSTANTS, SupportedAiModels} from "@/app/ai/models";
 import {ClaudeAgent} from "@/app/ai/anthropic-agent";
 import {GoogleAgent} from "@/app/ai/google-agent";
 import {MistralAgent} from "@/app/ai/mistral-agent";
+import {OpenAiO1Agent} from "@/app/ai/open-ai-o1-agent";
 
 export class AgentFactory {
 
@@ -28,7 +29,7 @@ export class AgentFactory {
                 return new OpenAiAgent(id, name, instruction, model.modelApiName, key, 0.2);
             case LLM_CONSTANTS.GPT_O1_MINI:
             case LLM_CONSTANTS.GPT_O1_PREVIEW:
-                return new OpenAiAgent(id, name, instruction, model.modelApiName, key, 1);
+                return new OpenAiO1Agent(id, name, instruction, model.modelApiName, key);
             case LLM_CONSTANTS.GEMINI_15_FLASH:
             case LLM_CONSTANTS.GEMINI_15_PRO:
                 return new GoogleAgent(id, name, instruction, model.modelApiName, key);

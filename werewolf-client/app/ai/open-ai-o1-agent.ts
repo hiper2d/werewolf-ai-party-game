@@ -6,12 +6,12 @@ import ChatCompletionMessageParam = OpenAI.Chat.Completions.ChatCompletionMessag
 import {util} from "protobufjs";
 import float = util.float;
 
-export class OpenAiAgent extends AbstractAgent {
+export class OpenAiO1Agent extends AbstractAgent {
     private readonly client: OpenAI;
     private readonly model: string;
 
-    constructor(id: string, name: string, instruction: string, model: string, apiKey: string, temperature: number) {
-        super(id, name, instruction, temperature);
+    constructor(id: string, name: string, instruction: string, model: string, apiKey: string) {
+        super(id, name, instruction, 1);
         this.model = model;
         this.client = new OpenAI({
             apiKey: apiKey,
@@ -21,16 +21,14 @@ export class OpenAiAgent extends AbstractAgent {
     async ask(messages: AgentMessageDto[]): Promise<string | null> {
         this.logger(`Asking agent. Message history: ${messages[messages.length - 1].msg}`);
 
-        const cl = this.client as OpenAI
-
         const openAiMessages = new Array<ChatCompletionMessageParam>();
-        openAiMessages.push({role: 'system', content: this.instruction});
         messages.forEach(msg => {
             openAiMessages.push({
-                role: msg.role as 'user' | 'assistant' | 'system',
+                role: msg.role as 'user' | 'assistant',
                 content: msg.msg
             });
         });
+        openAiMessages[0].content = this.instruction + openAiMessages[0].content
 
         try {
             const completion: ChatCompletion = await this.client.chat.completions.create({
