@@ -37,10 +37,10 @@ export async function previewGame(gamePreview: GamePreview): Promise<Game> {
     const apiKeys = await getUserFromFirestore(session.user.email)
         .then((user) => getUserApiKeys(user!.email));
 
-    // fixme: implement logic
     const userPrompt = format(STORY_USER_PROMPT, {
         theme: gamePreview.theme,
         description: '',
+        excluded_name: gamePreview.name,
         number_of_players: gamePreview.playerCount
     });
 
