@@ -46,38 +46,56 @@ You are an AI agent tasked with generating a game scene and character descriptio
   </Task2>
 </Tasks>
 
-<OutputFormat>
-  Your response must be a valid JSON object in the following format:
+<JSONSchema>
+  Your response must exactly match this TypeScript interface:
 
-  \`\`\`json
+  interface GameSetup {
+    scene: string;      // The vivid scene description
+    players: Array<{
+      name: string;     // Single-word unique name
+      story: string;    // 1-2 sentence character background
+    }>;
+  }
+
+  Example response structure:
   {
-    "scene": "Your scene description here",
+    "scene": "In the heart of a bustling space station...",
     "players": [
-      {"name": "Player 1 Name", "story": "Player 1 Story"},
-      {"name": "Player 2 Name", "story": "Player 2 Story"},
-      ...
+      {
+        "name": "Zenith",
+        "story": "A veteran maintenance engineer with a mysterious past..."
+      },
+      // ... more players
     ]
   }
-  \`\`\`
-</OutputFormat>
+</JSONSchema>
 
 <Instructions>
-  Instructions:
-
-  - Ensure that the scene and character stories are coherent and engaging.
-  - If the theme is a well-known setting, the characters should be original but can fit within that setting.
-  - The JSON output must be properly formatted with correct syntax to avoid parsing errors.
-  - Do not include any additional text outside of the JSON object.
-  - Avoid using the <ExcludedName>ExcludedName</ExcludedName> or any similar names when generating character names.
+  Important requirements:
+  - Return ONLY the JSON object, no additional text
+  - Ensure valid JSON syntax with proper escaping of special characters
+  - Make all character names unique single words
+  - Keep character stories to 1-2 sentences
+  - Never use or reference the excluded name
+  - Include exactly the number of players specified
+  - Make sure the scene description is relevant to the theme
 </Instructions>
 `;
-
 
 export const STORY_USER_PROMPT: string = `
 <Parameters>
   <Theme>%theme%</Theme>
-  <OptionalDescription>%description%</OptionalDescription> <!-- This may be empty -->
+  <OptionalDescription>%description%</OptionalDescription>
   <NumberOfPlayers>%number_of_players%</NumberOfPlayers>
   <ExcludedName>%excluded_name%</ExcludedName>
 </Parameters>
+
+Expected response format:
+{
+  "scene": string,        // Vivid scene description
+  "players": Array<{
+    "name": string,       // Single-word unique name
+    "story": string      // 1-2 sentence character background
+  }>
+}
 `;

@@ -14,6 +14,7 @@ export interface User {
 export interface GamePreview {
     id: string;
     name: string;
+    description: string;
     theme: string;
     playerCount: number;
     werewolfCount: number;
@@ -61,6 +62,7 @@ export function gamePreviewFromFirestore(id: string, data: any): GamePreview {
     return {
         id,
         name: data.name,
+        description: data.description,
         theme: data.theme,
         playerCount: data.playerCount,
         werewolfCount: data.werewolfCount,

@@ -10,9 +10,10 @@ import {LLM_CONSTANTS} from "@/app/ai/models";
 export default function CreateNewGamePage() {
     const [name, setName] = useState('');
     const [theme, setTheme] = useState('');
+    const [description, setDescription] = useState('');
     const [playerCount, setPlayerCount] = useState(8);
     const [werewolfCount, setWerewolfCount] = useState(3);
-    const [specialRoles, setSpecialRoles] = useState(['doctor', 'sherif']);
+    const [specialRoles, setSpecialRoles] = useState(['Doctor', 'Seer']);
     const [gameMasterAiType, setGameMasterAiType] = useState<string>(LLM_CONSTANTS.RANDOM);
     const [playersAiType, setPlayersAiType] = useState<string>(LLM_CONSTANTS.RANDOM);
     const [isFormValid, setIsFormValid] = useState(false);
@@ -24,6 +25,7 @@ export default function CreateNewGamePage() {
     const playerOptions = Array.from({ length: 7 }, (_, i) => i + 6);
     const supportedAi = Object.values(LLM_CONSTANTS);
     const supportedPlayerAi = Object.values(LLM_CONSTANTS);
+    const availableRoles = ['Doctor', 'Seer'];
 
     useEffect(() => {
         if (werewolfCount >= playerCount) {
@@ -36,13 +38,14 @@ export default function CreateNewGamePage() {
             name.trim() !== '' &&
             theme.trim() !== ''
         );
-    }, [name, theme, playerCount, werewolfCount, gameMasterAiType, playersAiType]);
+    }, [name, theme]);
 
     const handleGeneratePreview = async () => {
         const gamePreviewData: GamePreview = {
             id: '',
             name,
             theme,
+            description,
             playerCount,
             werewolfCount,
             specialRoles,
@@ -50,7 +53,6 @@ export default function CreateNewGamePage() {
             playersAiType
         };
 
-        // Generate preview
         setIsLoading(true);
         setError(null);
         try {
@@ -68,7 +70,6 @@ export default function CreateNewGamePage() {
         if (!gameData) {
             return;
         }
-        // Create game
         setIsLoading(true);
         setError(null);
         try {
@@ -129,21 +130,31 @@ export default function CreateNewGamePage() {
             </div>
 
             <form id="create-game-form" className="space-y-4">
-                <input
-                    className="w-1/2 p-3 rounded bg-gray-700 text-white placeholder-gray-400 border border-gray-600 focus:outline-none focus:border-gray-500"
-                    type="text"
-                    placeholder="Name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    required
-                />
+                <div className="flex space-x-4">
+                    <input
+                        className="w-1/2 p-3 rounded bg-gray-700 text-white placeholder-gray-400 border border-gray-600 focus:outline-none focus:border-gray-500"
+                        type="text"
+                        placeholder="Name"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        required
+                    />
+                    <input
+                        className="w-1/2 p-3 rounded bg-gray-700 text-white placeholder-gray-400 border border-gray-600 focus:outline-none focus:border-gray-500"
+                        type="text"
+                        placeholder="Theme"
+                        value={theme}
+                        onChange={(e) => setTheme(e.target.value)}
+                        required
+                    />
+                </div>
+
                 <textarea
                     className="w-full p-3 rounded bg-gray-700 text-white placeholder-gray-400 border border-gray-600 focus:outline-none focus:border-gray-500"
-                    placeholder="Theme"
-                    value={theme}
-                    onChange={(e) => setTheme(e.target.value)}
+                    placeholder="Description (optional)"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
                     rows={3}
-                    required
                 />
 
                 <div className="flex space-x-4">
@@ -203,7 +214,7 @@ export default function CreateNewGamePage() {
                 <div>
                     <label className="text-white">Special Roles:</label>
                     <div className="flex flex-wrap gap-4 mt-2">
-                        {gameRoles.map(role => (
+                        {availableRoles.map(role => (
                             <div key={role} className="flex items-center">
                                 <input
                                     type="checkbox"
@@ -227,6 +238,7 @@ export default function CreateNewGamePage() {
 
             {error && <p className="text-red-500 mt-2">{error}</p>}
 
+            {/* Preview section remains unchanged */}
             {gameData && (
                 <div className="mt-8">
                     <h2 className="text-2xl font-bold text-white mb-6">Preview</h2>

@@ -39,7 +39,7 @@ export async function previewGame(gamePreview: GamePreview): Promise<Game> {
 
     const userPrompt = format(STORY_USER_PROMPT, {
         theme: gamePreview.theme,
-        description: '',
+        description: gamePreview.description,
         excluded_name: gamePreview.name,
         number_of_players: gamePreview.playerCount
     });
