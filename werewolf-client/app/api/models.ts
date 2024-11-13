@@ -23,16 +23,30 @@ export interface GamePreview {
     playersAiType: string;
 }
 
-export interface Player {
+export interface BotPreview {
     name: string;
     story: string;
-    personality: string;
-    aiType: string;
+}
+
+export interface GamePreviewWithGeneratedBots extends GamePreview {
+    scene: string;
+    bots: BotPreview[];
+}
+
+export interface Player {
+    id: string;
+    name: string;
+    story: string;
+    role: string;
+    isAlive: boolean;
+    isBot: boolean;
 }
 
 export interface Game extends GamePreview {
     story: string;
     players: Player[];
+    humanPlayerName: string;
+    humanPlayerRole: string;
 }
 
 export interface Message {
@@ -58,7 +72,8 @@ export interface ApiKeyFirestore {
     updatedAt: Timestamp | null;
 }
 
-export function gamePreviewFromFirestore(id: string, data: any): GamePreview {
+// todo: update this to use Game object
+export function gamePreviewFromFirestore(id: string, data: any): GamePreviewWithGeneratedBots {
     return {
         id,
         name: data.name,
@@ -68,15 +83,16 @@ export function gamePreviewFromFirestore(id: string, data: any): GamePreview {
         werewolfCount: data.werewolfCount,
         specialRoles: data.specialRoles,
         gameMasterAiType: data.gameMasterAiType,
-        playersAiType: data.playersAiType
+        playersAiType: data.playersAiType,
+        scene: data.scene,
+        bots: data.bots
     };
 }
 
-export function gameFromFirestore(id: string, data: any): Game {
+// todo: update this to use Game object
+export function gameFromFirestore(id: string, data: any): GamePreviewWithGeneratedBots {
     return {
-        ...gamePreviewFromFirestore(id, data),
-        story: data.story,
-        players: data.players
+        ...gamePreviewFromFirestore(id, data)
     };
 }
 
@@ -97,3 +113,10 @@ export function apiKeyFromFirestore(id: string, data: ApiKeyFirestore): ApiKey {
         updatedAt: data.updatedAt ? data.updatedAt.toDate().toISOString() : null
     };
 }
+
+export const GAME_ROLES = {
+    DOCTOR: 'doctor',
+    SEER: 'seer',
+    WEREWOLF: 'werewolf',
+    VILLAGER: 'villager'
+} as const;

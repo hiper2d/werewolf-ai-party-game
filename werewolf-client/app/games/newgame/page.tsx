@@ -2,9 +2,9 @@
 
 import React, {useEffect, useState} from 'react';
 import {useRouter} from 'next/navigation';
-import {botPlayerPersonalities, buttonBlackStyle, gameRoles} from "@/app/constants";
+import {botPlayerPersonalities, buttonBlackStyle} from "@/app/constants";
 import {createGame, previewGame} from '@/app/api/actions';
-import {Game, GamePreview} from "@/app/api/models";
+import {Game, GamePreview, GAME_ROLES, GamePreviewWithGeneratedBots} from "@/app/api/models";
 import {LLM_CONSTANTS} from "@/app/ai/models";
 
 export default function CreateNewGamePage() {
@@ -13,11 +13,11 @@ export default function CreateNewGamePage() {
     const [description, setDescription] = useState('');
     const [playerCount, setPlayerCount] = useState(8);
     const [werewolfCount, setWerewolfCount] = useState(3);
-    const [specialRoles, setSpecialRoles] = useState(['Doctor', 'Seer']);
+    const [specialRoles, setSpecialRoles] = useState([GAME_ROLES.DOCTOR, GAME_ROLES.SEER]);
     const [gameMasterAiType, setGameMasterAiType] = useState<string>(LLM_CONSTANTS.RANDOM);
     const [playersAiType, setPlayersAiType] = useState<string>(LLM_CONSTANTS.RANDOM);
     const [isFormValid, setIsFormValid] = useState(false);
-    const [gameData, setGameData] = useState<Game | null>(null);
+    const [gameData, setGameData] = useState<GamePreviewWithGeneratedBots | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const router = useRouter();
@@ -25,7 +25,7 @@ export default function CreateNewGamePage() {
     const playerOptions = Array.from({ length: 7 }, (_, i) => i + 6);
     const supportedAi = Object.values(LLM_CONSTANTS);
     const supportedPlayerAi = Object.values(LLM_CONSTANTS);
-    const availableRoles = ['Doctor', 'Seer'];
+    const availableRoles = [GAME_ROLES.DOCTOR, GAME_ROLES.SEER];
 
     useEffect(() => {
         if (werewolfCount >= playerCount) {
@@ -56,7 +56,7 @@ export default function CreateNewGamePage() {
         setIsLoading(true);
         setError(null);
         try {
-            const game: Game = await previewGame(gamePreviewData);
+            const game: GamePreviewWithGeneratedBots = await previewGame(gamePreviewData);
             setGameData(game);
         } catch (err: any) {
             setError(err.message);
@@ -85,15 +85,15 @@ export default function CreateNewGamePage() {
 
     const handleStoryChange = (story: string) => {
         if (gameData) {
-            setGameData({ ...gameData, story });
+            setGameData(gameData);
         }
     };
 
     const handlePlayerChange = (index: number, field: string, value: string) => {
         if (gameData) {
-            const updatedPlayers = [...gameData.players];
+            const updatedPlayers = [...gameData.bots];
             updatedPlayers[index] = { ...updatedPlayers[index], [field]: value };
-            setGameData({ ...gameData, players: updatedPlayers });
+            setGameData({ ...gameData, bots: updatedPlayers });
         }
     };
 
@@ -229,7 +229,9 @@ export default function CreateNewGamePage() {
                                     }}
                                     className="mr-2"
                                 />
-                                <label htmlFor={role} className="text-white">{role}</label>
+                                <label htmlFor={role} className="text-white">
+                                    {role.charAt(0).toUpperCase() + role.slice(1)}
+                                </label>
                             </div>
                         ))}
                     </div>
@@ -249,43 +251,21 @@ export default function CreateNewGamePage() {
                             id="gameStory"
                             className="w-full p-3 rounded bg-gray-700 text-white placeholder-gray-400 border border-gray-600 focus:outline-none focus:border-gray-500"
                             rows={5}
-                            value={gameData.story}
+                            value={gameData.scene}
                             onChange={(e) => handleStoryChange(e.target.value)}
                         />
                     </div>
 
                     <h3 className="text-xl font-bold text-white mb-4">Players:</h3>
-                    {gameData.players.map((player, index) => (
+                    {gameData.bots.map((player, index) => (
                         <div key={index} className="mb-4 p-4 bg-gray-800 rounded">
-                            <div className="flex items-center space-x-4 mb-2">
-                                <input
-                                    type="text"
-                                    className="flex-grow p-2 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:border-gray-500"
-                                    value={player.name}
-                                    onChange={(e) => handlePlayerChange(index, 'name', e.target.value)}
-                                    placeholder="Player Name"
-                                />
-                                <select
-                                    className="p-2 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:border-gray-500"
-                                    value={player.personality || ''}
-                                    onChange={(e) => handlePlayerChange(index, 'personality', e.target.value)}
-                                >
-                                    <option value="">Select Personality</option>
-                                    {botPlayerPersonalities.map(p => (
-                                        <option key={p} value={p}>{p}</option>
-                                    ))}
-                                </select>
-                                <select
-                                    className="p-2 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:border-gray-500"
-                                    value={player.aiType || ''}
-                                    onChange={(e) => handlePlayerChange(index, 'aiType', e.target.value as string)}
-                                >
-                                    <option value="">Select AI Type</option>
-                                    {supportedAi.map(ai => (
-                                        <option key={ai} value={ai}>{ai}</option>
-                                    ))}
-                                </select>
-                            </div>
+                            <input
+                                type="text"
+                                className="w-full p-2 mb-2 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:border-gray-500"
+                                value={player.name}
+                                onChange={(e) => handlePlayerChange(index, 'name', e.target.value)}
+                                placeholder="Player Name"
+                            />
                             <textarea
                                 className="w-full p-2 rounded bg-gray-700 text-white placeholder-gray-400 border border-gray-600 focus:outline-none focus:border-gray-500"
                                 rows={3}
