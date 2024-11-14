@@ -1,9 +1,0 @@
-version: '3.8'
-
-services:
-  dynamodb:
-    image: amazon/dynamodb-local
-    container_name: werewolf-dynamodb
-    ports:
-      - "8000:8000"
-    command: "-jar DynamoDBLocal.jar -sharedDb"

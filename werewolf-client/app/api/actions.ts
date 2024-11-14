@@ -12,6 +12,7 @@ import {STORY_SYSTEM_PROMPT, STORY_USER_PROMPT} from "@/app/ai/prompts/story-gen
 import { GAME_ROLES } from '@/app/api/models';
 import {format} from "@/app/ai/prompts/utils";
 import { GamePreviewWithGeneratedBots } from "@/app/api/models";
+import { LLM_CONSTANTS } from '@/app/ai/models';
 
 export async function createGame(game: GamePreviewWithGeneratedBots): Promise<string|undefined> {
     if (!db) {
@@ -64,12 +65,35 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
         throw new Error('Failed to get AI response');
     }
 
-    const aiResponse = JSON.parse(response);
+    // Clean up potential markdown formatting
+    let cleanResponse = response.trim();
+    if (cleanResponse.startsWith('```json')) {
+        cleanResponse = cleanResponse.slice(7); // Remove leading ```json
+    } else if (cleanResponse.startsWith('```')) {
+        cleanResponse = cleanResponse.slice(3); // Remove leading ```
+    }
+    if (cleanResponse.endsWith('```')) {
+        cleanResponse = cleanResponse.slice(0, -3); // Remove trailing ```
+    }
 
-    const bots: BotPreview[] = aiResponse.players.map((bot: { name: string; story: string }) => ({
-        name: bot.name,
-        story: bot.story
-    }));
+    const aiResponse = JSON.parse(cleanResponse.trim());
+
+    const bots: BotPreview[] = aiResponse.players.map((bot: { name: string; story: string }) => {
+        let aiType = gamePreview.playersAiType;
+        
+        if (aiType === LLM_CONSTANTS.RANDOM) {
+            const availableTypes = Object.values(LLM_CONSTANTS).filter(
+                type => type !== LLM_CONSTANTS.RANDOM
+            );
+            aiType = availableTypes[Math.floor(Math.random() * availableTypes.length)];
+        }
+
+        return {
+            name: bot.name,
+            story: bot.story,
+            playerAiType: aiType
+        };
+    });
 
     /*
     const totalPlayers = gamePreview.playerCount;

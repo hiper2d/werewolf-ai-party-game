@@ -26,6 +26,7 @@ export interface GamePreview {
 export interface BotPreview {
     name: string;
     story: string;
+    playerAiType: string;
 }
 
 export interface GamePreviewWithGeneratedBots extends GamePreview {

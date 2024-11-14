@@ -2,7 +2,7 @@
 
 import React, {useEffect, useState} from 'react';
 import {useRouter} from 'next/navigation';
-import {botPlayerPersonalities, buttonBlackStyle} from "@/app/constants";
+import {botPlayerPersonalities, buttonTransparentStyle, buttonBlackStyle} from "@/app/constants";
 import {createGame, previewGame} from '@/app/api/actions';
 import {Game, GamePreview, GAME_ROLES, GamePreviewWithGeneratedBots} from "@/app/api/models";
 import {LLM_CONSTANTS} from "@/app/ai/models";
@@ -97,42 +97,41 @@ export default function CreateNewGamePage() {
         }
     };
 
+    // Common styles
+    const inputStyle = "p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50";
+    const labelStyle = "text-white whitespace-nowrap w-36";
+    const flexRowStyle = "flex space-x-4";
+    const flexItemStyle = "flex-1 flex items-center space-x-2";
+    const buttonDisabledStyle = "opacity-50 cursor-not-allowed";
+
     return (
         <div className="flex flex-col w-full h-full p-4 sm:p-6">
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-bold text-white">Create New Game</h1>
-                {!gameData ? (
+                <div className={`${flexRowStyle} justify-end mb-4`}>
                     <button
-                        className={`${buttonBlackStyle} ${(!isFormValid || isLoading) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        className={`${buttonBlackStyle} ${(!isFormValid || isLoading) ? buttonDisabledStyle : ''}`}
                         onClick={handleGeneratePreview}
                         disabled={!isFormValid || isLoading}
                     >
                         {isLoading ? 'Processing...' : 'Generate Game Preview'}
                     </button>
-                ) : (
-                    <div className="flex space-x-4">
+                    {gameData && (
                         <button
-                            className={`${buttonBlackStyle} ${(!isFormValid || isLoading) ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            onClick={handleGeneratePreview}
-                            disabled={!isFormValid || isLoading}
-                        >
-                            {isLoading ? 'Processing...' : 'Generate Game Preview Again'}
-                        </button>
-                        <button
-                            className={`${buttonBlackStyle} ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            className={`${buttonBlackStyle} ${isLoading ? buttonDisabledStyle : ''}`}
                             onClick={handleCreateGame}
                             disabled={isLoading}
                         >
                             {isLoading ? 'Processing...' : 'Create Game'}
                         </button>
-                    </div>
-                )}
+                    )}
+                </div>
             </div>
 
-            <form id="create-game-form" className="space-y-4">
-                <div className="flex space-x-4">
+            <form id="create-game-form" className="space-y-2">
+                <div className="flex space-x-2">
                     <input
-                        className="w-1/2 p-3 rounded bg-gray-700 text-white placeholder-gray-400 border border-gray-600 focus:outline-none focus:border-gray-500"
+                        className="w-1/2 p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
                         type="text"
                         placeholder="Name"
                         value={name}
@@ -140,7 +139,7 @@ export default function CreateNewGamePage() {
                         required
                     />
                     <input
-                        className="w-1/2 p-3 rounded bg-gray-700 text-white placeholder-gray-400 border border-gray-600 focus:outline-none focus:border-gray-500"
+                        className="w-1/2 p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
                         type="text"
                         placeholder="Theme"
                         value={theme}
@@ -150,41 +149,47 @@ export default function CreateNewGamePage() {
                 </div>
 
                 <textarea
-                    className="w-full p-3 rounded bg-gray-700 text-white placeholder-gray-400 border border-gray-600 focus:outline-none focus:border-gray-500"
+                    className="w-full p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
                     placeholder="Description (optional)"
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     rows={3}
                 />
 
-                <div className="flex space-x-4">
-                    <select
-                        className="flex-1 p-3 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:border-gray-500"
-                        value={playerCount}
-                        onChange={(e) => setPlayerCount(Number(e.target.value))}
-                        required
-                    >
-                        {playerOptions.map(count => (
-                            <option key={count} value={count}>{count} players</option>
-                        ))}
-                    </select>
-                    <select
-                        className="flex-1 p-3 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:border-gray-500"
-                        value={werewolfCount}
-                        onChange={(e) => setWerewolfCount(Number(e.target.value))}
-                        required
-                    >
-                        {Array.from({length: playerCount - 1}, (_, i) => (
-                            <option key={i} value={i}>{i} werewolves</option>
-                        ))}
-                    </select>
+                <div className={flexRowStyle}>
+                    <div className={flexItemStyle}>
+                        <label className={labelStyle}>Player Count:</label>
+                        <select
+                            className={`${inputStyle} flex-1`}
+                            value={playerCount}
+                            onChange={(e) => setPlayerCount(Number(e.target.value))}
+                            required
+                        >
+                            {playerOptions.map(count => (
+                                <option key={count} value={count}>{count} players</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className={flexItemStyle}>
+                        <label className={labelStyle}>Werewolf Count:</label>
+                        <select
+                            className={`${inputStyle} flex-1`}
+                            value={werewolfCount}
+                            onChange={(e) => setWerewolfCount(Number(e.target.value))}
+                            required
+                        >
+                            {Array.from({length: playerCount - 1}, (_, i) => (
+                                <option key={i} value={i}>{i} werewolves</option>
+                            ))}
+                        </select>
+                    </div>
                 </div>
 
-                <div className="flex space-x-4">
-                    <div className="flex-1">
-                        <label className="block text-white mb-2">Game Master AI Type:</label>
+                <div className={flexRowStyle}>
+                    <div className={flexItemStyle}>
+                        <label className={labelStyle}>Game Master AI:</label>
                         <select
-                            className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:border-gray-500"
+                            className={`${inputStyle} flex-1`}
                             value={gameMasterAiType}
                             onChange={(e) => setGameMasterAiType(e.target.value as string)}
                             required
@@ -194,46 +199,46 @@ export default function CreateNewGamePage() {
                             ))}
                         </select>
                     </div>
-                    <div className="flex-1">
-                        <label className="block text-white mb-2">Players AI Type:</label>
+                    <div className={flexItemStyle}>
+                        <label className={labelStyle}>Players AI:</label>
                         <select
-                            className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:border-gray-500"
+                            className={`${inputStyle} flex-1`}
                             value={playersAiType}
                             onChange={(e) => setPlayersAiType(e.target.value)}
                             required
                         >
                             {supportedPlayerAi.map(model => (
-                                <option key={model} value={model}>
-                                    {model}
-                                </option>
+                                <option key={model} value={model}>{model}</option>
                             ))}
                         </select>
                     </div>
                 </div>
 
-                <div>
-                    <label className="text-white">Special Roles:</label>
-                    <div className="flex flex-wrap gap-4 mt-2">
-                        {availableRoles.map(role => (
-                            <div key={role} className="flex items-center">
-                                <input
-                                    type="checkbox"
-                                    id={role}
-                                    checked={specialRoles.includes(role)}
-                                    onChange={(e) => {
-                                        if (e.target.checked) {
-                                            setSpecialRoles([...specialRoles, role]);
-                                        } else {
-                                            setSpecialRoles(specialRoles.filter(r => r !== role));
-                                        }
-                                    }}
-                                    className="mr-2"
-                                />
-                                <label htmlFor={role} className="text-white">
-                                    {role.charAt(0).toUpperCase() + role.slice(1)}
-                                </label>
-                            </div>
-                        ))}
+                <div className={flexRowStyle}>
+                    <div className={flexItemStyle}>
+                        <label className={labelStyle}>Special Roles:</label>
+                        <div className="flex gap-4">
+                            {availableRoles.map(role => (
+                                <div key={role} className="flex items-center">
+                                    <input
+                                        type="checkbox"
+                                        id={role}
+                                        checked={specialRoles.includes(role)}
+                                        onChange={(e) => {
+                                            if (e.target.checked) {
+                                                setSpecialRoles([...specialRoles, role]);
+                                            } else {
+                                                setSpecialRoles(specialRoles.filter(r => r !== role));
+                                            }
+                                        }}
+                                        className="mr-2"
+                                    />
+                                    <label htmlFor={role} className="text-white">
+                                        {role.charAt(0).toUpperCase() + role.slice(1)}
+                                    </label>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </div>
             </form>
@@ -249,7 +254,7 @@ export default function CreateNewGamePage() {
                         <label htmlFor="gameStory" className="block text-white mb-2">Game Story:</label>
                         <textarea
                             id="gameStory"
-                            className="w-full p-3 rounded bg-gray-700 text-white placeholder-gray-400 border border-gray-600 focus:outline-none focus:border-gray-500"
+                            className="w-full p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
                             rows={5}
                             value={gameData.scene}
                             onChange={(e) => handleStoryChange(e.target.value)}
@@ -258,16 +263,27 @@ export default function CreateNewGamePage() {
 
                     <h3 className="text-xl font-bold text-white mb-4">Players:</h3>
                     {gameData.bots.map((player, index) => (
-                        <div key={index} className="mb-4 p-4 bg-gray-800 rounded">
-                            <input
-                                type="text"
-                                className="w-full p-2 mb-2 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:border-gray-500"
-                                value={player.name}
-                                onChange={(e) => handlePlayerChange(index, 'name', e.target.value)}
-                                placeholder="Player Name"
-                            />
+                        <div key={index} className="mb-2">
+                            <div className="flex space-x-2">
+                                <input
+                                    type="text"
+                                    className="w-1/2 p-2 rounded bg-gray-900 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
+                                    value={player.name}
+                                    onChange={(e) => handlePlayerChange(index, 'name', e.target.value)}
+                                    placeholder="Player Name"
+                                />
+                                <select
+                                    className="w-1/2 p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
+                                    value={player.playerAiType}
+                                    onChange={(e) => handlePlayerChange(index, 'playerAiType', e.target.value)}
+                                >
+                                    {supportedPlayerAi.filter(model => model !== LLM_CONSTANTS.RANDOM).map(model => (
+                                        <option key={model} value={model}>{model}</option>
+                                    ))}
+                                </select>
+                            </div>
                             <textarea
-                                className="w-full p-2 rounded bg-gray-700 text-white placeholder-gray-400 border border-gray-600 focus:outline-none focus:border-gray-500"
+                                className="w-full p-2 mt-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
                                 rows={3}
                                 value={player.story}
                                 onChange={(e) => handlePlayerChange(index, 'story', e.target.value)}
@@ -275,6 +291,23 @@ export default function CreateNewGamePage() {
                             />
                         </div>
                     ))}
+
+                    <div className={`${flexRowStyle} justify-end mt-6`}>
+                        <button
+                            className={`${buttonTransparentStyle} ${(!isFormValid || isLoading) ? buttonDisabledStyle : ''}`}
+                            onClick={handleGeneratePreview}
+                            disabled={!isFormValid || isLoading}
+                        >
+                            {isLoading ? 'Processing...' : 'Generate Game Preview Again'}
+                        </button>
+                        <button
+                            className={`${buttonTransparentStyle} ${isLoading ? buttonDisabledStyle : ''}`}
+                            onClick={handleCreateGame}
+                            disabled={isLoading}
+                        >
+                            {isLoading ? 'Processing...' : 'Create Game'}
+                        </button>
+                    </div>
                 </div>
             )}
         </div>
