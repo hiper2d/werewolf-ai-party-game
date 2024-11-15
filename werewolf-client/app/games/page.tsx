@@ -27,8 +27,8 @@ const GamePages = async () => {
                         <li key={game.id} className="border border-white border-opacity-30 rounded-lg p-4 hover:bg-white/5 transition-colors">
                             <div className="flex justify-between items-center">
                                 <Link href={`/games/${game.id}`} className="flex-grow">
-                                    <h2 className="text-lg capitalize text-white font-semibold mb-1">{game.name}</h2>
-                                    <p className="text-sm text-gray-300">{game.theme}</p>
+                                    <h2 className="text-lg capitalize text-white font-semibold mb-1">{game.theme}</h2>
+                                    <p className="text-sm text-gray-300">{game.description}</p>
                                 </Link>
                                 <RemoveGame gameId={game.id} />
                             </div>

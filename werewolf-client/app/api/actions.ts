@@ -2,7 +2,7 @@
 
 import {db} from "@/firebase/server";
 import {firestore} from "firebase-admin";
-import {ApiKeyMap, BotPreview, Game, gameFromFirestore, GamePreview, Player, User} from "@/app/api/models";
+import {ApiKeyMap, Bot, BotPreview, Game, gameFromFirestore, GamePreview, Player, User} from "@/app/api/models";
 import {getServerSession} from "next-auth";
 import {AgentFactory} from "@/app/ai/agent-factory";
 import {AbstractAgent} from "@/app/ai/abstract-agent";
@@ -14,12 +14,55 @@ import {format} from "@/app/ai/prompts/utils";
 import { GamePreviewWithGeneratedBots } from "@/app/api/models";
 import { LLM_CONSTANTS } from '@/app/ai/models';
 
-export async function createGame(game: GamePreviewWithGeneratedBots): Promise<string|undefined> {
+export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Promise<string|undefined> {
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
     try {
-        // todo: add logic to generate Game from GamePreviewWithGeneratedBots
+        const totalPlayers = gamePreview.playerCount;
+        const werewolfCount = gamePreview.werewolfCount;
+        
+        // Create role distribution array
+        const roleDistribution: string[] = [];
+        if (gamePreview.specialRoles.includes(GAME_ROLES.DOCTOR)) {
+            roleDistribution.push(GAME_ROLES.DOCTOR);
+        }
+        if (gamePreview.specialRoles.includes(GAME_ROLES.SEER)) {
+            roleDistribution.push(GAME_ROLES.SEER);
+        }
+        roleDistribution.push(...Array(werewolfCount).fill(GAME_ROLES.WEREWOLF));    
+        const villagersNeeded = totalPlayers - roleDistribution.length;
+        roleDistribution.push(...Array(villagersNeeded).fill(GAME_ROLES.VILLAGER));
+
+        // Shuffle the roles
+        for (let i = roleDistribution.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [roleDistribution[i], roleDistribution[j]] = [roleDistribution[j], roleDistribution[i]];
+        }
+
+        // Convert BotPreviews to Bots with roles
+        const bots: Bot[] = gamePreview.bots.map((bot, index) => ({
+            id: crypto.randomUUID(),
+            name: bot.name,
+            story: bot.story,
+            role: roleDistribution[index + 1],
+            isAlive: true
+        }));
+
+        // Create the game object
+        const game: Game = {
+            id: crypto.randomUUID(), // This will be overwritten by Firestore
+            description: gamePreview.description,
+            theme: gamePreview.theme,
+            werewolfCount: gamePreview.werewolfCount,
+            specialRoles: gamePreview.specialRoles,
+            gameMasterAiType: gamePreview.gameMasterAiType,
+            story: gamePreview.scene,
+            bots: bots,
+            humanPlayerName: gamePreview.name,
+            humanPlayerRole: roleDistribution[0]
+        };
+
         const response = await db.collection('games').add(game);
         return response.id;
     } catch (error: any) {
@@ -95,51 +138,6 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
         };
     });
 
-    /*
-    const totalPlayers = gamePreview.playerCount;
-    const werewolfCount = gamePreview.werewolfCount;
-    
-    const roleDistribution: string[] = [];
-    
-    if (gamePreview.specialRoles.includes(GAME_ROLES.DOCTOR)) {
-        roleDistribution.push(GAME_ROLES.DOCTOR);
-    }
-    if (gamePreview.specialRoles.includes(GAME_ROLES.SEER)) {
-        roleDistribution.push(GAME_ROLES.SEER);
-    }
-    roleDistribution.push(...Array(werewolfCount).fill(GAME_ROLES.WEREWOLF));    
-    const villagersNeeded = totalPlayers - roleDistribution.length;
-    roleDistribution.push(...Array(villagersNeeded).fill(GAME_ROLES.VILLAGER));
-
-    // Shuffle the roles
-    for (let i = roleDistribution.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [roleDistribution[i], roleDistribution[j]] = [roleDistribution[j], roleDistribution[i]];
-    }
-
-    const humanPlayer = {
-        id: crypto.randomUUID(),
-        name: gamePreview.name,
-        role: roleDistribution[0],
-        isAlive: true,
-        isBot: false
-    }
-    const bots: Player[] = [];
-
-    aiResponse.players.forEach((p: { name: string; story: string }, index: number) => {
-        bots.push({
-            id: crypto.randomUUID(),
-            name: p.name,
-            story: p.story,
-            role: roleDistribution[index + 1],
-            isAlive: true,
-            isBot: true
-        });
-    });
-    */
-
-
-
     return {
         ...gamePreview,
         scene: aiResponse.scene,
@@ -155,8 +153,7 @@ export async function removeGameById(id: string) {
     return "ok"
 }
 
-// todo: update this to use Game object
-export async function getGame(gameId: string): Promise<GamePreviewWithGeneratedBots | null> {
+export async function getGame(gameId: string): Promise<Game | null> {
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
@@ -171,8 +168,7 @@ export async function getGame(gameId: string): Promise<GamePreviewWithGeneratedB
     }
 }
 
-// todo: update this to use Game object
-export async function getAllGames(): Promise<GamePreviewWithGeneratedBots[]> {
+export async function getAllGames(): Promise<Game[]> {
     if (!db) {
         throw new Error('Firestore is not initialized');
     }

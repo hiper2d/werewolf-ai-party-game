@@ -12,7 +12,6 @@ export interface User {
 }
 
 export interface GamePreview {
-    id: string;
     name: string;
     description: string;
     theme: string;
@@ -34,6 +33,14 @@ export interface GamePreviewWithGeneratedBots extends GamePreview {
     bots: BotPreview[];
 }
 
+export interface Bot {
+    id: string;
+    name: string;
+    story: string;
+    role: string;
+    isAlive: boolean;
+}
+
 export interface Player {
     id: string;
     name: string;
@@ -43,9 +50,15 @@ export interface Player {
     isBot: boolean;
 }
 
-export interface Game extends GamePreview {
+export interface Game {
+    id: string;
+    description: string;
+    theme: string;
+    werewolfCount: number;
+    specialRoles: string[];
+    gameMasterAiType: string;
     story: string;
-    players: Player[];
+    bots: Bot[];
     humanPlayerName: string;
     humanPlayerRole: string;
 }
@@ -76,7 +89,6 @@ export interface ApiKeyFirestore {
 // todo: update this to use Game object
 export function gamePreviewFromFirestore(id: string, data: any): GamePreviewWithGeneratedBots {
     return {
-        id,
         name: data.name,
         description: data.description,
         theme: data.theme,
@@ -91,9 +103,18 @@ export function gamePreviewFromFirestore(id: string, data: any): GamePreviewWith
 }
 
 // todo: update this to use Game object
-export function gameFromFirestore(id: string, data: any): GamePreviewWithGeneratedBots {
+export function gameFromFirestore(id: string, data: any): Game {
     return {
-        ...gamePreviewFromFirestore(id, data)
+        id,
+        description: data.description,
+        theme: data.theme,
+        werewolfCount: data.werewolfCount,
+        specialRoles: data.specialRoles,
+        gameMasterAiType: data.gameMasterAiType,
+        story: data.story,
+        bots: data.bots,
+        humanPlayerName: data.humanPlayerName,
+        humanPlayerRole: data.humanPlayerRole
     };
 }
 
