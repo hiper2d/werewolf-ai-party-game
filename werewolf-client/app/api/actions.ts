@@ -27,8 +27,8 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
         if (gamePreview.specialRoles.includes(GAME_ROLES.DOCTOR)) {
             roleDistribution.push(GAME_ROLES.DOCTOR);
         }
-        if (gamePreview.specialRoles.includes(GAME_ROLES.SEER)) {
-            roleDistribution.push(GAME_ROLES.SEER);
+        if (gamePreview.specialRoles.includes(GAME_ROLES.DETECTIVE)) {
+            roleDistribution.push(GAME_ROLES.DETECTIVE);
         }
         roleDistribution.push(...Array(werewolfCount).fill(GAME_ROLES.WEREWOLF));    
         const villagersNeeded = totalPlayers - roleDistribution.length;

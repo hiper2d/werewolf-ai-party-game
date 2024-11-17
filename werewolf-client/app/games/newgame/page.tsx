@@ -13,7 +13,7 @@ export default function CreateNewGamePage() {
     const [description, setDescription] = useState('');
     const [playerCount, setPlayerCount] = useState(8);
     const [werewolfCount, setWerewolfCount] = useState(3);
-    const [specialRoles, setSpecialRoles] = useState([GAME_ROLES.DOCTOR, GAME_ROLES.SEER]);
+    const [specialRoles, setSpecialRoles] = useState([GAME_ROLES.DOCTOR, GAME_ROLES.DETECTIVE]);
     const [gameMasterAiType, setGameMasterAiType] = useState<string>(LLM_CONSTANTS.RANDOM);
     const [playersAiType, setPlayersAiType] = useState<string>(LLM_CONSTANTS.RANDOM);
     const [isFormValid, setIsFormValid] = useState(false);
@@ -25,7 +25,7 @@ export default function CreateNewGamePage() {
     const playerOptions = Array.from({ length: 7 }, (_, i) => i + 6);
     const supportedAi = Object.values(LLM_CONSTANTS);
     const supportedPlayerAi = Object.values(LLM_CONSTANTS);
-    const availableRoles = [GAME_ROLES.DOCTOR, GAME_ROLES.SEER];
+    const availableRoles = [GAME_ROLES.DOCTOR, GAME_ROLES.DETECTIVE];
 
     useEffect(() => {
         if (werewolfCount >= playerCount) {

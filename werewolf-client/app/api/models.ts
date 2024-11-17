@@ -138,7 +138,7 @@ export function apiKeyFromFirestore(id: string, data: ApiKeyFirestore): ApiKey {
 
 export const GAME_ROLES = {
     DOCTOR: 'doctor',
-    SEER: 'seer',
+    DETECTIVE: 'datective',
     WEREWOLF: 'werewolf',
     VILLAGER: 'villager'
 } as const;
