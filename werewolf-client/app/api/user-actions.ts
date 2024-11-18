@@ -2,7 +2,7 @@
 
 import {db} from "@/firebase/server";
 import {firestore} from "firebase-admin";
-import {ApiKeyMap, User} from "@/app/api/models";
+import {ApiKeyMap, User} from "@/app/api/game-models";
 import FieldValue = firestore.FieldValue;
 
 export async function upsertUser(user: any) {

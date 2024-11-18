@@ -3,7 +3,7 @@ import {getAllGames} from "@/app/api/game-actions";
 import RemoveGame from "@/app/games/components/RemoveGame";
 import {getServerSession} from "next-auth";
 import {redirect} from "next/navigation";
-import {Game} from "@/app/api/models";
+import {Game} from "@/app/api/game-models";
 
 const GamePages = async () => {
     const session = await getServerSession();

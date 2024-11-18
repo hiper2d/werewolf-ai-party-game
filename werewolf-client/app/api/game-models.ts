@@ -50,6 +50,9 @@ export interface Game {
     bots: Bot[];
     humanPlayerName: string;
     humanPlayerRole: string;
+    gameState: string;
+    gameStateParamQueue: Array<string>;
+    gameStateProcessQueue: Array<string>;
 }
 
 export interface Message {
@@ -60,24 +63,13 @@ export interface Message {
     gameId: string;
 }
 
-export function gameFromFirestore(id: string, data: any): Game {
-    return {
-        id,
-        description: data.description,
-        theme: data.theme,
-        werewolfCount: data.werewolfCount,
-        specialRoles: data.specialRoles,
-        gameMasterAiType: data.gameMasterAiType,
-        story: data.story,
-        bots: data.bots,
-        humanPlayerName: data.humanPlayerName,
-        humanPlayerRole: data.humanPlayerRole
-    };
-}
-
 export const GAME_ROLES = {
     DOCTOR: 'doctor',
-    DETECTIVE: 'datective',
+    DETECTIVE: 'detective',
     WEREWOLF: 'werewolf',
     VILLAGER: 'villager'
+} as const;
+
+export const GAME_STATES = {
+    WELCOME: 'WELCOME'
 } as const;

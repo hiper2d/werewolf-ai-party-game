@@ -6,11 +6,10 @@ import {
     Bot,
     BotPreview,
     Game,
-    GAME_ROLES,
-    gameFromFirestore,
+    GAME_ROLES, GAME_STATES,
     GamePreview,
     GamePreviewWithGeneratedBots, User
-} from "@/app/api/models";
+} from "@/app/api/game-models";
 import {getServerSession} from "next-auth";
 import {AgentFactory} from "@/app/ai/agent-factory";
 import {AbstractAgent} from "@/app/ai/abstract-agent";
@@ -65,10 +64,14 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
             story: gamePreview.scene,
             bots: bots,
             humanPlayerName: gamePreview.name,
-            humanPlayerRole: roleDistribution[0]
+            humanPlayerRole: roleDistribution[0],
+            gameState: GAME_STATES.WELCOME,
+            gameStateParamQueue: [], // todo: put bot names in random order
+            gameStateProcessQueue: []
         };
 
         const response = await db.collection('games').add(game);
+        // todo: add Welcome message to messages
         return response.id;
     } catch (error: any) {
         console.error("Error adding document: ", error);
@@ -204,7 +207,6 @@ export async function createMessage(gameId: string, text: string, sender: string
 }
 
 
-
 async function getUserFromFirestore(email: string) {
     if (!db) {
         throw new Error('Firestore is not initialized');
@@ -226,4 +228,22 @@ async function getUserFromFirestore(email: string) {
     } else {
         return null;
     }
+}
+
+function gameFromFirestore(id: string, data: any): Game {
+    return {
+        id,
+        description: data.description,
+        theme: data.theme,
+        werewolfCount: data.werewolfCount,
+        specialRoles: data.specialRoles,
+        gameMasterAiType: data.gameMasterAiType,
+        story: data.story,
+        bots: data.bots,
+        humanPlayerName: data.humanPlayerName,
+        humanPlayerRole: data.humanPlayerRole,
+        gameState: data.gameState,
+        gameStateParamQueue: data.gameStateParamQueue,
+        gameStateProcessQueue: data.gameStateProcessQueue
+    };
 }

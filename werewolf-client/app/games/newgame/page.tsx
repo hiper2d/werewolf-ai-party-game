@@ -4,7 +4,7 @@ import React, {useEffect, useState} from 'react';
 import {useRouter} from 'next/navigation';
 import {buttonBlackStyle, buttonTransparentStyle} from "@/app/constants";
 import {createGame, previewGame} from '@/app/api/game-actions';
-import {GAME_ROLES, GamePreview, GamePreviewWithGeneratedBots} from "@/app/api/models";
+import {GAME_ROLES, GamePreview, GamePreviewWithGeneratedBots} from "@/app/api/game-models";
 import {LLM_CONSTANTS} from "@/app/ai/ai-models";
 
 export default function CreateNewGamePage() {
