@@ -3,8 +3,8 @@
 import React, {useState} from 'react';
 import {useRouter} from 'next/navigation';
 import {buttonTransparentStyle} from "@/app/constants";
-import {addApiKey} from "@/app/api/actions";
-import {SupportedAiKeyNames} from "@/app/ai/models";
+import {addApiKey} from "@/app/api/user-actions";
+import {SupportedAiKeyNames} from "@/app/ai/ai-models";
 
 export default function AddApiKeyForm({ userId }: { userId: string }) {
     const [newKeyType, setNewKeyType] = useState<string | ''>('');

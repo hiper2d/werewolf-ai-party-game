@@ -1,5 +1,5 @@
 import { AbstractAgent } from "@/app/ai/abstract-agent";
-import { AgentMessageDto } from "@/app/ai/models";
+import { AgentMessageDto } from "@/app/ai/ai-models";
 
 import { Anthropic } from '@anthropic-ai/sdk';
 import MessageParam from '@anthropic-ai/sdk/resources';

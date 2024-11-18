@@ -1,5 +1,4 @@
 import {Timestamp} from "firebase/firestore";
-import {LLM_CONSTANTS} from "@/app/ai/models";
 
 export interface ApiKeyMap {
     [id: string]: string
@@ -34,20 +33,10 @@ export interface GamePreviewWithGeneratedBots extends GamePreview {
 }
 
 export interface Bot {
-    id: string;
     name: string;
     story: string;
     role: string;
     isAlive: boolean;
-}
-
-export interface Player {
-    id: string;
-    name: string;
-    story: string;
-    role: string;
-    isAlive: boolean;
-    isBot: boolean;
 }
 
 export interface Game {
@@ -71,38 +60,6 @@ export interface Message {
     gameId: string;
 }
 
-export interface ApiKey {
-    id: string;
-    apiKeyType: string;
-    value: string;
-    createdAt: string | null;
-    updatedAt: string | null;
-}
-
-export interface ApiKeyFirestore {
-    type: string;
-    value: string;
-    createdAt: Timestamp | null;
-    updatedAt: Timestamp | null;
-}
-
-// todo: update this to use Game object
-export function gamePreviewFromFirestore(id: string, data: any): GamePreviewWithGeneratedBots {
-    return {
-        name: data.name,
-        description: data.description,
-        theme: data.theme,
-        playerCount: data.playerCount,
-        werewolfCount: data.werewolfCount,
-        specialRoles: data.specialRoles,
-        gameMasterAiType: data.gameMasterAiType,
-        playersAiType: data.playersAiType,
-        scene: data.scene,
-        bots: data.bots
-    };
-}
-
-// todo: update this to use Game object
 export function gameFromFirestore(id: string, data: any): Game {
     return {
         id,
@@ -115,24 +72,6 @@ export function gameFromFirestore(id: string, data: any): Game {
         bots: data.bots,
         humanPlayerName: data.humanPlayerName,
         humanPlayerRole: data.humanPlayerRole
-    };
-}
-
-export function apiKeyFromFirestore(id: string, data: ApiKeyFirestore): ApiKey {
-    // Cast or validate that the string from Firestore corresponds to the enum value
-    const llmModel = data.type as string; // Ensure that data.type is cast to the correct enum type
-
-    // Optional: You can add validation if you're concerned about invalid types.
-    if (!Object.values(LLM_CONSTANTS).includes(llmModel)) {
-        throw new Error(`Invalid LLM model type: ${data.type}`);
-    }
-
-    return {
-        id,
-        apiKeyType: llmModel,  // Use the casted or validated enum value here
-        value: data.value,
-        createdAt: data.createdAt ? data.createdAt.toDate().toISOString() : null,
-        updatedAt: data.updatedAt ? data.updatedAt.toDate().toISOString() : null
     };
 }
 

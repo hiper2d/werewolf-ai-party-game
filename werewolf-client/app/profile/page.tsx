@@ -5,7 +5,7 @@ import {buttonTransparentStyle} from "@/app/constants";
 import Image from 'next/image';
 import ApiKeyList from './components/ApiKeyList';
 import AddApiKeyForm from './components/AddApiKeyForm';
-import {getUserApiKeys} from "@/app/api/actions";
+import {getUserApiKeys} from "@/app/api/user-actions";
 
 export default async function UserProfilePage() {
     const session = await getServerSession();

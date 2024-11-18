@@ -2,10 +2,10 @@
 
 import React, {useEffect, useState} from 'react';
 import {useRouter} from 'next/navigation';
-import {botPlayerPersonalities, buttonTransparentStyle, buttonBlackStyle} from "@/app/constants";
-import {createGame, previewGame} from '@/app/api/actions';
-import {Game, GamePreview, GAME_ROLES, GamePreviewWithGeneratedBots} from "@/app/api/models";
-import {LLM_CONSTANTS} from "@/app/ai/models";
+import {buttonBlackStyle, buttonTransparentStyle} from "@/app/constants";
+import {createGame, previewGame} from '@/app/api/game-actions';
+import {GAME_ROLES, GamePreview, GamePreviewWithGeneratedBots} from "@/app/api/models";
+import {LLM_CONSTANTS} from "@/app/ai/ai-models";
 
 export default function CreateNewGamePage() {
     const [name, setName] = useState('');
@@ -23,7 +23,7 @@ export default function CreateNewGamePage() {
     const router = useRouter();
 
     const playerOptions = Array.from({ length: 7 }, (_, i) => i + 6);
-    const supportedAi = Object.values(LLM_CONSTANTS);
+    const supportedAi = Object.values(LLM_CONSTANTS); // todo: this list should be limited to ApiKeys player uploaded
     const supportedPlayerAi = Object.values(LLM_CONSTANTS);
     const availableRoles = [GAME_ROLES.DOCTOR, GAME_ROLES.DETECTIVE];
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { createMessage } from "@/app/api/actions";
+import { createMessage } from "@/app/api/game-actions";
 import {buttonTransparentStyle} from "@/app/constants";
 import {Message} from "@/app/api/models";
 

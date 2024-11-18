@@ -1,4 +1,4 @@
-import {AgentMessageDto} from "@/app/ai/models";
+import {AgentMessageDto} from "@/app/ai/ai-models";
 
 export abstract class AbstractAgent {
     id: string;

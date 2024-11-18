@@ -1,6 +1,6 @@
 import {AbstractAgent} from "@/app/ai/abstract-agent";
 import {OpenAI} from "openai";
-import {AgentMessageDto} from "@/app/ai/models";
+import {AgentMessageDto} from "@/app/ai/ai-models";
 import ChatCompletion = OpenAI.Chat.Completions.ChatCompletion;
 import ChatCompletionMessageParam = OpenAI.Chat.Completions.ChatCompletionMessageParam;
 import {util} from "protobufjs";

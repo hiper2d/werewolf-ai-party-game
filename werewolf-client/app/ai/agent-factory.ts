@@ -1,7 +1,7 @@
 import {ApiKeyMap} from '@/app/api/models';
 import {AbstractAgent} from "@/app/ai/abstract-agent";
 import {OpenAiAgent} from "@/app/ai/open-ai-agent";
-import {LLM_CONSTANTS, SupportedAiModels} from "@/app/ai/models";
+import {LLM_CONSTANTS, SupportedAiModels} from "@/app/ai/ai-models";
 import {ClaudeAgent} from "@/app/ai/anthropic-agent";
 import {GoogleAgent} from "@/app/ai/google-agent";
 import {MistralAgent} from "@/app/ai/mistral-agent";

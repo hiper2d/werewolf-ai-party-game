@@ -1,5 +1,5 @@
 import {AbstractAgent} from "@/app/ai/abstract-agent";
-import {AgentMessageDto} from "@/app/ai/models";
+import {AgentMessageDto} from "@/app/ai/ai-models";
 import {GoogleGenerativeAI} from "@google/generative-ai";
 
 // API Docs: https://ai.google.dev/gemini-api/docs/text-generation?lang=node

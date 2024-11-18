@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import {getAllGames} from "@/app/api/actions";
+import {getAllGames} from "@/app/api/game-actions";
 import RemoveGame from "@/app/games/components/RemoveGame";
 import {getServerSession} from "next-auth";
 import {redirect} from "next/navigation";

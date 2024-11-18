@@ -1,5 +1,5 @@
 import {AbstractAgent} from "@/app/ai/abstract-agent";
-import {AgentMessageDto} from "@/app/ai/models";
+import {AgentMessageDto} from "@/app/ai/ai-models";
 import {Mistral} from "@mistralai/mistralai";
 import {ChatCompletionResponse} from "@mistralai/mistralai/models/components";
 

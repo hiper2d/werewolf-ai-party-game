@@ -1,4 +1,4 @@
-import { getGame } from "@/app/api/actions";
+import { getGame } from "@/app/api/game-actions";
 import GameChat from "@/app/games/[id]/components/GameChat";
 import {buttonTransparentStyle} from "@/app/constants";
 import {getServerSession} from "next-auth";
@@ -24,8 +24,8 @@ export default async function GamePage({ params }: any) {
             <div className="w-1/4 flex flex-col pr-4 overflow-auto">
                 {/* Game info */}
                 <div className="bg-black bg-opacity-30 border border-white border-opacity-30 rounded p-4 mb-4">
-                    <h1 className="text-2xl font-bold mb-2">{game.name}</h1>
-                    <p className="text-sm text-gray-300 mb-4">{game.theme}</p>
+                    <h1 className="text-2xl font-bold mb-2">{game.theme}</h1>
+                    <p className="text-sm text-gray-300 mb-4">{game.description}</p>
                 </div>
 
                 {/* Participants list */}
