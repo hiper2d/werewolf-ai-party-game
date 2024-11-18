@@ -55,7 +55,7 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
 
         // Create the game object
         const game: Game = {
-            id: crypto.randomUUID(), // This will be overwritten by Firestore
+            id: "", // This will be overwritten by Firestore
             description: gamePreview.description,
             theme: gamePreview.theme,
             werewolfCount: gamePreview.werewolfCount,
@@ -65,6 +65,7 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
             bots: bots,
             humanPlayerName: gamePreview.name,
             humanPlayerRole: roleDistribution[0],
+            currentDay: 1,
             gameState: GAME_STATES.WELCOME,
             gameStateParamQueue: [], // todo: put bot names in random order
             gameStateProcessQueue: []
@@ -242,6 +243,7 @@ function gameFromFirestore(id: string, data: any): Game {
         bots: data.bots,
         humanPlayerName: data.humanPlayerName,
         humanPlayerRole: data.humanPlayerRole,
+        currentDay: data.currentDay,
         gameState: data.gameState,
         gameStateParamQueue: data.gameStateParamQueue,
         gameStateProcessQueue: data.gameStateProcessQueue

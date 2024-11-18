@@ -50,6 +50,7 @@ export interface Game {
     bots: Bot[];
     humanPlayerName: string;
     humanPlayerRole: string;
+    currentDay: number;
     gameState: string;
     gameStateParamQueue: Array<string>;
     gameStateProcessQueue: Array<string>;
@@ -71,5 +72,6 @@ export const GAME_ROLES = {
 } as const;
 
 export const GAME_STATES = {
-    WELCOME: 'WELCOME'
+    WELCOME: 'WELCOME',
+    DAY_DISCUSSION: 'DAY_DISCUSSION',
 } as const;
