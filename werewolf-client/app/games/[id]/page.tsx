@@ -4,7 +4,7 @@ import {buttonTransparentStyle} from "@/app/constants";
 import {getServerSession} from "next-auth";
 import {redirect} from "next/navigation";
 import { GAME_STATES } from "@/app/api/game-models";
-import {welcome} from "@/app/api/games/[id]/game-id-actions";
+import {welcome} from "@/app/api/game-actions";
 
 export default async function GamePage({ params }: any) {
     const session = await getServerSession();
@@ -18,7 +18,6 @@ export default async function GamePage({ params }: any) {
     }
 
     // Send welcome message if game state is WELCOME
-    console.log('game.gameState', game.gameState);
     if (game.gameState === GAME_STATES.WELCOME) {
         try {
             await welcome(game.id);
