@@ -207,7 +207,6 @@ export async function createMessage(gameId: string, text: string, sender: string
     }
 }
 
-
 async function getUserFromFirestore(email: string) {
     if (!db) {
         throw new Error('Firestore is not initialized');

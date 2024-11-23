@@ -3,6 +3,8 @@ import GameChat from "@/app/games/[id]/components/GameChat";
 import {buttonTransparentStyle} from "@/app/constants";
 import {getServerSession} from "next-auth";
 import {redirect} from "next/navigation";
+import { GAME_STATES } from "@/app/api/game-models";
+import {welcome} from "@/app/api/games/[id]/game-id-actions";
 
 export default async function GamePage({ params }: any) {
     const session = await getServerSession();
@@ -13,6 +15,16 @@ export default async function GamePage({ params }: any) {
 
     if (!game) {
         return <div>Game not found</div>;
+    }
+
+    // Send welcome message if game state is WELCOME
+    console.log('game.gameState', game.gameState);
+    if (game.gameState === GAME_STATES.WELCOME) {
+        try {
+            await welcome(game.id);
+        } catch (error) {
+            console.error('Error sending welcome request:', error);
+        }
     }
 
     // Hardcoded participants for now
@@ -54,7 +66,7 @@ export default async function GamePage({ params }: any) {
 
             {/* Right column - Chat */}
             <div className="w-3/4 h-full overflow-hidden">
-                <GameChat gameId={game.id} />
+                <GameChat gameId={game.id} gameState={game.gameState} />
             </div>
         </div>
     );

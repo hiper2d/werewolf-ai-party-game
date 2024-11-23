@@ -3,13 +3,14 @@
 import { useEffect, useState } from 'react';
 import { createMessage } from "@/app/api/game-actions";
 import {buttonTransparentStyle} from "@/app/constants";
-import {Message} from "@/app/api/models";
+import {GAME_STATES, Message} from "@/app/api/game-models";
 
 interface GameChatProps {
     gameId: string;
+    gameState: string;
 }
 
-export default function GameChat({ gameId }: GameChatProps) {
+export default function GameChat({ gameId, gameState }: GameChatProps) {
     const [messages, setMessages] = useState<Message[]>([]);
     const [newMessage, setNewMessage] = useState('');
 
@@ -37,6 +38,8 @@ export default function GameChat({ gameId }: GameChatProps) {
         }
     };
 
+    const isInputEnabled = gameState === GAME_STATES.DAY_DISCUSSION;
+
     return (
         <div className="flex flex-col h-full border border-white border-opacity-30 rounded-lg p-4">
             <h2 className="text-xl font-bold mb-4 text-white">Game Chat</h2>
@@ -61,11 +64,19 @@ export default function GameChat({ gameId }: GameChatProps) {
                     type="text"
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
-                    className="flex-grow p-3 rounded-l bg-black bg-opacity-30 text-white placeholder-gray-400 border
-                        mr-3 border-gray-600 focus:outline-none focus:border-gray-500"
-                    placeholder="Type a message..."
+                    disabled={!isInputEnabled}
+                    className={`flex-grow p-3 rounded-l bg-black bg-opacity-30 text-white placeholder-gray-400 border
+                        mr-3 border-gray-600 focus:outline-none focus:border-gray-500
+                        ${!isInputEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    placeholder={isInputEnabled ? "Type a message..." : "Waiting for game to start..."}
                 />
-                <button type="submit" className={buttonTransparentStyle}>Send</button>
+                <button 
+                    type="submit" 
+                    disabled={!isInputEnabled}
+                    className={`${buttonTransparentStyle} ${!isInputEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                    Send
+                </button>
             </form>
         </div>
     );
