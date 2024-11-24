@@ -1,9 +1,3 @@
-export const MESSAGE_ROLE = {
-    SYSTEM: 'system',
-    USER: 'user',
-    ASSISTANT: 'assistant'
-}
-
 export const API_KEY_CONSTANTS = {
     OPENAI: 'OPENAI_API_KEY',
     ANTHROPIC: 'ANTHROPIC_API_KEY',
@@ -77,11 +71,12 @@ export const SupportedAiModels = {
 
 export type LLMModel = keyof typeof SupportedAiModels;
 
-export const LLM_ROLES = {
-    USER: 'user',
-    SYSTEM: 'system',
-    ASSISTANT: 'assistant'
-}
+export const MESSAGE_ROLE = {
+    SYSTEM: "system" as const,
+    USER: "user" as const,
+    ASSISTANT: "assistant" as const,
+    TOOL: "tool" as const
+} as const;
 
 export const GAME_MASTER = 'Game Master';
 export const RECIPIENT_ALL = 'all';

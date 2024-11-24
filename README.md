@@ -44,97 +44,24 @@ docker-compose up
 
 ### Backend
 
-Install Python 3.11+ and Pipenv.
+# Setup firestore
 
-I use FastAPI Python web server and React Native frontend application. Here are my Intellij Idea run configurations:
+This project uses Firestore and Authentication from Firebase. I don't remember the exact commands, but it should be easy using CLI.
+I tried to use the Firebase Emulator at first but it was hard to make it work with Authentication so I gave up.
 
-<img src="images/backend-run-config.png" width="300">
-<img src="images/frontend-run-config.png" width="300">
+Here how I update indexes in my Firestore:
+```bash
+firebase deploy --only firestore:indexes
+```
 
-> **Note:** Before running Python code, rename the [.env.template](.env.template) file into `.env` and fill in the values. All
-environmental variables from it will be loaded by functions and used to talk to the external APIs (DynamoDB, OpenAI).
-
-### Run Python functions [deprecated as I already have UI]
-
-I don't have any better runner than Python junit tests for now. In future, I'll use a web server with UI in React Native
-for the local development. I'll deploy functions to Lambdas and host UI somewhere separately.
-Each function has a separate test. It does not make sense to run all of them, only for the function you want to run.
-To run tests, install Python dependencies using `Pipenv` (more details about it is [below](#pipenv_setup)), then run a
-test you need like this:
-
-   ```bash
-   python -m unittest test_lambda_functions.TestGameFunctions.test_init_game
-   ```
-
-### <a id="pipenv_setup"></a>Pipenv setup and dependency installation
-
-I use `pipenv` to manage dependencies. Install it, create a virtual environment, activate it and install dependencies.
-
-1. Install `pipenv` using official [docs](https://pipenv.pypa.io/en/latest/install/#installing-pipenv). For example, on
-   Mac:
-    ```bash
-    pip install pipenv --user
-    ```
-
-2. Add `pipenv` to PATH if it's not there. For example, I had to add to the `~/.zshrc` file the following line:
-    ```bash
-    export PATH="/Users/hiper2d/Library/Python/3.11/bin:$PATH"
-    ```
-
-3. Install packages and create a virtual environment for the project:
-    ```bash
-    cd <project dir> # navigate to the project dir
-    pipenv install
-    ```
-   This should create a virtual environment and install all dependencies from `Pipfile.lock` file.
-
-   If for any reason you need to create a virtual environment manually, use the following command:
-    ```bash
-    pip install virtualenv # install virtualenv if you don't have it
-    virtualenv --version # check if it's installed
-    cd <virtualenv dir> # for example, my virtual envs as here: /Users/hiper2d/.local/share/virtualenvs
-    virtualenv <virtualenv name> # I usually use a project name
-    ```
-
-4. To swtich to the virtual environment, use the following command:
-    ```bash
-    cd <project dir>
-    pipenv shell
-    ```
-   If this fails, then do the following:
-    ```bash
-    cd <virtualenv dir>/bin
-    source activate
-    ```
-
-### Frontend
+### Frontend and backend (next.js)
 
 Install node.js and npm. Navigate to the `werewolf-client` and run:
 
 ```bash
 npm install
-npm run web
+npm run pre-prod
 ```
 
-This will start the frontend on the `localhost:8081` address. 
-
-# Setup(Windows)
-
-To run the project locally, you need:
-- Install Docker and Docker Compose, run local DynamoDb with `docker-compose up`
-- Backend: install Python 3.11+
-- Frontend: install node.js and npm, navigate to the `werewolf-client` install dependencies with `npm install`, and run the app by `npm run web` 
-- Edit environment variables in control panel and add two environment variables to python in PATH, for example: 
-```bash
-..\AppData\Local\Programs\Python\Python312
-..\AppData\Local\Programs\Python\Python312\Scripts
-```
-- Install dependencies in root directory `pip install -r requirements.txt`
-- Inside `.env` file add keys and add AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY, remove AWS_PROFILE:
-
-```bash
-AWS_ACCESS_KEY_ID=DUMMYIDEXAMPLE
-AWS_SECRET_ACCESS_KEY=DUMMYEXAMPLEKEY
-```
-- From `server` folder run web server: `uvicorn local_server:app --reload`
+This will start the frontend on the `localhost:3000` address.
 

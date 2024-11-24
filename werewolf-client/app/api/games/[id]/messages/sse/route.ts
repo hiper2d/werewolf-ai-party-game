@@ -16,7 +16,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
             const q = db.collection('messages')
                 .where('gameId', '==', gameId)
                 .where('recipient', '==', RECIPIENT_ALL)
-                .orderBy('timestamp', 'asc');
+                .orderBy('timestamp', 'desc');
 
             const unsubscribe = q.onSnapshot( (snapshot) => {
                 snapshot.docChanges().forEach((change) => {

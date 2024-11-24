@@ -1,5 +1,5 @@
 import {AbstractAgent} from "@/app/ai/abstract-agent";
-import {AgentMessageDto} from "@/app/ai/ai-models";
+import {AgentMessageDto, MESSAGE_ROLE} from "@/app/ai/ai-models";
 import {Mistral} from "@mistralai/mistralai";
 import {ChatCompletionResponse} from "@mistralai/mistralai/models/components";
 
@@ -18,10 +18,13 @@ export class MistralAgent extends AbstractAgent {
 
         const chatResponse: ChatCompletionResponse | undefined = await this.client.chat.complete({
             model: this.model,
-            messages: [{role: 'user', content: messages[0].msg}],
+            messages: [
+                {role: MESSAGE_ROLE.SYSTEM, content: this.instruction},
+                {role: MESSAGE_ROLE.USER, content: messages[0].msg}
+            ],
         });
 
-        const reply = chatResponse.choices[0]?.message?.content;
+        const reply = chatResponse?.choices?.[0]?.message?.content;
         this.logger(`Reply: ${reply}`);
         return reply;
     }

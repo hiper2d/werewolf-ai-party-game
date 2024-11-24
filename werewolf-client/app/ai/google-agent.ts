@@ -10,7 +10,7 @@ export class GoogleAgent extends AbstractAgent {
     constructor(name: string, instruction: string, model: string, apiKey: string) {
         super(name, instruction, 0.2);
         this.client = new GoogleGenerativeAI(apiKey)
-        this.modelObj = this.client.getGenerativeModel({ model: model });
+        this.modelObj = this.client.getGenerativeModel({ model: model, systemInstruction: instruction });
     }
 
     async ask(messages: AgentMessageDto[]): Promise<string | null> {

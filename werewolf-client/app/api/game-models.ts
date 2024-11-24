@@ -77,3 +77,15 @@ export const GAME_STATES = {
     WELCOME: 'WELCOME',
     DAY_DISCUSSION: 'DAY_DISCUSSION',
 } as const;
+
+export class BotAnswer {
+    constructor(public reply: string) {}
+
+    static fromRawResponse(response: string): BotAnswer {
+        const cleanResponse = response.trim()
+            .replace(/^```(json)?/, '')
+            .replace(/```$/, '')
+            .trim();
+        return new BotAnswer(cleanResponse);
+    }
+}

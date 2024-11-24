@@ -18,6 +18,8 @@ import {STORY_SYSTEM_PROMPT, STORY_USER_PROMPT} from "@/app/ai/prompts/story-gen
 import {format} from "@/app/ai/prompts/utils";
 import FieldValue = firestore.FieldValue;
 import {getUserApiKeys} from "@/app/api/user-actions";
+import {BOT_SYSTEM_PROMPT} from "@/app/ai/prompts/bot-prompts";
+import {BotAnswer} from "@/app/api/game-models";
 
 export async function getAllGames(): Promise<Game[]> {
     if (!db) {
@@ -88,18 +90,8 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
         throw new Error('Failed to get AI response');
     }
 
-    // Clean up potential markdown formatting
-    let cleanResponse = response.trim();
-    if (cleanResponse.startsWith('```json')) {
-        cleanResponse = cleanResponse.slice(7); // Remove leading ```json
-    } else if (cleanResponse.startsWith('```')) {
-        cleanResponse = cleanResponse.slice(3); // Remove leading ```
-    }
-    if (cleanResponse.endsWith('```')) {
-        cleanResponse = cleanResponse.slice(0, -3); // Remove trailing ```
-    }
-
-    const aiResponse = JSON.parse(cleanResponse.trim());
+    const cleanResponse = cleanMarkdownResponse(response);
+    const aiResponse = JSON.parse(cleanResponse);
 
     const bots: BotPreview[] = aiResponse.players.map((bot: { name: string; story: string }) => {
         let aiType = gamePreview.playersAiType;
@@ -189,7 +181,7 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
     }
 }
 
-export async function welcome(gameId: string) {
+export async function welcome(gameId: string): Promise<Game> {
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
@@ -205,7 +197,7 @@ export async function welcome(gameId: string) {
             await db.collection('games').doc(gameId).update({
                 gameState: GAME_STATES.DAY_DISCUSSION
             });
-            return "ok";
+            return await getGame(gameId) as Game;
         }
 
         // Get the first bot name and remove it from queue
@@ -229,30 +221,47 @@ export async function welcome(gameId: string) {
         // todo: move to GM constants
         const gmMessage = `You are ${bot.name}. ${bot.story}. Introduce yourself to the group in 2-3 sentences.`;
 
+        const formattedSystemPrompt = format(BOT_SYSTEM_PROMPT, {
+            name: bot.name,
+            personal_story: bot.story,
+            temperament: "friendly", // You might want to generate or configure this
+            role: bot.role,
+            players_names: game.bots.filter(b => b.isAlive).map(b => b.name).concat([game.humanPlayerName]).join(", "),
+            dead_players_names_with_roles: game.bots.filter(b => !b.isAlive).map(b => `${b.name} (${b.role})`).join(", "),
+            reply_language_instruction: "English" // You might want to make this configurable
+        });
+
         const agent = AgentFactory.createAgent(
             botName,
-            gmMessage,
+            formattedSystemPrompt,
             bot.aiType,
             apiKeys
         );
 
         // Get the bot's introduction
-        const introduction = await agent.ask([{
+        const rawIntroduction = await agent.ask([{
             recipientName: bot.name,
             authorName: GAME_MASTER,
-            role: MESSAGE_ROLE.USER, // GM is a user to bots
-            msg: 'Please introduce yourself to the group.'
+            role: MESSAGE_ROLE.USER,
+            msg: 'Please introduce yourself to the group.' // todo: move to GM constants
         }]);
 
-        await addMessageToChatAndSaveToDb(gameId, gmMessage, GAME_MASTER, botName);
-        await addMessageToChatAndSaveToDb(gameId, introduction || '', botName, RECIPIENT_ALL);
+        //todo: pull message history from firestore
+
+        if (!rawIntroduction) {
+            throw new Error('Failed to get bot introduction');
+        }
+
+        const botAnswer = BotAnswer.fromRawResponse(rawIntroduction);
+        await addMessageToChatAndSaveToDb(gameId, botAnswer.reply, botName, RECIPIENT_ALL);
 
         // Update game with the modified queue
         await db.collection('games').doc(gameId).update({
             gameStateParamQueue: newQueue
         });
 
-        return "ok";
+        // Return the updated game state
+        return await getGame(gameId) as Game;
     } catch (error) {
         console.error('Error in welcome function:', error);
         throw error;
@@ -319,4 +328,17 @@ function gameFromFirestore(id: string, data: any): Game {
         gameStateParamQueue: data.gameStateParamQueue,
         gameStateProcessQueue: data.gameStateProcessQueue
     };
+}
+
+function cleanMarkdownResponse(response: string): string {
+    let cleanResponse = response.trim();
+    if (cleanResponse.startsWith('```json')) {
+        cleanResponse = cleanResponse.slice(7);
+    } else if (cleanResponse.startsWith('```')) {
+        cleanResponse = cleanResponse.slice(3);
+    }
+    if (cleanResponse.endsWith('```')) {
+        cleanResponse = cleanResponse.slice(0, -3);
+    }
+    return cleanResponse.trim();
 }
