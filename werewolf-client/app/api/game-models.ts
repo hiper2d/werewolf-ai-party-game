@@ -37,6 +37,7 @@ export interface Bot {
     story: string;
     role: string;
     isAlive: boolean;
+    aiType: string;
 }
 
 export interface Game {
@@ -52,8 +53,8 @@ export interface Game {
     humanPlayerRole: string;
     currentDay: number;
     gameState: string;
-    gameStateParamQueue: Array<string>;
-    gameStateProcessQueue: Array<string>;
+    gameStateParamQueue: Array<string>; // some states require a queue of params, usually bot names
+    gameStateProcessQueue: Array<string>; // some states need to keep intermediate results
 }
 
 export interface Message {
@@ -61,6 +62,7 @@ export interface Message {
     text: string;
     timestamp: Timestamp;
     sender: string;
+    recipient: string,
     gameId: string;
 }
 

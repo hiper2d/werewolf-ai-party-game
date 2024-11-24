@@ -1,5 +1,6 @@
 import {NextRequest} from 'next/server';
 import {db} from "@/firebase/server";
+import {RECIPIENT_ALL} from "@/app/ai/ai-models";
 
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
@@ -14,6 +15,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
             const q = db.collection('messages')
                 .where('gameId', '==', gameId)
+                .where('recipient', '==', RECIPIENT_ALL)
                 .orderBy('timestamp', 'asc');
 
             const unsubscribe = q.onSnapshot( (snapshot) => {

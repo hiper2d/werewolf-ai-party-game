@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { createMessage } from "@/app/api/game-actions";
+import { addMessageToChatAndSaveToDb } from "@/app/api/game-actions";
 import {buttonTransparentStyle} from "@/app/constants";
 import {GAME_STATES, Message} from "@/app/api/game-models";
+import {RECIPIENT_ALL} from "@/app/ai/ai-models";
 
 interface GameChatProps {
     gameId: string;
@@ -29,7 +30,7 @@ export default function GameChat({ gameId, gameState }: GameChatProps) {
         if (newMessage.trim() === '') return;
 
         try {
-            const result = await createMessage(gameId, newMessage, 'User');
+            const result = await addMessageToChatAndSaveToDb(gameId, newMessage, 'User', RECIPIENT_ALL); // todo: there should be the player name
             if (result) {
                 setNewMessage('');
             }

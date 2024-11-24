@@ -7,8 +7,8 @@ export class MistralAgent extends AbstractAgent {
     private readonly client: Mistral;
     private readonly model: string;
 
-    constructor(id: string, name: string, instruction: string, model: string, apiKey: string) {
-        super(id, name, instruction, 0.2);
+    constructor(name: string, instruction: string, model: string, apiKey: string) {
+        super(name, instruction, 0.2);
         this.model = model;
         this.client = new Mistral({apiKey: apiKey});
     }
@@ -16,8 +16,8 @@ export class MistralAgent extends AbstractAgent {
     async ask(messages: AgentMessageDto[]): Promise<string | null> {
         this.logger(`Asking agent. Message history: ${messages[messages.length - 1].msg}`);
 
-        const chatResponse: ChatCompletionResponse = await this.client.chat.complete({
-            model: 'mistral-large-latest',
+        const chatResponse: ChatCompletionResponse | undefined = await this.client.chat.complete({
+            model: this.model,
             messages: [{role: 'user', content: messages[0].msg}],
         });
 

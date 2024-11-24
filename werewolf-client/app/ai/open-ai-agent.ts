@@ -3,15 +3,13 @@ import {OpenAI} from "openai";
 import {AgentMessageDto} from "@/app/ai/ai-models";
 import ChatCompletion = OpenAI.Chat.Completions.ChatCompletion;
 import ChatCompletionMessageParam = OpenAI.Chat.Completions.ChatCompletionMessageParam;
-import {util} from "protobufjs";
-import float = util.float;
 
 export class OpenAiAgent extends AbstractAgent {
     private readonly client: OpenAI;
     private readonly model: string;
 
-    constructor(id: string, name: string, instruction: string, model: string, apiKey: string, temperature: number) {
-        super(id, name, instruction, temperature);
+    constructor(name: string, instruction: string, model: string, apiKey: string, temperature: number) {
+        super(name, instruction, temperature);
         this.model = model;
         this.client = new OpenAI({
             apiKey: apiKey,

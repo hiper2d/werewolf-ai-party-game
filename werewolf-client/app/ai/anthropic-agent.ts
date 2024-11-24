@@ -13,8 +13,8 @@ export class ClaudeAgent extends AbstractAgent {
     private readonly client: Anthropic;
     private readonly model: string;
 
-    constructor(id: string, name: string, instruction: string, model: string, apiKey: string) {
-        super(id, name, instruction, 0.2);
+    constructor(name: string, instruction: string, model: string, apiKey: string) {
+        super(name, instruction, 0.2);
         this.client = new Anthropic({
             apiKey: apiKey,
         });

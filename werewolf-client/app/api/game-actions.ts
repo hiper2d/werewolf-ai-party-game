@@ -13,70 +13,42 @@ import {
 import {getServerSession} from "next-auth";
 import {AgentFactory} from "@/app/ai/agent-factory";
 import {AbstractAgent} from "@/app/ai/abstract-agent";
-import {GM_ID, LLM_CONSTANTS, MESSAGE_ROLE, RECIPIENT_ALL} from "@/app/ai/ai-models";
+import {GAME_MASTER, LLM_CONSTANTS, MESSAGE_ROLE, RECIPIENT_ALL} from "@/app/ai/ai-models";
 import {STORY_SYSTEM_PROMPT, STORY_USER_PROMPT} from "@/app/ai/prompts/story-gen-prompts";
 import {format} from "@/app/ai/prompts/utils";
 import FieldValue = firestore.FieldValue;
 import {getUserApiKeys} from "@/app/api/user-actions";
 
-export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Promise<string|undefined> {
+export async function getAllGames(): Promise<Game[]> {
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
-    try {
-        const totalPlayers = gamePreview.playerCount;
-        const werewolfCount = gamePreview.werewolfCount;
-        
-        // Create role distribution array
-        const roleDistribution: string[] = [];
-        if (gamePreview.specialRoles.includes(GAME_ROLES.DOCTOR)) {
-            roleDistribution.push(GAME_ROLES.DOCTOR);
-        }
-        if (gamePreview.specialRoles.includes(GAME_ROLES.DETECTIVE)) {
-            roleDistribution.push(GAME_ROLES.DETECTIVE);
-        }
-        roleDistribution.push(...Array(werewolfCount).fill(GAME_ROLES.WEREWOLF));    
-        const villagersNeeded = totalPlayers - roleDistribution.length;
-        roleDistribution.push(...Array(villagersNeeded).fill(GAME_ROLES.VILLAGER));
+    const collectionRef = db.collection('games');
+    const snapshot = await collectionRef.get();
 
-        // Shuffle the roles
-        for (let i = roleDistribution.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [roleDistribution[i], roleDistribution[j]] = [roleDistribution[j], roleDistribution[i]];
-        }
+    return snapshot.docs.map((doc) => gameFromFirestore(doc.id, doc.data()));
+}
 
-        // Convert BotPreviews to Bots with roles
-        const bots: Bot[] = gamePreview.bots.map((bot, index) => ({
-            name: bot.name,
-            story: bot.story,
-            role: roleDistribution[index + 1],
-            isAlive: true
-        }));
+export async function removeGameById(id: string) {
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+    const response = await db.collection('games').doc(id).delete();
+    return "ok"
+}
 
-        // Create the game object
-        const game: Game = {
-            id: "", // This will be overwritten by Firestore
-            description: gamePreview.description,
-            theme: gamePreview.theme,
-            werewolfCount: gamePreview.werewolfCount,
-            specialRoles: gamePreview.specialRoles,
-            gameMasterAiType: gamePreview.gameMasterAiType,
-            story: gamePreview.scene,
-            bots: bots,
-            humanPlayerName: gamePreview.name,
-            humanPlayerRole: roleDistribution[0],
-            currentDay: 1,
-            gameState: GAME_STATES.WELCOME,
-            gameStateParamQueue: [], // todo: put bot names in random order
-            gameStateProcessQueue: []
-        };
+export async function getGame(gameId: string): Promise<Game | null> {
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
 
-        const response = await db.collection('games').add(game);
-        // todo: add Welcome message to messages
-        return response.id;
-    } catch (error: any) {
-        console.error("Error adding document: ", error);
-        throw new Error(`Failed to create game: ${error.message}`);
+    const gameRef = db.collection('games').doc(gameId);
+    const gameSnap = await gameRef.get();
+
+    if (gameSnap.exists) {
+        return gameFromFirestore(gameSnap.id, gameSnap.data());
+    } else {
+        return null;
     }
 }
 
@@ -103,13 +75,12 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
     });
 
     const storyTellAgent: AbstractAgent = AgentFactory.createAgent(
-        GM_ID, GM_ID, STORY_SYSTEM_PROMPT, gamePreview.gameMasterAiType, apiKeys
+        GAME_MASTER, STORY_SYSTEM_PROMPT, gamePreview.gameMasterAiType, apiKeys
     )
     const response = await storyTellAgent.ask([{
-        recipientId: RECIPIENT_ALL,
-        authorId: GM_ID,
-        authorName: GM_ID,
-        role: MESSAGE_ROLE.USER,
+        recipientName: RECIPIENT_ALL, // not important here
+        authorName: GAME_MASTER,
+        role: MESSAGE_ROLE.USER, // GM is a user to bots
         msg: userPrompt
     }])
 
@@ -155,37 +126,67 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
     };
 }
 
-export async function removeGameById(id: string) {
+export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Promise<string|undefined> {
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
-    const response = await db.collection('games').doc(id).delete();
-    return "ok"
-}
+    try {
+        const totalPlayers = gamePreview.playerCount;
+        const werewolfCount = gamePreview.werewolfCount;
+        
+        // Create role distribution array
+        const roleDistribution: string[] = [];
+        if (gamePreview.specialRoles.includes(GAME_ROLES.DOCTOR)) {
+            roleDistribution.push(GAME_ROLES.DOCTOR);
+        }
+        if (gamePreview.specialRoles.includes(GAME_ROLES.DETECTIVE)) {
+            roleDistribution.push(GAME_ROLES.DETECTIVE);
+        }
+        roleDistribution.push(...Array(werewolfCount).fill(GAME_ROLES.WEREWOLF));    
+        const villagersNeeded = totalPlayers - roleDistribution.length;
+        roleDistribution.push(...Array(villagersNeeded).fill(GAME_ROLES.VILLAGER));
 
-export async function getGame(gameId: string): Promise<Game | null> {
-    if (!db) {
-        throw new Error('Firestore is not initialized');
+        // Shuffle the roles
+        for (let i = roleDistribution.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [roleDistribution[i], roleDistribution[j]] = [roleDistribution[j], roleDistribution[i]];
+        }
+
+        // Convert BotPreviews to Bots with roles
+        const bots: Bot[] = gamePreview.bots.map((bot, index) => ({
+            name: bot.name,
+            story: bot.story,
+            role: roleDistribution[index + 1],
+            isAlive: true,
+            aiType: bot.playerAiType
+        }));
+
+        // Create the game object
+        const game: Game = {
+            id: "", // This will be overwritten by Firestore
+            description: gamePreview.description,
+            theme: gamePreview.theme,
+            werewolfCount: gamePreview.werewolfCount,
+            specialRoles: gamePreview.specialRoles,
+            gameMasterAiType: gamePreview.gameMasterAiType,
+            story: gamePreview.scene,
+            bots: bots,
+            humanPlayerName: gamePreview.name,
+            humanPlayerRole: roleDistribution[0],
+            currentDay: 1,
+            gameState: GAME_STATES.WELCOME,
+            gameStateParamQueue: bots.map(bot => bot.name),  // Initialize with shuffled bot names
+            gameStateProcessQueue: []
+        };
+
+        const response = await db.collection('games').add(game);
+
+        await addMessageToChatAndSaveToDb(response.id, game.story, GAME_MASTER, RECIPIENT_ALL);
+        return response.id;
+    } catch (error: any) {
+        console.error("Error adding document: ", error);
+        throw new Error(`Failed to create game: ${error.message}`);
     }
-
-    const gameRef = db.collection('games').doc(gameId);
-    const gameSnap = await gameRef.get();
-
-    if (gameSnap.exists) {
-        return gameFromFirestore(gameSnap.id, gameSnap.data());
-    } else {
-        return null;
-    }
-}
-
-export async function getAllGames(): Promise<Game[]> {
-    if (!db) {
-        throw new Error('Firestore is not initialized');
-    }
-    const collectionRef = db.collection('games');
-    const snapshot = await collectionRef.get();
-
-    return snapshot.docs.map((doc) => gameFromFirestore(doc.id, doc.data()));
 }
 
 export async function welcome(gameId: string) {
@@ -199,17 +200,57 @@ export async function welcome(gameId: string) {
     }
 
     try {
-        // Create welcome message
-        /*await createMessage(
-            gameId,
-            `Welcome to ${game.theme}! The game is about to begin. ${game.story}`,
-            'Game Master'
-        );*/
+        // If queue is empty, move to DAY_DISCUSSION state
+        if (game.gameStateParamQueue.length === 0) {
+            await db.collection('games').doc(gameId).update({
+                gameState: GAME_STATES.DAY_DISCUSSION
+            });
+            return "ok";
+        }
 
-        // Update game state to next state (probably DAY_DISCUSSION)
-        /*await db.collection('games').doc(gameId).update({
-            gameState: GAME_STATES.DAY_DISCUSSION
-        });*/
+        // Get the first bot name and remove it from queue
+        const botName = game.gameStateParamQueue[0];
+        const newQueue = game.gameStateParamQueue.slice(1);
+
+        // Find the bot in the game's bots array
+        const bot: Bot | undefined = game.bots.find(b => b.name === botName);
+        if (!bot) {
+            throw new Error(`Bot ${botName} not found in game`);
+        }
+
+        const session = await getServerSession();
+        if (!session?.user?.email) {
+            throw new Error('Not authenticated');
+        }
+
+        const apiKeys = await getUserFromFirestore(session.user.email)
+            .then((user) => getUserApiKeys(user!.email));
+
+        // todo: move to GM constants
+        const gmMessage = `You are ${bot.name}. ${bot.story}. Introduce yourself to the group in 2-3 sentences.`;
+
+        const agent = AgentFactory.createAgent(
+            botName,
+            gmMessage,
+            bot.aiType,
+            apiKeys
+        );
+
+        // Get the bot's introduction
+        const introduction = await agent.ask([{
+            recipientName: bot.name,
+            authorName: GAME_MASTER,
+            role: MESSAGE_ROLE.USER, // GM is a user to bots
+            msg: 'Please introduce yourself to the group.'
+        }]);
+
+        await addMessageToChatAndSaveToDb(gameId, gmMessage, GAME_MASTER, botName);
+        await addMessageToChatAndSaveToDb(gameId, introduction || '', botName, RECIPIENT_ALL);
+
+        // Update game with the modified queue
+        await db.collection('games').doc(gameId).update({
+            gameStateParamQueue: newQueue
+        });
 
         return "ok";
     } catch (error) {
@@ -218,7 +259,7 @@ export async function welcome(gameId: string) {
     }
 }
 
-export async function createMessage(gameId: string, text: string, sender: string) {
+export async function addMessageToChatAndSaveToDb(gameId: string, text: string, sender: string, recipient: string   ) {
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
@@ -227,6 +268,7 @@ export async function createMessage(gameId: string, text: string, sender: string
         const response = await db.collection('messages').add({
             text,
             sender,
+            recipient,
             timestamp: FieldValue.serverTimestamp(),
             gameId
         });

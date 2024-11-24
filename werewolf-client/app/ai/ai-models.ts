@@ -83,13 +83,11 @@ export const LLM_ROLES = {
     ASSISTANT: 'assistant'
 }
 
-export const GM_ID = 'gm';
-export const STORY_TELLER_ID = 'story_taller';
+export const GAME_MASTER = 'Game Master';
 export const RECIPIENT_ALL = 'all';
 
 export interface AgentMessageDto {
-    recipientId: string;
-    authorId: string;
+    recipientName: string;
     authorName: string;
     role: string;
     msg: string;

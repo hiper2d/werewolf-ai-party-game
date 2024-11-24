@@ -1,4 +1,4 @@
-import {ApiKeyMap} from '@/app/api/models';
+import {ApiKeyMap} from '@/app/api/game-models';
 import {AbstractAgent} from "@/app/ai/abstract-agent";
 import {OpenAiAgent} from "@/app/ai/open-ai-agent";
 import {LLM_CONSTANTS, SupportedAiModels} from "@/app/ai/ai-models";
@@ -10,7 +10,6 @@ import {OpenAiO1Agent} from "@/app/ai/open-ai-o1-agent";
 export class AgentFactory {
 
     static createAgent(
-        id: string,
         name: string,
         instruction: string,
         llmType: string,
@@ -23,19 +22,19 @@ export class AgentFactory {
         switch (modelName) {
             case LLM_CONSTANTS.CLAUDE_35_HAIKU:
             case LLM_CONSTANTS.CLAUDE_35_SONNET:
-                return new ClaudeAgent(id, name, instruction, model.modelApiName, key);
+                return new ClaudeAgent( name, instruction, model.modelApiName, key);
             case LLM_CONSTANTS.GPT_4O_MINI:
             case LLM_CONSTANTS.GPT_4O:
-                return new OpenAiAgent(id, name, instruction, model.modelApiName, key, 0.2);
+                return new OpenAiAgent(name, instruction, model.modelApiName, key, 0.2);
             case LLM_CONSTANTS.GPT_O1_MINI:
             case LLM_CONSTANTS.GPT_O1_PREVIEW:
-                return new OpenAiO1Agent(id, name, instruction, model.modelApiName, key);
+                return new OpenAiO1Agent(name, instruction, model.modelApiName, key);
             case LLM_CONSTANTS.GEMINI_15_FLASH:
             case LLM_CONSTANTS.GEMINI_15_PRO:
-                return new GoogleAgent(id, name, instruction, model.modelApiName, key);
+                return new GoogleAgent(name, instruction, model.modelApiName, key);
             case LLM_CONSTANTS.MISTRAL_2_SMALL:
             case LLM_CONSTANTS.MISTRAL_2_LARGE:
-                return new MistralAgent(id, name, instruction, model.modelApiName, key);
+                return new MistralAgent(name, instruction, model.modelApiName, key);
             default:
                 throw new Error(`Unknown Key: ${modelName}`);
         }

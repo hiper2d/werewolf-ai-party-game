@@ -1,13 +1,11 @@
 import {AgentMessageDto} from "@/app/ai/ai-models";
 
 export abstract class AbstractAgent {
-    id: string;
     name: string;
     instruction: string;
     temperature: number;
 
-    protected constructor(id: string, name: string, instruction: string, temperature: number) {
-        this.id = id;
+    protected constructor(name: string, instruction: string, temperature: number) {
         this.name = name;
         this.instruction = instruction;
         this.temperature = temperature;

@@ -5,12 +5,10 @@ import {GoogleGenerativeAI} from "@google/generative-ai";
 // API Docs: https://ai.google.dev/gemini-api/docs/text-generation?lang=node
 export class GoogleAgent extends AbstractAgent {
     private readonly client: GoogleGenerativeAI;
-    private readonly model: string;
     private readonly modelObj: any;
 
-    constructor(id: string, name: string, instruction: string, model: string, apiKey: string) {
-        super(id, name, instruction, 0.2);
-        this.model = model;
+    constructor(name: string, instruction: string, model: string, apiKey: string) {
+        super(name, instruction, 0.2);
         this.client = new GoogleGenerativeAI(apiKey)
         this.modelObj = this.client.getGenerativeModel({ model: model });
     }
