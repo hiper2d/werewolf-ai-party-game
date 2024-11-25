@@ -18,7 +18,7 @@ export default function GameChat({ gameId, gameState }: GameChatProps) {
     useEffect(() => {
         const eventSource = new EventSource(`/api/games/${gameId}/messages/sse`);
         eventSource.onmessage = (event) => {
-            const message = JSON.parse(event.data);
+            const message = JSON.parse(event.data); // Convert to AgentMessageDto
             setMessages(prev => [...prev, message]);
         };
 

@@ -273,7 +273,7 @@ export async function addMessageToChatAndSaveToDb(gameId: string, text: string, 
         throw new Error('Firestore is not initialized');
     }
     try {
-        // todo: Think if it makes sense to keep message in the games collection: `games/${gameId}/messages`
+        // todo: Convert there to the AgentMessageDto
         const response = await db.collection('messages').add({
             text,
             sender,

@@ -21,6 +21,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
             const unsubscribe = q.onSnapshot( (snapshot) => {
                 snapshot.docChanges().forEach((change) => {
                     if (change.type === 'added') {
+                        // todo: Convert there to the AgentMessageDto
                         const message = { id: change.doc.id, ...change.doc.data() };
                         controller.enqueue(encoder.encode(`data: ${JSON.stringify(message)}\n\n`));
                     }

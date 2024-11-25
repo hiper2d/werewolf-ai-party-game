@@ -57,6 +57,7 @@ export interface Game {
     gameStateProcessQueue: Array<string>; // some states need to keep intermediate results
 }
 
+// todo: Merge with AgentMessageDto
 export interface Message {
     id: string;
     text: string;
