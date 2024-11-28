@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import { addMessageToChatAndSaveToDb } from "@/app/api/game-actions";
 import { buttonTransparentStyle } from "@/app/constants";
-import { GAME_STATES, MessageType, RECIPIENT_ALL, FirestoreGameMessage, GameMessage } from "@/app/api/game-models";
+import { GAME_STATES, MessageType, RECIPIENT_ALL, FirestoreGameMessage, GameMessage, MESSAGE_ROLE } from "@/app/api/game-models";
+import { getPlayerColor } from "@/app/utils/color-utils";
 
 interface GameChatProps {
     gameId: string;
@@ -20,6 +21,7 @@ interface GameStory {
 
 function renderMessage(message: FirestoreGameMessage) {
     const isUserMessage = message.authorName === 'User';
+    const isGameMaster = message.messageType === 'GAME_MASTER_ASK';
     
     let displayContent: string;
     try {
@@ -57,13 +59,16 @@ function renderMessage(message: FirestoreGameMessage) {
     }
 
     return (
-        <div className={`mb-2 ${isUserMessage ? 'text-right' : 'text-left'}`}>
-            <span className={`text-xs ${isUserMessage ? 'text-gray-300' : 'text-gray-400'} mb-1 block`}>
-                {message.authorName}
-            </span>
-            <span className={`inline-block p-2 rounded-lg ${
-                isUserMessage ? 'bg-slate-700' : 'bg-slate-800'
-            } text-white`}>
+        <div className={`${isGameMaster ? 'py-2' : 'mb-2'} ${isUserMessage ? 'text-right' : 'text-left'}`}>
+            {!isGameMaster && (
+                <span className={`text-xs ${isUserMessage ? 'text-gray-300' : ''} mb-1 block`} style={!isUserMessage ? { color: getPlayerColor(message.authorName) } : undefined}>
+                    {message.authorName}
+                </span>
+            )}
+            <span className={`inline-block p-2 ${
+                isGameMaster ? 'w-full bg-slate-600/50' : 
+                isUserMessage ? 'rounded-lg bg-slate-700' : 'rounded-lg'
+            } text-white`} style={!isUserMessage && !isGameMaster ? { backgroundColor: `${getPlayerColor(message.authorName)}33` } : undefined}>
                 {displayContent}
             </span>
         </div>
