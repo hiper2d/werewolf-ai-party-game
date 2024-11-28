@@ -12,12 +12,20 @@ const playerColors = [
     '#6B7B8B', // Muted steel blue
 ];
 
+// Game Master specific color
+const GAME_MASTER_COLOR = '#FF6B6B'; // Coral red, more visible on dark backgrounds
+
 /**
  * Generates a consistent color for a player based on their name
  * @param playerName The name of the player
  * @returns A hex color code from the playerColors array
  */
 export function getPlayerColor(playerName: string): string {
+    // Special case for Game Master
+    if (playerName === 'Game Master') {
+        return GAME_MASTER_COLOR;
+    }
+
     // Use a simple hash function to get a consistent index for each name
     const hash = playerName.split('').reduce((acc, char) => {
         return char.charCodeAt(0) + ((acc << 5) - acc);
