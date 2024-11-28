@@ -22,6 +22,7 @@ function deserializeMessage(firestoreMessage: FirestoreGameMessage): GameMessage
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
     const gameId = params.id;
+    console.log('SSE: Starting connection for game:', gameId);
     const encoder = new TextEncoder();
 
     const stream = new ReadableStream({
@@ -30,25 +31,31 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
                 throw new Error('Firestore is not initialized');
             }
 
-            const q = db.collection('messages')
-                .where('gameId', '==', gameId)
+            console.log('SSE: Setting up Firestore listener');
+            const q = db.collection('games').doc(gameId).collection('messages')
                 .where('recipientName', '==', RECIPIENT_ALL)
                 .orderBy('timestamp', 'asc');
 
-            const unsubscribe = q.onSnapshot( (snapshot) => {
+            const unsubscribe = q.onSnapshot((snapshot) => {
+                console.log('SSE: Received snapshot with', snapshot.docChanges().length, 'changes');
                 snapshot.docChanges().forEach((change) => {
                     if (change.type === 'added') {
+                        console.log('SSE: New message added:', change.doc.id);
+                        const data = change.doc.data();
                         const firestoreMessage = {
                             id: change.doc.id,
-                            ...change.doc.data()
+                            ...data,
+                            timestamp: data.timestamp || Date.now(),
                         } as FirestoreGameMessage;
-                        const message = deserializeMessage(firestoreMessage);
-                        controller.enqueue(encoder.encode(`data: ${JSON.stringify(message)}\n\n`));
+                        controller.enqueue(encoder.encode(`data: ${JSON.stringify(firestoreMessage)}\n\n`));
                     }
                 });
+            }, error => {
+                console.error('SSE: Firestore listener error:', error);
             });
 
             request.signal.addEventListener('abort', () => {
+                console.log('SSE: Connection closed');
                 unsubscribe();
             });
         }

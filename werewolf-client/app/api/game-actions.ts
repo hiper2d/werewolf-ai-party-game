@@ -45,8 +45,7 @@ export async function removeGameById(id: string) {
     }
 
     // Delete all messages for this game
-    const messagesSnapshot = await db.collection('messages')
-        .where('gameId', '==', id)
+    const messagesSnapshot = await db.collection('games').doc(id).collection('messages')
         .get();
     
     const batch = db.batch();
@@ -184,8 +183,7 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
         }));
 
         // Create the game object
-        const game: Game = {
-            id: "", // This will be overwritten by Firestore
+        const game = {
             description: gamePreview.description,
             theme: gamePreview.theme,
             werewolfCount: gamePreview.werewolfCount,
@@ -262,7 +260,6 @@ export async function welcome(gameId: string): Promise<Game> {
             role: bot.role,
             players_names: game.bots.filter(b => b.isAlive).map(b => b.name).concat([game.humanPlayerName]).join(", "),
             dead_players_names_with_roles: game.bots.filter(b => !b.isAlive).map(b => `${b.name} (${b.role})`).join(", "),
-            reply_language_instruction: "English" // You might want to make this configurable
         });
 
         const agent = AgentFactory.createAgent(
@@ -323,22 +320,22 @@ function serializeMessageForFirestore(gameMessage: GameMessage, gameId: string) 
         role: gameMessage.role,
         msg,  // Firestore will handle the object/string automatically
         messageType: gameMessage.messageType,
-        timestamp: FieldValue.serverTimestamp(),
+        timestamp: Date.now(), // Use consistent timestamp
         gameId
     };
 }
 
-export async function addMessageToChatAndSaveToDb(gameMessage: GameMessage, gameId: string) {
+export async function addMessageToChatAndSaveToDb(gameMessage: GameMessage, gameId: string): Promise<string | undefined> {
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
     try {
         const serializedMessage = serializeMessageForFirestore(gameMessage, gameId);
-        const response = await db.collection('messages').add(serializedMessage);
+        const response = await db.collection('games').doc(gameId).collection('messages').add(serializedMessage);
         return response.id;
     } catch (error: any) {
         console.error("Error adding message: ", error);
-        throw new Error(`Failed to save message: ${error.message}`);
+        throw new Error(`Failed to add message: ${error.message}`);
     }
 }
 

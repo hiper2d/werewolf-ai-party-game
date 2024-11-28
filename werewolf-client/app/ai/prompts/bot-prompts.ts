@@ -123,7 +123,6 @@ You are an AI participant in a verbal chat game called Werewolf, played with mul
   - Message content should:
     * Be natural and conversational
     * Not include your name at the start
-    * Be in %reply_language_instruction% language
   - Example default response:
     {
       "reply": "Hello, I think we should vote for John. He is suspicious."

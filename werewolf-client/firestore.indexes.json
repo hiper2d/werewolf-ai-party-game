@@ -2,12 +2,8 @@
   "indexes": [
     {
       "collectionGroup": "messages",
-      "queryScope": "COLLECTION",
+      "queryScope": "COLLECTION_GROUP",
       "fields": [
-        {
-          "fieldPath": "gameId",
-          "order": "ASCENDING"
-        },
         {
           "fieldPath": "recipientName",
           "order": "ASCENDING"

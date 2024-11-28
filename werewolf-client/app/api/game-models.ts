@@ -122,6 +122,6 @@ export interface GameMessage {
 
 export interface FirestoreGameMessage extends GameMessage {
     id: string;
-    timestamp: Timestamp;
+    timestamp: number; // UTC epoch timestamp in milliseconds
     gameId: string;
 }
