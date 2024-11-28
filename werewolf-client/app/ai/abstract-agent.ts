@@ -1,4 +1,4 @@
-import {AgentMessageDto} from "@/app/ai/ai-models";
+import {GameMessage} from "@/app/ai/ai-models";
 
 export abstract class AbstractAgent {
     name: string;
@@ -11,7 +11,7 @@ export abstract class AbstractAgent {
         this.temperature = temperature;
     }
 
-    abstract ask(messages: AgentMessageDto[]): Promise<string | null>;
+    abstract ask(messages: GameMessage[]): Promise<string | null>;
 
     protected logger(message: string): void {
         console.log(`[${this.name}]: ${message}`);

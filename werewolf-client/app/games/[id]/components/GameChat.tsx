@@ -2,23 +2,82 @@
 
 import { useEffect, useState } from 'react';
 import { addMessageToChatAndSaveToDb } from "@/app/api/game-actions";
-import {buttonTransparentStyle} from "@/app/constants";
-import {GAME_STATES, Message} from "@/app/api/game-models";
-import {RECIPIENT_ALL} from "@/app/ai/ai-models";
+import { buttonTransparentStyle } from "@/app/constants";
+import { GAME_STATES, MessageType, RECIPIENT_ALL, FirestoreGameMessage, GameMessage } from "@/app/api/game-models";
 
 interface GameChatProps {
     gameId: string;
     gameState: string;
 }
 
+interface BotAnswer {
+    reply: string;
+}
+
+interface GameStory {
+    story: string;
+}
+
+function renderMessage(message: FirestoreGameMessage) {
+    const isUserMessage = message.authorName === 'User';
+    
+    let displayContent: string;
+    try {
+        switch (message.messageType) {
+            case MessageType.BOT_ANSWER: {
+                const botAnswer = message.msg as BotAnswer;
+                if (typeof botAnswer === 'object' && 'reply' in botAnswer) {
+                    displayContent = botAnswer.reply;
+                } else {
+                    displayContent = 'Invalid bot answer format';
+                }
+                break;
+            }
+            case MessageType.GAME_STORY: {
+                const gameStory = message.msg as GameStory;
+                if (typeof gameStory === 'object' && 'story' in gameStory) {
+                    displayContent = gameStory.story;
+                } else {
+                    displayContent = 'Invalid game story format';
+                }
+                break;
+            }
+            case MessageType.GAME_MASTER_ASK:
+            case MessageType.HUMAN_PLAYER_MESSAGE:
+                displayContent = typeof message.msg === 'string' ? message.msg : 'Invalid message format';
+                break;
+            default:
+                displayContent = typeof message.msg === 'string' 
+                    ? message.msg 
+                    : JSON.stringify(message.msg);
+        }
+    } catch (error) {
+        console.error('Error rendering message:', error);
+        displayContent = 'Error displaying message';
+    }
+
+    return (
+        <div className={`mb-2 ${isUserMessage ? 'text-right' : 'text-left'}`}>
+            <span className={`text-xs ${isUserMessage ? 'text-gray-300' : 'text-gray-400'} mb-1 block`}>
+                {message.authorName}
+            </span>
+            <span className={`inline-block p-2 rounded-lg ${
+                isUserMessage ? 'bg-slate-700' : 'bg-slate-800'
+            } text-white`}>
+                {displayContent}
+            </span>
+        </div>
+    );
+}
+
 export default function GameChat({ gameId, gameState }: GameChatProps) {
-    const [messages, setMessages] = useState<Message[]>([]);
+    const [messages, setMessages] = useState<FirestoreGameMessage[]>([]);
     const [newMessage, setNewMessage] = useState('');
 
     useEffect(() => {
         const eventSource = new EventSource(`/api/games/${gameId}/messages/sse`);
         eventSource.onmessage = (event) => {
-            const message = JSON.parse(event.data); // Convert to AgentMessageDto
+            const message = JSON.parse(event.data) as FirestoreGameMessage;
             setMessages(prev => [...prev, message]);
         };
 
@@ -29,8 +88,16 @@ export default function GameChat({ gameId, gameState }: GameChatProps) {
         e.preventDefault();
         if (newMessage.trim() === '') return;
 
+        const gameMessage: GameMessage = {
+            recipientName: RECIPIENT_ALL,
+            authorName: 'User', // todo: use actual player name
+            role: 'user',
+            msg: newMessage,
+            messageType: MessageType.HUMAN_PLAYER_MESSAGE
+        };
+
         try {
-            const result = await addMessageToChatAndSaveToDb(gameId, newMessage, 'User', RECIPIENT_ALL); // todo: there should be the player name
+            const result = await addMessageToChatAndSaveToDb(gameMessage, gameId);
             if (result) {
                 setNewMessage('');
             }
@@ -45,20 +112,13 @@ export default function GameChat({ gameId, gameState }: GameChatProps) {
         <div className="flex flex-col h-full border border-white border-opacity-30 rounded-lg p-4">
             <h2 className="text-xl font-bold mb-4 text-white">Game Chat</h2>
             <div className="flex-grow overflow-y-auto mb-4 p-2 bg-black bg-opacity-30 rounded">
-                {messages.map((message, index) => (
-                    <div key={message.id} className={`mb-2 ${message.sender === 'User' ? 'text-right' : 'text-left'}`}>
-                        {(index === 0 || messages[index - 1].sender !== message.sender) && (
-                            <span
-                                className={`text-xs ${message.sender === 'User' ? 'text-gray-300' : 'text-gray-400'} mb-1 block`}>
-                                {message.sender}
-                            </span>
-                        )}
-                        <span
-                            className={`inline-block p-2 rounded-lg ${message.sender === 'User' ? 'bg-slate-700 text-white' : 'bg-slate-800 text-white'}`}>
-                            {message.text}
-                        </span>
-                    </div>
-                ))}
+                {messages.map((message, index) => {
+                    // Only render if it's the first message or if the author changed
+                    if (index === 0 || messages[index - 1].authorName !== message.authorName) {
+                        return <div key={index}>{renderMessage(message)}</div>;
+                    }
+                    return null;
+                })}
             </div>
             <form onSubmit={sendMessage} className="flex">
                 <input

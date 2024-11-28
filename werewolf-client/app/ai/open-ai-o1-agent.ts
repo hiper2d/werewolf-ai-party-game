@@ -1,6 +1,6 @@
 import {AbstractAgent} from "@/app/ai/abstract-agent";
 import {OpenAI} from "openai";
-import {AgentMessageDto} from "@/app/ai/ai-models";
+import {GameMessage} from "@/app/ai/ai-models";
 import {util} from "protobufjs";
 import ChatCompletion = OpenAI.Chat.Completions.ChatCompletion;
 import ChatCompletionMessageParam = OpenAI.Chat.Completions.ChatCompletionMessageParam;
@@ -17,7 +17,7 @@ export class OpenAiO1Agent extends AbstractAgent {
         })
     }
 
-    async ask(messages: AgentMessageDto[]): Promise<string | null> {
+    async ask(messages: GameMessage[]): Promise<string | null> {
         this.logger(`Asking agent. Message history: ${messages[messages.length - 1].msg}`);
 
         const openAiMessages = new Array<ChatCompletionMessageParam>();

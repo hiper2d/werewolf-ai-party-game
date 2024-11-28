@@ -1,7 +1,24 @@
 import {NextRequest} from 'next/server';
 import {db} from "@/firebase/server";
-import {RECIPIENT_ALL} from "@/app/ai/ai-models";
+import {RECIPIENT_ALL, FirestoreGameMessage, GameMessage, MessageType} from "@/app/api/game-models";
+import {BotAnswer, GameStory} from "@/app/api/game-models";
 
+function deserializeMessage(firestoreMessage: FirestoreGameMessage): GameMessage {
+    try {
+        // For GAME_MASTER_ASK and HUMAN_PLAYER_MESSAGE, msg is a string
+        // For BOT_ANSWER and GAME_STORY, msg is already an object from Firestore
+        return {
+            recipientName: firestoreMessage.recipientName,
+            authorName: firestoreMessage.authorName,
+            role: firestoreMessage.role,
+            msg: firestoreMessage.msg,  // Keep as is - either string or object
+            messageType: firestoreMessage.messageType
+        };
+    } catch (error) {
+        console.error('Error deserializing message:', error);
+        throw new Error(`Failed to deserialize message: ${error}`);
+    }
+}
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
     const gameId = params.id;
@@ -15,14 +32,17 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
             const q = db.collection('messages')
                 .where('gameId', '==', gameId)
-                .where('recipient', '==', RECIPIENT_ALL)
-                .orderBy('timestamp', 'desc');
+                .where('recipientName', '==', RECIPIENT_ALL)
+                .orderBy('timestamp', 'asc');
 
             const unsubscribe = q.onSnapshot( (snapshot) => {
                 snapshot.docChanges().forEach((change) => {
                     if (change.type === 'added') {
-                        // todo: Convert there to the AgentMessageDto
-                        const message = { id: change.doc.id, ...change.doc.data() };
+                        const firestoreMessage = {
+                            id: change.doc.id,
+                            ...change.doc.data()
+                        } as FirestoreGameMessage;
+                        const message = deserializeMessage(firestoreMessage);
                         controller.enqueue(encoder.encode(`data: ${JSON.stringify(message)}\n\n`));
                     }
                 });

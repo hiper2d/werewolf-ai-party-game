@@ -1,7 +1,7 @@
 import {AbstractAgent} from "@/app/ai/abstract-agent";
-import {AgentMessageDto, MESSAGE_ROLE} from "@/app/ai/ai-models";
 import {Mistral} from "@mistralai/mistralai";
 import {ChatCompletionResponse} from "@mistralai/mistralai/models/components";
+import { GameMessage, MESSAGE_ROLE } from "@/app/api/game-models";
 
 export class MistralAgent extends AbstractAgent {
     private readonly client: Mistral;
@@ -13,7 +13,7 @@ export class MistralAgent extends AbstractAgent {
         this.client = new Mistral({apiKey: apiKey});
     }
 
-    async ask(messages: AgentMessageDto[]): Promise<string | null> {
+    async ask(messages: GameMessage[]): Promise<string | null> {
         this.logger(`Asking agent. Message history: ${messages[messages.length - 1].msg}`);
 
         const chatResponse: ChatCompletionResponse | undefined = await this.client.chat.complete({

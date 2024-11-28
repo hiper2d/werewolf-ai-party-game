@@ -9,12 +9,12 @@
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "recipient",
+          "fieldPath": "recipientName",
           "order": "ASCENDING"
         },
         {
           "fieldPath": "timestamp",
-          "order": "DESCENDING"
+          "order": "ASCENDING"
         }
       ]
     }

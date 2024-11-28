@@ -1,5 +1,5 @@
 import { AbstractAgent } from "@/app/ai/abstract-agent";
-import { AgentMessageDto } from "@/app/ai/ai-models";
+import { GameMessage } from "@/app/api/game-models";
 
 import { Anthropic } from '@anthropic-ai/sdk';
 import MessageParam from '@anthropic-ai/sdk/resources';
@@ -21,7 +21,7 @@ export class ClaudeAgent extends AbstractAgent {
         this.model = model;
     }
 
-    async ask(messages: AgentMessageDto[]): Promise<string | null> {
+    async ask(messages: GameMessage[]): Promise<string | null> {
         this.logger(`Asking ${this.name} agent. Last message: ${messages[messages.length - 1].msg}`);
 
         try {

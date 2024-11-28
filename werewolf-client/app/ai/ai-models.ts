@@ -1,3 +1,5 @@
+import { Timestamp } from "firebase/firestore";
+
 export const API_KEY_CONSTANTS = {
     OPENAI: 'OPENAI_API_KEY',
     ANTHROPIC: 'ANTHROPIC_API_KEY',
@@ -70,20 +72,3 @@ export const SupportedAiModels = {
 } as const;
 
 export type LLMModel = keyof typeof SupportedAiModels;
-
-export const MESSAGE_ROLE = {
-    SYSTEM: "system" as const,
-    USER: "user" as const,
-    ASSISTANT: "assistant" as const,
-    TOOL: "tool" as const
-} as const;
-
-export const GAME_MASTER = 'Game Master';
-export const RECIPIENT_ALL = 'all';
-
-export interface AgentMessageDto {
-    recipientName: string;
-    authorName: string;
-    role: string;
-    msg: string;
-}

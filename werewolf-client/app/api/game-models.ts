@@ -79,14 +79,49 @@ export const GAME_STATES = {
     DAY_DISCUSSION: 'DAY_DISCUSSION',
 } as const;
 
-export class BotAnswer {
-    constructor(public reply: string) {}
+export enum MessageType {
+    GAME_MASTER_ASK = 'GAME_MASTER_ASK',
+    BOT_ANSWER = 'BOT_ANSWER',
+    GAME_STORY = 'GAME_STORY',
+    HUMAN_PLAYER_MESSAGE = 'HUMAN_PLAYER_MESSAGE',
+}
 
-    static fromRawResponse(response: string): BotAnswer {
-        const cleanResponse = response.trim()
-            .replace(/^```(json)?/, '')
-            .replace(/```$/, '')
-            .trim();
-        return new BotAnswer(cleanResponse);
-    }
+export interface BaseMessage {
+    type: MessageType;
+}
+
+export class BotAnswer implements BaseMessage {
+    type: MessageType = MessageType.BOT_ANSWER;
+    
+    constructor(public reply: string) {}
+}
+
+export class GameStory implements BaseMessage {
+    type: MessageType = MessageType.GAME_STORY;
+    
+    constructor(public story: string) {}
+}
+
+export const MESSAGE_ROLE = {
+    SYSTEM: "system" as const,
+    USER: "user" as const,
+    ASSISTANT: "assistant" as const,
+    TOOL: "tool" as const
+} as const;
+
+export const GAME_MASTER = 'Game Master';
+export const RECIPIENT_ALL = 'all';
+
+export interface GameMessage {
+    recipientName: string;
+    authorName: string;
+    role: string;
+    msg: any;
+    messageType: string;
+}
+
+export interface FirestoreGameMessage extends GameMessage {
+    id: string;
+    timestamp: Timestamp;
+    gameId: string;
 }
