@@ -1,24 +1,6 @@
 import {NextRequest} from 'next/server';
 import {db} from "@/firebase/server";
-import {RECIPIENT_ALL, FirestoreGameMessage, GameMessage, MessageType} from "@/app/api/game-models";
-import {BotAnswer, GameStory} from "@/app/api/game-models";
-
-function deserializeMessage(firestoreMessage: FirestoreGameMessage): GameMessage {
-    try {
-        // For GAME_MASTER_ASK and HUMAN_PLAYER_MESSAGE, msg is a string
-        // For BOT_ANSWER and GAME_STORY, msg is already an object from Firestore
-        return {
-            recipientName: firestoreMessage.recipientName,
-            authorName: firestoreMessage.authorName,
-            role: firestoreMessage.role,
-            msg: firestoreMessage.msg,  // Keep as is - either string or object
-            messageType: firestoreMessage.messageType
-        };
-    } catch (error) {
-        console.error('Error deserializing message:', error);
-        throw new Error(`Failed to deserialize message: ${error}`);
-    }
-}
+import {RECIPIENT_ALL, GameMessage, MessageType} from "@/app/api/game-models";
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
     const gameId = params.id;
@@ -42,12 +24,16 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
                     if (change.type === 'added') {
                         console.log('SSE: New message added:', change.doc.id);
                         const data = change.doc.data();
-                        const firestoreMessage = {
+                        const message: GameMessage = {
                             id: change.doc.id,
-                            ...data,
-                            timestamp: data.timestamp || Date.now(),
-                        } as FirestoreGameMessage;
-                        controller.enqueue(encoder.encode(`data: ${JSON.stringify(firestoreMessage)}\n\n`));
+                            recipientName: data.recipientName,
+                            authorName: data.authorName,
+                            msg: data.msg,
+                            messageType: data.messageType,
+                            day: data.day || 1,
+                            timestamp: data.timestamp || Date.now()
+                        };
+                        controller.enqueue(encoder.encode(`data: ${JSON.stringify(message)}\n\n`));
                     }
                 });
             }, error => {

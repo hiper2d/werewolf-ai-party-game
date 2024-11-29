@@ -1,9 +1,10 @@
-import {GameMessage} from "@/app/api/game-models";
+import {AIMessage} from "@/app/api/game-models";
+import {convertToAIMessages} from "@/app/utils/message-utils";
 
 export abstract class AbstractAgent {
     name: string;
-    instruction: string;
-    temperature: number;
+    protected readonly instruction: string;
+    protected readonly temperature: number;
 
     protected constructor(name: string, instruction: string, temperature: number) {
         this.name = name;
@@ -11,9 +12,13 @@ export abstract class AbstractAgent {
         this.temperature = temperature;
     }
 
-    abstract ask(messages: GameMessage[]): Promise<string | null>;
+    abstract ask(messages: AIMessage[]): Promise<string | null>;
 
     protected logger(message: string): void {
         console.log(`[${this.name}]: ${message}`);
+    }
+
+    protected prepareMessages(messages: AIMessage[]): AIMessage[] {
+        return messages;
     }
 }

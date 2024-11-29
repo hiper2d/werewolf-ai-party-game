@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { addMessageToChatAndSaveToDb } from "@/app/api/game-actions";
 import { buttonTransparentStyle } from "@/app/constants";
-import { GAME_STATES, MessageType, RECIPIENT_ALL, FirestoreGameMessage, GameMessage, MESSAGE_ROLE } from "@/app/api/game-models";
+import { GAME_STATES, MessageType, RECIPIENT_ALL, GameMessage } from "@/app/api/game-models";
 import { getPlayerColor } from "@/app/utils/color-utils";
 
 interface GameChatProps {
@@ -19,7 +19,7 @@ interface GameStory {
     story: string;
 }
 
-function renderMessage(message: FirestoreGameMessage) {
+function renderMessage(message: GameMessage) {
     const isUserMessage = message.authorName === 'User';
     const isGameMaster = message.messageType === 'GAME_MASTER_ASK';
     
@@ -76,13 +76,13 @@ function renderMessage(message: FirestoreGameMessage) {
 }
 
 export default function GameChat({ gameId, gameState }: GameChatProps) {
-    const [messages, setMessages] = useState<FirestoreGameMessage[]>([]);
+    const [messages, setMessages] = useState<GameMessage[]>([]);
     const [newMessage, setNewMessage] = useState('');
 
     useEffect(() => {
         const eventSource = new EventSource(`/api/games/${gameId}/messages/sse`);
         eventSource.onmessage = (event) => {
-            const message = JSON.parse(event.data) as FirestoreGameMessage;
+            const message = JSON.parse(event.data) as GameMessage;
             setMessages(prev => [...prev, message]);
         };
 
@@ -94,11 +94,13 @@ export default function GameChat({ gameId, gameState }: GameChatProps) {
         if (newMessage.trim() === '') return;
 
         const gameMessage: GameMessage = {
+            id: null,
             recipientName: RECIPIENT_ALL,
             authorName: 'User', // todo: use actual player name
-            role: 'user',
             msg: newMessage,
-            messageType: MessageType.HUMAN_PLAYER_MESSAGE
+            messageType: MessageType.HUMAN_PLAYER_MESSAGE,
+            day: 1, // todo: get current day from game state
+            timestamp: Date.now()
         };
 
         try {
@@ -118,11 +120,7 @@ export default function GameChat({ gameId, gameState }: GameChatProps) {
             <h2 className="text-xl font-bold mb-4 text-white">Game Chat</h2>
             <div className="flex-grow overflow-y-auto mb-4 p-2 bg-black bg-opacity-30 rounded">
                 {messages.map((message, index) => {
-                    // Only render if it's the first message or if the author changed
-                    if (index === 0 || messages[index - 1].authorName !== message.authorName) {
-                        return <div key={index}>{renderMessage(message)}</div>;
-                    }
-                    return null;
+                    return <div key={index}>{renderMessage(message)}</div>;
                 })}
             </div>
             <form onSubmit={sendMessage} className="flex">

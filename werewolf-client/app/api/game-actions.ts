@@ -3,32 +3,33 @@
 import {db} from "@/firebase/server";
 import {firestore} from "firebase-admin";
 import {
+    AIMessage,
+    ApiKeyMap,
     Bot,
-    BotPreview,
-    Game,
-    GAME_ROLES, 
-    GAME_STATES,
-    GamePreview,
-    GamePreviewWithGeneratedBots, 
-    GameStory, 
-    User,
-    GAME_MASTER, 
-    GameMessage, 
-    MESSAGE_ROLE, 
-    RECIPIENT_ALL,
     BotAnswer,
-    MessageType
+    Game,
+    GameMessage,
+    GamePreview,
+    GamePreviewWithGeneratedBots,
+    GAME_MASTER,
+    GAME_ROLES,
+    GAME_STATES,
+    MESSAGE_ROLE,
+    MessageType,
+    RECIPIENT_ALL,
+    User,
+    BotPreview
 } from "@/app/api/game-models";
 import {getServerSession} from "next-auth";
 import {AgentFactory} from "@/app/ai/agent-factory";
-import {AbstractAgent} from "@/app/ai/abstract-agent";
-import {LLM_CONSTANTS} from "@/app/ai/ai-models";
+import {format} from "node:util";
 import {STORY_SYSTEM_PROMPT, STORY_USER_PROMPT} from "@/app/ai/prompts/story-gen-prompts";
-import {format} from "@/app/ai/prompts/utils";
-import {GM_COMMAND_INTRODUCE_YOURSELF} from "@/app/ai/prompts/gm-commands";
-import FieldValue = firestore.FieldValue;
-import {getUserApiKeys} from "@/app/api/user-actions";
 import {BOT_SYSTEM_PROMPT} from "@/app/ai/prompts/bot-prompts";
+import {GM_COMMAND_INTRODUCE_YOURSELF} from "@/app/ai/prompts/gm-commands";
+import {getUserApiKeys} from "@/app/api/user-actions";
+import {convertToAIMessages} from "@/app/utils/message-utils";
+import {LLM_CONSTANTS} from "@/app/ai/ai-models";
+import { AbstractAgent } from "../ai/abstract-agent";
 
 export async function getAllGames(): Promise<Game[]> {
     if (!db) {
@@ -113,11 +114,11 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
         authorName: GAME_MASTER,
         msg: userPrompt,
         messageType: MessageType.GAME_MASTER_ASK,
-        day: 0,
+        day: 1,
         timestamp: null
     };
 
-    const response = await storyTellAgent.ask([storyMessage]);
+    const response = await storyTellAgent.ask(convertToAIMessages([storyMessage]));
     if (!response) {
         throw new Error('Failed to get AI response');
     }
@@ -151,6 +152,10 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
 }
 
 export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Promise<string|undefined> {
+    const session = await getServerSession();
+    if (!session || !session.user?.email) {
+        throw new Error('Not authenticated');
+    }
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
@@ -222,10 +227,13 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
 }
 
 export async function welcome(gameId: string): Promise<Game> {
+    const session = await getServerSession();
+    if (!session || !session.user?.email) {
+        throw new Error('Not authenticated');
+    }
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
-
     const game = await getGame(gameId);
     if (!game) {
         throw new Error('Game not found');
@@ -250,29 +258,15 @@ export async function welcome(gameId: string): Promise<Game> {
             throw new Error(`Bot ${botName} not found in game`);
         }
 
-        const session = await getServerSession();
-        if (!session?.user?.email) {
-            throw new Error('Not authenticated');
-        }
-
         const apiKeys = await getUserFromFirestore(session.user.email)
             .then((user) => getUserApiKeys(user!.email));
 
-        const formattedSystemPrompt = format(BOT_SYSTEM_PROMPT, {
+        const agent = await AgentFactory.createAgent(bot.name, format(BOT_SYSTEM_PROMPT, {
             name: bot.name,
             personal_story: bot.story,
-            temperament: "friendly", // You might want to generate or configure this
-            role: bot.role,
-            players_names: game.bots.filter(b => b.isAlive).map(b => b.name).concat([game.humanPlayerName]).join(", "),
-            dead_players_names_with_roles: game.bots.filter(b => !b.isAlive).map(b => `${b.name} (${b.role})`).join(", "),
-        });
-
-        const agent = AgentFactory.createAgent(
-            botName,
-            formattedSystemPrompt,
-            bot.aiType,
-            apiKeys
-        );
+            temperament: 'You have a balanced and thoughtful personality.',
+            role: bot.role
+        }), bot.aiType, apiKeys);
 
         const gmMessage: GameMessage = {
             id: null,
@@ -284,13 +278,13 @@ export async function welcome(gameId: string): Promise<Game> {
             timestamp: Date.now()
         };
 
-        const rawIntroduction = await agent.ask([gmMessage]);
+        // Convert GameMessage to AIMessage before passing to agent
+        const rawIntroduction = await agent.ask(convertToAIMessages([gmMessage]));
         if (!rawIntroduction) {
-            throw new Error('Failed to get bot introduction');
+            throw new Error('Failed to get introduction from bot');
         }
-        const cleanIntroduction = cleanMarkdownResponse(rawIntroduction);
-        const botAnswer = JSON.parse(cleanIntroduction) as BotAnswer;
-        //todo: pull message history from firestore
+
+        const botAnswer = cleanMarkdownResponse(rawIntroduction);
         
         const botMessage: GameMessage = {
             id: null,

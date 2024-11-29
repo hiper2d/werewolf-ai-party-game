@@ -1,6 +1,6 @@
 import { AbstractAgent } from "@/app/ai/abstract-agent";
-import { GameMessage } from "@/app/api/game-models";
-
+import { AIMessage } from "@/app/api/game-models";
+import { convertToAIMessages } from "@/app/utils/message-utils";
 import { Anthropic } from '@anthropic-ai/sdk';
 import MessageParam from '@anthropic-ai/sdk/resources';
 
@@ -21,18 +21,18 @@ export class ClaudeAgent extends AbstractAgent {
         this.model = model;
     }
 
-    async ask(messages: GameMessage[]): Promise<string | null> {
-        this.logger(`Asking ${this.name} agent. Last message: ${messages[messages.length - 1].msg}`);
+    async ask(messages: AIMessage[]): Promise<string | null> {
+        this.logger(`Asking ${this.name} agent. Last message: ${messages[messages.length - 1].content}`);
 
         try {
-            const systemMessage = messages[0].msg;
+            const aiMessages = this.prepareMessages(messages);
 
             const params: Anthropic.MessageCreateParams = {
                 max_tokens: 1024,
                 system: this.instruction,
-                messages: messages.map(msg => ({
+                messages: aiMessages.filter(msg => msg.role !== 'system').map(msg => ({
                     role: msg.role,
-                    content: msg.msg
+                    content: msg.content
                 } as MessageParam)),
                 model: this.model,
                 temperature: this.temperature,
