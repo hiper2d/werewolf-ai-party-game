@@ -57,16 +57,6 @@ export interface Game {
     gameStateProcessQueue: Array<string>; // some states need to keep intermediate results
 }
 
-// todo: Merge with AgentMessageDto
-export interface Message {
-    id: string;
-    text: string;
-    timestamp: Timestamp;
-    sender: string;
-    recipient: string,
-    gameId: string;
-}
-
 export const GAME_ROLES = {
     DOCTOR: 'doctor',
     DETECTIVE: 'detective',
@@ -113,15 +103,16 @@ export const GAME_MASTER = 'Game Master';
 export const RECIPIENT_ALL = 'all';
 
 export interface GameMessage {
-    recipientName: string;
-    authorName: string;
-    role: string;
-    msg: any;
-    messageType: string;
+    id: string | null;           // Will be null for new messages, set by Firestore
+    recipientName: string;      // Who should receive this message
+    authorName: string;         // Who sent this message
+    msg: any;                   // The message content
+    messageType: string;        // Type of the message (e.g., BOT_ANSWER, GAME_STORY)
+    day: number;                // The game day when this message was created
+    timestamp: number | null;   // UTC epoch timestamp in milliseconds, null for new messages
 }
 
-export interface FirestoreGameMessage extends GameMessage {
-    id: string;
-    timestamp: number; // UTC epoch timestamp in milliseconds
-    gameId: string;
+export interface AIMessage {
+    role: 'system' | 'user' | 'assistant';
+    content: string;
 }

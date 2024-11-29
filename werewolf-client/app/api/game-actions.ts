@@ -25,6 +25,7 @@ import {AbstractAgent} from "@/app/ai/abstract-agent";
 import {LLM_CONSTANTS} from "@/app/ai/ai-models";
 import {STORY_SYSTEM_PROMPT, STORY_USER_PROMPT} from "@/app/ai/prompts/story-gen-prompts";
 import {format} from "@/app/ai/prompts/utils";
+import {GM_COMMAND_INTRODUCE_YOURSELF} from "@/app/ai/prompts/gm-commands";
 import FieldValue = firestore.FieldValue;
 import {getUserApiKeys} from "@/app/api/user-actions";
 import {BOT_SYSTEM_PROMPT} from "@/app/ai/prompts/bot-prompts";
@@ -107,11 +108,13 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
     )
 
     const storyMessage: GameMessage = {
+        id: null,
         recipientName: RECIPIENT_ALL, // not important here
         authorName: GAME_MASTER,
-        role: MESSAGE_ROLE.USER, // GM is a user to bots
         msg: userPrompt,
-        messageType: MessageType.GAME_MASTER_ASK
+        messageType: MessageType.GAME_MASTER_ASK,
+        day: 0,
+        timestamp: null
     };
 
     const response = await storyTellAgent.ask([storyMessage]);
@@ -201,11 +204,13 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
 
         const response = await db.collection('games').add(game);
         const gameStoryMessage: GameMessage = {
+            id: null,
             recipientName: RECIPIENT_ALL,
-            authorName: GAME_MASTER,
-            role: MESSAGE_ROLE.SYSTEM,
+            authorName: GAME_MASTER, 
             msg: { story: game.story },  
-            messageType: MessageType.GAME_STORY
+            messageType: MessageType.GAME_STORY,
+            day: game.currentDay,
+            timestamp: null
         };
 
         await addMessageToChatAndSaveToDb(gameStoryMessage, response.id);
@@ -270,11 +275,13 @@ export async function welcome(gameId: string): Promise<Game> {
         );
 
         const gmMessage: GameMessage = {
+            id: null,
             recipientName: bot.name,
             authorName: GAME_MASTER,
-            role: MESSAGE_ROLE.USER,
-            msg: 'Please introduce yourself to the group.' ,
-            messageType: MessageType.GAME_MASTER_ASK
+            msg: GM_COMMAND_INTRODUCE_YOURSELF,
+            messageType: MessageType.GAME_MASTER_ASK,
+            day: game.currentDay,
+            timestamp: Date.now()
         };
 
         const rawIntroduction = await agent.ask([gmMessage]);
@@ -286,11 +293,13 @@ export async function welcome(gameId: string): Promise<Game> {
         //todo: pull message history from firestore
         
         const botMessage: GameMessage = {
+            id: null,
             recipientName: RECIPIENT_ALL,
             authorName: bot.name,
-            role: MESSAGE_ROLE.ASSISTANT,
             msg: botAnswer,
-            messageType: MessageType.BOT_ANSWER
+            messageType: MessageType.BOT_ANSWER,
+            day: game.currentDay,
+            timestamp: Date.now()
         };
         await addMessageToChatAndSaveToDb(botMessage, gameId);
 
@@ -307,21 +316,14 @@ export async function welcome(gameId: string): Promise<Game> {
     }
 }
 
-function serializeMessageForFirestore(gameMessage: GameMessage, gameId: string) {
+function serializeMessageForFirestore(gameMessage: GameMessage) {
     // For GAME_MASTER_ASK and HUMAN_PLAYER_MESSAGE, msg is a string
     // For BOT_ANSWER and GAME_STORY, msg is an object that should be preserved
-    const msg = gameMessage.messageType === MessageType.BOT_ANSWER || gameMessage.messageType === MessageType.GAME_STORY
-        ? gameMessage.msg  // Keep as object for Firestore
-        : gameMessage.msg as string;  // It's a string for other message types
-
     return {
-        recipientName: gameMessage.recipientName,
-        authorName: gameMessage.authorName,
-        role: gameMessage.role,
-        msg,  // Firestore will handle the object/string automatically
-        messageType: gameMessage.messageType,
-        timestamp: Date.now(), // Use consistent timestamp
-        gameId
+        ...gameMessage,
+        msg: gameMessage.messageType === MessageType.BOT_ANSWER || gameMessage.messageType === MessageType.GAME_STORY
+            ? gameMessage.msg  // Keep as object for Firestore
+            : gameMessage.msg as string  // It's a string for other message types
     };
 }
 
@@ -330,8 +332,7 @@ export async function addMessageToChatAndSaveToDb(gameMessage: GameMessage, game
         throw new Error('Firestore is not initialized');
     }
     try {
-        const serializedMessage = serializeMessageForFirestore(gameMessage, gameId);
-        const response = await db.collection('games').doc(gameId).collection('messages').add(serializedMessage);
+        const response = await db.collection('games').doc(gameId).collection('messages').add(serializeMessageForFirestore(gameMessage));
         return response.id;
     } catch (error: any) {
         console.error("Error adding message: ", error);

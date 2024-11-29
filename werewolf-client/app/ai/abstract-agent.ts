@@ -1,4 +1,4 @@
-import {GameMessage} from "@/app/ai/ai-models";
+import {GameMessage} from "@/app/api/game-models";
 
 export abstract class AbstractAgent {
     name: string;
