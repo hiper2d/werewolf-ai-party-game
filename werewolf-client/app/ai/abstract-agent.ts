@@ -1,5 +1,4 @@
 import {AIMessage} from "@/app/api/game-models";
-import {convertToAIMessages} from "@/app/utils/message-utils";
 
 export abstract class AbstractAgent {
     name: string;

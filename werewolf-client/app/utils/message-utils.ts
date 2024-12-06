@@ -22,7 +22,7 @@ export function convertToAIMessage(message: GameMessage): AIMessage {
     
     // Determine the role based on message type and author
     if (message.authorName === GAME_MASTER) {
-        role = message.messageType === MessageType.GAME_STORY ? 'system' : 'user';
+        role = 'user';
     } else {
         role = 'assistant';
     }
@@ -54,66 +54,52 @@ export function convertToAIMessages(messages: GameMessage[], systemInstruction?:
     if (systemInstruction) {
         aiMessages.push({ role: 'system', content: systemInstruction });
     }
+
+    let currentGMMessage: string | null = null;
+    let otherPlayersMessages: string[] = [];
     
-    // Convert each game message
-    messages.forEach(message => {
-        aiMessages.push(convertToAIMessage(message));
-    });
-    
-    return aiMessages;
-}
+    for (let i = 0; i < messages.length; i++) {
+        const message = messages[i];
+        const isGM = message.authorName === GAME_MASTER;
+        const content = message.messageType === MessageType.BOT_ANSWER 
+            ? (message.msg as { reply: string }).reply 
+            : message.messageType === MessageType.GAME_STORY 
+                ? (message.msg as { story: string }).story 
+                : message.msg as string;
 
-/**
- * Converts game messages into a format suitable for bot's chat history.
- * The resulting history will have:
- * - System message with bot's instruction
- * - GM messages as "user" role, including other bots' messages as text blocks
- * - Bot's own messages as "assistant" role
- * 
- * @param messages - List of game messages to process
- * @param botName - Name of the bot for which to prepare the history
- * @param systemInstruction - System instruction for the bot
- */
-export function convertGameMessagesToBotHistory(
-    messages: GameMessage[],
-    botName: string,
-    systemInstruction: string
-): ChatCompletionMessageParam[] {
-    const openAiMessages = new Array<ChatCompletionMessageParam>();
-    openAiMessages.push({role: 'system', content: systemInstruction});
-
-    let currentGmMessage = '';
-    let pendingBotMessages: GameMessage[] = [];
-
-    for (const msg of messages) {
-        if (msg.authorName === 'Game Master') {
-            if (pendingBotMessages.length > 0) {
-                currentGmMessage += '\n\nOther players said:\n' + formatBotMessages(pendingBotMessages);
-                pendingBotMessages = [];
+        if (isGM) {
+            // If we have other players' messages, append them to the current GM message
+            if (otherPlayersMessages.length > 0) {
+                currentGMMessage = `${currentGMMessage}\n\nMessages from other players you haven't yet seen:\n${otherPlayersMessages.join('\n')}`;
+                otherPlayersMessages = [];
             }
-            openAiMessages.push({
-                role: 'user',
-                content: currentGmMessage ? currentGmMessage : msg.msg
-            });
-            currentGmMessage = '';
-        } else if (msg.authorName === botName) {
-            openAiMessages.push({
-                role: 'assistant',
-                content: msg.msg
-            });
+            
+            // Start new GM message or append to existing
+            currentGMMessage = currentGMMessage ? `${currentGMMessage}\n${content}` : content;
         } else {
-            pendingBotMessages.push(msg);
+            const playerMessage = `${message.authorName}: ${content}`;
+            
+            // If this is a bot message and we have a pending GM message, add both as a pair
+            if (message.messageType === MessageType.BOT_ANSWER) {
+                if (currentGMMessage) {
+                    aiMessages.push({ role: 'user', content: currentGMMessage });
+                    currentGMMessage = null;
+                }
+                aiMessages.push({ role: 'assistant', content });
+                otherPlayersMessages = [];
+            } else {
+                otherPlayersMessages.push(playerMessage);
+            }
         }
     }
-
-    // Handle any remaining bot messages
-    if (pendingBotMessages.length > 0 && currentGmMessage) {
-        currentGmMessage += '\n\nOther players said:\n' + formatBotMessages(pendingBotMessages);
-        openAiMessages.push({
-            role: 'user',
-            content: currentGmMessage
-        });
+    
+    // Handle any remaining messages
+    if (currentGMMessage) {
+        if (otherPlayersMessages.length > 0) {
+            currentGMMessage = `${currentGMMessage}\n\nMessages from other players:\n${otherPlayersMessages.join('\n')}`;
+        }
+        aiMessages.push({ role: 'user', content: currentGMMessage });
     }
-
-    return openAiMessages;
+    
+    return aiMessages;
 }

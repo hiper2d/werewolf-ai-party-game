@@ -12,8 +12,8 @@ export interface User {
 
 export interface GamePreview {
     name: string;
-    description: string;
     theme: string;
+    description: string;
     playerCount: number;
     werewolfCount: number;
     specialRoles: string[];

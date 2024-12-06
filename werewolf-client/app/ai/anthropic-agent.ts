@@ -1,6 +1,5 @@
 import { AbstractAgent } from "@/app/ai/abstract-agent";
 import { AIMessage } from "@/app/api/game-models";
-import { convertToAIMessages } from "@/app/utils/message-utils";
 import { Anthropic } from '@anthropic-ai/sdk';
 import MessageParam from '@anthropic-ai/sdk/resources';
 

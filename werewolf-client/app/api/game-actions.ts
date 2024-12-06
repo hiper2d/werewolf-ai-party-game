@@ -105,14 +105,14 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
     });
 
     const storyTellAgent: AbstractAgent = AgentFactory.createAgent(
-        GAME_MASTER, STORY_SYSTEM_PROMPT, gamePreview.gameMasterAiType, apiKeys
+        GAME_MASTER, userPrompt, gamePreview.gameMasterAiType, apiKeys
     )
 
     const storyMessage: GameMessage = {
         id: null,
         recipientName: RECIPIENT_ALL, // not important here
         authorName: GAME_MASTER,
-        msg: userPrompt,
+        msg: storyTellAgent,
         messageType: MessageType.GAME_MASTER_ASK,
         day: 1,
         timestamp: null
