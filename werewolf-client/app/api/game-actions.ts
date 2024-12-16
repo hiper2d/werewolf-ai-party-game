@@ -27,7 +27,7 @@ import {STORY_SYSTEM_PROMPT, STORY_USER_PROMPT} from "@/app/ai/prompts/story-gen
 import {BOT_SYSTEM_PROMPT} from "@/app/ai/prompts/bot-prompts";
 import {GM_COMMAND_INTRODUCE_YOURSELF} from "@/app/ai/prompts/gm-commands";
 import {getUserApiKeys} from "@/app/api/user-actions";
-import {convertToAIMessages} from "@/app/utils/message-utils";
+import {convertToAIMessage, convertToAIMessages} from "@/app/utils/message-utils";
 import {LLM_CONSTANTS} from "@/app/ai/ai-models";
 import { AbstractAgent } from "../ai/abstract-agent";
 
@@ -105,20 +105,20 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
     });
 
     const storyTellAgent: AbstractAgent = AgentFactory.createAgent(
-        GAME_MASTER, userPrompt, gamePreview.gameMasterAiType, apiKeys
+        GAME_MASTER, STORY_SYSTEM_PROMPT, gamePreview.gameMasterAiType, apiKeys
     )
 
     const storyMessage: GameMessage = {
         id: null,
         recipientName: RECIPIENT_ALL, // not important here
         authorName: GAME_MASTER,
-        msg: storyTellAgent,
+        msg: userPrompt,
         messageType: MessageType.GAME_MASTER_ASK,
         day: 1,
         timestamp: null
     };
 
-    const response = await storyTellAgent.ask(convertToAIMessages([storyMessage]));
+    const response = await storyTellAgent.ask([convertToAIMessage(storyMessage)]);
     if (!response) {
         throw new Error('Failed to get AI response');
     }
@@ -279,7 +279,7 @@ export async function welcome(gameId: string): Promise<Game> {
         };
 
         // Convert GameMessage to AIMessage before passing to agent
-        const rawIntroduction = await agent.ask(convertToAIMessages([gmMessage]));
+        const rawIntroduction = await agent.ask(convertToAIMessages(bot.name, [gmMessage]));
         if (!rawIntroduction) {
             throw new Error('Failed to get introduction from bot');
         }
