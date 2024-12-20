@@ -19,10 +19,12 @@ export class AgentFactory {
         const model = SupportedAiModels[modelName]
         const apiKeyName = model.apiKeyName
         const key = apiKeys[apiKeyName]
+
+        this.logger(name, instruction)
         switch (modelName) {
             case LLM_CONSTANTS.CLAUDE_35_HAIKU:
             case LLM_CONSTANTS.CLAUDE_35_SONNET:
-                return new ClaudeAgent( name, instruction, model.modelApiName, key);
+                return new ClaudeAgent(name, instruction, model.modelApiName, key);
             case LLM_CONSTANTS.GPT_4O_MINI:
             case LLM_CONSTANTS.GPT_4O:
                 return new OpenAiAgent(name, instruction, model.modelApiName, key, 0.2);
@@ -58,5 +60,9 @@ export class AgentFactory {
 
         // Return the llmType as it is
         return llmType;
+    }
+
+    private static logger(message: string, instruction: string): void {
+        console.log(`[${this.name}]: Creating agent, system instruction:${instruction}`);
     }
 }

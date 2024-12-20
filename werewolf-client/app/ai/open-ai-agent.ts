@@ -15,14 +15,17 @@ export class OpenAiAgent extends AbstractAgent {
     }
 
     async ask(messages: AIMessage[]): Promise<string | null> {
-        this.logger(`Asking agent. Message history: ${messages[messages.length - 1].content}`);
+        this.logger(`Asking ${this.name} agent. Last message: ${messages[messages.length-1].content}`);
 
-        const aiMessages = this.prepareMessages(messages);
+        const preparedMessages = this.prepareMessages(messages);
+        if (preparedMessages.length > 0) {
+            preparedMessages[0].content = `${this.instruction}\n\n${preparedMessages[0].content}`;
+        }
 
         try {
             const completion = await this.client.chat.completions.create({
                 model: this.model,
-                messages: aiMessages,
+                messages: preparedMessages,
                 temperature: this.temperature,
             });
 

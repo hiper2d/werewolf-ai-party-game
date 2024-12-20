@@ -11,7 +11,7 @@ export abstract class AbstractAgent {
         this.temperature = temperature;
     }
 
-    abstract ask(messages: AIMessage[]): Promise<string | null>;
+    abstract ask(messages: AIMessage[]): Promise<string | null>
 
     protected logger(message: string): void {
         console.log(`[${this.name}]: ${message}`);

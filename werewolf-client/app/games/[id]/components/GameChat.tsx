@@ -44,7 +44,7 @@ function renderMessage(message: GameMessage) {
                 }
                 break;
             }
-            case MessageType.GAME_MASTER_ASK:
+            case MessageType.GM_COMMAND:
             case MessageType.HUMAN_PLAYER_MESSAGE:
                 displayContent = typeof message.msg === 'string' ? message.msg : 'Invalid message format';
                 break;

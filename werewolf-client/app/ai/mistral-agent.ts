@@ -14,7 +14,7 @@ export class MistralAgent extends AbstractAgent {
     }
 
     async ask(messages: AIMessage[]): Promise<string | null> {
-        this.logger(`Asking agent. Message history: ${messages[messages.length - 1].msg}`);
+        this.logger(`Asking ${this.name} agent. Last message: ${messages[messages.length-1].content}`);
 
         const chatResponse: ChatCompletionResponse | undefined = await this.client.chat.complete({
             model: this.model,

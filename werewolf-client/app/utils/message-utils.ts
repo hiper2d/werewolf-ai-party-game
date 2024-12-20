@@ -1,4 +1,4 @@
-import {AIMessage, GameMessage, GAME_MASTER, MessageType} from "@/app/api/game-models";
+import {AIMessage, GameMessage, GAME_MASTER, MessageType, MESSAGE_ROLE} from "@/app/api/game-models";
 
 /**
  * Converts an array of GameMessages to AIMessages, handling the message history appropriately.
@@ -9,48 +9,54 @@ import {AIMessage, GameMessage, GAME_MASTER, MessageType} from "@/app/api/game-m
  */
 export function convertToAIMessages(currentBotName: string, messages: GameMessage[]): AIMessage[] {
     const aiMessages: AIMessage[] = [];
-
-    let lastGameMasterMessage: AIMessage | null = null;
+    let gmMessage: string | null = null;
+    let otherPlayerMessages: string[] = [];
 
     messages.forEach(message => {
-        let formattedMessage: AIMessage;
+        const content = message.messageType === MessageType.BOT_ANSWER 
+            ? (message.msg as { reply: string }).reply 
+            : message.msg as string;
 
         if (message.authorName === GAME_MASTER) {
-            const content = message.messageType === MessageType.BOT_ANSWER 
-                ? (message.msg as { reply: string }).reply 
-                : message.messageType === MessageType.GAME_STORY 
-                    ? (message.msg as { story: string }).story 
-                    : message.msg as string;
-
-            if (lastGameMasterMessage) {
+            if (gmMessage) {
                 // Concatenate with the last game master message
-                lastGameMasterMessage.content += `\n${content}`;
+                gmMessage += `\n${content}`;
             } else {
-                formattedMessage = { role: 'user', content: content };
-                lastGameMasterMessage = formattedMessage;
-                aiMessages.push(formattedMessage);
+                gmMessage = content;
             }
+        } else if (message.authorName === currentBotName) {
+            // If we have a GM message and other player messages, combine them before adding the bot's message
+            if (gmMessage) {
+                if (otherPlayerMessages.length > 0) {
+                    gmMessage += '\n\nMessages from other players:\n' + otherPlayerMessages.join('\n');
+                    otherPlayerMessages = [];
+                }
+                aiMessages.push({ role: 'user', content: gmMessage });
+                gmMessage = null;
+            }
+            aiMessages.push({ role: 'assistant', content });
         } else {
-            // Other players' messages
-            const content = message.messageType === MessageType.BOT_ANSWER 
-                ? (message.msg as { reply: string }).reply 
-                : message.messageType === MessageType.GAME_STORY 
-                    ? (message.msg as { story: string }).story 
-                    : message.msg as string;
-
+            // Messages from other players/bots
             const playerMessage = `${message.authorName}: ${content}`;
-
-            if (lastGameMasterMessage) {
-                lastGameMasterMessage.content += `\n${playerMessage}`;
-            } else {
-                aiMessages.push({ role: 'assistant', content: content });
-            }
+            otherPlayerMessages.push(playerMessage);
         }
     });
+
+    // Handle any remaining messages at the end
+    if (gmMessage !== null) {
+        const currentGmMessage = gmMessage;  // This creates a new variable that TypeScript knows is definitely a string
+        if (otherPlayerMessages.length > 0) {
+            gmMessage = currentGmMessage + '\n\nMessages from other players:\n' + otherPlayerMessages.join('\n');
+        }
+        aiMessages.push({ role: MESSAGE_ROLE.USER, content: gmMessage });
+    }
 
     return aiMessages;
 }
 
 export function convertToAIMessage(message: GameMessage): AIMessage {
-    return { role: 'user', content: message.msg }
+    return {
+        role: MESSAGE_ROLE.USER,
+        content: String(message.msg)
+    };
 }

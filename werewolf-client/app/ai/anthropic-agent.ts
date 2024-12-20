@@ -21,7 +21,7 @@ export class ClaudeAgent extends AbstractAgent {
     }
 
     async ask(messages: AIMessage[]): Promise<string | null> {
-        this.logger(`Asking ${this.name} agent. Last message: ${messages[messages.length - 1].content}`);
+        this.logger(`Asking ${this.name} agent. Last message: ${messages[messages.length-1].content}`);
 
         try {
             const aiMessages = this.prepareMessages(messages);

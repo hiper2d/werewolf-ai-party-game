@@ -1,9 +1,6 @@
 import {AbstractAgent} from "@/app/ai/abstract-agent";
 import {OpenAI} from "openai";
-import {GameMessage} from "@/app/ai/ai-models";
-import {util} from "protobufjs";
-import ChatCompletion = OpenAI.Chat.Completions.ChatCompletion;
-import ChatCompletionMessageParam = OpenAI.Chat.Completions.ChatCompletionMessageParam;
+import {AIMessage} from "@/app/api/game-models";
 
 export class OpenAiO1Agent extends AbstractAgent {
     private readonly client: OpenAI;
@@ -17,22 +14,18 @@ export class OpenAiO1Agent extends AbstractAgent {
         })
     }
 
-    async ask(messages: GameMessage[]): Promise<string | null> {
-        this.logger(`Asking agent. Message history: ${messages[messages.length - 1].msg}`);
+    async ask(messages: AIMessage[]): Promise<string | null> {
+        this.logger(`Asking ${this.name} agent. Last message: ${messages[messages.length-1].content}`);
 
-        const openAiMessages = new Array<ChatCompletionMessageParam>();
-        messages.forEach(msg => {
-            openAiMessages.push({
-                role: msg.role as 'user' | 'assistant',
-                content: msg.msg
-            });
-        });
-        openAiMessages[0].content = this.instruction + openAiMessages[0].content
+        const preparedMessages = this.prepareMessages(messages);
+        if (preparedMessages.length > 0) {
+            preparedMessages[0].content = `${this.instruction}\n\n${preparedMessages[0].content}`;
+        }
 
         try {
-            const completion: ChatCompletion = await this.client.chat.completions.create({
+            const completion = await this.client.chat.completions.create({
                 model: this.model,
-                messages: openAiMessages,
+                messages: preparedMessages,
                 temperature: this.temperature,
             });
 
@@ -40,7 +33,7 @@ export class OpenAiO1Agent extends AbstractAgent {
             this.logger(`Reply: ${reply}`);
             return reply || null;
         } catch (error) {
-            console.error('Error in OpenAiAgent.ask:', error);
+            console.error('Error in OpenAiO1Agent.ask:', error);
             return null;
         }
     }

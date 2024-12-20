@@ -70,9 +70,9 @@ export const GAME_STATES = {
 } as const;
 
 export enum MessageType {
-    GAME_MASTER_ASK = 'GAME_MASTER_ASK',
-    BOT_ANSWER = 'BOT_ANSWER',
-    GAME_STORY = 'GAME_STORY',
+    GM_COMMAND = 'GM_COMMAND',
+    BOT_ANSWER = 'BOT_ANSWER', // Response from a bot to GM command
+    GAME_STORY = 'GAME_STORY', // Initial message to generate the game, never used after
     HUMAN_PLAYER_MESSAGE = 'HUMAN_PLAYER_MESSAGE',
 }
 

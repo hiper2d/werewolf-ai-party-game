@@ -1,35 +1,30 @@
 'use server'
 
 import {db} from "@/firebase/server";
-import {firestore} from "firebase-admin";
 import {
-    AIMessage,
-    ApiKeyMap,
     Bot,
-    BotAnswer,
+    BotPreview,
     Game,
-    GameMessage,
-    GamePreview,
-    GamePreviewWithGeneratedBots,
     GAME_MASTER,
     GAME_ROLES,
     GAME_STATES,
-    MESSAGE_ROLE,
+    GameMessage,
+    GamePreview,
+    GamePreviewWithGeneratedBots,
     MessageType,
     RECIPIENT_ALL,
-    User,
-    BotPreview
+    User
 } from "@/app/api/game-models";
 import {getServerSession} from "next-auth";
 import {AgentFactory} from "@/app/ai/agent-factory";
-import {format} from "node:util";
 import {STORY_SYSTEM_PROMPT, STORY_USER_PROMPT} from "@/app/ai/prompts/story-gen-prompts";
 import {BOT_SYSTEM_PROMPT} from "@/app/ai/prompts/bot-prompts";
 import {GM_COMMAND_INTRODUCE_YOURSELF} from "@/app/ai/prompts/gm-commands";
 import {getUserApiKeys} from "@/app/api/user-actions";
 import {convertToAIMessage, convertToAIMessages} from "@/app/utils/message-utils";
 import {LLM_CONSTANTS} from "@/app/ai/ai-models";
-import { AbstractAgent } from "../ai/abstract-agent";
+import {AbstractAgent} from "../ai/abstract-agent";
+import {format} from "@/app/ai/prompts/utils";
 
 export async function getAllGames(): Promise<Game[]> {
     if (!db) {
@@ -96,7 +91,11 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
         .then((user) => getUserApiKeys(user!.email));
 
     const botCount = gamePreview.playerCount - 1; // exclude human player
-    
+
+    const storyTellAgent: AbstractAgent = AgentFactory.createAgent(
+        GAME_MASTER, STORY_SYSTEM_PROMPT, gamePreview.gameMasterAiType, apiKeys
+    )
+        
     const userPrompt = format(STORY_USER_PROMPT, {
         theme: gamePreview.theme,
         description: gamePreview.description,
@@ -104,16 +103,12 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
         number_of_players: botCount
     });
 
-    const storyTellAgent: AbstractAgent = AgentFactory.createAgent(
-        GAME_MASTER, STORY_SYSTEM_PROMPT, gamePreview.gameMasterAiType, apiKeys
-    )
-
     const storyMessage: GameMessage = {
         id: null,
         recipientName: RECIPIENT_ALL, // not important here
         authorName: GAME_MASTER,
         msg: userPrompt,
-        messageType: MessageType.GAME_MASTER_ASK,
+        messageType: MessageType.GM_COMMAND,
         day: 1,
         timestamp: null
     };
@@ -261,19 +256,36 @@ export async function welcome(gameId: string): Promise<Game> {
         const apiKeys = await getUserFromFirestore(session.user.email)
             .then((user) => getUserApiKeys(user!.email));
 
-        const agent = await AgentFactory.createAgent(bot.name, format(BOT_SYSTEM_PROMPT, {
-            name: bot.name,
-            personal_story: bot.story,
-            temperament: 'You have a balanced and thoughtful personality.',
-            role: bot.role
-        }), bot.aiType, apiKeys);
+        const botPrompt = format(
+            BOT_SYSTEM_PROMPT, {
+                name: bot.name,
+                personal_story: bot.story,
+                temperament: 'You have a balanced and thoughtful personality.',
+                role: bot.role,
+                players_names: game.bots
+                    .filter(b => b.name !== bot.name)
+                    .map(b => b.name)
+                    .join(", "),
+                dead_players_names_with_roles: game.bots
+                    .filter(b => !b.isAlive)
+                    .map(b => `${b.name} (${b.role})`)
+                    .join(", ")
+            }
+        );
+
+        const agent = AgentFactory.createAgent(
+            bot.name,
+            botPrompt,
+            bot.aiType,
+            apiKeys
+        );
 
         const gmMessage: GameMessage = {
             id: null,
             recipientName: bot.name,
             authorName: GAME_MASTER,
             msg: GM_COMMAND_INTRODUCE_YOURSELF,
-            messageType: MessageType.GAME_MASTER_ASK,
+            messageType: MessageType.GM_COMMAND,
             day: game.currentDay,
             timestamp: Date.now()
         };

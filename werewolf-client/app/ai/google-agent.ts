@@ -1,23 +1,37 @@
-import {AbstractAgent} from "@/app/ai/abstract-agent";
-import {AIMessage, GameMessage} from "@/app/api/game-models";
-import {GoogleGenerativeAI} from "@google/generative-ai";
+import { AbstractAgent } from "@/app/ai/abstract-agent";
+import { AIMessage } from "@/app/api/game-models";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // API Docs: https://ai.google.dev/gemini-api/docs/text-generation?lang=node
 export class GoogleAgent extends AbstractAgent {
     private readonly client: GoogleGenerativeAI;
     private readonly modelObj: any;
+    private chat: any | null = null;
 
     constructor(name: string, instruction: string, model: string, apiKey: string) {
         super(name, instruction, 0.2);
-        this.client = new GoogleGenerativeAI(apiKey)
-        this.modelObj = this.client.getGenerativeModel({ model: model, systemInstruction: instruction });
+        this.client = new GoogleGenerativeAI(apiKey);
+        this.modelObj = this.client.getGenerativeModel({ model: model });
     }
 
     async ask(messages: AIMessage[]): Promise<string | null> {
-        this.logger(`Asking agent. Message history: ${messages[messages.length - 1].msg}`);
+        this.logger(`Asking ${this.name} agent. Last message: ${messages[messages.length - 1].content}`);
 
         try {
-            const result = await this.modelObj.generateContent(messages);
+            // Initialize chat if not already started
+            if (!this.chat) {
+                this.chat = this.modelObj.startChat({
+                    history: messages.map((message) => ({
+                        role: message.role === 'assistant' ? 'model' : message.role,
+                        parts: [{ text: message.content }],
+                    })),
+                });
+            }
+
+            // Send the latest message to the chat
+            const userMessage = messages[messages.length - 1].content;
+            const result = await this.chat.sendMessage(userMessage);
+
             const res = result.response.text();
 
             this.logger(`Reply: ${res}`);
