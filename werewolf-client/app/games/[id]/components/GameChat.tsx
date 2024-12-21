@@ -13,6 +13,7 @@ interface GameChatProps {
 
 interface BotAnswer {
     reply: string;
+    type: string;
 }
 
 interface GameStory {
@@ -25,23 +26,16 @@ function renderMessage(message: GameMessage) {
     
     let displayContent: string;
     try {
+        console.log(message)
         switch (message.messageType) {
             case MessageType.BOT_ANSWER: {
-                const botAnswer = message.msg as BotAnswer;
-                if (typeof botAnswer === 'object' && 'reply' in botAnswer) {
-                    displayContent = botAnswer.reply;
-                } else {
-                    displayContent = 'Invalid bot answer format';
-                }
+                const botAnswer: BotAnswer = message.msg as BotAnswer;
+                displayContent = botAnswer.reply;
                 break;
             }
             case MessageType.GAME_STORY: {
                 const gameStory = message.msg as GameStory;
-                if (typeof gameStory === 'object' && 'story' in gameStory) {
-                    displayContent = gameStory.story;
-                } else {
-                    displayContent = 'Invalid game story format';
-                }
+                displayContent = gameStory.story;
                 break;
             }
             case MessageType.GM_COMMAND:

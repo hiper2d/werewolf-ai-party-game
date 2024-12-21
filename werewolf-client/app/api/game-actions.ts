@@ -13,7 +13,8 @@ import {
     GamePreviewWithGeneratedBots,
     MessageType,
     RECIPIENT_ALL,
-    User
+    User,
+    BotAnswer
 } from "@/app/api/game-models";
 import {getServerSession} from "next-auth";
 import {AgentFactory} from "@/app/ai/agent-factory";
@@ -118,7 +119,7 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
         throw new Error('Failed to get AI response');
     }
 
-    const cleanResponse = cleanMarkdownResponse(response);
+    const cleanResponse: string = cleanMarkdownResponse(response);
     const aiResponse = JSON.parse(cleanResponse);
 
     const bots: BotPreview[] = aiResponse.players.map((bot: { name: string; story: string }) => {
@@ -295,14 +296,18 @@ export async function welcome(gameId: string): Promise<Game> {
         if (!rawIntroduction) {
             throw new Error('Failed to get introduction from bot');
         }
+        console.log('Raw introduction:', rawIntroduction);
 
-        const botAnswer = cleanMarkdownResponse(rawIntroduction);
+        const cleanResponse: string = cleanMarkdownResponse(rawIntroduction);
+        const aiResponse = JSON.parse(cleanResponse);
+
+        console.log('Cleaned bot answer:', aiResponse);
         
         const botMessage: GameMessage = {
             id: null,
             recipientName: RECIPIENT_ALL,
             authorName: bot.name,
-            msg: botAnswer,
+            msg: {reply: aiResponse.reply},
             messageType: MessageType.BOT_ANSWER,
             day: game.currentDay,
             timestamp: Date.now()

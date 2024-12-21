@@ -1,7 +1,6 @@
 import { AbstractAgent } from "@/app/ai/abstract-agent";
 import { AIMessage } from "@/app/api/game-models";
 import { Anthropic } from '@anthropic-ai/sdk';
-import MessageParam from '@anthropic-ai/sdk/resources';
 
 interface Message {
     role: string;
@@ -29,10 +28,10 @@ export class ClaudeAgent extends AbstractAgent {
             const params: Anthropic.MessageCreateParams = {
                 max_tokens: 1024,
                 system: this.instruction,
-                messages: aiMessages.filter(msg => msg.role !== 'system').map(msg => ({
-                    role: msg.role,
+                messages: aiMessages.map(msg => ({
+                    role: msg.role === 'system' ? 'user' : msg.role,  // Claude doesn't support system role in messages
                     content: msg.content
-                } as MessageParam)),
+                })),
                 model: this.model,
                 temperature: this.temperature,
             }
