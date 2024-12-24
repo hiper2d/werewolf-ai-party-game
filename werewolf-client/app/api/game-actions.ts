@@ -13,19 +13,45 @@ import {
     GamePreviewWithGeneratedBots,
     MessageType,
     RECIPIENT_ALL,
-    User,
-    BotAnswer
+    User
 } from "@/app/api/game-models";
 import {getServerSession} from "next-auth";
 import {AgentFactory} from "@/app/ai/agent-factory";
 import {STORY_SYSTEM_PROMPT, STORY_USER_PROMPT} from "@/app/ai/prompts/story-gen-prompts";
-import {BOT_SYSTEM_PROMPT} from "@/app/ai/prompts/bot-prompts";
-import {GM_COMMAND_INTRODUCE_YOURSELF} from "@/app/ai/prompts/gm-commands";
 import {getUserApiKeys} from "@/app/api/user-actions";
-import {convertToAIMessage, convertToAIMessages} from "@/app/utils/message-utils";
+import {convertToAIMessage} from "@/app/utils/message-utils";
 import {LLM_CONSTANTS} from "@/app/ai/ai-models";
 import {AbstractAgent} from "../ai/abstract-agent";
 import {format} from "@/app/ai/prompts/utils";
+
+/**
+ * Now marked as async
+ */
+export async function cleanMarkdownResponse(response: string): Promise<any> {
+    let cleanResponse = response.trim();
+    if (cleanResponse.startsWith('```json')) {
+        cleanResponse = cleanResponse.slice(7);
+    } else if (cleanResponse.startsWith('```')) {
+        cleanResponse = cleanResponse.slice(3);
+    }
+
+    if (cleanResponse.endsWith('```')) {
+        cleanResponse = cleanResponse.slice(0, -3);
+    }
+
+    cleanResponse = cleanResponse.trim();
+
+    try {
+        return JSON.parse(cleanResponse);
+    } catch (e) {
+        console.log('Failed to parse JSON, returning as string:', cleanResponse);
+        return cleanResponse;
+    }
+}
+
+/* -----------------------------------------
+    Exported methods
+----------------------------------------- */
 
 export async function getAllGames(): Promise<Game[]> {
     if (!db) {
@@ -106,7 +132,7 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
 
     const storyMessage: GameMessage = {
         id: null,
-        recipientName: RECIPIENT_ALL, // not important here
+        recipientName: RECIPIENT_ALL,
         authorName: GAME_MASTER,
         msg: userPrompt,
         messageType: MessageType.GM_COMMAND,
@@ -126,7 +152,7 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
         let aiType = gamePreview.playersAiType;
         
         if (aiType === LLM_CONSTANTS.RANDOM) {
-            // todo: support only models for which user has API keys
+            // Support only models for which user has API keys (if needed)
             const availableTypes = Object.values(LLM_CONSTANTS).filter(
                 type => type !== LLM_CONSTANTS.RANDOM
             );
@@ -199,11 +225,12 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
             humanPlayerRole: roleDistribution[0],
             currentDay: 1,
             gameState: GAME_STATES.WELCOME,
-            gameStateParamQueue: bots.map(bot => bot.name),  // Initialize with shuffled bot names
+            gameStateParamQueue: bots.map(bot => bot.name),
             gameStateProcessQueue: []
         };
 
         const response = await db.collection('games').add(game);
+        
         const gameStoryMessage: GameMessage = {
             id: null,
             recipientName: RECIPIENT_ALL,
@@ -222,128 +249,14 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
     }
 }
 
-export async function welcome(gameId: string): Promise<Game> {
-    const session = await getServerSession();
-    if (!session || !session.user?.email) {
-        throw new Error('Not authenticated');
-    }
-    if (!db) {
-        throw new Error('Firestore is not initialized');
-    }
-    const game = await getGame(gameId);
-    if (!game) {
-        throw new Error('Game not found');
-    }
-
-    try {
-        // If queue is empty, move to DAY_DISCUSSION state
-        if (game.gameStateParamQueue.length === 0) {
-            await db.collection('games').doc(gameId).update({
-                gameState: GAME_STATES.DAY_DISCUSSION
-            });
-            return await getGame(gameId) as Game;
-        }
-
-        // Get the first bot name and remove it from queue
-        const botName = game.gameStateParamQueue[0];
-        const newQueue = game.gameStateParamQueue.slice(1);
-
-        // Find the bot in the game's bots array
-        const bot: Bot | undefined = game.bots.find(b => b.name === botName);
-        if (!bot) {
-            throw new Error(`Bot ${botName} not found in game`);
-        }
-
-        const apiKeys = await getUserFromFirestore(session.user.email)
-            .then((user) => getUserApiKeys(user!.email));
-
-        const botPrompt = format(
-            BOT_SYSTEM_PROMPT, {
-                name: bot.name,
-                personal_story: bot.story,
-                temperament: 'You have a balanced and thoughtful personality.',
-                role: bot.role,
-                players_names: game.bots
-                    .filter(b => b.name !== bot.name)
-                    .map(b => b.name)
-                    .join(", "),
-                dead_players_names_with_roles: game.bots
-                    .filter(b => !b.isAlive)
-                    .map(b => `${b.name} (${b.role})`)
-                    .join(", ")
-            }
-        );
-
-        const agent = AgentFactory.createAgent(
-            bot.name,
-            botPrompt,
-            bot.aiType,
-            apiKeys
-        );
-
-        const gmMessage: GameMessage = {
-            id: null,
-            recipientName: bot.name,
-            authorName: GAME_MASTER,
-            msg: GM_COMMAND_INTRODUCE_YOURSELF,
-            messageType: MessageType.GM_COMMAND,
-            day: game.currentDay,
-            timestamp: Date.now()
-        };
-
-        // Convert GameMessage to AIMessage before passing to agent
-        const rawIntroduction = await agent.ask(convertToAIMessages(bot.name, [gmMessage]));
-        if (!rawIntroduction) {
-            throw new Error('Failed to get introduction from bot');
-        }
-        console.log('Raw introduction:', rawIntroduction);
-
-        const botAnswer = cleanMarkdownResponse(rawIntroduction);
-        console.log('Cleaned bot answer:', botAnswer);
-        
-        const botMessage: GameMessage = {
-            id: null,
-            recipientName: RECIPIENT_ALL,
-            authorName: bot.name,
-            msg: typeof botAnswer === 'object' && 'reply' in botAnswer 
-                ? new BotAnswer(botAnswer.reply) 
-                : new BotAnswer(botAnswer),
-            messageType: MessageType.BOT_ANSWER,
-            day: game.currentDay,
-            timestamp: Date.now()
-        };
-        await addMessageToChatAndSaveToDb(botMessage, gameId);
-
-        // Update game with the modified queue
-        await db.collection('games').doc(gameId).update({
-            gameStateParamQueue: newQueue
-        });
-
-        // Return the updated game state
-        return await getGame(gameId) as Game;
-    } catch (error) {
-        console.error('Error in welcome function:', error);
-        throw error;
-    }
-}
-
-function serializeMessageForFirestore(gameMessage: GameMessage) {
-    // For GAME_MASTER_ASK and HUMAN_PLAYER_MESSAGE, msg is a string
-    // For BOT_ANSWER and GAME_STORY, msg is an object that should be preserved
-    return {
-        ...gameMessage,
-        msg: gameMessage.messageType === MessageType.BOT_ANSWER || gameMessage.messageType === MessageType.GAME_STORY
-            ? gameMessage.msg  // Keep as object for Firestore
-            : gameMessage.msg as string  // It's a string for other message types
-    };
-}
-
 export async function addMessageToChatAndSaveToDb(gameMessage: GameMessage, gameId: string): Promise<string | undefined> {
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
     try {
-        const response = await db.collection('games').doc(gameId).collection('messages').add(serializeMessageForFirestore(gameMessage));
+        const response = await db.collection('games').doc(gameId).collection('messages').add(
+            serializeMessageForFirestore(gameMessage)
+        );
         return response.id;
     } catch (error: any) {
         console.error("Error adding message: ", error);
@@ -351,7 +264,10 @@ export async function addMessageToChatAndSaveToDb(gameMessage: GameMessage, game
     }
 }
 
-async function getUserFromFirestore(email: string) {
+/**
+ * Exported so bot-actions can access user details
+ */
+export async function getUserFromFirestore(email: string): Promise<User | null> {
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
@@ -361,17 +277,27 @@ async function getUserFromFirestore(email: string) {
 
     if (userSnap.exists) {
         const userData = userSnap.data();
-
-        const user: User = {
+        return {
             name: userData?.name,
             email: userData?.email,
             apiKeys: userData?.ApiKeys || []
         };
-
-        return user;
     } else {
         return null;
     }
+}
+
+/* -----------------------------------------
+    Private / helper functions
+----------------------------------------- */
+
+function serializeMessageForFirestore(gameMessage: GameMessage) {
+    return {
+        ...gameMessage,
+        msg: gameMessage.messageType === MessageType.BOT_ANSWER || gameMessage.messageType === MessageType.GAME_STORY
+            ? gameMessage.msg  // keep as object
+            : gameMessage.msg as string  // it's a string for most other message types
+    };
 }
 
 function gameFromFirestore(id: string, data: any): Game {
@@ -391,24 +317,4 @@ function gameFromFirestore(id: string, data: any): Game {
         gameStateParamQueue: data.gameStateParamQueue,
         gameStateProcessQueue: data.gameStateProcessQueue
     };
-}
-
-function cleanMarkdownResponse(response: string): any {
-    let cleanResponse = response.trim();
-    if (cleanResponse.startsWith('```json')) {
-        cleanResponse = cleanResponse.slice(7);
-    } else if (cleanResponse.startsWith('```')) {
-        cleanResponse = cleanResponse.slice(3);
-    }
-    if (cleanResponse.endsWith('```')) {
-        cleanResponse = cleanResponse.slice(0, -3);
-    }
-    cleanResponse = cleanResponse.trim();
-    
-    try {
-        return JSON.parse(cleanResponse);
-    } catch (e) {
-        console.log('Failed to parse JSON, returning as string:', cleanResponse);
-        return cleanResponse;
-    }
 }

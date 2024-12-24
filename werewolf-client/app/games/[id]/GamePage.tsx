@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { getGame, welcome } from "@/app/api/game-actions";
+import { getGame } from "@/app/api/game-actions";
 import GameChat from "@/app/games/[id]/components/GameChat";
 import { buttonTransparentStyle } from "@/app/constants";
 import { GAME_STATES } from "@/app/api/game-models";
 import type { Game } from "@/app/api/game-models";
 import type { Session } from "next-auth";
+import { welcome } from '@/app/api/bot-actions';
 
 export default function GamePage({ 
     initialGame, 

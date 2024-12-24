@@ -22,8 +22,8 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
                 console.log('SSE: Received snapshot with', snapshot.docChanges().length, 'changes');
                 snapshot.docChanges().forEach((change) => {
                     if (change.type === 'added') {
-                        console.log('SSE: New message added:', change.doc.id);
                         const data = change.doc.data();
+                        console.log('SSE: New message added:', data);
                         const message: GameMessage = {
                             id: change.doc.id,
                             recipientName: data.recipientName,
