@@ -4,11 +4,9 @@ import {AIMessage} from "@/app/api/game-models";
 
 export class OpenAiO1Agent extends AbstractAgent {
     private readonly client: OpenAI;
-    private readonly model: string;
 
     constructor(name: string, instruction: string, model: string, apiKey: string) {
-        super(name, instruction, 1);
-        this.model = model;
+        super(name, instruction, model, 1);
         this.client = new OpenAI({
             apiKey: apiKey,
         })

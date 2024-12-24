@@ -4,18 +4,19 @@ import {AIMessage} from "@/app/api/game-models";
 
 export class OpenAiAgent extends AbstractAgent {
     private readonly client: OpenAI;
-    private readonly model: string;
 
     constructor(name: string, instruction: string, model: string, apiKey: string, temperature: number) {
-        super(name, instruction, temperature);
-        this.model = model;
+        super(name, instruction, model, temperature);
         this.client = new OpenAI({
             apiKey: apiKey,
         })
     }
 
     async ask(messages: AIMessage[]): Promise<string | null> {
-        this.logger(`Asking ${this.name} agent. Last message: ${messages[messages.length-1].content}`);
+        this.logger(`Asking ${this.name} ${this.model} agent. Last message: ${messages[messages.length-1].content}`);
+        messages.forEach((msg) => {
+            this.logger()
+        })
 
         const preparedMessages = this.prepareMessages(messages);
         if (preparedMessages.length > 0) {

@@ -9,18 +9,16 @@ interface Message {
 
 export class ClaudeAgent extends AbstractAgent {
     private readonly client: Anthropic;
-    private readonly model: string;
 
     constructor(name: string, instruction: string, model: string, apiKey: string) {
-        super(name, instruction, 0.2);
+        super(name, instruction, model, 0.2);
         this.client = new Anthropic({
             apiKey: apiKey,
         });
-        this.model = model;
     }
 
     async ask(messages: AIMessage[]): Promise<string | null> {
-        this.logger(`Asking ${this.name} agent. Last message: ${messages[messages.length-1].content}`);
+        this.logger(`Asking ${this.model} agent. Last message: ${messages[messages.length-1].content}`);
 
         try {
             const aiMessages = this.prepareMessages(messages);

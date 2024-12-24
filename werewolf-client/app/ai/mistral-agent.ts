@@ -5,16 +5,14 @@ import { AIMessage, GameMessage, MESSAGE_ROLE } from "@/app/api/game-models";
 
 export class MistralAgent extends AbstractAgent {
     private readonly client: Mistral;
-    private readonly model: string;
 
     constructor(name: string, instruction: string, model: string, apiKey: string) {
-        super(name, instruction, 0.2);
-        this.model = model;
+        super(name, instruction, model, 0.2);
         this.client = new Mistral({apiKey: apiKey});
     }
 
     async ask(messages: AIMessage[]): Promise<string | null> {
-        this.logger(`Asking ${this.name} agent. Last message: ${messages[messages.length-1].content}`);
+        this.logger(`Asking ${this.name} ${this.model} agent. Last message: ${messages[messages.length-1].content}`);
 
         const chatResponse: ChatCompletionResponse | undefined = await this.client.chat.complete({
             model: this.model,

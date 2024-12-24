@@ -119,7 +119,7 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
         throw new Error('Failed to get AI response');
     }
 
-    const cleanResponse: string = cleanMarkdownResponse(response);
+    const cleanResponse = cleanMarkdownResponse(response);
     const aiResponse = JSON.parse(cleanResponse);
 
     const bots: BotPreview[] = aiResponse.players.map((bot: { name: string; story: string }) => {
@@ -298,16 +298,16 @@ export async function welcome(gameId: string): Promise<Game> {
         }
         console.log('Raw introduction:', rawIntroduction);
 
-        const cleanResponse: string = cleanMarkdownResponse(rawIntroduction);
-        const aiResponse = JSON.parse(cleanResponse);
-
-        console.log('Cleaned bot answer:', aiResponse);
+        const botAnswer = cleanMarkdownResponse(rawIntroduction);
+        console.log('Cleaned bot answer:', botAnswer);
         
         const botMessage: GameMessage = {
             id: null,
             recipientName: RECIPIENT_ALL,
             authorName: bot.name,
-            msg: {reply: aiResponse.reply},
+            msg: typeof botAnswer === 'object' && 'reply' in botAnswer 
+                ? new BotAnswer(botAnswer.reply) 
+                : new BotAnswer(botAnswer),
             messageType: MessageType.BOT_ANSWER,
             day: game.currentDay,
             timestamp: Date.now()
@@ -393,7 +393,7 @@ function gameFromFirestore(id: string, data: any): Game {
     };
 }
 
-function cleanMarkdownResponse(response: string): string {
+function cleanMarkdownResponse(response: string): any {
     let cleanResponse = response.trim();
     if (cleanResponse.startsWith('```json')) {
         cleanResponse = cleanResponse.slice(7);
@@ -403,5 +403,12 @@ function cleanMarkdownResponse(response: string): string {
     if (cleanResponse.endsWith('```')) {
         cleanResponse = cleanResponse.slice(0, -3);
     }
-    return cleanResponse.trim();
+    cleanResponse = cleanResponse.trim();
+    
+    try {
+        return JSON.parse(cleanResponse);
+    } catch (e) {
+        console.log('Failed to parse JSON, returning as string:', cleanResponse);
+        return cleanResponse;
+    }
 }

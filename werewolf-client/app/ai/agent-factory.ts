@@ -20,7 +20,7 @@ export class AgentFactory {
         const apiKeyName = model.apiKeyName
         const key = apiKeys[apiKeyName]
 
-        this.logger(name, instruction)
+        this.logger(name, model, instruction)
         switch (modelName) {
             case LLM_CONSTANTS.CLAUDE_35_HAIKU:
             case LLM_CONSTANTS.CLAUDE_35_SONNET:
@@ -62,7 +62,7 @@ export class AgentFactory {
         return llmType;
     }
 
-    private static logger(message: string, instruction: string): void {
-        console.log(`[${this.name}]: Creating agent, system instruction:${instruction}`);
+    private static logger(message: string, model: string, instruction: string): void {
+        console.log(`[${this.name} ${model}]: Creating agent, system instruction: ${instruction}`);
     }
 }
