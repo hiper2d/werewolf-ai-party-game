@@ -60,3 +60,25 @@ export function convertToAIMessage(message: GameMessage): AIMessage {
         content: String(message.msg)
     };
 }
+
+export function parseResponseToObj(response: string): any {
+    let cleanResponse = response.trim();
+    if (cleanResponse.startsWith('```json')) {
+        cleanResponse = cleanResponse.slice(7);
+    } else if (cleanResponse.startsWith('```')) {
+        cleanResponse = cleanResponse.slice(3);
+    }
+
+    if (cleanResponse.endsWith('```')) {
+        cleanResponse = cleanResponse.slice(0, -3);
+    }
+
+    cleanResponse = cleanResponse.trim();
+
+    try {
+        return JSON.parse(cleanResponse);
+    } catch (e) {
+        console.log('Failed to parse JSON, returning as string:', cleanResponse);
+        return cleanResponse;
+    }
+}

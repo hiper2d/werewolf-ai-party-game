@@ -11,6 +11,7 @@ import {
     GameMessage,
     GamePreview,
     GamePreviewWithGeneratedBots,
+    GameStory,
     MessageType,
     RECIPIENT_ALL,
     User
@@ -19,39 +20,10 @@ import {getServerSession} from "next-auth";
 import {AgentFactory} from "@/app/ai/agent-factory";
 import {STORY_SYSTEM_PROMPT, STORY_USER_PROMPT} from "@/app/ai/prompts/story-gen-prompts";
 import {getUserApiKeys} from "@/app/api/user-actions";
-import {convertToAIMessage} from "@/app/utils/message-utils";
+import {convertToAIMessage, parseResponseToObj} from "@/app/utils/message-utils";
 import {LLM_CONSTANTS} from "@/app/ai/ai-models";
 import {AbstractAgent} from "../ai/abstract-agent";
 import {format} from "@/app/ai/prompts/utils";
-
-/**
- * Now marked as async
- */
-export async function cleanMarkdownResponse(response: string): Promise<any> {
-    let cleanResponse = response.trim();
-    if (cleanResponse.startsWith('```json')) {
-        cleanResponse = cleanResponse.slice(7);
-    } else if (cleanResponse.startsWith('```')) {
-        cleanResponse = cleanResponse.slice(3);
-    }
-
-    if (cleanResponse.endsWith('```')) {
-        cleanResponse = cleanResponse.slice(0, -3);
-    }
-
-    cleanResponse = cleanResponse.trim();
-
-    try {
-        return JSON.parse(cleanResponse);
-    } catch (e) {
-        console.log('Failed to parse JSON, returning as string:', cleanResponse);
-        return cleanResponse;
-    }
-}
-
-/* -----------------------------------------
-    Exported methods
------------------------------------------ */
 
 export async function getAllGames(): Promise<Game[]> {
     if (!db) {
@@ -145,8 +117,7 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
         throw new Error('Failed to get AI response');
     }
 
-    const cleanResponse = cleanMarkdownResponse(response);
-    const aiResponse = JSON.parse(cleanResponse);
+    const aiResponse = parseResponseToObj(response);
 
     const bots: BotPreview[] = aiResponse.players.map((bot: { name: string; story: string }) => {
         let aiType = gamePreview.playersAiType;

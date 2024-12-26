@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { addMessageToChatAndSaveToDb } from "@/app/api/game-actions";
+import { talkToAll } from "@/app/api/bot-actions";
 import { buttonTransparentStyle } from "@/app/constants";
 import { GAME_STATES, MessageType, RECIPIENT_ALL, GameMessage } from "@/app/api/game-models";
 import { getPlayerColor } from "@/app/utils/color-utils";
@@ -85,25 +85,14 @@ export default function GameChat({ gameId, gameState }: GameChatProps) {
 
     const sendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (newMessage.trim() === '') return;
-
-        const gameMessage: GameMessage = {
-            id: null,
-            recipientName: RECIPIENT_ALL,
-            authorName: 'User', // todo: use actual player name
-            msg: newMessage,
-            messageType: MessageType.HUMAN_PLAYER_MESSAGE,
-            day: 1, // todo: get current day from game state
-            timestamp: Date.now()
-        };
+        const trimmed = newMessage.trim();
+        if (!trimmed) return;
 
         try {
-            const result = await addMessageToChatAndSaveToDb(gameMessage, gameId);
-            if (result) {
-                setNewMessage('');
-            }
-        } catch (err) {
-            console.error("Error sending message:", err);
+            await talkToAll(gameId, trimmed);
+            setNewMessage('');
+        } catch (error) {
+            console.error("Error sending message:", error);
         }
     };
 
@@ -113,9 +102,11 @@ export default function GameChat({ gameId, gameState }: GameChatProps) {
         <div className="flex flex-col h-full border border-white border-opacity-30 rounded-lg p-4">
             <h2 className="text-xl font-bold mb-4 text-white">Game Chat</h2>
             <div className="flex-grow overflow-y-auto mb-4 p-2 bg-black bg-opacity-30 rounded">
-                {messages.map((message, index) => {
-                    return <div key={index}>{renderMessage(message)}</div>;
-                })}
+                {messages.map((message, index) => (
+                    <div key={index}>
+                        {renderMessage(message)}
+                    </div>
+                ))}
             </div>
             <form onSubmit={sendMessage} className="flex">
                 <input

@@ -7,10 +7,9 @@ import { BOT_SYSTEM_PROMPT } from "@/app/ai/prompts/bot-prompts";
 import { AgentFactory } from "@/app/ai/agent-factory";
 import { getServerSession } from "next-auth";
 import { format } from "@/app/ai/prompts/utils";
-import { convertToAIMessages } from "@/app/utils/message-utils";
+import {convertToAIMessages, parseResponseToObj} from "@/app/utils/message-utils";
 import {
     getGame,
-    cleanMarkdownResponse,
     addMessageToChatAndSaveToDb,
     getUserFromFirestore
 } from "./game-actions";
@@ -95,7 +94,7 @@ export async function welcome(gameId: string): Promise<Game> {
             throw new Error('Failed to get introduction from bot');
         }
 
-        const botAnswer = cleanMarkdownResponse(rawIntroduction);
+        const botAnswer = parseResponseToObj(rawIntroduction);
 
         const botMessage: GameMessage = {
             id: null,
@@ -121,6 +120,115 @@ export async function welcome(gameId: string): Promise<Game> {
         return await getGame(gameId) as Game;
     } catch (error) {
         console.error('Error in welcome function:', error);
+        throw error;
+    }
+}
+
+/**
+ * Send a user message to all bots in the game (one by one), collecting replies.
+ * The user message is saved to chat, and each bot reply is also saved to chat.
+ */
+export async function talkToAll(gameId: string, userMessage: string): Promise<Game> {
+    const session = await getServerSession();
+    if (!session || !session.user?.email) {
+        throw new Error('Not authenticated');
+    }
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+
+    // Fetch the current game
+    const game = await getGame(gameId);
+    if (!game) {
+        throw new Error('Game not found');
+    }
+
+    // Save the user's message to the chat
+    const userChatMessage: GameMessage = {
+        id: null,
+        recipientName: 'ALL',
+        // Here we use the session user email or name as the message author
+        authorName: session.user.email ?? 'Unknown User',
+        msg: userMessage,
+        messageType: MessageType.HUMAN_PLAYER_MESSAGE,
+        day: game.currentDay,
+        timestamp: Date.now()
+    };
+    await addMessageToChatAndSaveToDb(userChatMessage, gameId);
+
+    try {
+        // For each (alive) bot in the game, produce a response
+        for (const bot of game.bots.filter(b => b.isAlive)) {
+            // Retrieve user-specific API keys
+            const apiKeys = await getUserFromFirestore(session.user.email)
+                .then((user) => getUserApiKeys(user!.email));
+
+            // Construct the system prompt for the bot
+            const botSystemPrompt = format(
+                BOT_SYSTEM_PROMPT,
+                {
+                    name: bot.name,
+                    personal_story: bot.story,
+                    temperament: 'You have a balanced and thoughtful personality.',
+                    role: bot.role,
+                    players_names: game.bots
+                        .filter(bOther => bOther.name !== bot.name)
+                        .map(bOther => bOther.name)
+                        .join(", "),
+                    dead_players_names_with_roles: game.bots
+                        .filter(bDead => !bDead.isAlive)
+                        .map(bDead => `${bDead.name} (${bDead.role})`)
+                        .join(", ")
+                }
+            );
+
+            // Create the bot's agent
+            const agent = AgentFactory.createAgent(
+                bot.name,
+                botSystemPrompt,
+                bot.aiType,
+                apiKeys
+            );
+
+            // The user message is effectively the "latest chat" text to the bot
+            // We'll treat it as a normal user message
+            const chatMessage: GameMessage = {
+                id: null,
+                recipientName: bot.name,
+                authorName: session.user.email ?? 'Unknown User',
+                msg: userMessage,
+                messageType: MessageType.HUMAN_PLAYER_MESSAGE,
+                day: game.currentDay,
+                timestamp: Date.now()
+            };
+
+            // Ask the bot
+            const rawBotReply = await agent.ask(convertToAIMessages(bot.name, [chatMessage]));
+            if (!rawBotReply) {
+                continue; // If no reply for any reason, skip
+            }
+            const botReply = parseResponseToObj(rawBotReply) as BotAnswer;
+
+            // Save the bot reply to the chat
+            const botMessage: GameMessage = {
+                id: null,
+                recipientName: 'ALL',
+                authorName: bot.name,
+                msg:
+                    typeof botReply === 'object' && 'reply' in botReply
+                        ? new BotAnswer(botReply.reply)
+                        : new BotAnswer(botReply),
+                messageType: MessageType.BOT_ANSWER,
+                day: game.currentDay,
+                timestamp: Date.now()
+            };
+            await addMessageToChatAndSaveToDb(botMessage, gameId);
+        }
+
+        // Finally, return the updated game state
+        return await getGame(gameId) as Game;
+    } catch (error) {
+        console.error('Error in talkToAll function:', error);
         throw error;
     }
 } 
