@@ -4,14 +4,16 @@ export const API_KEY_CONSTANTS = {
     OPENAI: 'OPENAI_API_KEY',
     ANTHROPIC: 'ANTHROPIC_API_KEY',
     GOOGLE: 'GOOGLE_API_KEY',
-    MISTRAL: 'MISTRAL_API_KEY'
+    MISTRAL: 'MISTRAL_API_KEY',
+    DEEPSEEK: 'DEEPSEEK_API_KEY'
 } as const;
 
 export const SupportedAiKeyNames: Record<string, string> = {
     [API_KEY_CONSTANTS.OPENAI]: 'OpenAI',
     [API_KEY_CONSTANTS.ANTHROPIC]: 'Anthropic',
     [API_KEY_CONSTANTS.GOOGLE]: 'Google',
-    [API_KEY_CONSTANTS.MISTRAL]: 'Mistral'
+    [API_KEY_CONSTANTS.MISTRAL]: 'Mistral',
+    [API_KEY_CONSTANTS.DEEPSEEK]: 'DeepSeek'
 };
 
 export const LLM_CONSTANTS = {
@@ -25,7 +27,8 @@ export const LLM_CONSTANTS = {
     GEMINI_15_PRO: 'Gemini 1.5 Pro',
     MISTRAL_2_LARGE: 'Mistral 2 Large',
     MISTRAL_2_SMALL: 'Mistral 2 Small',
-    RANDOM: 'Random'
+    RANDOM: 'Random',
+    DEEPSEEK_CHAT: 'DeepSeek Chat'
 }
 
 export const SupportedAiModels = {
@@ -68,6 +71,10 @@ export const SupportedAiModels = {
     [LLM_CONSTANTS.MISTRAL_2_SMALL]: {
         modelApiName: 'mistral-small-latest',
         apiKeyName: API_KEY_CONSTANTS.MISTRAL
+    },
+    [LLM_CONSTANTS.DEEPSEEK_CHAT]: {
+        modelApiName: 'deepseek-chat',
+        apiKeyName: API_KEY_CONSTANTS.DEEPSEEK
     }
 } as const;
 

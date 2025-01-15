@@ -22,6 +22,7 @@ export class ClaudeAgent extends AbstractAgent {
 
         try {
             const aiMessages = this.prepareMessages(messages);
+            this.printMessages(aiMessages);
 
             const params: Anthropic.MessageCreateParams = {
                 max_tokens: 1024,

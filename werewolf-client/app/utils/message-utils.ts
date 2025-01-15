@@ -61,6 +61,21 @@ export function convertToAIMessage(message: GameMessage): AIMessage {
     };
 }
 
+export function cleanResponse(response: string): string {
+    let cleanResponse = response.trim();
+    if (cleanResponse.startsWith('```json')) {
+        cleanResponse = cleanResponse.slice(7);
+    } else if (cleanResponse.startsWith('```')) {
+        cleanResponse = cleanResponse.slice(3);
+    }
+
+    if (cleanResponse.endsWith('```')) {
+        cleanResponse = cleanResponse.slice(0, -3);
+    }
+
+    return cleanResponse.trim();
+}
+
 export function parseResponseToObj(response: string): any {
     let cleanResponse = response.trim();
     if (cleanResponse.startsWith('```json')) {

@@ -7,7 +7,7 @@ import { BOT_SYSTEM_PROMPT } from "@/app/ai/prompts/bot-prompts";
 import { AgentFactory } from "@/app/ai/agent-factory";
 import { getServerSession } from "next-auth";
 import { format } from "@/app/ai/prompts/utils";
-import {convertToAIMessages, parseResponseToObj} from "@/app/utils/message-utils";
+import {cleanResponse, convertToAIMessages, parseResponseToObj} from "@/app/utils/message-utils";
 import {
     getGame,
     addMessageToChatAndSaveToDb,
@@ -71,12 +71,7 @@ export async function welcome(gameId: string): Promise<Game> {
             }
         );
 
-        const agent = AgentFactory.createAgent(
-            bot.name,
-            botPrompt,
-            bot.aiType,
-            apiKeys
-        );
+        const agent = AgentFactory.createAgent(bot.name, botPrompt, bot.aiType, apiKeys);
 
         const gmMessage: GameMessage = {
             id: null,
@@ -88,22 +83,25 @@ export async function welcome(gameId: string): Promise<Game> {
             timestamp: Date.now()
         };
 
-        // Convert GameMessage to AIMessage before passing to agent
-        const rawIntroduction = await agent.ask(convertToAIMessages(bot.name, [gmMessage]));
+        const history = convertToAIMessages(bot.name, [gmMessage]);
+        const rawIntroduction = await agent.ask(history);
         if (!rawIntroduction) {
             throw new Error('Failed to get introduction from bot');
         }
 
-        const botAnswer = parseResponseToObj(rawIntroduction);
+        const cleanAnswer = cleanResponse(rawIntroduction);
+        let answer: BotAnswer;
+        try {
+            answer = JSON.parse(cleanAnswer) as BotAnswer;
+        } catch (e: any) {
+            throw new Error(`Failed to parse JSON, returning as string: ${e.message}`);
+        }
 
         const botMessage: GameMessage = {
             id: null,
             recipientName: 'ALL',
             authorName: bot.name,
-            msg:
-                typeof botAnswer === 'object' && 'reply' in botAnswer
-                    ? new BotAnswer(botAnswer.reply)
-                    : new BotAnswer(botAnswer),
+            msg: JSON.stringify(answer),
             messageType: MessageType.BOT_ANSWER,
             day: game.currentDay,
             timestamp: Date.now()

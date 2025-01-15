@@ -6,6 +6,7 @@ import {ClaudeAgent} from "@/app/ai/anthropic-agent";
 import {GoogleAgent} from "@/app/ai/google-agent";
 import {MistralAgent} from "@/app/ai/mistral-agent";
 import {OpenAiO1Agent} from "@/app/ai/open-ai-o1-agent";
+import {DeepSeekAgent} from "@/app/ai/deepseek-agent";
 
 export class AgentFactory {
 
@@ -20,7 +21,7 @@ export class AgentFactory {
         const apiKeyName = model.apiKeyName
         const key = apiKeys[apiKeyName]
 
-        this.logger(name, model, instruction)
+        this.logger(name, model.modelApiName, instruction)
         switch (modelName) {
             case LLM_CONSTANTS.CLAUDE_35_HAIKU:
             case LLM_CONSTANTS.CLAUDE_35_SONNET:
@@ -37,6 +38,8 @@ export class AgentFactory {
             case LLM_CONSTANTS.MISTRAL_2_SMALL:
             case LLM_CONSTANTS.MISTRAL_2_LARGE:
                 return new MistralAgent(name, instruction, model.modelApiName, key);
+            case LLM_CONSTANTS.DEEPSEEK_CHAT:
+                return new DeepSeekAgent(name, instruction, model.modelApiName, key);
             default:
                 throw new Error(`Unknown Key: ${modelName}`);
         }

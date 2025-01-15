@@ -19,6 +19,16 @@ export abstract class AbstractAgent {
         console.log(`[${this.name} ${this.model}]: ${message}`);
     }
 
+    protected printMessages(messages: AIMessage[]): void {
+        console.log(`\n[${this.name} ${this.model}] Message History:`);
+        messages.forEach((msg, index) => {
+            if (msg.role !== 'system') {
+                console.log(`${index}. ${msg.role}: ${msg.content}`);
+            }
+        });
+        console.log('');
+    }
+
     protected prepareMessages(messages: AIMessage[]): AIMessage[] {
         return messages;
     }
