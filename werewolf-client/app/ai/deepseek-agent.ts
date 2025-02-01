@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import {AIMessage} from "@/app/api/game-models";
 import {AbstractAgent} from "@/app/ai/abstract-agent";
+import { fileURLToPath } from "url";
 
 export class DeepSeekAgent extends AbstractAgent {
     private readonly client: OpenAI;
@@ -45,3 +46,15 @@ export class DeepSeekAgent extends AbstractAgent {
         }
     }
 }
+
+async function main(): Promise<void> {
+    const testHistory: AIMessage[] = [
+        { role: "user", content: "Test input from DeepSeekAgent" },
+        { role: "assistant", content: "Initial response" }
+    ];
+    const agent = new DeepSeekAgent("TestDeepSeek", "Test instruction", "test-model", "dummy-api-key");
+    const result = await agent.ask(testHistory);
+    console.log("DeepSeekAgent API call result:", result);
+}
+
+ // Main invocation removed for tests.
