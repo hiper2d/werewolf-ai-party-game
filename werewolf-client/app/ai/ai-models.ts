@@ -19,16 +19,17 @@ export const SupportedAiKeyNames: Record<string, string> = {
 export const LLM_CONSTANTS = {
     CLAUDE_35_SONNET: 'Claude 3.5 Sonnet',
     CLAUDE_35_HAIKU: 'Claude 3.5 Haiku',
+    DEEPSEEK_CHAT: 'DeepSeek Chat',
+    DEEPSEEK_REASONER: 'DeepSeek Reasoner',
     GPT_4O: 'GPT-4o',
     GPT_4O_MINI: 'GPT-4o Mini',
-    GPT_O1_PREVIEW: 'o1-preview',
-    GPT_O1_MINI: 'o1-mini',
-    GEMINI_15_FLASH: 'Gemini 1.5 Flash',
+    GPT_O1: 'o1',
+    GPT_O3_MINI: 'o3-mini',
+    GEMINI_2_FLASH_EXP: 'Gemini 2.0 Flash',
     GEMINI_15_PRO: 'Gemini 1.5 Pro',
     MISTRAL_2_LARGE: 'Mistral 2 Large',
-    MISTRAL_2_SMALL: 'Mistral 2 Small',
+    MISTRAL_3_SMALL: 'Mistral 3 Small',
     RANDOM: 'Random',
-    DEEPSEEK_CHAT: 'DeepSeek Chat'
 }
 
 export const SupportedAiModels = {
@@ -48,16 +49,16 @@ export const SupportedAiModels = {
         modelApiName: 'gpt-4o-mini',
         apiKeyName: API_KEY_CONSTANTS.OPENAI
     },
-    [LLM_CONSTANTS.GPT_O1_PREVIEW]: {
-        modelApiName: 'o1-preview',
+    [LLM_CONSTANTS.GPT_O1]: {
+        modelApiName: 'o1',
         apiKeyName: API_KEY_CONSTANTS.OPENAI
     },
-    [LLM_CONSTANTS.GPT_O1_MINI]: {
-        modelApiName: 'o1-mini',
+    [LLM_CONSTANTS.GPT_O3_MINI]: {
+        modelApiName: 'o3-mini',
         apiKeyName: API_KEY_CONSTANTS.OPENAI
     },
-    [LLM_CONSTANTS.GEMINI_15_FLASH]: {
-        modelApiName: 'gemini-1.5-flash',
+    [LLM_CONSTANTS.GEMINI_2_FLASH_EXP]: {
+        modelApiName: 'gemini-2.0-flash-exp',
         apiKeyName: API_KEY_CONSTANTS.GOOGLE
     },
     [LLM_CONSTANTS.GEMINI_15_PRO]: {
@@ -68,14 +69,18 @@ export const SupportedAiModels = {
         modelApiName: 'mistral-large-latest',
         apiKeyName: API_KEY_CONSTANTS.MISTRAL
     },
-    [LLM_CONSTANTS.MISTRAL_2_SMALL]: {
+    [LLM_CONSTANTS.MISTRAL_3_SMALL]: {
         modelApiName: 'mistral-small-latest',
         apiKeyName: API_KEY_CONSTANTS.MISTRAL
     },
     [LLM_CONSTANTS.DEEPSEEK_CHAT]: {
         modelApiName: 'deepseek-chat',
         apiKeyName: API_KEY_CONSTANTS.DEEPSEEK
-    }
+    },
+    [LLM_CONSTANTS.DEEPSEEK_REASONER]: {
+        modelApiName: 'deepseek-reasoner',
+        apiKeyName: API_KEY_CONSTANTS.DEEPSEEK
+    },
 } as const;
 
 export type LLMModel = keyof typeof SupportedAiModels;

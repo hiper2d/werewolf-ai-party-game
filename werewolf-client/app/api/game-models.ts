@@ -1,5 +1,3 @@
-import {Timestamp} from "firebase/firestore";
-
 export interface ApiKeyMap {
     [id: string]: string
 }
@@ -76,27 +74,18 @@ export enum MessageType {
     HUMAN_PLAYER_MESSAGE = 'HUMAN_PLAYER_MESSAGE',
 }
 
-export interface BaseMessage {
-    type: MessageType;
-}
-
-export class BotAnswer implements BaseMessage {
-    type: MessageType = MessageType.BOT_ANSWER;
-    
+export class BotAnswer {
     constructor(public reply: string) {}
 }
 
-export class GameStory implements BaseMessage {
-    type: MessageType = MessageType.GAME_STORY;
-    
+export class GameStory {
     constructor(public story: string) {}
 }
 
 export const MESSAGE_ROLE = {
     SYSTEM: "system" as const,
     USER: "user" as const,
-    ASSISTANT: "assistant" as const,
-    TOOL: "tool" as const
+    ASSISTANT: "assistant" as const
 } as const;
 
 export const GAME_MASTER = 'Game Master';

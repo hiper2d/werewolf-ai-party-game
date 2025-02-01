@@ -101,7 +101,7 @@ export async function welcome(gameId: string): Promise<Game> {
             id: null,
             recipientName: 'ALL',
             authorName: bot.name,
-            msg: JSON.stringify(answer),
+            msg: { reply: answer.reply },
             messageType: MessageType.BOT_ANSWER,
             day: game.currentDay,
             timestamp: Date.now()

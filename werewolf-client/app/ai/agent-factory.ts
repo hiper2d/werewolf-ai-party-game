@@ -29,13 +29,13 @@ export class AgentFactory {
             case LLM_CONSTANTS.GPT_4O_MINI:
             case LLM_CONSTANTS.GPT_4O:
                 return new OpenAiAgent(name, instruction, model.modelApiName, key, 0.2);
-            case LLM_CONSTANTS.GPT_O1_MINI:
-            case LLM_CONSTANTS.GPT_O1_PREVIEW:
+            case LLM_CONSTANTS.GPT_O3_MINI:
+            case LLM_CONSTANTS.GPT_O1:
                 return new OpenAiO1Agent(name, instruction, model.modelApiName, key);
-            case LLM_CONSTANTS.GEMINI_15_FLASH:
+            case LLM_CONSTANTS.GEMINI_2_FLASH_EXP:
             case LLM_CONSTANTS.GEMINI_15_PRO:
                 return new GoogleAgent(name, instruction, model.modelApiName, key);
-            case LLM_CONSTANTS.MISTRAL_2_SMALL:
+            case LLM_CONSTANTS.MISTRAL_3_SMALL:
             case LLM_CONSTANTS.MISTRAL_2_LARGE:
                 return new MistralAgent(name, instruction, model.modelApiName, key);
             case LLM_CONSTANTS.DEEPSEEK_CHAT:
