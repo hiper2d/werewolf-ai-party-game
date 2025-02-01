@@ -17,13 +17,32 @@ export class MistralAgent extends AbstractAgent {
         const chatResponse: ChatCompletionResponse | undefined = await this.client.chat.complete({
             model: this.model,
             messages: [
-                {role: MESSAGE_ROLE.SYSTEM, content: this.instruction},
+                { role: MESSAGE_ROLE.SYSTEM, content: this.instruction },
                 ...messages
             ],
         });
 
-        const reply = chatResponse?.choices?.[0]?.message?.content;
-        this.logger(`Reply: ${reply}`);
+        let reply = chatResponse?.choices?.[0]?.message?.content;
+        this.logger(`Raw reply: ${reply}`);
+        if (reply === undefined || reply === null) {
+            return null;
+        }
+        if (Array.isArray(reply)) {
+            // For each chunk, if it's a string, include it.
+            // If it's an object and its type is 'text', then include its text property.
+            // Otherwise ignore non-text chunks.
+            reply = reply.map(chunk => {
+                if (typeof chunk === "string") {
+                    return chunk;
+                } else if (typeof chunk === "object" && "type" in chunk && chunk.type === "text" && "text" in chunk) {
+                    return chunk.text;
+                }
+                return "";
+            }).join("");
+        } else if (typeof reply !== "string") {
+            return null;
+        }
+        this.logger(`Final reply: ${reply}`);
         return reply;
     }
 }
