@@ -1,6 +1,6 @@
 import { AbstractAgent } from "@/app/ai/abstract-agent";
 import { AIMessage } from "@/app/api/game-models";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 
 // API Docs: https://ai.google.dev/gemini-api/docs/text-generation?lang=node
 export class GoogleAgent extends AbstractAgent {
@@ -11,7 +11,26 @@ export class GoogleAgent extends AbstractAgent {
     constructor(name: string, instruction: string, model: string, apiKey: string) {
         super(name, instruction, model, 0.2);
         this.client = new GoogleGenerativeAI(apiKey);
-        this.modelObj = this.client.getGenerativeModel({ model: model });
+        
+        const botAnswerSchema = {
+            type: SchemaType.OBJECT,
+            properties: {
+                reply: {
+                    type: SchemaType.STRING,
+                    description: "The bot's response message",
+                    nullable: false,
+                }
+            },
+            required: ["reply"]
+        };
+
+        this.modelObj = this.client.getGenerativeModel({
+            model: model,
+            generationConfig: {
+                responseMimeType: "application/json",
+                responseSchema: botAnswerSchema
+            }
+        });
     }
 
     async ask(messages: AIMessage[]): Promise<string | null> {
@@ -25,6 +44,9 @@ export class GoogleAgent extends AbstractAgent {
                         role: message.role === 'assistant' ? 'model' : message.role,
                         parts: [{ text: message.content }],
                     })),
+                    config: {
+                        system_instruction: this.instruction
+                    }
                 });
             }
 

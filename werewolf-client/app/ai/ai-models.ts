@@ -25,8 +25,8 @@ export const LLM_CONSTANTS = {
     GPT_4O_MINI: 'GPT-4o Mini',
     GPT_O1: 'o1',
     GPT_O3_MINI: 'o3-mini',
-    GEMINI_2_FLASH_EXP: 'Gemini 2.0 Flash',
-    GEMINI_15_PRO: 'Gemini 1.5 Pro',
+    GEMINI_2_FLASH: 'Gemini 2.0 Flash',
+    GEMINI_2_PRO_EXP: 'Gemini 2.0 Pro',
     MISTRAL_2_LARGE: 'Mistral 2 Large',
     MISTRAL_3_SMALL: 'Mistral 3 Small',
     RANDOM: 'Random',
@@ -57,12 +57,12 @@ export const SupportedAiModels = {
         modelApiName: 'o3-mini',
         apiKeyName: API_KEY_CONSTANTS.OPENAI
     },
-    [LLM_CONSTANTS.GEMINI_2_FLASH_EXP]: {
-        modelApiName: 'gemini-2.0-flash-exp',
+    [LLM_CONSTANTS.GEMINI_2_FLASH]: {
+        modelApiName: 'gemini-2.0-flash-001',
         apiKeyName: API_KEY_CONSTANTS.GOOGLE
     },
-    [LLM_CONSTANTS.GEMINI_15_PRO]: {
-        modelApiName: 'gemini-1.5-pro',
+    [LLM_CONSTANTS.GEMINI_2_PRO_EXP]: {
+        modelApiName: 'gemini-2.0-pro-exp-02-05',
         apiKeyName: API_KEY_CONSTANTS.GOOGLE
     },
     [LLM_CONSTANTS.MISTRAL_2_LARGE]: {

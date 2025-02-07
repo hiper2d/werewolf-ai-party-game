@@ -32,8 +32,8 @@ export class AgentFactory {
             case LLM_CONSTANTS.GPT_O3_MINI:
             case LLM_CONSTANTS.GPT_O1:
                 return new OpenAiO1Agent(name, instruction, model.modelApiName, key);
-            case LLM_CONSTANTS.GEMINI_2_FLASH_EXP:
-            case LLM_CONSTANTS.GEMINI_15_PRO:
+            case LLM_CONSTANTS.GEMINI_2_FLASH:
+            case LLM_CONSTANTS.GEMINI_2_PRO_EXP:
                 return new GoogleAgent(name, instruction, model.modelApiName, key);
             case LLM_CONSTANTS.MISTRAL_3_SMALL:
             case LLM_CONSTANTS.MISTRAL_2_LARGE:
