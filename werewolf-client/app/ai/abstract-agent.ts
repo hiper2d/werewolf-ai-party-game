@@ -1,4 +1,5 @@
-import {AIMessage} from "@/app/api/game-models";
+import { AIMessage } from "@/app/api/game-models";
+import { ResponseSchema } from "@/app/ai/prompts/ai-schemas";
 
 export abstract class AbstractAgent {
     name: string;
@@ -13,7 +14,8 @@ export abstract class AbstractAgent {
         this.model = model;
     }
 
-    abstract ask(messages: AIMessage[]): Promise<string | null>
+    abstract ask(messages: AIMessage[]): Promise<string | null>;
+    abstract askWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<string | null>;
 
     protected logger(message: string): void {
         console.log(`[${this.name} ${this.model}]: ${message}`);

@@ -24,6 +24,7 @@ import {convertToAIMessage, parseResponseToObj} from "@/app/utils/message-utils"
 import {LLM_CONSTANTS} from "@/app/ai/ai-models";
 import {AbstractAgent} from "../ai/abstract-agent";
 import {format} from "@/app/ai/prompts/utils";
+import {createGameSetupSchema} from "@/app/ai/prompts/ai-schemas";
 
 export async function getAllGames(): Promise<Game[]> {
     if (!db) {
@@ -112,7 +113,8 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
         timestamp: null
     };
 
-    const response = await storyTellAgent.ask([convertToAIMessage(storyMessage)]);
+    const schema = createGameSetupSchema();
+    const response = await storyTellAgent.askWithSchema(schema, [convertToAIMessage(storyMessage)]);
     if (!response) {
         throw new Error('Failed to get AI response');
     }

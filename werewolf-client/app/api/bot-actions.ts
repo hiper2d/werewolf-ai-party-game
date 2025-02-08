@@ -5,6 +5,7 @@ import { Bot, BotAnswer, GAME_MASTER, GAME_STATES, MessageType, GameMessage, Gam
 import { GM_COMMAND_INTRODUCE_YOURSELF } from "@/app/ai/prompts/gm-commands";
 import { BOT_SYSTEM_PROMPT } from "@/app/ai/prompts/bot-prompts";
 import { AgentFactory } from "@/app/ai/agent-factory";
+import { createBotAnswerSchema } from "@/app/ai/prompts/ai-schemas";
 import { getServerSession } from "next-auth";
 import { format } from "@/app/ai/prompts/utils";
 import {cleanResponse, convertToAIMessages, parseResponseToObj} from "@/app/utils/message-utils";
@@ -82,16 +83,17 @@ export async function welcome(gameId: string): Promise<Game> {
             day: game.currentDay,
             timestamp: Date.now()
         };
+const history = convertToAIMessages(bot.name, [gmMessage]);
+const schema = createBotAnswerSchema();
+const rawIntroduction = await agent.askWithSchema(schema, history);
+if (!rawIntroduction) {
+    throw new Error('Failed to get introduction from bot');
+}
 
-        const history = convertToAIMessages(bot.name, [gmMessage]);
-        const rawIntroduction = await agent.ask(history);
-        if (!rawIntroduction) {
-            throw new Error('Failed to get introduction from bot');
-        }
-
-        const cleanAnswer = cleanResponse(rawIntroduction);
-        let answer: BotAnswer;
-        try {
+const cleanAnswer = cleanResponse(rawIntroduction);
+let answer: BotAnswer;
+try {
+    answer = JSON.parse(cleanAnswer);
             answer = JSON.parse(cleanAnswer) as BotAnswer;
         } catch (e: any) {
             throw new Error(`Failed to parse JSON, returning as string: ${e.message}`);
@@ -200,12 +202,13 @@ export async function talkToAll(gameId: string, userMessage: string): Promise<Ga
                 timestamp: Date.now()
             };
 
-            // Ask the bot
-            const rawBotReply = await agent.ask(convertToAIMessages(bot.name, [chatMessage]));
+            // Ask the bot with schema validation
+            const schema = createBotAnswerSchema();
+            const rawBotReply = await agent.askWithSchema(schema, convertToAIMessages(bot.name, [chatMessage]));
             if (!rawBotReply) {
                 continue; // If no reply for any reason, skip
             }
-            const botReply = parseResponseToObj(rawBotReply) as BotAnswer;
+            const botReply = parseResponseToObj(rawBotReply);
 
             // Save the bot reply to the chat
             const botMessage: GameMessage = {

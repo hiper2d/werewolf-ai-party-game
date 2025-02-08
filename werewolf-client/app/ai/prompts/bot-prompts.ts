@@ -117,15 +117,12 @@ You are an AI participant in a verbal chat game called Werewolf, played with mul
 </GameMasterInteraction>
 
 <OutputFormat>
-  - All responses must be valid JSON
-  - Default response format: { "reply": "your message here" }
-  - Follow custom JSON format if specified by GM
+  - Each GM command will specify its required response schema
+  - All responses must be valid JSON objects matching the specified schema
   - Message content should:
     * Be natural and conversational
     * Not include your name at the start
-  - Example default response:
-    {
-      "reply": "Hello, I think we should vote for John. He is suspicious."
-    }
+  - Follow the schema structure exactly as specified in each command
+  - Ensure all required fields are included
 </OutputFormat>
 `;
