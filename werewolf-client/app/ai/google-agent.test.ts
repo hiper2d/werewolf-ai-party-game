@@ -47,9 +47,11 @@ describe("GoogleAgent integration", () => {
       expect(typeof response).toBe("string");
       expect(response!.length).toBeGreaterThan(0);
       
-      // Parse response to BotAnswer
-      const parsedResponse = parseResponseToObj(response!) as BotAnswer;
-      expect(parsedResponse.reply).not.toBeNull();
+      // Parse response and verify reply
+      const parsed = parseResponseToObj(response!);
+      expect(parsed.reply).toBeDefined();
+      expect(typeof parsed.reply).toBe('string');
+      expect(parsed.reply.length).toBeGreaterThan(0);
     } catch (error) {
       console.error('Test error:', error);
       throw error;
@@ -93,9 +95,11 @@ describe("GoogleAgent integration", () => {
       expect(typeof response).toBe("string");
       expect(response!.length).toBeGreaterThan(0);
       
-      // Parse response to BotAnswer
-      const parsedResponse = parseResponseToObj(response!) as BotAnswer;
-      expect(parsedResponse.reply).not.toBeNull();
+      // Parse response and verify reply
+      const parsed = parseResponseToObj(response!);
+      expect(parsed.reply).toBeDefined();
+      expect(typeof parsed.reply).toBe('string');
+      expect(parsed.reply.length).toBeGreaterThan(0);
     } catch (error) {
       console.error('Test error:', error);
       throw error;
