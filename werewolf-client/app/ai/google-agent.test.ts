@@ -7,6 +7,7 @@ import { LLM_CONSTANTS, SupportedAiModels } from "@/app/ai/ai-models";
 import { BOT_SYSTEM_PROMPT } from "@/app/ai/prompts/bot-prompts";
 import { format } from "@/app/ai/prompts/utils";
 import { GM_COMMAND_INTRODUCE_YOURSELF, HISTORY_PREFIX } from "@/app/ai/prompts/gm-commands";
+import { createBotAnswerSchema } from "@/app/ai/prompts/ai-schemas";
 
 describe("GoogleAgent integration", () => {
   it("should respond with a valid answer", async () => {
@@ -37,15 +38,22 @@ describe("GoogleAgent integration", () => {
         )
       }
     ];
-    const response = await agent.ask(messages);
     
-    expect(response).not.toBeNull();
-    expect(typeof response).toBe("string");
-    expect(response!.length).toBeGreaterThan(0);
-    
-    // Parse response to BotAnswer
-    const parsedResponse = parseResponseToObj(response!) as BotAnswer;
-    expect(parsedResponse.reply).not.toBeNull();
+    try {
+      const response = await agent.askWithSchema(createBotAnswerSchema(), messages);
+      console.log('Response:', response);
+      
+      expect(response).not.toBeNull();
+      expect(typeof response).toBe("string");
+      expect(response!.length).toBeGreaterThan(0);
+      
+      // Parse response to BotAnswer
+      const parsedResponse = parseResponseToObj(response!) as BotAnswer;
+      expect(parsedResponse.reply).not.toBeNull();
+    } catch (error) {
+      console.error('Test error:', error);
+      throw error;
+    }
   });
 
   it("should respond with a valid answer using Gemini Flash", async () => {
@@ -76,14 +84,21 @@ describe("GoogleAgent integration", () => {
         )
       }
     ];
-    const response = await agent.ask(messages);
     
-    expect(response).not.toBeNull();
-    expect(typeof response).toBe("string");
-    expect(response!.length).toBeGreaterThan(0);
-    
-    // Parse response to BotAnswer
-    const parsedResponse = parseResponseToObj(response!) as BotAnswer;
-    expect(parsedResponse.reply).not.toBeNull();
+    try {
+      const response = await agent.askWithSchema(createBotAnswerSchema(), messages);
+      console.log('Response:', response);
+      
+      expect(response).not.toBeNull();
+      expect(typeof response).toBe("string");
+      expect(response!.length).toBeGreaterThan(0);
+      
+      // Parse response to BotAnswer
+      const parsedResponse = parseResponseToObj(response!) as BotAnswer;
+      expect(parsedResponse.reply).not.toBeNull();
+    } catch (error) {
+      console.error('Test error:', error);
+      throw error;
+    }
   });
 });
