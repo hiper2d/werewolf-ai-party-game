@@ -12,7 +12,6 @@ export class GoogleAgent extends AbstractAgent {
         super(name, instruction, model, 0.2);
         this.client = new GoogleGenerativeAI(apiKey);
 
-        // Removed schema from the constructor. The schema will be passed via the ask method.
         this.modelObj = this.client.getGenerativeModel({
             model: model,
             generationConfig: {
@@ -21,16 +20,18 @@ export class GoogleAgent extends AbstractAgent {
         });
     }
 
-    // Implementation without schema
     async ask(messages: AIMessage[]): Promise<string | null> {
-        this.logger(`Asking ${this.name} ${this.model} agent. Last message: ${messages[messages.length - 1].content}`);
+        this.logger(`Asking ${this.name} ${this.model} agent.`);
 
         try {
+            const history: Array<{}> = messages.map((message) => ({
+                role: message.role === 'assistant' ? 'model' : 'user',
+                parts: [{ text: message.content }],
+            }));
+
+            this.logger(`History:\n${JSON.stringify(history)}`);
             const chat = this.modelObj.startChat({
-                history: messages.map((message) => ({
-                    role: message.role === 'assistant' ? 'model' : message.role,
-                    parts: [{ text: message.content }],
-                }))
+                history: history
             });
 
             const result = await chat.sendMessage(messages[messages.length - 1].content);
@@ -42,7 +43,6 @@ export class GoogleAgent extends AbstractAgent {
         }
     }
 
-    // Implementation with schema
     async askWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<string | null> {
         this.logger(`Asking ${this.name} ${this.model} agent with schema. Last message: ${messages[messages.length - 1].content}`);
 

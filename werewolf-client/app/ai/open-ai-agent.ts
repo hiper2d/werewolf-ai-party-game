@@ -15,7 +15,7 @@ export class OpenAiAgent extends AbstractAgent {
     async ask(messages: AIMessage[]): Promise<string | null> {
         this.logger(`Asking ${this.name} ${this.model} agent. Last message: ${messages[messages.length-1].content}`);
         messages.forEach((msg) => {
-            this.logger()
+            this.logger(msg.content);
         })
 
         const preparedMessages = this.prepareMessages(messages);
