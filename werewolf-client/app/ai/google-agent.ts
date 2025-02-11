@@ -22,6 +22,7 @@ export class GoogleAgent extends AbstractAgent {
 
     async ask(messages: AIMessage[]): Promise<string | null> {
         this.logger(`Asking ${this.name} ${this.model} agent.`);
+        this.logger(`Messages:\n${JSON.stringify(messages, null, 2)}`);
 
         try {
             const history: Array<{}> = messages.map((message) => ({
@@ -29,7 +30,6 @@ export class GoogleAgent extends AbstractAgent {
                 parts: [{ text: message.content }],
             }));
 
-            this.logger(`History:\n${JSON.stringify(history)}`);
             const chat = this.modelObj.startChat({
                 history: history
             });
@@ -44,14 +44,17 @@ export class GoogleAgent extends AbstractAgent {
     }
 
     async askWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<string | null> {
-        this.logger(`Asking ${this.name} ${this.model} agent with schema. Last message: ${messages[messages.length - 1].content}`);
+        this.logger(`Asking ${this.name} ${this.model} agent with schema.`);
+        this.logger(`Messages:\n${JSON.stringify(messages, null, 2)}`);
 
         try {
+            const history: Array<{}> = messages.map((message) => ({
+                role: message.role === 'assistant' ? 'model' : message.role,
+                parts: [{ text: message.content }],
+            }));
+
             const chat = this.modelObj.startChat({
-                history: messages.map((message) => ({
-                    role: message.role === 'assistant' ? 'model' : message.role,
-                    parts: [{ text: message.content }],
-                }))
+                history: history
             });
 
             // Construct the full prompt with schema instructions

@@ -7,6 +7,7 @@ import { LLM_CONSTANTS, SupportedAiModels } from "@/app/ai/ai-models";
 import { BOT_SYSTEM_PROMPT } from "@/app/ai/prompts/bot-prompts";
 import { format } from "@/app/ai/prompts/utils";
 import { GM_COMMAND_INTRODUCE_YOURSELF, HISTORY_PREFIX } from "@/app/ai/prompts/gm-commands";
+import { createBotAnswerSchema } from "@/app/ai/prompts/ai-schemas";
 
 // Helper function to create a MistralAgent instance
 const createAgent = (botName: string, modelType: string): MistralAgent => {
@@ -52,8 +53,14 @@ describe("MistralAgent integration", () => {
     expect(typeof response).toBe("string");
     expect(response.length).toBeGreaterThan(0);
     
-    const parsedResponse: BotAnswer = parseResponseToObj(response) as BotAnswer;
-    expect(parsedResponse.reply).not.toBeNull();
+    // Parse response and create BotAnswer instance
+    const parsedObj = parseResponseToObj(response);
+    expect(parsedObj).toHaveProperty('reply');
+    const botAnswer = new BotAnswer(parsedObj.reply);
+    expect(botAnswer).toBeInstanceOf(BotAnswer);
+    expect(botAnswer.reply).not.toBeNull();
+    expect(typeof botAnswer.reply).toBe('string');
+    expect(botAnswer.reply.length).toBeGreaterThan(0);
   });
 
   it("should respond with a valid answer using Mistral 3 Small model", async () => {
@@ -67,7 +74,69 @@ describe("MistralAgent integration", () => {
     expect(typeof response).toBe("string");
     expect(response.length).toBeGreaterThan(0);
     
-    const parsedResponse: BotAnswer = parseResponseToObj(response) as BotAnswer;
-    expect(parsedResponse.reply).not.toBeNull();
+    // Parse response and create BotAnswer instance
+    const parsedObj = parseResponseToObj(response);
+    expect(parsedObj).toHaveProperty('reply');
+    const botAnswer = new BotAnswer(parsedObj.reply);
+    expect(botAnswer).toBeInstanceOf(BotAnswer);
+    expect(botAnswer.reply).not.toBeNull();
+    expect(typeof botAnswer.reply).toBe('string');
+    expect(botAnswer.reply.length).toBeGreaterThan(0);
+  });
+
+  it("should respond with a valid schema-based answer", async () => {
+    const botName = "MistralBot";
+    const agent = createAgent(botName, LLM_CONSTANTS.MISTRAL_2_LARGE);
+    const messages: AIMessage[] = [
+      {
+        role: 'user',
+        content: 'What do you think about the current situation in the village?'
+      }
+    ];
+
+    const schema = createBotAnswerSchema();
+    const response = await agent.askWithSchema(schema, messages);
+    
+    expect(response).not.toBeNull();
+    if(response === null) return;
+    expect(typeof response).toBe("string");
+    expect(response.length).toBeGreaterThan(0);
+
+    // Parse response and create BotAnswer instance
+    const parsedObj = parseResponseToObj(response);
+    expect(parsedObj).toHaveProperty('reply');
+    const botAnswer = new BotAnswer(parsedObj.reply);
+    expect(botAnswer).toBeInstanceOf(BotAnswer);
+    expect(botAnswer.reply).not.toBeNull();
+    expect(typeof botAnswer.reply).toBe('string');
+    expect(botAnswer.reply.length).toBeGreaterThan(0);
+  });
+
+  it("should respond with a valid schema-based answer using Mistral 3 Small model", async () => {
+    const botName = "MistralBotSmall";
+    const agent = createAgent(botName, LLM_CONSTANTS.MISTRAL_3_SMALL);
+    const messages: AIMessage[] = [
+      {
+        role: 'user',
+        content: 'What do you think about the current situation in the village?'
+      }
+    ];
+
+    const schema = createBotAnswerSchema();
+    const response = await agent.askWithSchema(schema, messages);
+    
+    expect(response).not.toBeNull();
+    if(response === null) return;
+    expect(typeof response).toBe("string");
+    expect(response.length).toBeGreaterThan(0);
+
+    // Parse response and create BotAnswer instance
+    const parsedObj = parseResponseToObj(response);
+    expect(parsedObj).toHaveProperty('reply');
+    const botAnswer = new BotAnswer(parsedObj.reply);
+    expect(botAnswer).toBeInstanceOf(BotAnswer);
+    expect(botAnswer.reply).not.toBeNull();
+    expect(typeof botAnswer.reply).toBe('string');
+    expect(botAnswer.reply.length).toBeGreaterThan(0);
   });
 });

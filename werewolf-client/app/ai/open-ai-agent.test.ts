@@ -1,6 +1,6 @@
 import dotenv from "dotenv";
 dotenv.config();
-import { DeepSeekAgent } from "./deepseek-agent";
+import { OpenAiAgent } from "./open-ai-agent";
 import { AIMessage, BotAnswer } from "@/app/api/game-models";
 import { parseResponseToObj } from "@/app/utils/message-utils";
 import { LLM_CONSTANTS, SupportedAiModels } from "@/app/ai/ai-models";
@@ -9,8 +9,8 @@ import { format } from "@/app/ai/prompts/utils";
 import { GM_COMMAND_INTRODUCE_YOURSELF, HISTORY_PREFIX } from "@/app/ai/prompts/gm-commands";
 import { createBotAnswerSchema } from "@/app/ai/prompts/ai-schemas";
 
-describe("DeepSeekAgent integration", () => {
-  const setupAgent = (botName: string, modelType: string): DeepSeekAgent => {
+describe("OpenAiAgent integration", () => {
+  const setupAgent = (botName: string, modelType: string): OpenAiAgent => {
     const instruction = format(BOT_SYSTEM_PROMPT, {
       name: botName,
       personal_story: "A mysterious wanderer with a hidden past",
@@ -20,17 +20,17 @@ describe("DeepSeekAgent integration", () => {
       dead_players_names_with_roles: "David (Werewolf)"
     });
 
-    return new DeepSeekAgent(
+    return new OpenAiAgent(
       botName,
       instruction,
       SupportedAiModels[modelType].modelApiName,
-      process.env.DEEPSEEK_K!,
-      0.7
+      process.env.OPENAI_K!,
+      0.2
     );
   };
 
-  it("should respond with a valid answer using DeepSeek Chat", async () => {
-    const agent = setupAgent("DeepSeekBot", LLM_CONSTANTS.DEEPSEEK_CHAT);
+  it("should respond with a valid answer using GPT-4O", async () => {
+    const agent = setupAgent("OpenAiBot", LLM_CONSTANTS.GPT_4O);
     const messages: AIMessage[] = [
       {
         role: 'user',
@@ -57,8 +57,8 @@ describe("DeepSeekAgent integration", () => {
     expect(botAnswer.reply.length).toBeGreaterThan(0);
   });
 
-  it("should respond with a valid answer using DeepSeek Reasoner", async () => {
-    const agent = setupAgent("DeepSeekReasonerBot", LLM_CONSTANTS.DEEPSEEK_REASONER);
+  it("should respond with a valid answer using GPT-4O Mini", async () => {
+    const agent = setupAgent("OpenAiBotMini", LLM_CONSTANTS.GPT_4O_MINI);
     const messages: AIMessage[] = [
       {
         role: 'user',
@@ -85,8 +85,8 @@ describe("DeepSeekAgent integration", () => {
     expect(botAnswer.reply.length).toBeGreaterThan(0);
   });
 
-  it("should respond with a valid schema-based answer using DeepSeek Chat", async () => {
-    const agent = setupAgent("DeepSeekBot", LLM_CONSTANTS.DEEPSEEK_CHAT);
+  it("should respond with a valid schema-based answer using GPT-4O", async () => {
+    const agent = setupAgent("OpenAiBot", LLM_CONSTANTS.GPT_4O);
     const messages: AIMessage[] = [
       {
         role: 'user',
@@ -111,8 +111,8 @@ describe("DeepSeekAgent integration", () => {
     expect(botAnswer.reply.length).toBeGreaterThan(0);
   });
 
-  it("should respond with a valid schema-based answer using DeepSeek Reasoner", async () => {
-    const agent = setupAgent("DeepSeekReasonerBot", LLM_CONSTANTS.DEEPSEEK_REASONER);
+  it("should respond with a valid schema-based answer using GPT-4O Mini", async () => {
+    const agent = setupAgent("OpenAiBotMini", LLM_CONSTANTS.GPT_4O_MINI);
     const messages: AIMessage[] = [
       {
         role: 'user',

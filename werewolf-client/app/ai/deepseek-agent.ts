@@ -1,11 +1,11 @@
 import OpenAI from "openai";
 import {AIMessage} from "@/app/api/game-models";
 import {AbstractAgent} from "@/app/ai/abstract-agent";
-import { fileURLToPath } from "url";
+import { ResponseSchema } from "@/app/ai/prompts/ai-schemas";
+import { cleanResponse } from "@/app/utils/message-utils";
 
 export class DeepSeekAgent extends AbstractAgent {
     private readonly client: OpenAI;
-    private readonly apiKey: string;
 
     constructor(
         name: string,
@@ -15,10 +15,9 @@ export class DeepSeekAgent extends AbstractAgent {
         temperature: number = 0.7
     ) {
         super(name, instruction, model, temperature);
-        this.apiKey = apiKey;
         this.client = new OpenAI({
             baseURL: 'https://api.deepseek.com',
-            apiKey: this.apiKey
+            apiKey: apiKey,
         });
     }
 
@@ -34,27 +33,65 @@ export class DeepSeekAgent extends AbstractAgent {
             const completion = await this.client.chat.completions.create({
                 messages: preparedMessages,
                 model: this.model,
-                temperature: this.temperature
+                temperature: this.temperature,
             });
 
             const reply = completion.choices[0].message?.content;
-            this.logger(`Reply: ${reply}`);
-            return reply || null;
+            this.logger(`Raw reply: ${reply}`);
+            if (!reply) return null;
+            
+            const cleanedReply = cleanResponse(reply);
+            this.logger(`Final reply: ${cleanedReply}`);
+            return cleanedReply;
         } catch (error) {
-            console.error('Error in DeepSeekAgent.ask:', error);
+            this.logger(`Error in ${this.name} agent: ${error}`);
+            return null;
+        }
+    }
+
+    async askWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<string | null> {
+        this.logger(`Asking ${this.model} agent with schema.`);
+        this.logger(`Messages:\n${JSON.stringify(messages, null, 2)}`);
+
+        try {
+            // Construct the schema instructions
+            const schemaInstructions = `Your response must be a valid JSON object matching this schema:
+${JSON.stringify(schema, null, 2)}
+
+Ensure your response strictly follows the schema requirements.`;
+
+            // Modify the last message to include schema instructions
+            const lastMessage = messages[messages.length - 1];
+            const fullPrompt = `${lastMessage.content}
+
+${schemaInstructions}`;
+            const modifiedMessages = [
+                ...messages.slice(0, -1),
+                { ...lastMessage, content: fullPrompt }
+            ];
+
+            // Prepare messages and add instruction to the first message
+            const preparedMessages = this.prepareMessages(modifiedMessages);
+            if (preparedMessages.length > 0) {
+                preparedMessages[0].content = `${this.instruction}\n\n${preparedMessages[0].content}`;
+            }
+
+            const completion = await this.client.chat.completions.create({
+                messages: preparedMessages,
+                model: this.model,
+                temperature: this.temperature,
+            });
+
+            const reply = completion.choices[0].message?.content;
+            this.logger(`Raw reply: ${reply}`);
+            if (!reply) return null;
+            
+            const cleanedReply = cleanResponse(reply);
+            this.logger(`Final reply: ${cleanedReply}`);
+            return cleanedReply;
+        } catch (error) {
+            this.logger(`Error in ${this.name} agent: ${error}`);
             return null;
         }
     }
 }
-
-async function main(): Promise<void> {
-    const testHistory: AIMessage[] = [
-        { role: "user", content: "Test input from DeepSeekAgent" },
-        { role: "assistant", content: "Initial response" }
-    ];
-    const agent = new DeepSeekAgent("TestDeepSeek", "Test instruction", "test-model", "dummy-api-key");
-    const result = await agent.ask(testHistory);
-    console.log("DeepSeekAgent API call result:", result);
-}
-
- // Main invocation removed for tests.

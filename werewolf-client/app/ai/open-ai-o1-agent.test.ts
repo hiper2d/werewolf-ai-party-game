@@ -1,17 +1,17 @@
 import dotenv from "dotenv";
 dotenv.config();
-import { ClaudeAgent } from "./anthropic-agent";
+import { OpenAiO1Agent } from "./open-ai-o1-agent";
 import { AIMessage, BotAnswer } from "@/app/api/game-models";
 import { parseResponseToObj } from "@/app/utils/message-utils";
 import { LLM_CONSTANTS, SupportedAiModels } from "@/app/ai/ai-models";
 import { BOT_SYSTEM_PROMPT } from "@/app/ai/prompts/bot-prompts";
 import { format } from "@/app/ai/prompts/utils";
 import { GM_COMMAND_INTRODUCE_YOURSELF, HISTORY_PREFIX } from "@/app/ai/prompts/gm-commands";
-import { ResponseSchema, createBotAnswerSchema } from "@/app/ai/prompts/ai-schemas";
+import { createBotAnswerSchema } from "@/app/ai/prompts/ai-schemas";
 
-describe("ClaudeAgent integration", () => {
+describe("OpenAiO1Agent integration", () => {
   const setupAgent = () => {
-    const botName = "Claudine";
+    const botName = "OpenAiO1Bot";
     const instruction = format(BOT_SYSTEM_PROMPT, {
       name: botName,
       personal_story: "A mysterious wanderer with a hidden past",
@@ -21,11 +21,11 @@ describe("ClaudeAgent integration", () => {
       dead_players_names_with_roles: "David (Werewolf)"
     });
 
-    return new ClaudeAgent(
+    return new OpenAiO1Agent(
       botName,
       instruction,
-      SupportedAiModels[LLM_CONSTANTS.CLAUDE_35_SONNET].modelApiName,
-      process.env.ANTHROPIC_K!
+      SupportedAiModels[LLM_CONSTANTS.GPT_O1].modelApiName,
+      process.env.OPENAI_K!
     );
   };
 
@@ -73,10 +73,13 @@ describe("ClaudeAgent integration", () => {
     expect(typeof response).toBe("string");
     expect(response!.length).toBeGreaterThan(0);
 
-    // Verify the response is valid JSON matching the schema
-    const parsedResponse = JSON.parse(response!);
-    expect(parsedResponse).toHaveProperty('reply');
-    expect(typeof parsedResponse.reply).toBe('string');
-    expect(parsedResponse.reply.length).toBeGreaterThan(0);
+    // Parse response and create BotAnswer instance
+    const parsedObj = parseResponseToObj(response!);
+    expect(parsedObj).toHaveProperty('reply');
+    const botAnswer = new BotAnswer(parsedObj.reply);
+    expect(botAnswer).toBeInstanceOf(BotAnswer);
+    expect(botAnswer.reply).not.toBeNull();
+    expect(typeof botAnswer.reply).toBe('string');
+    expect(botAnswer.reply.length).toBeGreaterThan(0);
   });
 });
