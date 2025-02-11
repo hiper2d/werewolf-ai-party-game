@@ -24,7 +24,7 @@ describe("DeepSeekAgent integration", () => {
       botName,
       instruction,
       SupportedAiModels[modelType].modelApiName,
-      process.env.DEEPSEEK_K!,
+      process.env.DEEP_SEEK_K!,
       0.7
     );
   };
