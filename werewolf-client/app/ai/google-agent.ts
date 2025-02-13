@@ -21,7 +21,7 @@ export class GoogleAgent extends AbstractAgent {
     }
 
     async ask(messages: AIMessage[]): Promise<string | null> {
-        this.logger(`Asking ${this.name} ${this.model} agent.`);
+        this.logger(`Asking ${this.name} ${this.model} agent`);
         this.logger(`Messages:\n${JSON.stringify(messages, null, 2)}`);
 
         try {

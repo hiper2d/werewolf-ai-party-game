@@ -7,6 +7,35 @@ import { cleanResponse } from "@/app/utils/message-utils";
 
 export class MistralAgent extends AbstractAgent {
     private readonly client: Mistral;
+    private readonly defaultParams: Omit<Parameters<Mistral['chat']['complete']>[0], 'messages'> = {
+        model: this.model,
+    };
+
+    // Log message templates
+    private readonly logTemplates = {
+        askingAgent: (name: string, model: string) => `Asking ${name} ${model} agent`,
+        messages: (msgs: AIMessage[]) => `Messages:\n${JSON.stringify(msgs, null, 2)}`,
+        rawReply: (reply: unknown) => `Raw reply: ${reply}`,
+        finalReply: (reply: string) => `Final reply: ${reply}`,
+        error: (name: string, error: unknown) => `Error in ${name} agent: ${error}`,
+    };
+
+    // Error message templates
+    private readonly errorMessages = {
+        emptyResponse: 'Empty or undefined response from Mistral API',
+        invalidFormat: 'Invalid response format from Mistral API',
+        apiError: (error: unknown) =>
+            `Failed to get response from Mistral API: ${error instanceof Error ? error.message : String(error)}`,
+    };
+
+    // Schema instruction template
+    private readonly schemaTemplate = {
+        instructions: (schema: ResponseSchema) =>
+            `Your response must be a valid JSON object matching this schema:
+${JSON.stringify(schema, null, 2)}
+
+Ensure your response strictly follows the schema requirements.`,
+    };
 
     constructor(name: string, instruction: string, model: string, apiKey: string) {
         super(name, instruction, model, 0.2);
@@ -14,101 +43,67 @@ export class MistralAgent extends AbstractAgent {
     }
 
     async ask(messages: AIMessage[]): Promise<string | null> {
-        this.logger(`Asking ${this.name} ${this.model} agent. Last message: ${messages[messages.length-1].content}`);
-
-        try {
-            const chatResponse: ChatCompletionResponse | undefined = await this.client.chat.complete({
-                model: this.model,
-                messages: [
-                    { role: MESSAGE_ROLE.SYSTEM, content: this.instruction },
-                    ...messages
-                ],
-            });
-
-            let reply = chatResponse?.choices?.[0]?.message?.content;
-            this.logger(`Raw reply: ${reply}`);
-            if (reply === undefined || reply === null) {
-                return null;
-            }
-            if (Array.isArray(reply)) {
-                // For each chunk, if it's a string, include it.
-                // If it's an object and its type is 'text', then include its text property.
-                // Otherwise ignore non-text chunks.
-                reply = reply.map(chunk => {
-                    if (typeof chunk === "string") {
-                        return chunk;
-                    } else if (typeof chunk === "object" && "type" in chunk && chunk.type === "text" && "text" in chunk) {
-                        return chunk.text;
-                    }
-                    return "";
-                }).join("");
-            } else if (typeof reply !== "string") {
-                return null;
-            }
-            reply = cleanResponse(reply);
-            this.logger(`Final reply: ${reply}`);
-            return reply;
-        } catch (error) {
-            this.logger(`Error in ${this.name} agent: ${error}`);
-            return null;
-        }
+        return null; // Method kept empty to maintain inheritance
     }
 
-    async askWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<string | null> {
-        this.logger(`Asking ${this.name} ${this.model} agent with schema.`);
-        this.logger(`Messages:\n${JSON.stringify(messages, null, 2)}`);
+    async askWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<string> {
+        this.logger(this.logTemplates.askingAgent(this.name, this.model));
+        this.logger(this.logTemplates.messages(messages));
+
+        const schemaInstructions = this.schemaTemplate.instructions(schema);
+        const lastMessage = messages[messages.length - 1];
+        const fullPrompt = `${lastMessage.content}\n\n${schemaInstructions}`;
+        const modifiedMessages = [
+            ...messages.slice(0, -1),
+            { ...lastMessage, content: fullPrompt }
+        ];
 
         try {
-            // Construct the schema instructions
-            const schemaInstructions = `Your response must be a valid JSON object matching this schema:
-${JSON.stringify(schema, null, 2)}
-
-Ensure your response strictly follows the schema requirements.`;
-
-            // Modify the last message to include schema instructions
-            const lastMessage = messages[messages.length - 1];
-            const fullPrompt = `${lastMessage.content}
-
-${schemaInstructions}`;
-            const modifiedMessages = [
-                ...messages.slice(0, -1),
-                { ...lastMessage, content: fullPrompt }
-            ];
-
-            const chatResponse: ChatCompletionResponse | undefined = await this.client.chat.complete({
-                model: this.model,
+            const chatResponse = await this.client.chat.complete({
+                ...this.defaultParams,
                 messages: [
                     { role: MESSAGE_ROLE.SYSTEM, content: this.instruction },
                     ...modifiedMessages
                 ],
             });
 
-            let reply = chatResponse?.choices?.[0]?.message?.content;
-            this.logger(`Raw reply: ${reply}`);
-            if (reply === undefined || reply === null) {
-                return null;
-            }
-            if (Array.isArray(reply)) {
-                // For each chunk, if it's a string, include it.
-                // If it's an object and its type is 'text', then include its text property.
-                // Otherwise ignore non-text chunks.
-                reply = reply.map(chunk => {
-                    if (typeof chunk === "string") {
-                        return chunk;
-                    } else if (typeof chunk === "object" && "type" in chunk && chunk.type === "text" && "text" in chunk) {
-                        return chunk.text;
-                    }
-                    return "";
-                }).join("");
-            } else if (typeof reply !== "string") {
-                return null;
-            }
-            reply = cleanResponse(reply);
-            this.logger(`Final reply: ${reply}`);
+            const reply = this.processReply(chatResponse);
+            this.logger(this.logTemplates.finalReply(reply));
             return reply;
         } catch (error) {
-            this.logger(`Error in ${this.name} agent: ${error}`);
-            return null;
+            this.logger(this.logTemplates.error(this.name, error));
+            throw new Error(this.errorMessages.apiError(error));
         }
+    }
+
+    private processReply(response: ChatCompletionResponse | undefined): string {
+        let reply = response?.choices?.[0]?.message?.content;
+        this.logger(this.logTemplates.rawReply(reply));
+
+        if (reply === undefined || reply === null) {
+            throw new Error(this.errorMessages.emptyResponse);
+        }
+
+        if (Array.isArray(reply)) {
+            reply = this.processArrayReply(reply);
+        } else if (typeof reply !== "string") {
+            throw new Error(this.errorMessages.invalidFormat);
+        }
+
+        return cleanResponse(reply);
+    }
+
+    private processArrayReply(reply: unknown[]): string {
+        return reply.map(chunk => {
+            if (typeof chunk === "string") {
+                return chunk;
+            }
+            if (typeof chunk === "object" && chunk !== null &&
+                "type" in chunk && chunk.type === "text" &&
+                "text" in chunk) {
+                return chunk.text;
+            }
+            return "";
+        }).join("");
     }
 }

@@ -27,34 +27,18 @@ describe("ClaudeAgent integration", () => {
       SupportedAiModels[LLM_CONSTANTS.CLAUDE_35_SONNET].modelApiName,
       process.env.ANTHROPIC_K!
     );
-  };
+  }
 
-  it("should respond with a valid answer", async () => {
+  it("should return null for ask method to maintain inheritance", async () => {
     const agent = setupAgent();
     const messages: AIMessage[] = [
       {
         role: 'user',
-        content: GM_COMMAND_INTRODUCE_YOURSELF + '\n\n' + HISTORY_PREFIX.replace(
-          '%player_name_to_message_list%',
-          'Alice: Greetings everyone! I am Alice, a local herbalist who has lived in this village for many years. I take pride in helping our community with natural remedies, though these dark times call for a different kind of healing. I hope my knowledge of people\'s habits might help us identify the werewolves among us.\n' +
-          'Bob: Hello, I\'m Bob, the village blacksmith. My forge has been in my family for generations, and I know the sound of every hammer strike on steel. These days, I\'m more concerned with forging alliances than horseshoes. We must work together to root out the evil in our midst.'
-        )
+        content: 'Test message'
       }
     ];
     const response = await agent.ask(messages);
-    
-    expect(response).not.toBeNull();
-    expect(typeof response).toBe("string");
-    expect(response!.length).toBeGreaterThan(0);
-    
-    // Parse response and create BotAnswer instance
-    const parsedObj = parseResponseToObj(response!);
-    expect(parsedObj).toHaveProperty('reply');
-    const botAnswer = new BotAnswer(parsedObj.reply);
-    expect(botAnswer).toBeInstanceOf(BotAnswer);
-    expect(botAnswer.reply).not.toBeNull();
-    expect(typeof botAnswer.reply).toBe('string');
-    expect(botAnswer.reply.length).toBeGreaterThan(0);
+    expect(response).toBeNull();
   });
 
   it("should respond with a valid schema-based answer", async () => {
@@ -69,14 +53,49 @@ describe("ClaudeAgent integration", () => {
     const schema = createBotAnswerSchema();
     const response = await agent.askWithSchema(schema, messages);
     
-    expect(response).not.toBeNull();
     expect(typeof response).toBe("string");
-    expect(response!.length).toBeGreaterThan(0);
+    expect(response.length).toBeGreaterThan(0);
 
     // Verify the response is valid JSON matching the schema
-    const parsedResponse = JSON.parse(response!);
+    const parsedResponse = JSON.parse(response);
     expect(parsedResponse).toHaveProperty('reply');
     expect(typeof parsedResponse.reply).toBe('string');
     expect(parsedResponse.reply.length).toBeGreaterThan(0);
+  });
+
+  it("should handle invalid role type", async () => {
+    const agent = setupAgent();
+    const messages: AIMessage[] = [
+      {
+        role: 'invalid_role' as any,
+        content: 'Test message'
+      }
+    ];
+
+    const schema = createBotAnswerSchema();
+    await expect(agent.askWithSchema(schema, messages))
+      .rejects
+      .toThrow('Unsupported role type: invalid_role');
+  });
+
+  it("should handle API errors", async () => {
+    const agent = new ClaudeAgent(
+      "TestBot",
+      "Test instruction",
+      SupportedAiModels[LLM_CONSTANTS.CLAUDE_35_SONNET].modelApiName,
+      "invalid_api_key"
+    );
+
+    const messages: AIMessage[] = [
+      {
+        role: 'user',
+        content: 'Test message'
+      }
+    ];
+
+    const schema = createBotAnswerSchema();
+    await expect(agent.askWithSchema(schema, messages))
+      .rejects
+      .toThrow('Failed to get response from Anthropic API');
   });
 });

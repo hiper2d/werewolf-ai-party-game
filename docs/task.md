@@ -1,10 +1,9 @@
-Tasks:
+I want you to refactor the Anthropic agent. I realized that I don't need the `ask` method, since I will alway expect responses in JSON format following a provided schema. Let's not remove it entirelly but keep empty to not to break the inherritance.
 
-[ ] - Review abstract-agent.ts methods. Plan to adjust other agents to override both ask and askWithSchema methods. Use google-agent.ts as an example since it correctly implements both methods
-[x] - anthropic-agent with tests
-[x] - mistral-agent with tests
-[x] - open-ai-agent with tests
-[x] - open-ai-o1-agent with tests
-[x] - deepseek-agent with tests
+Work on the following tasks in order:
+[x] - Clear ask method
+[x] - Move prompts to variables out of the method to improve readability
+[x] - Let's try to avoid throwing exceptions with are cought in the same method
+[x] - Let's avoid returning null. It should be either string cleanned response or an exception
 
 Mark the completed test with [x] and uncompleted tasks as [ ]
