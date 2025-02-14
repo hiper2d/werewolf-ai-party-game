@@ -29,7 +29,7 @@ describe("OpenAiAgent integration", () => {
     );
   };
 
-  it("should respond with a valid answer using GPT-4O", async () => {
+  it("should respond with a valid schema-based answer for introduction using GPT-4O", async () => {
     const agent = setupAgent("OpenAiBot", LLM_CONSTANTS.GPT_4O);
     const messages: AIMessage[] = [
       {
@@ -41,14 +41,15 @@ describe("OpenAiAgent integration", () => {
         )
       }
     ];
-    const response = await agent.ask(messages);
+    const schema = createBotAnswerSchema();
+    const response = await agent.askWithSchema(schema, messages);
     
     expect(response).not.toBeNull();
     expect(typeof response).toBe("string");
-    expect(response!.length).toBeGreaterThan(0);
+    expect(response.length).toBeGreaterThan(0);
     
     // Parse response and create BotAnswer instance
-    const parsedObj = parseResponseToObj(response!);
+    const parsedObj = parseResponseToObj(response);
     expect(parsedObj).toHaveProperty('reply');
     const botAnswer = new BotAnswer(parsedObj.reply);
     expect(botAnswer).toBeInstanceOf(BotAnswer);
@@ -57,7 +58,7 @@ describe("OpenAiAgent integration", () => {
     expect(botAnswer.reply.length).toBeGreaterThan(0);
   });
 
-  it("should respond with a valid answer using GPT-4O Mini", async () => {
+  it("should respond with a valid schema-based answer for introduction using GPT-4O Mini", async () => {
     const agent = setupAgent("OpenAiBotMini", LLM_CONSTANTS.GPT_4O_MINI);
     const messages: AIMessage[] = [
       {
@@ -69,14 +70,15 @@ describe("OpenAiAgent integration", () => {
         )
       }
     ];
-    const response = await agent.ask(messages);
+    const schema = createBotAnswerSchema();
+    const response = await agent.askWithSchema(schema, messages);
     
     expect(response).not.toBeNull();
     expect(typeof response).toBe("string");
-    expect(response!.length).toBeGreaterThan(0);
+    expect(response.length).toBeGreaterThan(0);
     
     // Parse response and create BotAnswer instance
-    const parsedObj = parseResponseToObj(response!);
+    const parsedObj = parseResponseToObj(response);
     expect(parsedObj).toHaveProperty('reply');
     const botAnswer = new BotAnswer(parsedObj.reply);
     expect(botAnswer).toBeInstanceOf(BotAnswer);
@@ -85,7 +87,7 @@ describe("OpenAiAgent integration", () => {
     expect(botAnswer.reply.length).toBeGreaterThan(0);
   });
 
-  it("should respond with a valid schema-based answer using GPT-4O", async () => {
+  it("should respond with a valid schema-based answer for suspicion using GPT-4O", async () => {
     const agent = setupAgent("OpenAiBot", LLM_CONSTANTS.GPT_4O);
     const messages: AIMessage[] = [
       {
@@ -99,10 +101,10 @@ describe("OpenAiAgent integration", () => {
     
     expect(response).not.toBeNull();
     expect(typeof response).toBe("string");
-    expect(response!.length).toBeGreaterThan(0);
+    expect(response.length).toBeGreaterThan(0);
 
     // Parse response and create BotAnswer instance
-    const parsedObj = parseResponseToObj(response!);
+    const parsedObj = parseResponseToObj(response);
     expect(parsedObj).toHaveProperty('reply');
     const botAnswer = new BotAnswer(parsedObj.reply);
     expect(botAnswer).toBeInstanceOf(BotAnswer);
@@ -111,7 +113,7 @@ describe("OpenAiAgent integration", () => {
     expect(botAnswer.reply.length).toBeGreaterThan(0);
   });
 
-  it("should respond with a valid schema-based answer using GPT-4O Mini", async () => {
+  it("should respond with a valid schema-based answer for suspicion using GPT-4O Mini", async () => {
     const agent = setupAgent("OpenAiBotMini", LLM_CONSTANTS.GPT_4O_MINI);
     const messages: AIMessage[] = [
       {
@@ -125,10 +127,10 @@ describe("OpenAiAgent integration", () => {
     
     expect(response).not.toBeNull();
     expect(typeof response).toBe("string");
-    expect(response!.length).toBeGreaterThan(0);
+    expect(response.length).toBeGreaterThan(0);
 
     // Parse response and create BotAnswer instance
-    const parsedObj = parseResponseToObj(response!);
+    const parsedObj = parseResponseToObj(response);
     expect(parsedObj).toHaveProperty('reply');
     const botAnswer = new BotAnswer(parsedObj.reply);
     expect(botAnswer).toBeInstanceOf(BotAnswer);

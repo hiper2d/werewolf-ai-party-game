@@ -29,7 +29,7 @@ describe("DeepSeekAgent integration", () => {
     );
   };
 
-  it("should respond with a valid answer using DeepSeek Chat", async () => {
+  it("should respond with a valid schema-based answer for introduction using DeepSeek Chat", async () => {
     const agent = setupAgent("DeepSeekBot", LLM_CONSTANTS.DEEPSEEK_CHAT);
     const messages: AIMessage[] = [
       {
@@ -41,23 +41,24 @@ describe("DeepSeekAgent integration", () => {
         )
       }
     ];
-    const response = await agent.ask(messages);
+    const schema = createBotAnswerSchema();
+    const response = await agent.askWithSchema(schema, messages);
     
-    expect(response).not.toBeNull();
+    expect(response).toBeDefined();
     expect(typeof response).toBe("string");
-    expect(response!.length).toBeGreaterThan(0);
+    expect(response.length).toBeGreaterThan(0);
     
     // Parse response and create BotAnswer instance
-    const parsedObj = parseResponseToObj(response!);
+    const parsedObj = parseResponseToObj(response);
     expect(parsedObj).toHaveProperty('reply');
     const botAnswer = new BotAnswer(parsedObj.reply);
     expect(botAnswer).toBeInstanceOf(BotAnswer);
-    expect(botAnswer.reply).not.toBeNull();
+    expect(botAnswer.reply).toBeDefined();
     expect(typeof botAnswer.reply).toBe('string');
     expect(botAnswer.reply.length).toBeGreaterThan(0);
   });
 
-  it("should respond with a valid answer using DeepSeek Reasoner", async () => {
+  it("should respond with a valid schema-based answer for introduction using DeepSeek Reasoner", async () => {
     const agent = setupAgent("DeepSeekReasonerBot", LLM_CONSTANTS.DEEPSEEK_REASONER);
     const messages: AIMessage[] = [
       {
@@ -69,23 +70,24 @@ describe("DeepSeekAgent integration", () => {
         )
       }
     ];
-    const response = await agent.ask(messages);
+    const schema = createBotAnswerSchema();
+    const response = await agent.askWithSchema(schema, messages);
     
-    expect(response).not.toBeNull();
+    expect(response).toBeDefined();
     expect(typeof response).toBe("string");
-    expect(response!.length).toBeGreaterThan(0);
+    expect(response.length).toBeGreaterThan(0);
     
     // Parse response and create BotAnswer instance
-    const parsedObj = parseResponseToObj(response!);
+    const parsedObj = parseResponseToObj(response);
     expect(parsedObj).toHaveProperty('reply');
     const botAnswer = new BotAnswer(parsedObj.reply);
     expect(botAnswer).toBeInstanceOf(BotAnswer);
-    expect(botAnswer.reply).not.toBeNull();
+    expect(botAnswer.reply).toBeDefined();
     expect(typeof botAnswer.reply).toBe('string');
     expect(botAnswer.reply.length).toBeGreaterThan(0);
   });
 
-  it("should respond with a valid schema-based answer using DeepSeek Chat", async () => {
+  it("should respond with a valid schema-based answer for suspicion using DeepSeek Chat", async () => {
     const agent = setupAgent("DeepSeekBot", LLM_CONSTANTS.DEEPSEEK_CHAT);
     const messages: AIMessage[] = [
       {
@@ -97,21 +99,21 @@ describe("DeepSeekAgent integration", () => {
     const schema = createBotAnswerSchema();
     const response = await agent.askWithSchema(schema, messages);
     
-    expect(response).not.toBeNull();
+    expect(response).toBeDefined();
     expect(typeof response).toBe("string");
-    expect(response!.length).toBeGreaterThan(0);
+    expect(response.length).toBeGreaterThan(0);
 
     // Parse response and create BotAnswer instance
-    const parsedObj = parseResponseToObj(response!);
+    const parsedObj = parseResponseToObj(response);
     expect(parsedObj).toHaveProperty('reply');
     const botAnswer = new BotAnswer(parsedObj.reply);
     expect(botAnswer).toBeInstanceOf(BotAnswer);
-    expect(botAnswer.reply).not.toBeNull();
+    expect(botAnswer.reply).toBeDefined();
     expect(typeof botAnswer.reply).toBe('string');
     expect(botAnswer.reply.length).toBeGreaterThan(0);
   });
 
-  it("should respond with a valid schema-based answer using DeepSeek Reasoner", async () => {
+  it("should respond with a valid schema-based answer for suspicion using DeepSeek Reasoner", async () => {
     const agent = setupAgent("DeepSeekReasonerBot", LLM_CONSTANTS.DEEPSEEK_REASONER);
     const messages: AIMessage[] = [
       {
@@ -123,17 +125,47 @@ describe("DeepSeekAgent integration", () => {
     const schema = createBotAnswerSchema();
     const response = await agent.askWithSchema(schema, messages);
     
-    expect(response).not.toBeNull();
+    expect(response).toBeDefined();
     expect(typeof response).toBe("string");
-    expect(response!.length).toBeGreaterThan(0);
+    expect(response.length).toBeGreaterThan(0);
 
     // Parse response and create BotAnswer instance
-    const parsedObj = parseResponseToObj(response!);
+    const parsedObj = parseResponseToObj(response);
     expect(parsedObj).toHaveProperty('reply');
     const botAnswer = new BotAnswer(parsedObj.reply);
     expect(botAnswer).toBeInstanceOf(BotAnswer);
-    expect(botAnswer.reply).not.toBeNull();
+    expect(botAnswer.reply).toBeDefined();
     expect(typeof botAnswer.reply).toBe('string');
     expect(botAnswer.reply.length).toBeGreaterThan(0);
+  });
+
+  it("should throw error when API response is empty", async () => {
+    const agent = setupAgent("DeepSeekBot", LLM_CONSTANTS.DEEPSEEK_CHAT);
+    const messages: AIMessage[] = [
+      {
+        role: 'user',
+        content: 'Test message'
+      }
+    ];
+    const schema = createBotAnswerSchema();
+
+    // Mock the OpenAI client to return an empty response
+    (agent as any).client = {
+      chat: {
+        completions: {
+          create: jest.fn().mockResolvedValue({
+            id: 'test-id',
+            object: 'chat.completion',
+            created: Date.now(),
+            model: 'deepseek-chat',
+            choices: [{ message: { content: null } }]
+          })
+        }
+      }
+    };
+
+    await expect(agent.askWithSchema(schema, messages))
+      .rejects
+      .toThrow('Empty or undefined response from DeepSeek API');
   });
 });
