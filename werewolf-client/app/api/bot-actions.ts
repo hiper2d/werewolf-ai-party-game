@@ -1,11 +1,11 @@
 'use server';
 
 import { db } from "@/firebase/server";
-import { Bot, BotAnswer, GAME_MASTER, GAME_STATES, MessageType, GameMessage, Game } from "@/app/api/game-models";
+import { Bot, BotAnswer, GAME_MASTER, GAME_STATES, MessageType, GameMessage, Game, RECIPIENT_ALL } from "@/app/api/game-models";
 import { GM_COMMAND_INTRODUCE_YOURSELF } from "@/app/ai/prompts/gm-commands";
 import { BOT_SYSTEM_PROMPT } from "@/app/ai/prompts/bot-prompts";
-import { AgentFactory } from "@/app/ai/agent-factory";
 import { createBotAnswerSchema } from "@/app/ai/prompts/ai-schemas";
+import { AgentFactory } from "@/app/ai/agent-factory";
 import { getServerSession } from "next-auth";
 import { format } from "@/app/ai/prompts/utils";
 import {cleanResponse, convertToAIMessages, parseResponseToObj} from "@/app/utils/message-utils";
@@ -83,25 +83,25 @@ export async function welcome(gameId: string): Promise<Game> {
             day: game.currentDay,
             timestamp: Date.now()
         };
-const history = convertToAIMessages(bot.name, [gmMessage]);
-const schema = createBotAnswerSchema();
-const rawIntroduction = await agent.askWithSchema(schema, history);
-if (!rawIntroduction) {
-    throw new Error('Failed to get introduction from bot');
-}
 
-const cleanAnswer = cleanResponse(rawIntroduction);
-let answer: BotAnswer;
-try {
-    answer = JSON.parse(cleanAnswer);
-            answer = JSON.parse(cleanAnswer) as BotAnswer;
+        const history = convertToAIMessages(bot.name, [gmMessage]);
+        const schema = createBotAnswerSchema();
+        const rawIntroduction = await agent.askWithSchema(schema, history);
+        if (!rawIntroduction) {
+            throw new Error('Failed to get introduction from bot');
+        }
+
+        const cleanAnswer = cleanResponse(rawIntroduction);
+        let answer: BotAnswer;
+        try {
+            answer = JSON.parse(cleanAnswer);
         } catch (e: any) {
             throw new Error(`Failed to parse JSON, returning as string: ${e.message}`);
         }
 
         const botMessage: GameMessage = {
             id: null,
-            recipientName: 'ALL',
+            recipientName: RECIPIENT_ALL,
             authorName: bot.name,
             msg: { reply: answer.reply },
             messageType: MessageType.BOT_ANSWER,
@@ -146,7 +146,7 @@ export async function talkToAll(gameId: string, userMessage: string): Promise<Ga
     // Save the user's message to the chat
     const userChatMessage: GameMessage = {
         id: null,
-        recipientName: 'ALL',
+        recipientName: RECIPIENT_ALL,
         // Here we use the session user email or name as the message author
         authorName: session.user.email ?? 'Unknown User',
         msg: userMessage,
@@ -213,7 +213,7 @@ export async function talkToAll(gameId: string, userMessage: string): Promise<Ga
             // Save the bot reply to the chat
             const botMessage: GameMessage = {
                 id: null,
-                recipientName: 'ALL',
+                recipientName: RECIPIENT_ALL,
                 authorName: bot.name,
                 msg:
                     typeof botReply === 'object' && 'reply' in botReply

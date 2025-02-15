@@ -89,7 +89,7 @@ export const MESSAGE_ROLE = {
 } as const;
 
 export const GAME_MASTER = 'Game Master';
-export const RECIPIENT_ALL = 'all';
+export const RECIPIENT_ALL = 'ALL';
 
 export interface GameMessage {
     id: string | null;           // Will be null for new messages, set by Firestore

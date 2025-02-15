@@ -113,7 +113,7 @@ export default function CreateNewGamePage() {
                         onClick={handleGeneratePreview}
                         disabled={!isFormValid || isLoading}
                     >
-                        {isLoading ? 'Processing...' : 'Generate Game Preview Again'}
+                        {isLoading ? 'Processing...' : (gameData ? 'Generate Preview Again' : 'Generate Preview')}
                     </button>
                     {gameData && (
                         <button
@@ -310,7 +310,7 @@ export default function CreateNewGamePage() {
                                 onClick={handleGeneratePreview}
                                 disabled={!isFormValid || isLoading}
                             >
-                                {isLoading ? 'Processing...' : 'Generate Game Preview Again'}
+                                {isLoading ? 'Processing...' : 'Generate Preview Again'}
                             </button>
                             <button
                                 className={`${buttonTransparentStyle} ${isLoading ? buttonDisabledStyle : ''}`}

@@ -39,6 +39,7 @@ export class AgentFactory {
             case LLM_CONSTANTS.MISTRAL_2_LARGE:
                 return new MistralAgent(name, instruction, model.modelApiName, key);
             case LLM_CONSTANTS.DEEPSEEK_CHAT:
+            case LLM_CONSTANTS.DEEPSEEK_REASONER:
                 return new DeepSeekAgent(name, instruction, model.modelApiName, key);
             default:
                 throw new Error(`Unknown Key: ${modelName}`);

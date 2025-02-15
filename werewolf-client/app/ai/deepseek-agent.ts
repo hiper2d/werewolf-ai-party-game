@@ -65,7 +65,7 @@ Ensure your response strictly follows the schema requirements.`,
         instruction: string,
         model: string,
         apiKey: string,
-        temperature: number = 0.7
+        temperature: number = 0.6
     ) {
         super(name, instruction, model, temperature);
         this.client = new OpenAI({
