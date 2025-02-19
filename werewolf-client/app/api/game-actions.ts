@@ -77,6 +77,28 @@ export async function getGame(gameId: string): Promise<Game | null> {
     }
 }
 
+export async function getGameMessages(gameId: string): Promise<GameMessage[]> {
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+
+    const messagesSnapshot = await db.collection('games')
+        .doc(gameId)
+        .collection('messages')
+        .orderBy('timestamp', 'asc')
+        .get();
+
+    return messagesSnapshot.docs.map(doc => ({
+        id: doc.id,
+        recipientName: doc.data().recipientName,
+        authorName: doc.data().authorName,
+        msg: doc.data().msg,
+        messageType: doc.data().messageType,
+        day: doc.data().day,
+        timestamp: doc.data().timestamp
+    }));
+}
+
 export async function previewGame(gamePreview: GamePreview): Promise<GamePreviewWithGeneratedBots> {
     const session = await getServerSession();
     if (!session || !session.user?.email) {

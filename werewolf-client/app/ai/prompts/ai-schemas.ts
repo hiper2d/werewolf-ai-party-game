@@ -1,20 +1,7 @@
 import { BotAnswer } from "@/app/api/game-models";
 
-// Schema type for response validation
-export type ResponseSchema = {
-    type: string;
-    properties: {
-        [key: string]: {
-            type: string;
-            description?: string;
-            items?: ResponseSchema;
-            properties?: {
-                [key: string]: ResponseSchema;
-            };
-        };
-    };
-    required?: string[];
-};
+// Make ResponseSchema completely flexible
+export type ResponseSchema = Record<string, any>;
 
 // Story generation interface
 export interface GameSetup {
@@ -25,8 +12,14 @@ export interface GameSetup {
     }>;
 }
 
+// GM bot selection interface
+export interface GmBotSelection {
+    selected_bots: string[];  // Array of 1-3 bot names
+    reasoning: string;        // Explanation for the selection
+}
+
 // Bot answer schema for response validation
-export const createBotAnswerSchema = (): ResponseSchema => ({
+export const createBotAnswerSchema = () => ({
     type: 'object',
     properties: {
         reply: {
@@ -37,8 +30,29 @@ export const createBotAnswerSchema = (): ResponseSchema => ({
     required: ['reply']
 });
 
+// GM bot selection schema for response validation
+export const createGmBotSelectionSchema = () => ({
+    type: 'object',
+    properties: {
+        selected_bots: {
+            type: 'array',
+            items: {
+                type: 'string'
+            },
+            description: 'Array of 1-3 bot names who should respond next',
+            minItems: 1,
+            maxItems: 3
+        },
+        reasoning: {
+            type: 'string',
+            description: 'Brief explanation of why these bots were selected'
+        }
+    },
+    required: ['selected_bots', 'reasoning']
+});
+
 // Game setup schema for story generation
-export const createGameSetupSchema = (): ResponseSchema => ({
+export const createGameSetupSchema = () => ({
     type: 'object',
     properties: {
         scene: {

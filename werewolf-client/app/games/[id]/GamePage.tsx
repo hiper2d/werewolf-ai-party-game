@@ -8,6 +8,14 @@ import { GAME_STATES } from "@/app/api/game-models";
 import type { Game } from "@/app/api/game-models";
 import type { Session } from "next-auth";
 import { welcome } from '@/app/api/bot-actions';
+import { getPlayerColor } from "@/app/utils/color-utils";
+
+interface Participant {
+    name: string;
+    role: string;
+    isHuman: boolean;
+    isAlive: boolean;
+}
 
 export default function GamePage({ 
     initialGame, 
@@ -19,6 +27,7 @@ export default function GamePage({
     const [game, setGame] = useState(initialGame);
     const hasErrorRef = useRef(false);
 
+    // Handle welcome state
     useEffect(() => {
         const handleWelcome = async () => {
             if (game.gameState === GAME_STATES.WELCOME && !hasErrorRef.current) {
@@ -34,6 +43,22 @@ export default function GamePage({
 
         handleWelcome();
     }, [game.gameStateParamQueue.length]);
+
+    // Poll for game state updates
+    useEffect(() => {
+        const pollInterval = setInterval(async () => {
+            try {
+                const updatedGame = await getGame(game.id);
+                if (updatedGame) {
+                    setGame(updatedGame);
+                }
+            } catch (error) {
+                console.error('Error polling game state:', error);
+            }
+        }, 5000); // Poll every 5 seconds
+
+        return () => clearInterval(pollInterval);
+    }, [game.id]);
 
     if (!game) {
         return <div>Game not found</div>;
@@ -56,8 +81,21 @@ export default function GamePage({
         );
     }
 
-    // Hardcoded participants for now
-    const participants = ['Alice', 'Bob', 'Charlie', 'David'];
+    // Combine human player and bots for participants list
+    const participants: Participant[] = [
+        { 
+            name: game.humanPlayerName, 
+            role: game.humanPlayerRole, 
+            isHuman: true,
+            isAlive: true // Human player is always considered alive
+        },
+        ...game.bots.map(bot => ({ 
+            name: bot.name, 
+            role: bot.role, 
+            isHuman: false, 
+            isAlive: bot.isAlive 
+        }))
+    ];
 
     return (
         <div className="flex h-full text-white overflow-hidden">
@@ -67,6 +105,9 @@ export default function GamePage({
                 <div className="bg-black bg-opacity-30 border border-white border-opacity-30 rounded p-4 mb-4">
                     <h1 className="text-2xl font-bold mb-2">{game.theme}</h1>
                     <p className="text-sm text-gray-300 mb-4">{game.description}</p>
+                    <div className="text-sm text-gray-400">
+                        Day {game.currentDay} - {game.gameState}
+                    </div>
                 </div>
 
                 {/* Participants list */}
@@ -74,7 +115,18 @@ export default function GamePage({
                     <h2 className="text-xl font-bold mb-2">Participants</h2>
                     <ul>
                         {participants.map((participant, index) => (
-                            <li key={index} className="mb-1">{participant}</li>
+                            <li 
+                                key={index} 
+                                className={`mb-2 flex items-center justify-between ${!participant.isHuman && !participant.isAlive ? 'opacity-50' : ''}`}
+                            >
+                                <span style={{ color: getPlayerColor(participant.name) }}>
+                                    {participant.name}
+                                    {participant.isHuman && ' (You)'}
+                                </span>
+                                {!participant.isAlive && (
+                                    <span className="text-sm text-red-500">(Dead)</span>
+                                )}
+                            </li>
                         ))}
                     </ul>
                 </div>
@@ -95,7 +147,7 @@ export default function GamePage({
 
             {/* Right column - Chat */}
             <div className="w-3/4 h-full overflow-hidden">
-                <GameChat gameId={game.id} gameState={game.gameState} />
+                <GameChat gameId={game.id} game={game} />
             </div>
         </div>
     );
