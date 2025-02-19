@@ -262,9 +262,7 @@ export async function talkToAll(gameId: string, userMessage: string): Promise<Ga
                 id: null,
                 recipientName: RECIPIENT_ALL,
                 authorName: bot.name,
-                msg: typeof botReply === 'object' && 'reply' in botReply
-                    ? new BotAnswer(botReply.reply)
-                    : new BotAnswer(botReply),
+                msg: { reply: botReply.reply },
                 messageType: MessageType.BOT_ANSWER,
                 day: game.currentDay,
                 timestamp: Date.now()
