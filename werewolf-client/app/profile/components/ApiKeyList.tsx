@@ -2,7 +2,7 @@
 
 import React, {useState} from 'react';
 import {deleteApiKey, updateApiKey} from "@/app/api/user-actions";
-import {ApiKeyMap} from "@/app/api/models";
+import {ApiKeyMap} from "@/app/api/game-models";
 
 export default function ApiKeyList({ initialApiKeys, userId }: { initialApiKeys: ApiKeyMap, userId: string }) {
     const [apiKeys, setApiKeys] = useState<ApiKeyMap>(initialApiKeys);

@@ -2,19 +2,19 @@
 
 import React from 'react';
 import AuthButtons from '@/components/auth-buttons';
-import { useAuth } from "@/components/auth-provider";
+import { useSession } from "next-auth/react";
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
 const LoginPage = () => {
-    const auth = useAuth();
+    const { data: session } = useSession();
     const router = useRouter();
 
     useEffect(() => {
-        if (auth?.currentUser) {
+        if (session) {
             router.push('/games');
         }
-    }, [auth?.currentUser, router]);
+    }, [session, router]);
 
     return (
         <div className="flex items-center justify-center border border-white border-opacity-30">

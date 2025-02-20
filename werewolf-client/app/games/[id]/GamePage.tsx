@@ -42,7 +42,7 @@ export default function GamePage({
         };
 
         handleWelcome();
-    }, [game.gameStateParamQueue.length]);
+    }, [game.gameState, game.id]);
 
     // Poll for game state updates
     useEffect(() => {
