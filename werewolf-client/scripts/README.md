@@ -5,7 +5,7 @@ This directory contains utility scripts for working with game data. These script
 ## Available Scripts
 
 ### 1. Get Game Messages
-Lists all messages for a specific game, sorted by timestamp. Uses getGameMessages from game-actions.ts.
+Lists all messages for a specific game, sorted by timestamp, and saves them to a JSON file in the logs directory.
 
 ```bash
 npx tsx scripts/get-messages.ts <gameId>
@@ -16,23 +16,18 @@ Example:
 npx tsx scripts/get-messages.ts 5bHVwJCnRyJef2pQW5rk
 ```
 
-Output:
-```json
-[
-  {
-    "id": "msg123",
-    "recipientName": "ALL",
-    "authorName": "Game Master",
-    "msg": {
-      "story": "The game begins..."
-    },
-    "messageType": "GAME_STORY",
-    "day": 1,
-    "timestamp": null
-  },
-  // ... more messages
-]
+This will create a file in the `werewolf-client/logs` directory with a name format:
 ```
+game-messages-<gameId>-<timestamp>.json
+```
+
+The file contains a JSON array of all messages in the game, including:
+- Message IDs
+- Recipients and authors
+- Message content
+- Message types
+- Day numbers
+- Timestamps
 
 ### 2. Copy Game
 Creates a complete copy of a game, including all its messages. Contains standalone Firestore operations.
@@ -70,6 +65,42 @@ npx tsx scripts/update-message.ts nvlnmQuYC3SwbYexMqcl abc123 '{"story": "A new 
 Output:
 ```
 Message updated successfully
+```
+
+### 4. Delete Message
+Deletes a specific message from a game.
+
+```bash
+npx tsx scripts/delete-message.ts <gameId> <messageId>
+```
+
+Example:
+```bash
+npx tsx scripts/delete-message.ts nvlnmQuYC3SwbYexMqcl kXTKcNkUekygFLk3odeB
+```
+
+Output:
+```
+Message with ID kXTKcNkUekygFLk3odeB deleted successfully from game nvlnmQuYC3SwbYexMqcl
+Message deletion completed
+```
+
+### 5. Delete Messages After
+Deletes all messages that come after a specified message ID in a game. This is useful for rolling back a game to a specific point.
+
+```bash
+npx tsx scripts/delete-messages-after.ts <gameId> <messageId>
+```
+
+Example:
+```bash
+npx tsx scripts/delete-messages-after.ts nvlnmQuYC3SwbYexMqcl kXTKcNkUekygFLk3odeB
+```
+
+Output:
+```
+Successfully deleted 5 messages after message kXTKcNkUekygFLk3odeB
+Message deletion completed
 ```
 
 ## Message Structure

@@ -156,7 +156,7 @@ export async function talkToAll(gameId: string, userMessage: string): Promise<Ga
             const userChatMessage: GameMessage = {
                 id: null,
                 recipientName: RECIPIENT_ALL,
-                authorName: session.user.email ?? 'Unknown User',
+                authorName: game.humanPlayerName,
                 msg: userMessage,
                 messageType: MessageType.HUMAN_PLAYER_MESSAGE,
                 day: game.currentDay,
