@@ -12,11 +12,11 @@ All projects registry: [Builds](https://backdropbuild.com/builds)
 
 The event project page: [ai-werewolf](https://backdropbuild.com/v3/ai-werewolf)
 
-# Gameplay
+## Gameplay
 
 What is nice about this game is complete freedom in the themes and roleplay. You can create any setting you want. A movie, a book, any historical period, or even a completely new world. The game is very flexible and can be adapted to any setting. 
 
-Here is an example of the "Terminator" theme:
+Here is an example of the "Terminator" theme with AI bots roleplaying characters from the movie:
 <img src="images/screen2.png">
 
 Or "Lord of the Rings":
@@ -26,42 +26,30 @@ I really like these thematic dialogs and how creative the bots are.
 
 UI is chunky and ugly yet but I'm working on it. It's a very early stage of the project. It is only possible to create a new game, to chat with bot players and to initiate a first round of voting. I have more things in the API but UI is not ready yet.
 
-# Setup
+## Setup
 
 To run the project locally, you need:
-- Install Docker and Docker Compose, run local DynamoDb with `docker-compose up`
-- Frontend: install node.js and npm, install dependencies with `npm install`, and run the app by `npm run web`
-- Backend: install Python 3.11+ and Pypenv, install dependencies with `pipenv install`, and run the FastAPI server
+1. Node.js and npm installed
+2. Firebase project set up with Firestore and Authentication enabled
 
-### DynamoDB
+### Firebase Setup
 
-I prefer to run it with Docker Compose. There is a firebase in the root directory, just run it. You need to have docker
-and docker-compose installed.
+This project uses Firestore and Authentication from Firebase. You'll need to:
+1. Create a new Firebase project in the Firebase Console
+2. Enable Firestore Database
+3. Enable Authentication
+4. Deploy Firestore indexes using Firebase CLI:
+   ```bash
+   firebase deploy --only firestore:indexes
+   ```
 
-```bash
-docker-compose up
-```
+### Frontend Setup
 
-### Backend
-
-# Setup firestore
-
-This project uses Firestore and Authentication from Firebase. I don't remember the exact commands, but it should be easy using CLI.
-I tried to use the Firebase Emulator at first but it was hard to make it work with Authentication so I gave up.
-
-Here how I update indexes in my Firestore:
-```bash
-firebase deploy --only firestore:indexes
-```
-
-### Frontend and backend (next.js)
-
-Install node.js and npm. Navigate to the `werewolf-client` and run:
+Navigate to the `werewolf-client` directory and run:
 
 ```bash
 npm install
 npm run pre-prod
 ```
 
-This will start the frontend on the `localhost:3000` address.
-
+This will start the Next.js application on `localhost:3000`.
