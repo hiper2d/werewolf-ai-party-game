@@ -24,7 +24,7 @@ describe("ClaudeAgent integration", () => {
     return new ClaudeAgent(
       botName,
       instruction,
-      SupportedAiModels[LLM_CONSTANTS.CLAUDE_35_SONNET].modelApiName,
+      SupportedAiModels[LLM_CONSTANTS.CLAUDE_37_SONNET].modelApiName,
       process.env.ANTHROPIC_K!
     );
   }
@@ -52,7 +52,7 @@ describe("ClaudeAgent integration", () => {
 
     const schema = createBotAnswerSchema();
     const response = await agent.askWithSchema(schema, messages);
-    
+
     expect(typeof response).toBe("string");
     expect(response.length).toBeGreaterThan(0);
 
@@ -82,7 +82,7 @@ describe("ClaudeAgent integration", () => {
     const agent = new ClaudeAgent(
       "TestBot",
       "Test instruction",
-      SupportedAiModels[LLM_CONSTANTS.CLAUDE_35_SONNET].modelApiName,
+      SupportedAiModels[LLM_CONSTANTS.CLAUDE_37_SONNET].modelApiName,
       "invalid_api_key"
     );
 

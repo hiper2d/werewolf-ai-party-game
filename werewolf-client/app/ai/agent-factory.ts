@@ -24,7 +24,7 @@ export class AgentFactory {
         this.logger(name, model.modelApiName, instruction)
         switch (modelName) {
             case LLM_CONSTANTS.CLAUDE_35_HAIKU:
-            case LLM_CONSTANTS.CLAUDE_35_SONNET:
+            case LLM_CONSTANTS.CLAUDE_37_SONNET:
                 return new ClaudeAgent(name, instruction, model.modelApiName, key);
             case LLM_CONSTANTS.GPT_4O_MINI:
             case LLM_CONSTANTS.GPT_4O:
@@ -33,7 +33,7 @@ export class AgentFactory {
             case LLM_CONSTANTS.GPT_O1:
                 return new OpenAiO1Agent(name, instruction, model.modelApiName, key);
             case LLM_CONSTANTS.GEMINI_2_FLASH:
-            case LLM_CONSTANTS.GEMINI_2_PRO_EXP:
+            case LLM_CONSTANTS.GEMINI_15_PRO:
                 return new GoogleAgent(name, instruction, model.modelApiName, key);
             case LLM_CONSTANTS.MISTRAL_3_SMALL:
             case LLM_CONSTANTS.MISTRAL_2_LARGE:

@@ -17,7 +17,7 @@ export const SupportedAiKeyNames: Record<string, string> = {
 };
 
 export const LLM_CONSTANTS = {
-    CLAUDE_35_SONNET: 'Claude 3.5 Sonnet',
+    CLAUDE_37_SONNET: 'Claude 3.7 Sonnet',
     CLAUDE_35_HAIKU: 'Claude 3.5 Haiku',
     DEEPSEEK_CHAT: 'DeepSeek Chat',
     DEEPSEEK_REASONER: 'DeepSeek Reasoner',
@@ -26,15 +26,15 @@ export const LLM_CONSTANTS = {
     GPT_O1: 'o1',
     GPT_O3_MINI: 'o3-mini',
     GEMINI_2_FLASH: 'Gemini 2.0 Flash',
-    GEMINI_2_PRO_EXP: 'Gemini 2.0 Pro',
+    GEMINI_15_PRO: 'Gemini 1.5 Pro',
     MISTRAL_2_LARGE: 'Mistral 2 Large',
     MISTRAL_3_SMALL: 'Mistral 3 Small',
     RANDOM: 'Random',
 }
 
 export const SupportedAiModels = {
-    [LLM_CONSTANTS.CLAUDE_35_SONNET]: {
-        modelApiName: 'claude-3-5-sonnet-latest',
+    [LLM_CONSTANTS.CLAUDE_37_SONNET]: {
+        modelApiName: 'claude-3-7-sonnet-latest',
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC
     },
     [LLM_CONSTANTS.CLAUDE_35_HAIKU]: {
@@ -58,11 +58,11 @@ export const SupportedAiModels = {
         apiKeyName: API_KEY_CONSTANTS.OPENAI
     },
     [LLM_CONSTANTS.GEMINI_2_FLASH]: {
-        modelApiName: 'gemini-2.0-flash-001',
+        modelApiName: 'gemini-2.0-flash',
         apiKeyName: API_KEY_CONSTANTS.GOOGLE
     },
-    [LLM_CONSTANTS.GEMINI_2_PRO_EXP]: {
-        modelApiName: 'gemini-2.0-pro-exp-02-05',
+    [LLM_CONSTANTS.GEMINI_15_PRO]: {
+        modelApiName: 'gemini-1.5-pro',
         apiKeyName: API_KEY_CONSTANTS.GOOGLE
     },
     [LLM_CONSTANTS.MISTRAL_2_LARGE]: {

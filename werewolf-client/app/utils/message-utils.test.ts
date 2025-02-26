@@ -1,5 +1,5 @@
 import { convertToAIMessages } from './message-utils';
-import { GameMessage, MessageType, GAME_MASTER } from '@/app/api/game-models';
+import { GameMessage, MessageType, GAME_MASTER, MESSAGE_ROLE } from '@/app/api/game-models';
 import { GM_COMMAND_INTRODUCE_YOURSELF } from '@/app/ai/prompts/gm-commands';
 
 describe('convertToAIMessages', () => {
@@ -201,6 +201,113 @@ describe('convertToAIMessages', () => {
             {
                 role: 'user',
                 content: 'Initial GM command\nFinal GM command\n\nMessages from other players:\nPlayer1: First player message\nPlayer2: Second player message'
+            }
+        ]);
+    });
+    it('should convert real game history with game story and multiple bot answers', () => {
+        const gameHistory: GameMessage[] = [
+            {
+                "id": "zs1miB0qT4hYKPRL0yEz",
+                "recipientName": "ALL",
+                "authorName": "Game Master",
+                "msg": "In the ruins of what was once a thriving district, the air is thick with tension and the scent of smoke. The annual Hunger Games are about to begin, and the tributes from each district are gathered, their fates intertwined in a deadly competition. The Capitol looms in the distance, a stark reminder of the power that controls their lives.",
+                "messageType": "GAME_STORY",
+                "day": 1,
+                "timestamp": null
+            },
+            {
+                "id": "bA7nOVG0jKBaDkvBpFND",
+                "recipientName": "ALL",
+                "authorName": "Blaze",
+                "msg": {
+                    "reply": "Hey everyone, I'm Blaze, from District 7. You might know me for my skills with a bow, but here, I'm just another player looking to survive and figure out who we can trust. Let's make this game one to remember!"
+                },
+                "messageType": "BOT_ANSWER",
+                "day": 1,
+                "timestamp": 1739929097026
+            },
+            {
+                "id": "4yDis2Kzzaf5v1y70pku",
+                "recipientName": "ALL",
+                "authorName": "Cinder",
+                "msg": {
+                    "reply": "Hello everyone! I'm Cinder—hailing from a rough district where survival is never taken for granted. I tend to keep a low profile, but don't mistake my quiet demeanor; I've got a knack for strategy. Looking forward to standing together and unmasking any lurking threats among us."
+                },
+                "messageType": "BOT_ANSWER",
+                "day": 1,
+                "timestamp": 1739929126609
+            }
+        ];
+
+        const result = convertToAIMessages("Blaze", gameHistory);
+
+        expect(result).toEqual([
+            {
+                role: 'user',
+                content: "In the ruins of what was once a thriving district, the air is thick with tension and the scent of smoke. The annual Hunger Games are about to begin, and the tributes from each district are gathered, their fates intertwined in a deadly competition. The Capitol looms in the distance, a stark reminder of the power that controls their lives."
+            },
+            {
+                role: 'assistant',
+                content: "Hey everyone, I'm Blaze, from District 7. You might know me for my skills with a bow, but here, I'm just another player looking to survive and figure out who we can trust. Let's make this game one to remember!"
+            },
+            {
+                role: 'user',
+                content: "Messages from other players:\nCinder: Hello everyone! I'm Cinder—hailing from a rough district where survival is never taken for granted. I tend to keep a low profile, but don't mistake my quiet demeanor; I've got a knack for strategy. Looking forward to standing together and unmasking any lurking threats among us."
+            }
+        ]);
+    });
+
+    it('should convert real game history messages correctly', () => {
+        const gameMessages: GameMessage[] = [
+            {
+                "id": "zs1miB0qT4hYKPRL0yEz",
+                "recipientName": "ALL",
+                "authorName": "Game Master",
+                "msg": {
+                    "story": "In the ruins of what was once a thriving district, the air is thick with tension and the scent of smoke. The annual Hunger Games are about to begin, and the tributes from each district are gathered, their fates intertwined in a deadly competition. The Capitol looms in the distance, a stark reminder of the power that controls their lives."
+                },
+                "messageType": "GAME_STORY",
+                "day": 1,
+                "timestamp": null
+            },
+            {
+                "id": "bA7nOVG0jKBaDkvBpFND",
+                "recipientName": "ALL",
+                "authorName": "Blaze",
+                "msg": {
+                    "reply": "Hey everyone, I'm Blaze, from District 7. You might know me for my skills with a bow, but here, I'm just another player looking to survive and figure out who we can trust. Let's make this game one to remember!"
+                },
+                "messageType": "BOT_ANSWER",
+                "day": 1,
+                "timestamp": 1739929097026
+            },
+            {
+                "id": "4yDis2Kzzaf5v1y70pku",
+                "recipientName": "ALL",
+                "authorName": "Cinder",
+                "msg": {
+                    "reply": "Hello everyone! I'm Cinder—hailing from a rough district where survival is never taken for granted. I tend to keep a low profile, but don't mistake my quiet demeanor; I've got a knack for strategy. Looking forward to standing together and unmasking any lurking threats among us."
+                },
+                "messageType": "BOT_ANSWER",
+                "day": 1,
+                "timestamp": 1739929126609
+            }
+        ];
+
+        const result = convertToAIMessages("Blaze", gameMessages);
+
+        expect(result).toEqual([
+            {
+                role: 'user',
+                content: "In the ruins of what was once a thriving district, the air is thick with tension and the scent of smoke. The annual Hunger Games are about to begin, and the tributes from each district are gathered, their fates intertwined in a deadly competition. The Capitol looms in the distance, a stark reminder of the power that controls their lives."
+            },
+            {
+                role: 'assistant',
+                content: "Hey everyone, I'm Blaze, from District 7. You might know me for my skills with a bow, but here, I'm just another player looking to survive and figure out who we can trust. Let's make this game one to remember!"
+            },
+            {
+                role: 'user',
+                content: "Messages from other players:\nCinder: Hello everyone! I'm Cinder—hailing from a rough district where survival is never taken for granted. I tend to keep a low profile, but don't mistake my quiet demeanor; I've got a knack for strategy. Looking forward to standing together and unmasking any lurking threats among us."
             }
         ]);
     });

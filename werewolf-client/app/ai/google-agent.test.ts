@@ -24,7 +24,7 @@ describe("GoogleAgent integration", () => {
     return new GoogleAgent(
       botName,
       instruction,
-      SupportedAiModels[LLM_CONSTANTS.GEMINI_2_PRO_EXP].modelApiName,
+      SupportedAiModels[LLM_CONSTANTS.GEMINI_15_PRO].modelApiName,
       apiKey
     );
   };
