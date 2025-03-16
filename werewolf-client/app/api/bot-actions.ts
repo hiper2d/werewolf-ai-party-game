@@ -3,7 +3,7 @@
 import { db } from "@/firebase/server";
 import { Bot, BotAnswer, GAME_MASTER, GAME_STATES, MessageType, GameMessage, Game, RECIPIENT_ALL } from "@/app/api/game-models";
 import { GM_COMMAND_INTRODUCE_YOURSELF, GM_COMMAND_SELECT_RESPONDERS } from "@/app/ai/prompts/gm-commands";
-import { BOT_SYSTEM_PROMPT } from "@/app/ai/prompts/bot-prompts";
+import { BOT_SYSTEM_PROMPT, ROUTER_SYSTEM_PROMPT } from "@/app/ai/prompts/bot-prompts";
 import { createBotAnswerSchema, createGmBotSelectionSchema } from "@/app/ai/prompts/ai-schemas";
 import { AgentFactory } from "@/app/ai/agent-factory";
 import { getServerSession } from "next-auth";
@@ -172,13 +172,13 @@ export async function talkToAll(gameId: string, userMessage: string): Promise<Ga
             const apiKeys = await getUserFromFirestore(session.user.email)
                 .then((user) => getUserApiKeys(user!.email));
 
-            const gmPrompt = format(BOT_SYSTEM_PROMPT, {
-                name: GAME_MASTER,
-                personal_story: "You are the Game Master",
-                temperament: "You are fair and balanced",
-                role: "Game Master",
-                players_names: game.bots.map(b => b.name).join(", "),
-                dead_players_names_with_roles: game.bots
+            // For the router prompt, we only need to include alive bots
+            const gmPrompt = format(ROUTER_SYSTEM_PROMPT, {
+                alive_bot_names: game.bots
+                    .filter(b => b.isAlive)
+                    .map(b => b.name)
+                    .join(", "),
+                dead_bot_names_with_roles: game.bots
                     .filter(b => !b.isAlive)
                     .map(b => `${b.name} (${b.role})`)
                     .join(", ")

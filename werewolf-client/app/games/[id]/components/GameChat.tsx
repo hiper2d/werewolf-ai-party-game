@@ -77,8 +77,7 @@ export default function GameChat({ gameId, game }: GameChatProps) {
     // Auto-process queue when not empty
     useEffect(() => {
         if (game.gameState === GAME_STATES.DAY_DISCUSSION && 
-            game.gameStateProcessQueue.length > 0 && 
-            !isProcessing) {
+            game.gameStateProcessQueue.length > 0 && !isProcessing) {
             const processQueue = async () => {
                 setIsProcessing(true);
                 try {

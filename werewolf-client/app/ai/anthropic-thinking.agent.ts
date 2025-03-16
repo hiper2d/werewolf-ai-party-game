@@ -11,14 +11,18 @@ interface AnthropicMessage {
     content: string;
 }
 
-export class ClaudeAgent extends AbstractAgent {
+// Documentation: https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking
+export class ClaudeThinkingAgent extends AbstractAgent {
     private readonly client: Anthropic;
     private readonly maxTokens = 128000;
     private readonly defaultParams: Omit<Anthropic.MessageCreateParams, 'messages'> = {
         max_tokens: this.maxTokens,
         system: this.instruction,
         model: this.model,
-        temperature: this.temperature
+        thinking: {
+            type: "enabled",
+            budget_tokens: 2000
+        }
     };
 
     // Log message templates
@@ -72,7 +76,7 @@ Ensure your response strictly follows the schema requirements.`,
 
         const params: Anthropic.MessageCreateParams = {
             ...this.defaultParams,
-            messages: this.convertToAnthropicMessages(aiMessages),
+            messages: this.convertToAnthropicMessages(aiMessages)
         };
 
         let response;

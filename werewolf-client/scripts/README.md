@@ -76,7 +76,7 @@ npx tsx scripts/delete-message.ts <gameId> <messageId>
 
 Example:
 ```bash
-npx tsx scripts/delete-message.ts nvlnmQuYC3SwbYexMqcl kXTKcNkUekygFLk3odeB
+npx tsx scripts/delete-message.ts 5bHVwJCnRyJef2pQW5rk P1WHN3BNx8AETJZHeT4o
 ```
 
 Output:
@@ -94,7 +94,7 @@ npx tsx scripts/delete-messages-after.ts <gameId> <messageId>
 
 Example:
 ```bash
-npx tsx scripts/delete-messages-after.ts nvlnmQuYC3SwbYexMqcl kXTKcNkUekygFLk3odeB
+npx tsx scripts/delete-messages-after.ts 5bHVwJCnRyJef2pQW5rk P1WHN3BNx8AETJZHeT4o
 ```
 
 Output:
