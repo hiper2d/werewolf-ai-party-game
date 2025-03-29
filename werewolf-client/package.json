@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "NEXT_PUBLIC_APP_ENV='emulator' next dev",
-    "pre-prod": "next dev",
+    "dev-emu": "NEXT_PUBLIC_APP_ENV='emulator' next dev",
+    "dev": "next dev",
     "build": "npm run build-service-worker && next build",
     "build-service-worker": "npx esbuild auth-service-worker.js --bundle --outfile=public/auth-service-worker.js",
     "start": "next start",
@@ -19,7 +19,7 @@
     "firebase": "^10.12.2",
     "firebase-admin": "^12.2.0",
     "next": "14.2.4",
-    "next-auth": "4.24.7",
+    "next-auth": "^5.0.0-beta.25",
     "openai": "4.58.1",
     "react": "^18",
     "react-dom": "^18"
