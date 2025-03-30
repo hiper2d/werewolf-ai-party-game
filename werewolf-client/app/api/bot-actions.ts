@@ -6,8 +6,8 @@ import { GM_COMMAND_INTRODUCE_YOURSELF, GM_COMMAND_SELECT_RESPONDERS } from "@/a
 import { BOT_SYSTEM_PROMPT } from "@/app/ai/prompts/bot-prompts";
 import { createBotAnswerSchema, createGmBotSelectionSchema } from "@/app/ai/prompts/ai-schemas";
 import { AgentFactory } from "@/app/ai/agent-factory";
-import { getServerSession } from "next-auth";
 import { format } from "@/app/ai/prompts/utils";
+import { auth } from "@/auth";
 import {cleanResponse, convertToAIMessages, parseResponseToObj} from "@/app/utils/message-utils";
 import {
     getGame,
@@ -21,7 +21,7 @@ import { getUserApiKeys } from "./user-actions";
  * Bot intro/welcome function, previously in game-actions.ts
  */
 export async function welcome(gameId: string): Promise<Game> {
-    const session = await getServerSession();
+    const session = await auth();
     if (!session || !session.user?.email) {
         throw new Error('Not authenticated');
     }
@@ -130,7 +130,7 @@ export async function welcome(gameId: string): Promise<Game> {
  * The user message is saved to chat, and each bot reply is also saved to chat.
  */
 export async function talkToAll(gameId: string, userMessage: string): Promise<Game> {
-    const session = await getServerSession();
+    const session = await auth();
     if (!session || !session.user?.email) {
         throw new Error('Not authenticated');
     }

@@ -1,10 +1,10 @@
-import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { getGame } from "@/app/api/game-actions";
 import GamePage from "./GamePage";
+import { auth } from "@/auth";
 
 export async function generateMetadata({ params }: any) {
-    const session = await getServerSession();
+    const session = await auth();
     if (!session) {
         redirect('/api/auth/signin');
     }
@@ -20,7 +20,7 @@ export async function generateMetadata({ params }: any) {
 }
 
 export default async function Page({ params }: any) {
-    const session = await getServerSession();
+    const session = await auth();
     if (!session) {
         redirect('/api/auth/signin');
     }

@@ -1,14 +1,14 @@
 import React from 'react';
-import {getServerSession} from "next-auth";
 import {redirect} from "next/navigation";
 import {buttonTransparentStyle} from "@/app/constants";
 import Image from 'next/image';
 import ApiKeyList from './components/ApiKeyList';
 import AddApiKeyForm from './components/AddApiKeyForm';
 import {getUserApiKeys} from "@/app/api/user-actions";
+import { auth } from "@/auth";
 
 export default async function UserProfilePage() {
-    const session = await getServerSession();
+    const session = await auth();
     if (!session) {
         redirect('/api/auth/signin');
     }

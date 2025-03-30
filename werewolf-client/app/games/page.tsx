@@ -1,12 +1,12 @@
 import Link from 'next/link';
 import {getAllGames} from "@/app/api/game-actions";
 import RemoveGame from "@/app/games/components/RemoveGame";
-import {getServerSession} from "next-auth";
 import {redirect} from "next/navigation";
 import {Game} from "@/app/api/game-models";
+import { auth } from "@/auth";
 
 const GamePages = async () => {
-    const session = await getServerSession();
+    const session = await auth();
     if (!session) {
         redirect('/api/auth/signin');
     }
