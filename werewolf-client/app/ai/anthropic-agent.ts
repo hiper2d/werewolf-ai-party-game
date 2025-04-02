@@ -77,6 +77,7 @@ Ensure your response strictly follows the schema requirements.`,
 
         let response;
         try {
+            // fixms: for some reason, the last message has the assistant type from Sparks, i.e. self = what to do with it?
             response = await this.client.messages.create(params);
             if (!('content' in response) || !Array.isArray(response.content) || response.content.length === 0) {
                 throw new Error(this.errorMessages.emptyResponse);

@@ -13,7 +13,7 @@ export function convertToAIMessages(currentBotName: string, messages: GameMessag
     let otherPlayerMessages: string[] = [];
 
     messages.forEach(message => {
-        const content = message.messageType === MessageType.BOT_ANSWER 
+        const content = message.messageType === MessageType.BOT_ANSWER // fixme: story type message is ignored
             ? (message.msg as { reply: string }).reply 
             : message.msg as string;
 
