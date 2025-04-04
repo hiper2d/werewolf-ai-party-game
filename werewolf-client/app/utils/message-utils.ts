@@ -13,9 +13,15 @@ export function convertToAIMessages(currentBotName: string, messages: GameMessag
     let otherPlayerMessages: string[] = [];
 
     messages.forEach(message => {
-        const content = message.messageType === MessageType.BOT_ANSWER // fixme: story type message is ignored
-            ? (message.msg as { reply: string }).reply 
-            : message.msg as string;
+        let content: string;
+        if (message.messageType === MessageType.BOT_ANSWER) {
+            content = (message.msg as { reply: string }).reply;
+        } else if (message.messageType === MessageType.GAME_STORY) {
+            content = (message.msg as { story: string }).story;
+        } else {
+            // Assume string for other types like HUMAN_PLAYER_MESSAGE, GM_COMMAND (if text)
+            content = message.msg as string;
+        }
 
         if (message.authorName === GAME_MASTER) {
             if (gmMessage) {
@@ -28,7 +34,7 @@ export function convertToAIMessages(currentBotName: string, messages: GameMessag
             // If we have a GM message and other player messages, combine them before adding the bot's message
             if (gmMessage) {
                 if (otherPlayerMessages.length > 0) {
-                    gmMessage += '\n\nMessages from other players:\n' + otherPlayerMessages.join('\n');
+                    gmMessage += '\n\n<NewMessagesFromOtherPlayers>\n' + otherPlayerMessages.join('\n') + '\n</NewMessagesFromOtherPlayers>';
                     otherPlayerMessages = [];
                 }
                 aiMessages.push({ role: 'user', content: gmMessage });
@@ -46,7 +52,7 @@ export function convertToAIMessages(currentBotName: string, messages: GameMessag
     if (gmMessage !== null) {
         const currentGmMessage = gmMessage;  // This creates a new variable that TypeScript knows is definitely a string
         if (otherPlayerMessages.length > 0) {
-            gmMessage = currentGmMessage + '\n\nMessages from other players:\n' + otherPlayerMessages.join('\n');
+            gmMessage = currentGmMessage + '\n\n<NewMessagesFromOtherPlayers>\n' + otherPlayerMessages.join('\n') + '\n</NewMessagesFromOtherPlayers>';
         }
         aiMessages.push({ role: MESSAGE_ROLE.USER, content: gmMessage });
     }

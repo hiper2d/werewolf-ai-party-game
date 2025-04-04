@@ -16,7 +16,7 @@ import {
     RECIPIENT_ALL,
     User
 } from "@/app/api/game-models";
-import {getServerSession} from "next-auth";
+import {auth} from "@/auth"; // Import auth from your auth.ts file
 import {AgentFactory} from "@/app/ai/agent-factory";
 import {STORY_SYSTEM_PROMPT, STORY_USER_PROMPT} from "@/app/ai/prompts/story-gen-prompts";
 import {getUserApiKeys} from "@/app/api/user-actions";
@@ -140,7 +140,7 @@ export async function copyGame(sourceGameId: string): Promise<string> {
 }
 
 export async function previewGame(gamePreview: GamePreview): Promise<GamePreviewWithGeneratedBots> {
-    const session = await getServerSession();
+    const session = await auth();
     if (!session || !session.user?.email) {
         throw new Error('Not authenticated');
     }
@@ -209,7 +209,7 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
 }
 
 export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Promise<string|undefined> {
-    const session = await getServerSession();
+    const session = await auth();
     if (!session || !session.user?.email) {
         throw new Error('Not authenticated');
     }
