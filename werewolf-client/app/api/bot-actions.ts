@@ -1,4 +1,4 @@
-'use server';
+// 'use server';
 
 import { db } from "@/firebase/server";
 import { Bot, BotAnswer, GAME_MASTER, GAME_STATES, MessageType, GameMessage, Game, RECIPIENT_ALL } from "@/app/api/game-models";
@@ -13,7 +13,8 @@ import {
     getGame,
     addMessageToChatAndSaveToDb,
     getUserFromFirestore,
-    getGameMessages
+    getGameMessages,
+    getBotMessages
 } from "./game-actions";
 import { getUserApiKeys } from "./user-actions";
 
@@ -75,6 +76,7 @@ export async function welcome(gameId: string): Promise<Game> {
 
         const agent = AgentFactory.createAgent(bot.name, botPrompt, bot.aiType, apiKeys);
 
+        // Create the game master command message
         const gmMessage: GameMessage = {
             id: null,
             recipientName: bot.name,
@@ -85,7 +87,14 @@ export async function welcome(gameId: string): Promise<Game> {
             timestamp: Date.now()
         };
 
-        const history = convertToAIMessages(bot.name, [gmMessage]);
+        // Save the game master command to the database
+        await addMessageToChatAndSaveToDb(gmMessage, gameId);
+
+        // Get messages for this bot (ALL + direct messages to this bot)
+        const botMessages = await getBotMessages(gameId, bot.name, game.currentDay);
+
+        // Create history from filtered messages
+        const history = convertToAIMessages(bot.name, botMessages);
         const schema = createBotAnswerSchema();
         const rawIntroduction = await agent.askWithSchema(schema, history);
         if (!rawIntroduction) {
@@ -223,12 +232,8 @@ export async function talkToAll(gameId: string, userMessage: string): Promise<Ga
                 throw new Error(`Bot ${botName} not found in game`);
             }
 
-            // Get messages for this bot (ALL + direct)
-            const messages = await getGameMessages(gameId);
-            const botMessages = messages.filter(m => 
-                m.day === game.currentDay && 
-                (m.recipientName === RECIPIENT_ALL || m.recipientName === bot.name)
-            );
+            // Get messages for this bot (ALL + direct) using the optimized query
+            const botMessages = await getBotMessages(gameId, bot.name, game.currentDay);
 
             // Get bot's response
             const apiKeys = await getUserFromFirestore(session.user.email)

@@ -300,6 +300,64 @@ export async function addMessageToChatAndSaveToDb(gameMessage: GameMessage, game
 }
 
 /**
+ * Get messages for a specific bot (messages sent to all players or directly to this bot)
+ * Filters at the database level for better performance
+ */
+export async function getBotMessages(gameId: string, botName: string, day: number): Promise<GameMessage[]> {
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+
+    // We need to perform two queries and combine the results:
+    // 1. Messages where recipientName is RECIPIENT_ALL
+    // 2. Messages where recipientName is the specific bot name
+    
+    const allMessagesQuery = db.collection('games')
+        .doc(gameId)
+        .collection('messages')
+        .where('day', '==', day)
+        .where('recipientName', '==', RECIPIENT_ALL)
+        .orderBy('timestamp', 'asc');
+        
+    const directMessagesQuery = db.collection('games')
+        .doc(gameId)
+        .collection('messages')
+        .where('day', '==', day)
+        .where('recipientName', '==', botName)
+        .orderBy('timestamp', 'asc');
+        
+    // Execute both queries
+    const [allMessagesSnapshot, directMessagesSnapshot] = await Promise.all([
+        allMessagesQuery.get(),
+        directMessagesQuery.get()
+    ]);
+    
+    // Combine and convert the results
+    const allMessages = allMessagesSnapshot.docs.map(doc => ({
+        id: doc.id,
+        recipientName: doc.data().recipientName,
+        authorName: doc.data().authorName,
+        msg: doc.data().msg,
+        messageType: doc.data().messageType,
+        day: doc.data().day,
+        timestamp: doc.data().timestamp
+    }));
+    
+    const directMessages = directMessagesSnapshot.docs.map(doc => ({
+        id: doc.id,
+        recipientName: doc.data().recipientName,
+        authorName: doc.data().authorName,
+        msg: doc.data().msg,
+        messageType: doc.data().messageType,
+        day: doc.data().day,
+        timestamp: doc.data().timestamp
+    }));
+    
+    // Combine and sort by timestamp
+    return [...allMessages, ...directMessages].sort((a, b) => a.timestamp - b.timestamp);
+}
+
+/**
  * Exported so bot-actions can access user details
  */
 export async function getUserFromFirestore(email: string): Promise<User | null> {

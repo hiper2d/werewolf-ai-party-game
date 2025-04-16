@@ -16,6 +16,7 @@ export const SupportedAiKeyNames: Record<string, string> = {
     [API_KEY_CONSTANTS.DEEPSEEK]: 'DeepSeek'
 };
 
+// todo: Add Grok (grok-3-latest, grok-3-fast-latest)
 export const LLM_CONSTANTS = {
     CLAUDE_37_SONNET: 'Claude 3.7 Sonnet',
     CLAUDE_35_HAIKU: 'Claude 3.5 Haiku',
@@ -26,7 +27,7 @@ export const LLM_CONSTANTS = {
     GPT_O1: 'o1',
     GPT_O3_MINI: 'o3-mini',
     GEMINI_2_FLASH: 'Gemini 2.0 Flash',
-    GEMINI_15_PRO: 'Gemini 1.5 Pro',
+    GEMINI_15_PRO: 'Gemini 1.5 Pro', // todo: Replace with 2.5 Pro
     MISTRAL_2_LARGE: 'Mistral 2 Large',
     MISTRAL_3_SMALL: 'Mistral 3 Small',
     RANDOM: 'Random',
