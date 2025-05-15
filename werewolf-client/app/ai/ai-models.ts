@@ -22,11 +22,11 @@ export const LLM_CONSTANTS = {
     CLAUDE_35_HAIKU: 'Claude 3.5 Haiku',
     DEEPSEEK_CHAT: 'DeepSeek Chat',
     DEEPSEEK_REASONER: 'DeepSeek Reasoner',
-    GPT_4O: 'GPT-4o',
-    GPT_4O_MINI: 'GPT-4o Mini',
-    GPT_O1: 'o1',
-    GPT_O3_MINI: 'o3-mini',
-    GEMINI_2_FLASH: 'Gemini 2.0 Flash',
+    GPT_4O: 'GPT-4o', // todo: Replace with gpt-4.1
+    GPT_4O_MINI: 'GPT-4o Mini', // todo: Replace with gpt-4.1-mini
+    GPT_O1: 'o1', // todo: Replace with o3
+    GPT_O3_MINI: 'o3-mini', // todo: Replace with o4-mini
+    GEMINI_2_FLASH: 'Gemini 2.0 Flash', // todo: Update to gemini-2.5-flash-preview
     GEMINI_15_PRO: 'Gemini 1.5 Pro', // todo: Replace with 2.5 Pro
     MISTRAL_2_LARGE: 'Mistral 2 Large',
     MISTRAL_3_SMALL: 'Mistral 3 Small',
