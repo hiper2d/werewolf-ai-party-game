@@ -24,7 +24,7 @@ describe("GoogleAgent integration", () => {
     return new GoogleAgent(
       botName,
       instruction,
-      SupportedAiModels[LLM_CONSTANTS.GEMINI_15_PRO].modelApiName,
+      SupportedAiModels[LLM_CONSTANTS.GEMINI_25_PRO].modelApiName,
       apiKey
     );
   };
@@ -87,7 +87,7 @@ describe("GoogleAgent integration", () => {
     const agent = new GoogleAgent(
       botName,
       instruction,
-      SupportedAiModels[LLM_CONSTANTS.GEMINI_2_FLASH].modelApiName,
+      SupportedAiModels[LLM_CONSTANTS.GEMINI_25_FLASH].modelApiName,
       process.env.GOOGLE_K!
     );
 

@@ -5,7 +5,7 @@ import {LLM_CONSTANTS, SupportedAiModels} from "@/app/ai/ai-models";
 import {ClaudeAgent} from "@/app/ai/anthropic-agent";
 import {GoogleAgent} from "@/app/ai/google-agent";
 import {MistralAgent} from "@/app/ai/mistral-agent";
-import {OpenAiO1Agent} from "@/app/ai/open-ai-o1-agent";
+import {OpenAiOAgent} from "@/app/ai/open-ai-o-agent";
 import {DeepSeekAgent} from "@/app/ai/deepseek-agent";
 
 export class AgentFactory {
@@ -27,13 +27,13 @@ export class AgentFactory {
             case LLM_CONSTANTS.CLAUDE_37_SONNET:
                 return new ClaudeAgent(name, instruction, model.modelApiName, key);
             case LLM_CONSTANTS.GPT_4O_MINI:
-            case LLM_CONSTANTS.GPT_4O:
+            case LLM_CONSTANTS.GPT_41:
                 return new OpenAiAgent(name, instruction, model.modelApiName, key, 0.2);
-            case LLM_CONSTANTS.GPT_O3_MINI:
-            case LLM_CONSTANTS.GPT_O1:
-                return new OpenAiO1Agent(name, instruction, model.modelApiName, key);
-            case LLM_CONSTANTS.GEMINI_2_FLASH:
-            case LLM_CONSTANTS.GEMINI_15_PRO:
+            case LLM_CONSTANTS.GPT_O4_MINI:
+            case LLM_CONSTANTS.GPT_O3:
+                return new OpenAiOAgent(name, instruction, model.modelApiName, key);
+            case LLM_CONSTANTS.GEMINI_25_FLASH:
+            case LLM_CONSTANTS.GEMINI_25_PRO:
                 return new GoogleAgent(name, instruction, model.modelApiName, key);
             case LLM_CONSTANTS.MISTRAL_3_SMALL:
             case LLM_CONSTANTS.MISTRAL_2_LARGE:

@@ -16,7 +16,7 @@ import {
     RECIPIENT_ALL,
     User
 } from "@/app/api/game-models";
-import {auth} from "@/auth"; // Import auth from your auth.ts file
+import {auth} from "@/auth";
 import {AgentFactory} from "@/app/ai/agent-factory";
 import {STORY_SYSTEM_PROMPT, STORY_USER_PROMPT} from "@/app/ai/prompts/story-gen-prompts";
 import {getUserApiKeys} from "@/app/api/user-actions";

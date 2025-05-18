@@ -22,15 +22,15 @@ export const LLM_CONSTANTS = {
     CLAUDE_35_HAIKU: 'Claude 3.5 Haiku',
     DEEPSEEK_CHAT: 'DeepSeek Chat',
     DEEPSEEK_REASONER: 'DeepSeek Reasoner',
-    GPT_4O: 'GPT-4o', // todo: Replace with gpt-4.1
-    GPT_4O_MINI: 'GPT-4o Mini', // todo: Replace with gpt-4.1-mini
-    GPT_O1: 'o1', // todo: Replace with o3
-    GPT_O3_MINI: 'o3-mini', // todo: Replace with o4-mini
-    GEMINI_2_FLASH: 'Gemini 2.0 Flash', // todo: Update to gemini-2.5-flash-preview
-    GEMINI_15_PRO: 'Gemini 1.5 Pro', // todo: Replace with 2.5 Pro
+    GPT_41: 'GPT-4.1',
+    // GPT_O3: 'o3', this model requires some id verification which is weird, I exclude it for now
+    GPT_O4_MINI: 'o4-mini',
+    GEMINI_25_FLASH: 'Gemini 2.5 Flash Preview 04-17', //todo: update API lig to @google/genai as per docs https://ai.google.dev/gemini-api/docs/text-generation#javascript
+    GEMINI_25_PRO: 'Gemini 2.5 Pro Preview 05-06',
     MISTRAL_2_LARGE: 'Mistral 2 Large',
     MISTRAL_3_SMALL: 'Mistral 3 Small',
     RANDOM: 'Random',
+    // todo: add grok-3-beta and grok-3-mini-beta https://docs.x.ai/docs/models
 }
 
 export const SupportedAiModels = {
@@ -42,28 +42,24 @@ export const SupportedAiModels = {
         modelApiName: 'claude-3-5-haiku-latest',
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC
     },
-    [LLM_CONSTANTS.GPT_4O]: {
-        modelApiName: 'gpt-4o',
+    [LLM_CONSTANTS.GPT_41]: {
+        modelApiName: 'gpt-4.1',
         apiKeyName: API_KEY_CONSTANTS.OPENAI
     },
-    [LLM_CONSTANTS.GPT_4O_MINI]: {
-        modelApiName: 'gpt-4o-mini',
+    /*[LLM_CONSTANTS.GPT_O3]: {
+        modelApiName: 'o3',
+        apiKeyName: API_KEY_CONSTANTS.OPENAI
+    },*/
+    [LLM_CONSTANTS.GPT_O4_MINI]: {
+        modelApiName: 'o4-mini',
         apiKeyName: API_KEY_CONSTANTS.OPENAI
     },
-    [LLM_CONSTANTS.GPT_O1]: {
-        modelApiName: 'o1',
-        apiKeyName: API_KEY_CONSTANTS.OPENAI
-    },
-    [LLM_CONSTANTS.GPT_O3_MINI]: {
-        modelApiName: 'o3-mini',
-        apiKeyName: API_KEY_CONSTANTS.OPENAI
-    },
-    [LLM_CONSTANTS.GEMINI_2_FLASH]: {
-        modelApiName: 'gemini-2.0-flash',
+    [LLM_CONSTANTS.GEMINI_25_FLASH]: {
+        modelApiName: 'gemini-2.5-flash-preview-04-17',
         apiKeyName: API_KEY_CONSTANTS.GOOGLE
     },
-    [LLM_CONSTANTS.GEMINI_15_PRO]: {
-        modelApiName: 'gemini-1.5-pro',
+    [LLM_CONSTANTS.GEMINI_25_PRO]: {
+        modelApiName: 'gemini-2.5-pro-preview-05-06',
         apiKeyName: API_KEY_CONSTANTS.GOOGLE
     },
     [LLM_CONSTANTS.MISTRAL_2_LARGE]: {

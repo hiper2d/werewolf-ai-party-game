@@ -1,6 +1,6 @@
 import dotenv from "dotenv";
 dotenv.config();
-import { OpenAiO1Agent } from "./open-ai-o1-agent";
+import { OpenAiOAgent } from "./open-ai-o-agent";
 import { AIMessage, BotAnswer } from "@/app/api/game-models";
 import { parseResponseToObj } from "@/app/utils/message-utils";
 import { LLM_CONSTANTS, SupportedAiModels } from "@/app/ai/ai-models";
@@ -9,9 +9,9 @@ import { format } from "@/app/ai/prompts/utils";
 import { GM_COMMAND_INTRODUCE_YOURSELF, HISTORY_PREFIX } from "@/app/ai/prompts/gm-commands";
 import { createBotAnswerSchema } from "@/app/ai/prompts/ai-schemas";
 
-describe("OpenAiO1Agent integration", () => {
+describe("OpenAiOAgent integration", () => {
   const setupAgent = () => {
-    const botName = "OpenAiO1Bot";
+    const botName = "OpenAiO4MiniBot";
     const instruction = format(BOT_SYSTEM_PROMPT, {
       name: botName,
       personal_story: "A mysterious wanderer with a hidden past",
@@ -21,10 +21,10 @@ describe("OpenAiO1Agent integration", () => {
       dead_players_names_with_roles: "David (Werewolf)"
     });
 
-    return new OpenAiO1Agent(
+    return new OpenAiOAgent(
       botName,
       instruction,
-      SupportedAiModels[LLM_CONSTANTS.GPT_O1].modelApiName,
+      SupportedAiModels[LLM_CONSTANTS.GPT_O4_MINI].modelApiName,
       process.env.OPENAI_K!
     );
   };

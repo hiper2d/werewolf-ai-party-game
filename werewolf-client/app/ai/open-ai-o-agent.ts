@@ -4,7 +4,7 @@ import {AIMessage} from "@/app/api/game-models";
 import { ResponseSchema } from "@/app/ai/prompts/ai-schemas";
 import { cleanResponse } from "@/app/utils/message-utils";
 
-export class OpenAiO1Agent extends AbstractAgent {
+export class OpenAiOAgent extends AbstractAgent {
     private readonly client: OpenAI;
     private readonly defaultParams: Omit<Parameters<OpenAI['chat']['completions']['create']>[0], 'messages'> = {
         model: this.model,
