@@ -10,8 +10,9 @@ import { GM_COMMAND_INTRODUCE_YOURSELF, HISTORY_PREFIX } from "@/app/ai/prompts/
 import { createBotAnswerSchema } from "@/app/ai/prompts/ai-schemas";
 
 describe("GoogleAgent integration", () => {
+  // Use Flash model for tests since it has a free quota
   const setupAgent = (apiKey = process.env.GOOGLE_K!) => {
-    const botName = "Google Pro Reasoner";
+    const botName = "Google Flash Reasoner";
     const instruction = format(BOT_SYSTEM_PROMPT, {
       name: botName,
       personal_story: "A sophisticated AI with deep analytical capabilities and extensive knowledge.",
@@ -24,7 +25,7 @@ describe("GoogleAgent integration", () => {
     return new GoogleAgent(
       botName,
       instruction,
-      SupportedAiModels[LLM_CONSTANTS.GEMINI_25_PRO].modelApiName,
+      SupportedAiModels[LLM_CONSTANTS.GEMINI_25_FLASH].modelApiName,
       apiKey
     );
   };
@@ -52,7 +53,7 @@ describe("GoogleAgent integration", () => {
     expect(parsed).toHaveProperty('reply');
     expect(typeof parsed.reply).toBe('string');
     expect(parsed.reply.length).toBeGreaterThan(0);
-  });
+  }, 30000); // Increase timeout for real API calls
 
   it("should handle API errors", async () => {
     const agent = setupAgent("invalid_api_key");
@@ -102,5 +103,5 @@ describe("GoogleAgent integration", () => {
     expect(parsed).toHaveProperty('reply');
     expect(typeof parsed.reply).toBe('string');
     expect(parsed.reply.length).toBeGreaterThan(0);
-  });
+  }, 30000); // Increase timeout for real API calls
 });

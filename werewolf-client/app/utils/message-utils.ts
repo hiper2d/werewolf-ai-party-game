@@ -7,59 +7,77 @@ import {AIMessage, GameMessage, GAME_MASTER, MessageType, MESSAGE_ROLE} from "@/
  * @param systemInstruction - Optional system instruction to prepend
  * @returns Array of AIMessages suitable for AI API communication
  */
-export function convertToAIMessages(currentBotName: string, messages: GameMessage[]): AIMessage[] {
-    let gmMessage: string = "";
-    let otherPlayerMessages: { name: string, message: string }[] = [];
+/**
+ * Calculates a hash for a message to identify duplicates
+ */
+function calculateMessageHash(message: GameMessage): string {
+    // Extract message content, stringify if not a string
+    const msgContent = typeof message.msg === 'string'
+        ? message.msg
+        : JSON.stringify(message.msg);
+    
+    // Create a hash from author and content
+    return `${message.authorName}|${msgContent}`;
+}
 
+function flushGmMessages(
+    gmMessages: Array<string>,
+    otherPlayerMessages: { name: string; message: string }[],
+    aiMessages: AIMessage[]
+) {
+    if (gmMessages.length > 0) {
+        let gmBlock: string = gmMessages.join("\n\n");
+        let otherPlayerConcatBlock = "";
+        if (otherPlayerMessages.length > 0) {
+            otherPlayerConcatBlock = `Below are messages from the other players you haven't yet seen. Each message with it's own tag with the player name attribute:\n<NewMessagesFromOtherPlayers>\n`;
+            otherPlayerConcatBlock += otherPlayerMessages
+                .map(pair => `  <Player name="${pair.name}">${pair.message}</Player>`)
+                .join('\n');
+            otherPlayerConcatBlock += `\n</NewMessagesFromOtherPlayers>`;
+            otherPlayerMessages.splice(0, otherPlayerMessages.length);
+        }
+        let fullGmMessage = gmBlock += "\n\n" + otherPlayerConcatBlock;
+        gmMessages.splice(0, gmMessages.length);
+        aiMessages.push({role: MESSAGE_ROLE.USER, content: fullGmMessage.trim()});
+    };
+}
+
+export function convertToAIMessages(currentBotName: string, messages: GameMessage[]): AIMessage[] {
+    let otherPlayerMessages: { name: string, message: string }[] = [];
+    let gmMessages: Array<string> = [];
     let aiMessages: AIMessage[] = [];
+
+    // Track the hash of the last processed message
+    let lastMessageHash: string | null = null;
     
     messages.forEach(((message, index) => {
+        // Calculate hash for current message
+        const currentHash = calculateMessageHash(message);
+        
+        // Check if this message is a duplicate of the previous one
+        const isDuplicate = lastMessageHash === currentHash;
+        
+        // Remember this message's hash for next iteration
+        lastMessageHash = currentHash;
+        
+        // If it's a duplicate, skip processing it
+        if (isDuplicate) {
+            return;
+        }
+        
         let content: string;
-/* fixme:
-- There are 3 types of messages: from GM (user), from the current bot (assistant), from other players
-- GM is considered to be the user for the LLM, the current bot is the assistant. Messages from other players should be appended to the GM's messages as the following text block:
-    <NewMessagesFromOtherPlayers>
-        <PlayerName1>: <Message1>
-        <PlayerName2>: <Message2>
-    </NewMessagesFromOtherPlayers>
-- If there are multiple GM's messages in a row, they should be concatenated
 
-The expected logic:
-For each message do this
-- Decide on the message type and correctly extract the content
-- For the current bot message, convert it into the assistant type message
-- For the other player message or human player message, remember it to the list of other player messages
-- For GM message check if the next message is also from GM. If so, then remember the current GM message and proceed to the next one. If the next message it not from GM, then concatenate the current message with previously remembered GM messages if wny, append the block with messages from the other players if any, then convert the result into the user type message
-
-After the whole history is converted it should be either empty or consists of the even number of messages where one user message is followed by on assistant message
-*/
-        // todo: New logic is here:
         if (message.authorName === GAME_MASTER) {
             if (message.messageType === MessageType.GAME_STORY) {
                 content = (message.msg as { story: string }).story;
             } else {
                 content = message.msg as string;
             }
-            // check if the next message is from GM as well
-            if (index < messages.length - 1 && messages[index+1].authorName === GAME_MASTER) {
-                // if so, remember and skip
-                gmMessage += "\n\n" + content;
-            } else {
-                // Prepare GM message from gmMessage and otherPlayerMessages (user type)
-                let fullGmMessage = gmMessage + "\n\n" + content;
-                if (otherPlayerMessages.length > 0) {
-                    let otherPlayerConcatBlock = `Below are messages from the other players you haven't yet seen. Each message with it's own tag with the player name attribute:\n<NewMessagesFromOtherPlayers>\n`;
-                    otherPlayerConcatBlock += otherPlayerMessages
-                        .map(pair => `  <Player name="${pair.name}">${pair.message}</Player>`)
-                        .join('\n');
-                    otherPlayerConcatBlock += `\n</NewMessagesFromOtherPlayers>`;
-                    fullGmMessage += "\n\n" + otherPlayerConcatBlock;
-                    otherPlayerMessages = [];
-                }
-                aiMessages.push({ role: MESSAGE_ROLE.USER, content: fullGmMessage.trim() });
-                gmMessage = "";
-            }
+            gmMessages.push(content);
         } else if (message.authorName === currentBotName) {
+            // Flush GM and other players messages
+            flushGmMessages(gmMessages, otherPlayerMessages, aiMessages);
+
             // Prepare own message (assistant type)
             if (message.messageType === MessageType.BOT_ANSWER) {
                 content = (message.msg as { reply: string }).reply;
@@ -80,9 +98,9 @@ After the whole history is converted it should be either empty or consists of th
                 otherPlayerMessages.push({ name: message.authorName, message: content });
             }
         }
-
     }));
 
+    flushGmMessages(gmMessages, otherPlayerMessages, aiMessages);
     return aiMessages;
 }
 

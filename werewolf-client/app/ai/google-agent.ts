@@ -1,23 +1,25 @@
 import { AbstractAgent } from "@/app/ai/abstract-agent";
 import { AIMessage } from "@/app/api/game-models";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 import { ResponseSchema } from "@/app/ai/prompts/ai-schemas";
 import { cleanResponse } from "@/app/utils/message-utils";
 
 type GoogleRole = 'model' | 'user';
 
-interface GoogleMessage {
+// Define types for the new Google GenAI SDK
+interface Part {
+    text: string;
+}
+
+interface Content {
     role: GoogleRole;
-    parts: Array<{ text: string }>;
+    parts: Part[];
 }
 
 export class GoogleAgent extends AbstractAgent {
-    private readonly client: GoogleGenerativeAI;
-    private readonly modelObj: any;
-    private readonly defaultParams = {
-        generationConfig: {
-            responseMimeType: "application/json"
-        }
+    private readonly client: GoogleGenAI;
+    private readonly defaultConfig = {
+        responseMimeType: "application/json"
     };
 
     // Log message templates
@@ -48,10 +50,8 @@ Ensure your response strictly follows the schema requirements.`,
 
     constructor(name: string, instruction: string, model: string, apiKey: string) {
         super(name, instruction, model, 0.2);
-        this.client = new GoogleGenerativeAI(apiKey);
-        this.modelObj = this.client.getGenerativeModel({
-            model: model,
-            ...this.defaultParams
+        this.client = new GoogleGenAI({
+            apiKey: apiKey
         });
     }
 
@@ -60,14 +60,21 @@ Ensure your response strictly follows the schema requirements.`,
         this.logger(this.logTemplates.messages(messages));
 
         try {
-            const googleMessages = this.convertToGoogleMessages(messages);
-            const chat = this.modelObj.startChat({
-                history: googleMessages
+            const contents = this.convertToContents(messages);
+            
+            const response = await this.client.models.generateContent({
+                model: this.model,
+                contents: contents,
+                config: {
+                    temperature: this.temperature
+                }
             });
-
-            const result = await chat.sendMessage(messages[messages.length - 1].content);
-            const response = await result.response;
-            const reply = cleanResponse(response.text());
+            
+            if (!response.text) {
+                throw new Error(this.errorMessages.emptyResponse);
+            }
+            
+            const reply = cleanResponse(response.text);
             this.logger(this.logTemplates.reply(reply));
             return reply;
         } catch (error) {
@@ -81,18 +88,36 @@ Ensure your response strictly follows the schema requirements.`,
         this.logger(this.logTemplates.messages(messages));
 
         try {
-            const googleMessages = this.convertToGoogleMessages(messages);
-            const chat = this.modelObj.startChat({
-                history: googleMessages
-            });
-
-            const schemaInstructions = this.buildSchemaInstructions(schema);
+            // Convert all messages except the last one
+            const historyMessages = messages.slice(0, -1);
+            const contents = this.convertToContents(historyMessages);
+            
+            // Get the last message and add schema instructions
             const lastMessage = messages[messages.length - 1];
+            const schemaInstructions = this.buildSchemaInstructions(schema);
             const fullPrompt = this.buildFullPrompt(lastMessage.content, schemaInstructions);
-
-            const result = await chat.sendMessage(fullPrompt);
-            const response = await result.response;
-            const reply = cleanResponse(response.text());
+            
+            // Add the last message with schema instructions
+            contents.push({
+                role: this.convertRole(lastMessage.role),
+                parts: [{ text: fullPrompt }]
+            });
+            
+            const response = await this.client.models.generateContent({
+                model: this.model,
+                contents: contents,
+                config: {
+                    temperature: this.temperature,
+                    responseMimeType: "application/json",
+                    responseSchema: schema
+                }
+            });
+            
+            if (!response.text) {
+                throw new Error(this.errorMessages.emptyResponse);
+            }
+            
+            const reply = cleanResponse(response.text);
             this.logger(this.logTemplates.reply(reply));
             return reply;
         } catch (error) {
@@ -111,7 +136,7 @@ Ensure your response strictly follows the schema requirements.`,
 ${instructions}`;
     }
 
-    private convertToGoogleMessages(messages: AIMessage[]): GoogleMessage[] {
+    private convertToContents(messages: AIMessage[]): Content[] {
         try {
             return messages.map(msg => ({
                 role: this.convertRole(msg.role),

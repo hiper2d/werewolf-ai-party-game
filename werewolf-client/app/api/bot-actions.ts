@@ -1,4 +1,4 @@
-// 'use server';
+'use server';
 
 import { db } from "@/firebase/server";
 import { Bot, BotAnswer, GAME_MASTER, GAME_STATES, MessageType, GameMessage, Game, RECIPIENT_ALL } from "@/app/api/game-models";

@@ -30,38 +30,15 @@ describe('convertToAIMessages', () => {
           day: CURRENT_DAY,
           timestamp: 1000
         },
-        
-        // 2. GM asks bot A to introduce itself
+        // 1. GM tells everybody the story
         {
           id: '2',
-          recipientName: BOT_A,
-          authorName: GAME_MASTER,
-          msg: 'Welcome to the game! Please introduce yourself to the group.',
-          messageType: MessageType.GM_COMMAND,
-          day: CURRENT_DAY,
-          timestamp: 2000
-        },
-        
-        // 3. Bot A introduces himself to everybody
-        {
-          id: '3',
           recipientName: RECIPIENT_ALL,
-          authorName: BOT_A,
-          msg: { reply: 'Greetings, fellow villagers! I am the blacksmith of this village. I forge tools and weapons for our community.' },
-          messageType: MessageType.BOT_ANSWER,
-          day: CURRENT_DAY,
-          timestamp: 3000
-        },
-        
-        // 4. GM asks bot B to introduce himself
-        {
-          id: '4',
-          recipientName: BOT_B,
           authorName: GAME_MASTER,
-          msg: 'Welcome to the game! Please introduce yourself to the group.',
-          messageType: MessageType.GM_COMMAND,
+          msg: { story: 'Welcome to the werewolf game set in a medieval village. The villagers suspect that werewolves are among them...' },
+          messageType: MessageType.GAME_STORY,
           day: CURRENT_DAY,
-          timestamp: 4000
+          timestamp: 1000
         },
         
         // 5. Bot B introduces himself to everybody
@@ -95,33 +72,42 @@ describe('convertToAIMessages', () => {
           messageType: MessageType.GM_COMMAND,
           day: CURRENT_DAY,
           timestamp: 7000
+        },
+
+        // 8. GM asks bot C to introduce itself
+        {
+          id: '8',
+          recipientName: RECIPIENT_ALL,
+          authorName: BOT_C,
+          msg: { reply: 'Hi, I am bot C.' },
+          messageType: MessageType.BOT_ANSWER,
+          day: CURRENT_DAY,
+          timestamp: 8000
         }
       ];
       
       // Convert messages for Bot C
       const result = convertToAIMessages(BOT_C, messages);
       
-      // Basic assertions
-      expect(result.length).toBe(3);
-      
-      // All messages should have the correct role (user for GM messages)
-      result.forEach(msg => {
-        expect(msg.role).toBe(MESSAGE_ROLE.USER);
-      });
-      
-      // The final message to Bot C should include Bot B and Human Player introductions
-      // (but not Bot A, as it was included in an earlier message)
-      const finalMessage = result[result.length - 1];
-      
+      // Basic assertions - with deduplication, we expect 1 message
+      expect(result.length).toBe(2);
+
+
       // Check that the final message includes Bot B and Human Player introductions
-      expect(finalMessage.content).toContain('Bot B');
-      expect(finalMessage.content).toContain('doctor');
-      expect(finalMessage.content).toContain('Human Player');
-      expect(finalMessage.content).toContain('tavern keeper');
-      
-      // Check that the second message includes Bot A's introduction
-      expect(result[1].content).toContain('Bot A');
-      expect(result[1].content).toContain('blacksmith');
+      expect(result[0].role).toBe('user');
+      expect(result[0].content).toBe(`
+      Welcome to the werewolf game set in a medieval village. The villagers suspect that werewolves are among them...
+
+Welcome to the game! Please introduce yourself to the group.
+
+Below are messages from the other players you haven't yet seen. Each message with it's own tag with the player name attribute:
+<NewMessagesFromOtherPlayers>
+  <Player name="Bot B">Hello everyone! I am the village doctor. I have been treating the sick and injured in this village for many years.</Player>
+  <Player name="Human Player">Hi all! I am the tavern keeper. My tavern is the center of gossip in this village.</Player>
+</NewMessagesFromOtherPlayers>
+      `.trim());
+      expect(result[1].role).toContain('assistant');
+      expect(result[1].content).toContain('Hi, I am bot C.');
     });
     
     it('should handle a more complex conversation with multiple GM messages', () => {
@@ -154,27 +140,7 @@ describe('convertToAIMessages', () => {
           timestamp: 2000
         },
         
-        // GM asks bot A to introduce itself with multiple messages
-        {
-          id: '3',
-          recipientName: BOT_A,
-          authorName: GAME_MASTER,
-          msg: 'First part of introduction request.',
-          messageType: MessageType.GM_COMMAND,
-          day: CURRENT_DAY,
-          timestamp: 3000
-        },
-        {
-          id: '4',
-          recipientName: BOT_A,
-          authorName: GAME_MASTER,
-          msg: 'Second part of introduction request.',
-          messageType: MessageType.GM_COMMAND,
-          day: CURRENT_DAY,
-          timestamp: 4000
-        },
-        
-        // Bot A responds
+        // // Bot A introduce itself to everybody
         {
           id: '5',
           recipientName: RECIPIENT_ALL,
@@ -244,23 +210,32 @@ describe('convertToAIMessages', () => {
       // Convert messages for Bot C
       const result = convertToAIMessages(BOT_C, messages);
       
-      // Basic assertions
-      expect(result.length).toBe(4);
+      // Basic assertions - with deduplication, we expect 3 messages
+      expect(result.length).toBe(3);
       
-      // Verify message roles alternate correctly
-      expect(result[0].role).toBe(MESSAGE_ROLE.USER);    // GM
-      expect(result[1].role).toBe(MESSAGE_ROLE.ASSISTANT); // Bot C
-      expect(result[2].role).toBe(MESSAGE_ROLE.USER);    // GM
-      expect(result[3].role).toBe(MESSAGE_ROLE.USER);    // GM
-      
-      // Verify Bot C's message content
+      expect(result[0].role).toBe(MESSAGE_ROLE.USER);
+      expect(result[0].content).toBe(`Part 1 of the story...
+
+Part 2 of the story...
+
+Below are messages from the other players you haven't yet seen. Each message with it's own tag with the player name attribute:
+<NewMessagesFromOtherPlayers>
+  <Player name="Bot A">Bot A introduction</Player>
+</NewMessagesFromOtherPlayers>`);
+
+      expect(result[1].role).toBe(MESSAGE_ROLE.ASSISTANT);
       expect(result[1].content).toBe('Bot C first message');
-      
-      // Verify that the final message includes all necessary content
-      const finalMessage = result[result.length - 1];
-      expect(finalMessage.content).toContain('A question for Bot C');
-      expect(finalMessage.content).toContain('Bot B response');
-      expect(finalMessage.content).toContain('Human player response');
+
+      expect(result[2].role).toBe(MESSAGE_ROLE.USER);
+      expect(result[2].content).toBe(`A question from GM
+
+A question for Bot C
+
+Below are messages from the other players you haven't yet seen. Each message with it's own tag with the player name attribute:
+<NewMessagesFromOtherPlayers>
+  <Player name="Bot B">Bot B response</Player>
+  <Player name="Human Player">Human player response</Player>
+</NewMessagesFromOtherPlayers>`);
     });
   });
 });
