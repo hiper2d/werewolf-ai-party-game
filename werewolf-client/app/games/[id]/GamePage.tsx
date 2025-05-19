@@ -30,7 +30,9 @@ export default function GamePage({
     // Handle welcome state
     useEffect(() => {
         const handleWelcome = async () => {
-            if (game.gameState === GAME_STATES.WELCOME && !hasErrorRef.current) {
+            if (game.gameState === GAME_STATES.WELCOME &&
+                game.gameStateParamQueue.length > 0 &&
+                !hasErrorRef.current) {
                 try {
                     const updatedGame = await welcome(game.id);
                     setGame(updatedGame);
@@ -42,7 +44,7 @@ export default function GamePage({
         };
 
         handleWelcome();
-    }, [game.gameState, game.id]);
+    }, [game.gameState, game.id, game.gameStateParamQueue]);
 
     // Poll for game state updates
     useEffect(() => {
