@@ -2,8 +2,9 @@ import {NextRequest} from 'next/server';
 import {db} from "@/firebase/server";
 import {RECIPIENT_ALL, GameMessage, MessageType} from "@/app/api/game-models";
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
-    const gameId = params.id;
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+    const resolvedParams = await params;
+    const gameId = resolvedParams.id;
     console.log('SSE: Starting connection for game:', gameId);
     const encoder = new TextEncoder();
 
