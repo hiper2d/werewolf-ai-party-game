@@ -16,8 +16,13 @@ function calculateMessageHash(message: GameMessage): string {
         ? message.msg
         : JSON.stringify(message.msg);
     
-    // Create a hash from author and content
-    return `${message.authorName}|${msgContent}`;
+    // If the author is GAME_MASTER, include both author and content in the hash
+    // Otherwise, only include the author name
+    if (message.authorName === GAME_MASTER) {
+        return `${message.authorName}|${msgContent}`;
+    } else {
+        return `${message.authorName}`;
+    }
 }
 
 function flushGmMessages(

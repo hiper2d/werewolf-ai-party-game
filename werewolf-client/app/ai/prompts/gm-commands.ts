@@ -46,3 +46,20 @@ export const HISTORY_PREFIX = `
 Here are previous messages from other players you haven't yet seen:
 %player_name_to_message_list%
 `
+
+export const GM_COMMAND_REPLY_TO_DISCUSSION: string = `Reply to the players in the discussion. Be thoughtful and consider what has been said so far.
+
+Your response must follow this schema:
+
+{
+    type: "object",
+    properties: {
+        reply: {
+            type: "string",
+            description: "Your response to the ongoing discussion"
+        }
+    },
+    required: ["reply"]
+}
+
+Return a single JSON object matching this schema.`;
