@@ -18,7 +18,8 @@ export const SupportedAiKeyNames: Record<string, string> = {
 
 // todo: Add Grok (grok-3-latest, grok-3-fast-latest)
 export const LLM_CONSTANTS = {
-    CLAUDE_37_SONNET: 'Claude 3.7 Sonnet',
+    CLAUDE_4_OPUS: 'Claude 4 Opus',
+    CLAUDE_4_SONNET: 'Claude 4 Sonnet',
     CLAUDE_35_HAIKU: 'Claude 3.5 Haiku',
     DEEPSEEK_CHAT: 'DeepSeek Chat',
     DEEPSEEK_REASONER: 'DeepSeek Reasoner',
@@ -34,8 +35,12 @@ export const LLM_CONSTANTS = {
 }
 
 export const SupportedAiModels = {
-    [LLM_CONSTANTS.CLAUDE_37_SONNET]: {
-        modelApiName: 'claude-3-7-sonnet-latest',
+    [LLM_CONSTANTS.CLAUDE_4_OPUS]: {
+        modelApiName: 'claude-opus-4-0',
+        apiKeyName: API_KEY_CONSTANTS.ANTHROPIC
+    },
+    [LLM_CONSTANTS.CLAUDE_4_SONNET]: {
+        modelApiName: 'claude-sonnet-4-0',
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC
     },
     [LLM_CONSTANTS.CLAUDE_35_HAIKU]: {

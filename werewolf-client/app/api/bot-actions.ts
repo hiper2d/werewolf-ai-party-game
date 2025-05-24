@@ -87,14 +87,11 @@ export async function welcome(gameId: string): Promise<Game> {
             timestamp: Date.now()
         };
 
-        // Save the game master command to the database
-        await addMessageToChatAndSaveToDb(gmMessage, gameId);
-
         // Get messages for this bot (ALL + direct messages to this bot)
         const botMessages = await getBotMessages(gameId, bot.name, game.currentDay);
 
-        // Create history from filtered messages
-        const history = convertToAIMessages(bot.name, botMessages);
+        // Create history from filtered messages, including the GM command that hasn't been saved yet
+        const history = convertToAIMessages(bot.name, [...botMessages, gmMessage]);
         const schema = createBotAnswerSchema();
         const rawIntroduction = await agent.askWithSchema(schema, history);
         if (!rawIntroduction) {
@@ -119,6 +116,10 @@ export async function welcome(gameId: string): Promise<Game> {
             timestamp: Date.now()
         };
 
+        // Save the game master command to the database first
+        await addMessageToChatAndSaveToDb(gmMessage, gameId);
+        
+        // Then save the bot's response
         await addMessageToChatAndSaveToDb(botMessage, gameId);
 
         // Update game with the modified queue
@@ -206,7 +207,6 @@ async function handleHumanPlayerMessage(
         day: game.currentDay,
         timestamp: Date.now()
     };
-    await addMessageToChatAndSaveToDb(userChatMessage, gameId);
 
     // Get all messages for the current day
     const messages = await getGameMessages(gameId);
@@ -239,7 +239,8 @@ async function handleHumanPlayerMessage(
         timestamp: Date.now()
     };
 
-    const history = convertToAIMessages(GAME_MASTER, [...dayMessages, gmMessage]);
+    // Include the user's message in the GM's history for bot selection
+    const history = convertToAIMessages(GAME_MASTER, [...dayMessages, userChatMessage, gmMessage]);
     const schema = createGmBotSelectionSchema();
     const rawGmResponse = await gmAgent.askWithSchema(schema, history);
     if (!rawGmResponse) {
@@ -250,6 +251,9 @@ async function handleHumanPlayerMessage(
     if (!gmResponse.selected_bots || !Array.isArray(gmResponse.selected_bots)) {
         throw new Error('Invalid GM response format');
     }
+
+    // Save the user's message to the database after successful GM response
+    await addMessageToChatAndSaveToDb(userChatMessage, gameId);
 
     // Update game state with selected bots queue
     if (!db) {
@@ -316,7 +320,8 @@ async function processNextBotInQueue(
     });
 
     const agent = AgentFactory.createAgent(bot.name, botPrompt, bot.aiType, apiKeys);
-    const history = convertToAIMessages(bot.name, botMessages);
+    // Include the GM command in history without saving it yet
+    const history = convertToAIMessages(bot.name, [...botMessages, gmMessage]);
     const schema = createBotAnswerSchema();
     const rawBotReply = await agent.askWithSchema(schema, history);
     if (!rawBotReply) {
@@ -334,6 +339,10 @@ async function processNextBotInQueue(
         timestamp: Date.now()
     };
 
+    // Save the game master command to the database first
+    await addMessageToChatAndSaveToDb(gmMessage, gameId);
+    
+    // Then save the bot's response
     await addMessageToChatAndSaveToDb(botMessage, gameId);
 
     // Update queue

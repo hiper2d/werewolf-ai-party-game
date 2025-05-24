@@ -85,7 +85,7 @@ describe("DeepSeekAgent integration", () => {
     expect(botAnswer.reply).toBeDefined();
     expect(typeof botAnswer.reply).toBe('string');
     expect(botAnswer.reply.length).toBeGreaterThan(0);
-  });
+  }, 60000); // 60 second timeout for DeepSeek Reasoner
 
   it("should respond with a valid schema-based answer for suspicion using DeepSeek Chat", async () => {
     const agent = setupAgent("DeepSeekBot", LLM_CONSTANTS.DEEPSEEK_CHAT);
@@ -137,7 +137,7 @@ describe("DeepSeekAgent integration", () => {
     expect(botAnswer.reply).toBeDefined();
     expect(typeof botAnswer.reply).toBe('string');
     expect(botAnswer.reply.length).toBeGreaterThan(0);
-  });
+  }, 60000); // 60 second timeout for DeepSeek Reasoner
 
   it("should throw error when API response is empty", async () => {
     const agent = setupAgent("DeepSeekBot", LLM_CONSTANTS.DEEPSEEK_CHAT);

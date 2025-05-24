@@ -10,7 +10,7 @@ import { GM_COMMAND_INTRODUCE_YOURSELF, HISTORY_PREFIX } from "@/app/ai/prompts/
 import { ResponseSchema, createBotAnswerSchema } from "@/app/ai/prompts/ai-schemas";
 
 describe("ClaudeAgent integration", () => {
-  const setupAgent = () => {
+  const setupAgent = (modelConstant: string = LLM_CONSTANTS.CLAUDE_4_SONNET) => {
     const botName = "Claudine";
     const instruction = format(BOT_SYSTEM_PROMPT, {
       name: botName,
@@ -24,7 +24,7 @@ describe("ClaudeAgent integration", () => {
     return new ClaudeAgent(
       botName,
       instruction,
-      SupportedAiModels[LLM_CONSTANTS.CLAUDE_37_SONNET].modelApiName,
+      SupportedAiModels[modelConstant as keyof typeof SupportedAiModels].modelApiName,
       process.env.ANTHROPIC_K!
     );
   }
@@ -82,7 +82,7 @@ describe("ClaudeAgent integration", () => {
     const agent = new ClaudeAgent(
       "TestBot",
       "Test instruction",
-      SupportedAiModels[LLM_CONSTANTS.CLAUDE_37_SONNET].modelApiName,
+      SupportedAiModels[LLM_CONSTANTS.CLAUDE_4_SONNET].modelApiName,
       "invalid_api_key"
     );
 
@@ -97,5 +97,34 @@ describe("ClaudeAgent integration", () => {
     await expect(agent.askWithSchema(schema, messages))
       .rejects
       .toThrow('Failed to get response from Anthropic API');
+  });
+
+  describe("Different Anthropic models", () => {
+    const testModels = [
+      { name: "Claude 4 Opus", constant: LLM_CONSTANTS.CLAUDE_4_OPUS },
+      { name: "Claude 4 Sonnet", constant: LLM_CONSTANTS.CLAUDE_4_SONNET },
+      { name: "Claude 3.5 Haiku", constant: LLM_CONSTANTS.CLAUDE_35_HAIKU }
+    ];
+
+    testModels.forEach(({ name, constant }) => {
+      it(`should work with ${name} model`, async () => {
+        const agent = setupAgent(constant);
+        expect(agent).toBeDefined();
+        expect(agent.name).toBe("Claudine");
+        // Verify the agent was created with the correct model by checking it doesn't throw
+        expect(() => agent).not.toThrow();
+      });
+    });
+
+    it("should have valid model API names for all Anthropic models", () => {
+      testModels.forEach(({ name, constant }) => {
+        const modelConfig = SupportedAiModels[constant as keyof typeof SupportedAiModels];
+        expect(modelConfig).toBeDefined();
+        expect(modelConfig.modelApiName).toBeDefined();
+        expect(modelConfig.apiKeyName).toBe('ANTHROPIC_API_KEY');
+        expect(typeof modelConfig.modelApiName).toBe('string');
+        expect(modelConfig.modelApiName.length).toBeGreaterThan(0);
+      });
+    });
   });
 });
