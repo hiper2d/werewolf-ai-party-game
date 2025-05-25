@@ -1,8 +1,8 @@
-import { AbstractAgent } from "@/app/ai/abstract-agent";
-import { AIMessage } from "@/app/api/game-models";
-import { Anthropic } from '@anthropic-ai/sdk';
-import { ResponseSchema } from "@/app/ai/prompts/ai-schemas";
-import { cleanResponse } from "@/app/utils/message-utils";
+import {AbstractAgent} from "@/app/ai/abstract-agent";
+import {AIMessage} from "@/app/api/game-models";
+import {Anthropic} from '@anthropic-ai/sdk';
+import {ResponseSchema} from "@/app/ai/prompts/ai-schemas";
+import {cleanResponse} from "@/app/utils/message-utils";
 
 type AnthropicRole = 'user' | 'assistant';
 
@@ -24,8 +24,6 @@ export class ClaudeAgent extends AbstractAgent {
     // Log message templates
     private readonly logTemplates = {
         askingAgent: (name: string, model: string) => `Asking ${name} ${model} agent`,
-        messages: (msgs: AIMessage[]) => `Messages:\n${JSON.stringify(msgs, null, 2)}`,
-        reply: (text: string) => `Reply: ${text}`,
         error: (name: string, error: unknown) => `Error in ${name} agent: ${error}`,
     };
 
@@ -54,16 +52,12 @@ Ensure your response strictly follows the schema requirements.`,
         });
     }
 
-    async ask(messages: AIMessage[]): Promise<string | null> {
+    protected async doAsk(messages: AIMessage[]): Promise<string | null> {
         return null; // Method kept empty to maintain inheritance
     }
 
-    async askWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<string> {
-        this.logger(this.logTemplates.askingAgent(this.name, this.model));
-        this.logger(this.logTemplates.messages(messages));
-
+    protected async doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<string> {
         const aiMessages = this.prepareMessages(messages);
-        this.printMessages(aiMessages);
 
         const schemaInstructions = this.buildSchemaInstructions(schema);
         const lastMessage = aiMessages[aiMessages.length - 1];
@@ -86,11 +80,8 @@ Ensure your response strictly follows the schema requirements.`,
             if (!('text' in content)) {
                 throw new Error(this.errorMessages.invalidFormat);
             }
-            const reply = cleanResponse(content.text);
-            this.logger(this.logTemplates.reply(reply));
-            return reply;
+            return cleanResponse(content.text);
         } catch (error) {
-            this.logger(this.logTemplates.error(this.name, error));
             throw new Error(this.errorMessages.apiError(error));
         }
     }

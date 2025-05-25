@@ -1,6 +1,8 @@
 # Bugs and improvements
 
-+Save GM command to DB only after successful AI reply to avoid duplicates on errors
+- Bug: AlivePlayers bot's list doesn't contain the human player name
+- Improve logging: truncate long messages, add timestamps, avoid duplicates, divide logging by layers (SSE, agent AP calls)
++ Save GM command to DB only after successful AI reply to avoid duplicates on errors
 - Add ability to switch bot models on UI
 - Create day summaries, keep them separate from messages, attach to bots history
 - Collect day statistics on how many messages each bot made. Make the Router take this into account. Display it on UI

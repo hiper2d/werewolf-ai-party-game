@@ -1,4 +1,4 @@
-import {AIMessage, GameMessage, GAME_MASTER, MessageType, MESSAGE_ROLE} from "@/app/api/game-models";
+import {AIMessage, GAME_MASTER, GameMessage, MESSAGE_ROLE, MessageType} from "@/app/api/game-models";
 
 /**
  * Converts an array of GameMessages to AIMessages, handling the message history appropriately.
@@ -26,6 +26,7 @@ function calculateMessageHash(message: GameMessage): string {
 }
 
 function flushGmMessages(
+    currentBotName: string,
     gmMessages: Array<string>,
     otherPlayerMessages: { name: string; message: string }[],
     aiMessages: AIMessage[]
@@ -42,8 +43,10 @@ function flushGmMessages(
             otherPlayerMessages.splice(0, otherPlayerMessages.length);
         }
         let fullGmMessage = gmBlock += "\n\n" + otherPlayerConcatBlock;
-        gmMessages.splice(0, gmMessages.length);
-        aiMessages.push({role: MESSAGE_ROLE.USER, content: fullGmMessage.trim()});
+        gmMessages.splice(0, gmMessages.length); // clear
+        
+        const aiMessage = {role: MESSAGE_ROLE.USER, content: fullGmMessage.trim()};
+        aiMessages.push(aiMessage);
     };
 }
 
@@ -81,7 +84,7 @@ export function convertToAIMessages(currentBotName: string, messages: GameMessag
             gmMessages.push(content);
         } else if (message.authorName === currentBotName) {
             // Flush GM and other players messages
-            flushGmMessages(gmMessages, otherPlayerMessages, aiMessages);
+            flushGmMessages(currentBotName, gmMessages, otherPlayerMessages, aiMessages);
 
             // Prepare own message (assistant type)
             if (message.messageType === MessageType.BOT_ANSWER) {
@@ -89,7 +92,8 @@ export function convertToAIMessages(currentBotName: string, messages: GameMessag
             } else {
                 content = message.msg as string;
             }
-            aiMessages.push({ role: MESSAGE_ROLE.ASSISTANT, content: content });
+            const aiMessage = { role: MESSAGE_ROLE.ASSISTANT, content: content };
+            aiMessages.push(aiMessage);
         } else {
             // Check if the message from another bot
             if (message.messageType === MessageType.BOT_ANSWER) {
@@ -105,7 +109,7 @@ export function convertToAIMessages(currentBotName: string, messages: GameMessag
         }
     }));
 
-    flushGmMessages(gmMessages, otherPlayerMessages, aiMessages);
+    flushGmMessages(currentBotName, gmMessages, otherPlayerMessages, aiMessages);
     return aiMessages;
 }
 

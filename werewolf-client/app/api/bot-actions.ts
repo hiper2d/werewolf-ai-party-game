@@ -1,26 +1,36 @@
 'use server';
 
-import { db } from "@/firebase/server";
-import { Bot, BotAnswer, GAME_MASTER, GAME_STATES, MessageType, GameMessage, Game, RECIPIENT_ALL } from "@/app/api/game-models";
-import { GM_COMMAND_INTRODUCE_YOURSELF, GM_COMMAND_REPLY_TO_DISCUSSION, GM_COMMAND_SELECT_RESPONDERS } from "@/app/ai/prompts/gm-commands";
-import { BOT_SYSTEM_PROMPT } from "@/app/ai/prompts/bot-prompts";
-import { createBotAnswerSchema, createGmBotSelectionSchema } from "@/app/ai/prompts/ai-schemas";
-import { AgentFactory } from "@/app/ai/agent-factory";
-import { format } from "@/app/ai/prompts/utils";
-import { auth } from "@/auth";
+import {db} from "@/firebase/server";
+import {
+    Bot,
+    BotAnswer,
+    Game,
+    GAME_MASTER,
+    GAME_STATES,
+    GameMessage,
+    MessageType,
+    RECIPIENT_ALL
+} from "@/app/api/game-models";
+import {
+    GM_COMMAND_INTRODUCE_YOURSELF,
+    GM_COMMAND_REPLY_TO_DISCUSSION,
+    GM_COMMAND_SELECT_RESPONDERS
+} from "@/app/ai/prompts/gm-commands";
+import {BOT_SYSTEM_PROMPT} from "@/app/ai/prompts/bot-prompts";
+import {createBotAnswerSchema, createGmBotSelectionSchema} from "@/app/ai/prompts/ai-schemas";
+import {AgentFactory} from "@/app/ai/agent-factory";
+import {format} from "@/app/ai/prompts/utils";
+import {auth} from "@/auth";
 import {cleanResponse, convertToAIMessages, parseResponseToObj} from "@/app/utils/message-utils";
 import {
-    getGame,
     addMessageToChatAndSaveToDb,
-    getUserFromFirestore,
+    getBotMessages,
+    getGame,
     getGameMessages,
-    getBotMessages
+    getUserFromFirestore
 } from "./game-actions";
-import { getUserApiKeys } from "./user-actions";
+import {getUserApiKeys} from "./user-actions";
 
-/**
- * Bot intro/welcome function, previously in game-actions.ts
- */
 export async function welcome(gameId: string): Promise<Game> {
     const session = await auth();
     if (!session || !session.user?.email) {
@@ -93,6 +103,7 @@ export async function welcome(gameId: string): Promise<Game> {
         // Create history from filtered messages, including the GM command that hasn't been saved yet
         const history = convertToAIMessages(bot.name, [...botMessages, gmMessage]);
         const schema = createBotAnswerSchema();
+        
         const rawIntroduction = await agent.askWithSchema(schema, history);
         if (!rawIntroduction) {
             throw new Error('Failed to get introduction from bot');
@@ -135,18 +146,6 @@ export async function welcome(gameId: string): Promise<Game> {
     }
 }
 
-/**
- * Send a user message to all bots in the game (one by one), collecting replies.
- * The user message is saved to chat, and each bot reply is also saved to chat.
- */
-/**
- * Send a user message to all bots in the game (one by one), collecting replies.
- * The user message is saved to chat, and each bot reply is also saved to chat.
- *
- * This function handles two distinct cases:
- * 1. Human player initiates discussion (userMessage is provided)
- * 2. Process next bot in queue (userMessage is empty and queue has bots)
- */
 export async function talkToAll(gameId: string, userMessage: string): Promise<Game> {
     // Common authentication and validation
     const session = await auth();
@@ -213,8 +212,7 @@ async function handleHumanPlayerMessage(
     const dayMessages = messages.filter(m => m.day === game.currentDay);
 
     // Ask GM which bots should respond
-    const apiKeys = await getUserFromFirestore(userEmail)
-        .then((user) => getUserApiKeys(user!.email));
+    const apiKeys = await getUserFromFirestore(userEmail).then((user) => getUserApiKeys(user!.email));
 
     const gmPrompt = format(BOT_SYSTEM_PROMPT, {
         name: GAME_MASTER,
@@ -242,6 +240,7 @@ async function handleHumanPlayerMessage(
     // Include the user's message in the GM's history for bot selection
     const history = convertToAIMessages(GAME_MASTER, [...dayMessages, userChatMessage, gmMessage]);
     const schema = createGmBotSelectionSchema();
+
     const rawGmResponse = await gmAgent.askWithSchema(schema, history);
     if (!rawGmResponse) {
         throw new Error('Failed to get bot selection from GM');
@@ -276,6 +275,16 @@ async function processNextBotInQueue(
     // Get the first bot from queue
     const botName = game.gameStateProcessQueue[0];
     const newQueue = game.gameStateProcessQueue.slice(1);
+    if (botName === game.humanPlayerName) {
+        // Update queue
+        if (!db) {
+            throw new Error('Firestore is not initialized');
+        }
+        await db.collection('games').doc(gameId).update({
+            gameStateProcessQueue: newQueue
+        });
+        return;
+    }
 
     // Find the bot
     const bot = game.bots.find(b => b.name === botName);
@@ -323,6 +332,7 @@ async function processNextBotInQueue(
     // Include the GM command in history without saving it yet
     const history = convertToAIMessages(bot.name, [...botMessages, gmMessage]);
     const schema = createBotAnswerSchema();
+    
     const rawBotReply = await agent.askWithSchema(schema, history);
     if (!rawBotReply) {
         throw new Error('Failed to get response from bot');

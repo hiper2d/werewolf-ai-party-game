@@ -1,9 +1,9 @@
 import OpenAI from "openai";
-import { AIMessage } from "@/app/api/game-models";
-import { AbstractAgent } from "@/app/ai/abstract-agent";
-import { ResponseSchema } from "@/app/ai/prompts/ai-schemas";
-import { cleanResponse } from "@/app/utils/message-utils";
-import { LLM_CONSTANTS, SupportedAiModels } from "@/app/ai/ai-models";
+import {AIMessage} from "@/app/api/game-models";
+import {AbstractAgent} from "@/app/ai/abstract-agent";
+import {ResponseSchema} from "@/app/ai/prompts/ai-schemas";
+import {cleanResponse} from "@/app/utils/message-utils";
+import {LLM_CONSTANTS, SupportedAiModels} from "@/app/ai/ai-models";
 
 // DeepSeek specific types
 interface DeepSeekMessage {
@@ -36,10 +36,6 @@ export class DeepSeekAgent extends AbstractAgent {
     // Log message templates
     private readonly logTemplates = {
         askingAgent: (name: string, model: string) => `Asking ${name} ${model} agent`,
-        messages: (msgs: AIMessage[]) => `Messages:\n${JSON.stringify(msgs, null, 2)}`,
-        rawReply: (reply: unknown) => `Raw reply: ${reply}`,
-        reasoning: (content: string) => `Reasoning tokens: ${content}`,
-        finalReply: (reply: string) => `Final reply: ${reply}`,
         error: (name: string, error: unknown) => `Error in ${name} agent: ${error}`,
     };
 
@@ -74,14 +70,11 @@ Ensure your response strictly follows the schema requirements.`,
         });
     }
 
-    async ask(messages: AIMessage[]): Promise<string | null> {
+    protected async doAsk(messages: AIMessage[]): Promise<string | null> {
         return null; // Method kept empty to maintain inheritance
     }
 
-    async askWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<string> {
-        this.logger(this.logTemplates.askingAgent(this.name, this.model));
-        this.logger(this.logTemplates.messages(messages));
-
+    protected async doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<string> {
         const schemaInstructions = this.schemaTemplate.instructions(schema);
         const lastMessage = messages[messages.length - 1];
         const fullPrompt = `${lastMessage.content}\n\n${schemaInstructions}`;
@@ -104,9 +97,7 @@ Ensure your response strictly follows the schema requirements.`,
 
             const completion = await this.client.chat.completions.create(params) as DeepSeekCompletion;
 
-            const reply = this.processCompletion(completion);
-            this.logger(this.logTemplates.finalReply(reply));
-            return reply;
+            return this.processCompletion(completion);
         } catch (error) {
             this.logger(this.logTemplates.error(this.name, error));
             throw new Error(this.errorMessages.apiError(error));
@@ -123,11 +114,10 @@ Ensure your response strictly follows the schema requirements.`,
 
     private processCompletion(completion: DeepSeekCompletion): string {
         const reply = completion.choices[0]?.message?.content;
-        this.logger(this.logTemplates.rawReply(reply));
 
         const reasoning = completion.choices[0]?.message?.reasoning_content;
         if (reasoning !== undefined) {
-            this.logger(this.logTemplates.reasoning(reasoning));
+            this.logReasoningTokens(reasoning);
         }
 
         if (!reply) {

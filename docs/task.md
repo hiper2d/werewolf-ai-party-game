@@ -1,13 +1,4 @@
-Help me to refactor the talkToAll logic
-
-This function covers two cases:
-1. When the human player asks something, and the list of bot who should reply is not yet defined by the Game Master. In this case, we should 
-    - load the messages from the database for the current day, addressed to everybody
-    - Ask the Game Master agent to pick from 1 to 3 bots to respond to the human player taking into account the daily discussion (the messages we loaded)
-    - One the Game Master Agent return a list of names, this list if returned to the client
-2. When there is no human player message but the gameStateProcessQueue is not empty (it has one or more bot player names in it). In this case, we should
-    - Take the first name from the gameStateProcessQueue
-    - Load all the messages from the current day addressed to everybody or to this bot
-    - Ask the bot to reply. It should be a GAme MAster command message similarly how bots are being asked to introduce themselves in the welcome function
-    - Save the bot's reply to the database
-    - Update the gameStateProcessQueue, because now it has 1 name less
+Help me to improve logging in the application. I want to see every AI API call to be logger in the following way:
+- A message that a certain bot is being asked. There should be a timestamp, a bot name, and a bot model
+- A bot's history. This part is tricky because it can be long, and each single message in the history can also be very long. Some Game Master command messages contains a list of other bots messages. I think we should log the message history when converting database message into bot's history in the @message-utils.ts When a message is pushed into the aiMessages, we can log it with the message role and the truncated content (one line, no longer than 50 characters). If there are other players messages, I want to see them in logs as well: each message on a new line with an author name and the text (one line, no longer than 50 characters)
+- Some logs are duplicated becase I have them in different layers: a model reply, an SSE is being used. In fact, I only want to see the models calls in the logs

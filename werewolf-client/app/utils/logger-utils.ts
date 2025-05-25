@@ -13,27 +13,71 @@ function getFormattedDate() {
     return `${year}-${month}-${day}_${hours}-${minutes}-${seconds}`
 }
 
-// 1. Create a "logs" folder in the project root if it doesn't exist
-const logsDir = path.join(process.cwd(), 'logs')
-if (!fs.existsSync(logsDir)) {
-    fs.mkdirSync(logsDir)
+// Singleton logger class to ensure single log file per application run
+class Logger {
+    private static instance: Logger;
+    private logFileName: string;
+    private initialized: boolean = false;
+
+    private constructor() {
+        // This will be set when initialize() is called
+        this.logFileName = '';
+    }
+
+    public static getInstance(): Logger {
+        if (!Logger.instance) {
+            Logger.instance = new Logger();
+        }
+        return Logger.instance;
+    }
+
+    private initialize(): void {
+        if (this.initialized) {
+            return;
+        }
+
+        // 1. Create a "logs" folder in the project root if it doesn't exist
+        const logsDir = path.join(process.cwd(), 'logs')
+        if (!fs.existsSync(logsDir)) {
+            fs.mkdirSync(logsDir)
+        }
+
+        // 2. Generate a unique filename for each server run
+        // Example filename: log-2024-12-22_10-59-29.log
+        const runId = getFormattedDate()
+        this.logFileName = path.join(logsDir, `log-${runId}.log`)
+
+        // 3. Write an initial header to the file
+        const startMessage = `=== Application Start @ ${new Date().toISOString()} ===`;
+        fs.writeFileSync(this.logFileName, `${startMessage}\n`, 'utf-8')
+        
+        // Also log to console
+        console.log(startMessage);
+
+        this.initialized = true;
+    }
+
+    public log(message: string): void {
+        this.initialize(); // Ensure logger is initialized
+
+        // Create timestamped message
+        const timestamp = new Date().toISOString()
+        const logEntry = `[${timestamp}] ${message}`;
+
+        // Write to file
+        fs.appendFileSync(this.logFileName, `${logEntry}\n`, 'utf-8')
+        
+        // Also write to console
+        console.log(logEntry);
+    }
 }
 
-// 2. Generate a unique filename for each server run
-// Example filename: log-2024-12-22_10-59-29.log
-const runId = getFormattedDate()
-const logFileName = path.join(logsDir, `log-${runId}.log`)
+// Get the singleton instance
+const loggerInstance = Logger.getInstance();
 
-// 3. Optionally write an initial header to the file
-fs.writeFileSync(
-    logFileName,
-    `=== Application Start @ ${new Date().toISOString()} ===\n`,
-    'utf-8'
-)
-
-// 4. Export a simple logger function
+// 4. Export logging functions
 export default function logger(message: string) {
-    // Append the message to the log file with a timestamp
-    const timestamp = new Date().toISOString()
-    fs.appendFileSync(logFileName, `[${timestamp}] ${message}\n`, 'utf-8')
+    loggerInstance.log(message);
 }
+
+

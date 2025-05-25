@@ -21,7 +21,6 @@ export class AgentFactory {
         const apiKeyName = model.apiKeyName
         const key = apiKeys[apiKeyName]
 
-        this.logger(name, model.modelApiName, instruction)
         switch (modelName) {
             case LLM_CONSTANTS.CLAUDE_4_OPUS:
             case LLM_CONSTANTS.CLAUDE_4_SONNET:

@@ -1,9 +1,9 @@
 import {AbstractAgent} from "@/app/ai/abstract-agent";
 import {Mistral} from "@mistralai/mistralai";
 import {ChatCompletionResponse} from "@mistralai/mistralai/models/components";
-import { AIMessage, GameMessage, MESSAGE_ROLE } from "@/app/api/game-models";
-import { ResponseSchema } from "@/app/ai/prompts/ai-schemas";
-import { cleanResponse } from "@/app/utils/message-utils";
+import {AIMessage, MESSAGE_ROLE} from "@/app/api/game-models";
+import {ResponseSchema} from "@/app/ai/prompts/ai-schemas";
+import {cleanResponse} from "@/app/utils/message-utils";
 
 export class MistralAgent extends AbstractAgent {
     private readonly client: Mistral;
@@ -14,9 +14,6 @@ export class MistralAgent extends AbstractAgent {
     // Log message templates
     private readonly logTemplates = {
         askingAgent: (name: string, model: string) => `Asking ${name} ${model} agent`,
-        messages: (msgs: AIMessage[]) => `Messages:\n${JSON.stringify(msgs, null, 2)}`,
-        rawReply: (reply: unknown) => `Raw reply: ${reply}`,
-        finalReply: (reply: string) => `Final reply: ${reply}`,
         error: (name: string, error: unknown) => `Error in ${name} agent: ${error}`,
     };
 
@@ -42,14 +39,11 @@ Ensure your response strictly follows the schema requirements.`,
         this.client = new Mistral({apiKey: apiKey});
     }
 
-    async ask(messages: AIMessage[]): Promise<string | null> {
+    protected async doAsk(messages: AIMessage[]): Promise<string | null> {
         return null; // Method kept empty to maintain inheritance
     }
 
-    async askWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<string> {
-        this.logger(this.logTemplates.askingAgent(this.name, this.model));
-        this.logger(this.logTemplates.messages(messages));
-
+    protected async doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<string> {
         const schemaInstructions = this.schemaTemplate.instructions(schema);
         const lastMessage = messages[messages.length - 1];
         const fullPrompt = `${lastMessage.content}\n\n${schemaInstructions}`;
@@ -67,9 +61,7 @@ Ensure your response strictly follows the schema requirements.`,
                 ],
             });
 
-            const reply = this.processReply(chatResponse);
-            this.logger(this.logTemplates.finalReply(reply));
-            return reply;
+            return this.processReply(chatResponse);
         } catch (error) {
             this.logger(this.logTemplates.error(this.name, error));
             throw new Error(this.errorMessages.apiError(error));
@@ -78,7 +70,6 @@ Ensure your response strictly follows the schema requirements.`,
 
     private processReply(response: ChatCompletionResponse | undefined): string {
         let reply = response?.choices?.[0]?.message?.content;
-        this.logger(this.logTemplates.rawReply(reply));
 
         if (reply === undefined || reply === null) {
             throw new Error(this.errorMessages.emptyResponse);
@@ -86,8 +77,6 @@ Ensure your response strictly follows the schema requirements.`,
 
         if (Array.isArray(reply)) {
             reply = this.processArrayReply(reply);
-        } else if (typeof reply !== "string") {
-            throw new Error(this.errorMessages.invalidFormat);
         }
 
         return cleanResponse(reply);

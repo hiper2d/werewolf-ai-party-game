@@ -5,7 +5,6 @@ import {RECIPIENT_ALL, GameMessage, MessageType} from "@/app/api/game-models";
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     const resolvedParams = await params;
     const gameId = resolvedParams.id;
-    console.log('SSE: Starting connection for game:', gameId);
     const encoder = new TextEncoder();
 
     const stream = new ReadableStream({
@@ -14,17 +13,14 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
                 throw new Error('Firestore is not initialized');
             }
 
-            console.log('SSE: Setting up Firestore listener');
             const q = db.collection('games').doc(gameId).collection('messages')
                 .where('recipientName', '==', RECIPIENT_ALL)
                 .orderBy('timestamp', 'asc');
 
             const unsubscribe = q.onSnapshot((snapshot) => {
-                console.log('SSE: Received snapshot with', snapshot.docChanges().length, 'changes');
                 snapshot.docChanges().forEach((change) => {
                     if (change.type === 'added') {
                         const data = change.doc.data();
-                        console.log('SSE: New message added:', data);
                         const message: GameMessage = {
                             id: change.doc.id,
                             recipientName: data.recipientName,
@@ -42,7 +38,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             });
 
             request.signal.addEventListener('abort', () => {
-                console.log('SSE: Connection closed');
                 unsubscribe();
             });
         }

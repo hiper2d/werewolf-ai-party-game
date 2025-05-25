@@ -11,7 +11,6 @@ import {
     GameMessage,
     GamePreview,
     GamePreviewWithGeneratedBots,
-    GameStory,
     MessageType,
     RECIPIENT_ALL,
     User
@@ -176,13 +175,13 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
     };
 
     const schema = createGameSetupSchema();
-    const response = await storyTellAgent.askWithSchema(schema, [convertToAIMessage(storyMessage)]);
-    if (!response) {
+    
+    const rawResponse = await storyTellAgent.askWithSchema(schema, [convertToAIMessage(storyMessage)]);
+    if (!rawResponse) {
         throw new Error('Failed to get AI response');
     }
 
-    const aiResponse = parseResponseToObj(response);
-
+    const aiResponse = parseResponseToObj(rawResponse);
     const bots: BotPreview[] = aiResponse.players.map((bot: { name: string; story: string }) => {
         let aiType = gamePreview.playersAiType;
         

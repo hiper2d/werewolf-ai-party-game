@@ -1,8 +1,8 @@
-import { AbstractAgent } from "@/app/ai/abstract-agent";
-import { AIMessage } from "@/app/api/game-models";
-import { GoogleGenAI } from "@google/genai";
-import { ResponseSchema } from "@/app/ai/prompts/ai-schemas";
-import { cleanResponse } from "@/app/utils/message-utils";
+import {AbstractAgent} from "@/app/ai/abstract-agent";
+import {AIMessage} from "@/app/api/game-models";
+import {GoogleGenAI} from "@google/genai";
+import {ResponseSchema} from "@/app/ai/prompts/ai-schemas";
+import {cleanResponse} from "@/app/utils/message-utils";
 
 type GoogleRole = 'model' | 'user';
 
@@ -25,8 +25,6 @@ export class GoogleAgent extends AbstractAgent {
     // Log message templates
     private readonly logTemplates = {
         askingAgent: (name: string, model: string) => `Asking ${name} ${model} agent`,
-        messages: (msgs: AIMessage[]) => `Messages:\n${JSON.stringify(msgs, null, 2)}`,
-        reply: (text: string) => `Reply: ${text}`,
         error: (name: string, error: unknown) => `Error in ${name} agent: ${error}`,
     };
 
@@ -55,10 +53,7 @@ Ensure your response strictly follows the schema requirements.`,
         });
     }
 
-    async ask(messages: AIMessage[]): Promise<string | null> {
-        this.logger(this.logTemplates.askingAgent(this.name, this.model));
-        this.logger(this.logTemplates.messages(messages));
-
+    protected async doAsk(messages: AIMessage[]): Promise<string | null> {
         try {
             const contents = this.convertToContents(messages);
             
@@ -73,20 +68,15 @@ Ensure your response strictly follows the schema requirements.`,
             if (!response.text) {
                 throw new Error(this.errorMessages.emptyResponse);
             }
-            
-            const reply = cleanResponse(response.text);
-            this.logger(this.logTemplates.reply(reply));
-            return reply;
+
+            return cleanResponse(response.text);
         } catch (error) {
             this.logger(this.logTemplates.error(this.name, error));
             return null;
         }
     }
 
-    async askWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<string | null> {
-        this.logger(this.logTemplates.askingAgent(this.name, this.model));
-        this.logger(this.logTemplates.messages(messages));
-
+    protected async doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<string | null> {
         try {
             // Convert all messages except the last one
             const historyMessages = messages.slice(0, -1);
@@ -116,10 +106,8 @@ Ensure your response strictly follows the schema requirements.`,
             if (!response.text) {
                 throw new Error(this.errorMessages.emptyResponse);
             }
-            
-            const reply = cleanResponse(response.text);
-            this.logger(this.logTemplates.reply(reply));
-            return reply;
+
+            return cleanResponse(response.text);
         } catch (error) {
             this.logger(this.logTemplates.error(this.name, error));
             return null;

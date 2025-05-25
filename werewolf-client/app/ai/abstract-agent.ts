@@ -1,5 +1,6 @@
 import { AIMessage } from "@/app/api/game-models";
 import { ResponseSchema } from "@/app/ai/prompts/ai-schemas";
+import logger from "@/app/utils/logger-utils";
 
 export abstract class AbstractAgent {
     name: string;
@@ -14,21 +15,53 @@ export abstract class AbstractAgent {
         this.model = model;
     }
 
-    abstract ask(messages: AIMessage[]): Promise<string | null>;
-    abstract askWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<string | null>;
-
-    protected logger(message: string): void {
-        console.log(`[${this.name} ${this.model}]: ${message}`);
+    // Template Method pattern: public methods with logging, calling protected abstract methods
+    async ask(messages: AIMessage[]): Promise<string | null> {
+        this.logger(`Asking bot ${this.name} (${this.model})`);
+        this.logMessages(messages);
+        
+        try {
+            const result = await this.doAsk(messages);
+            this.logger(`Bot ${this.name}: ${result}`);
+            return result;
+        } catch (error) {
+            this.logger(`${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
     }
 
-    protected printMessages(messages: AIMessage[]): void {
-        console.log(`\n[${this.name} ${this.model}] Message History:`);
+    async askWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<string | null> {
+        this.logger(`Asking bot ${this.name} (${this.model})`);
+        this.logMessages(messages);
+        
+        try {
+            const result = await this.doAskWithSchema(schema, messages);
+            this.logger(`Bot ${this.name} replied: ${result}`);
+            return result;
+        } catch (error) {
+            this.logger(`${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    // Abstract methods that child classes must implement
+    protected abstract doAsk(messages: AIMessage[]): Promise<string | null>;
+    protected abstract doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<string | null>;
+
+    protected logger(message: string): void {
+        logger(`[${this.name} ${this.model}]: ${message}`);
+    }
+
+    protected logMessages(messages: AIMessage[]): void {
+        this.logger(`History for ${this.name}:`);
         messages.forEach((msg, index) => {
-            if (msg.role !== 'system') {
-                console.log(`${index}. ${msg.role}: ${msg.content}`);
-            }
+            const preview = msg.content.length > 1000 ? msg.content.substring(0, 1000) + '...' : msg.content;
+            this.logger(`  ${index + 1}. [${msg.role}]: ${preview}`);
         });
-        console.log('');
+    }
+
+    protected logReasoningTokens(reasoningTokens: string): void {
+        this.logger(`Bot ${this.name} thoughts: ${reasoningTokens}`);
     }
 
     protected prepareMessages(messages: AIMessage[]): AIMessage[] {
