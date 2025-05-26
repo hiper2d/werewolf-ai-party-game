@@ -18,7 +18,7 @@ Chat with other players. You can follow the theme and roleplay, you can tell the
 
 <img src="images/game_chat.png" width="600">
 
-Survival is not easy
+Survival is not easy, poor Alex
 
 <img src="images/game_vote_all_for_alex.png" width="600">
 
