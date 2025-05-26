@@ -2,29 +2,35 @@
 
 <img src="images/werewolf-ai-logo-1.webp" width="600">
 
-> [!IMPORTANT]  
-> I'm reworking the app to the Next.js + Firebase stack. I'm throwing away the Python backend because I feel like switching to Next.js simplifies things a lot. It's a common app for both frontend and backend. Firebase gives me a database for games and chat messages which is easier to use than DynamoDb. Firebase also provides authentication and hosting.
-> I plan to complete the redesign in 1-2 weeks. So far all the work in going on in the `nextjs-with-firebase` branch.
-
-I created this repo for the Backdrop Build V3 hackathon on February 26, 2024. It was based on my other project [mafia-gpt](https://github.com/hiper2d/mafia-gpt). Mafia used OpenAI Assistants API which disappointed me a lot in process of development (slow, native client freezes randomly, outages on the OpenAI side), so I replaced it with a pure completion API. This gave me flexibility to switch between models (GPT-4, Claude3 Opus, Mistral Large, Grok 1.5 for now) but forced to store the chat history in DynamoDB. I like this approach so I deprecated mafia-gpt in favor of this repo.
-
-All projects registry: [Builds](https://backdropbuild.com/builds)
-
-The event project page: [ai-werewolf](https://backdropbuild.com/v3/ai-werewolf)
+This the Werewolf game with AI bots who are instructed to pretend to be humans. 
+Who doesn't know about other AI in the game.
+Who has its personal goals, a secret role and alliances.
 
 ## Gameplay
 
-What is nice about this game is complete freedom in the themes and roleplay. You can create any setting you want. A movie, a book, any historical period, or even a completely new world. The game is very flexible and can be adapted to any setting. 
+Create a game in the setting you like, choose models for the Game Master and for each player
 
-Here is an example of the "Terminator" theme with AI bots roleplaying characters from the movie:
-<img src="images/screen2.png">
+<img src="images/game_create.png" width="600">
 
-Or "Lord of the Rings":
-<img src="images/screen3.png">
+Chat with other players. You can follow the theme and roleplay, you can tell them that they are AI, you can try to jailbreak - whatever it takes to survive the voting and the game night.
 
-I really like these thematic dialogs and how creative the bots are. 
+<img src="images/game_welcome.png" width="600">
 
-UI is chunky and ugly yet but I'm working on it. It's a very early stage of the project. It is only possible to create a new game, to chat with bot players and to initiate a first round of voting. I have more things in the API but UI is not ready yet.
+<img src="images/game_chat.png" width="600">
+
+Survival is not easy
+
+<img src="images/game_vote_all_for_alex.png" width="600">
+
+## AI
+
+The game supports all the major latest models:
+- Open AI: GPT-4.1, O4-mini
+- Anthropic: Claude 4 Opus, Claude 4 Sonnet, Claude 3.5 Haiku
+- Google: Gemini 2.5 Pro (05-06), Gemini 2.5 Flash (4-17)
+- DeepSeek: Reasoner (R1), Chat (V3)
+- Mistral: Mistral 2 Large, Mistral 3 Small
+- Grok: TBD
 
 ## Setup
 
@@ -49,7 +55,7 @@ Navigate to the `werewolf-client` directory and run:
 
 ```bash
 npm install
-npm run pre-prod
+npm run dev
 ```
 
 This will start the Next.js application on `localhost:3000`.
