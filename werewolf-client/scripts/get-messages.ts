@@ -33,7 +33,7 @@ if (!gameId) {
 getGameMessages(gameId)
     .then(async messages => {
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const outputPath = join(process.cwd(), 'werewolf-client', 'logs', `game-messages-${gameId}-${timestamp}.json`);
+        const outputPath = join(process.cwd(), 'logs', `game-messages-${gameId}-${timestamp}.json`);
         await writeFile(outputPath, JSON.stringify(messages, null, 2));
         console.log(`Messages written to: ${outputPath}`);
     })

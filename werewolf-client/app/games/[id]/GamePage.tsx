@@ -7,7 +7,7 @@ import { buttonTransparentStyle } from "@/app/constants";
 import { GAME_STATES } from "@/app/api/game-models";
 import type { Game } from "@/app/api/game-models";
 import type { Session } from "next-auth";
-import { welcome } from '@/app/api/bot-actions';
+import { welcome, vote } from '@/app/api/bot-actions';
 import { getPlayerColor } from "@/app/utils/color-utils";
 
 interface Participant {
@@ -45,6 +45,28 @@ export default function GamePage({
 
         handleWelcome();
     }, [game.gameState, game.id, game.gameStateParamQueue]);
+
+    // Handle vote state
+    useEffect(() => {
+        const handleVote = async () => {
+            if (game.gameState === GAME_STATES.VOTE &&
+                game.gameStateProcessQueue.length > 0 &&
+                !hasErrorRef.current) {
+                try {
+                    const updatedGame = await vote(game.id);
+                    setGame(updatedGame);
+                } catch (error) {
+                    console.error('Error processing vote:', error);
+                    hasErrorRef.current = true;
+                }
+            }
+        };
+
+        // Only call vote() when in VOTE state with items in queue, not when in VOTE_RESULTS
+        if (game.gameState === GAME_STATES.VOTE) {
+            handleVote();
+        }
+    }, [game.gameState, game.id, game.gameStateProcessQueue]);
 
     // Poll for game state updates
     useEffect(() => {
@@ -136,20 +158,33 @@ export default function GamePage({
                 {/* Game controls */}
                 <div className="bg-black bg-opacity-30 border border-white border-opacity-30 rounded p-4">
                     {/*<h2 className="text-xl font-bold mb-2">Game Controls</h2>*/}
-                    <div className="flex gap-2 justify-evenly">
-                        <button className={buttonTransparentStyle}>
-                            Start
-                        </button>
-                        <button className={buttonTransparentStyle}>
-                            Pause
-                        </button>
+                    <div className="flex gap-2 justify-start">
+                        {game.gameState === GAME_STATES.DAY_DISCUSSION && (
+                            <button
+                                className={buttonTransparentStyle}
+                                onClick={async () => {
+                                    try {
+                                        const updatedGame = await vote(game.id);
+                                        setGame(updatedGame);
+                                    } catch (error) {
+                                        console.error('Error starting vote:', error);
+                                    }
+                                }}
+                            >
+                                Voting
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
 
             {/* Right column - Chat */}
             <div className="w-3/4 h-full overflow-hidden">
-                <GameChat gameId={game.id} game={game} />
+                <GameChat
+                    gameId={game.id}
+                    game={game}
+                    onGameStateChange={setGame}
+                />
             </div>
         </div>
     );

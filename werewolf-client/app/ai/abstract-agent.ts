@@ -32,6 +32,7 @@ export abstract class AbstractAgent {
 
     async askWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<string | null> {
         this.logger(`Asking bot ${this.name} (${this.model})`);
+        this.logger(this.instruction);
         this.logMessages(messages);
         
         try {
@@ -55,7 +56,7 @@ export abstract class AbstractAgent {
     protected logMessages(messages: AIMessage[]): void {
         this.logger(`History for ${this.name}:`);
         messages.forEach((msg, index) => {
-            const preview = msg.content.length > 1000 ? msg.content.substring(0, 1000) + '...' : msg.content;
+            const preview = msg.content.length > 5000 ? msg.content.substring(0, 5000) + '...' : msg.content;
             this.logger(`  ${index + 1}. [${msg.role}]: ${preview}`);
         });
     }

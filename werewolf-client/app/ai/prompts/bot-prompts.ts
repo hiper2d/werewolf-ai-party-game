@@ -126,3 +126,30 @@ You are an AI participant in a verbal chat game called Werewolf, played with mul
   - Ensure all required fields are included
 </OutputFormat>
 `;
+
+export const BOT_VOTE_PROMPT: string = `It's time to vote for someone to eliminate from the game. You must choose one player who you believe should be voted out.
+
+Consider:
+- Who seems most suspicious based on the discussions
+- Who might be a threat to your team's victory
+- The evidence and arguments presented so far
+- Your role's objectives and win conditions
+
+Your response must follow this schema:
+
+{
+    type: "object",
+    properties: {
+        who: {
+            type: "string",
+            description: "The name of the player you are voting to eliminate"
+        },
+        why: {
+            type: "string",
+            description: "Your reasoning for voting for this player (keep it brief but convincing)"
+        }
+    },
+    required: ["who", "why"]
+}
+
+Return a single JSON object matching this schema.`;

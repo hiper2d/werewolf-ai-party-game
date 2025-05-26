@@ -386,7 +386,9 @@ export async function getUserFromFirestore(email: string): Promise<User | null> 
 function serializeMessageForFirestore(gameMessage: GameMessage) {
     return {
         ...gameMessage,
-        msg: gameMessage.messageType === MessageType.BOT_ANSWER || gameMessage.messageType === MessageType.GAME_STORY
+        msg: gameMessage.messageType === MessageType.BOT_ANSWER ||
+             gameMessage.messageType === MessageType.GAME_STORY ||
+             gameMessage.messageType === MessageType.VOTE_MESSAGE
             ? gameMessage.msg  // keep as object
             : gameMessage.msg as string  // it's a string for most other message types
     };

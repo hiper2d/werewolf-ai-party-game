@@ -13,7 +13,7 @@ npx tsx scripts/get-messages.ts <gameId>
 
 Example:
 ```bash
-npx tsx scripts/get-messages.ts 5bHVwJCnRyJef2pQW5rk
+npx tsx scripts/get-messages.ts umYTgtLzM8iqbwSMOpwP
 ```
 
 This will create a file in the `werewolf-client/logs` directory with a name format:

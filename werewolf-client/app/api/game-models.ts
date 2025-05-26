@@ -65,6 +65,8 @@ export const GAME_ROLES = {
 export const GAME_STATES = {
     WELCOME: 'WELCOME',
     DAY_DISCUSSION: 'DAY_DISCUSSION',
+    VOTE: 'VOTE',
+    VOTE_RESULTS: 'VOTE_RESULTS',
 } as const;
 
 export enum MessageType {
@@ -72,6 +74,7 @@ export enum MessageType {
     BOT_ANSWER = 'BOT_ANSWER', // Response from a bot to GM command
     GAME_STORY = 'GAME_STORY', // Initial message to generate the game, never used after
     HUMAN_PLAYER_MESSAGE = 'HUMAN_PLAYER_MESSAGE',
+    VOTE_MESSAGE = 'VOTE_MESSAGE',
 }
 
 export class BotAnswer {

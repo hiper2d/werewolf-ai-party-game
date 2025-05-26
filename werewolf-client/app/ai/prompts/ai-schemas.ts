@@ -18,6 +18,12 @@ export interface GmBotSelection {
     reasoning: string;        // Explanation for the selection
 }
 
+// Bot vote interface
+export interface BotVote {
+    who: string;    // Name of the player being voted for
+    why: string;    // Reasoning for the vote
+}
+
 // Bot answer schema for response validation
 export const createBotAnswerSchema = () => ({
     type: 'object',
@@ -78,4 +84,20 @@ export const createGameSetupSchema = () => ({
         }
     },
     required: ['scene', 'players']
+});
+
+// Bot vote schema for response validation
+export const createBotVoteSchema = () => ({
+    type: 'object',
+    properties: {
+        who: {
+            type: 'string',
+            description: 'The name of the player you are voting to eliminate'
+        },
+        why: {
+            type: 'string',
+            description: 'Your reasoning for voting for this player (keep it brief but convincing)'
+        }
+    },
+    required: ['who', 'why']
 });
