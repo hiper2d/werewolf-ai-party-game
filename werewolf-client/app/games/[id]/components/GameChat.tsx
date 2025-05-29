@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { talkToAll } from "@/app/api/bot-actions";
 import { buttonTransparentStyle } from "@/app/constants";
-import { GAME_STATES, MessageType, RECIPIENT_ALL, GameMessage, Game } from "@/app/api/game-models";
+import { GAME_STATES, MessageType, RECIPIENT_ALL, GameMessage, Game, SystemErrorMessage, BotResponseError } from "@/app/api/game-models";
 import { getPlayerColor } from "@/app/utils/color-utils";
 
 interface GameChatProps {
@@ -24,6 +24,69 @@ interface GameStory {
 interface VoteMessage {
     who: string;
     why: string;
+}
+
+interface ErrorBannerProps {
+    error: SystemErrorMessage;
+    onDismiss: () => void;
+    onRetry?: () => void;
+}
+
+function ErrorBanner({ error, onDismiss, onRetry }: ErrorBannerProps) {
+    const isWarning = error.error.toLowerCase().includes('warning');
+    const bgColor = isWarning ? 'bg-yellow-900/50 border-yellow-500/30' : 'bg-red-900/50 border-red-500/30';
+    const textColor = isWarning ? 'text-yellow-200' : 'text-red-200';
+    const iconColor = isWarning ? 'text-yellow-400' : 'text-red-400';
+
+    return (
+        <div className={`mb-4 p-3 rounded-lg border ${bgColor} ${textColor}`}>
+            <div className="flex items-start justify-between">
+                <div className="flex items-start space-x-2 flex-1">
+                    <div className={`mt-0.5 ${iconColor}`}>
+                        {isWarning ? (
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                                <line x1="12" y1="9" x2="12" y2="13"/>
+                                <line x1="12" y1="17" x2="12.01" y2="17"/>
+                            </svg>
+                        ) : (
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <line x1="15" y1="9" x2="9" y2="15"/>
+                                <line x1="9" y1="9" x2="15" y2="15"/>
+                            </svg>
+                        )}
+                    </div>
+                    <div className="flex-1">
+                        <div className="font-medium text-sm">{error.error}</div>
+                        {error.details && (
+                            <div className="text-xs mt-1 opacity-80">{error.details}</div>
+                        )}
+                    </div>
+                </div>
+                <div className="flex items-center space-x-2 ml-4">
+                    {error.recoverable && onRetry && (
+                        <button
+                            onClick={onRetry}
+                            className="px-2 py-1 text-xs rounded bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+                        >
+                            Retry
+                        </button>
+                    )}
+                    <button
+                        onClick={onDismiss}
+                        className="p-1 rounded hover:bg-gray-600/50 transition-colors"
+                        title="Dismiss"
+                    >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <line x1="18" y1="6" x2="6" y2="18"/>
+                            <line x1="6" y1="6" x2="18" y2="18"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
 }
 
 function renderMessage(message: GameMessage, gameId: string, onDeleteAfter: (messageId: string) => void) {
@@ -115,6 +178,9 @@ export default function GameChat({ gameId, game, onGameStateChange }: GameChatPr
     const [newMessage, setNewMessage] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [error, setError] = useState<SystemErrorMessage | null>(null);
+    const [showErrorBanner, setShowErrorBanner] = useState(false);
+    const [lastFailedAction, setLastFailedAction] = useState<(() => Promise<void>) | null>(null);
 
     // Auto-process queue when not empty
     useEffect(() => {
@@ -137,9 +203,14 @@ export default function GameChat({ gameId, game, onGameStateChange }: GameChatPr
 
     useEffect(() => {
         const eventSource = new EventSource(`/api/games/${gameId}/messages/sse`);
+        
         eventSource.onmessage = (event) => {
             const message = JSON.parse(event.data) as GameMessage;
             setMessages(prev => [...prev, message]);
+        };
+
+        eventSource.onerror = (event) => {
+            console.error('SSE connection error:', event);
         };
 
         return () => eventSource.close();
@@ -150,12 +221,66 @@ export default function GameChat({ gameId, game, onGameStateChange }: GameChatPr
         const trimmed = newMessage.trim();
         if (!trimmed) return;
 
-        try {
-            setIsProcessing(true);
+        const action = async () => {
             await talkToAll(gameId, trimmed);
             setNewMessage('');
+        };
+
+        try {
+            setIsProcessing(true);
+            setLastFailedAction(() => action);
+            await action();
         } catch (error) {
             console.error("Error sending message:", error);
+            
+            // Handle BotResponseError by converting to SystemErrorMessage for display
+            if (error instanceof BotResponseError) {
+                const systemError: SystemErrorMessage = {
+                    error: error.message || 'Bot response error occurred',
+                    details: error.details || 'Failed to process bot response',
+                    context: error.context || {},
+                    recoverable: error.recoverable !== false, // Default to recoverable
+                    timestamp: Date.now()
+                };
+                handleError(systemError);
+            } else {
+                // Handle other errors
+                const systemError: SystemErrorMessage = {
+                    error: 'System error occurred',
+                    details: error instanceof Error ? error.message : 'Unknown error',
+                    context: {},
+                    recoverable: false,
+                    timestamp: Date.now()
+                };
+                handleError(systemError);
+            }
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    const handleError = (errorMessage: SystemErrorMessage) => {
+        setError(errorMessage);
+        setShowErrorBanner(true);
+    };
+
+    const handleDismissError = () => {
+        setShowErrorBanner(false);
+        setError(null);
+    };
+
+    const handleRetryError = async () => {
+        if (!lastFailedAction) return;
+        
+        try {
+            setIsProcessing(true);
+            setShowErrorBanner(false);
+            await lastFailedAction();
+            setError(null);
+        } catch (error) {
+            console.error("Error retrying action:", error);
+            // Keep the error banner visible if retry fails
+            setShowErrorBanner(true);
         } finally {
             setIsProcessing(false);
         }
@@ -233,6 +358,13 @@ export default function GameChat({ gameId, game, onGameStateChange }: GameChatPr
     return (
         <div className="flex flex-col h-full border border-white border-opacity-30 rounded-lg p-4">
             <h2 className="text-xl font-bold mb-4 text-white">Game Chat</h2>
+            {showErrorBanner && error && (
+                <ErrorBanner
+                    error={error}
+                    onDismiss={handleDismissError}
+                    onRetry={error.recoverable ? handleRetryError : undefined}
+                />
+            )}
             {game.gameStateProcessQueue.length > 0 && (
                 <div className="mb-4 text-sm text-gray-400">
                     Bots in queue: {game.gameStateProcessQueue.join(', ')}

@@ -60,9 +60,9 @@ describe("MistralAgent integration", () => {
       const response = await agent.askWithSchema(schema, messages);
 
       expect(typeof response).toBe("string");
-      expect(response.length).toBeGreaterThan(0);
+      expect(response?.length).toBeGreaterThan(0);
 
-      const parsedObj = parseResponseToObj(response);
+      const parsedObj = parseResponseToObj(response!);
       expect(parsedObj).toHaveProperty('reply');
       const botAnswer = new BotAnswer(parsedObj.reply);
       expect(botAnswer).toBeInstanceOf(BotAnswer);

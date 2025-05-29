@@ -75,6 +75,8 @@ export enum MessageType {
     GAME_STORY = 'GAME_STORY', // Initial message to generate the game, never used after
     HUMAN_PLAYER_MESSAGE = 'HUMAN_PLAYER_MESSAGE',
     VOTE_MESSAGE = 'VOTE_MESSAGE',
+    SYSTEM_ERROR = 'SYSTEM_ERROR',
+    SYSTEM_WARNING = 'SYSTEM_WARNING',
 }
 
 export class BotAnswer {
@@ -83,6 +85,33 @@ export class BotAnswer {
 
 export class GameStory {
     constructor(public story: string) {}
+}
+
+export interface SystemErrorMessage {
+    error: string;
+    details: string;
+    context: Record<string, any>;
+    recoverable: boolean;
+    timestamp: number;
+}
+
+export class BotResponseError extends Error {
+    public details: string;
+    public context: Record<string, any>;
+    public recoverable: boolean;
+
+    constructor(
+        message: string,
+        details: string = '',
+        context: Record<string, any> = {},
+        recoverable: boolean = true
+    ) {
+        super(message);
+        this.name = 'BotResponseError';
+        this.details = details;
+        this.context = context;
+        this.recoverable = recoverable;
+    }
 }
 
 export const MESSAGE_ROLE = {

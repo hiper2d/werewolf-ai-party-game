@@ -1,6 +1,39 @@
 import {AIMessage, GAME_MASTER, GameMessage, MESSAGE_ROLE, MessageType} from "@/app/api/game-models";
 
 /**
+ * Converts message content to a human-readable string format
+ * Handles different message types appropriately to prevent "[object Object]" display
+ */
+export function convertMessageContent(message: GameMessage): string {
+    if (typeof message.msg === 'string') {
+        return message.msg;
+    }
+
+    switch (message.messageType) {
+        case MessageType.VOTE_MESSAGE:
+            const voteMsg = message.msg as { who: string; why: string };
+            return `Votes for ${voteMsg.who}: "${voteMsg.why}"`;
+        
+        case MessageType.BOT_ANSWER:
+            const botMsg = message.msg as { reply: string };
+            return botMsg.reply;
+        
+        case MessageType.GAME_STORY:
+            const storyMsg = message.msg as { story: string };
+            return storyMsg.story;
+        
+        case MessageType.SYSTEM_ERROR:
+        case MessageType.SYSTEM_WARNING:
+            const errorMsg = message.msg as { error: string; details: string };
+            return `${errorMsg.error}: ${errorMsg.details}`;
+        
+        default:
+            // Fallback to JSON string for unknown types
+            return JSON.stringify(message.msg);
+    }
+}
+
+/**
  * Converts an array of GameMessages to AIMessages, handling the message history appropriately.
  * 
  * @param messages - Array of game messages to convert
@@ -135,7 +168,7 @@ export function cleanResponse(response: string): string {
     return cleanResponse.trim();
 }
 
-export function parseResponseToObj(response: string): any {
+export function parseResponseToObj(response: string, expectedType?: string): any {
     let cleanResponse = response.trim();
     if (cleanResponse.startsWith('```json')) {
         cleanResponse = cleanResponse.slice(7);
@@ -149,10 +182,71 @@ export function parseResponseToObj(response: string): any {
 
     cleanResponse = cleanResponse.trim();
 
+    let parsedObj: any;
     try {
-        return JSON.parse(cleanResponse);
+        parsedObj = JSON.parse(cleanResponse);
     } catch (e) {
-        console.log('Failed to parse JSON, returning as string:', cleanResponse);
-        return cleanResponse;
+        const { BotResponseError } = require('@/app/api/game-models');
+        throw new BotResponseError(
+            'Failed to parse bot response as JSON',
+            `Invalid JSON format: ${(e as Error).message}`,
+            {
+                originalResponse: response,
+                cleanedResponse: cleanResponse,
+                expectedType: expectedType || 'unknown'
+            },
+            true
+        );
     }
+
+    // Validate required fields based on expected type
+    if (expectedType) {
+        const { BotResponseError } = require('@/app/api/game-models');
+        
+        switch (expectedType) {
+            case 'BotAnswer':
+                if (!parsedObj.reply || typeof parsedObj.reply !== 'string') {
+                    throw new BotResponseError(
+                        'Bot response missing required "reply" field',
+                        'BotAnswer responses must contain a valid "reply" string field',
+                        {
+                            parsedResponse: parsedObj,
+                            expectedType: expectedType,
+                            missingField: 'reply'
+                        },
+                        true
+                    );
+                }
+                break;
+                
+            case 'VoteMessage':
+                if (!parsedObj.who || typeof parsedObj.who !== 'string') {
+                    throw new BotResponseError(
+                        'Vote response missing required "who" field',
+                        'VoteMessage responses must contain a valid "who" string field',
+                        {
+                            parsedResponse: parsedObj,
+                            expectedType: expectedType,
+                            missingField: 'who'
+                        },
+                        true
+                    );
+                }
+                if (!parsedObj.why || typeof parsedObj.why !== 'string') {
+                    throw new BotResponseError(
+                        'Vote response missing required "why" field',
+                        'VoteMessage responses must contain a valid "why" string field',
+                        {
+                            parsedResponse: parsedObj,
+                            expectedType: expectedType,
+                            missingField: 'why'
+                        },
+                        true
+                    );
+                }
+                break;
+        }
+    }
+
+    return parsedObj;
 }

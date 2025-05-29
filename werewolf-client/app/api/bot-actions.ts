@@ -9,7 +9,9 @@ import {
     GAME_STATES,
     GameMessage,
     MessageType,
-    RECIPIENT_ALL
+    RECIPIENT_ALL,
+    BotResponseError,
+    SystemErrorMessage
 } from "@/app/api/game-models";
 import {
     GM_COMMAND_INTRODUCE_YOURSELF,
@@ -30,6 +32,51 @@ import {
     getUserFromFirestore
 } from "./game-actions";
 import {getUserApiKeys} from "./user-actions";
+
+/**
+ * Wraps Firestore operations in a transaction for atomicity
+ * Ensures all game state updates are atomic and can be rolled back on errors
+ */
+async function processWithTransaction<T>(
+    gameId: string,
+    operation: (transaction: FirebaseFirestore.Transaction, gameRef: FirebaseFirestore.DocumentReference) => Promise<T>
+): Promise<T> {
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+
+    const gameRef = db.collection('games').doc(gameId);
+    
+    try {
+        return await db.runTransaction(async (transaction) => {
+            console.log(`Starting transaction for game ${gameId}`);
+            const result = await operation(transaction, gameRef);
+            console.log(`Transaction completed successfully for game ${gameId}`);
+            return result;
+        });
+    } catch (error) {
+        console.error(`Transaction failed for game ${gameId}:`, error);
+        
+        // Re-throw BotResponseError as-is for frontend handling
+        if (error instanceof BotResponseError) {
+            console.error('BotResponseError details:', {
+                message: error.message,
+                details: error.details,
+                context: error.context,
+                recoverable: error.recoverable
+            });
+            throw error;
+        }
+        
+        // Wrap other errors in BotResponseError for consistent handling
+        throw new BotResponseError(
+            'System error occurred',
+            error instanceof Error ? error.message : 'Unknown error',
+            { originalError: error },
+            false // System errors are typically not recoverable
+        );
+    }
+}
 
 export async function welcome(gameId: string): Promise<Game> {
     const session = await auth();
@@ -108,16 +155,15 @@ export async function welcome(gameId: string): Promise<Game> {
         
         const rawIntroduction = await agent.askWithSchema(schema, history);
         if (!rawIntroduction) {
-            throw new Error('Failed to get introduction from bot');
+            throw new BotResponseError(
+                'Bot failed to provide introduction',
+                `Bot ${bot.name} did not respond to introduction request`,
+                { botName: bot.name, aiType: bot.aiType },
+                true
+            );
         }
 
-        const cleanAnswer = cleanResponse(rawIntroduction);
-        let answer: BotAnswer;
-        try {
-            answer = JSON.parse(cleanAnswer);
-        } catch (e: any) {
-            throw new Error(`Failed to parse JSON, returning as string: ${e.message}`);
-        }
+        const answer = parseResponseToObj(rawIntroduction, 'BotAnswer');
 
         const botMessage: GameMessage = {
             id: null,
@@ -248,12 +294,22 @@ async function handleHumanPlayerMessage(
 
     const rawGmResponse = await gmAgent.askWithSchema(schema, history);
     if (!rawGmResponse) {
-        throw new Error('Failed to get bot selection from GM');
+        throw new BotResponseError(
+            'Game Master failed to select responding bots',
+            'GM did not respond to bot selection request',
+            { gmAiType: game.gameMasterAiType, action: 'bot_selection' },
+            true
+        );
     }
 
     const gmResponse = parseResponseToObj(rawGmResponse);
     if (!gmResponse.selected_bots || !Array.isArray(gmResponse.selected_bots)) {
-        throw new Error('Invalid GM response format');
+        throw new BotResponseError(
+            'Game Master provided invalid bot selection',
+            'GM response format was invalid or missing selected_bots array',
+            { gmAiType: game.gameMasterAiType, response: gmResponse },
+            true
+        );
     }
 
     // Save the user's message to the database after successful GM response
@@ -342,10 +398,15 @@ async function processNextBotInQueue(
     
     const rawBotReply = await agent.askWithSchema(schema, history);
     if (!rawBotReply) {
-        throw new Error('Failed to get response from bot');
+        throw new BotResponseError(
+            'Bot failed to respond to discussion',
+            `Bot ${bot.name} did not respond to discussion prompt`,
+            { botName: bot.name, aiType: bot.aiType, action: 'discussion_reply' },
+            true
+        );
     }
 
-    const botReply = parseResponseToObj(rawBotReply);
+    const botReply = parseResponseToObj(rawBotReply, 'BotAnswer');
     const botMessage: GameMessage = {
         id: null,
         recipientName: RECIPIENT_ALL,
@@ -495,13 +556,15 @@ export async function vote(gameId: string): Promise<Game> {
             
             const rawVoteResponse = await agent.askWithSchema(schema, history);
             if (!rawVoteResponse) {
-                throw new Error('Failed to get vote from bot');
+                throw new BotResponseError(
+                    'Bot failed to cast vote',
+                    `Bot ${bot.name} did not respond to voting prompt`,
+                    { botName: bot.name, aiType: bot.aiType, action: 'vote' },
+                    true
+                );
             }
             
-            const voteResponse = parseResponseToObj(rawVoteResponse);
-            if (!voteResponse.who || !voteResponse.why) {
-                throw new Error('Invalid vote response format');
-            }
+            const voteResponse = parseResponseToObj(rawVoteResponse, 'VoteMessage');
             
             // Validate the vote target is alive and valid
             if (!alivePlayerNames.includes(voteResponse.who)) {
