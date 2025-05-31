@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { talkToAll } from "@/app/api/bot-actions";
+import { talkToAll, humanPlayerVote } from "@/app/api/bot-actions";
 import { buttonTransparentStyle } from "@/app/constants";
 import { GAME_STATES, MessageType, RECIPIENT_ALL, GameMessage, Game, SystemErrorMessage, BotResponseError } from "@/app/api/game-models";
 import { getPlayerColor } from "@/app/utils/color-utils";
+import VotingModal from "./VotingModal";
 
 interface GameChatProps {
     gameId: string;
@@ -181,16 +182,32 @@ export default function GameChat({ gameId, game, onGameStateChange }: GameChatPr
     const [error, setError] = useState<SystemErrorMessage | null>(null);
     const [showErrorBanner, setShowErrorBanner] = useState(false);
     const [lastFailedAction, setLastFailedAction] = useState<(() => Promise<void>) | null>(null);
+    const [showVotingModal, setShowVotingModal] = useState(false);
+    const [isVoting, setIsVoting] = useState(false);
 
     // Auto-process queue when not empty
     useEffect(() => {
-        if (game.gameState === GAME_STATES.DAY_DISCUSSION && 
-            game.gameStateProcessQueue.length > 0 && 
+        console.log('🔍 AUTO-PROCESS QUEUE CHECK:', {
+            gameState: game.gameState,
+            queueLength: game.gameStateProcessQueue.length,
+            queue: game.gameStateProcessQueue,
+            isProcessing,
+            gameId,
+            timestamp: new Date().toISOString()
+        });
+
+        if (game.gameState === GAME_STATES.DAY_DISCUSSION &&
+            game.gameStateProcessQueue.length > 0 &&
             !isProcessing) {
+            console.log('🚨 CALLING TALK_TO_ALL API - This could be the loop source!', {
+                gameId,
+                queue: game.gameStateProcessQueue
+            });
             const processQueue = async () => {
                 setIsProcessing(true);
                 try {
                     await talkToAll(gameId, '');
+                    console.log('✅ TalkToAll API completed');
                 } catch (error) {
                     console.error("Error processing queue:", error);
                 } finally {
@@ -200,6 +217,28 @@ export default function GameChat({ gameId, game, onGameStateChange }: GameChatPr
             processQueue();
         }
     }, [game.gameState, game.gameStateProcessQueue, gameId, isProcessing]);
+
+    // Check if it's human player's turn to vote
+    useEffect(() => {
+        console.log('🔍 VOTING MODAL TRIGGER CHECK:', {
+            gameState: game.gameState,
+            queueLength: game.gameStateProcessQueue.length,
+            firstInQueue: game.gameStateProcessQueue[0],
+            humanPlayerName: game.humanPlayerName,
+            showVotingModal,
+            isVoting,
+            timestamp: new Date().toISOString()
+        });
+        
+        if (game.gameState === GAME_STATES.VOTE &&
+            game.gameStateProcessQueue.length > 0 &&
+            game.gameStateProcessQueue[0] === game.humanPlayerName &&
+            !showVotingModal &&
+            !isVoting) {
+            console.log('🚨 OPENING VOTING MODAL - This could be the loop source!');
+            setShowVotingModal(true);
+        }
+    }, [game.gameState, game.gameStateProcessQueue, game.humanPlayerName, showVotingModal, isVoting]);
 
     useEffect(() => {
         const eventSource = new EventSource(`/api/games/${gameId}/messages/sse`);
@@ -338,6 +377,62 @@ export default function GameChat({ gameId, game, onGameStateChange }: GameChatPr
         }
     };
 
+    const handleVote = async (targetPlayer: string, reason: string) => {
+        console.log('🗳️ HUMAN VOTE SUBMISSION:', {
+            targetPlayer,
+            reason,
+            gameId,
+            currentState: game.gameState,
+            queue: game.gameStateProcessQueue,
+            timestamp: new Date().toISOString()
+        });
+        
+        try {
+            setIsVoting(true);
+            console.log('🚨 CALLING HUMAN_PLAYER_VOTE API - This could trigger the loop!');
+            const updatedGame = await humanPlayerVote(gameId, targetPlayer, reason);
+            console.log('✅ Human vote API completed, closing modal and updating state');
+            setShowVotingModal(false);
+            
+            // Update game state if callback is provided
+            if (onGameStateChange) {
+                console.log('📊 Updating parent game state after vote');
+                onGameStateChange(updatedGame);
+            }
+        } catch (error) {
+            console.error('Error casting vote:', error);
+            
+            // Handle voting errors
+            if (error instanceof BotResponseError) {
+                const systemError: SystemErrorMessage = {
+                    error: error.message || 'Voting error occurred',
+                    details: error.details || 'Failed to cast vote',
+                    context: error.context || {},
+                    recoverable: error.recoverable !== false,
+                    timestamp: Date.now()
+                };
+                handleError(systemError);
+            } else {
+                const systemError: SystemErrorMessage = {
+                    error: 'Failed to cast vote',
+                    details: error instanceof Error ? error.message : 'Unknown error',
+                    context: {},
+                    recoverable: true,
+                    timestamp: Date.now()
+                };
+                handleError(systemError);
+            }
+        } finally {
+            setIsVoting(false);
+        }
+    };
+
+    const handleCloseVotingModal = () => {
+        if (!isVoting) {
+            setShowVotingModal(false);
+        }
+    };
+
     const isInputEnabled = game.gameState === GAME_STATES.DAY_DISCUSSION &&
                           game.gameStateProcessQueue.length === 0 &&
                           !isProcessing &&
@@ -401,6 +496,14 @@ export default function GameChat({ gameId, game, onGameStateChange }: GameChatPr
                     Send
                 </button>
             </form>
+            {showVotingModal && (
+                <VotingModal
+                    game={game}
+                    onVote={handleVote}
+                    onClose={handleCloseVotingModal}
+                    isSubmitting={isVoting}
+                />
+            )}
         </div>
     );
 }

@@ -5,7 +5,7 @@
   "scripts": {
     "dev-emu": "NEXT_PUBLIC_APP_ENV='emulator' next dev",
     "dev": "next dev",
-    "build": "npm run build-service-worker && next build",
+    "build": "next build",
     "start": "next start",
     "lint": "next lint",
     "emulators": "firebase emulators:start",
