@@ -1,5 +1,7 @@
 # Bugs and improvements
 
+- Fix "Waiting for game to start" disabled input hit in GamePage
+- remove transactions
 - Add ability to switch bot models on UI
 - Create day summaries, keep them separate from messages, attach to bots history
 - Collect day statistics on how many messages each bot made. Make the Router take this into account. Display it on UI

@@ -46,10 +46,10 @@ export default function GamePage({
         handleWelcome();
     }, [game.gameState, game.id, game.gameStateParamQueue]);
 
-    // Handle vote state - only trigger when we have a non-empty queue AND we're in VOTE state
+    // Handle vote state - trigger when in VOTE state and queue changes (including when it becomes empty)
     useEffect(() => {
-        // Only proceed if we're in VOTE state with items in queue
-        if (game.gameState !== GAME_STATES.VOTE || game.gameStateProcessQueue.length === 0 || hasErrorRef.current) {
+        // Only proceed if we're in VOTE state and no error
+        if (game.gameState !== GAME_STATES.VOTE || hasErrorRef.current) {
             return;
         }
 
@@ -62,20 +62,37 @@ export default function GamePage({
             timestamp: new Date().toISOString()
         });
 
+        // Special handling for empty queue - this should trigger vote results
+        if (game.gameStateProcessQueue.length === 0) {
+            console.log('🎯 EMPTY QUEUE DETECTED - TRIGGERING VOTE RESULTS:', {
+                gameId: game.id,
+                gameState: game.gameState,
+                timestamp: new Date().toISOString()
+            });
+        }
+
         const handleVote = async () => {
             console.log('🚨 CALLING VOTE API', {
                 gameId: game.id,
-                queue: game.gameStateProcessQueue
+                queue: game.gameStateProcessQueue,
+                queueLength: game.gameStateProcessQueue.length,
+                isEmptyQueue: game.gameStateProcessQueue.length === 0
             });
             try {
                 const updatedGame = await vote(game.id);
-                console.log('✅ Vote API completed, updating game state');
+                console.log('✅ Vote API completed, updating game state:', {
+                    oldState: game.gameState,
+                    newState: updatedGame.gameState,
+                    oldQueueLength: game.gameStateProcessQueue.length,
+                    newQueueLength: updatedGame.gameStateProcessQueue.length
+                });
                 setGame(updatedGame);
             } catch (error) {
                 console.error('❌ VOTE API ERROR:', {
                     error: error instanceof Error ? error.message : String(error),
                     gameState: game.gameState,
                     gameId: game.id,
+                    queueLength: game.gameStateProcessQueue.length,
                     timestamp: new Date().toISOString()
                 });
                 hasErrorRef.current = true;
@@ -83,53 +100,8 @@ export default function GamePage({
         };
 
         handleVote();
-    }, [game.gameState, game.gameStateProcessQueue.length, game.id]); // Use queue length instead of the array itself
+    }, [game.gameState, game.gameStateProcessQueue.length, game.gameStateProcessQueue.join(','), game.id]);
 
-    // Poll for game state updates
-    useEffect(() => {
-        console.log('🔍 SETTING UP GAME STATE POLLING for game:', game.id);
-        
-        const pollInterval = setInterval(async () => {
-            console.log('🔄 POLLING GAME STATE:', {
-                gameId: game.id,
-                currentState: game.gameState,
-                timestamp: new Date().toISOString()
-            });
-            try {
-                const updatedGame = await getGame(game.id);
-                if (updatedGame) {
-                    console.log('📊 Game state poll result:', {
-                        oldState: game.gameState,
-                        newState: updatedGame.gameState,
-                        oldQueue: game.gameStateProcessQueue,
-                        newQueue: updatedGame.gameStateProcessQueue,
-                        stateChanged: game.gameState !== updatedGame.gameState,
-                        queueChanged: JSON.stringify(game.gameStateProcessQueue) !== JSON.stringify(updatedGame.gameStateProcessQueue),
-                        timestamp: new Date().toISOString()
-                    });
-                    
-                    // Check if we're transitioning to VOTE_RESULTS
-                    if (game.gameState === GAME_STATES.VOTE && updatedGame.gameState === GAME_STATES.VOTE_RESULTS) {
-                        console.log('🎯 DETECTED TRANSITION TO VOTE_RESULTS:', {
-                            gameId: game.id,
-                            fromState: game.gameState,
-                            toState: updatedGame.gameState,
-                            timestamp: new Date().toISOString()
-                        });
-                    }
-                    
-                    setGame(updatedGame);
-                }
-            } catch (error) {
-                console.error('Error polling game state:', error);
-            }
-        }, 5000); // Poll every 5 seconds
-
-        return () => {
-            console.log('🛑 CLEARING GAME STATE POLLING for game:', game.id);
-            clearInterval(pollInterval);
-        };
-    }, [game.id]);
 
     if (!game) {
         return <div>Game not found</div>;

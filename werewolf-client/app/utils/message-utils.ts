@@ -128,17 +128,10 @@ export function convertToAIMessages(currentBotName: string, messages: GameMessag
             const aiMessage = { role: MESSAGE_ROLE.ASSISTANT, content: content };
             aiMessages.push(aiMessage);
         } else {
-            // Check if the message from another bot
-            if (message.messageType === MessageType.BOT_ANSWER) {
-                content = (message.msg as { reply: string }).reply;
-                // Add to otherPlayerMessages as a name/message pair
-                otherPlayerMessages.push({ name: message.authorName, message: content });
-            } else {
-                // Must it be from the human player then
-                content = message.msg as string;
-                // Add to otherPlayerMessages as a name/message pair
-                otherPlayerMessages.push({ name: message.authorName, message: content });
-            }
+            // Use convertMessageContent to properly handle all message types
+            content = convertMessageContent(message);
+            // Add to otherPlayerMessages as a name/message pair
+            otherPlayerMessages.push({ name: message.authorName, message: content });
         }
     }));
 
@@ -249,4 +242,36 @@ export function parseResponseToObj(response: string, expectedType?: string): any
     }
 
     return parsedObj;
+}
+
+/**
+ * Generates a natural language summary of voting results
+ * @param results - Record of player names to vote counts
+ * @returns Formatted voting results message
+ */
+export function generateVotingResultsMessage(results: Record<string, number>): string {
+    // Handle no votes case
+    const totalVotes = Object.values(results).reduce((sum, count) => sum + count, 0);
+    if (totalVotes === 0) {
+        return "No votes were cast during this round.";
+    }
+
+    // Find highest vote count and players
+    const maxVotes = Math.max(...Object.values(results));
+    const topPlayers = Object.entries(results)
+        .filter(([_, count]) => count === maxVotes)
+        .map(([name]) => name);
+
+    // Format results
+    const resultLines = Object.entries(results)
+        .filter(([_, count]) => count > 0)
+        .map(([name, count]) => `${name}: ${count} vote${count !== 1 ? 's' : ''}`)
+        .join('\n');
+
+    // Handle ties
+    if (topPlayers.length > 1) {
+        return `Voting results (tie):\n${resultLines}\n\nThere is a tie between ${topPlayers.join(', ')}!`;
+    }
+
+    return `Voting results:\n${resultLines}\n\n${topPlayers[0]} received the most votes and will be eliminated.`;
 }
