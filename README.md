@@ -1,6 +1,6 @@
 # Werewolf Party Game with AI Bots
 
-<img src="images/werewolf-ai-logo-1.webp" width="600">
+<img src="images/werewolf-ai-logo-3.png" width="600">
 
 This the Werewolf game with AI bots who are instructed to pretend to be humans. 
 Who doesn't know about other AI in the game.
@@ -18,9 +18,9 @@ Chat with other players. You can follow the theme and roleplay, you can tell the
 
 <img src="images/game_chat.png" width="600">
 
-Survival is not easy, poor Alex
+Survival is not easy, poor Bob (me)
 
-<img src="images/game_vote_all_for_alex.png" width="600">
+<img src="images/game_vote_all_for_bob.png" width="600">
 
 ## AI
 
@@ -30,7 +30,7 @@ The game supports all the major latest models:
 - Google: `Gemini 2.5 Pro (05-06)`, `Gemini 2.5 Flash (4-17)`
 - DeepSeek: `Reasoner (R1)`, `Chat (V3)`
 - Mistral: `Mistral 2 Large`, `Mistral 3 Small`
-- Grok: TBD
+- Grok: to be added soon
 
 ## Setup
 
