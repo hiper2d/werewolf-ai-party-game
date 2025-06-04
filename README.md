@@ -1,5 +1,3 @@
-# Werewolf Party Game with AI Bots
-
 <img src="images/werewolf-ai-logo-3.png" width="600">
 
 This the Werewolf game with AI bots who are instructed to pretend to be humans. 
@@ -31,6 +29,13 @@ The game supports all the major latest models:
 - DeepSeek: `Reasoner (R1)`, `Chat (V3)`
 - Mistral: `Mistral 2 Large`, `Mistral 3 Small`
 - Grok: to be added soon
+
+I don't use any frameworks for AI, I created s simple agent for each vendor based on their native SDK.
+
+### Stack
+
+- next.js 15
+- firebase: auth, firestore
 
 ## Setup
 
