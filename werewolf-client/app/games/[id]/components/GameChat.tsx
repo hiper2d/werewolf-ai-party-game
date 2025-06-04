@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { talkToAll, humanPlayerVote } from "@/app/api/bot-actions";
+import { startNight } from "@/app/api/night-actions";
 import { buttonTransparentStyle } from "@/app/constants";
 import { GAME_STATES, MessageType, RECIPIENT_ALL, GameMessage, Game, SystemErrorMessage, BotResponseError } from "@/app/api/game-models";
 import { getPlayerColor } from "@/app/utils/color-utils";
@@ -137,7 +138,7 @@ function renderMessage(message: GameMessage, gameId: string, onDeleteAfter: (mes
                     <span className={`text-xs ${isUserMessage ? 'text-gray-300' : ''}`} style={!isUserMessage ? { color: getPlayerColor(message.authorName) } : undefined}>
                         {message.authorName}
                     </span>
-                    {isBotMessage && message.id && (
+                    {isBotMessage && message.id && !isVoteMessage && (
                         <button
                             onClick={() => onDeleteAfter(message.id!)}
                             className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 ml-2 p-1 rounded hover:bg-gray-600/50"
@@ -184,6 +185,7 @@ export default function GameChat({ gameId, game, onGameStateChange }: GameChatPr
     const [lastFailedAction, setLastFailedAction] = useState<(() => Promise<void>) | null>(null);
     const [showVotingModal, setShowVotingModal] = useState(false);
     const [isVoting, setIsVoting] = useState(false);
+    const [isStartingNight, setIsStartingNight] = useState(false);
 
     // Auto-process queue when not empty
     useEffect(() => {
@@ -433,6 +435,52 @@ export default function GameChat({ gameId, game, onGameStateChange }: GameChatPr
         }
     };
 
+    const handleStartNight = async () => {
+        console.log('🌙 START NIGHT BUTTON CLICKED:', {
+            gameId,
+            currentState: game.gameState,
+            timestamp: new Date().toISOString()
+        });
+        
+        try {
+            setIsStartingNight(true);
+            console.log('🚨 CALLING START_NIGHT API');
+            const updatedGame = await startNight(gameId);
+            console.log('✅ Start night API completed, updating state');
+            
+            // Update game state if callback is provided
+            if (onGameStateChange) {
+                console.log('📊 Updating parent game state after starting night');
+                onGameStateChange(updatedGame);
+            }
+        } catch (error) {
+            console.error('Error starting night:', error);
+            
+            // Handle start night errors
+            if (error instanceof BotResponseError) {
+                const systemError: SystemErrorMessage = {
+                    error: error.message || 'Start night error occurred',
+                    details: error.details || 'Failed to start night phase',
+                    context: error.context || {},
+                    recoverable: error.recoverable !== false,
+                    timestamp: Date.now()
+                };
+                handleError(systemError);
+            } else {
+                const systemError: SystemErrorMessage = {
+                    error: 'Failed to start night',
+                    details: error instanceof Error ? error.message : 'Unknown error',
+                    context: {},
+                    recoverable: true,
+                    timestamp: Date.now()
+                };
+                handleError(systemError);
+            }
+        } finally {
+            setIsStartingNight(false);
+        }
+    };
+
     const isInputEnabled = game.gameState === GAME_STATES.DAY_DISCUSSION &&
                           game.gameStateProcessQueue.length === 0 &&
                           !isProcessing &&
@@ -440,6 +488,12 @@ export default function GameChat({ gameId, game, onGameStateChange }: GameChatPr
 
     const getInputPlaceholder = () => {
         console.log(game.gameState.valueOf());
+        if (game.gameState === GAME_STATES.GAME_OVER) {
+            return "Game has ended - chat disabled";
+        }
+        if (game.gameState === GAME_STATES.NIGHT_BEGINS) {
+            return "Night phase has begun...";
+        }
         if (game.gameState !== GAME_STATES.DAY_DISCUSSION) {
             return "Waiting for game to start...";
         }
@@ -477,6 +531,17 @@ export default function GameChat({ gameId, game, onGameStateChange }: GameChatPr
                     </div>
                 )}
             </div>
+            {game.gameState === GAME_STATES.VOTE_RESULTS && (
+                <div className="mb-4 flex justify-center">
+                    <button
+                        onClick={handleStartNight}
+                        disabled={isStartingNight}
+                        className={`${buttonTransparentStyle} ${isStartingNight ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                        {isStartingNight ? 'Starting Night...' : 'Start Night'}
+                    </button>
+                </div>
+            )}
             <form onSubmit={sendMessage} className="flex">
                 <input
                     type="text"
@@ -488,8 +553,8 @@ export default function GameChat({ gameId, game, onGameStateChange }: GameChatPr
                         ${!isInputEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                     placeholder={getInputPlaceholder()}
                 />
-                <button 
-                    type="submit" 
+                <button
+                    type="submit"
                     disabled={!isInputEnabled}
                     className={`${buttonTransparentStyle} ${!isInputEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >

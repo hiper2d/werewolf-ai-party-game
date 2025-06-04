@@ -67,6 +67,8 @@ export const GAME_STATES = {
     DAY_DISCUSSION: 'DAY_DISCUSSION',
     VOTE: 'VOTE',
     VOTE_RESULTS: 'VOTE_RESULTS',
+    NIGHT_BEGINS: 'NIGHT_BEGINS',
+    GAME_OVER: 'GAME_OVER',
 } as const;
 
 export enum MessageType {

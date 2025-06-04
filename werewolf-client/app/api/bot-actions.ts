@@ -23,7 +23,7 @@ import {createBotAnswerSchema, createGmBotSelectionSchema, createBotVoteSchema} 
 import {AgentFactory} from "@/app/ai/agent-factory";
 import {format} from "@/app/ai/prompts/utils";
 import {auth} from "@/auth";
-import {cleanResponse, convertToAIMessages, parseResponseToObj, generateVotingResultsMessage} from "@/app/utils/message-utils";
+import {cleanResponse, convertToAIMessages, parseResponseToObj, generateVotingResultsMessage, generateEliminationMessage} from "@/app/utils/message-utils";
 import {
     addMessageToChatAndSaveToDb,
     getBotMessages,
@@ -529,8 +529,92 @@ export async function vote(gameId: string): Promise<Game> {
                 };
                 await addMessageToChatAndSaveToDb(gmMessage, gameId);
                 
-                console.log('✅ VOTE FUNCTION: Successfully saved GM results message and returning updated game');
-                return updatedGame;
+                console.log('✅ VOTE FUNCTION: Successfully saved GM results message');
+                
+                // ELIMINATION LOGIC: Process elimination after everyone has voted
+                if (Object.keys(votingResults).length > 0) {
+                    const maxVotes = Math.max(...Object.values(votingResults));
+                    const topPlayers = Object.entries(votingResults)
+                        .filter(([_, count]) => count === maxVotes)
+                        .map(([name]) => name);
+                    
+                    let eliminatedPlayer: string;
+                    let eliminatedRole: string;
+                    let isHumanEliminated = false;
+                    
+                    if (topPlayers.length === 1) {
+                        // Single player with most votes
+                        eliminatedPlayer = topPlayers[0];
+                    } else {
+                        // Handle tie: randomly select from tied players, but exclude human if they're tied
+                        const nonHumanTiedPlayers = topPlayers.filter(name => name !== updatedGame.humanPlayerName);
+                        if (nonHumanTiedPlayers.length > 0) {
+                            // Select randomly from non-human tied players
+                            eliminatedPlayer = nonHumanTiedPlayers[Math.floor(Math.random() * nonHumanTiedPlayers.length)];
+                        } else {
+                            // All tied players are human (shouldn't happen with multiple players, but handle edge case)
+                            eliminatedPlayer = topPlayers[0];
+                        }
+                    }
+                    
+                    // Determine if eliminated player is human
+                    if (eliminatedPlayer === updatedGame.humanPlayerName) {
+                        isHumanEliminated = true;
+                        eliminatedRole = updatedGame.humanPlayerRole;
+                    } else {
+                        // Find the bot and get their role
+                        const eliminatedBot = updatedGame.bots.find(bot => bot.name === eliminatedPlayer);
+                        if (eliminatedBot) {
+                            eliminatedRole = eliminatedBot.role;
+                        } else {
+                            console.error(`Could not find eliminated player: ${eliminatedPlayer}`);
+                            eliminatedRole = 'unknown';
+                        }
+                    }
+                    
+                    // Generate elimination message
+                    const eliminationMessage = generateEliminationMessage(eliminatedPlayer, eliminatedRole);
+                    
+                    // Create and save elimination message
+                    const eliminationGmMessage: GameMessage = {
+                        id: null,
+                        recipientName: RECIPIENT_ALL,
+                        authorName: GAME_MASTER,
+                        msg: { story: eliminationMessage },
+                        messageType: MessageType.GAME_STORY,
+                        day: updatedGame.currentDay,
+                        timestamp: Date.now(),
+                    };
+                    await addMessageToChatAndSaveToDb(eliminationGmMessage, gameId);
+                    
+                    // Update game state based on elimination
+                    if (isHumanEliminated) {
+                        // Human eliminated: set game state to GAME_OVER
+                        await db.collection('games').doc(gameId).update({
+                            gameState: GAME_STATES.GAME_OVER
+                        });
+                        console.log('🎮 ELIMINATION: Human player eliminated, game over');
+                    } else {
+                        // Bot eliminated: set Bot.isAlive = false
+                        const updatedBots = updatedGame.bots.map(bot =>
+                            bot.name === eliminatedPlayer
+                                ? { ...bot, isAlive: false }
+                                : bot
+                        );
+                        
+                        await db.collection('games').doc(gameId).update({
+                            bots: updatedBots
+                        });
+                        console.log(`🤖 ELIMINATION: Bot ${eliminatedPlayer} eliminated`);
+                    }
+                    
+                    console.log('✅ ELIMINATION: Successfully processed elimination logic');
+                }
+                
+                // Get final updated game state
+                const finalGame = await getGame(gameId) as Game;
+                console.log('✅ VOTE FUNCTION: Successfully completed voting and elimination, returning final game');
+                return finalGame;
             }
             
             // Get the first name from queue
@@ -547,164 +631,139 @@ export async function vote(gameId: string): Promise<Game> {
                 throw new Error(`Bot ${currentVoter} not found in game`);
             }
             
-            // Process the bot's vote atomically using transaction
-            return await processWithTransaction(gameId, async (transaction, gameRef) => {
-                console.log(`Processing vote for bot ${bot.name}`);
-                
-                // Re-read game state within transaction to ensure consistency
-                const gameDoc = await transaction.get(gameRef);
-                if (!gameDoc.exists) {
-                    throw new Error('Game not found in transaction');
+            // Process the bot's vote using simple sequential operations
+            console.log(`Processing vote for bot ${bot.name}`);
+            
+            // Get current game state
+            const currentGame = await getGame(gameId) as Game;
+            
+            // Idempotency check: Verify this bot is still in the queue
+            if (!currentGame.gameStateProcessQueue.includes(currentVoter)) {
+                console.log(`Bot ${currentVoter} already processed, skipping`);
+                return currentGame;
+            }
+            
+            // Validate game state hasn't changed
+            if (currentGame.gameState !== GAME_STATES.VOTE) {
+                throw new Error(`Game state changed during processing: ${currentGame.gameState}`);
+            }
+            
+            // Get all alive players for voting options
+            const alivePlayerNames = [
+                ...currentGame.bots.filter(b => b.isAlive && b.name !== bot.name).map(b => b.name),
+                currentGame.humanPlayerName
+            ];
+            
+            if (alivePlayerNames.length === 0) {
+                throw new Error('No valid voting targets available');
+            }
+            
+            // Get API keys and create bot agent
+            const apiKeys = await getUserFromFirestore(session.user!.email!)
+                .then((user) => getUserApiKeys(user!.email));
+            
+            const botPrompt = format(
+                BOT_SYSTEM_PROMPT,
+                {
+                    name: bot.name,
+                    personal_story: bot.story,
+                    temperament: 'You have a balanced and thoughtful personality.',
+                    role: bot.role,
+                    players_names: [
+                        ...currentGame.bots
+                            .filter(b => b.name !== bot.name)
+                            .map(b => b.name),
+                        currentGame.humanPlayerName
+                    ].join(", "),
+                    dead_players_names_with_roles: currentGame.bots
+                        .filter(b => !b.isAlive)
+                        .map(b => `${b.name} (${b.role})`)
+                        .join(", ")
                 }
-                
-                const currentGame = { id: gameDoc.id, ...gameDoc.data() } as Game;
-                
-                // Idempotency check: Verify this bot is still in the queue
-                if (!currentGame.gameStateProcessQueue.includes(currentVoter)) {
-                    console.log(`Bot ${currentVoter} already processed, skipping`);
-                    return currentGame;
-                }
-                
-                // Validate game state hasn't changed
-                if (currentGame.gameState !== GAME_STATES.VOTE) {
-                    throw new Error(`Game state changed during processing: ${currentGame.gameState}`);
-                }
-                
-                // Get all alive players for voting options
-                const alivePlayerNames = [
-                    ...currentGame.bots.filter(b => b.isAlive && b.name !== bot.name).map(b => b.name),
-                    currentGame.humanPlayerName
-                ];
-                
-                if (alivePlayerNames.length === 0) {
-                    throw new Error('No valid voting targets available');
-                }
-                
-                // Get API keys and create bot agent
-                const apiKeys = await getUserFromFirestore(session.user!.email!)
-                    .then((user) => getUserApiKeys(user!.email));
-                
-                const botPrompt = format(
-                    BOT_SYSTEM_PROMPT,
-                    {
-                        name: bot.name,
-                        personal_story: bot.story,
-                        temperament: 'You have a balanced and thoughtful personality.',
-                        role: bot.role,
-                        players_names: [
-                            ...currentGame.bots
-                                .filter(b => b.name !== bot.name)
-                                .map(b => b.name),
-                            currentGame.humanPlayerName
-                        ].join(", "),
-                        dead_players_names_with_roles: currentGame.bots
-                            .filter(b => !b.isAlive)
-                            .map(b => `${b.name} (${b.role})`)
-                            .join(", ")
-                    }
+            );
+            
+            const agent = AgentFactory.createAgent(bot.name, botPrompt, bot.aiType, apiKeys);
+            
+            // Create the voting command message
+            const gmMessage: GameMessage = {
+                id: null,
+                recipientName: bot.name,
+                authorName: GAME_MASTER,
+                msg: BOT_VOTE_PROMPT,
+                messageType: MessageType.GM_COMMAND,
+                day: currentGame.currentDay,
+                timestamp: Date.now()
+            };
+            
+            // Get messages for this bot
+            const botMessages = await getBotMessages(gameId, bot.name, currentGame.currentDay);
+            
+            // Create history including the voting command
+            const history = convertToAIMessages(bot.name, [...botMessages, gmMessage]);
+            const schema = createBotVoteSchema();
+            
+            const rawVoteResponse = await agent.askWithSchema(schema, history);
+            if (!rawVoteResponse) {
+                throw new BotResponseError(
+                    'Bot failed to cast vote',
+                    `Bot ${bot.name} did not respond to voting prompt`,
+                    { botName: bot.name, aiType: bot.aiType, action: 'vote' },
+                    true
                 );
-                
-                const agent = AgentFactory.createAgent(bot.name, botPrompt, bot.aiType, apiKeys);
-                
-                // Create the voting command message
-                const gmMessage: GameMessage = {
-                    id: null,
-                    recipientName: bot.name,
-                    authorName: GAME_MASTER,
-                    msg: BOT_VOTE_PROMPT,
-                    messageType: MessageType.GM_COMMAND,
-                    day: currentGame.currentDay,
-                    timestamp: Date.now()
-                };
-                
-                // Get messages for this bot
-                const botMessages = await getBotMessages(gameId, bot.name, currentGame.currentDay);
-                
-                // Create history including the voting command
-                const history = convertToAIMessages(bot.name, [...botMessages, gmMessage]);
-                const schema = createBotVoteSchema();
-                
-                const rawVoteResponse = await agent.askWithSchema(schema, history);
-                if (!rawVoteResponse) {
-                    throw new BotResponseError(
-                        'Bot failed to cast vote',
-                        `Bot ${bot.name} did not respond to voting prompt`,
-                        { botName: bot.name, aiType: bot.aiType, action: 'vote' },
-                        true
-                    );
+            }
+            
+            const voteResponse = parseResponseToObj(rawVoteResponse, 'VoteMessage');
+            
+            // Validate the vote target is alive and valid
+            if (!alivePlayerNames.includes(voteResponse.who)) {
+                // If invalid target, vote for a random valid target
+                voteResponse.who = alivePlayerNames[Math.floor(Math.random() * alivePlayerNames.length)];
+                voteResponse.why = "Voting for a suspicious player";
+            }
+            
+            // Update voting results in gameStateParamQueue (as a map of names to vote counts)
+            let votingResults: Record<string, number> = {};
+            if (currentGame.gameStateParamQueue.length > 0) {
+                try {
+                    votingResults = JSON.parse(currentGame.gameStateParamQueue[0]);
+                } catch (e) {
+                    votingResults = {};
                 }
-                
-                const voteResponse = parseResponseToObj(rawVoteResponse, 'VoteMessage');
-                
-                // Validate the vote target is alive and valid
-                if (!alivePlayerNames.includes(voteResponse.who)) {
-                    // If invalid target, vote for a random valid target
-                    voteResponse.who = alivePlayerNames[Math.floor(Math.random() * alivePlayerNames.length)];
-                    voteResponse.why = "Voting for a suspicious player";
-                }
-                
-                // Update voting results in gameStateParamQueue (as a map of names to vote counts)
-                let votingResults: Record<string, number> = {};
-                if (currentGame.gameStateParamQueue.length > 0) {
-                    try {
-                        votingResults = JSON.parse(currentGame.gameStateParamQueue[0]);
-                    } catch (e) {
-                        votingResults = {};
-                    }
-                }
-                
-                // Add this vote
-                votingResults[voteResponse.who] = (votingResults[voteResponse.who] || 0) + 1;
-                
-                // Save the vote as a message
-                const voteMessage: GameMessage = {
-                    id: null,
-                    recipientName: RECIPIENT_ALL,
-                    authorName: bot.name,
-                    msg: {
-                        who: voteResponse.who,
-                        why: voteResponse.why
-                    },
-                    messageType: MessageType.VOTE_MESSAGE,
-                    day: currentGame.currentDay,
-                    timestamp: Date.now()
-                };
-                
-                // Save messages to database within transaction
-                if (!db) {
-                    throw new Error('Firestore is not initialized');
-                }
-                const messagesRef = db.collection('games').doc(gameId).collection('messages');
-                
-                // Add GM command message
-                await transaction.create(messagesRef.doc(), {
-                    ...gmMessage,
-                    timestamp: Date.now()
-                });
-                
-                // Add vote message
-                await transaction.create(messagesRef.doc(), {
-                    ...voteMessage,
-                    timestamp: Date.now()
-                });
-                
-                // Remove the bot from queue and update voting results atomically
-                const newQueue = currentGame.gameStateProcessQueue.slice(1);
-                
-                transaction.update(gameRef, {
-                    gameStateProcessQueue: newQueue,
-                    gameStateParamQueue: [JSON.stringify(votingResults)]
-                });
-                
-                console.log(`Successfully processed vote for bot ${bot.name}, removed from queue`);
-                
-                // Return updated game state
-                return {
-                    ...currentGame,
-                    gameStateProcessQueue: newQueue,
-                    gameStateParamQueue: [JSON.stringify(votingResults)]
-                };
+            }
+            
+            // Add this vote
+            votingResults[voteResponse.who] = (votingResults[voteResponse.who] || 0) + 1;
+            
+            // Save the vote as a message
+            const voteMessage: GameMessage = {
+                id: null,
+                recipientName: RECIPIENT_ALL,
+                authorName: bot.name,
+                msg: {
+                    who: voteResponse.who,
+                    why: voteResponse.why
+                },
+                messageType: MessageType.VOTE_MESSAGE,
+                day: currentGame.currentDay,
+                timestamp: Date.now()
+            };
+            
+            // Save messages to database sequentially
+            await addMessageToChatAndSaveToDb(gmMessage, gameId);
+            await addMessageToChatAndSaveToDb(voteMessage, gameId);
+            
+            // Remove the bot from queue and update voting results
+            const newQueue = currentGame.gameStateProcessQueue.slice(1);
+            
+            await db.collection('games').doc(gameId).update({
+                gameStateProcessQueue: newQueue,
+                gameStateParamQueue: [JSON.stringify(votingResults)]
             });
+            
+            console.log(`Successfully processed vote for bot ${bot.name}, removed from queue`);
+            
+            // Return updated game state
+            return await getGame(gameId) as Game;
         }
         
         else {

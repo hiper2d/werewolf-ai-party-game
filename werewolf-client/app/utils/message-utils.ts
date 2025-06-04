@@ -275,3 +275,13 @@ export function generateVotingResultsMessage(results: Record<string, number>): s
 
     return `Voting results:\n${resultLines}\n\n${topPlayers[0]} received the most votes and will be eliminated.`;
 }
+
+/**
+ * Generates an elimination message with role reveal
+ * @param playerName - Name of the eliminated player
+ * @param playerRole - Role of the eliminated player
+ * @returns Formatted elimination message
+ */
+export function generateEliminationMessage(playerName: string, playerRole: string): string {
+    return `${playerName} has been eliminated! They were a ${playerRole}.`;
+}

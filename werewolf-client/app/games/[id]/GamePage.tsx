@@ -102,6 +102,21 @@ export default function GamePage({
         handleVote();
     }, [game.gameState, game.gameStateProcessQueue.length, game.gameStateProcessQueue.join(','), game.id]);
 
+    // Handle NIGHT_BEGINS state - ensure component properly reacts to state changes
+    useEffect(() => {
+        console.log('🌙 NIGHT_BEGINS STATE CHECK:', {
+            gameState: game.gameState,
+            isNightBegins: game.gameState === GAME_STATES.NIGHT_BEGINS,
+            gameId: game.id,
+            timestamp: new Date().toISOString()
+        });
+        
+        // Reset error state when entering NIGHT_BEGINS to allow game reset
+        if (game.gameState === GAME_STATES.NIGHT_BEGINS && hasErrorRef.current) {
+            console.log('🔄 Resetting error state for NIGHT_BEGINS');
+            hasErrorRef.current = false;
+        }
+    }, [game.gameState, game.id]);
 
     if (!game) {
         return <div>Game not found</div>;
@@ -124,19 +139,27 @@ export default function GamePage({
         );
     }
 
+    // Check if game is over
+    const isGameOver = game.gameState === GAME_STATES.GAME_OVER;
+
+    // Handle exit game
+    const handleExitGame = () => {
+        window.location.href = '/games';
+    };
+
     // Combine human player and bots for participants list
     const participants: Participant[] = [
-        { 
-            name: game.humanPlayerName, 
-            role: game.humanPlayerRole, 
+        {
+            name: game.humanPlayerName,
+            role: game.humanPlayerRole,
             isHuman: true,
-            isAlive: true // Human player is always considered alive
+            isAlive: !isGameOver // Human player is alive unless game is over
         },
-        ...game.bots.map(bot => ({ 
-            name: bot.name, 
-            role: bot.role, 
-            isHuman: false, 
-            isAlive: bot.isAlive 
+        ...game.bots.map(bot => ({
+            name: bot.name,
+            role: bot.role,
+            isHuman: false,
+            isAlive: bot.isAlive
         }))
     ];
 
@@ -158,16 +181,27 @@ export default function GamePage({
                     <h2 className="text-xl font-bold mb-2">Participants</h2>
                     <ul>
                         {participants.map((participant, index) => (
-                            <li 
-                                key={index} 
-                                className={`mb-2 flex items-center justify-between ${!participant.isHuman && !participant.isAlive ? 'opacity-50' : ''}`}
+                            <li
+                                key={index}
+                                className={`mb-2 flex flex-col ${!participant.isAlive ? 'opacity-60' : ''}`}
                             >
-                                <span style={{ color: getPlayerColor(participant.name) }}>
-                                    {participant.name}
-                                    {participant.isHuman && ' (You)'}
-                                </span>
-                                {!participant.isAlive && (
-                                    <span className="text-sm text-red-500">(Dead)</span>
+                                <div className="flex items-center justify-between">
+                                    <span
+                                        style={{ color: getPlayerColor(participant.name) }}
+                                        className={!participant.isAlive ? 'line-through' : ''}
+                                    >
+                                        {participant.name}
+                                        {participant.isHuman && ' (You)'}
+                                    </span>
+                                    {!participant.isAlive && (
+                                        <span className="text-sm text-red-400">💀 Eliminated</span>
+                                    )}
+                                </div>
+                                {/* Show role for eliminated players or when game is over */}
+                                {(!participant.isAlive || isGameOver) && (
+                                    <div className="text-xs text-gray-400 mt-1 ml-2">
+                                        Role: {participant.role}
+                                    </div>
                                 )}
                             </li>
                         ))}
@@ -176,24 +210,38 @@ export default function GamePage({
 
                 {/* Game controls */}
                 <div className="bg-black bg-opacity-30 border border-white border-opacity-30 rounded p-4">
-                    {/*<h2 className="text-xl font-bold mb-2">Game Controls</h2>*/}
-                    <div className="flex gap-2 justify-start">
-                        {game.gameState === GAME_STATES.DAY_DISCUSSION && (
+                    {isGameOver ? (
+                        <div className="text-center">
+                            <div className="mb-4">
+                                <h3 className="text-lg font-bold text-red-400 mb-2">🎭 Game Over</h3>
+                                <p className="text-sm text-gray-300">The game has ended. All roles have been revealed above.</p>
+                            </div>
                             <button
-                                className={buttonTransparentStyle}
-                                onClick={async () => {
-                                    try {
-                                        const updatedGame = await vote(game.id);
-                                        setGame(updatedGame);
-                                    } catch (error) {
-                                        console.error('Error starting vote:', error);
-                                    }
-                                }}
+                                className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500`}
+                                onClick={handleExitGame}
                             >
-                                Voting
+                                Exit Game
                             </button>
-                        )}
-                    </div>
+                        </div>
+                    ) : (
+                        <div className="flex gap-2 justify-start">
+                            {game.gameState === GAME_STATES.DAY_DISCUSSION && (
+                                <button
+                                    className={buttonTransparentStyle}
+                                    onClick={async () => {
+                                        try {
+                                            const updatedGame = await vote(game.id);
+                                            setGame(updatedGame);
+                                        } catch (error) {
+                                            console.error('Error starting vote:', error);
+                                        }
+                                    }}
+                                >
+                                    Voting
+                                </button>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
 
