@@ -1,22 +1,25 @@
-I need to implement the voting functionality.
+# Werewold Night Action Phase
 
-Voting is a new game phase which goes after the DAY DISCUSSION, when the human player hits the Voting button.
-The voting button should be in the left bottom corner of the game instead of Start and Pause.
-When the voting button is pressed, a backend calls of the new "vote" function is made.
+Okay, we are ready to implement the first night action. After the VOTE phase is completed, the game should be in the NIGHT_BEGINS state. The startNight function currently does nothing. Let's add some functionality.
 
-The voting function has two modes (similar to the talkToAll):
-1. When the game state is DAY_DISCUSSION, then 
-   - clean the gameStateProcessQueue and gameStateParamQueue arrays, 
-   - set the new game state "VOTE"
-   - Take all alive bot players, add the human player name, shuffle the result list and save into the gameStateProcessQueue
-   - save the game, return the API call
-2. When the game state is VOTE, then
-   - Check if there are names in the gameStateProcessQueue. If not, then update the game state to the VOTE_RESULTS, and return the API call
-   - Pop the first name from the gameStateProcessQueue (it should be removed from the array)
-   - Ask the selected bot to vote. They must choose another alive player name who should leave the game and why. The answer should be in the JSON format with two fields: "who", "why"
-   - Update voting results map in the gameStateParamQueue field. This map should contain names and the vote counts for them
-   - Save the result object to the database and save the game
+1. First of all, we should create a config for game roles and their night actions. Who goes after who. Currently roles are defined in game-modes.ts as constants and there are some difinitions of them in bot-prompts.ts. Let's change that. We should have a config with all the special roles in order of them night actions, with the exception for villager as it's a passive role withough any actions at night. Thera are three special roles for now: werewolf, doctor, detective. Each role in the role config should include the following fields:
+- name
+- instruction
+- gm_command
+The name is clear. The instruction is for the role owner player to explain what they can do. Roles instructions will be included to bot's prompts and to the game rules on UI later. The gm_command is the command the Game Master will tell to the model when it's time for the night action. Having this role config, we can read it and use when creating the game, constructing instructions to bots, and when performing the night actions.
 
-UI behavior:
-- Similarly to the Welcome state, the Game page on the UI should detect if the the state is VOTE and perform an action: send the API call to the vote function
-- When a bot votes, it added a message in a certain format to the database. This message is delivered to UI via SSE. UI should render in some nice way showing the name and the reason.
+2. Let's rename the startNight function into the nightAction, and the NIGHT_BEGINS actin name into the NIGHT_ACTION. The nightAction function would work in the following way:
+- When it is being called for the first time (from the VOTE_RESULTS state), we clean the game's gameStateParamQueue and gameStateProcessQueue. Then we look for the first role in the role config and populate the gameStateProcessQueue with role names in order. Then return.
+- When the game state is the NIGHT_ACTION, we read the first role name in the gameStateProcessQueue. Now we need to process this role. Let's create the RoleActionProcessor abstract class and implementations for each role with one method - process. The method return true is the action is completed, and false if the action of the current role is not final. It also accepts the game object. The nightAction should calls the process on the correct implementation. If it returns true, then the first role name from the gameStateProcessQueue is removed, the game is saved, and the nightAction returns. In case, the process returns false, the nightAction returns without updating the game in the database.
+- When the game state is the NIGHT_ACTION and gameStateProcessQueue is empty, then we update the game state to the NIGHT_RESULTS and return.
+
+3. Let's implement the WerewolvesActionProcessor first. When the process method is being called, TBD
+
+TBD
+
+
+# Referenced files
+
+night-actions.ts
+bot-prompts.ts
+game-modes.ts
