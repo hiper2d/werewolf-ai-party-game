@@ -5,6 +5,7 @@
 .env
 .venv
 env/
+logs/
 venv/
 ENV/
 env.bak/
