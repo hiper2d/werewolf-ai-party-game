@@ -3,12 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev-emu": "NEXT_PUBLIC_APP_ENV='emulator' next dev",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "emulators": "firebase emulators:start",
     "test": "jest"
   },
   "dependencies": {
