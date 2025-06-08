@@ -298,6 +298,41 @@ export async function addMessageToChatAndSaveToDb(gameMessage: GameMessage, game
     }
 }
 
+export async function updateBotModel(gameId: string, botName: string, newAiType: string): Promise<Game> {
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+    
+    try {
+        const gameRef = db.collection('games').doc(gameId);
+        const gameSnap = await gameRef.get();
+        
+        if (!gameSnap.exists) {
+            throw new Error('Game not found');
+        }
+        
+        const gameData = gameSnap.data();
+        const bots = gameData?.bots || [];
+        
+        // Find and update the bot
+        const updatedBots = bots.map((bot: Bot) => {
+            if (bot.name === botName) {
+                return { ...bot, aiType: newAiType };
+            }
+            return bot;
+        });
+        
+        // Update the game in Firestore
+        await gameRef.update({ bots: updatedBots });
+        
+        // Return the updated game
+        return gameFromFirestore(gameId, { ...gameData, bots: updatedBots });
+    } catch (error: any) {
+        console.error("Error updating bot model: ", error);
+        throw new Error(`Failed to update bot model: ${error.message}`);
+    }
+}
+
 /**
  * Get messages for a specific bot (messages sent to all players or directly to this bot)
  * Filters at the database level for better performance

@@ -595,10 +595,10 @@ export async function vote(gameId: string): Promise<Game> {
                         });
                         console.log('🎮 ELIMINATION: Human player eliminated, game over');
                     } else {
-                        // Bot eliminated: set Bot.isAlive = false
+                        // Bot eliminated: set Bot.isAlive = false and track elimination day
                         const updatedBots = updatedGame.bots.map(bot =>
                             bot.name === eliminatedPlayer
-                                ? { ...bot, isAlive: false }
+                                ? { ...bot, isAlive: false, eliminationDay: updatedGame.currentDay }
                                 : bot
                         );
                         

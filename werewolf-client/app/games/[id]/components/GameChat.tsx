@@ -4,8 +4,9 @@ import { useEffect, useState } from 'react';
 import { talkToAll, humanPlayerVote } from "@/app/api/bot-actions";
 import { startNight } from "@/app/api/night-actions";
 import { buttonTransparentStyle } from "@/app/constants";
-import { GAME_STATES, MessageType, RECIPIENT_ALL, GameMessage, Game, SystemErrorMessage, BotResponseError } from "@/app/api/game-models";
+import { GAME_STATES, MessageType, RECIPIENT_ALL, GameMessage, Game, SystemErrorMessage, BotResponseError, GAME_MASTER } from "@/app/api/game-models";
 import { getPlayerColor } from "@/app/utils/color-utils";
+import { convertMessageContent } from "@/app/utils/message-utils";
 import VotingModal from "./VotingModal";
 
 interface GameChatProps {
@@ -27,6 +28,7 @@ interface VoteMessage {
     who: string;
     why: string;
 }
+
 
 interface ErrorBannerProps {
     error: SystemErrorMessage;
@@ -91,10 +93,10 @@ function ErrorBanner({ error, onDismiss, onRetry }: ErrorBannerProps) {
     );
 }
 
-function renderMessage(message: GameMessage, gameId: string, onDeleteAfter: (messageId: string) => void) {
-    const isUserMessage = message.authorName === 'User';
-    const isGameMaster = message.messageType === 'GAME_MASTER_ASK';
-    const isBotMessage = !isUserMessage && !isGameMaster;
+function renderMessage(message: GameMessage, gameId: string, onDeleteAfter: (messageId: string) => void, game: Game) {
+    const isUserMessage = message.messageType === MessageType.HUMAN_PLAYER_MESSAGE || message.authorName === game.humanPlayerName;
+    const isGameMaster = message.authorName === GAME_MASTER || message.messageType === MessageType.GM_COMMAND;
+    const isBotMessage = message.messageType === MessageType.BOT_ANSWER && !isGameMaster && !isUserMessage;
     
     let displayContent: string;
     try {
@@ -116,6 +118,8 @@ function renderMessage(message: GameMessage, gameId: string, onDeleteAfter: (mes
                 break;
             }
             case MessageType.GM_COMMAND:
+                displayContent = typeof message.msg === 'string' ? `🎭 ${message.msg}` : '🎭 Invalid message format';
+                break;
             case MessageType.HUMAN_PLAYER_MESSAGE:
                 displayContent = typeof message.msg === 'string' ? message.msg : 'Invalid message format';
                 break;
@@ -133,39 +137,40 @@ function renderMessage(message: GameMessage, gameId: string, onDeleteAfter: (mes
     
     return (
         <div className={`${isGameMaster ? 'py-2' : 'mb-2'} ${isUserMessage ? 'text-right' : 'text-left'} group`}>
-            {!isGameMaster && (
-                <div className="flex items-center justify-between mb-1">
-                    <span className={`text-xs ${isUserMessage ? 'text-gray-300' : ''}`} style={!isUserMessage ? { color: getPlayerColor(message.authorName) } : undefined}>
-                        {message.authorName}
-                    </span>
-                    {isBotMessage && message.id && !isVoteMessage && (
-                        <button
-                            onClick={() => onDeleteAfter(message.id!)}
-                            className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 ml-2 p-1 rounded hover:bg-gray-600/50"
-                            title="Reset chat to this point (delete all messages after this one)"
+            <div className="flex items-center justify-between mb-1">
+                <span className={`text-xs font-semibold ${
+                    isGameMaster ? 'text-green-400' : 
+                    isUserMessage ? 'text-gray-300' : ''
+                }`} style={!isUserMessage && !isGameMaster ? { color: getPlayerColor(message.authorName) } : undefined}>
+                    {message.authorName}
+                </span>
+                {isBotMessage && message.id && !isVoteMessage && (
+                    <button
+                        onClick={() => onDeleteAfter(message.id!)}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 ml-2 p-1 rounded hover:bg-gray-600/50"
+                        title="Reset chat to this point (delete all messages after this one)"
+                    >
+                        <svg
+                            width="14"
+                            height="14"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="text-gray-400 hover:text-red-400"
                         >
-                            <svg
-                                width="14"
-                                height="14"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                className="text-gray-400 hover:text-red-400"
-                            >
-                                <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
-                                <path d="M21 3v5h-5"/>
-                                <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
-                                <path d="M3 21v-5h5"/>
-                            </svg>
-                        </button>
-                    )}
-                </div>
-            )}
+                            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+                            <path d="M21 3v5h-5"/>
+                            <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+                            <path d="M3 21v-5h5"/>
+                        </svg>
+                    </button>
+                )}
+            </div>
             <span className={`inline-block p-2 ${
-                isGameMaster ? 'w-full bg-slate-600/50' :
+                isGameMaster ? 'rounded-lg bg-green-900/50 border border-green-500/30' :
                 isVoteMessage ? 'rounded-lg bg-orange-900/50 border border-orange-500/30' :
                 isUserMessage ? 'rounded-lg bg-slate-700' : 'rounded-lg'
             } text-white`} style={!isUserMessage && !isGameMaster && !isVoteMessage ? { backgroundColor: `${getPlayerColor(message.authorName)}33` } : undefined}>
@@ -265,6 +270,17 @@ export default function GameChat({ gameId, game, onGameStateChange }: GameChatPr
         const action = async () => {
             await talkToAll(gameId, trimmed);
             setNewMessage('');
+            
+            // Refresh game state to trigger queue processing in parent component
+            if (onGameStateChange) {
+                console.log('🔄 REFRESHING GAME STATE after human message...');
+                const { getGame } = await import("@/app/api/game-actions");
+                const updatedGame = await getGame(gameId);
+                if (updatedGame) {
+                    console.log('✅ GAME STATE UPDATED - Processing queue length:', updatedGame.gameStateProcessQueue.length);
+                    onGameStateChange(updatedGame);
+                }
+            }
         };
 
         try {
@@ -362,9 +378,12 @@ export default function GameChat({ gameId, game, onGameStateChange }: GameChatPr
             // Refresh game state immediately if callback is provided
             if (onGameStateChange) {
                 try {
+                    console.log('🔄 REFRESHING GAME STATE after message deletion...');
                     const { getGame } = await import("@/app/api/game-actions");
                     const updatedGame = await getGame(gameId);
                     if (updatedGame) {
+                        const aliveBots = updatedGame.bots.filter(bot => bot.isAlive).map(bot => bot.name);
+                        console.log('✅ GAME STATE REFRESHED - Alive bots:', aliveBots);
                         onGameStateChange(updatedGame);
                     }
                 } catch (error) {
@@ -522,7 +541,7 @@ export default function GameChat({ gameId, game, onGameStateChange }: GameChatPr
             <div className="flex-grow overflow-y-auto mb-4 p-2 bg-black bg-opacity-30 rounded">
                 {messages.map((message, index) => (
                     <div key={index}>
-                        {renderMessage(message, gameId, handleDeleteAfter)}
+                        {renderMessage(message, gameId, handleDeleteAfter, game)}
                     </div>
                 ))}
                 {isDeleting && (
@@ -563,6 +582,7 @@ export default function GameChat({ gameId, game, onGameStateChange }: GameChatPr
             </form>
             {showVotingModal && (
                 <VotingModal
+                    isOpen={showVotingModal}
                     game={game}
                     onVote={handleVote}
                     onClose={handleCloseVotingModal}

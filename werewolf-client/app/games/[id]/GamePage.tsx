@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { getGame } from "@/app/api/game-actions";
+import { getGame, updateBotModel } from "@/app/api/game-actions";
 import GameChat from "@/app/games/[id]/components/GameChat";
+import ModelSelectionDialog from "@/app/games/[id]/components/ModelSelectionDialog";
 import { buttonTransparentStyle } from "@/app/constants";
 import { GAME_STATES } from "@/app/api/game-models";
 import type { Game } from "@/app/api/game-models";
@@ -15,6 +16,7 @@ interface Participant {
     role: string;
     isHuman: boolean;
     isAlive: boolean;
+    aiType?: string;
 }
 
 export default function GamePage({ 
@@ -26,6 +28,8 @@ export default function GamePage({
 }) {
     const [game, setGame] = useState(initialGame);
     const hasErrorRef = useRef(false);
+    const [modelDialogOpen, setModelDialogOpen] = useState(false);
+    const [selectedBot, setSelectedBot] = useState<{ name: string; aiType: string } | null>(null);
 
     // Handle welcome state
     useEffect(() => {
@@ -102,6 +106,30 @@ export default function GamePage({
         handleVote();
     }, [game.gameState, game.gameStateProcessQueue.length, game.gameStateProcessQueue.join(','), game.id]);
 
+    // Handle DAY_DISCUSSION state - process bot responses in queue
+    useEffect(() => {
+        const handleDayDiscussion = async () => {
+            if (game.gameState === GAME_STATES.DAY_DISCUSSION &&
+                game.gameStateProcessQueue.length > 0 &&
+                !hasErrorRef.current) {
+                try {
+                    console.log('🗣️ DAY_DISCUSSION: Processing bot queue...', {
+                        queueLength: game.gameStateProcessQueue.length,
+                        queue: game.gameStateProcessQueue
+                    });
+                    const { talkToAll } = await import("@/app/api/bot-actions");
+                    const updatedGame = await talkToAll(game.id, '');
+                    setGame(updatedGame);
+                } catch (error) {
+                    console.error('Error processing day discussion queue:', error);
+                    hasErrorRef.current = true;
+                }
+            }
+        };
+
+        handleDayDiscussion();
+    }, [game.gameState, game.gameStateProcessQueue.length, game.gameStateProcessQueue.join(','), game.id]);
+
     // Handle NIGHT_BEGINS state - ensure component properly reacts to state changes
     useEffect(() => {
         console.log('🌙 NIGHT_BEGINS STATE CHECK:', {
@@ -111,9 +139,9 @@ export default function GamePage({
             timestamp: new Date().toISOString()
         });
         
-        // Reset error state when entering NIGHT_BEGINS to allow game reset
-        if (game.gameState === GAME_STATES.NIGHT_BEGINS && hasErrorRef.current) {
-            console.log('🔄 Resetting error state for NIGHT_BEGINS');
+        // Reset error state when entering NIGHT_BEGINS or DAY_DISCUSSION to allow game reset
+        if ((game.gameState === GAME_STATES.NIGHT_BEGINS || game.gameState === GAME_STATES.DAY_DISCUSSION) && hasErrorRef.current) {
+            console.log(`🔄 Resetting error state for ${game.gameState}`);
             hasErrorRef.current = false;
         }
     }, [game.gameState, game.id]);
@@ -147,6 +175,24 @@ export default function GamePage({
         window.location.href = '/games';
     };
 
+    // Handle model update
+    const handleModelUpdate = async (newModel: string) => {
+        if (!selectedBot) return;
+        
+        try {
+            const updatedGame = await updateBotModel(game.id, selectedBot.name, newModel);
+            setGame(updatedGame);
+        } catch (error) {
+            console.error('Error updating bot model:', error);
+            throw error;
+        }
+    };
+
+    const openModelDialog = (botName: string, currentModel: string) => {
+        setSelectedBot({ name: botName, aiType: currentModel });
+        setModelDialogOpen(true);
+    };
+
     // Combine human player and bots for participants list
     const participants: Participant[] = [
         {
@@ -159,7 +205,8 @@ export default function GamePage({
             name: bot.name,
             role: bot.role,
             isHuman: false,
-            isAlive: bot.isAlive
+            isAlive: bot.isAlive,
+            aiType: bot.aiType
         }))
     ];
 
@@ -183,7 +230,7 @@ export default function GamePage({
                         {participants.map((participant, index) => (
                             <li
                                 key={index}
-                                className={`mb-2 flex flex-col ${!participant.isAlive ? 'opacity-60' : ''}`}
+                                className={`mb-3 flex flex-col ${!participant.isAlive ? 'opacity-60' : ''}`}
                             >
                                 <div className="flex items-center justify-between">
                                     <span
@@ -197,6 +244,18 @@ export default function GamePage({
                                         <span className="text-sm text-red-400">💀 Eliminated</span>
                                     )}
                                 </div>
+                                {/* Show AI model for all bots */}
+                                {!participant.isHuman && participant.aiType && (
+                                    <div className="text-xs mt-1 ml-2">
+                                        <button
+                                            onClick={() => openModelDialog(participant.name, participant.aiType!)}
+                                            className="text-gray-500 hover:text-gray-300 transition-colors duration-200"
+                                            title="Click to change AI model"
+                                        >
+                                            Model: {participant.aiType}
+                                        </button>
+                                    </div>
+                                )}
                                 {/* Show role for eliminated players or when game is over */}
                                 {(!participant.isAlive || isGameOver) && (
                                     <div className="text-xs text-gray-400 mt-1 ml-2">
@@ -253,6 +312,18 @@ export default function GamePage({
                     onGameStateChange={setGame}
                 />
             </div>
+            
+            {/* Model Selection Dialog */}
+            <ModelSelectionDialog
+                isOpen={modelDialogOpen}
+                onClose={() => {
+                    setModelDialogOpen(false);
+                    setSelectedBot(null);
+                }}
+                onSelect={handleModelUpdate}
+                currentModel={selectedBot?.aiType || ''}
+                botName={selectedBot?.name || ''}
+            />
         </div>
     );
 }

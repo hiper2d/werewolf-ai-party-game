@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/firebase/server';
-import {GAME_STATES} from "@/app/api/game-models";
+import {GAME_STATES, Bot, Game} from "@/app/api/game-models";
 
 export async function DELETE(
     request: NextRequest,
@@ -60,6 +60,36 @@ export async function DELETE(
             );
         }
 
+        // Get current game state to check current day and bot status
+        const gameDoc = await db.collection('games').doc(gameId).get();
+        if (!gameDoc.exists) {
+            return NextResponse.json(
+                { error: 'Game not found' },
+                { status: 404 }
+            );
+        }
+        
+        const gameData = gameDoc.data() as Game;
+        const currentDay = gameData.currentDay;
+        
+        // Reset bots that were eliminated on the current day
+        const restoredBots = gameData.bots.map((bot: Bot) => {
+            if (!bot.isAlive && bot.eliminationDay === currentDay) {
+                // Bot was eliminated today, restore them
+                console.log(`🔄 RESTORING BOT: ${bot.name} (eliminated on day ${bot.eliminationDay})`);
+                return { ...bot, isAlive: true, eliminationDay: undefined };
+            }
+            return bot;
+        });
+        
+        const restoredBotNames = restoredBots
+            .filter((bot: Bot, index: number) => !gameData.bots[index].isAlive && bot.isAlive)
+            .map((bot: Bot) => bot.name);
+            
+        if (restoredBotNames.length > 0) {
+            console.log(`🎭 RESET SUMMARY: Restored ${restoredBotNames.length} bot(s) - ${restoredBotNames.join(', ')}`);
+        }
+
         // Create a batch operation for deletion and game state reset
         const batch = db.batch();
         
@@ -68,20 +98,28 @@ export async function DELETE(
             batch.delete(doc.ref);
         });
 
-        // Reset game state to DAY_DISCUSSION and clear processing queues
+        // Reset game state to DAY_DISCUSSION, clear processing queues, and restore bots
         const gameRef = db.collection('games').doc(gameId);
         batch.update(gameRef, {
             gameState: GAME_STATES.DAY_DISCUSSION,
             gameStateProcessQueue: [],
-            gameStateParamQueue: []
+            gameStateParamQueue: [],
+            bots: restoredBots
         });
 
         // Execute all operations in a single atomic transaction
         await batch.commit();
         
+        // Count restored bots
+        const restoredBotCount = restoredBots.filter((bot: Bot, index: number) => {
+            const originalBot = gameData.bots[index];
+            return !originalBot.isAlive && bot.isAlive;
+        }).length;
+        
         return NextResponse.json({
-            message: `Successfully deleted ${messagesToDeleteSnapshot.size} messages after message ${messageId} and reset game state`,
-            deletedCount: messagesToDeleteSnapshot.size
+            message: `Successfully deleted ${messagesToDeleteSnapshot.size} messages after message ${messageId}, reset game state${restoredBotCount > 0 ? `, and restored ${restoredBotCount} bot(s) eliminated today` : ''}`,
+            deletedCount: messagesToDeleteSnapshot.size,
+            restoredBots: restoredBotCount
         });
 
     } catch (error) {

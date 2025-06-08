@@ -36,6 +36,7 @@ export interface Bot {
     role: string;
     isAlive: boolean;
     aiType: string;
+    eliminationDay?: number; // Track which day this bot was eliminated (undefined if alive)
 }
 
 export interface Game {
