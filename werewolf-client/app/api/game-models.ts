@@ -63,6 +63,38 @@ export const GAME_ROLES = {
     VILLAGER: 'villager'
 } as const;
 
+export interface RoleConfig {
+    name: string;
+    hasNightAction: boolean;
+    nightActionOrder: number;
+    description: string;
+    actionType?: 'protect' | 'investigate' | 'eliminate' | 'none';
+}
+
+export const ROLE_CONFIGS: Record<string, RoleConfig> = {
+    [GAME_ROLES.WEREWOLF]: {
+        name: 'Werewolf',
+        hasNightAction: true,
+        nightActionOrder: 1,
+        description: 'Can eliminate other players during the night',
+        actionType: 'eliminate'
+    },
+    [GAME_ROLES.DOCTOR]: {
+        name: 'Doctor',
+        hasNightAction: true,
+        nightActionOrder: 2,
+        description: 'Can protect a player from elimination during the night',
+        actionType: 'protect'
+    },
+    [GAME_ROLES.DETECTIVE]: {
+        name: 'Detective',
+        hasNightAction: true,
+        nightActionOrder: 3,
+        description: 'Can investigate a player to learn their role during the night',
+        actionType: 'investigate'
+    }
+};
+
 export const GAME_STATES = {
     WELCOME: 'WELCOME',
     DAY_DISCUSSION: 'DAY_DISCUSSION',

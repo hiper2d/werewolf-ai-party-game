@@ -9,6 +9,7 @@ import { GAME_STATES } from "@/app/api/game-models";
 import type { Game } from "@/app/api/game-models";
 import type { Session } from "next-auth";
 import { welcome, vote } from '@/app/api/bot-actions';
+import { replayNight } from '@/app/api/night-actions';
 import { getPlayerColor } from "@/app/utils/color-utils";
 
 interface Participant {
@@ -297,6 +298,21 @@ export default function GamePage({
                                     }}
                                 >
                                     Voting
+                                </button>
+                            )}
+                            {game.gameState === GAME_STATES.NIGHT_BEGINS && (
+                                <button
+                                    className={`${buttonTransparentStyle} bg-purple-600 hover:bg-purple-700 border-purple-500`}
+                                    onClick={async () => {
+                                        try {
+                                            const updatedGame = await replayNight(game.id);
+                                            setGame(updatedGame);
+                                        } catch (error) {
+                                            console.error('Error replaying night:', error);
+                                        }
+                                    }}
+                                >
+                                    🔄 Replay Night
                                 </button>
                             )}
                         </div>

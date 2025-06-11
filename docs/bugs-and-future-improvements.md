@@ -1,5 +1,9 @@
 # Bugs and improvements
 
+- Add an ability to change GM model
+- Make the user input expandable to dropdown
+- Clean chat messages when backend restarts
+- Updated indexes in the sources (for resetting messages and for resetting night)
 - Fix "Waiting for game to start" disabled input hit in GamePage
 - remove transactions
 - Add ability to switch bot models on UI

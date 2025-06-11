@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { talkToAll, humanPlayerVote } from "@/app/api/bot-actions";
-import { startNight } from "@/app/api/night-actions";
+import { startNight, beginNight } from "@/app/api/night-actions";
 import { buttonTransparentStyle } from "@/app/constants";
 import { GAME_STATES, MessageType, RECIPIENT_ALL, GameMessage, Game, SystemErrorMessage, BotResponseError, GAME_MASTER } from "@/app/api/game-models";
 import { getPlayerColor } from "@/app/utils/color-utils";
@@ -463,9 +463,9 @@ export default function GameChat({ gameId, game, onGameStateChange }: GameChatPr
         
         try {
             setIsStartingNight(true);
-            console.log('🚨 CALLING START_NIGHT API');
-            const updatedGame = await startNight(gameId);
-            console.log('✅ Start night API completed, updating state');
+            console.log('🚨 CALLING BEGIN_NIGHT API');
+            const updatedGame = await beginNight(gameId);
+            console.log('✅ Begin night API completed, updating state');
             
             // Update game state if callback is provided
             if (onGameStateChange) {

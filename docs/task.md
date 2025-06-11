@@ -13,13 +13,10 @@ The name is clear. The instruction is for the role owner player to explain what 
 - When the game state is the NIGHT_ACTION, we read the first role name in the gameStateProcessQueue. Now we need to process this role. Let's create the RoleActionProcessor abstract class and implementations for each role with one method - process. The method return true is the action is completed, and false if the action of the current role is not final. It also accepts the game object. The nightAction should calls the process on the correct implementation. If it returns true, then the first role name from the gameStateProcessQueue is removed, the game is saved, and the nightAction returns. In case, the process returns false, the nightAction returns without updating the game in the database.
 - When the game state is the NIGHT_ACTION and gameStateProcessQueue is empty, then we update the game state to the NIGHT_RESULTS and return.
 
-3. Let's implement the WerewolvesActionProcessor first. When the process method is being called, TBD
+Let's implement this first before we proceed with the implementations for the RoleActionProcessor.
 
-TBD
-
+The @/werewolf-client/app/games/[id]/GamePage.tsx  should check the first role in the gameStateProcessQueue and show that this player is making a move. The same way as we show other actions in progress like "Starting Night..."
 
 # Referenced files
 
-night-actions.ts
-bot-prompts.ts
-game-modes.ts
+@/werewolf-client/app/api/night-actions.ts@/werewolf-client/app/ai/prompts/bot-prompts.ts@/werewolf-client/app/api/game-models.ts
