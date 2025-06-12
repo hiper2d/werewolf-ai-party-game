@@ -77,7 +77,8 @@ export async function DELETE(
             if (!bot.isAlive && bot.eliminationDay === currentDay) {
                 // Bot was eliminated today, restore them
                 console.log(`🔄 RESTORING BOT: ${bot.name} (eliminated on day ${bot.eliminationDay})`);
-                return { ...bot, isAlive: true, eliminationDay: undefined };
+                const { eliminationDay, ...botWithoutEliminationDay } = bot;
+                return { ...botWithoutEliminationDay, isAlive: true };
             }
             return bot;
         });
@@ -90,25 +91,41 @@ export async function DELETE(
             console.log(`🎭 RESET SUMMARY: Restored ${restoredBotNames.length} bot(s) - ${restoredBotNames.join(', ')}`);
         }
 
-        // Create a batch operation for deletion and game state reset
-        const batch = db.batch();
-        
-        // Delete all messages after the target timestamp
-        messagesToDeleteSnapshot.docs.forEach(doc => {
-            batch.delete(doc.ref);
-        });
-
-        // Reset game state to DAY_DISCUSSION, clear processing queues, and restore bots
+        // First, update the game state (separate from message deletion)
         const gameRef = db.collection('games').doc(gameId);
-        batch.update(gameRef, {
+        
+        console.log('🔧 Updating game state with:', {
             gameState: GAME_STATES.DAY_DISCUSSION,
-            gameStateProcessQueue: [],
-            gameStateParamQueue: [],
-            bots: restoredBots
+            processQueueLength: 0,
+            paramQueueLength: 0,
+            botsCount: restoredBots.length,
+            restoredBots: restoredBots.map(bot => ({ name: bot.name, isAlive: bot.isAlive }))
         });
 
-        // Execute all operations in a single atomic transaction
-        await batch.commit();
+        try {
+            // Update game state first
+            await gameRef.update({
+                gameState: GAME_STATES.DAY_DISCUSSION,
+                gameStateProcessQueue: [],
+                gameStateParamQueue: [],
+                bots: restoredBots
+            });
+            console.log('✅ Game state update successful');
+
+            // Then delete messages in a separate batch
+            if (!messagesToDeleteSnapshot.empty) {
+                const deleteBatch = db.batch();
+                messagesToDeleteSnapshot.docs.forEach(doc => {
+                    deleteBatch.delete(doc.ref);
+                });
+                
+                await deleteBatch.commit();
+                console.log('✅ Message deletion batch successful');
+            }
+        } catch (error) {
+            console.error('❌ Operations failed:', error);
+            throw new Error(`Failed to reset game: ${error instanceof Error ? error.message : String(error)}`);
+        }
         
         // Count restored bots
         const restoredBotCount = restoredBots.filter((bot: Bot, index: number) => {

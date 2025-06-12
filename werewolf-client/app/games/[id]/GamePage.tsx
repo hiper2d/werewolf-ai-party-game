@@ -31,6 +31,7 @@ export default function GamePage({
     const hasErrorRef = useRef(false);
     const [modelDialogOpen, setModelDialogOpen] = useState(false);
     const [selectedBot, setSelectedBot] = useState<{ name: string; aiType: string } | null>(null);
+    const [clearNightMessages, setClearNightMessages] = useState(false);
 
     // Handle welcome state
     useEffect(() => {
@@ -305,10 +306,18 @@ export default function GamePage({
                                     className={`${buttonTransparentStyle} bg-purple-600 hover:bg-purple-700 border-purple-500`}
                                     onClick={async () => {
                                         try {
+                                            // First trigger UI message clearing
+                                            setClearNightMessages(true);
+                                            
+                                            // Then replay night in backend
                                             const updatedGame = await replayNight(game.id);
                                             setGame(updatedGame);
+                                            
+                                            // Reset the clear flag after a brief delay
+                                            setTimeout(() => setClearNightMessages(false), 100);
                                         } catch (error) {
                                             console.error('Error replaying night:', error);
+                                            setClearNightMessages(false);
                                         }
                                     }}
                                 >
@@ -326,6 +335,7 @@ export default function GamePage({
                     gameId={game.id}
                     game={game}
                     onGameStateChange={setGame}
+                    clearNightMessages={clearNightMessages}
                 />
             </div>
             

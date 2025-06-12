@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { talkToAll, humanPlayerVote } from "@/app/api/bot-actions";
 import { startNight, beginNight } from "@/app/api/night-actions";
 import { buttonTransparentStyle } from "@/app/constants";
@@ -13,6 +13,7 @@ interface GameChatProps {
     gameId: string;
     game: Game;
     onGameStateChange?: (updatedGame: Game) => void;
+    clearNightMessages?: boolean;
 }
 
 interface BotAnswer {
@@ -95,7 +96,7 @@ function ErrorBanner({ error, onDismiss, onRetry }: ErrorBannerProps) {
 
 function renderMessage(message: GameMessage, gameId: string, onDeleteAfter: (messageId: string) => void, game: Game) {
     const isUserMessage = message.messageType === MessageType.HUMAN_PLAYER_MESSAGE || message.authorName === game.humanPlayerName;
-    const isGameMaster = message.authorName === GAME_MASTER || message.messageType === MessageType.GM_COMMAND;
+    const isGameMaster = message.authorName === GAME_MASTER || message.messageType === MessageType.GM_COMMAND || message.messageType === MessageType.NIGHT_BEGINS;
     const isBotMessage = message.messageType === MessageType.BOT_ANSWER && !isGameMaster && !isUserMessage;
     
     let displayContent: string;
@@ -119,6 +120,9 @@ function renderMessage(message: GameMessage, gameId: string, onDeleteAfter: (mes
             }
             case MessageType.GM_COMMAND:
                 displayContent = typeof message.msg === 'string' ? `🎭 ${message.msg}` : '🎭 Invalid message format';
+                break;
+            case MessageType.NIGHT_BEGINS:
+                displayContent = typeof message.msg === 'string' ? `🌙 ${message.msg}` : '🌙 Invalid message format';
                 break;
             case MessageType.HUMAN_PLAYER_MESSAGE:
                 displayContent = typeof message.msg === 'string' ? message.msg : 'Invalid message format';
@@ -180,7 +184,7 @@ function renderMessage(message: GameMessage, gameId: string, onDeleteAfter: (mes
     );
 }
 
-export default function GameChat({ gameId, game, onGameStateChange }: GameChatProps) {
+export default function GameChat({ gameId, game, onGameStateChange, clearNightMessages }: GameChatProps) {
     const [messages, setMessages] = useState<GameMessage[]>([]);
     const [newMessage, setNewMessage] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
@@ -191,6 +195,33 @@ export default function GameChat({ gameId, game, onGameStateChange }: GameChatPr
     const [showVotingModal, setShowVotingModal] = useState(false);
     const [isVoting, setIsVoting] = useState(false);
     const [isStartingNight, setIsStartingNight] = useState(false);
+
+    // Function to clear messages from night phase onward
+    const clearMessagesFromNight = () => {
+        setMessages(prev => {
+            // Find the first NIGHT_BEGINS message for the current day
+            const nightBeginsIndex = prev.findIndex(msg => 
+                msg.messageType === MessageType.NIGHT_BEGINS && 
+                msg.day === game.currentDay
+            );
+            
+            if (nightBeginsIndex === -1) {
+                console.log('🌙 No NIGHT_BEGINS message found for current day, keeping all messages');
+                return prev;
+            }
+            
+            const messagesBeforeNight = prev.slice(0, nightBeginsIndex);
+            console.log(`🌙 Cleared ${prev.length - nightBeginsIndex} messages from night phase (kept ${messagesBeforeNight.length})`);
+            return messagesBeforeNight;
+        });
+    };
+
+    // Clear night messages when prop changes
+    React.useEffect(() => {
+        if (clearNightMessages) {
+            clearMessagesFromNight();
+        }
+    }, [clearNightMessages]);
 
     // Auto-process queue when not empty
     useEffect(() => {

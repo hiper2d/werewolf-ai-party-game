@@ -110,6 +110,7 @@ export enum MessageType {
     GAME_STORY = 'GAME_STORY', // Initial message to generate the game, never used after
     HUMAN_PLAYER_MESSAGE = 'HUMAN_PLAYER_MESSAGE',
     VOTE_MESSAGE = 'VOTE_MESSAGE',
+    NIGHT_BEGINS = 'NIGHT_BEGINS', // Special message type for when night phase starts
     SYSTEM_ERROR = 'SYSTEM_ERROR',
     SYSTEM_WARNING = 'SYSTEM_WARNING',
 }

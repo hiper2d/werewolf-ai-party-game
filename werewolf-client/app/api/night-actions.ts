@@ -148,7 +148,7 @@ export async function beginNight(gameId: string): Promise<Game> {
             recipientName: RECIPIENT_ALL,
             authorName: GAME_MASTER,
             msg: gmMessage,
-            messageType: MessageType.GM_COMMAND,
+            messageType: MessageType.NIGHT_BEGINS,
             day: game.currentDay,
             timestamp: Date.now()
         };
@@ -222,39 +222,29 @@ export async function replayNight(gameId: string): Promise<Game> {
     }
 
     try {
-        // Find the "Night falls" message using Firestore query (more efficient than loading all messages)
-        const nightFallsSnapshot = await db.collection('games')
+        // Find the NIGHT_BEGINS message for the current day using the specific message type
+        const nightBeginsSnapshot = await db.collection('games')
             .doc(gameId)
             .collection('messages')
-            .where('messageType', '==', MessageType.GM_COMMAND)
-            .where('authorName', '==', GAME_MASTER)
+            .where('messageType', '==', MessageType.NIGHT_BEGINS)
+            .where('day', '==', game.currentDay)
             .orderBy('timestamp', 'desc')
+            .limit(1)
             .get();
 
-        // Find the most recent "Night falls" message
-        let nightFallsMessage = null;
-        for (const doc of nightFallsSnapshot.docs) {
-            const data = doc.data();
-            if (typeof data.msg === 'string' && data.msg.includes('Night falls')) {
-                nightFallsMessage = {
-                    id: doc.id,
-                    timestamp: data.timestamp,
-                    msg: data.msg
-                };
-                break;
-            }
-        }
-
-        if (!nightFallsMessage) {
-            console.log(`⚠️ REPLAY NIGHT: No "Night falls" message found, cannot delete messages`);
+        if (nightBeginsSnapshot.empty) {
+            console.log(`⚠️ REPLAY NIGHT: No NIGHT_BEGINS message found for day ${game.currentDay}, cannot delete messages`);
         } else {
-            console.log(`🔍 REPLAY NIGHT: Found "Night falls" message at timestamp ${nightFallsMessage.timestamp}`);
+            const nightBeginsDoc = nightBeginsSnapshot.docs[0];
+            const nightBeginsTimestamp = nightBeginsDoc.data().timestamp;
+            
+            console.log(`🔍 REPLAY NIGHT: Found NIGHT_BEGINS message for day ${game.currentDay} at timestamp ${nightBeginsTimestamp}`);
 
-            // Use Firestore query to find all messages AFTER the "Night falls" message
+            // Use Firestore query to find all messages FROM the NIGHT_BEGINS message onward (including the night message itself)
             const messagesToDeleteSnapshot = await db.collection('games')
                 .doc(gameId)
                 .collection('messages')
-                .where('timestamp', '>', nightFallsMessage.timestamp)
+                .where('timestamp', '>=', nightBeginsTimestamp)
                 .get();
 
             if (messagesToDeleteSnapshot.empty) {

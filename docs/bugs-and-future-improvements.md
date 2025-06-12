@@ -1,5 +1,7 @@
 # Bugs and improvements
 
+- Night replay doesn't delete GM's initial night message; role descriptions in the night message don't start form the new line
+- When bot votes or speaks, the scroll is not moving on UI
 - Add an ability to change GM model
 - Make the user input expandable to dropdown
 - Clean chat messages when backend restarts
