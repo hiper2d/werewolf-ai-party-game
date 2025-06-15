@@ -4,14 +4,13 @@ import {db} from "@/firebase/server";
 import {
     Bot,
     BotAnswer,
+    BotResponseError,
     Game,
     GAME_MASTER,
     GAME_STATES,
     GameMessage,
     MessageType,
-    RECIPIENT_ALL,
-    BotResponseError,
-    SystemErrorMessage
+    RECIPIENT_ALL
 } from "@/app/api/game-models";
 import {
     GM_COMMAND_INTRODUCE_YOURSELF,
@@ -19,11 +18,17 @@ import {
     GM_COMMAND_SELECT_RESPONDERS
 } from "@/app/ai/prompts/gm-commands";
 import {BOT_SYSTEM_PROMPT, BOT_VOTE_PROMPT} from "@/app/ai/prompts/bot-prompts";
-import {createBotAnswerSchema, createGmBotSelectionSchema, createBotVoteSchema} from "@/app/ai/prompts/ai-schemas";
+import {GM_SYSTEM_PROMPT} from "@/app/ai/prompts/gm-prompts";
+import {createBotAnswerSchema, createBotVoteSchema, createGmBotSelectionSchema} from "@/app/ai/prompts/ai-schemas";
 import {AgentFactory} from "@/app/ai/agent-factory";
 import {format} from "@/app/ai/prompts/utils";
 import {auth} from "@/auth";
-import {cleanResponse, convertToAIMessages, parseResponseToObj, generateVotingResultsMessage, generateEliminationMessage} from "@/app/utils/message-utils";
+import {
+    convertToAIMessages,
+    generateEliminationMessage,
+    generateVotingResultsMessage,
+    parseResponseToObj
+} from "@/app/utils/message-utils";
 import {
     addMessageToChatAndSaveToDb,
     getBotMessages,
@@ -113,8 +118,7 @@ export async function welcome(gameId: string): Promise<Game> {
         const apiKeys = await getUserFromFirestore(session.user.email)
             .then((user) => getUserApiKeys(user!.email));
 
-        const botPrompt = format(
-            BOT_SYSTEM_PROMPT,
+        const botPrompt = format(BOT_SYSTEM_PROMPT,
             {
                 name: bot.name,
                 personal_story: bot.story,
@@ -262,11 +266,7 @@ async function handleHumanPlayerMessage(
     // Ask GM which bots should respond
     const apiKeys = await getUserFromFirestore(userEmail).then((user) => getUserApiKeys(user!.email));
 
-    const gmPrompt = format(BOT_SYSTEM_PROMPT, {
-        name: GAME_MASTER,
-        personal_story: "You are the Game Master", //todo: what is this?
-        temperament: "You are fair and balanced",
-        role: "Game Master",
+    const gmPrompt = format(GM_SYSTEM_PROMPT, {
         players_names: [
             ...game.bots.map(b => b.name),
             game.humanPlayerName

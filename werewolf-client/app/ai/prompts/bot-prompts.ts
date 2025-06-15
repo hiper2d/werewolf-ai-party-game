@@ -127,7 +127,8 @@ You are an AI participant in a verbal chat game called Werewolf, played with mul
 </OutputFormat>
 `;
 
-export const BOT_VOTE_PROMPT: string = `It's time to vote for someone to eliminate from the game. You must choose one player who you believe should be voted out.
+export const BOT_VOTE_PROMPT: string = `It's time to vote for someone to eliminate from the game. \
+You must choose one player who you believe should be voted out.
 
 Consider:
 - Who seems most suspicious based on the discussions
