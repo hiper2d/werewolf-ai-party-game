@@ -264,7 +264,7 @@ async function handleHumanPlayerMessage(
 
     const gmPrompt = format(BOT_SYSTEM_PROMPT, {
         name: GAME_MASTER,
-        personal_story: "You are the Game Master",
+        personal_story: "You are the Game Master", //todo: what is this?
         temperament: "You are fair and balanced",
         role: "Game Master",
         players_names: [

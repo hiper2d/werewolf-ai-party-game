@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { getGame, updateBotModel } from "@/app/api/game-actions";
+import { getGame, updateBotModel, updateGameMasterModel } from "@/app/api/game-actions";
 import GameChat from "@/app/games/[id]/components/GameChat";
 import ModelSelectionDialog from "@/app/games/[id]/components/ModelSelectionDialog";
 import { buttonTransparentStyle } from "@/app/constants";
@@ -182,10 +182,15 @@ export default function GamePage({
         if (!selectedBot) return;
         
         try {
-            const updatedGame = await updateBotModel(game.id, selectedBot.name, newModel);
+            let updatedGame;
+            if (selectedBot.name === 'Game Master') {
+                updatedGame = await updateGameMasterModel(game.id, newModel);
+            } else {
+                updatedGame = await updateBotModel(game.id, selectedBot.name, newModel);
+            }
             setGame(updatedGame);
         } catch (error) {
-            console.error('Error updating bot model:', error);
+            console.error('Error updating model:', error);
             throw error;
         }
     };
@@ -220,8 +225,17 @@ export default function GamePage({
                 <div className="bg-black bg-opacity-30 border border-white border-opacity-30 rounded p-4 mb-4">
                     <h1 className="text-2xl font-bold mb-2">{game.theme}</h1>
                     <p className="text-sm text-gray-300 mb-4">{game.description}</p>
-                    <div className="text-sm text-gray-400">
+                    <div className="text-sm text-gray-400 mb-2">
                         Day {game.currentDay} - {game.gameState}
+                    </div>
+                    <div className="text-xs">
+                        <button
+                            onClick={() => openModelDialog('Game Master', game.gameMasterAiType)}
+                            className="text-gray-500 hover:text-gray-300 transition-colors duration-200"
+                            title="Click to change Game Master AI model"
+                        >
+                            Game Master Model: {game.gameMasterAiType}
+                        </button>
                     </div>
                 </div>
 

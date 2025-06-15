@@ -333,6 +333,32 @@ export async function updateBotModel(gameId: string, botName: string, newAiType:
     }
 }
 
+export async function updateGameMasterModel(gameId: string, newAiType: string): Promise<Game> {
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+    
+    try {
+        const gameRef = db.collection('games').doc(gameId);
+        const gameSnap = await gameRef.get();
+        
+        if (!gameSnap.exists) {
+            throw new Error('Game not found');
+        }
+        
+        const gameData = gameSnap.data();
+        
+        // Update the Game Master AI type in Firestore
+        await gameRef.update({ gameMasterAiType: newAiType });
+        
+        // Return the updated game
+        return gameFromFirestore(gameId, { ...gameData, gameMasterAiType: newAiType });
+    } catch (error: any) {
+        console.error("Error updating Game Master model: ", error);
+        throw new Error(`Failed to update Game Master model: ${error.message}`);
+    }
+}
+
 /**
  * Get messages for a specific bot (messages sent to all players or directly to this bot)
  * Filters at the database level for better performance
