@@ -9,7 +9,7 @@ import { GAME_STATES } from "@/app/api/game-models";
 import type { Game } from "@/app/api/game-models";
 import type { Session } from "next-auth";
 import { welcome, vote } from '@/app/api/bot-actions';
-import { replayNight } from '@/app/api/night-actions';
+import { replayNight, performNightAction } from '@/app/api/night-actions';
 import { getPlayerColor } from "@/app/utils/color-utils";
 
 interface Participant {
@@ -132,17 +132,39 @@ export default function GamePage({
         handleDayDiscussion();
     }, [game.gameState, game.gameStateProcessQueue.length, game.gameStateProcessQueue.join(','), game.id]);
 
-    // Handle NIGHT_BEGINS state - ensure component properly reacts to state changes
+    // Handle NIGHT state - process night actions when in NIGHT state
     useEffect(() => {
-        console.log('🌙 NIGHT_BEGINS STATE CHECK:', {
+        const handleNightAction = async () => {
+            if (game.gameState === GAME_STATES.NIGHT && !hasErrorRef.current) {
+                try {
+                    console.log('🌙 NIGHT: Processing night action...', {
+                        gameState: game.gameState,
+                        queueLength: game.gameStateProcessQueue.length,
+                        queue: game.gameStateProcessQueue,
+                        gameId: game.id
+                    });
+                    const updatedGame = await performNightAction(game.id);
+                    setGame(updatedGame);
+                } catch (error) {
+                    console.error('Error processing night action:', error);
+                    hasErrorRef.current = true;
+                }
+            }
+        };
+
+        handleNightAction();
+    }, [game.gameState, game.gameStateProcessQueue.length, game.gameStateProcessQueue.join(','), game.id]);
+
+    // Handle state changes and error resets
+    useEffect(() => {
+        console.log('📊 GAME STATE CHECK:', {
             gameState: game.gameState,
-            isNightBegins: game.gameState === GAME_STATES.NIGHT_BEGINS,
             gameId: game.id,
             timestamp: new Date().toISOString()
         });
         
-        // Reset error state when entering NIGHT_BEGINS or DAY_DISCUSSION to allow game reset
-        if ((game.gameState === GAME_STATES.NIGHT_BEGINS || game.gameState === GAME_STATES.DAY_DISCUSSION) && hasErrorRef.current) {
+        // Reset error state when entering NIGHT or DAY_DISCUSSION to allow game reset
+        if ((game.gameState === GAME_STATES.NIGHT || game.gameState === GAME_STATES.DAY_DISCUSSION) && hasErrorRef.current) {
             console.log(`🔄 Resetting error state for ${game.gameState}`);
             hasErrorRef.current = false;
         }
@@ -315,28 +337,48 @@ export default function GamePage({
                                     Voting
                                 </button>
                             )}
-                            {game.gameState === GAME_STATES.NIGHT_BEGINS && (
+                            {game.gameState === GAME_STATES.VOTE_RESULTS && (
                                 <button
-                                    className={`${buttonTransparentStyle} bg-purple-600 hover:bg-purple-700 border-purple-500`}
+                                    className={`${buttonTransparentStyle} bg-blue-600 hover:bg-blue-700 border-blue-500`}
                                     onClick={async () => {
                                         try {
-                                            // First trigger UI message clearing
-                                            setClearNightMessages(true);
-                                            
-                                            // Then replay night in backend
-                                            const updatedGame = await replayNight(game.id);
+                                            const updatedGame = await performNightAction(game.id);
                                             setGame(updatedGame);
-                                            
-                                            // Reset the clear flag after a brief delay
-                                            setTimeout(() => setClearNightMessages(false), 100);
                                         } catch (error) {
-                                            console.error('Error replaying night:', error);
-                                            setClearNightMessages(false);
+                                            console.error('Error starting night:', error);
                                         }
                                     }}
                                 >
-                                    🔄 Replay Night
+                                    🌙 Start Night
                                 </button>
+                            )}
+                            {game.gameState === GAME_STATES.NIGHT && (
+                                <div className="flex flex-col gap-2">
+                                    <div className="text-sm text-yellow-400 text-center">
+                                        🌙 Night in progress...
+                                    </div>
+                                    <button
+                                        className={`${buttonTransparentStyle} bg-purple-600 hover:bg-purple-700 border-purple-500`}
+                                        onClick={async () => {
+                                            try {
+                                                // First trigger UI message clearing
+                                                setClearNightMessages(true);
+                                                
+                                                // Then replay night in backend
+                                                const updatedGame = await replayNight(game.id);
+                                                setGame(updatedGame);
+                                                
+                                                // Reset the clear flag after a brief delay
+                                                setTimeout(() => setClearNightMessages(false), 100);
+                                            } catch (error) {
+                                                console.error('Error replaying night:', error);
+                                                setClearNightMessages(false);
+                                            }
+                                        }}
+                                    >
+                                        🔄 Replay Night
+                                    </button>
+                                </div>
                             )}
                         </div>
                     )}

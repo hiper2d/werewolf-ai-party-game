@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { talkToAll, humanPlayerVote } from "@/app/api/bot-actions";
-import { startNight, beginNight } from "@/app/api/night-actions";
+import { beginNight } from "@/app/api/night-actions";
 import { buttonTransparentStyle } from "@/app/constants";
 import { GAME_STATES, MessageType, RECIPIENT_ALL, GameMessage, Game, SystemErrorMessage, BotResponseError, GAME_MASTER } from "@/app/api/game-models";
 import { getPlayerColor } from "@/app/utils/color-utils";
@@ -541,8 +541,8 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
         if (game.gameState === GAME_STATES.GAME_OVER) {
             return "Game has ended - chat disabled";
         }
-        if (game.gameState === GAME_STATES.NIGHT_BEGINS) {
-            return "Night phase has begun...";
+        if (game.gameState === GAME_STATES.NIGHT) {
+            return "Night phase in progress...";
         }
         if (game.gameState !== GAME_STATES.DAY_DISCUSSION) {
             return "Waiting for game to start...";

@@ -15,10 +15,11 @@ import {auth} from "@/auth";
 import {getGame, addMessageToChatAndSaveToDb} from "./game-actions";
 
 /**
- * Handles the "Start Night" button click
- * Validates the game is in VOTE_RESULTS state and transitions to NIGHT_BEGINS
+ * Handles night phase progression
+ * If game is in VOTE_RESULTS state, transitions to NIGHT and sets up night actions
+ * If game is in NIGHT state, processes the next night action in the queue
  */
-export async function startNight(gameId: string): Promise<Game> {
+export async function performNightAction(gameId: string): Promise<Game> {
     // Authentication check
     const session = await auth();
     if (!session || !session.user?.email) {
@@ -36,46 +37,28 @@ export async function startNight(gameId: string): Promise<Game> {
         throw new Error('Game not found');
     }
 
-    // Validate game state
-    if (game.gameState !== GAME_STATES.VOTE_RESULTS) {
+    // Handle different game states
+    if (game.gameState === GAME_STATES.VOTE_RESULTS) {
+        // Transition from VOTE_RESULTS to NIGHT and set up night actions
+        return await initializeNight(gameId, game);
+    } else if (game.gameState === GAME_STATES.NIGHT) {
+        // Process next night action or end night if queue is empty
+        return await processNightQueue(gameId, game);
+    } else {
         throw new BotResponseError(
-            'Invalid game state for starting night',
-            `Game must be in VOTE_RESULTS state to start night. Current state: ${game.gameState}`,
+            'Invalid game state for night action',
+            `Game must be in VOTE_RESULTS or NIGHT state. Current state: ${game.gameState}`,
             { 
                 currentState: game.gameState, 
-                expectedState: GAME_STATES.VOTE_RESULTS,
+                expectedStates: [GAME_STATES.VOTE_RESULTS, GAME_STATES.NIGHT],
                 gameId 
             },
             true
         );
     }
 
-    try {
-        // Update game state and clear queues
-        await db.collection('games').doc(gameId).update({
-            gameState: GAME_STATES.NIGHT_BEGINS,
-            gameStateProcessQueue: [],
-            gameStateParamQueue: []
-        });
-
-        // Return the updated game state
-        return await getGame(gameId) as Game;
-    } catch (error) {
-        console.error('Error in startNight function:', error);
-        
-        // Re-throw BotResponseError as-is for frontend handling
-        if (error instanceof BotResponseError) {
-            throw error;
-        }
-        
-        // Wrap other errors in BotResponseError for consistent handling
-        throw new BotResponseError(
-            'System error occurred',
-            error instanceof Error ? error.message : 'Unknown error',
-            { originalError: error },
-            false // System errors are typically not recoverable
-        );
-    }
+    // This should never be reached due to the validation above
+    throw new Error('Unexpected code path in performNightAction');
 }
 
 /**
@@ -158,12 +141,12 @@ export async function beginNight(gameId: string): Promise<Game> {
 
         // Update game state with night action queue
         await db.collection('games').doc(gameId).update({
-            gameState: GAME_STATES.NIGHT_BEGINS,
+            gameState: GAME_STATES.NIGHT,
             gameStateProcessQueue: sortedNightRoles,
             gameStateParamQueue: []
         });
 
-        console.log(`🌙 NIGHT BEGINS: Set up night actions for ${sortedNightRoles.length} roles: ${sortedNightRoles.join(', ')}`);
+        console.log(`🌙 NIGHT: Set up night actions for ${sortedNightRoles.length} roles: ${sortedNightRoles.join(', ')}`);
 
         // Return the updated game state
         return await getGame(gameId) as Game;
@@ -208,13 +191,13 @@ export async function replayNight(gameId: string): Promise<Game> {
     }
 
     // Validate game state (should be in a night phase)
-    if (game.gameState !== GAME_STATES.NIGHT_BEGINS) {
+    if (game.gameState !== GAME_STATES.NIGHT) {
         throw new BotResponseError(
             'Invalid game state for replaying night',
-            `Game must be in NIGHT_BEGINS state to replay night. Current state: ${game.gameState}`,
+            `Game must be in NIGHT state to replay night. Current state: ${game.gameState}`,
             { 
                 currentState: game.gameState, 
-                expectedState: GAME_STATES.NIGHT_BEGINS,
+                expectedState: GAME_STATES.NIGHT,
                 gameId 
             },
             true
@@ -284,6 +267,161 @@ export async function replayNight(gameId: string): Promise<Game> {
         // Wrap other errors in BotResponseError for consistent handling
         throw new BotResponseError(
             'System error occurred during night replay',
+            error instanceof Error ? error.message : 'Unknown error',
+            { originalError: error },
+            false // System errors are typically not recoverable
+        );
+    }
+}
+
+/**
+ * Initialize night phase from VOTE_RESULTS state
+ */
+async function initializeNight(gameId: string, game: Game): Promise<Game> {
+    // Firestore initialization check
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+    
+    try {
+        // Get unique roles with night actions that have alive players, sorted by action order
+        const activeNightRoles = new Set<string>();
+        
+        // Check all bots for night actions
+        game.bots
+            .filter(bot => bot.isAlive && ROLE_CONFIGS[bot.role]?.hasNightAction)
+            .forEach(bot => {
+                activeNightRoles.add(bot.role);
+            });
+
+        // Check human player for night actions
+        if (ROLE_CONFIGS[game.humanPlayerRole]?.hasNightAction) {
+            activeNightRoles.add(game.humanPlayerRole);
+        }
+
+        // Convert to sorted array based on nightActionOrder
+        const sortedNightRoles = Array.from(activeNightRoles)
+            .sort((a, b) => ROLE_CONFIGS[a].nightActionOrder - ROLE_CONFIGS[b].nightActionOrder);
+
+        // Create Game Master message explaining the night phase
+        const roleDescriptions = Object.values(ROLE_CONFIGS)
+            .filter(config => config.hasNightAction)
+            .sort((a, b) => a.nightActionOrder - b.nightActionOrder)
+            .map(config => `• ${config.name}: ${config.description}`)
+            .join('\n');
+
+        const gmMessage = `Night falls over the village. During this phase, players with special abilities will act in this order:\n${roleDescriptions}\n\nThe night actions will be processed automatically.`;
+
+        const gameMessage: GameMessage = {
+            id: null,
+            recipientName: RECIPIENT_ALL,
+            authorName: GAME_MASTER,
+            msg: gmMessage,
+            messageType: MessageType.NIGHT_BEGINS,
+            day: game.currentDay,
+            timestamp: Date.now()
+        };
+
+        // Save the Game Master message
+        await addMessageToChatAndSaveToDb(gameMessage, gameId);
+
+        // Update game state with night action queue
+        await db.collection('games').doc(gameId).update({
+            gameState: GAME_STATES.NIGHT,
+            gameStateProcessQueue: sortedNightRoles,
+            gameStateParamQueue: []
+        });
+
+        console.log(`🌙 NIGHT: Set up night actions for ${sortedNightRoles.length} roles: ${sortedNightRoles.join(', ')}`);
+
+        // Return the updated game state
+        return await getGame(gameId) as Game;
+    } catch (error) {
+        console.error('Error in initializeNight function:', error);
+        
+        // Re-throw BotResponseError as-is for frontend handling
+        if (error instanceof BotResponseError) {
+            throw error;
+        }
+        
+        // Wrap other errors in BotResponseError for consistent handling
+        throw new BotResponseError(
+            'System error occurred during night initialization',
+            error instanceof Error ? error.message : 'Unknown error',
+            { originalError: error },
+            false // System errors are typically not recoverable
+        );
+    }
+}
+
+/**
+ * Process the next item in the night action queue
+ */
+async function processNightQueue(gameId: string, game: Game): Promise<Game> {
+    // Firestore initialization check
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+    
+    try {
+        // If queue is empty, end the night
+        if (game.gameStateProcessQueue.length === 0) {
+            await db.collection('games').doc(gameId).update({
+                gameState: GAME_STATES.NIGHT_ENDS,
+                gameStateProcessQueue: [],
+                gameStateParamQueue: []
+            });
+
+            console.log('🌅 NIGHT_ENDS: All night actions completed');
+            return await getGame(gameId) as Game;
+        }
+
+        // Get the next role to act
+        const currentRole = game.gameStateProcessQueue[0];
+        const remainingQueue = game.gameStateProcessQueue.slice(1);
+
+        // Find players with this role
+        const playersWithRole = [];
+        
+        // Check bots
+        const botsWithRole = game.bots.filter(bot => bot.isAlive && bot.role === currentRole);
+        playersWithRole.push(...botsWithRole.map(bot => bot.name));
+        
+        // Check human player
+        if (game.humanPlayerRole === currentRole) {
+            playersWithRole.push(game.humanPlayerName);
+        }
+
+        // Log the action based on role type
+        if (currentRole === 'werewolf') {
+            // For werewolves, show all of them taking action together
+            const werewolfNames = playersWithRole.join(', ');
+            console.log(`🐺 NIGHT ACTION: Werewolves (${werewolfNames}) are taking their night action`);
+        } else {
+            // For other roles, show individual action
+            const playerName = playersWithRole.length > 0 ? playersWithRole[0] : 'Unknown';
+            const roleConfig = ROLE_CONFIGS[currentRole];
+            console.log(`🌙 NIGHT ACTION: ${roleConfig?.name || currentRole} (${playerName}) is taking their night action`);
+        }
+
+        // Update the queue (remove the processed role)
+        await db.collection('games').doc(gameId).update({
+            gameStateProcessQueue: remainingQueue
+        });
+
+        // Return the updated game state
+        return await getGame(gameId) as Game;
+    } catch (error) {
+        console.error('Error in processNightQueue function:', error);
+        
+        // Re-throw BotResponseError as-is for frontend handling
+        if (error instanceof BotResponseError) {
+            throw error;
+        }
+        
+        // Wrap other errors in BotResponseError for consistent handling
+        throw new BotResponseError(
+            'System error occurred during night queue processing',
             error instanceof Error ? error.message : 'Unknown error',
             { originalError: error },
             false // System errors are typically not recoverable
