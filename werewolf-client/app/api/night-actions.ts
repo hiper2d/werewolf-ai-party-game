@@ -13,6 +13,7 @@ import {
 } from "@/app/api/game-models";
 import {auth} from "@/auth";
 import {getGame, addMessageToChatAndSaveToDb} from "./game-actions";
+import { RoleProcessorFactory } from "./roles";
 
 /**
  * Handles night phase progression
@@ -380,28 +381,25 @@ async function processNightQueue(gameId: string, game: Game): Promise<Game> {
         const currentRole = game.gameStateProcessQueue[0];
         const remainingQueue = game.gameStateProcessQueue.slice(1);
 
-        // Find players with this role
-        const playersWithRole = [];
+        // Create role processor for the current role
+        const roleProcessor = RoleProcessorFactory.createProcessor(currentRole, gameId, game);
         
-        // Check bots
-        const botsWithRole = game.bots.filter(bot => bot.isAlive && bot.role === currentRole);
-        playersWithRole.push(...botsWithRole.map(bot => bot.name));
-        
-        // Check human player
-        if (game.humanPlayerRole === currentRole) {
-            playersWithRole.push(game.humanPlayerName);
-        }
-
-        // Log the action based on role type
-        if (currentRole === 'werewolf') {
-            // For werewolves, show all of them taking action together
-            const werewolfNames = playersWithRole.join(', ');
-            console.log(`🐺 NIGHT ACTION: Werewolves (${werewolfNames}) are taking their night action`);
+        if (!roleProcessor) {
+            // This role doesn't have night actions, skip it
+            console.warn(`🌙 NIGHT ACTION: Role ${currentRole} has no processor, skipping`);
         } else {
-            // For other roles, show individual action
-            const playerName = playersWithRole.length > 0 ? playersWithRole[0] : 'Unknown';
-            const roleConfig = ROLE_CONFIGS[currentRole];
-            console.log(`🌙 NIGHT ACTION: ${roleConfig?.name || currentRole} (${playerName}) is taking their night action`);
+            // Process the night action for this role
+            const result = await roleProcessor.processNightAction();
+            
+            if (!result.success) {
+                console.error(`🌙 NIGHT ACTION ERROR: Failed to process ${currentRole} action: ${result.error}`);
+                // Continue processing even if one role fails
+            }
+
+            // Apply any game updates from the role processor
+            if (result.gameUpdates && Object.keys(result.gameUpdates).length > 0) {
+                await db.collection('games').doc(gameId).update(result.gameUpdates);
+            }
         }
 
         // Update the queue (remove the processed role)
