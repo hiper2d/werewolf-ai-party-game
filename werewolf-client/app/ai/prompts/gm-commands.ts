@@ -16,10 +16,8 @@ Your response must follow this schema:
 Return a single JSON object matching this schema.`;
 
 export const GM_COMMAND_SELECT_RESPONDERS: string = `Based on the recent chat messages, select 1-3 bots who should respond next.
-Consider the conversation flow, relevance to each bot's role and personality, and maintain engaging group dynamics.
 
 Your response must follow this schema:
-
 {
     type: "object",
     properties: {

@@ -1,6 +1,14 @@
 export const STORY_SYSTEM_PROMPT: string = `
 You are an AI agent tasked with generating a game scene and character descriptions for a chat-based version of the party game Werewolf.
 
+<GameContext>
+  This is a Werewolf party game where players have secret roles. The game includes these roles:
+  - **Villagers**: The default innocent members trying to identify and eliminate the threats
+  - **Dynamic Roles**: Additional roles will be provided in the GameRoles parameter, each with specific abilities and team alignments
+  
+  The scene you create should incorporate the concept of these roles into the narrative without revealing which characters might have which roles.
+</GameContext>
+
 <Parameters>
   The following parameters will be provided:
 
@@ -23,6 +31,12 @@ You are an AI agent tasked with generating a game scene and character descriptio
     - **Definition**: A name that should be excluded when generating character names.
     - **Instructions**: Do not use this name or any similar names when creating character names.
   </ExcludedName>
+
+  <GameRoles>
+    - **Definition**: A list of role configurations that will be present in the game.
+    - **Format**: Each role includes name, description, and alignment (good/evil).
+    - **Usage**: Use this information to craft a scene that subtly references these roles without being explicit.
+  </GameRoles>
 </Parameters>
 
 <Tasks>
@@ -30,7 +44,14 @@ You are an AI agent tasked with generating a game scene and character descriptio
 
   <Task1>
     <SceneGeneration>
-      Create a vivid and immersive scene description (a few sentences) that sets the mood for the game. The scene should be relevant to the provided <Theme>Theme</Theme> and incorporate elements from the <OptionalDescription>OptionalDescription</OptionalDescription> if given.
+      Create a vivid and immersive scene description (2-3 sentences) that:
+      - Sets the mood for the game within the provided <Theme>Theme</Theme>
+      - Incorporates elements from the <OptionalDescription>OptionalDescription</OptionalDescription> if given
+      - **Subtly references the roles from GameRoles**: Mention concepts related to the roles without being explicit
+        * For evil-aligned roles: Hidden threats, dangerous secrets, mysterious intentions
+        * For good-aligned roles: Protectors, investigators, healers, guardians of truth
+      - Creates an atmosphere of mystery and suspicion where anyone could be hiding secrets
+      - Establishes why the group is gathered and why trust is uncertain
     </SceneGeneration>
   </Task1>
 
@@ -40,7 +61,11 @@ You are an AI agent tasked with generating a game scene and character descriptio
 
       <CharacterDetails>
         - A unique, single-word <Name>name</Name> appropriate to the theme. Do not use the <ExcludedName>ExcludedName</ExcludedName> or any similar names.
-        - A brief <Story>story</Story> (1-2 sentences) for the character that fits within the context of the scene and theme.
+        - A brief <Story>story</Story> (1-2 sentences) that:
+          * Fits within the context of the scene and theme
+          * **Includes ambiguous details that could hint at any role without revealing it**
+          * References backgrounds, skills, or motivations that could relate to the GameRoles in subtle ways
+          * Creates intrigue about their true nature and intentions
       </CharacterDetails>
     </CharacterCreation>
   </Task2>
@@ -88,6 +113,7 @@ export const STORY_USER_PROMPT: string = `
   <OptionalDescription>%description%</OptionalDescription>
   <NumberOfPlayers>%number_of_players%</NumberOfPlayers>
   <ExcludedName>%excluded_name%</ExcludedName>
+  <GameRoles>%game_roles%</GameRoles>
 </Parameters>
 
 Expected response format:

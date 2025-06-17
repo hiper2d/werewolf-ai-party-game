@@ -13,6 +13,7 @@ import {
     GamePreviewWithGeneratedBots,
     MessageType,
     RECIPIENT_ALL,
+    ROLE_CONFIGS,
     User
 } from "@/app/api/game-models";
 import {auth} from "@/auth";
@@ -157,11 +158,33 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
         GAME_MASTER, STORY_SYSTEM_PROMPT, gamePreview.gameMasterAiType, apiKeys
     )
         
+    // Gather role configurations for the story generation
+    const gameRoleConfigs = [];
+    
+    // Always include werewolves
+    if (gamePreview.werewolfCount > 0) {
+        gameRoleConfigs.push(ROLE_CONFIGS[GAME_ROLES.WEREWOLF]);
+    }
+    
+    // Add special roles if included
+    if (gamePreview.specialRoles.includes(GAME_ROLES.DOCTOR)) {
+        gameRoleConfigs.push(ROLE_CONFIGS[GAME_ROLES.DOCTOR]);
+    }
+    if (gamePreview.specialRoles.includes(GAME_ROLES.DETECTIVE)) {
+        gameRoleConfigs.push(ROLE_CONFIGS[GAME_ROLES.DETECTIVE]);
+    }
+    
+    // Format role configurations for the prompt
+    const gameRolesText = gameRoleConfigs.map(role => 
+        `- **${role.name}** (${role.alignment}): ${role.description}`
+    ).join('\n');
+
     const userPrompt = format(STORY_USER_PROMPT, {
         theme: gamePreview.theme,
         description: gamePreview.description,
         excluded_name: gamePreview.name,
-        number_of_players: botCount
+        number_of_players: botCount,
+        game_roles: gameRolesText
     });
 
     const storyMessage: GameMessage = {

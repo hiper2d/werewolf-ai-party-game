@@ -69,6 +69,7 @@ export interface RoleConfig {
     nightActionOrder: number;
     description: string;
     actionType?: 'protect' | 'investigate' | 'eliminate' | 'none';
+    alignment: 'good' | 'evil'; // 'good' = villager team, 'evil' = werewolf team
 }
 
 export const ROLE_CONFIGS: Record<string, RoleConfig> = {
@@ -77,21 +78,24 @@ export const ROLE_CONFIGS: Record<string, RoleConfig> = {
         hasNightAction: true,
         nightActionOrder: 1,
         description: 'Can eliminate other players during the night',
-        actionType: 'eliminate'
+        actionType: 'eliminate',
+        alignment: 'evil'
     },
     [GAME_ROLES.DOCTOR]: {
         name: 'Doctor',
         hasNightAction: true,
         nightActionOrder: 2,
         description: 'Can protect a player from elimination during the night',
-        actionType: 'protect'
+        actionType: 'protect',
+        alignment: 'good'
     },
     [GAME_ROLES.DETECTIVE]: {
         name: 'Detective',
         hasNightAction: true,
         nightActionOrder: 3,
         description: 'Can investigate a player to learn their role during the night',
-        actionType: 'investigate'
+        actionType: 'investigate',
+        alignment: 'good'
     }
 };
 
