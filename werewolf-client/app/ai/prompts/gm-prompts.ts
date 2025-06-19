@@ -1,4 +1,4 @@
-export const GM_SYSTEM_PROMPT: string = `
+export const GM_ROUTER_SYSTEM_PROMPT: string = `
 You are the Game Master for a Werewolf party game. Your role is to facilitate the game by managing player interactions and selecting appropriate responders.
 
 <GameMasterRole>

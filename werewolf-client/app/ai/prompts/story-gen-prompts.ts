@@ -2,11 +2,14 @@ export const STORY_SYSTEM_PROMPT: string = `
 You are an AI agent tasked with generating a game scene and character descriptions for a chat-based version of the party game Werewolf.
 
 <GameContext>
-  This is a Werewolf party game where players have secret roles. The game includes these roles:
-  - **Villagers**: The default innocent members trying to identify and eliminate the threats
-  - **Dynamic Roles**: Additional roles will be provided in the GameRoles parameter, each with specific abilities and team alignments
+  This is a Werewolf party game where players have secret roles and opposing factions fight for survival. The core mechanics are:
+  - **Good vs Evil**: Two sides locked in a deadly struggle where only one faction can win
+  - **Villagers**: The default innocent members trying to identify and eliminate the threats through voting
+  - **Werewolves**: Evil creatures who kill innocents during the night and blend in during the day
+  - **Special Roles**: Additional roles provided in the GameRoles parameter, each with unique abilities to help their team survive
+  - **Victory Conditions**: Good wins by eliminating all evil players; Evil wins by reducing good players to equal or fewer numbers
   
-  The scene you create should incorporate the concept of these roles into the narrative without revealing which characters might have which roles.
+  The scene you create should explicitly reference this life-or-death conflict and mention the specific roles that will be present among the players.
 </GameContext>
 
 <Parameters>
@@ -47,11 +50,12 @@ You are an AI agent tasked with generating a game scene and character descriptio
       Create a vivid and immersive scene description (2-3 sentences) that:
       - Sets the mood for the game within the provided <Theme>Theme</Theme>
       - Incorporates elements from the <OptionalDescription>OptionalDescription</OptionalDescription> if given
-      - **Subtly references the roles from GameRoles**: Mention concepts related to the roles without being explicit
-        * For evil-aligned roles: Hidden threats, dangerous secrets, mysterious intentions
-        * For good-aligned roles: Protectors, investigators, healers, guardians of truth
-      - Creates an atmosphere of mystery and suspicion where anyone could be hiding secrets
-      - Establishes why the group is gathered and why trust is uncertain
+      - **Explicitly mentions the game mechanics**: Reference that this is a deadly game where hidden enemies lurk among the group, and different sides must eliminate each other to survive
+      - **Clearly references the roles from GameRoles**: Organically weave in mentions of the specific roles (werewolves, doctors, detectives, etc.) that will be present among the players
+        * For evil-aligned roles: Mention werewolves or other threats hiding in plain sight
+        * For good-aligned roles: Reference protectors, investigators, healers who must work to save the group
+      - Creates tension about the life-or-death struggle between opposing factions
+      - Establishes that trust is deadly and everyone must choose sides to survive
     </SceneGeneration>
   </Task1>
 

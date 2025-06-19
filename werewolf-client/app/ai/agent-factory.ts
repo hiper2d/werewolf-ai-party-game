@@ -7,6 +7,7 @@ import {GoogleAgent} from "@/app/ai/google-agent";
 import {MistralAgent} from "@/app/ai/mistral-agent";
 import {OpenAiOAgent} from "@/app/ai/open-ai-o-agent";
 import {DeepSeekAgent} from "@/app/ai/deepseek-agent";
+import {GrokAgent} from "@/app/ai/grok-agent";
 
 export class AgentFactory {
 
@@ -28,6 +29,9 @@ export class AgentFactory {
                 return new ClaudeAgent(name, instruction, model.modelApiName, key);
             case LLM_CONSTANTS.GPT_41:
                 return new OpenAiAgent(name, instruction, model.modelApiName, key, 0.2);
+            case LLM_CONSTANTS.GPT_O1:
+            case LLM_CONSTANTS.GPT_O3:
+            case LLM_CONSTANTS.GPT_O3_PRO:
             case LLM_CONSTANTS.GPT_O4_MINI:
                 return new OpenAiOAgent(name, instruction, model.modelApiName, key);
             case LLM_CONSTANTS.GEMINI_25_FLASH:
@@ -39,6 +43,9 @@ export class AgentFactory {
             case LLM_CONSTANTS.DEEPSEEK_CHAT:
             case LLM_CONSTANTS.DEEPSEEK_REASONER:
                 return new DeepSeekAgent(name, instruction, model.modelApiName, key);
+            case LLM_CONSTANTS.GROK_3:
+            case LLM_CONSTANTS.GROK_3_MINI:
+                return new GrokAgent(name, instruction, model.modelApiName, key, 0.7);
             default:
                 throw new Error(`Unknown Key: ${modelName}`);
         }

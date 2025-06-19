@@ -5,7 +5,8 @@ export const API_KEY_CONSTANTS = {
     ANTHROPIC: 'ANTHROPIC_API_KEY',
     GOOGLE: 'GOOGLE_API_KEY',
     MISTRAL: 'MISTRAL_API_KEY',
-    DEEPSEEK: 'DEEPSEEK_API_KEY'
+    DEEPSEEK: 'DEEPSEEK_API_KEY',
+    GROK: 'GROK_API_KEY'
 } as const;
 
 export const SupportedAiKeyNames: Record<string, string> = {
@@ -13,10 +14,10 @@ export const SupportedAiKeyNames: Record<string, string> = {
     [API_KEY_CONSTANTS.ANTHROPIC]: 'Anthropic',
     [API_KEY_CONSTANTS.GOOGLE]: 'Google',
     [API_KEY_CONSTANTS.MISTRAL]: 'Mistral',
-    [API_KEY_CONSTANTS.DEEPSEEK]: 'DeepSeek'
+    [API_KEY_CONSTANTS.DEEPSEEK]: 'DeepSeek',
+    [API_KEY_CONSTANTS.GROK]: 'Grok'
 };
 
-// todo: Add Grok (grok-3-latest, grok-3-fast-latest)
 export const LLM_CONSTANTS = {
     CLAUDE_4_OPUS: 'Claude 4 Opus',
     CLAUDE_4_SONNET: 'Claude 4 Sonnet',
@@ -24,14 +25,17 @@ export const LLM_CONSTANTS = {
     DEEPSEEK_CHAT: 'DeepSeek Chat',
     DEEPSEEK_REASONER: 'DeepSeek Reasoner',
     GPT_41: 'GPT-4.1',
-    // GPT_O3: 'o3', this model requires some id verification which is weird, I exclude it for now
     GPT_O4_MINI: 'o4-mini',
-    GEMINI_25_FLASH: 'Gemini 2.5 Flash Preview 04-17', //todo: update API lig to @google/genai as per docs https://ai.google.dev/gemini-api/docs/text-generation#javascript
-    GEMINI_25_PRO: 'Gemini 2.5 Pro Preview 05-06',
+    GEMINI_25_FLASH: 'Gemini 2.5 Flash',
+    GEMINI_25_PRO: 'Gemini 2.5 Pro',
+    GPT_O1: 'o1',
+    GPT_O3: 'o3',
+    GPT_O3_PRO: 'o3-pro',
     MISTRAL_2_LARGE: 'Mistral 2 Large',
     MISTRAL_3_SMALL: 'Mistral 3 Small',
+    GROK_3: 'Grok 3',
+    GROK_3_MINI: 'Grok 3 Mini',
     RANDOM: 'Random',
-    // todo: add grok-3-beta and grok-3-mini-beta https://docs.x.ai/docs/models
 }
 
 export const SupportedAiModels = {
@@ -51,20 +55,28 @@ export const SupportedAiModels = {
         modelApiName: 'gpt-4.1',
         apiKeyName: API_KEY_CONSTANTS.OPENAI
     },
-    /*[LLM_CONSTANTS.GPT_O3]: {
+    [LLM_CONSTANTS.GPT_O1]: {
+        modelApiName: 'o1',
+        apiKeyName: API_KEY_CONSTANTS.OPENAI
+    },
+    [LLM_CONSTANTS.GPT_O3]: {
         modelApiName: 'o3',
         apiKeyName: API_KEY_CONSTANTS.OPENAI
-    },*/
+    },
+    [LLM_CONSTANTS.GPT_O3_PRO]: {
+        modelApiName: 'o3-pro',
+        apiKeyName: API_KEY_CONSTANTS.OPENAI
+    },
     [LLM_CONSTANTS.GPT_O4_MINI]: {
         modelApiName: 'o4-mini',
         apiKeyName: API_KEY_CONSTANTS.OPENAI
     },
     [LLM_CONSTANTS.GEMINI_25_FLASH]: {
-        modelApiName: 'gemini-2.5-flash-preview-04-17',
+        modelApiName: 'gemini-2.5-flash',
         apiKeyName: API_KEY_CONSTANTS.GOOGLE
     },
     [LLM_CONSTANTS.GEMINI_25_PRO]: {
-        modelApiName: 'gemini-2.5-pro-preview-05-06',
+        modelApiName: 'gemini-2.5-pro',
         apiKeyName: API_KEY_CONSTANTS.GOOGLE
     },
     [LLM_CONSTANTS.MISTRAL_2_LARGE]: {
@@ -82,6 +94,14 @@ export const SupportedAiModels = {
     [LLM_CONSTANTS.DEEPSEEK_REASONER]: {
         modelApiName: 'deepseek-reasoner',
         apiKeyName: API_KEY_CONSTANTS.DEEPSEEK
+    },
+    [LLM_CONSTANTS.GROK_3]: {
+        modelApiName: 'grok-3-latest',
+        apiKeyName: API_KEY_CONSTANTS.GROK
+    },
+    [LLM_CONSTANTS.GROK_3_MINI]: {
+        modelApiName: 'grok-3-mini-latest',
+        apiKeyName: API_KEY_CONSTANTS.GROK
     },
 } as const;
 

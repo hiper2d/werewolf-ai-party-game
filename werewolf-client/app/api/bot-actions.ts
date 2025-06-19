@@ -18,7 +18,7 @@ import {
     GM_COMMAND_SELECT_RESPONDERS
 } from "@/app/ai/prompts/gm-commands";
 import {BOT_SYSTEM_PROMPT, BOT_VOTE_PROMPT} from "@/app/ai/prompts/bot-prompts";
-import {GM_SYSTEM_PROMPT} from "@/app/ai/prompts/gm-prompts";
+import {GM_ROUTER_SYSTEM_PROMPT} from "@/app/ai/prompts/gm-prompts";
 import {createBotAnswerSchema, createBotVoteSchema, createGmBotSelectionSchema} from "@/app/ai/prompts/ai-schemas";
 import {AgentFactory} from "@/app/ai/agent-factory";
 import {format} from "@/app/ai/prompts/utils";
@@ -266,7 +266,7 @@ async function handleHumanPlayerMessage(
     // Ask GM which bots should respond
     const apiKeys = await getUserFromFirestore(userEmail).then((user) => getUserApiKeys(user!.email));
 
-    const gmPrompt = format(GM_SYSTEM_PROMPT, {
+    const gmPrompt = format(GM_ROUTER_SYSTEM_PROMPT, {
         players_names: [
             ...game.bots.map(b => b.name),
             game.humanPlayerName
