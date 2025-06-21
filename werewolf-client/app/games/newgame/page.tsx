@@ -260,6 +260,22 @@ export default function CreateNewGamePage() {
                         />
                     </div>
 
+                    <div className="mb-6">
+                        <h3 className="text-xl font-bold text-white mb-4">Game Master:</h3>
+                        <div className={flexItemStyle}>
+                            <label className={labelStyle}>Game Master AI:</label>
+                            <select
+                                className={`${inputStyle} flex-1`}
+                                value={gameData.gameMasterAiType}
+                                onChange={(e) => setGameData({ ...gameData, gameMasterAiType: e.target.value })}
+                            >
+                                {supportedAi.filter(model => model !== LLM_CONSTANTS.RANDOM).map(model => (
+                                    <option key={model} value={model}>{model}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+
                     <h3 className="text-xl font-bold text-white mb-4">Players:</h3>
                     {gameData.bots.map((player, index) => (
                         <div key={index} className="mb-2">
@@ -291,35 +307,21 @@ export default function CreateNewGamePage() {
                         </div>
                     ))}
 
-                    <div className={`${flexRowStyle} justify-between mt-6`}>
-                        <div className={flexItemStyle}>
-                            <label className={labelStyle}>Game Master AI:</label>
-                            <select
-                                className={`${inputStyle} flex-1`}
-                                value={gameData.gameMasterAiType}
-                                onChange={(e) => setGameData({ ...gameData, gameMasterAiType: e.target.value })}
-                            >
-                                {supportedAi.filter(model => model !== LLM_CONSTANTS.RANDOM).map(model => (
-                                    <option key={model} value={model}>{model}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div className="flex space-x-4">
-                            <button
-                                className={`${buttonTransparentStyle} ${(!isFormValid || isLoading) ? buttonDisabledStyle : ''}`}
-                                onClick={handleGeneratePreview}
-                                disabled={!isFormValid || isLoading}
-                            >
-                                {isLoading ? 'Processing...' : 'Generate Preview Again'}
-                            </button>
-                            <button
-                                className={`${buttonTransparentStyle} ${isLoading ? buttonDisabledStyle : ''}`}
-                                onClick={handleCreateGame}
-                                disabled={isLoading}
-                            >
-                                {isLoading ? 'Processing...' : 'Create Game'}
-                            </button>
-                        </div>
+                    <div className="flex justify-end space-x-4 mt-6">
+                        <button
+                            className={`${buttonTransparentStyle} ${(!isFormValid || isLoading) ? buttonDisabledStyle : ''}`}
+                            onClick={handleGeneratePreview}
+                            disabled={!isFormValid || isLoading}
+                        >
+                            {isLoading ? 'Processing...' : 'Generate Preview Again'}
+                        </button>
+                        <button
+                            className={`${buttonTransparentStyle} ${isLoading ? buttonDisabledStyle : ''}`}
+                            onClick={handleCreateGame}
+                            disabled={isLoading}
+                        >
+                            {isLoading ? 'Processing...' : 'Create Game'}
+                        </button>
                     </div>
                 </div>
             )}

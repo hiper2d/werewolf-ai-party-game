@@ -1,8 +1,8 @@
 # Bugs and improvements
 
+- Add button "Keep Going" to let bots to continue the conversation
 - Optimize indexes in DB
 - When bot votes or speaks, the scroll is not moving on UI
-- Add an ability to change GM model
 - Make the user input expandable to dropdown
 - Clean chat messages when backend restarts
 - Updated indexes in the sources (for resetting messages and for resetting night)

@@ -5,7 +5,7 @@ import { getGame, updateBotModel, updateGameMasterModel } from "@/app/api/game-a
 import GameChat from "@/app/games/[id]/components/GameChat";
 import ModelSelectionDialog from "@/app/games/[id]/components/ModelSelectionDialog";
 import { buttonTransparentStyle } from "@/app/constants";
-import { GAME_STATES } from "@/app/api/game-models";
+import { GAME_STATES, BotResponseError } from "@/app/api/game-models";
 import type { Game } from "@/app/api/game-models";
 import type { Session } from "next-auth";
 import { welcome, vote } from '@/app/api/bot-actions';
@@ -29,15 +29,20 @@ export default function GamePage({
 }) {
     const [game, setGame] = useState(initialGame);
     const hasErrorRef = useRef(false);
+    const [errorDetails, setErrorDetails] = useState<BotResponseError | Error | null>(null);
     const [modelDialogOpen, setModelDialogOpen] = useState(false);
     const [selectedBot, setSelectedBot] = useState<{ name: string; aiType: string } | null>(null);
     const [clearNightMessages, setClearNightMessages] = useState(false);
+
+    // Handle exit game
+    const handleExitGame = () => {
+        window.location.href = '/games';
+    };
 
     // Handle welcome state
     useEffect(() => {
         const handleWelcome = async () => {
             if (game.gameState === GAME_STATES.WELCOME &&
-                game.gameStateParamQueue.length > 0 &&
                 !hasErrorRef.current) {
                 try {
                     const updatedGame = await welcome(game.id);
@@ -45,6 +50,7 @@ export default function GamePage({
                 } catch (error) {
                     console.error('Error sending welcome request:', error);
                     hasErrorRef.current = true;
+                    setErrorDetails(error instanceof Error ? error : new Error(String(error)));
                 }
             }
         };
@@ -175,17 +181,74 @@ export default function GamePage({
     }
 
     if (hasErrorRef.current) {
+        const isBotResponseError = errorDetails instanceof BotResponseError;
+        const isRecoverable = isBotResponseError ? errorDetails.recoverable : false;
+        
         return (
-            <div className="flex h-full text-white items-center justify-center">
-                <div className="bg-black bg-opacity-30 border border-red-500 border-opacity-50 rounded p-4 text-center">
-                    <h2 className="text-xl font-bold mb-2">Error during bot introductions</h2>
-                    <p className="text-sm text-gray-300 mb-4">Please refresh the page to try again.</p>
-                    <button 
-                        onClick={() => window.location.reload()} 
-                        className={buttonTransparentStyle}
-                    >
-                        Refresh Page
-                    </button>
+            <div className="flex h-full text-white items-center justify-center p-4">
+                <div className="bg-black bg-opacity-50 border border-red-500 border-opacity-50 rounded-lg p-6 max-w-2xl">
+                    <div className="text-center mb-4">
+                        <h2 className="text-xl font-bold mb-2">⚠️ Game Error</h2>
+                        <p className="text-sm text-gray-300">
+                            {game.gameState === GAME_STATES.WELCOME 
+                                ? "Error during bot introductions" 
+                                : "Error during game processing"}
+                        </p>
+                    </div>
+                    
+                    {errorDetails && (
+                        <div className="mb-4 p-3 bg-red-900 bg-opacity-30 rounded border border-red-700 border-opacity-30">
+                            <h3 className="text-sm font-semibold mb-2 text-red-300">Error Details:</h3>
+                            <p className="text-xs text-gray-200 mb-2">{errorDetails.message}</p>
+                            
+                            {isBotResponseError && errorDetails.details && (
+                                <div className="text-xs text-gray-300">
+                                    <p className="mb-1"><span className="font-semibold">Details:</span> {errorDetails.details}</p>
+                                    {errorDetails.context?.agentName && (
+                                        <p className="mb-1"><span className="font-semibold">Bot:</span> {errorDetails.context.agentName}</p>
+                                    )}
+                                    {errorDetails.context?.model && (
+                                        <p className="mb-1"><span className="font-semibold">Model:</span> {errorDetails.context.model}</p>
+                                    )}
+                                    {errorDetails.context?.apiProvider && (
+                                        <p><span className="font-semibold">Provider:</span> {errorDetails.context.apiProvider}</p>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                    
+                    <div className="flex gap-3 justify-center">
+                        {isRecoverable && (
+                            <button 
+                                onClick={() => {
+                                    hasErrorRef.current = false;
+                                    setErrorDetails(null);
+                                }}
+                                className={`${buttonTransparentStyle} bg-green-600 hover:bg-green-700 border-green-500`}
+                            >
+                                🔄 Retry
+                            </button>
+                        )}
+                        <button 
+                            onClick={() => window.location.reload()} 
+                            className={buttonTransparentStyle}
+                        >
+                            🔃 Refresh Page
+                        </button>
+                        <button 
+                            onClick={handleExitGame}
+                            className={`${buttonTransparentStyle} bg-gray-600 hover:bg-gray-700 border-gray-500`}
+                        >
+                            🚪 Exit Game
+                        </button>
+                    </div>
+                    
+                    {isRecoverable && (
+                        <p className="text-xs text-green-400 text-center mt-3">
+                            💡 This error may be temporary. Try the retry button first.
+                        </p>
+                    )}
                 </div>
             </div>
         );
@@ -193,11 +256,6 @@ export default function GamePage({
 
     // Check if game is over
     const isGameOver = game.gameState === GAME_STATES.GAME_OVER;
-
-    // Handle exit game
-    const handleExitGame = () => {
-        window.location.href = '/games';
-    };
 
     // Handle model update
     const handleModelUpdate = async (newModel: string) => {

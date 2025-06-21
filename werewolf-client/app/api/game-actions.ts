@@ -154,8 +154,17 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
 
     const botCount = gamePreview.playerCount - 1; // exclude human player
 
+    // Resolve Game Master AI type if it's Random
+    let resolvedGmAiType = gamePreview.gameMasterAiType;
+    if (resolvedGmAiType === LLM_CONSTANTS.RANDOM) {
+        const availableTypes = Object.values(LLM_CONSTANTS).filter(
+            type => type !== LLM_CONSTANTS.RANDOM
+        );
+        resolvedGmAiType = availableTypes[Math.floor(Math.random() * availableTypes.length)];
+    }
+
     const storyTellAgent: AbstractAgent = AgentFactory.createAgent(
-        GAME_MASTER, STORY_SYSTEM_PROMPT, gamePreview.gameMasterAiType, apiKeys
+        GAME_MASTER, STORY_SYSTEM_PROMPT, resolvedGmAiType, apiKeys
     )
         
     // Gather role configurations for the story generation
@@ -184,7 +193,8 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
         description: gamePreview.description,
         excluded_name: gamePreview.name,
         number_of_players: botCount,
-        game_roles: gameRolesText
+        game_roles: gameRolesText,
+        werewolf_count: gamePreview.werewolfCount
     });
 
     const storyMessage: GameMessage = {
@@ -225,6 +235,7 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
 
     return {
         ...gamePreview,
+        gameMasterAiType: resolvedGmAiType,
         scene: aiResponse.scene,
         bots: bots
     };

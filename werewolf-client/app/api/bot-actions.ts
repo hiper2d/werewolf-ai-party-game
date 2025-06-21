@@ -100,7 +100,8 @@ export async function welcome(gameId: string): Promise<Game> {
         // If queue is empty, move to DAY_DISCUSSION state
         if (game.gameStateParamQueue.length === 0) {
             await db.collection('games').doc(gameId).update({
-                gameState: GAME_STATES.DAY_DISCUSSION
+                gameState: GAME_STATES.DAY_DISCUSSION,
+                gameStateProcessQueue: [] // Ensure the process queue is empty for DAY_DISCUSSION
             });
             return await getGame(gameId) as Game;
         }

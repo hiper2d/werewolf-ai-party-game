@@ -40,6 +40,11 @@ You are an AI agent tasked with generating a game scene and character descriptio
     - **Format**: Each role includes name, description, and alignment (good/evil).
     - **Usage**: Use this information to craft a scene that subtly references these roles without being explicit.
   </GameRoles>
+
+  <WerewolfCount>
+    - **Definition**: The exact number of werewolves that will be present in the game.
+    - **Usage**: Mention this specific number in the scene to create tension and inform players of the threat level.
+  </WerewolfCount>
 </Parameters>
 
 <Tasks>
@@ -56,6 +61,8 @@ You are an AI agent tasked with generating a game scene and character descriptio
         * For good-aligned roles: Reference protectors, investigators, healers who must work to save the group
       - Creates tension about the life-or-death struggle between opposing factions
       - Establishes that trust is deadly and everyone must choose sides to survive
+      - **Ends with a reminder about the goals**: Conclude with a warning that when night falls, the werewolves will strike, and the players must work together to identify and eliminate the threats before it's too late
+      - **Mention the exact werewolf count**: Include the specific number of werewolves from <WerewolfCount> to inform players of the threat level
     </SceneGeneration>
   </Task1>
 
@@ -118,6 +125,7 @@ export const STORY_USER_PROMPT: string = `
   <NumberOfPlayers>%number_of_players%</NumberOfPlayers>
   <ExcludedName>%excluded_name%</ExcludedName>
   <GameRoles>%game_roles%</GameRoles>
+  <WerewolfCount>%werewolf_count%</WerewolfCount>
 </Parameters>
 
 Expected response format:

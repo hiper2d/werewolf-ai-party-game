@@ -1,5 +1,5 @@
 import {AbstractAgent} from "@/app/ai/abstract-agent";
-import {AIMessage} from "@/app/api/game-models";
+import {AIMessage, BotResponseError} from "@/app/api/game-models";
 import {Anthropic} from '@anthropic-ai/sdk';
 import {ResponseSchema} from "@/app/ai/prompts/ai-schemas";
 import {cleanResponse} from "@/app/utils/message-utils";
@@ -82,7 +82,23 @@ Ensure your response strictly follows the schema requirements.`,
             }
             return cleanResponse(content.text);
         } catch (error) {
-            throw new Error(this.errorMessages.apiError(error));
+            const errorDetails = error instanceof Error ? error.message : String(error);
+            
+            // Check if this is an API overload error (529) which is recoverable
+            const isRecoverable = errorDetails.includes('overloaded_error') || 
+                                errorDetails.includes('529') || 
+                                errorDetails.includes('rate_limit');
+            
+            throw new BotResponseError(
+                'Failed to get response from Anthropic API',
+                errorDetails,
+                { 
+                    model: this.model, 
+                    agentName: this.name,
+                    apiProvider: 'Anthropic'
+                },
+                isRecoverable
+            );
         }
     }
 
