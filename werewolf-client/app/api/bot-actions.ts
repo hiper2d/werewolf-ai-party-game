@@ -10,6 +10,8 @@ import {
     GAME_STATES,
     GameMessage,
     MessageType,
+    PLAY_STYLES,
+    PLAY_STYLE_CONFIGS,
     RECIPIENT_ALL
 } from "@/app/api/game-models";
 import {
@@ -37,6 +39,26 @@ import {
     getUserFromFirestore
 } from "./game-actions";
 import {getUserApiKeys} from "./user-actions";
+
+/**
+ * Generates the play style description for a bot, including special parameters for suspicious style
+ */
+function generatePlayStyleDescription(bot: Bot): string {
+    const config = PLAY_STYLE_CONFIGS[bot.playStyle];
+    if (!config) {
+        return 'You have a balanced and thoughtful personality.';
+    }
+    
+    let description = config.description;
+    
+    // For suspicious style, inject the specific target names if available
+    if (bot.playStyle === PLAY_STYLES.SUSPICIOUS && bot.playStyleParams && bot.playStyleParams.length >= 2) {
+        const [target1, target2] = bot.playStyleParams;
+        description = `You are highly suspicious of ${target1} and ${target2} specifically. You believe they are werewolves and focus your suspicions on them throughout the game. ${description}`;
+    }
+    
+    return description;
+}
 
 /**
  * Wraps Firestore operations in a transaction for atomicity
@@ -123,7 +145,7 @@ export async function welcome(gameId: string): Promise<Game> {
             {
                 name: bot.name,
                 personal_story: bot.story,
-                temperament: 'You have a balanced and thoughtful personality.',
+                play_style: generatePlayStyleDescription(bot),
                 role: bot.role,
                 players_names: [
                     ...game.bots
@@ -378,7 +400,7 @@ async function processNextBotInQueue(
     const botPrompt = format(BOT_SYSTEM_PROMPT, {
         name: bot.name,
         personal_story: bot.story,
-        temperament: 'You have a balanced and thoughtful personality.',
+        play_style: generatePlayStyleDescription(bot),
         role: bot.role,
         players_names: [
             ...game.bots
@@ -668,7 +690,7 @@ export async function vote(gameId: string): Promise<Game> {
                 {
                     name: bot.name,
                     personal_story: bot.story,
-                    temperament: 'You have a balanced and thoughtful personality.',
+                    play_style: generatePlayStyleDescription(bot),
                     role: bot.role,
                     players_names: [
                         ...currentGame.bots

@@ -12,6 +12,7 @@ import {
     GamePreview,
     GamePreviewWithGeneratedBots,
     MessageType,
+    PLAY_STYLES,
     RECIPIENT_ALL,
     ROLE_CONFIGS,
     User
@@ -226,10 +227,15 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
             aiType = availableTypes[Math.floor(Math.random() * availableTypes.length)];
         }
 
+        // Randomly assign play style
+        const availablePlayStyles = Object.values(PLAY_STYLES);
+        const randomPlayStyle = availablePlayStyles[Math.floor(Math.random() * availablePlayStyles.length)];
+
         return {
             name: bot.name,
             story: bot.story,
-            playerAiType: aiType
+            playerAiType: aiType,
+            playStyle: randomPlayStyle
         };
     });
 
@@ -271,14 +277,31 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
             [roleDistribution[i], roleDistribution[j]] = [roleDistribution[j], roleDistribution[i]];
         }
 
+        // Get all player names (bots + human)
+        const allPlayerNames = [gamePreview.name, ...gamePreview.bots.map(bot => bot.name)];
+
         // Convert BotPreviews to Bots with roles
-        const bots: Bot[] = gamePreview.bots.map((bot, index) => ({
-            name: bot.name,
-            story: bot.story,
-            role: roleDistribution[index + 1],
-            isAlive: true,
-            aiType: bot.playerAiType
-        }));
+        const bots: Bot[] = gamePreview.bots.map((bot, index) => {
+            let playStyleParams: string[] | undefined = undefined;
+            
+            // For suspicious play style, select 2 random other players as targets
+            if (bot.playStyle === PLAY_STYLES.SUSPICIOUS) {
+                const otherPlayerNames = allPlayerNames.filter(name => name !== bot.name);
+                // Shuffle and take first 2
+                const shuffled = [...otherPlayerNames].sort(() => Math.random() - 0.5);
+                playStyleParams = shuffled.slice(0, 2);
+            }
+
+            return {
+                name: bot.name,
+                story: bot.story,
+                role: roleDistribution[index + 1],
+                isAlive: true,
+                aiType: bot.playerAiType,
+                playStyle: bot.playStyle,
+                playStyleParams
+            };
+        });
 
         // Create the game object
         const game = {

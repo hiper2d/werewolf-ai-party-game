@@ -23,6 +23,7 @@ export interface BotPreview {
     name: string;
     story: string;
     playerAiType: string;
+    playStyle: string;
 }
 
 export interface GamePreviewWithGeneratedBots extends GamePreview {
@@ -36,6 +37,8 @@ export interface Bot {
     role: string;
     isAlive: boolean;
     aiType: string;
+    playStyle: string;
+    playStyleParams?: string[]; // For suspicious style: contains 2 target player names
     eliminationDay?: number; // Track which day this bot was eliminated (undefined if alive)
 }
 
@@ -96,6 +99,32 @@ export const ROLE_CONFIGS: Record<string, RoleConfig> = {
         description: 'Can investigate a player to learn their role during the night',
         actionType: 'investigate',
         alignment: 'good'
+    }
+};
+
+export const PLAY_STYLES = {
+    AGGRESSIVE: 'aggressive',
+    SUSPICIOUS: 'suspicious', 
+    TEAM_PLAYER: 'team_player'
+} as const;
+
+export interface PlayStyleConfig {
+    name: string;
+    description: string;
+}
+
+export const PLAY_STYLE_CONFIGS: Record<string, PlayStyleConfig> = {
+    [PLAY_STYLES.AGGRESSIVE]: {
+        name: 'Aggressive',
+        description: 'Constantly accuses other players of being associated with werewolves to see how they react. Believes this is the best way to catch players in lies. If the bot is a werewolf, false accusations help pretend to be a villager.'
+    },
+    [PLAY_STYLES.SUSPICIOUS]: {
+        name: 'Suspicious',
+        description: 'Randomly chooses 2 other players and suspects them of being werewolves. The specific target names are selected when the game is created and remain consistent throughout the game.'
+    },
+    [PLAY_STYLES.TEAM_PLAYER]: {
+        name: 'Team Player',
+        description: 'Focuses on teaming up with certain players who most likely are not werewolves. Prefers collaboration and building trust over aggressive accusations.'
     }
 };
 
