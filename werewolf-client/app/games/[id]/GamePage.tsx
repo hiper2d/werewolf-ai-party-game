@@ -108,6 +108,7 @@ export default function GamePage({
                     timestamp: new Date().toISOString()
                 });
                 hasErrorRef.current = true;
+                setErrorDetails(error instanceof Error ? error : new Error(String(error)));
             }
         };
 
@@ -131,6 +132,7 @@ export default function GamePage({
                 } catch (error) {
                     console.error('Error processing day discussion queue:', error);
                     hasErrorRef.current = true;
+                    setErrorDetails(error instanceof Error ? error : new Error(String(error)));
                 }
             }
         };
@@ -154,6 +156,7 @@ export default function GamePage({
                 } catch (error) {
                     console.error('Error processing night action:', error);
                     hasErrorRef.current = true;
+                    setErrorDetails(error instanceof Error ? error : new Error(String(error)));
                 }
             }
         };
@@ -180,79 +183,11 @@ export default function GamePage({
         return <div>Game not found</div>;
     }
 
-    if (hasErrorRef.current) {
-        const isBotResponseError = errorDetails instanceof BotResponseError;
-        const isRecoverable = isBotResponseError ? errorDetails.recoverable : false;
-        
-        return (
-            <div className="flex h-full text-white items-center justify-center p-4">
-                <div className="bg-black bg-opacity-50 border border-red-500 border-opacity-50 rounded-lg p-6 max-w-2xl">
-                    <div className="text-center mb-4">
-                        <h2 className="text-xl font-bold mb-2">⚠️ Game Error</h2>
-                        <p className="text-sm text-gray-300">
-                            {game.gameState === GAME_STATES.WELCOME 
-                                ? "Error during bot introductions" 
-                                : "Error during game processing"}
-                        </p>
-                    </div>
-                    
-                    {errorDetails && (
-                        <div className="mb-4 p-3 bg-red-900 bg-opacity-30 rounded border border-red-700 border-opacity-30">
-                            <h3 className="text-sm font-semibold mb-2 text-red-300">Error Details:</h3>
-                            <p className="text-xs text-gray-200 mb-2">{errorDetails.message}</p>
-                            
-                            {isBotResponseError && errorDetails.details && (
-                                <div className="text-xs text-gray-300">
-                                    <p className="mb-1"><span className="font-semibold">Details:</span> {errorDetails.details}</p>
-                                    {errorDetails.context?.agentName && (
-                                        <p className="mb-1"><span className="font-semibold">Bot:</span> {errorDetails.context.agentName}</p>
-                                    )}
-                                    {errorDetails.context?.model && (
-                                        <p className="mb-1"><span className="font-semibold">Model:</span> {errorDetails.context.model}</p>
-                                    )}
-                                    {errorDetails.context?.apiProvider && (
-                                        <p><span className="font-semibold">Provider:</span> {errorDetails.context.apiProvider}</p>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    )}
-                    
-                    <div className="flex gap-3 justify-center">
-                        {isRecoverable && (
-                            <button 
-                                onClick={() => {
-                                    hasErrorRef.current = false;
-                                    setErrorDetails(null);
-                                }}
-                                className={`${buttonTransparentStyle} bg-green-600 hover:bg-green-700 border-green-500`}
-                            >
-                                🔄 Retry
-                            </button>
-                        )}
-                        <button 
-                            onClick={() => window.location.reload()} 
-                            className={buttonTransparentStyle}
-                        >
-                            🔃 Refresh Page
-                        </button>
-                        <button 
-                            onClick={handleExitGame}
-                            className={`${buttonTransparentStyle} bg-gray-600 hover:bg-gray-700 border-gray-500`}
-                        >
-                            🚪 Exit Game
-                        </button>
-                    </div>
-                    
-                    {isRecoverable && (
-                        <p className="text-xs text-green-400 text-center mt-3">
-                            💡 This error may be temporary. Try the retry button first.
-                        </p>
-                    )}
-                </div>
-            </div>
-        );
-    }
+    // Handle error cleared callback from GameChat
+    const handleErrorCleared = () => {
+        hasErrorRef.current = false;
+        setErrorDetails(null);
+    };
 
     // Check if game is over
     const isGameOver = game.gameState === GAME_STATES.GAME_OVER;
@@ -391,6 +326,8 @@ export default function GamePage({
                                                 setGame(updatedGame);
                                             } catch (error) {
                                                 console.error('Error starting vote:', error);
+                                                hasErrorRef.current = true;
+                                                setErrorDetails(error instanceof Error ? error : new Error(String(error)));
                                             }
                                         }}
                                         title="Start the voting phase to eliminate a suspected werewolf"
@@ -406,6 +343,8 @@ export default function GamePage({
                                                 setGame(updatedGame);
                                             } catch (error) {
                                                 console.error('Error keeping bots going:', error);
+                                                hasErrorRef.current = true;
+                                                setErrorDetails(error instanceof Error ? error : new Error(String(error)));
                                             }
                                         }}
                                         title={game.gameStateProcessQueue.length > 0 ? 'Bots are already talking' : 'Let 1-3 bots continue the conversation'}
@@ -423,6 +362,8 @@ export default function GamePage({
                                             setGame(updatedGame);
                                         } catch (error) {
                                             console.error('Error starting night:', error);
+                                            hasErrorRef.current = true;
+                                            setErrorDetails(error instanceof Error ? error : new Error(String(error)));
                                         }
                                     }}
                                     title="Begin the night phase where werewolves and special roles take their actions"
@@ -451,6 +392,8 @@ export default function GamePage({
                                             } catch (error) {
                                                 console.error('Error replaying night:', error);
                                                 setClearNightMessages(false);
+                                                hasErrorRef.current = true;
+                                                setErrorDetails(error instanceof Error ? error : new Error(String(error)));
                                             }
                                         }}
                                         title="Clear night messages and replay the night phase actions"
@@ -471,6 +414,8 @@ export default function GamePage({
                     game={game}
                     onGameStateChange={setGame}
                     clearNightMessages={clearNightMessages}
+                    externalError={hasErrorRef.current ? errorDetails : null}
+                    onErrorHandled={handleErrorCleared}
                 />
             </div>
             

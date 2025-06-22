@@ -14,6 +14,8 @@ interface GameChatProps {
     game: Game;
     onGameStateChange?: (updatedGame: Game) => void;
     clearNightMessages?: boolean;
+    externalError?: Error | BotResponseError | null;
+    onErrorHandled?: () => void;
 }
 
 interface BotAnswer {
@@ -185,7 +187,7 @@ function renderMessage(message: GameMessage, gameId: string, onDeleteAfter: (mes
     );
 }
 
-export default function GameChat({ gameId, game, onGameStateChange, clearNightMessages }: GameChatProps) {
+export default function GameChat({ gameId, game, onGameStateChange, clearNightMessages, externalError, onErrorHandled }: GameChatProps) {
     const [messages, setMessages] = useState<GameMessage[]>([]);
     const [newMessage, setNewMessage] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
@@ -223,6 +225,39 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
             clearMessagesFromNight();
         }
     }, [clearNightMessages]);
+
+    // Handle external errors from GamePage
+    React.useEffect(() => {
+        if (externalError) {
+            console.log('🚨 External error received in GameChat:', externalError);
+            
+            // Convert external error to SystemErrorMessage format
+            if (externalError instanceof BotResponseError) {
+                const systemError: SystemErrorMessage = {
+                    error: externalError.message || 'Bot response error occurred',
+                    details: externalError.details || 'Failed to process bot response',
+                    context: externalError.context || {},
+                    recoverable: externalError.recoverable !== false,
+                    timestamp: Date.now()
+                };
+                handleError(systemError);
+            } else {
+                const systemError: SystemErrorMessage = {
+                    error: 'System error occurred',
+                    details: externalError.message || 'Unknown error',
+                    context: {},
+                    recoverable: false,
+                    timestamp: Date.now()
+                };
+                handleError(systemError);
+            }
+            
+            // Notify parent that error has been handled
+            if (onErrorHandled) {
+                onErrorHandled();
+            }
+        }
+    }, [externalError, onErrorHandled]);
 
     // Auto-process queue when not empty
     useEffect(() => {
