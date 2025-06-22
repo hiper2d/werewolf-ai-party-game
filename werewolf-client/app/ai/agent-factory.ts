@@ -29,9 +29,7 @@ export class AgentFactory {
                 return new ClaudeAgent(name, instruction, model.modelApiName, key);
             case LLM_CONSTANTS.GPT_41:
                 return new OpenAiAgent(name, instruction, model.modelApiName, key, 0.2);
-            case LLM_CONSTANTS.GPT_O1:
             case LLM_CONSTANTS.GPT_O3:
-            case LLM_CONSTANTS.GPT_O3_PRO:
             case LLM_CONSTANTS.GPT_O4_MINI:
                 return new OpenAiOAgent(name, instruction, model.modelApiName, key);
             case LLM_CONSTANTS.GEMINI_25_FLASH:

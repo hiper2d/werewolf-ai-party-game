@@ -28,9 +28,8 @@ export const LLM_CONSTANTS = {
     GPT_O4_MINI: 'o4-mini',
     GEMINI_25_FLASH: 'Gemini 2.5 Flash',
     GEMINI_25_PRO: 'Gemini 2.5 Pro',
-    GPT_O1: 'o1',
     GPT_O3: 'o3',
-    GPT_O3_PRO: 'o3-pro',
+    // GPT_O3_PRO: 'o3-pro', // Disabled: doesn't support conversation history properly
     MISTRAL_2_LARGE: 'Mistral 2 Large',
     MISTRAL_3_SMALL: 'Mistral 3 Small',
     GROK_3: 'Grok 3',
@@ -55,18 +54,14 @@ export const SupportedAiModels = {
         modelApiName: 'gpt-4.1',
         apiKeyName: API_KEY_CONSTANTS.OPENAI
     },
-    [LLM_CONSTANTS.GPT_O1]: {
-        modelApiName: 'o1',
-        apiKeyName: API_KEY_CONSTANTS.OPENAI
-    },
     [LLM_CONSTANTS.GPT_O3]: {
         modelApiName: 'o3',
         apiKeyName: API_KEY_CONSTANTS.OPENAI
     },
-    [LLM_CONSTANTS.GPT_O3_PRO]: {
-        modelApiName: 'o3-pro',
-        apiKeyName: API_KEY_CONSTANTS.OPENAI
-    },
+    // [LLM_CONSTANTS.GPT_O3_PRO]: {
+    //     modelApiName: 'o3-pro',
+    //     apiKeyName: API_KEY_CONSTANTS.OPENAI
+    // }, // Disabled: doesn't support conversation history properly
     [LLM_CONSTANTS.GPT_O4_MINI]: {
         modelApiName: 'o4-mini',
         apiKeyName: API_KEY_CONSTANTS.OPENAI
