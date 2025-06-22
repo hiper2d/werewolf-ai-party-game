@@ -148,6 +148,12 @@ Consider:
 - The evidence and arguments presented so far
 - Your role's objectives and win conditions
 
+**CRITICAL TEAM STRATEGY REMINDER:**
+- If you are a Werewolf: AVOID voting for other Werewolves unless it's absolutely necessary for deception (e.g., to avoid looking suspicious when everyone else is voting for a werewolf teammate)
+- If you are NOT a Werewolf: Focus on identifying and eliminating suspected Werewolves
+- Always prioritize your team's victory over individual survival
+- Consider how your vote will be perceived by other players
+
 Your response must follow this schema:
 
 {

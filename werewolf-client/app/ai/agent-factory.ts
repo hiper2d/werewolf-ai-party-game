@@ -25,14 +25,12 @@ export class AgentFactory {
         switch (modelName) {
             case LLM_CONSTANTS.CLAUDE_4_OPUS:
             case LLM_CONSTANTS.CLAUDE_4_SONNET:
-            case LLM_CONSTANTS.CLAUDE_35_HAIKU:
                 return new ClaudeAgent(name, instruction, model.modelApiName, key);
             case LLM_CONSTANTS.GPT_41:
                 return new OpenAiAgent(name, instruction, model.modelApiName, key, 0.2);
             case LLM_CONSTANTS.GPT_O3:
             case LLM_CONSTANTS.GPT_O4_MINI:
                 return new OpenAiOAgent(name, instruction, model.modelApiName, key);
-            case LLM_CONSTANTS.GEMINI_25_FLASH:
             case LLM_CONSTANTS.GEMINI_25_PRO:
                 return new GoogleAgent(name, instruction, model.modelApiName, key);
             case LLM_CONSTANTS.MISTRAL_3_SMALL:
