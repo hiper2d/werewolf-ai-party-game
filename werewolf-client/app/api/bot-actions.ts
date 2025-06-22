@@ -260,6 +260,101 @@ export async function talkToAll(gameId: string, userMessage: string): Promise<Ga
     }
 }
 
+export async function keepBotsGoing(gameId: string): Promise<Game> {
+    // Common authentication and validation
+    const session = await auth();
+    if (!session || !session.user?.email) {
+        throw new Error('Not authenticated');
+    }
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+
+    // Fetch the current game
+    const game = await getGame(gameId);
+    if (!game) {
+        throw new Error('Game not found');
+    }
+
+    // Validate game state
+    if (game.gameState !== GAME_STATES.DAY_DISCUSSION) {
+        throw new Error('Game is not in DAY_DISCUSSION state');
+    }
+
+    // Only allow if no bots are currently in queue (empty queue means we can start new bot conversation)
+    if (game.gameStateProcessQueue.length > 0) {
+        throw new Error('Bots are already in conversation queue');
+    }
+
+    try {
+        // Get all messages for the current day to provide context to GM
+        const messages = await getGameMessages(gameId);
+        const dayMessages = messages.filter(m => m.day === game.currentDay);
+
+        // Ask GM which bots should continue the conversation (without human input)
+        const apiKeys = await getUserFromFirestore(session.user.email).then((user) => getUserApiKeys(user!.email));
+
+        const gmPrompt = format(GM_ROUTER_SYSTEM_PROMPT, {
+            players_names: [
+                ...game.bots.map(b => b.name),
+                game.humanPlayerName
+            ].join(", "),
+            dead_players_names_with_roles: game.bots
+                .filter(b => !b.isAlive)
+                .map(b => `${b.name} (${b.role})`)
+                .join(", ")
+        });
+
+        const gmAgent = AgentFactory.createAgent(GAME_MASTER, gmPrompt, game.gameMasterAiType, apiKeys);
+        const gmMessage: GameMessage = {
+            id: null,
+            recipientName: GAME_MASTER,
+            authorName: GAME_MASTER,
+            msg: GM_COMMAND_SELECT_RESPONDERS,
+            messageType: MessageType.GM_COMMAND,
+            day: game.currentDay,
+            timestamp: Date.now()
+        };
+
+        // Include recent conversation in the GM's history for bot selection
+        const history = convertToAIMessages(GAME_MASTER, [...dayMessages, gmMessage]);
+        const schema = createGmBotSelectionSchema();
+
+        const rawGmResponse = await gmAgent.askWithSchema(schema, history);
+        if (!rawGmResponse) {
+            throw new BotResponseError(
+                'Game Master failed to select responding bots',
+                'GM did not respond to bot selection request',
+                { gmAiType: game.gameMasterAiType, action: 'bot_selection' },
+                true
+            );
+        }
+
+        const gmResponse = parseResponseToObj(rawGmResponse);
+        if (!gmResponse.selected_bots || !Array.isArray(gmResponse.selected_bots)) {
+            throw new BotResponseError(
+                'Game Master provided invalid bot selection',
+                'GM response format was invalid or missing selected_bots array',
+                { gmAiType: game.gameMasterAiType, response: gmResponse },
+                true
+            );
+        }
+
+        // Update game state with selected bots queue (limit to 1-3 bots as requested)
+        const selectedBots = gmResponse.selected_bots.slice(0, 3);
+        
+        await db.collection('games').doc(gameId).update({
+            gameStateProcessQueue: selectedBots
+        });
+
+        // Return updated game state
+        return await getGame(gameId) as Game;
+    } catch (error) {
+        console.error('Error in keepBotsGoing function:', error);
+        throw error;
+    }
+}
+
 /**
  * Handle the case when a human player initiates a discussion.
  * Saves the human message and selects bots to respond.

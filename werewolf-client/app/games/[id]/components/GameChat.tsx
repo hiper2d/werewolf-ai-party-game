@@ -74,6 +74,7 @@ function ErrorBanner({ error, onDismiss, onRetry }: ErrorBannerProps) {
                         <button
                             onClick={onRetry}
                             className="px-2 py-1 text-xs rounded bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+                            title="Retry the failed action"
                         >
                             Retry
                         </button>
@@ -506,7 +507,7 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
         } catch (error) {
             console.error('Error starting night:', error);
             
-            // Handle start night errors
+            // Handle start night errors locally in GameChat
             if (error instanceof BotResponseError) {
                 const systemError: SystemErrorMessage = {
                     error: error.message || 'Start night error occurred',
@@ -587,6 +588,7 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
                         onClick={handleStartNight}
                         disabled={isStartingNight}
                         className={`${buttonTransparentStyle} ${isStartingNight ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        title={isStartingNight ? "Starting night phase..." : "Begin the night phase where werewolves and special roles take their actions"}
                     >
                         {isStartingNight ? 'Starting Night...' : 'Start Night'}
                     </button>
@@ -607,6 +609,7 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
                     type="submit"
                     disabled={!isInputEnabled}
                     className={`${buttonTransparentStyle} ${!isInputEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    title={!isInputEnabled ? "Game is not ready for input" : "Send your message to all players"}
                 >
                     Send
                 </button>

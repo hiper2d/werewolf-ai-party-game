@@ -8,7 +8,7 @@ import { buttonTransparentStyle } from "@/app/constants";
 import { GAME_STATES, BotResponseError } from "@/app/api/game-models";
 import type { Game } from "@/app/api/game-models";
 import type { Session } from "next-auth";
-import { welcome, vote } from '@/app/api/bot-actions';
+import { welcome, vote, keepBotsGoing } from '@/app/api/bot-actions';
 import { replayNight, performNightAction } from '@/app/api/night-actions';
 import { getPlayerColor } from "@/app/utils/color-utils";
 
@@ -374,6 +374,7 @@ export default function GamePage({
                             <button
                                 className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500`}
                                 onClick={handleExitGame}
+                                title="Return to the games list"
                             >
                                 Exit Game
                             </button>
@@ -381,19 +382,37 @@ export default function GamePage({
                     ) : (
                         <div className="flex gap-2 justify-start">
                             {game.gameState === GAME_STATES.DAY_DISCUSSION && (
-                                <button
-                                    className={buttonTransparentStyle}
-                                    onClick={async () => {
-                                        try {
-                                            const updatedGame = await vote(game.id);
-                                            setGame(updatedGame);
-                                        } catch (error) {
-                                            console.error('Error starting vote:', error);
-                                        }
-                                    }}
-                                >
-                                    Voting
-                                </button>
+                                <>
+                                    <button
+                                        className={buttonTransparentStyle}
+                                        onClick={async () => {
+                                            try {
+                                                const updatedGame = await vote(game.id);
+                                                setGame(updatedGame);
+                                            } catch (error) {
+                                                console.error('Error starting vote:', error);
+                                            }
+                                        }}
+                                        title="Start the voting phase to eliminate a suspected werewolf"
+                                    >
+                                        Vote
+                                    </button>
+                                    <button
+                                        className={`${buttonTransparentStyle} ${game.gameStateProcessQueue.length > 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                        disabled={game.gameStateProcessQueue.length > 0}
+                                        onClick={async () => {
+                                            try {
+                                                const updatedGame = await keepBotsGoing(game.id);
+                                                setGame(updatedGame);
+                                            } catch (error) {
+                                                console.error('Error keeping bots going:', error);
+                                            }
+                                        }}
+                                        title={game.gameStateProcessQueue.length > 0 ? 'Bots are already talking' : 'Let 1-3 bots continue the conversation'}
+                                    >
+                                        Keep Going
+                                    </button>
+                                </>
                             )}
                             {game.gameState === GAME_STATES.VOTE_RESULTS && (
                                 <button
@@ -406,6 +425,7 @@ export default function GamePage({
                                             console.error('Error starting night:', error);
                                         }
                                     }}
+                                    title="Begin the night phase where werewolves and special roles take their actions"
                                 >
                                     🌙 Start Night
                                 </button>
@@ -433,6 +453,7 @@ export default function GamePage({
                                                 setClearNightMessages(false);
                                             }
                                         }}
+                                        title="Clear night messages and replay the night phase actions"
                                     >
                                         🔄 Replay Night
                                     </button>
