@@ -14,13 +14,14 @@ import {
 import {auth} from "@/auth";
 import {getGame, addMessageToChatAndSaveToDb} from "./game-actions";
 import { RoleProcessorFactory } from "./roles";
+import {withGameErrorHandling} from "@/app/utils/server-action-wrapper";
 
 /**
  * Handles night phase progression
  * If game is in VOTE_RESULTS state, transitions to NIGHT and sets up night actions
  * If game is in NIGHT state, processes the next night action in the queue
  */
-export async function performNightAction(gameId: string): Promise<Game> {
+async function performNightActionImpl(gameId: string): Promise<Game> {
     // Authentication check
     const session = await auth();
     if (!session || !session.user?.email) {
@@ -66,7 +67,7 @@ export async function performNightAction(gameId: string): Promise<Game> {
  * Begins the night phase by setting up role actions based on configuration
  * Validates the game is in VOTE_RESULTS state and transitions through night preparation
  */
-export async function beginNight(gameId: string): Promise<Game> {
+async function beginNightImpl(gameId: string): Promise<Game> {
     // Authentication check
     const session = await auth();
     if (!session || !session.user?.email) {
@@ -173,7 +174,7 @@ export async function beginNight(gameId: string): Promise<Game> {
  * Replays the night phase by resetting the game back to VOTE_RESULTS state
  * This clears all night actions and allows the night to be started again
  */
-export async function replayNight(gameId: string): Promise<Game> {
+async function replayNightImpl(gameId: string): Promise<Game> {
     // Authentication check
     const session = await auth();
     if (!session || !session.user?.email) {
@@ -426,3 +427,8 @@ async function processNightQueue(gameId: string, game: Game): Promise<Game> {
         );
     }
 }
+
+// Wrapped exports with error handling
+export const performNightAction = withGameErrorHandling(performNightActionImpl);
+export const beginNight = withGameErrorHandling(beginNightImpl);
+export const replayNight = withGameErrorHandling(replayNightImpl);

@@ -39,6 +39,7 @@ import {
     getUserFromFirestore
 } from "./game-actions";
 import {getUserApiKeys} from "./user-actions";
+import {withGameErrorHandling} from "@/app/utils/server-action-wrapper";
 
 /**
  * Generates the play style description for a bot, including special parameters for suspicious style
@@ -105,7 +106,7 @@ async function processWithTransaction<T>(
     }
 }
 
-export async function welcome(gameId: string): Promise<Game> {
+async function welcomeImpl(gameId: string): Promise<Game> {
     const session = await auth();
     if (!session || !session.user?.email) {
         throw new Error('Not authenticated');
@@ -221,7 +222,7 @@ export async function welcome(gameId: string): Promise<Game> {
     }
 }
 
-export async function talkToAll(gameId: string, userMessage: string): Promise<Game> {
+async function talkToAllImpl(gameId: string, userMessage: string): Promise<Game> {
     // Common authentication and validation
     const session = await auth();
     if (!session || !session.user?.email) {
@@ -260,7 +261,7 @@ export async function talkToAll(gameId: string, userMessage: string): Promise<Ga
     }
 }
 
-export async function keepBotsGoing(gameId: string): Promise<Game> {
+async function keepBotsGoingImpl(gameId: string): Promise<Game> {
     // Common authentication and validation
     const session = await auth();
     if (!session || !session.user?.email) {
@@ -550,7 +551,7 @@ async function processNextBotInQueue(
     });
 }
 
-export async function vote(gameId: string): Promise<Game> {
+async function voteImpl(gameId: string): Promise<Game> {
     const session = await auth();
     if (!session || !session.user?.email) {
         throw new Error('Not authenticated');
@@ -903,7 +904,7 @@ export async function vote(gameId: string): Promise<Game> {
     }
 }
 
-export async function humanPlayerVote(gameId: string, targetPlayer: string, reason: string): Promise<Game> {
+async function humanPlayerVoteImpl(gameId: string, targetPlayer: string, reason: string): Promise<Game> {
     const session = await auth();
     if (!session || !session.user?.email) {
         throw new Error('Not authenticated');
@@ -1015,3 +1016,10 @@ export async function humanPlayerVote(gameId: string, targetPlayer: string, reas
         throw error;
     }
 }
+
+// Wrapped exports with error handling
+export const welcome = withGameErrorHandling(welcomeImpl);
+export const talkToAll = withGameErrorHandling(talkToAllImpl);
+export const keepBotsGoing = withGameErrorHandling(keepBotsGoingImpl);
+export const vote = withGameErrorHandling(voteImpl);
+export const humanPlayerVote = withGameErrorHandling(humanPlayerVoteImpl);

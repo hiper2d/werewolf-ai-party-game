@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
-import { getGame, updateBotModel, updateGameMasterModel } from "@/app/api/game-actions";
+import { useEffect, useState } from 'react';
+import { getGame, updateBotModel, updateGameMasterModel, clearGameErrorState } from "@/app/api/game-actions";
 import GameChat from "@/app/games/[id]/components/GameChat";
 import ModelSelectionDialog from "@/app/games/[id]/components/ModelSelectionDialog";
 import { buttonTransparentStyle } from "@/app/constants";
-import { GAME_STATES, BotResponseError } from "@/app/api/game-models";
+import { GAME_STATES } from "@/app/api/game-models";
 import type { Game } from "@/app/api/game-models";
 import type { Session } from "next-auth";
 import { welcome, vote, keepBotsGoing } from '@/app/api/bot-actions';
@@ -28,8 +28,6 @@ export default function GamePage({
     session: Session | null 
 }) {
     const [game, setGame] = useState(initialGame);
-    const hasErrorRef = useRef(false);
-    const [errorDetails, setErrorDetails] = useState<BotResponseError | Error | null>(null);
     const [modelDialogOpen, setModelDialogOpen] = useState(false);
     const [selectedBot, setSelectedBot] = useState<{ name: string; aiType: string } | null>(null);
     const [clearNightMessages, setClearNightMessages] = useState(false);
@@ -42,26 +40,19 @@ export default function GamePage({
     // Handle welcome state
     useEffect(() => {
         const handleWelcome = async () => {
-            if (game.gameState === GAME_STATES.WELCOME &&
-                !hasErrorRef.current) {
-                try {
-                    const updatedGame = await welcome(game.id);
-                    setGame(updatedGame);
-                } catch (error) {
-                    console.error('Error sending welcome request:', error);
-                    hasErrorRef.current = true;
-                    setErrorDetails(error instanceof Error ? error : new Error(String(error)));
-                }
+            if (game.gameState === GAME_STATES.WELCOME && !game.errorState) {
+                const updatedGame = await welcome(game.id);
+                setGame(updatedGame);
             }
         };
 
         handleWelcome();
-    }, [game.gameState, game.id, game.gameStateParamQueue]);
+    }, [game.gameState, game.id, game.gameStateParamQueue, game.errorState]);
 
     // Handle vote state - trigger when in VOTE state and queue changes (including when it becomes empty)
     useEffect(() => {
         // Only proceed if we're in VOTE state and no error
-        if (game.gameState !== GAME_STATES.VOTE || hasErrorRef.current) {
+        if (game.gameState !== GAME_STATES.VOTE || game.errorState) {
             return;
         }
 
@@ -69,7 +60,7 @@ export default function GamePage({
             gameState: game.gameState,
             queueLength: game.gameStateProcessQueue.length,
             queue: game.gameStateProcessQueue,
-            hasError: hasErrorRef.current,
+            hasError: !!game.errorState,
             gameId: game.id,
             timestamp: new Date().toISOString()
         });
@@ -90,93 +81,64 @@ export default function GamePage({
                 queueLength: game.gameStateProcessQueue.length,
                 isEmptyQueue: game.gameStateProcessQueue.length === 0
             });
-            try {
-                const updatedGame = await vote(game.id);
-                console.log('✅ Vote API completed, updating game state:', {
-                    oldState: game.gameState,
-                    newState: updatedGame.gameState,
-                    oldQueueLength: game.gameStateProcessQueue.length,
-                    newQueueLength: updatedGame.gameStateProcessQueue.length
-                });
-                setGame(updatedGame);
-            } catch (error) {
-                console.error('❌ VOTE API ERROR:', {
-                    error: error instanceof Error ? error.message : String(error),
-                    gameState: game.gameState,
-                    gameId: game.id,
-                    queueLength: game.gameStateProcessQueue.length,
-                    timestamp: new Date().toISOString()
-                });
-                hasErrorRef.current = true;
-                setErrorDetails(error instanceof Error ? error : new Error(String(error)));
-            }
+            const updatedGame = await vote(game.id);
+            console.log('✅ Vote API completed, updating game state:', {
+                oldState: game.gameState,
+                newState: updatedGame.gameState,
+                oldQueueLength: game.gameStateProcessQueue.length,
+                newQueueLength: updatedGame.gameStateProcessQueue.length
+            });
+            setGame(updatedGame);
         };
 
         handleVote();
-    }, [game.gameState, game.gameStateProcessQueue.length, game.gameStateProcessQueue.join(','), game.id]);
+    }, [game.gameState, game.gameStateProcessQueue.length, game.gameStateProcessQueue.join(','), game.id, game.errorState]);
 
-    // Handle DAY_DISCUSSION state - process bot responses in queue
-    useEffect(() => {
-        const handleDayDiscussion = async () => {
-            if (game.gameState === GAME_STATES.DAY_DISCUSSION &&
-                game.gameStateProcessQueue.length > 0 &&
-                !hasErrorRef.current) {
-                try {
-                    console.log('🗣️ DAY_DISCUSSION: Processing bot queue...', {
-                        queueLength: game.gameStateProcessQueue.length,
-                        queue: game.gameStateProcessQueue
-                    });
-                    const { talkToAll } = await import("@/app/api/bot-actions");
-                    const updatedGame = await talkToAll(game.id, '');
-                    setGame(updatedGame);
-                } catch (error) {
-                    console.error('Error processing day discussion queue:', error);
-                    hasErrorRef.current = true;
-                    setErrorDetails(error instanceof Error ? error : new Error(String(error)));
-                }
-            }
-        };
+    // Handle DAY_DISCUSSION state - Let GameChat handle auto-processing to avoid duplicate calls
+    // This useEffect is disabled to prevent duplicate processing with GameChat
+    // useEffect(() => {
+    //     const handleDayDiscussion = async () => {
+    //         if (game.gameState === GAME_STATES.DAY_DISCUSSION &&
+    //             game.gameStateProcessQueue.length > 0 &&
+    //             !game.errorState) {
+    //             console.log('🗣️ DAY_DISCUSSION: Processing bot queue...', {
+    //                 queueLength: game.gameStateProcessQueue.length,
+    //                 queue: game.gameStateProcessQueue
+    //             });
+    //             const { talkToAll } = await import("@/app/api/bot-actions");
+    //             const updatedGame = await talkToAll(game.id, '');
+    //             setGame(updatedGame);
+    //         }
+    //     };
 
-        handleDayDiscussion();
-    }, [game.gameState, game.gameStateProcessQueue.length, game.gameStateProcessQueue.join(','), game.id]);
+    //     handleDayDiscussion();
+    // }, [game.gameState, game.gameStateProcessQueue.length, game.gameStateProcessQueue.join(','), game.id, game.errorState]);
 
     // Handle NIGHT state - process night actions when in NIGHT state
     useEffect(() => {
         const handleNightAction = async () => {
-            if (game.gameState === GAME_STATES.NIGHT && !hasErrorRef.current) {
-                try {
-                    console.log('🌙 NIGHT: Processing night action...', {
-                        gameState: game.gameState,
-                        queueLength: game.gameStateProcessQueue.length,
-                        queue: game.gameStateProcessQueue,
-                        gameId: game.id
-                    });
-                    const updatedGame = await performNightAction(game.id);
-                    setGame(updatedGame);
-                } catch (error) {
-                    console.error('Error processing night action:', error);
-                    hasErrorRef.current = true;
-                    setErrorDetails(error instanceof Error ? error : new Error(String(error)));
-                }
+            if (game.gameState === GAME_STATES.NIGHT && !game.errorState) {
+                console.log('🌙 NIGHT: Processing night action...', {
+                    gameState: game.gameState,
+                    queueLength: game.gameStateProcessQueue.length,
+                    queue: game.gameStateProcessQueue,
+                    gameId: game.id
+                });
+                const updatedGame = await performNightAction(game.id);
+                setGame(updatedGame);
             }
         };
 
         handleNightAction();
-    }, [game.gameState, game.gameStateProcessQueue.length, game.gameStateProcessQueue.join(','), game.id]);
+    }, [game.gameState, game.gameStateProcessQueue.length, game.gameStateProcessQueue.join(','), game.id, game.errorState]);
 
-    // Handle state changes and error resets
+    // Handle state changes logging
     useEffect(() => {
         console.log('📊 GAME STATE CHECK:', {
             gameState: game.gameState,
             gameId: game.id,
             timestamp: new Date().toISOString()
         });
-        
-        // Reset error state when entering NIGHT or DAY_DISCUSSION to allow game reset
-        if ((game.gameState === GAME_STATES.NIGHT || game.gameState === GAME_STATES.DAY_DISCUSSION) && hasErrorRef.current) {
-            console.log(`🔄 Resetting error state for ${game.gameState}`);
-            hasErrorRef.current = false;
-        }
     }, [game.gameState, game.id]);
 
     if (!game) {
@@ -184,9 +146,13 @@ export default function GamePage({
     }
 
     // Handle error cleared callback from GameChat
-    const handleErrorCleared = () => {
-        hasErrorRef.current = false;
-        setErrorDetails(null);
+    const handleErrorCleared = async () => {
+        try {
+            const updatedGame = await clearGameErrorState(game.id);
+            setGame(updatedGame);
+        } catch (error) {
+            console.error('Failed to clear error state:', error);
+        }
     };
 
     // Check if game is over
@@ -321,14 +287,8 @@ export default function GamePage({
                                     <button
                                         className={buttonTransparentStyle}
                                         onClick={async () => {
-                                            try {
-                                                const updatedGame = await vote(game.id);
-                                                setGame(updatedGame);
-                                            } catch (error) {
-                                                console.error('Error starting vote:', error);
-                                                hasErrorRef.current = true;
-                                                setErrorDetails(error instanceof Error ? error : new Error(String(error)));
-                                            }
+                                            const updatedGame = await vote(game.id);
+                                            setGame(updatedGame);
                                         }}
                                         title="Start the voting phase to eliminate a suspected werewolf"
                                     >
@@ -338,14 +298,8 @@ export default function GamePage({
                                         className={`${buttonTransparentStyle} ${game.gameStateProcessQueue.length > 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
                                         disabled={game.gameStateProcessQueue.length > 0}
                                         onClick={async () => {
-                                            try {
-                                                const updatedGame = await keepBotsGoing(game.id);
-                                                setGame(updatedGame);
-                                            } catch (error) {
-                                                console.error('Error keeping bots going:', error);
-                                                hasErrorRef.current = true;
-                                                setErrorDetails(error instanceof Error ? error : new Error(String(error)));
-                                            }
+                                            const updatedGame = await keepBotsGoing(game.id);
+                                            setGame(updatedGame);
                                         }}
                                         title={game.gameStateProcessQueue.length > 0 ? 'Bots are already talking' : 'Let 1-3 bots continue the conversation'}
                                     >
@@ -357,14 +311,8 @@ export default function GamePage({
                                 <button
                                     className={`${buttonTransparentStyle} bg-blue-600 hover:bg-blue-700 border-blue-500`}
                                     onClick={async () => {
-                                        try {
-                                            const updatedGame = await performNightAction(game.id);
-                                            setGame(updatedGame);
-                                        } catch (error) {
-                                            console.error('Error starting night:', error);
-                                            hasErrorRef.current = true;
-                                            setErrorDetails(error instanceof Error ? error : new Error(String(error)));
-                                        }
+                                        const updatedGame = await performNightAction(game.id);
+                                        setGame(updatedGame);
                                     }}
                                     title="Begin the night phase where werewolves and special roles take their actions"
                                 >
@@ -379,22 +327,15 @@ export default function GamePage({
                                     <button
                                         className={`${buttonTransparentStyle} bg-purple-600 hover:bg-purple-700 border-purple-500`}
                                         onClick={async () => {
-                                            try {
-                                                // First trigger UI message clearing
-                                                setClearNightMessages(true);
-                                                
-                                                // Then replay night in backend
-                                                const updatedGame = await replayNight(game.id);
-                                                setGame(updatedGame);
-                                                
-                                                // Reset the clear flag after a brief delay
-                                                setTimeout(() => setClearNightMessages(false), 100);
-                                            } catch (error) {
-                                                console.error('Error replaying night:', error);
-                                                setClearNightMessages(false);
-                                                hasErrorRef.current = true;
-                                                setErrorDetails(error instanceof Error ? error : new Error(String(error)));
-                                            }
+                                            // First trigger UI message clearing
+                                            setClearNightMessages(true);
+                                            
+                                            // Then replay night in backend
+                                            const updatedGame = await replayNight(game.id);
+                                            setGame(updatedGame);
+                                            
+                                            // Reset the clear flag after a brief delay
+                                            setTimeout(() => setClearNightMessages(false), 100);
                                         }}
                                         title="Clear night messages and replay the night phase actions"
                                     >
@@ -414,7 +355,6 @@ export default function GamePage({
                     game={game}
                     onGameStateChange={setGame}
                     clearNightMessages={clearNightMessages}
-                    externalError={hasErrorRef.current ? errorDetails : null}
                     onErrorHandled={handleErrorCleared}
                 />
             </div>

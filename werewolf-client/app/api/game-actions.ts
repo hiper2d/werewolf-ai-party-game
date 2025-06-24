@@ -15,6 +15,7 @@ import {
     PLAY_STYLES,
     RECIPIENT_ALL,
     ROLE_CONFIGS,
+    SystemErrorMessage,
     User
 } from "@/app/api/game-models";
 import {auth} from "@/auth";
@@ -478,6 +479,64 @@ export async function getBotMessages(gameId: string, botName: string, day: numbe
 }
 
 /**
+ * Set error state for a game (persisted to database)
+ */
+export async function setGameErrorState(gameId: string, errorState: SystemErrorMessage): Promise<Game> {
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+    
+    try {
+        const gameRef = db.collection('games').doc(gameId);
+        const gameSnap = await gameRef.get();
+        
+        if (!gameSnap.exists) {
+            throw new Error('Game not found');
+        }
+        
+        const gameData = gameSnap.data();
+        
+        // Update the error state in Firestore
+        await gameRef.update({ errorState: errorState });
+        
+        // Return the updated game
+        return gameFromFirestore(gameId, { ...gameData, errorState: errorState });
+    } catch (error: any) {
+        console.error("Error setting game error state: ", error);
+        throw new Error(`Failed to set game error state: ${error.message}`);
+    }
+}
+
+/**
+ * Clear error state for a game (persisted to database)
+ */
+export async function clearGameErrorState(gameId: string): Promise<Game> {
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+    
+    try {
+        const gameRef = db.collection('games').doc(gameId);
+        const gameSnap = await gameRef.get();
+        
+        if (!gameSnap.exists) {
+            throw new Error('Game not found');
+        }
+        
+        const gameData = gameSnap.data();
+        
+        // Clear the error state in Firestore
+        await gameRef.update({ errorState: null });
+        
+        // Return the updated game
+        return gameFromFirestore(gameId, { ...gameData, errorState: null });
+    } catch (error: any) {
+        console.error("Error clearing game error state: ", error);
+        throw new Error(`Failed to clear game error state: ${error.message}`);
+    }
+}
+
+/**
  * Exported so bot-actions can access user details
  */
 export async function getUserFromFirestore(email: string): Promise<User | null> {
@@ -530,6 +589,7 @@ function gameFromFirestore(id: string, data: any): Game {
         currentDay: data.currentDay,
         gameState: data.gameState,
         gameStateParamQueue: data.gameStateParamQueue,
-        gameStateProcessQueue: data.gameStateProcessQueue
+        gameStateProcessQueue: data.gameStateProcessQueue,
+        errorState: data.errorState || null
     };
 }

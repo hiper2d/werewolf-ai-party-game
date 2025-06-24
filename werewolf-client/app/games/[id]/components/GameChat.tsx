@@ -7,6 +7,7 @@ import { buttonTransparentStyle } from "@/app/constants";
 import { GAME_STATES, MessageType, RECIPIENT_ALL, GameMessage, Game, SystemErrorMessage, BotResponseError, GAME_MASTER } from "@/app/api/game-models";
 import { getPlayerColor } from "@/app/utils/color-utils";
 import { convertMessageContent } from "@/app/utils/message-utils";
+import { clearGameErrorState } from "@/app/api/game-actions";
 import VotingModal from "./VotingModal";
 
 interface GameChatProps {
@@ -14,7 +15,6 @@ interface GameChatProps {
     game: Game;
     onGameStateChange?: (updatedGame: Game) => void;
     clearNightMessages?: boolean;
-    externalError?: Error | BotResponseError | null;
     onErrorHandled?: () => void;
 }
 
@@ -187,14 +187,11 @@ function renderMessage(message: GameMessage, gameId: string, onDeleteAfter: (mes
     );
 }
 
-export default function GameChat({ gameId, game, onGameStateChange, clearNightMessages, externalError, onErrorHandled }: GameChatProps) {
+export default function GameChat({ gameId, game, onGameStateChange, clearNightMessages, onErrorHandled }: GameChatProps) {
     const [messages, setMessages] = useState<GameMessage[]>([]);
     const [newMessage, setNewMessage] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
-    const [error, setError] = useState<SystemErrorMessage | null>(null);
-    const [showErrorBanner, setShowErrorBanner] = useState(false);
-    const [lastFailedAction, setLastFailedAction] = useState<(() => Promise<void>) | null>(null);
     const [showVotingModal, setShowVotingModal] = useState(false);
     const [isVoting, setIsVoting] = useState(false);
     const [isStartingNight, setIsStartingNight] = useState(false);
@@ -226,38 +223,6 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
         }
     }, [clearNightMessages]);
 
-    // Handle external errors from GamePage
-    React.useEffect(() => {
-        if (externalError) {
-            console.log('🚨 External error received in GameChat:', externalError);
-            
-            // Convert external error to SystemErrorMessage format
-            if (externalError instanceof BotResponseError) {
-                const systemError: SystemErrorMessage = {
-                    error: externalError.message || 'Bot response error occurred',
-                    details: externalError.details || 'Failed to process bot response',
-                    context: externalError.context || {},
-                    recoverable: externalError.recoverable !== false,
-                    timestamp: Date.now()
-                };
-                handleError(systemError);
-            } else {
-                const systemError: SystemErrorMessage = {
-                    error: 'System error occurred',
-                    details: externalError.message || 'Unknown error',
-                    context: {},
-                    recoverable: false,
-                    timestamp: Date.now()
-                };
-                handleError(systemError);
-            }
-            
-            // Notify parent that error has been handled
-            if (onErrorHandled) {
-                onErrorHandled();
-            }
-        }
-    }, [externalError, onErrorHandled]);
 
     // Auto-process queue when not empty
     useEffect(() => {
@@ -266,31 +231,34 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
             queueLength: game.gameStateProcessQueue.length,
             queue: game.gameStateProcessQueue,
             isProcessing,
+            hasError: !!game.errorState,
             gameId,
             timestamp: new Date().toISOString()
         });
 
         if (game.gameState === GAME_STATES.DAY_DISCUSSION &&
             game.gameStateProcessQueue.length > 0 &&
-            !isProcessing) {
+            !isProcessing &&
+            !game.errorState) {
             console.log('🚨 CALLING TALK_TO_ALL API - This could be the loop source!', {
                 gameId,
                 queue: game.gameStateProcessQueue
             });
             const processQueue = async () => {
                 setIsProcessing(true);
-                try {
-                    await talkToAll(gameId, '');
-                    console.log('✅ TalkToAll API completed');
-                } catch (error) {
-                    console.error("Error processing queue:", error);
-                } finally {
-                    setIsProcessing(false);
+                const updatedGame = await talkToAll(gameId, '');
+                console.log('✅ TalkToAll API completed');
+                
+                // Update parent game state to clear the queue
+                if (onGameStateChange) {
+                    console.log('🔄 UPDATING PARENT GAME STATE after auto-processing...');
+                    onGameStateChange(updatedGame);
                 }
+                setIsProcessing(false);
             };
             processQueue();
         }
-    }, [game.gameState, game.gameStateProcessQueue, gameId, isProcessing]);
+    }, [game.gameState, game.gameStateProcessQueue, gameId, isProcessing, game.errorState, onGameStateChange]);
 
     // Check if it's human player's turn to vote
     useEffect(() => {
@@ -334,79 +302,29 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
         const trimmed = newMessage.trim();
         if (!trimmed) return;
 
-        const action = async () => {
-            await talkToAll(gameId, trimmed);
-            setNewMessage('');
-            
-            // Refresh game state to trigger queue processing in parent component
-            if (onGameStateChange) {
-                console.log('🔄 REFRESHING GAME STATE after human message...');
-                const { getGame } = await import("@/app/api/game-actions");
-                const updatedGame = await getGame(gameId);
-                if (updatedGame) {
-                    console.log('✅ GAME STATE UPDATED - Processing queue length:', updatedGame.gameStateProcessQueue.length);
-                    onGameStateChange(updatedGame);
-                }
-            }
-        };
-
-        try {
-            setIsProcessing(true);
-            setLastFailedAction(() => action);
-            await action();
-        } catch (error) {
-            console.error("Error sending message:", error);
-            
-            // Handle BotResponseError by converting to SystemErrorMessage for display
-            if (error instanceof BotResponseError) {
-                const systemError: SystemErrorMessage = {
-                    error: error.message || 'Bot response error occurred',
-                    details: error.details || 'Failed to process bot response',
-                    context: error.context || {},
-                    recoverable: error.recoverable !== false, // Default to recoverable
-                    timestamp: Date.now()
-                };
-                handleError(systemError);
-            } else {
-                // Handle other errors
-                const systemError: SystemErrorMessage = {
-                    error: 'System error occurred',
-                    details: error instanceof Error ? error.message : 'Unknown error',
-                    context: {},
-                    recoverable: false,
-                    timestamp: Date.now()
-                };
-                handleError(systemError);
-            }
-        } finally {
-            setIsProcessing(false);
-        }
-    };
-
-    const handleError = (errorMessage: SystemErrorMessage) => {
-        setError(errorMessage);
-        setShowErrorBanner(true);
-    };
-
-    const handleDismissError = () => {
-        setShowErrorBanner(false);
-        setError(null);
-    };
-
-    const handleRetryError = async () => {
-        if (!lastFailedAction) return;
+        setIsProcessing(true);
+        const updatedGame = await talkToAll(gameId, trimmed);
+        setNewMessage('');
         
+        // Update parent game state
+        if (onGameStateChange) {
+            console.log('🔄 UPDATING GAME STATE after human message...');
+            onGameStateChange(updatedGame);
+        }
+        setIsProcessing(false);
+    };
+
+    const handleDismissError = async () => {
+        // Clear the persistent error state in the database
         try {
-            setIsProcessing(true);
-            setShowErrorBanner(false);
-            await lastFailedAction();
-            setError(null);
+            console.log('🔄 CLEARING GAME ERROR STATE and refreshing...');
+            const updatedGame = await clearGameErrorState(gameId);
+            if (onGameStateChange) {
+                onGameStateChange(updatedGame);
+            }
+            console.log('✅ GAME ERROR STATE CLEARED and game state refreshed');
         } catch (error) {
-            console.error("Error retrying action:", error);
-            // Keep the error banner visible if retry fails
-            setShowErrorBanner(true);
-        } finally {
-            setIsProcessing(false);
+            console.error('Error clearing game error state:', error);
         }
     };
 
@@ -475,44 +393,18 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
             timestamp: new Date().toISOString()
         });
         
-        try {
-            setIsVoting(true);
-            console.log('🚨 CALLING HUMAN_PLAYER_VOTE API - This could trigger the loop!');
-            const updatedGame = await humanPlayerVote(gameId, targetPlayer, reason);
-            console.log('✅ Human vote API completed, closing modal and updating state');
-            setShowVotingModal(false);
-            
-            // Update game state if callback is provided
-            if (onGameStateChange) {
-                console.log('📊 Updating parent game state after vote');
-                onGameStateChange(updatedGame);
-            }
-        } catch (error) {
-            console.error('Error casting vote:', error);
-            
-            // Handle voting errors
-            if (error instanceof BotResponseError) {
-                const systemError: SystemErrorMessage = {
-                    error: error.message || 'Voting error occurred',
-                    details: error.details || 'Failed to cast vote',
-                    context: error.context || {},
-                    recoverable: error.recoverable !== false,
-                    timestamp: Date.now()
-                };
-                handleError(systemError);
-            } else {
-                const systemError: SystemErrorMessage = {
-                    error: 'Failed to cast vote',
-                    details: error instanceof Error ? error.message : 'Unknown error',
-                    context: {},
-                    recoverable: true,
-                    timestamp: Date.now()
-                };
-                handleError(systemError);
-            }
-        } finally {
-            setIsVoting(false);
+        setIsVoting(true);
+        console.log('🚨 CALLING HUMAN_PLAYER_VOTE API - This could trigger the loop!');
+        const updatedGame = await humanPlayerVote(gameId, targetPlayer, reason);
+        console.log('✅ Human vote API completed, closing modal and updating state');
+        setShowVotingModal(false);
+        
+        // Update game state if callback is provided
+        if (onGameStateChange) {
+            console.log('📊 Updating parent game state after vote');
+            onGameStateChange(updatedGame);
         }
+        setIsVoting(false);
     };
 
     const handleCloseVotingModal = () => {
@@ -528,43 +420,17 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
             timestamp: new Date().toISOString()
         });
         
-        try {
-            setIsStartingNight(true);
-            console.log('🚨 CALLING BEGIN_NIGHT API');
-            const updatedGame = await beginNight(gameId);
-            console.log('✅ Begin night API completed, updating state');
-            
-            // Update game state if callback is provided
-            if (onGameStateChange) {
-                console.log('📊 Updating parent game state after starting night');
-                onGameStateChange(updatedGame);
-            }
-        } catch (error) {
-            console.error('Error starting night:', error);
-            
-            // Handle start night errors locally in GameChat
-            if (error instanceof BotResponseError) {
-                const systemError: SystemErrorMessage = {
-                    error: error.message || 'Start night error occurred',
-                    details: error.details || 'Failed to start night phase',
-                    context: error.context || {},
-                    recoverable: error.recoverable !== false,
-                    timestamp: Date.now()
-                };
-                handleError(systemError);
-            } else {
-                const systemError: SystemErrorMessage = {
-                    error: 'Failed to start night',
-                    details: error instanceof Error ? error.message : 'Unknown error',
-                    context: {},
-                    recoverable: true,
-                    timestamp: Date.now()
-                };
-                handleError(systemError);
-            }
-        } finally {
-            setIsStartingNight(false);
+        setIsStartingNight(true);
+        console.log('🚨 CALLING BEGIN_NIGHT API');
+        const updatedGame = await beginNight(gameId);
+        console.log('✅ Begin night API completed, updating state');
+        
+        // Update game state if callback is provided
+        if (onGameStateChange) {
+            console.log('📊 Updating parent game state after starting night');
+            onGameStateChange(updatedGame);
         }
+        setIsStartingNight(false);
     };
 
     const isInputEnabled = game.gameState === GAME_STATES.DAY_DISCUSSION &&
@@ -593,11 +459,10 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
     return (
         <div className="flex flex-col h-full border border-white border-opacity-30 rounded-lg p-4">
             <h2 className="text-xl font-bold mb-4 text-white">Game Chat</h2>
-            {showErrorBanner && error && (
+            {game.errorState && (
                 <ErrorBanner
-                    error={error}
+                    error={game.errorState}
                     onDismiss={handleDismissError}
-                    onRetry={error.recoverable ? handleRetryError : undefined}
                 />
             )}
             {game.gameStateProcessQueue.length > 0 && (
