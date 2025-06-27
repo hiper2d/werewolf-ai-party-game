@@ -193,13 +193,13 @@ async function replayNightImpl(gameId: string): Promise<Game> {
     }
 
     // Validate game state (should be in a night phase)
-    if (game.gameState !== GAME_STATES.NIGHT) {
+    if (game.gameState !== GAME_STATES.NIGHT && game.gameState !== GAME_STATES.NIGHT_ENDS) {
         throw new BotResponseError(
             'Invalid game state for replaying night',
-            `Game must be in NIGHT state to replay night. Current state: ${game.gameState}`,
+            `Game must be in NIGHT or NIGHT_ENDS state to replay night. Current state: ${game.gameState}`,
             { 
                 currentState: game.gameState, 
-                expectedState: GAME_STATES.NIGHT,
+                expectedStates: [GAME_STATES.NIGHT, GAME_STATES.NIGHT_ENDS],
                 gameId 
             },
             true

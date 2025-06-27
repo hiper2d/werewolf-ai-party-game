@@ -319,7 +319,7 @@ export default function GamePage({
                                     🌙 Start Night
                                 </button>
                             )}
-                            {game.gameState === GAME_STATES.NIGHT && (
+                            {(game.gameState === GAME_STATES.NIGHT || game.gameState === GAME_STATES.NIGHT_ENDS) && (
                                 <div className="flex flex-col gap-2">
                                     <div className="text-sm text-yellow-400 text-center">
                                         🌙 Night in progress...
