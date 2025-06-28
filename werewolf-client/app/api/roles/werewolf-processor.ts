@@ -27,11 +27,28 @@ export class WerewolfProcessor extends BaseRoleProcessor {
             const werewolfNames = playersInfo.allPlayers.map(p => p.name).join(', ');
             this.logNightAction(`Werewolves (${werewolfNames}) are taking their night action`);
 
-            // For now, just log the action - actual elimination logic will be implemented later
-            // This is where we would:
-            // 1. Determine which player the werewolves want to eliminate
-            // 2. Apply the elimination (unless protected by doctor)
-            // 3. Send appropriate messages
+            // todo
+
+            /* if the game.gameStateParamQueue is empty, then do the following
+                1. create a list of werewolf names in a random order
+                2. there are more than one werewolves alive, append the list to itself, so each name present twice in the final list
+                3. save the result list to the game.gameStateParamQueue
+                4. end the execution of the processor
+
+                If the game.gameStateParamQueue is not empty, then do this:
+                1. pick the first name from the queue
+                2. create a bot agents and ask it to select a victim the werewolves want to kill this night
+                3. save the response to the database with the new recipient type WEREWOLVES
+                4. remove the name from the queue and save it
+                5. end the execution of the processor
+
+                When removing the last name from the game.gameStateParamQueue, updates the gameStateProcessQueue by removing the current role ('werewolf') from it as well.
+                This means that the werewolves phase is completed. Later we'll handle the werewolves phase results later.
+
+                Update the frontend logic in the GameChat so it handles the GAME_STATES.NIGHT:
+                1. It should check what is the first role in the game.gameStateProcessQueue and show that this role is taking action in the getInputPlaceholder
+                2. Then it should make a server function call to the processNightQueue
+            */
 
             // Send a message indicating werewolves are active
             await this.sendMessage(`🐺 The werewolves stir in the darkness, planning their next move...`);
