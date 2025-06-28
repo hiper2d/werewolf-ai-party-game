@@ -50,7 +50,10 @@ function generatePlayStyleDescription(bot: Bot): string {
         return 'You have a balanced and thoughtful personality.';
     }
     
-    let description = config.description;
+    // Use werewolfDescription for werewolf bots, regular description for others
+    let description = bot.role === GAME_ROLES.WEREWOLF 
+        ? config.werewolfDescription 
+        : config.description;
     
     // For suspicious style, inject the specific target names if available
     if (bot.playStyle === PLAY_STYLES.SUSPICIOUS && bot.playStyleParams && bot.playStyleParams.length >= 2) {
