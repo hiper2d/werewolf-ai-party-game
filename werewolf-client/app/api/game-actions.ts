@@ -14,6 +14,7 @@ import {
     MessageType,
     PLAY_STYLES,
     RECIPIENT_ALL,
+    RECIPIENT_WEREWOLVES,
     ROLE_CONFIGS,
     SystemErrorMessage,
     User
@@ -429,53 +430,73 @@ export async function getBotMessages(gameId: string, botName: string, day: numbe
         throw new Error('Firestore is not initialized');
     }
 
-    // We need to perform two queries and combine the results:
+    // Get the game to check if this bot is a werewolf
+    const game = await getGame(gameId);
+    if (!game) {
+        throw new Error('Game not found');
+    }
+    
+    // Check if this bot is a werewolf
+    const bot = game.bots.find(b => b.name === botName);
+    const isWerewolf = bot?.role === GAME_ROLES.WEREWOLF || 
+                      (botName === game.humanPlayerName && game.humanPlayerRole === GAME_ROLES.WEREWOLF);
+
+    // Base queries that all bots get:
     // 1. Messages where recipientName is RECIPIENT_ALL
     // 2. Messages where recipientName is the specific bot name
+    const queries = [
+        db.collection('games')
+            .doc(gameId)
+            .collection('messages')
+            .where('day', '==', day)
+            .where('recipientName', '==', RECIPIENT_ALL)
+            .orderBy('timestamp', 'asc'),
+            
+        db.collection('games')
+            .doc(gameId)
+            .collection('messages')
+            .where('day', '==', day)
+            .where('recipientName', '==', botName)
+            .orderBy('timestamp', 'asc')
+    ];
     
-    const allMessagesQuery = db.collection('games')
-        .doc(gameId)
-        .collection('messages')
-        .where('day', '==', day)
-        .where('recipientName', '==', RECIPIENT_ALL)
-        .orderBy('timestamp', 'asc');
+    // Add werewolf-only messages if this bot is a werewolf
+    if (isWerewolf) {
+        queries.push(
+            db.collection('games')
+                .doc(gameId)
+                .collection('messages')
+                .where('day', '==', day)
+                .where('recipientName', '==', RECIPIENT_WEREWOLVES)
+                .orderBy('timestamp', 'asc')
+        );
+    }
         
-    const directMessagesQuery = db.collection('games')
-        .doc(gameId)
-        .collection('messages')
-        .where('day', '==', day)
-        .where('recipientName', '==', botName)
-        .orderBy('timestamp', 'asc');
-        
-    // Execute both queries
-    const [allMessagesSnapshot, directMessagesSnapshot] = await Promise.all([
-        allMessagesQuery.get(),
-        directMessagesQuery.get()
-    ]);
+    // Execute all queries
+    const snapshots = await Promise.all(queries.map(query => query.get()));
     
-    // Combine and convert the results
-    const allMessages = allMessagesSnapshot.docs.map(doc => ({
-        id: doc.id,
-        recipientName: doc.data().recipientName,
-        authorName: doc.data().authorName,
-        msg: doc.data().msg,
-        messageType: doc.data().messageType,
-        day: doc.data().day,
-        timestamp: doc.data().timestamp
-    }));
+    // Combine all messages
+    const allMessages: GameMessage[] = [];
+    snapshots.forEach(snapshot => {
+        snapshot.docs.forEach(doc => {
+            allMessages.push({
+                id: doc.id,
+                recipientName: doc.data().recipientName,
+                authorName: doc.data().authorName,
+                msg: doc.data().msg,
+                messageType: doc.data().messageType,
+                day: doc.data().day,
+                timestamp: doc.data().timestamp
+            });
+        });
+    });
     
-    const directMessages = directMessagesSnapshot.docs.map(doc => ({
-        id: doc.id,
-        recipientName: doc.data().recipientName,
-        authorName: doc.data().authorName,
-        msg: doc.data().msg,
-        messageType: doc.data().messageType,
-        day: doc.data().day,
-        timestamp: doc.data().timestamp
-    }));
+    // Remove duplicates and sort by timestamp
+    const uniqueMessages = allMessages.filter((message, index, array) => 
+        array.findIndex(m => m.id === message.id) === index
+    );
     
-    // Combine and sort by timestamp
-    return [...allMessages, ...directMessages].sort((a, b) => a.timestamp - b.timestamp);
+    return uniqueMessages.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
 }
 
 /**

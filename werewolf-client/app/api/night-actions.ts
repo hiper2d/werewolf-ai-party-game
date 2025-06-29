@@ -384,13 +384,14 @@ async function processNightQueue(gameId: string, game: Game): Promise<Game> {
 
         // Create role processor for the current role
         const roleProcessor = RoleProcessorFactory.createProcessor(currentRole, gameId, game);
+        let result: any = { success: true };
         
         if (!roleProcessor) {
             // This role doesn't have night actions, skip it
             console.warn(`🌙 NIGHT ACTION: Role ${currentRole} has no processor, skipping`);
         } else {
             // Process the night action for this role
-            const result = await roleProcessor.processNightAction();
+            result = await roleProcessor.processNightAction();
             
             if (!result.success) {
                 console.error(`🌙 NIGHT ACTION ERROR: Failed to process ${currentRole} action: ${result.error}`);
@@ -403,10 +404,14 @@ async function processNightQueue(gameId: string, game: Game): Promise<Game> {
             }
         }
 
-        // Update the queue (remove the processed role)
-        await db.collection('games').doc(gameId).update({
-            gameStateProcessQueue: remainingQueue
-        });
+        // Update the queue (remove the processed role only if gameStateParamQueue is empty)
+        if (!result.gameUpdates?.gameStateParamQueue || result.gameUpdates.gameStateParamQueue.length === 0) {
+            // Add gameStateProcessQueue update to the existing gameUpdates if they exist
+            const finalUpdates = result.gameUpdates ? { ...result.gameUpdates } : {};
+            finalUpdates.gameStateProcessQueue = remainingQueue;
+            
+            await db.collection('games').doc(gameId).update(finalUpdates);
+        }
 
         // Return the updated game state
         return await getGame(gameId) as Game;

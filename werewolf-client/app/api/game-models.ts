@@ -189,6 +189,10 @@ export class GameStory {
     constructor(public story: string) {}
 }
 
+export class WerewolfAction {
+    constructor(public target: string, public reasoning: string) {}
+}
+
 export interface SystemErrorMessage {
     error: string;
     details: string;
@@ -224,6 +228,7 @@ export const MESSAGE_ROLE = {
 
 export const GAME_MASTER = 'Game Master';
 export const RECIPIENT_ALL = 'ALL';
+export const RECIPIENT_WEREWOLVES = 'WEREWOLVES';
 
 export interface GameMessage {
     id: string | null;           // Will be null for new messages, set by Firestore

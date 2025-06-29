@@ -101,3 +101,25 @@ export const createBotVoteSchema = () => ({
     },
     required: ['who', 'why']
 });
+
+// Werewolf action interface
+export interface WerewolfAction {
+    target: string;
+    reasoning: string;
+}
+
+// Werewolf action schema for response validation
+export const createWerewolfActionSchema = () => ({
+    type: 'object',
+    properties: {
+        target: {
+            type: 'string',
+            description: 'The name of the player to eliminate'
+        },
+        reasoning: {
+            type: 'string',
+            description: 'Reasoning for the target selection'
+        }
+    },
+    required: ['target', 'reasoning']
+});

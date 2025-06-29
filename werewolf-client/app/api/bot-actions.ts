@@ -7,6 +7,7 @@ import {
     BotResponseError,
     Game,
     GAME_MASTER,
+    GAME_ROLES,
     GAME_STATES,
     GameMessage,
     MessageType,
@@ -40,29 +41,7 @@ import {
 } from "./game-actions";
 import {getUserApiKeys} from "./user-actions";
 import {withGameErrorHandling} from "@/app/utils/server-action-wrapper";
-
-/**
- * Generates the play style description for a bot, including special parameters for suspicious style
- */
-function generatePlayStyleDescription(bot: Bot): string {
-    const config = PLAY_STYLE_CONFIGS[bot.playStyle];
-    if (!config) {
-        return 'You have a balanced and thoughtful personality.';
-    }
-    
-    // Use werewolfDescription for werewolf bots, regular description for others
-    let description = bot.role === GAME_ROLES.WEREWOLF 
-        ? config.werewolfDescription 
-        : config.description;
-    
-    // For suspicious style, inject the specific target names if available
-    if (bot.playStyle === PLAY_STYLES.SUSPICIOUS && bot.playStyleParams && bot.playStyleParams.length >= 2) {
-        const [target1, target2] = bot.playStyleParams;
-        description = `You are highly suspicious of ${target1} and ${target2} specifically. You believe they are werewolves and focus your suspicions on them throughout the game. ${description}`;
-    }
-    
-    return description;
-}
+import {generatePlayStyleDescription} from "@/app/utils/bot-utils";
 
 /**
  * Wraps Firestore operations in a transaction for atomicity

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { talkToAll, humanPlayerVote } from "@/app/api/bot-actions";
-import { beginNight } from "@/app/api/night-actions";
+import { beginNight, performNightAction } from "@/app/api/night-actions";
 import { buttonTransparentStyle } from "@/app/constants";
 import { GAME_STATES, MessageType, RECIPIENT_ALL, GameMessage, Game, SystemErrorMessage, BotResponseError, GAME_MASTER } from "@/app/api/game-models";
 import { getPlayerColor } from "@/app/utils/color-utils";
@@ -236,6 +236,7 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
             timestamp: new Date().toISOString()
         });
 
+        // Auto-process DAY_DISCUSSION queue
         if (game.gameState === GAME_STATES.DAY_DISCUSSION &&
             game.gameStateProcessQueue.length > 0 &&
             !isProcessing &&
@@ -257,6 +258,30 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
                 setIsProcessing(false);
             };
             processQueue();
+        }
+        
+        // Auto-process NIGHT queue
+        if (game.gameState === GAME_STATES.NIGHT &&
+            game.gameStateProcessQueue.length > 0 &&
+            !isProcessing &&
+            !game.errorState) {
+            console.log('🌙 CALLING PERFORM_NIGHT_ACTION API', {
+                gameId,
+                queue: game.gameStateProcessQueue
+            });
+            const processNightQueue = async () => {
+                setIsProcessing(true);
+                const updatedGame = await performNightAction(gameId);
+                console.log('✅ PerformNightAction API completed');
+                
+                // Update parent game state
+                if (onGameStateChange) {
+                    console.log('🔄 UPDATING PARENT GAME STATE after night processing...');
+                    onGameStateChange(updatedGame);
+                }
+                setIsProcessing(false);
+            };
+            processNightQueue();
         }
     }, [game.gameState, game.gameStateProcessQueue, gameId, isProcessing, game.errorState, onGameStateChange]);
 
@@ -444,6 +469,12 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
             return "Game has ended - chat disabled";
         }
         if (game.gameState === GAME_STATES.NIGHT) {
+            if (game.gameStateProcessQueue.length > 0) {
+                const currentRole = game.gameStateProcessQueue[0];
+                // Capitalize the role name for display
+                const displayRole = currentRole.charAt(0).toUpperCase() + currentRole.slice(1);
+                return `Night phase: ${displayRole} is taking action...`;
+            }
             return "Night phase in progress...";
         }
         if (game.gameState !== GAME_STATES.DAY_DISCUSSION) {

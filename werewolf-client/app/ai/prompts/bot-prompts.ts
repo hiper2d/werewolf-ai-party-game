@@ -172,3 +172,60 @@ Your response must follow this schema:
 }
 
 Return a single JSON object matching this schema.`;
+
+export const BOT_WEREWOLF_DISCUSSION_PROMPT: string = `🌙 **Night Phase - Werewolf Discussion**
+
+The night has fallen and werewolves are discussing their strategy. This is your private communication with other werewolves.
+
+Discuss:
+- Who should be targeted for elimination tonight?
+- Analysis of potential threats (Doctor, Detective, suspicious players)
+- Strategy for tomorrow's day phase (who to defend, who to accuse)
+- Coordination with other werewolves
+
+This is a private werewolf-only discussion. Share your thoughts, analysis, and suggestions with your fellow werewolves.
+
+Your response must follow this schema:
+
+{
+    "type": "object",
+    "properties": {
+        "reply": {
+            "type": "string",
+            "description": "Your discussion message to other werewolves about strategy and plans"
+        }
+    },
+    "required": ["reply"]
+}
+
+Return a single JSON object matching this schema.`;
+
+export const BOT_WEREWOLF_ACTION_PROMPT: string = `🌙 **Night Phase - Werewolf Final Decision**
+
+After the werewolf discussion, it's time to make the final decision on who to eliminate tonight. You are the designated decision-maker for this night.
+
+Consider:
+- The discussion and suggestions from other werewolves
+- Who poses the greatest threat to the werewolf team?
+- Who might be a special role (Doctor, Detective) that needs to be eliminated?
+- Who has been most suspicious of werewolves during discussions?
+- Strategic value of eliminating this player
+
+Your response must follow this schema:
+
+{
+    "type": "object",
+    "properties": {
+        "target": {
+            "type": "string",
+            "description": "The name of the player you want to eliminate tonight"
+        },
+        "reasoning": {
+            "type": "string", 
+            "description": "Your reasoning for choosing this target (private werewolf discussion)"
+        }
+    },
+    "required": ["target", "reasoning"]
+}
+
+Return a single JSON object matching this schema.`;

@@ -1,5 +1,15 @@
 import { BaseRoleProcessor, NightActionResult } from "./base-role-processor";
-import { GAME_ROLES } from "@/app/api/game-models";
+import { GAME_ROLES, RECIPIENT_WEREWOLVES, GAME_MASTER, GameMessage, MessageType, BotAnswer } from "@/app/api/game-models";
+import { AgentFactory } from "@/app/ai/agent-factory";
+import { addMessageToChatAndSaveToDb, getBotMessages, getUserFromFirestore } from "@/app/api/game-actions";
+import { getUserApiKeys } from "@/app/api/user-actions";
+import { generatePlayStyleDescription } from "@/app/utils/bot-utils";
+import { auth } from "@/auth";
+import { convertToAIMessages, parseResponseToObj } from "@/app/utils/message-utils";
+import { BOT_SYSTEM_PROMPT, BOT_WEREWOLF_ACTION_PROMPT, BOT_WEREWOLF_DISCUSSION_PROMPT } from "@/app/ai/prompts/bot-prompts";
+import { format } from "@/app/ai/prompts/utils";
+import { createWerewolfActionSchema, WerewolfAction, createBotAnswerSchema } from "@/app/ai/prompts/ai-schemas";
+import { db } from "@/firebase/server";
 
 /**
  * Werewolf role processor
@@ -27,35 +37,171 @@ export class WerewolfProcessor extends BaseRoleProcessor {
             const werewolfNames = playersInfo.allPlayers.map(p => p.name).join(', ');
             this.logNightAction(`Werewolves (${werewolfNames}) are taking their night action`);
 
-            // todo
-
-            /* if the game.gameStateParamQueue is empty, then do the following
-                1. create a list of werewolf names in a random order
-                2. there are more than one werewolves alive, append the list to itself, so each name present twice in the final list
-                3. save the result list to the game.gameStateParamQueue
-                4. end the execution of the processor
-
-                If the game.gameStateParamQueue is not empty, then do this:
-                1. pick the first name from the queue
-                2. create a bot agents and ask it to select a victim the werewolves want to kill this night
-                3. save the response to the database with the new recipient type WEREWOLVES
-                4. remove the name from the queue and save it
-                5. end the execution of the processor
-
-                When removing the last name from the game.gameStateParamQueue, updates the gameStateProcessQueue by removing the current role ('werewolf') from it as well.
-                This means that the werewolves phase is completed. Later we'll handle the werewolves phase results later.
-
-                Update the frontend logic in the GameChat so it handles the GAME_STATES.NIGHT:
-                1. It should check what is the first role in the game.gameStateProcessQueue and show that this role is taking action in the getInputPlaceholder
-                2. Then it should make a server function call to the processNightQueue
-            */
-
-            // Send a message indicating werewolves are active
-            await this.sendMessage(`🐺 The werewolves stir in the darkness, planning their next move...`);
+            // Check if queue initialization is needed
+            if (this.game.gameStateParamQueue.length === 0) {
+                // Phase 1: Initialize queue with werewolf names
+                this.logNightAction("Initializing werewolf action queue");
+                
+                // Create list of werewolf names in random order
+                let werewolfNames = playersInfo.allPlayers.map(p => p.name);
+                werewolfNames = werewolfNames.sort(() => Math.random() - 0.5);
+                
+                // If there are multiple werewolves, duplicate the list so each name appears twice
+                if (werewolfNames.length > 1) {
+                    werewolfNames = [...werewolfNames, ...werewolfNames];
+                }
+                
+                this.logNightAction(`Initialized queue with werewolves: ${werewolfNames.join(', ')}`);
+                return { 
+                    success: true,
+                    gameUpdates: {
+                        gameStateParamQueue: werewolfNames
+                    }
+                };
+            }
+            
+            // Phase 2: Process next werewolf action
+            const currentWerewolfName = this.game.gameStateParamQueue[0];
+            const remainingQueue = this.game.gameStateParamQueue.slice(1);
+            
+            this.logNightAction(`Processing action for werewolf: ${currentWerewolfName}`);
+            
+            // Get the werewolf bot (skip if human player)
+            const werewolfBot = playersInfo.bots.find(bot => bot.name === currentWerewolfName);
+            if (!werewolfBot) {
+                // If human werewolf, skip for now (would need UI implementation)
+                this.logNightAction(`Skipping human werewolf: ${currentWerewolfName}`);
+                
+                if (remainingQueue.length === 0) {
+                    this.logNightAction("Werewolf phase completed");
+                }
+                
+                return { 
+                    success: true,
+                    gameUpdates: {
+                        gameStateParamQueue: remainingQueue
+                    }
+                };
+            }
+            
+            // Get authentication for API calls
+            const session = await auth();
+            if (!session || !session.user?.email) {
+                throw new Error('Not authenticated');
+            }
+            
+            // Get API keys
+            const user = await getUserFromFirestore(session.user.email);
+            const apiKeys = await getUserApiKeys(user!.email);
+            
+            // Create werewolf prompt
+            const werewolfPrompt = format(BOT_SYSTEM_PROMPT, {
+                name: werewolfBot.name,
+                personal_story: werewolfBot.story,
+                play_style: generatePlayStyleDescription(werewolfBot),
+                role: werewolfBot.role,
+                players_names: [
+                    ...this.game.bots
+                        .filter(b => b.name !== werewolfBot.name)
+                        .map(b => b.name),
+                    this.game.humanPlayerName
+                ].join(", "),
+                dead_players_names_with_roles: this.game.bots
+                    .filter(b => !b.isAlive)
+                    .map(b => `${b.name} (${b.role})`)
+                    .join(", ")
+            });
+            
+            // Create agent
+            const agent = AgentFactory.createAgent(werewolfBot.name, werewolfPrompt, werewolfBot.aiType, apiKeys);
+            
+            // Determine if this is the last werewolf in queue (decision maker)
+            const isLastWerewolf = remainingQueue.length === 0;
+            
+            let gmMessage: GameMessage;
+            let schema: any;
+            let responseType: string;
+            
+            if (isLastWerewolf) {
+                // Last werewolf makes the final decision
+                const targetablePlayers = this.getTargetablePlayers(true); // Exclude werewolves
+                const targetNames = targetablePlayers.map(p => p.name).join(', ');
+                
+                const werewolfActionPrompt = `${BOT_WEREWOLF_ACTION_PROMPT}\n\n**Available targets:** ${targetNames}`;
+                
+                gmMessage = {
+                    id: null,
+                    recipientName: werewolfBot.name,
+                    authorName: GAME_MASTER,
+                    msg: werewolfActionPrompt,
+                    messageType: MessageType.GM_COMMAND,
+                    day: this.game.currentDay,
+                    timestamp: Date.now()
+                };
+                
+                schema = createWerewolfActionSchema();
+                responseType = 'WerewolfAction';
+            } else {
+                // Regular werewolf discussion
+                gmMessage = {
+                    id: null,
+                    recipientName: werewolfBot.name,
+                    authorName: GAME_MASTER,
+                    msg: BOT_WEREWOLF_DISCUSSION_PROMPT,
+                    messageType: MessageType.GM_COMMAND,
+                    day: this.game.currentDay,
+                    timestamp: Date.now()
+                };
+                
+                schema = createBotAnswerSchema();
+                responseType = 'BotAnswer';
+            }
+            
+            // Get messages for this werewolf bot
+            const botMessages = await getBotMessages(this.gameId, werewolfBot.name, this.game.currentDay);
+            
+            // Create conversation history
+            const history = convertToAIMessages(werewolfBot.name, [...botMessages, gmMessage]);
+            
+            const rawResponse = await agent.askWithSchema(schema, history);
+            
+            if (!rawResponse) {
+                throw new Error(`Werewolf ${werewolfBot.name} failed to respond to ${isLastWerewolf ? 'action' : 'discussion'} prompt`);
+            }
+            
+            const werewolfResponse = parseResponseToObj(rawResponse, responseType);
+            
+            // Create werewolf response message with WEREWOLVES recipient
+            const werewolfMessage: GameMessage = {
+                id: null,
+                recipientName: RECIPIENT_WEREWOLVES,
+                authorName: werewolfBot.name,
+                msg: werewolfResponse,
+                messageType: MessageType.BOT_ANSWER,
+                day: this.game.currentDay,
+                timestamp: Date.now()
+            };
+            
+            // Save messages
+            await addMessageToChatAndSaveToDb(gmMessage, this.gameId);
+            await addMessageToChatAndSaveToDb(werewolfMessage, this.gameId);
+            
+            // Check if this was the last werewolf in the queue
+            if (remainingQueue.length === 0) {
+                this.logNightAction("Werewolf phase completed");
+            }
+            
+            if (isLastWerewolf) {
+                this.logNightAction(`Werewolf ${werewolfBot.name} selected target: ${(werewolfResponse as WerewolfAction).target}`);
+            } else {
+                this.logNightAction(`Werewolf ${werewolfBot.name} contributed to discussion`);
+            }
 
             return {
                 success: true,
-                messages: []
+                gameUpdates: {
+                    gameStateParamQueue: remainingQueue
+                }
             };
 
         } catch (error) {
@@ -66,4 +212,5 @@ export class WerewolfProcessor extends BaseRoleProcessor {
             };
         }
     }
+
 }
