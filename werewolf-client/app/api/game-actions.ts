@@ -558,6 +558,49 @@ export async function clearGameErrorState(gameId: string): Promise<Game> {
 }
 
 /**
+ * Start the next day by incrementing the day counter and setting state to DAY_DISCUSSION
+ */
+export async function startNextDay(gameId: string): Promise<Game> {
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+    
+    try {
+        const gameRef = db.collection('games').doc(gameId);
+        const gameSnap = await gameRef.get();
+        
+        if (!gameSnap.exists) {
+            throw new Error('Game not found');
+        }
+        
+        const gameData = gameSnap.data();
+        
+        // Validate that we're in NIGHT_ENDS state
+        if (gameData?.gameState !== GAME_STATES.NIGHT_ENDS) {
+            throw new Error(`Cannot start next day from state: ${gameData?.gameState}. Expected: ${GAME_STATES.NIGHT_ENDS}`);
+        }
+        
+        // Increment day and set to DAY_DISCUSSION
+        const nextDay = (gameData.currentDay || 1) + 1;
+        
+        await gameRef.update({
+            currentDay: nextDay,
+            gameState: GAME_STATES.DAY_DISCUSSION,
+            gameStateParamQueue: [],
+            gameStateProcessQueue: []
+        });
+        
+        console.log(`🌅 DAY ${nextDay}: Started new day discussion phase`);
+        
+        // Return the updated game
+        return await getGame(gameId) as Game;
+    } catch (error: any) {
+        console.error("Error starting next day: ", error);
+        throw new Error(`Failed to start next day: ${error.message}`);
+    }
+}
+
+/**
  * Exported so bot-actions can access user details
  */
 export async function getUserFromFirestore(email: string): Promise<User | null> {
@@ -589,7 +632,8 @@ function serializeMessageForFirestore(gameMessage: GameMessage) {
         ...gameMessage,
         msg: gameMessage.messageType === MessageType.BOT_ANSWER ||
              gameMessage.messageType === MessageType.GAME_STORY ||
-             gameMessage.messageType === MessageType.VOTE_MESSAGE
+             gameMessage.messageType === MessageType.VOTE_MESSAGE ||
+             gameMessage.messageType === MessageType.WEREWOLF_ACTION
             ? gameMessage.msg  // keep as object
             : gameMessage.msg as string  // it's a string for most other message types
     };

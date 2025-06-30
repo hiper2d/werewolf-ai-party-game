@@ -177,7 +177,7 @@ export class WerewolfProcessor extends BaseRoleProcessor {
                 recipientName: RECIPIENT_WEREWOLVES,
                 authorName: werewolfBot.name,
                 msg: werewolfResponse,
-                messageType: MessageType.BOT_ANSWER,
+                messageType: isLastWerewolf ? MessageType.WEREWOLF_ACTION : MessageType.BOT_ANSWER,
                 day: this.game.currentDay,
                 timestamp: Date.now()
             };

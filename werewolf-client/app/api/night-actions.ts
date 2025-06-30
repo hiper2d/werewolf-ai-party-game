@@ -395,7 +395,19 @@ async function processNightQueue(gameId: string, game: Game): Promise<Game> {
             
             if (!result.success) {
                 console.error(`🌙 NIGHT ACTION ERROR: Failed to process ${currentRole} action: ${result.error}`);
-                // Continue processing even if one role fails
+                // Throw error to trigger game error state handling
+                throw new BotResponseError(
+                    `Night action failed for ${currentRole}`,
+                    result.error || 'Unknown error in role processor',
+                    {
+                        role: currentRole,
+                        gameId,
+                        gameState: game.gameState,
+                        gameStateProcessQueue: game.gameStateProcessQueue,
+                        gameStateParamQueue: game.gameStateParamQueue
+                    },
+                    true // Recoverable - user can replay night phase
+                );
             }
 
             // Apply any game updates from the role processor

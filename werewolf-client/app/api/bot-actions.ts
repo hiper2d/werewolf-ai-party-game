@@ -816,6 +816,7 @@ async function voteImpl(gameId: string): Promise<Game> {
             const voteResponse = parseResponseToObj(rawVoteResponse, 'VoteMessage');
             
             // Validate the vote target is alive and valid
+            // fixme: we should not have a random logic in case of a bot's mistake; we should throw an error
             if (!alivePlayerNames.includes(voteResponse.who)) {
                 // If invalid target, vote for a random valid target
                 voteResponse.who = alivePlayerNames[Math.floor(Math.random() * alivePlayerNames.length)];

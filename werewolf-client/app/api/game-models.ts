@@ -173,6 +173,7 @@ export const GAME_STATES = {
 export enum MessageType {
     GM_COMMAND = 'GM_COMMAND',
     BOT_ANSWER = 'BOT_ANSWER', // Response from a bot to GM command
+    WEREWOLF_ACTION = 'WEREWOLF_ACTION', // Werewolf night action response
     GAME_STORY = 'GAME_STORY', // Initial message to generate the game, never used after
     HUMAN_PLAYER_MESSAGE = 'HUMAN_PLAYER_MESSAGE',
     VOTE_MESSAGE = 'VOTE_MESSAGE',

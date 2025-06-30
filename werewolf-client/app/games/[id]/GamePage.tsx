@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getGame, updateBotModel, updateGameMasterModel, clearGameErrorState } from "@/app/api/game-actions";
+import { getGame, updateBotModel, updateGameMasterModel, clearGameErrorState, startNextDay } from "@/app/api/game-actions";
 import GameChat from "@/app/games/[id]/components/GameChat";
 import ModelSelectionDialog from "@/app/games/[id]/components/ModelSelectionDialog";
 import { buttonTransparentStyle } from "@/app/constants";
@@ -322,7 +322,7 @@ export default function GamePage({
                             {(game.gameState === GAME_STATES.NIGHT || game.gameState === GAME_STATES.NIGHT_ENDS) && (
                                 <div className="flex flex-col gap-2">
                                     <div className="text-sm text-yellow-400 text-center">
-                                        🌙 Night in progress...
+                                        {game.gameState === GAME_STATES.NIGHT_ENDS ? '🌅 Night completed' : '🌙 Night in progress...'}
                                     </div>
                                     <button
                                         className={`${buttonTransparentStyle} bg-purple-600 hover:bg-purple-700 border-purple-500`}
@@ -341,6 +341,18 @@ export default function GamePage({
                                     >
                                         🔄 Replay Night
                                     </button>
+                                    {game.gameState === GAME_STATES.NIGHT_ENDS && (
+                                        <button
+                                            className={`${buttonTransparentStyle} bg-green-600 hover:bg-green-700 border-green-500`}
+                                            onClick={async () => {
+                                                const updatedGame = await startNextDay(game.id);
+                                                setGame(updatedGame);
+                                            }}
+                                            title="Start the next day and begin discussion phase"
+                                        >
+                                            🌅 Start Next Day
+                                        </button>
+                                    )}
                                 </div>
                             )}
                         </div>

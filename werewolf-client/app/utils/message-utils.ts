@@ -12,11 +12,15 @@ export function convertMessageContent(message: GameMessage): string {
     switch (message.messageType) {
         case MessageType.VOTE_MESSAGE:
             const voteMsg = message.msg as { who: string; why: string };
-            return `Votes for ${voteMsg.who}: "${voteMsg.why}"`;
+            return `🗳️ Votes for ${voteMsg.who}: "${voteMsg.why}"`;
         
         case MessageType.BOT_ANSWER:
             const botMsg = message.msg as { reply: string };
             return botMsg.reply;
+        
+        case MessageType.WEREWOLF_ACTION:
+            const werewolfMsg = message.msg as { target: string; reasoning: string };
+            return `Selected ${werewolfMsg.target} for elimination. Reasoning: ${werewolfMsg.reasoning}`;
         
         case MessageType.GAME_STORY:
             const storyMsg = message.msg as { story: string };
@@ -122,6 +126,12 @@ export function convertToAIMessages(currentBotName: string, messages: GameMessag
             // Prepare own message (assistant type)
             if (message.messageType === MessageType.BOT_ANSWER) {
                 content = (message.msg as { reply: string }).reply;
+            } else if (message.messageType === MessageType.WEREWOLF_ACTION) {
+                const werewolfMsg = message.msg as { target: string; reasoning: string };
+                content = `Selected ${werewolfMsg.target} for elimination. Reasoning: ${werewolfMsg.reasoning}`;
+            } else if (message.messageType === MessageType.VOTE_MESSAGE) {
+                const voteMsg = message.msg as { who: string; why: string };
+                content = `🗳️ Votes for ${voteMsg.who}: "${voteMsg.why}"`;
             } else {
                 content = message.msg as string;
             }
