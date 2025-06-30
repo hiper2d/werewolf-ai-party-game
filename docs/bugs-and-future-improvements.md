@@ -1,6 +1,9 @@
 # Bugs and improvements
 
-- Add button "Keep Going" to let bots to continue the conversation
+- Implement human player participat
+- Implement Detective night action
+- Implement night resolution
+- Implement the end of night summarization
 - Optimize indexes in DB
 - When bot votes or speaks, the scroll is not moving on UI
 - Make the user input expandable to dropdown

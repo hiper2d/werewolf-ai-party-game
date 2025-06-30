@@ -22,6 +22,10 @@ export function convertMessageContent(message: GameMessage): string {
             const werewolfMsg = message.msg as { target: string; reasoning: string };
             return `Selected ${werewolfMsg.target} for elimination. Reasoning: ${werewolfMsg.reasoning}`;
         
+        case MessageType.DOCTOR_ACTION:
+            const doctorMsg = message.msg as { target: string; reasoning: string };
+            return `Protected ${doctorMsg.target} from werewolf attacks. Reasoning: ${doctorMsg.reasoning}`;
+        
         case MessageType.GAME_STORY:
             const storyMsg = message.msg as { story: string };
             return storyMsg.story;
@@ -129,6 +133,9 @@ export function convertToAIMessages(currentBotName: string, messages: GameMessag
             } else if (message.messageType === MessageType.WEREWOLF_ACTION) {
                 const werewolfMsg = message.msg as { target: string; reasoning: string };
                 content = `Selected ${werewolfMsg.target} for elimination. Reasoning: ${werewolfMsg.reasoning}`;
+            } else if (message.messageType === MessageType.DOCTOR_ACTION) {
+                const doctorMsg = message.msg as { target: string; reasoning: string };
+                content = `Protected ${doctorMsg.target} from werewolf attacks. Reasoning: ${doctorMsg.reasoning}`;
             } else if (message.messageType === MessageType.VOTE_MESSAGE) {
                 const voteMsg = message.msg as { who: string; why: string };
                 content = `🗳️ Votes for ${voteMsg.who}: "${voteMsg.why}"`;

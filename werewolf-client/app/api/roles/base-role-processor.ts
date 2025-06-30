@@ -20,7 +20,7 @@ export interface NightActionResult {
  */
 export interface RolePlayersInfo {
     // All players (bots + human) with this role who are alive
-    allPlayers: Array<{ name: string; isHuman: boolean; bot?: Bot }>;
+    allPlayers: Array<{ name: string; isHuman: boolean; isAlive: boolean; bot?: Bot }>;
     // Just the bot players with this role
     bots: Bot[];
     // Whether the human player has this role
@@ -63,8 +63,8 @@ export abstract class BaseRoleProcessor {
 
         // Combine all players
         const allPlayers = [
-            ...bots.map(bot => ({ name: bot.name, isHuman: false, bot })),
-            ...(hasHumanPlayer ? [{ name: this.game.humanPlayerName, isHuman: true }] : [])
+            ...bots.map(bot => ({ name: bot.name, isHuman: false, isAlive: bot.isAlive, bot })),
+            ...(hasHumanPlayer ? [{ name: this.game.humanPlayerName, isHuman: true, isAlive: true }] : [])
         ];
 
         return {

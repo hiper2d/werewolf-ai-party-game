@@ -44,6 +44,21 @@ export class WerewolfProcessor extends BaseRoleProcessor {
                 
                 // Create list of werewolf names in random order
                 let werewolfNames = playersInfo.allPlayers.map(p => p.name);
+                
+                // Check if there are any alive werewolves
+                if (werewolfNames.length === 0) {
+                    throw new BotResponseError(
+                        "No alive werewolves found",
+                        "The game should have ended with villager victory already. This indicates a game state error.",
+                        {
+                            gameState: this.game.gameState,
+                            currentDay: this.game.currentDay,
+                            alivePlayers: this.game.bots.filter(bot => bot.isAlive).map(bot => bot.name)
+                        },
+                        true
+                    );
+                }
+                
                 werewolfNames = werewolfNames.sort(() => Math.random() - 0.5);
                 
                 // If there are multiple werewolves, duplicate the list so each name appears twice

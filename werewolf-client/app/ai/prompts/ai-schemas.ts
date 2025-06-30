@@ -108,6 +108,12 @@ export interface WerewolfAction {
     reasoning: string;
 }
 
+// Doctor action interface
+export interface DoctorAction {
+    target: string;
+    reasoning: string;
+}
+
 // Werewolf action schema for response validation
 export const createWerewolfActionSchema = () => ({
     type: 'object',
@@ -119,6 +125,22 @@ export const createWerewolfActionSchema = () => ({
         reasoning: {
             type: 'string',
             description: 'Reasoning for the target selection'
+        }
+    },
+    required: ['target', 'reasoning']
+});
+
+// Doctor action schema for response validation
+export const createDoctorActionSchema = () => ({
+    type: 'object',
+    properties: {
+        target: {
+            type: 'string',
+            description: 'The name of the player to protect from werewolf attacks'
+        },
+        reasoning: {
+            type: 'string',
+            description: 'Reasoning for the protection choice'
         }
     },
     required: ['target', 'reasoning']

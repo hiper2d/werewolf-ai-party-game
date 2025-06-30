@@ -229,3 +229,41 @@ Your response must follow this schema:
 }
 
 Return a single JSON object matching this schema.`;
+
+export const BOT_DOCTOR_ACTION_PROMPT: string = `🏥 **Night Phase - Doctor Protection**
+
+The night has fallen and it's time for you to save a life. As the Doctor, you must choose one player to protect from werewolf attacks tonight.
+
+**IMPORTANT RULES:**
+- You can protect any living player, including yourself
+- If you protect yourself, you will survive even if werewolves target you tonight
+- You CANNOT protect the same player two nights in a row (this rule will be enforced later)
+- Your protection only works against werewolf attacks, not voting eliminations
+
+Consider:
+- Who is most likely to be targeted by werewolves tonight?
+- Who poses the greatest threat to werewolves (detectives, vocal villagers)?
+- Should you protect yourself to guarantee your survival?
+- Who has been acting suspiciously and might need protection?
+- Strategic value of keeping this player alive
+
+**Remember:** Keep your role as Doctor completely secret. Never reveal your protection choices or role to other players during day discussions.
+
+Your response must follow this schema:
+
+{
+    "type": "object",
+    "properties": {
+        "target": {
+            "type": "string",
+            "description": "The name of the player you want to protect tonight"
+        },
+        "reasoning": {
+            "type": "string", 
+            "description": "Your reasoning for choosing to protect this player (private doctor thoughts)"
+        }
+    },
+    "required": ["target", "reasoning"]
+}
+
+Return a single JSON object matching this schema.`;
