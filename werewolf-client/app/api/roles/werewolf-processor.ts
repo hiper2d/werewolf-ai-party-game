@@ -1,5 +1,5 @@
 import { BaseRoleProcessor, NightActionResult } from "./base-role-processor";
-import { GAME_ROLES, RECIPIENT_WEREWOLVES, GAME_MASTER, GameMessage, MessageType, BotAnswer } from "@/app/api/game-models";
+import { GAME_ROLES, RECIPIENT_WEREWOLVES, GAME_MASTER, GameMessage, MessageType, BotAnswer, BotResponseError } from "@/app/api/game-models";
 import { AgentFactory } from "@/app/ai/agent-factory";
 import { addMessageToChatAndSaveToDb, getBotMessages, getUserFromFirestore } from "@/app/api/game-actions";
 import { getUserApiKeys } from "@/app/api/user-actions";
@@ -171,6 +171,38 @@ export class WerewolfProcessor extends BaseRoleProcessor {
             
             const werewolfResponse = parseResponseToObj(rawResponse, responseType);
             
+            // Validate and save target if this is the final werewolf decision
+            let gameUpdates: any = {
+                gameStateParamQueue: remainingQueue
+            };
+            
+            if (isLastWerewolf) {
+                const targetName = (werewolfResponse as WerewolfAction).target;
+                const targetablePlayers = this.getTargetablePlayers(true); // Exclude werewolves
+                const targetableNames = targetablePlayers.map(p => p.name);
+                
+                if (!targetableNames.includes(targetName)) {
+                    throw new BotResponseError(
+                        `Invalid werewolf target: ${targetName}`,
+                        `The target must be a living non-werewolf player. Available targets: ${targetableNames.join(', ')}`,
+                        {
+                            selectedTarget: targetName,
+                            availableTargets: targetableNames,
+                            werewolfName: werewolfBot.name
+                        },
+                        true
+                    );
+                }
+                
+                // Save the target to nightResults
+                const currentNightResults = this.game.nightResults || {};
+                currentNightResults[GAME_ROLES.WEREWOLF] = { target: targetName };
+                
+                gameUpdates.nightResults = currentNightResults;
+                
+                this.logNightAction(`✅ Werewolf target validated and saved: ${targetName}`);
+            }
+            
             // Create werewolf response message with WEREWOLVES recipient
             const werewolfMessage: GameMessage = {
                 id: null,
@@ -199,9 +231,7 @@ export class WerewolfProcessor extends BaseRoleProcessor {
 
             return {
                 success: true,
-                gameUpdates: {
-                    gameStateParamQueue: remainingQueue
-                }
+                gameUpdates: gameUpdates
             };
 
         } catch (error) {

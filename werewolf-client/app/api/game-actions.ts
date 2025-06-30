@@ -655,6 +655,7 @@ function gameFromFirestore(id: string, data: any): Game {
         gameState: data.gameState,
         gameStateParamQueue: data.gameStateParamQueue,
         gameStateProcessQueue: data.gameStateProcessQueue,
-        errorState: data.errorState || null
+        errorState: data.errorState || null,
+        nightResults: data.nightResults || {}
     };
 }
