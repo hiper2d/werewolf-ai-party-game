@@ -94,26 +94,6 @@ export default function GamePage({
         handleVote();
     }, [game.gameState, game.gameStateProcessQueue.length, game.gameStateProcessQueue.join(','), game.id, game.errorState]);
 
-    // Handle DAY_DISCUSSION state - Let GameChat handle auto-processing to avoid duplicate calls
-    // This useEffect is disabled to prevent duplicate processing with GameChat
-    // useEffect(() => {
-    //     const handleDayDiscussion = async () => {
-    //         if (game.gameState === GAME_STATES.DAY_DISCUSSION &&
-    //             game.gameStateProcessQueue.length > 0 &&
-    //             !game.errorState) {
-    //             console.log('🗣️ DAY_DISCUSSION: Processing bot queue...', {
-    //                 queueLength: game.gameStateProcessQueue.length,
-    //                 queue: game.gameStateProcessQueue
-    //             });
-    //             const { talkToAll } = await import("@/app/api/bot-actions");
-    //             const updatedGame = await talkToAll(game.id, '');
-    //             setGame(updatedGame);
-    //         }
-    //     };
-
-    //     handleDayDiscussion();
-    // }, [game.gameState, game.gameStateProcessQueue.length, game.gameStateProcessQueue.join(','), game.id, game.errorState]);
-
     // Handle NIGHT state - process night actions when in NIGHT state
     useEffect(() => {
         const handleNightAction = async () => {

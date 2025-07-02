@@ -46,13 +46,17 @@ async function performNightActionImpl(gameId: string): Promise<Game> {
     } else if (game.gameState === GAME_STATES.NIGHT) {
         // Process next night action or end night if queue is empty
         return await processNightQueue(gameId, game);
+    } else if (game.gameState === GAME_STATES.NIGHT_ENDS) {
+        // Night has already ended, return current game state
+        console.log('🌅 Night actions already completed, returning current game state');
+        return game;
     } else {
         throw new BotResponseError(
             'Invalid game state for night action',
-            `Game must be in VOTE_RESULTS or NIGHT state. Current state: ${game.gameState}`,
+            `Game must be in VOTE_RESULTS, NIGHT, or NIGHT_ENDS state. Current state: ${game.gameState}`,
             { 
                 currentState: game.gameState, 
-                expectedStates: [GAME_STATES.VOTE_RESULTS, GAME_STATES.NIGHT],
+                expectedStates: [GAME_STATES.VOTE_RESULTS, GAME_STATES.NIGHT, GAME_STATES.NIGHT_ENDS],
                 gameId 
             },
             true

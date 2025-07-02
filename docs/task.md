@@ -34,3 +34,42 @@ Now let me describe the backend logic:
    the recipientName. When the message history is prepared for a werewolf bot, all the WEREWOLVES recipient messages
    should be also selected. In the human player is a werewolf, they are allowed to see those messages as well. After the
    message is saved to DB, we remove it from the gameStateParamQueue and save the game object.
+
+=============
+
+We implemented werewolves and doctor night actions but one thing is missing. What if the human player has the werewolf
+or doctor role? In this case, we should not use the "performNightAction" server function which is supposed to work with
+bots only. Instead, we should make the @werewolf-client/app/games/[id]/components/GameChat.tsx component to see if there
+is the NIGHT state, and there is the werewolf role is the first one in the gameStateProcessingQueue, and there is the
+human player name on
+the first place of the gameStateParamQueue, then the UI should show a popup for the human player to provide a message
+and with a dropdown with possible targets (similar to the voting dialog). The dropdown should be enabled only when the
+human player is the only name in the gameStateParamQueue. In case of the werewolves, it should conclude who will be the
+target. Once the dialog window if populates, its makes the call of the new server function in the bot-actions called "
+performNumanPlayerNightAction". It should save the message to the database with the appropriate type (WEREWOLF_ACTION or
+a new DOCTOR_ACTION). Then should check in the beginning the right values in both queues and remove the first name/role,
+similarly how we handle bots.
+
+==============
+
+We implemented werewolves and doctor night actions but one thing is missing. What if the human player has the werewolf
+or doctor role? Let's implement the logic that handles human player's werewolf actions during the night. When The
+@werewolf-client/app/games/[id]/components/GameChat.tsx component sees that it's the NIGHT phase and there is the
+werewolf role is the first in the gameStateProcessingQueue, and it is the human player's name is the first one in the
+gameStateParamQueue, then one of two things can happen:
+
+1. If there are more than one names in the gameStateParamQueue, then the chat becomes active, and the human player can
+   post a message to the chat. They basically talk to other werewolves
+2. When the human player's name is the last and the only item in the gameStateParamQueue, then we should show a button
+   the chat called "Choose the werewolves target". Clicking the button shows the dialog similar to the voting dialog. It
+   should contain a dropdown with target names and an input to provide the last message to other werewolves this night.
+   In both cases, after the message is posted of after the dialog's OK button it presses, the new "
+   performNumanPlayerNightAction" in the @werewolf-client/app/api/bot-actions.ts must be called. It saves the message
+   with the WEREWOLVES recipient and concludes the werewolves action phase if this is the last werewolf.
+
+I think the dialog can be generic. Depending on the current role, it can show a message from the ROLE_CONFIGS in
+@werewolf-client/app/api/game-models.ts.
+
+====
+
+For the doctor night action, we ne

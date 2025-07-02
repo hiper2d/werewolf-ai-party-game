@@ -13,7 +13,8 @@ import {
     MessageType,
     PLAY_STYLES,
     PLAY_STYLE_CONFIGS,
-    RECIPIENT_ALL
+    RECIPIENT_ALL,
+    RECIPIENT_WEREWOLVES
 } from "@/app/api/game-models";
 import {
     GM_COMMAND_INTRODUCE_YOURSELF,
@@ -1000,9 +1001,121 @@ async function humanPlayerVoteImpl(gameId: string, targetPlayer: string, reason:
     }
 }
 
+/**
+ * Handles human player's night action (werewolf, doctor, or detective)
+ * Saves the message with appropriate recipient and concludes the action phase if needed
+ */
+async function performHumanPlayerNightActionImpl(gameId: string, targetPlayer: string, message: string): Promise<Game> {
+    const session = await auth();
+    if (!session || !session.user?.email) {
+        throw new Error('Not authenticated');
+    }
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+
+    const game = await getGame(gameId);
+    if (!game) {
+        throw new Error('Game not found');
+    }
+
+    // Validate game state
+    if (game.gameState !== GAME_STATES.NIGHT) {
+        throw new Error('Game is not in night phase');
+    }
+
+    // Check if it's the human player's turn for night action
+    if (game.gameStateProcessQueue.length === 0 || game.gameStateParamQueue.length === 0) {
+        throw new Error('No night actions in progress');
+    }
+
+    const currentRole = game.gameStateProcessQueue[0];
+    const currentPlayer = game.gameStateParamQueue[0];
+
+    if (currentRole !== game.humanPlayerRole || currentPlayer !== game.humanPlayerName) {
+        throw new Error('Not your turn for night action');
+    }
+
+    // Validate target player is alive
+    const allPlayers = [
+        { name: game.humanPlayerName, isAlive: true },
+        ...game.bots.map(bot => ({ name: bot.name, isAlive: bot.isAlive }))
+    ];
+    const alivePlayerNames = allPlayers.filter(p => p.isAlive).map(p => p.name);
+    
+    if (!alivePlayerNames.includes(targetPlayer)) {
+        throw new Error('Invalid target player');
+    }
+
+    try {
+        // Determine recipient based on role
+        const recipient = currentRole === GAME_ROLES.WEREWOLF ? RECIPIENT_WEREWOLVES : RECIPIENT_ALL;
+        
+        // Determine message type based on whether this is the last player in the queue
+        const isLastInQueue = game.gameStateParamQueue.length === 1;
+        let messageType: MessageType;
+        
+        if (currentRole === GAME_ROLES.WEREWOLF && isLastInQueue) {
+            messageType = MessageType.WEREWOLF_ACTION;
+        } else if (currentRole === GAME_ROLES.DOCTOR && isLastInQueue) {
+            messageType = MessageType.DOCTOR_ACTION;
+        } else {
+            messageType = MessageType.BOT_ANSWER; // Coordination message
+        }
+
+        // Create the night action message
+        const nightActionMessage: GameMessage = {
+            id: null,
+            recipientName: recipient,
+            authorName: game.humanPlayerName,
+            msg: isLastInQueue ? { target: targetPlayer, reasoning: message } : { reply: message },
+            messageType: messageType,
+            day: game.currentDay,
+            timestamp: Date.now()
+        };
+        
+        // Save night action message to database
+        await addMessageToChatAndSaveToDb(nightActionMessage, gameId);
+        
+        // Remove the human player from param queue
+        const newParamQueue = game.gameStateParamQueue.slice(1);
+        
+        // Update night results if this is a final action
+        let updatedNightResults = game.nightResults || {};
+        if (isLastInQueue) {
+            updatedNightResults = {
+                ...updatedNightResults,
+                [currentRole]: { target: targetPlayer }
+            };
+        }
+        
+        // If this was the last player in the param queue, also remove from process queue
+        let newProcessQueue = game.gameStateProcessQueue;
+        if (newParamQueue.length === 0) {
+            newProcessQueue = game.gameStateProcessQueue.slice(1);
+        }
+        
+        // Update game state
+        await db.collection('games').doc(gameId).update({
+            gameStateParamQueue: newParamQueue,
+            gameStateProcessQueue: newProcessQueue,
+            nightResults: updatedNightResults
+        });
+        
+        console.log(`Successfully processed night action for human player ${game.humanPlayerName}`);
+        
+        // Return updated game state
+        return await getGame(gameId) as Game;
+    } catch (error) {
+        console.error('Error in performHumanPlayerNightAction function:', error);
+        throw error;
+    }
+}
+
 // Wrapped exports with error handling
 export const welcome = withGameErrorHandling(welcomeImpl);
 export const talkToAll = withGameErrorHandling(talkToAllImpl);
 export const keepBotsGoing = withGameErrorHandling(keepBotsGoingImpl);
 export const vote = withGameErrorHandling(voteImpl);
 export const humanPlayerVote = withGameErrorHandling(humanPlayerVoteImpl);
+export const performHumanPlayerNightAction = withGameErrorHandling(performHumanPlayerNightActionImpl);

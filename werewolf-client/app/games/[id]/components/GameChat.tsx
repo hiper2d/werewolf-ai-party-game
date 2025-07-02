@@ -4,11 +4,12 @@ import React, { useEffect, useState } from 'react';
 import { talkToAll, humanPlayerVote } from "@/app/api/bot-actions";
 import { beginNight, performNightAction } from "@/app/api/night-actions";
 import { buttonTransparentStyle } from "@/app/constants";
-import { GAME_STATES, MessageType, RECIPIENT_ALL, GameMessage, Game, SystemErrorMessage, BotResponseError, GAME_MASTER } from "@/app/api/game-models";
+import { GAME_STATES, MessageType, RECIPIENT_ALL, GameMessage, Game, SystemErrorMessage, BotResponseError, GAME_MASTER, ROLE_CONFIGS } from "@/app/api/game-models";
 import { getPlayerColor } from "@/app/utils/color-utils";
 import { convertMessageContent } from "@/app/utils/message-utils";
 import { clearGameErrorState } from "@/app/api/game-actions";
 import VotingModal from "./VotingModal";
+import NightActionModal from "./NightActionModal";
 
 interface GameChatProps {
     gameId: string;
@@ -195,6 +196,8 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
     const [showVotingModal, setShowVotingModal] = useState(false);
     const [isVoting, setIsVoting] = useState(false);
     const [isStartingNight, setIsStartingNight] = useState(false);
+    const [showNightActionModal, setShowNightActionModal] = useState(false);
+    const [isPerformingNightAction, setIsPerformingNightAction] = useState(false);
 
     // Function to clear messages from night phase onward
     const clearMessagesFromNight = () => {
@@ -260,11 +263,26 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
             processQueue();
         }
         
-        // Auto-process NIGHT queue
+        // Auto-process NIGHT queue (but skip if human player is involved)
         if (game.gameState === GAME_STATES.NIGHT &&
             game.gameStateProcessQueue.length > 0 &&
             !isProcessing &&
             !game.errorState) {
+            
+            const currentRole = game.gameStateProcessQueue[0];
+            const currentPlayer = game.gameStateParamQueue.length > 0 ? game.gameStateParamQueue[0] : null;
+            
+            // Skip auto-processing if it's the human player's turn for this role
+            if (currentRole === game.humanPlayerRole && currentPlayer === game.humanPlayerName) {
+                console.log('🌙 SKIPPING AUTO-PROCESS - Human player turn for night action', {
+                    currentRole,
+                    currentPlayer,
+                    humanPlayerRole: game.humanPlayerRole,
+                    humanPlayerName: game.humanPlayerName
+                });
+                return;
+            }
+            
             console.log('🌙 CALLING PERFORM_NIGHT_ACTION API', {
                 gameId,
                 queue: game.gameStateProcessQueue
@@ -306,6 +324,42 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
             setShowVotingModal(true);
         }
     }, [game.gameState, game.gameStateProcessQueue, game.humanPlayerName, showVotingModal, isVoting]);
+
+    // Check if it's human player's turn for night action
+    useEffect(() => {
+        console.log('🔍 NIGHT ACTION MODAL TRIGGER CHECK:', {
+            gameState: game.gameState,
+            processQueue: game.gameStateProcessQueue,
+            paramQueue: game.gameStateParamQueue,
+            humanPlayerName: game.humanPlayerName,
+            humanPlayerRole: game.humanPlayerRole,
+            showNightActionModal,
+            isPerformingNightAction,
+            timestamp: new Date().toISOString()
+        });
+        
+        // Check conditions for showing night action modal or enabling chat
+        if (game.gameState === GAME_STATES.NIGHT &&
+            game.gameStateProcessQueue.length > 0 &&
+            game.gameStateParamQueue.length > 0 &&
+            !showNightActionModal &&
+            !isPerformingNightAction) {
+            
+            const currentRole = game.gameStateProcessQueue[0];
+            const currentPlayer = game.gameStateParamQueue[0];
+            
+            // Check if it's the human player's role and they're in the param queue
+            if (currentRole === game.humanPlayerRole && currentPlayer === game.humanPlayerName) {
+                // Check if this is the last player in the param queue (target selection needed)
+                if (game.gameStateParamQueue.length === 1) {
+                    console.log('🚨 OPENING NIGHT ACTION MODAL - Last in queue, target selection needed');
+                    setShowNightActionModal(true);
+                }
+                // If multiple players in param queue, enable chat for werewolf coordination
+                // This will be handled by enabling the input field below
+            }
+        }
+    }, [game.gameState, game.gameStateProcessQueue, game.gameStateParamQueue, game.humanPlayerName, game.humanPlayerRole, showNightActionModal, isPerformingNightAction]);
 
     useEffect(() => {
         const eventSource = new EventSource(`/api/games/${gameId}/messages/sse`);
@@ -458,10 +512,65 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
         setIsStartingNight(false);
     };
 
-    const isInputEnabled = game.gameState === GAME_STATES.DAY_DISCUSSION &&
-                          game.gameStateProcessQueue.length === 0 &&
-                          !isProcessing &&
-                          !isDeleting;
+    const handleNightAction = async (targetPlayer: string, message: string) => {
+        console.log('🌙 HUMAN NIGHT ACTION SUBMISSION:', {
+            targetPlayer,
+            message,
+            gameId,
+            currentState: game.gameState,
+            role: game.humanPlayerRole,
+            timestamp: new Date().toISOString()
+        });
+        
+        setIsPerformingNightAction(true);
+        console.log('🚨 CALLING PERFORM_HUMAN_PLAYER_NIGHT_ACTION API');
+        
+        // We'll need to import this function
+        const { performHumanPlayerNightAction } = await import("@/app/api/bot-actions");
+        const updatedGame = await performHumanPlayerNightAction(gameId, targetPlayer, message);
+        console.log('✅ Human night action API completed, closing modal and updating state');
+        setShowNightActionModal(false);
+        
+        // Update game state if callback is provided
+        if (onGameStateChange) {
+            console.log('📊 Updating parent game state after night action');
+            onGameStateChange(updatedGame);
+        }
+        setIsPerformingNightAction(false);
+    };
+
+    const handleCloseNightActionModal = () => {
+        if (!isPerformingNightAction) {
+            setShowNightActionModal(false);
+        }
+    };
+
+    // Check if chat input should be enabled
+    const isInputEnabled = () => {
+        // Day discussion - normal chat when no queue processing
+        if (game.gameState === GAME_STATES.DAY_DISCUSSION &&
+            game.gameStateProcessQueue.length === 0 &&
+            !isProcessing &&
+            !isDeleting) {
+            return true;
+        }
+        
+        // Night phase - enable chat for human werewolf coordination
+        if (game.gameState === GAME_STATES.NIGHT &&
+            game.gameStateProcessQueue.length > 0 &&
+            game.gameStateParamQueue.length > 1 && // Multiple players in queue means coordination phase
+            !isProcessing &&
+            !isDeleting) {
+            
+            const currentRole = game.gameStateProcessQueue[0];
+            const currentPlayer = game.gameStateParamQueue[0];
+            
+            // Enable if it's the human player's role and they're first in param queue
+            return currentRole === game.humanPlayerRole && currentPlayer === game.humanPlayerName;
+        }
+        
+        return false;
+    };
 
     const getInputPlaceholder = () => {
         console.log(game.gameState.valueOf());
@@ -530,17 +639,17 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
                     type="text"
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
-                    disabled={!isInputEnabled}
+                    disabled={!isInputEnabled()}
                     className={`flex-grow p-3 rounded-l bg-black bg-opacity-30 text-white placeholder-gray-400 border
                         mr-3 border-gray-600 focus:outline-none focus:border-gray-500
-                        ${!isInputEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        ${!isInputEnabled() ? 'opacity-50 cursor-not-allowed' : ''}`}
                     placeholder={getInputPlaceholder()}
                 />
                 <button
                     type="submit"
-                    disabled={!isInputEnabled}
-                    className={`${buttonTransparentStyle} ${!isInputEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    title={!isInputEnabled ? "Game is not ready for input" : "Send your message to all players"}
+                    disabled={!isInputEnabled()}
+                    className={`${buttonTransparentStyle} ${!isInputEnabled() ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    title={!isInputEnabled() ? "Game is not ready for input" : "Send your message to all players"}
                 >
                     Send
                 </button>
@@ -552,6 +661,17 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
                     onVote={handleVote}
                     onClose={handleCloseVotingModal}
                     isSubmitting={isVoting}
+                />
+            )}
+            {showNightActionModal && (
+                <NightActionModal
+                    isOpen={showNightActionModal}
+                    game={game}
+                    currentRole={game.humanPlayerRole}
+                    isLastInQueue={game.gameStateParamQueue.length === 1}
+                    onAction={handleNightAction}
+                    onClose={handleCloseNightActionModal}
+                    isSubmitting={isPerformingNightAction}
                 />
             )}
         </div>

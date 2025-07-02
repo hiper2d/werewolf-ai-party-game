@@ -75,6 +75,12 @@ export interface RoleConfig {
     description: string;
     actionType?: 'protect' | 'investigate' | 'eliminate' | 'none';
     alignment: 'good' | 'evil'; // 'good' = villager team, 'evil' = werewolf team
+    // UI text for night action modal
+    actionTitle?: string;
+    targetLabel?: string;
+    messageLabel?: string;
+    messagePlaceholder?: string;
+    submitButtonText?: string;
 }
 
 export const ROLE_CONFIGS: Record<string, RoleConfig> = {
@@ -84,7 +90,12 @@ export const ROLE_CONFIGS: Record<string, RoleConfig> = {
         nightActionOrder: 1,
         description: 'Can eliminate other players during the night',
         actionType: 'eliminate',
-        alignment: 'evil'
+        alignment: 'evil',
+        actionTitle: 'Choose the werewolves target',
+        targetLabel: 'Who should be eliminated tonight?',
+        messageLabel: 'Message to other werewolves:',
+        messagePlaceholder: 'Coordinate with other werewolves...',
+        submitButtonText: 'Eliminate Target'
     },
     [GAME_ROLES.DOCTOR]: {
         name: 'Doctor',
@@ -92,7 +103,12 @@ export const ROLE_CONFIGS: Record<string, RoleConfig> = {
         nightActionOrder: 2,
         description: 'Can protect a player from elimination during the night',
         actionType: 'protect',
-        alignment: 'good'
+        alignment: 'good',
+        actionTitle: 'Choose who to protect',
+        targetLabel: 'Who do you want to protect tonight?',
+        messageLabel: 'Message to other doctors:',
+        messagePlaceholder: 'Share your thoughts...',
+        submitButtonText: 'Protect Target'
     },
     [GAME_ROLES.DETECTIVE]: {
         name: 'Detective',
@@ -100,7 +116,12 @@ export const ROLE_CONFIGS: Record<string, RoleConfig> = {
         nightActionOrder: 3,
         description: 'Can investigate a player to learn their role during the night',
         actionType: 'investigate',
-        alignment: 'good'
+        alignment: 'good',
+        actionTitle: 'Choose who to investigate',
+        targetLabel: 'Who do you want to investigate tonight?',
+        messageLabel: 'Message to other detectives:',
+        messagePlaceholder: 'Share your thoughts...',
+        submitButtonText: 'Investigate Target'
     }
 };
 

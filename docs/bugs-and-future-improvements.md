@@ -1,7 +1,8 @@
 # Bugs and improvements
 
-- Implement human player participat
+- Implement human player participat and chat role messages visibility for human player
 - Implement Detective night action
+- Get rid of transactions 
 - Implement night resolution
 - Implement the end of night summarization
 - Optimize indexes in DB
