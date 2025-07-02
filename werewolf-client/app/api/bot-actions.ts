@@ -14,7 +14,9 @@ import {
     PLAY_STYLES,
     PLAY_STYLE_CONFIGS,
     RECIPIENT_ALL,
-    RECIPIENT_WEREWOLVES
+    RECIPIENT_WEREWOLVES,
+    RECIPIENT_DOCTOR,
+    RECIPIENT_DETECTIVE
 } from "@/app/api/game-models";
 import {
     GM_COMMAND_INTRODUCE_YOURSELF,
@@ -1002,8 +1004,9 @@ async function humanPlayerVoteImpl(gameId: string, targetPlayer: string, reason:
 }
 
 /**
- * Handles human player's night action (werewolf, doctor, or detective)
- * Saves the message with appropriate recipient and concludes the action phase if needed
+ * Handles human player's final night action (werewolf, doctor, or detective)
+ * NEW LOGIC: This function is only called when human player is the last in gameStateParamQueue
+ * and needs to make the final target decision for their role
  */
 async function performHumanPlayerNightActionImpl(gameId: string, targetPlayer: string, message: string): Promise<Game> {
     const session = await auth();
@@ -1036,39 +1039,63 @@ async function performHumanPlayerNightActionImpl(gameId: string, targetPlayer: s
         throw new Error('Not your turn for night action');
     }
 
-    // Validate target player is alive
+    // NEW LOGIC: This function should only be called when human is the last in queue (final action)
+    if (game.gameStateParamQueue.length !== 1) {
+        throw new Error('Use humanPlayerTalkWerewolves for werewolf coordination phase');
+    }
+
+    // Validate target player based on role-specific rules
     const allPlayers = [
         { name: game.humanPlayerName, isAlive: true },
         ...game.bots.map(bot => ({ name: bot.name, isAlive: bot.isAlive }))
     ];
     const alivePlayerNames = allPlayers.filter(p => p.isAlive).map(p => p.name);
     
-    if (!alivePlayerNames.includes(targetPlayer)) {
-        throw new Error('Invalid target player');
+    // Role-specific target validation
+    if (currentRole === GAME_ROLES.WEREWOLF) {
+        // Werewolves cannot target other werewolves
+        const werewolfNames = [
+            game.humanPlayerRole === GAME_ROLES.WEREWOLF ? game.humanPlayerName : null,
+            ...game.bots.filter(bot => bot.isAlive && bot.role === GAME_ROLES.WEREWOLF).map(bot => bot.name)
+        ].filter(name => name !== null);
+        
+        const validTargets = alivePlayerNames.filter(name => !werewolfNames.includes(name));
+        if (!validTargets.includes(targetPlayer)) {
+            throw new Error(`Invalid werewolf target. Available targets: ${validTargets.join(', ')}`);
+        }
+    } else {
+        // Doctor and detective can target any alive player
+        if (!alivePlayerNames.includes(targetPlayer)) {
+            throw new Error(`Invalid target. Available targets: ${alivePlayerNames.join(', ')}`);
+        }
     }
 
     try {
-        // Determine recipient based on role
-        const recipient = currentRole === GAME_ROLES.WEREWOLF ? RECIPIENT_WEREWOLVES : RECIPIENT_ALL;
-        
-        // Determine message type based on whether this is the last player in the queue
-        const isLastInQueue = game.gameStateParamQueue.length === 1;
+        // Determine recipient and message type based on role
+        let recipient: string;
         let messageType: MessageType;
         
-        if (currentRole === GAME_ROLES.WEREWOLF && isLastInQueue) {
+        if (currentRole === GAME_ROLES.WEREWOLF) {
+            recipient = RECIPIENT_WEREWOLVES;
             messageType = MessageType.WEREWOLF_ACTION;
-        } else if (currentRole === GAME_ROLES.DOCTOR && isLastInQueue) {
+        } else if (currentRole === GAME_ROLES.DOCTOR) {
+            recipient = RECIPIENT_DOCTOR;
             messageType = MessageType.DOCTOR_ACTION;
+        } else if (currentRole === GAME_ROLES.DETECTIVE) {
+            recipient = RECIPIENT_DETECTIVE;
+            messageType = MessageType.BOT_ANSWER; // No specific detective action type yet
         } else {
-            messageType = MessageType.BOT_ANSWER; // Coordination message
+            // Fallback for other roles
+            recipient = RECIPIENT_ALL;
+            messageType = MessageType.BOT_ANSWER;
         }
 
-        // Create the night action message
+        // Create the night action message with final target decision
         const nightActionMessage: GameMessage = {
             id: null,
             recipientName: recipient,
             authorName: game.humanPlayerName,
-            msg: isLastInQueue ? { target: targetPlayer, reasoning: message } : { reply: message },
+            msg: { target: targetPlayer, reasoning: message },
             messageType: messageType,
             day: game.currentDay,
             timestamp: Date.now()
@@ -1077,32 +1104,61 @@ async function performHumanPlayerNightActionImpl(gameId: string, targetPlayer: s
         // Save night action message to database
         await addMessageToChatAndSaveToDb(nightActionMessage, gameId);
         
-        // Remove the human player from param queue
+        // Update night results with the target
+        const updatedNightResults = {
+            ...(game.nightResults || {}),
+            [currentRole]: { target: targetPlayer }
+        };
+        
+        // Remove current player from param queue (should make it empty)
         const newParamQueue = game.gameStateParamQueue.slice(1);
         
-        // Update night results if this is a final action
-        let updatedNightResults = game.nightResults || {};
-        if (isLastInQueue) {
-            updatedNightResults = {
-                ...updatedNightResults,
-                [currentRole]: { target: targetPlayer }
-            };
-        }
-        
-        // If this was the last player in the param queue, also remove from process queue
-        let newProcessQueue = game.gameStateProcessQueue;
+        // Since this was the last player, move to next role or end night
+        let finalUpdates: any = {
+            gameStateParamQueue: newParamQueue,
+            nightResults: updatedNightResults
+        };
+
         if (newParamQueue.length === 0) {
-            newProcessQueue = game.gameStateProcessQueue.slice(1);
+            // Current role finished, move to next role or end night
+            const newProcessQueue = game.gameStateProcessQueue.slice(1);
+            finalUpdates.gameStateProcessQueue = newProcessQueue;
+
+            if (newProcessQueue.length > 0) {
+                // Move to next role - import populateParamQueueForRole logic
+                const nextRole = newProcessQueue[0];
+                const playersWithRole: string[] = [];
+                
+                // Check bots for next role
+                game.bots
+                    .filter(bot => bot.isAlive && bot.role === nextRole)
+                    .forEach(bot => playersWithRole.push(bot.name));
+                
+                // Check human player for next role
+                if (game.humanPlayerRole === nextRole) {
+                    playersWithRole.push(game.humanPlayerName);
+                }
+                
+                // For werewolves, duplicate the list if multiple werewolves exist (for coordination phase)
+                let nextParamQueue: string[] = [];
+                if (nextRole === GAME_ROLES.WEREWOLF && playersWithRole.length > 1) {
+                    nextParamQueue = [...playersWithRole, ...playersWithRole];
+                } else {
+                    nextParamQueue = [...playersWithRole];
+                }
+                
+                // Randomize the order
+                finalUpdates.gameStateParamQueue = nextParamQueue.sort(() => Math.random() - 0.5);
+            } else {
+                // No more roles, night ends
+                finalUpdates.gameState = GAME_STATES.NIGHT_ENDS;
+            }
         }
         
         // Update game state
-        await db.collection('games').doc(gameId).update({
-            gameStateParamQueue: newParamQueue,
-            gameStateProcessQueue: newProcessQueue,
-            nightResults: updatedNightResults
-        });
+        await db.collection('games').doc(gameId).update(finalUpdates);
         
-        console.log(`Successfully processed night action for human player ${game.humanPlayerName}`);
+        console.log(`Successfully processed final night action for human player ${game.humanPlayerName} targeting ${targetPlayer}`);
         
         // Return updated game state
         return await getGame(gameId) as Game;

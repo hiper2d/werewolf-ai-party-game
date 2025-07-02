@@ -97,20 +97,49 @@ export default function GamePage({
     // Handle NIGHT state - process night actions when in NIGHT state
     useEffect(() => {
         const handleNightAction = async () => {
-            if (game.gameState === GAME_STATES.NIGHT && !game.errorState) {
-                console.log('🌙 NIGHT: Processing night action...', {
+            if (game.gameState === GAME_STATES.NIGHT && 
+                game.gameStateProcessQueue.length > 0 && 
+                !game.errorState) {
+                
+                const currentRole = game.gameStateProcessQueue[0];
+                const currentPlayer = game.gameStateParamQueue.length > 0 ? game.gameStateParamQueue[0] : null;
+                
+                console.log('🔍 GAMEPAGE: AUTO-PROCESS NIGHT CHECK:', {
+                    currentRole,
+                    currentPlayer,
+                    humanPlayerRole: game.humanPlayerRole,
+                    humanPlayerName: game.humanPlayerName,
+                    isHumanPlayerTurn: currentRole === game.humanPlayerRole && currentPlayer === game.humanPlayerName,
+                    gameId: game.id,
+                    timestamp: new Date().toISOString()
+                });
+                
+                // Skip auto-processing if it's the human player's turn for this role
+                if (currentRole === game.humanPlayerRole && currentPlayer === game.humanPlayerName) {
+                    console.log('🌙 GAMEPAGE: SKIPPING AUTO-PROCESS - Human player turn for night action', {
+                        currentRole,
+                        currentPlayer,
+                        humanPlayerRole: game.humanPlayerRole,
+                        humanPlayerName: game.humanPlayerName
+                    });
+                    return;
+                }
+                
+                console.log('🌙 GAMEPAGE: CALLING PERFORM_NIGHT_ACTION API', {
                     gameState: game.gameState,
                     queueLength: game.gameStateProcessQueue.length,
                     queue: game.gameStateProcessQueue,
-                    gameId: game.id
+                    gameId: game.id,
+                    timestamp: new Date().toISOString()
                 });
                 const updatedGame = await performNightAction(game.id);
+                console.log('✅ GAMEPAGE: PerformNightAction API completed');
                 setGame(updatedGame);
             }
         };
 
         handleNightAction();
-    }, [game.gameState, game.gameStateProcessQueue.length, game.gameStateProcessQueue.join(','), game.id, game.errorState]);
+    }, [game.gameState, game.gameStateProcessQueue.length, game.gameStateProcessQueue.join(','), game.gameStateParamQueue.length, game.gameStateParamQueue.join(','), game.humanPlayerRole, game.humanPlayerName, game.id, game.errorState]);
 
     // Handle state changes logging
     useEffect(() => {
@@ -291,7 +320,13 @@ export default function GamePage({
                                 <button
                                     className={`${buttonTransparentStyle} bg-blue-600 hover:bg-blue-700 border-blue-500`}
                                     onClick={async () => {
+                                        console.log('🌙 GAMEPAGE: START NIGHT BUTTON CLICKED:', {
+                                            gameId: game.id,
+                                            currentState: game.gameState,
+                                            timestamp: new Date().toISOString()
+                                        });
                                         const updatedGame = await performNightAction(game.id);
+                                        console.log('✅ GAMEPAGE: Start Night button - PerformNightAction API completed');
                                         setGame(updatedGame);
                                     }}
                                     title="Begin the night phase where werewolves and special roles take their actions"

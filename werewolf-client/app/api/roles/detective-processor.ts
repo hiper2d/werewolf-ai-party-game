@@ -23,8 +23,16 @@ export class DetectiveProcessor extends BaseRoleProcessor {
                 return { success: true };
             }
 
-            // For individual roles like detective, typically only one player
-            const detectiveName = playersInfo.allPlayers[0].name;
+            // The gameStateParamQueue should already be populated by the generic night action logic
+            if (this.game.gameStateParamQueue.length === 0) {
+                this.logNightAction("No detectives in action queue, skipping");
+                return { success: true };
+            }
+
+            // Get the current detective from the param queue
+            const detectiveName = this.game.gameStateParamQueue[0];
+            const remainingQueue = this.game.gameStateParamQueue.slice(1);
+            
             this.logNightAction(`Detective (${detectiveName}) is taking their night action`);
 
             // For now, just log the action - actual investigation logic will be implemented later
@@ -38,7 +46,9 @@ export class DetectiveProcessor extends BaseRoleProcessor {
 
             return {
                 success: true,
-                messages: []
+                gameUpdates: {
+                    gameStateParamQueue: remainingQueue
+                }
             };
 
         } catch (error) {

@@ -32,24 +32,29 @@ export class DoctorProcessor extends BaseRoleProcessor {
                 return { success: true };
             }
 
-            // For individual roles like doctor, typically only one player
-            const doctorPlayer = playersInfo.allPlayers[0];
-            
-            // Check if the doctor is alive
-            if (!doctorPlayer.isAlive) {
-                this.logNightAction(`Doctor ${doctorPlayer.name} is dead, skipping action`);
+            // The gameStateParamQueue should already be populated by the generic night action logic
+            if (this.game.gameStateParamQueue.length === 0) {
+                this.logNightAction("No doctors in action queue, skipping");
                 return { success: true };
             }
+
+            // Get the current doctor from the param queue
+            const doctorName = this.game.gameStateParamQueue[0];
+            const remainingQueue = this.game.gameStateParamQueue.slice(1);
             
-            const doctorName = doctorPlayer.name;
             this.logNightAction(`Doctor (${doctorName}) is taking their night action`);
 
             // Get the doctor bot (skip if human player)
             const doctorBot = playersInfo.bots.find(bot => bot.name === doctorName);
             if (!doctorBot) {
                 // If human doctor, skip for now (would need UI implementation)
-                this.logNightAction(`Skipping human doctor: ${doctorName}`);
-                return { success: true };
+                this.logNightAction(`HUMAN DOCTOR DETECTED: Skipping auto-processing for human doctor: ${doctorName}`);
+                return { 
+                    success: true,
+                    gameUpdates: {
+                        gameStateParamQueue: remainingQueue
+                    }
+                };
             }
 
             // Get authentication for API calls
@@ -155,7 +160,8 @@ export class DoctorProcessor extends BaseRoleProcessor {
             return {
                 success: true,
                 gameUpdates: {
-                    nightResults: currentNightResults
+                    nightResults: currentNightResults,
+                    gameStateParamQueue: remainingQueue
                 }
             };
 

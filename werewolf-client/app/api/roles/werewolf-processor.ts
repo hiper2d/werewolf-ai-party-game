@@ -37,45 +37,23 @@ export class WerewolfProcessor extends BaseRoleProcessor {
             const werewolfNames = playersInfo.allPlayers.map(p => p.name).join(', ');
             this.logNightAction(`Werewolves (${werewolfNames}) are taking their night action`);
 
-            // Check if queue initialization is needed
+            // The gameStateParamQueue should already be populated by the generic night action logic
             if (this.game.gameStateParamQueue.length === 0) {
-                // Phase 1: Initialize queue with werewolf names
-                this.logNightAction("Initializing werewolf action queue");
-                
-                // Create list of werewolf names in random order
-                let werewolfNames = playersInfo.allPlayers.map(p => p.name);
-                
-                // Check if there are any alive werewolves
-                if (werewolfNames.length === 0) {
-                    throw new BotResponseError(
-                        "No alive werewolves found",
-                        "The game should have ended with villager victory already. This indicates a game state error.",
-                        {
-                            gameState: this.game.gameState,
-                            currentDay: this.game.currentDay,
-                            alivePlayers: this.game.bots.filter(bot => bot.isAlive).map(bot => bot.name)
-                        },
-                        true
-                    );
-                }
-                
-                werewolfNames = werewolfNames.sort(() => Math.random() - 0.5);
-                
-                // If there are multiple werewolves, duplicate the list so each name appears twice
-                if (werewolfNames.length > 1) {
-                    werewolfNames = [...werewolfNames, ...werewolfNames];
-                }
-                
-                this.logNightAction(`Initialized queue with werewolves: ${werewolfNames.join(', ')}`);
-                return { 
-                    success: true,
-                    gameUpdates: {
-                        gameStateParamQueue: werewolfNames
-                    }
-                };
+                throw new BotResponseError(
+                    "No werewolves in action queue",
+                    "The gameStateParamQueue should have been populated with werewolf names by the night action initialization. This indicates a system error.",
+                    {
+                        gameState: this.game.gameState,
+                        currentDay: this.game.currentDay,
+                        processQueue: this.game.gameStateProcessQueue,
+                        paramQueue: this.game.gameStateParamQueue,
+                        alivePlayers: this.game.bots.filter(bot => bot.isAlive).map(bot => bot.name)
+                    },Fi
+                    true
+                );
             }
             
-            // Phase 2: Process next werewolf action
+            // Process next werewolf action
             const currentWerewolfName = this.game.gameStateParamQueue[0];
             const remainingQueue = this.game.gameStateParamQueue.slice(1);
             

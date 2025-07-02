@@ -2,9 +2,9 @@
 
 import React, { useEffect, useState } from 'react';
 import { talkToAll, humanPlayerVote } from "@/app/api/bot-actions";
-import { beginNight, performNightAction } from "@/app/api/night-actions";
+import { beginNight, performNightAction, humanPlayerTalkWerewolves } from "@/app/api/night-actions";
 import { buttonTransparentStyle } from "@/app/constants";
-import { GAME_STATES, MessageType, RECIPIENT_ALL, GameMessage, Game, SystemErrorMessage, BotResponseError, GAME_MASTER, ROLE_CONFIGS } from "@/app/api/game-models";
+import { GAME_STATES, MessageType, RECIPIENT_ALL, GameMessage, Game, SystemErrorMessage, BotResponseError, GAME_MASTER, ROLE_CONFIGS, GAME_ROLES } from "@/app/api/game-models";
 import { getPlayerColor } from "@/app/utils/color-utils";
 import { convertMessageContent } from "@/app/utils/message-utils";
 import { clearGameErrorState } from "@/app/api/game-actions";
@@ -263,18 +263,29 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
             processQueue();
         }
         
-        // Auto-process NIGHT queue (but skip if human player is involved)
+        // Auto-process NIGHT queue (but skip if human player is involved or night has ended)
         if (game.gameState === GAME_STATES.NIGHT &&
             game.gameStateProcessQueue.length > 0 &&
+            game.gameStateParamQueue.length > 0 &&
             !isProcessing &&
             !game.errorState) {
             
             const currentRole = game.gameStateProcessQueue[0];
-            const currentPlayer = game.gameStateParamQueue.length > 0 ? game.gameStateParamQueue[0] : null;
+            const currentPlayer = game.gameStateParamQueue[0];
+            
+            console.log('🔍 GAMECHAT: AUTO-PROCESS NIGHT CHECK:', {
+                currentRole,
+                currentPlayer,
+                humanPlayerRole: game.humanPlayerRole,
+                humanPlayerName: game.humanPlayerName,
+                isHumanPlayerTurn: currentRole === game.humanPlayerRole && currentPlayer === game.humanPlayerName,
+                gameId,
+                timestamp: new Date().toISOString()
+            });
             
             // Skip auto-processing if it's the human player's turn for this role
             if (currentRole === game.humanPlayerRole && currentPlayer === game.humanPlayerName) {
-                console.log('🌙 SKIPPING AUTO-PROCESS - Human player turn for night action', {
+                console.log('🌙 GAMECHAT: SKIPPING AUTO-PROCESS - Human player turn for night action', {
                     currentRole,
                     currentPlayer,
                     humanPlayerRole: game.humanPlayerRole,
@@ -283,25 +294,27 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
                 return;
             }
             
-            console.log('🌙 CALLING PERFORM_NIGHT_ACTION API', {
+            console.log('🌙 GAMECHAT: CALLING PERFORM_NIGHT_ACTION API', {
                 gameId,
-                queue: game.gameStateProcessQueue
+                queue: game.gameStateProcessQueue,
+                processQueueLength: game.gameStateProcessQueue.length,
+                paramQueueLength: game.gameStateParamQueue.length
             });
             const processNightQueue = async () => {
                 setIsProcessing(true);
                 const updatedGame = await performNightAction(gameId);
-                console.log('✅ PerformNightAction API completed');
+                console.log('✅ GAMECHAT: PerformNightAction API completed');
                 
                 // Update parent game state
                 if (onGameStateChange) {
-                    console.log('🔄 UPDATING PARENT GAME STATE after night processing...');
+                    console.log('🔄 GAMECHAT: UPDATING PARENT GAME STATE after night processing...');
                     onGameStateChange(updatedGame);
                 }
                 setIsProcessing(false);
             };
             processNightQueue();
         }
-    }, [game.gameState, game.gameStateProcessQueue, gameId, isProcessing, game.errorState, onGameStateChange]);
+    }, [game.gameState, game.gameStateProcessQueue, game.gameStateParamQueue, game.humanPlayerRole, game.humanPlayerName, gameId, isProcessing, game.errorState, onGameStateChange]);
 
     // Check if it's human player's turn to vote
     useEffect(() => {
@@ -382,6 +395,35 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
         if (!trimmed) return;
 
         setIsProcessing(true);
+        
+        // NEW LOGIC: Check if this is werewolf coordination phase
+        if (game.gameState === GAME_STATES.NIGHT &&
+            game.gameStateProcessQueue.length > 0 &&
+            game.gameStateParamQueue.length > 1) {
+            
+            const currentRole = game.gameStateProcessQueue[0];
+            const currentPlayer = game.gameStateParamQueue[0];
+            
+            // If it's human werewolf coordination phase, use humanPlayerTalkWerewolves
+            if (currentRole === game.humanPlayerRole && 
+                currentPlayer === game.humanPlayerName &&
+                currentRole === GAME_ROLES.WEREWOLF) {
+                
+                console.log('🐺 SENDING WEREWOLF COORDINATION MESSAGE:', { message: trimmed, gameId });
+                const updatedGame = await humanPlayerTalkWerewolves(gameId, trimmed);
+                setNewMessage('');
+                
+                // Update parent game state
+                if (onGameStateChange) {
+                    console.log('🔄 UPDATING GAME STATE after werewolf coordination...');
+                    onGameStateChange(updatedGame);
+                }
+                setIsProcessing(false);
+                return;
+            }
+        }
+        
+        // Default behavior: normal day discussion
         const updatedGame = await talkToAll(gameId, trimmed);
         setNewMessage('');
         
@@ -580,6 +622,16 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
         if (game.gameState === GAME_STATES.NIGHT) {
             if (game.gameStateProcessQueue.length > 0) {
                 const currentRole = game.gameStateProcessQueue[0];
+                const currentPlayer = game.gameStateParamQueue.length > 0 ? game.gameStateParamQueue[0] : null;
+                
+                // Check if it's werewolf coordination phase for human player
+                if (currentRole === game.humanPlayerRole && 
+                    currentPlayer === game.humanPlayerName &&
+                    currentRole === GAME_ROLES.WEREWOLF &&
+                    game.gameStateParamQueue.length > 1) {
+                    return "Coordinate with other werewolves...";
+                }
+                
                 // Capitalize the role name for display
                 const displayRole = currentRole.charAt(0).toUpperCase() + currentRole.slice(1);
                 return `Night phase: ${displayRole} is taking action...`;

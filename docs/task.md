@@ -72,4 +72,59 @@ I think the dialog can be generic. Depending on the current role, it can show a 
 
 ====
 
-For the doctor night action, we ne
+The race condition problem: when the human player performs the doctor's night action, while the dialog window is being
+shown, the game goes into the NIGHT_END state in parallel.
+We failed to find the root cause multiple times. Instead, I'd like to revising the whole night logic.
+
+Night init logic:
+When the night starts, we put all roles, who are going to do actions, in the gameStateProcessQueue. We call
+gameStateProcessQueue[0] the active role. We also populate the gameStateParamQueue with names of the players with the
+active role. In case of werewolves it's a list of multiple names, for the doctor and the detective it's just one name.
+We call the gameStateParamQueue[0] the active player. IT can be a bot name or the human player name.
+The last steps is the move the game state from the NIGHT_BEGINS to the NIGHT. Let's then pass the execution back to the
+frontend. The GameChat component checks the game's state, the active role, and the active player and decides what to do:
+
+- to call the performNightAction server function
+- or to let the human player to do something on UI (type to the chat or submit a message and a target name in the dialog
+  window). We should never do both.
+
+Night actions logic:
+The frontend should check in the current game state is the NIGHT. If so, it should check what is the current role and
+who is the current player.
+Let's review all options:
+
+1. The current role is 'werewolf', the current player is a bot. The frontend should call the performNightAction server
+   function. The new logic assumes that when the function is being called, the gameStateParamQueue is populated with at
+   least one name. The function acts slightly differently when there is only one name in the gameStateParamQueue versus
+   many:
+   1.1. There are more than one name in the gameStateParamQueue. This means that werewolves are still discussing their
+   action and not ready to pick the target. The current player bot is being asked to participate the werewolves'
+   discussion. After the successful reply, the bots message is saved to the database, the active player name is removed
+   from the gameStateParamQueue
+   1.2. The active bot player is the last in the gameStateParamQueue. This means that this werewolf concludes the
+   werewolves action phase. It provides the message and the target. The message and the werewolves action is saved to
+   the database, the active player name is removed from the gameStateParamQueue leaving it empty. In this case, we know
+   that the current role finished its action, we should remove it from the gameStateProcessQueue and we should
+   reinitialize the gameStateParamQueue with the new list of names for the next role. If this was the last role in the
+   gameStateProcessQueue, we should moe the game state to the NIGHT_ENDS.
+2. The current player is 'werewolf' and it's the human player. In this case, we don't call any server functions. There
+   are two possible scenarios:
+   2.1. The active player is not the last in the gameStateParamQueue. In this case, the human player should be able to
+   reply to the game chat. Normally, we call the talkToAll server function for that. But in this case, let's create a
+   new server function called humanPlayerTalkWerewolves in the night-actions. This function saved the message with the
+   WEREWOLVES recipient name. When the message is saved to DB, we remove the active name from the gameStateParamQueue
+   and return the execution back to the frontend.
+   2.2. The active player is the last in the gameStateParamQueue. In this case, the frontend don't make any calls to the
+   backend, it shows the dialog window for the human player asking to finalize the werewolves night action. When
+   submitted, the performHumanPlayerNightAction server function should be called. It saves the message and the
+   werewolves night action results to the database, removes the name from the gameStateParamQueue. Since this was the
+   last name in it, it's time to remove the active role from the gameStateProcessQueue and either go to the next role or
+   move the night to the NIGHT_ENDS state. The logic is exactly the same as in the 1.2.
+
+Let's implement this. The summary of the idea:
+
+- The gameStateParamQueue is always initialized when the performNightAction, humanPlayerTalkWerewolves,
+  performHumanPlayerNightAction functions are being called
+- If the gameStateParamQueue is empty, this means that the current role finishes its actions, and it's time to move to the next role
+- When the active role finishes its actions, we move to the next role and reinitialize gameStateParamQueue
+- There is no parallel processing on the frontend and on the backend. We either call a server function or wait for a user to provide some data on UI

@@ -6,15 +6,51 @@ import {
     GAME_STATES,
     BotResponseError,
     ROLE_CONFIGS,
+    GAME_ROLES,
     GAME_MASTER,
     GameMessage,
     MessageType,
-    RECIPIENT_ALL
+    RECIPIENT_ALL,
+    RECIPIENT_WEREWOLVES,
+    RECIPIENT_DOCTOR,
+    RECIPIENT_DETECTIVE
 } from "@/app/api/game-models";
 import {auth} from "@/auth";
 import {getGame, addMessageToChatAndSaveToDb} from "./game-actions";
 import { RoleProcessorFactory } from "./roles";
 import {withGameErrorHandling} from "@/app/utils/server-action-wrapper";
+
+/**
+ * Helper function to populate gameStateParamQueue with players for a given role
+ * @param game - The current game state
+ * @param role - The role to get players for
+ * @returns Array of player names for the param queue
+ */
+function populateParamQueueForRole(game: Game, role: string): string[] {
+    // Get players with this role
+    const playersWithRole: string[] = [];
+    
+    // Check bots
+    game.bots
+        .filter(bot => bot.isAlive && bot.role === role)
+        .forEach(bot => playersWithRole.push(bot.name));
+    
+    // Check human player
+    if (game.humanPlayerRole === role) {
+        playersWithRole.push(game.humanPlayerName);
+    }
+    
+    // For werewolves, duplicate the list if multiple werewolves exist (for coordination phase)
+    let paramQueue: string[] = [];
+    if (role === GAME_ROLES.WEREWOLF && playersWithRole.length > 1) {
+        paramQueue = [...playersWithRole, ...playersWithRole];
+    } else {
+        paramQueue = [...playersWithRole];
+    }
+    
+    // Randomize the order
+    return paramQueue.sort(() => Math.random() - 0.5);
+}
 
 /**
  * Handles night phase progression
@@ -42,7 +78,7 @@ async function performNightActionImpl(gameId: string): Promise<Game> {
     // Handle different game states
     if (game.gameState === GAME_STATES.VOTE_RESULTS) {
         // Transition from VOTE_RESULTS to NIGHT and set up night actions
-        return await initializeNight(gameId, game);
+        return await beginNightImpl(gameId);
     } else if (game.gameState === GAME_STATES.NIGHT) {
         // Process next night action or end night if queue is empty
         return await processNightQueue(gameId, game);
@@ -69,7 +105,7 @@ async function performNightActionImpl(gameId: string): Promise<Game> {
 
 /**
  * Begins the night phase by setting up role actions based on configuration
- * Validates the game is in VOTE_RESULTS state and transitions through night preparation
+ * Validates the game is in VOTE_RESULTS state and tr ansitions through night preparation
  */
 async function beginNightImpl(gameId: string): Promise<Game> {
     // Authentication check
@@ -145,11 +181,18 @@ async function beginNightImpl(gameId: string): Promise<Game> {
         // Save the Game Master message
         await addMessageToChatAndSaveToDb(gameMessage, gameId);
 
+        // Initialize gameStateParamQueue with players for the first role
+        let initialParamQueue: string[] = [];
+        if (sortedNightRoles.length > 0) {
+            const firstRole = sortedNightRoles[0];
+            initialParamQueue = populateParamQueueForRole(game, firstRole);
+        }
+
         // Update game state with night action queue
         await db.collection('games').doc(gameId).update({
             gameState: GAME_STATES.NIGHT,
             gameStateProcessQueue: sortedNightRoles,
-            gameStateParamQueue: []
+            gameStateParamQueue: initialParamQueue
         });
 
         console.log(`🌙 NIGHT: Set up night actions for ${sortedNightRoles.length} roles: ${sortedNightRoles.join(', ')}`);
@@ -280,88 +323,10 @@ async function replayNightImpl(gameId: string): Promise<Game> {
     }
 }
 
-/**
- * Initialize night phase from VOTE_RESULTS state
- */
-async function initializeNight(gameId: string, game: Game): Promise<Game> {
-    // Firestore initialization check
-    if (!db) {
-        throw new Error('Firestore is not initialized');
-    }
-    
-    try {
-        // Get unique roles with night actions that have alive players, sorted by action order
-        const activeNightRoles = new Set<string>();
-        
-        // Check all bots for night actions
-        game.bots
-            .filter(bot => bot.isAlive && ROLE_CONFIGS[bot.role]?.hasNightAction)
-            .forEach(bot => {
-                activeNightRoles.add(bot.role);
-            });
-
-        // Check human player for night actions
-        if (ROLE_CONFIGS[game.humanPlayerRole]?.hasNightAction) {
-            activeNightRoles.add(game.humanPlayerRole);
-        }
-
-        // Convert to sorted array based on nightActionOrder
-        const sortedNightRoles = Array.from(activeNightRoles)
-            .sort((a, b) => ROLE_CONFIGS[a].nightActionOrder - ROLE_CONFIGS[b].nightActionOrder);
-
-        // Create Game Master message explaining the night phase
-        const roleDescriptions = Object.values(ROLE_CONFIGS)
-            .filter(config => config.hasNightAction)
-            .sort((a, b) => a.nightActionOrder - b.nightActionOrder)
-            .map(config => `• ${config.name}: ${config.description}`)
-            .join('\n');
-
-        const gmMessage = `Night falls over the village. During this phase, players with special abilities will act in this order:\n${roleDescriptions}\n\nThe night actions will be processed automatically.`;
-
-        const gameMessage: GameMessage = {
-            id: null,
-            recipientName: RECIPIENT_ALL,
-            authorName: GAME_MASTER,
-            msg: gmMessage,
-            messageType: MessageType.NIGHT_BEGINS,
-            day: game.currentDay,
-            timestamp: Date.now()
-        };
-
-        // Save the Game Master message
-        await addMessageToChatAndSaveToDb(gameMessage, gameId);
-
-        // Update game state with night action queue
-        await db.collection('games').doc(gameId).update({
-            gameState: GAME_STATES.NIGHT,
-            gameStateProcessQueue: sortedNightRoles,
-            gameStateParamQueue: []
-        });
-
-        console.log(`🌙 NIGHT: Set up night actions for ${sortedNightRoles.length} roles: ${sortedNightRoles.join(', ')}`);
-
-        // Return the updated game state
-        return await getGame(gameId) as Game;
-    } catch (error) {
-        console.error('Error in initializeNight function:', error);
-        
-        // Re-throw BotResponseError as-is for frontend handling
-        if (error instanceof BotResponseError) {
-            throw error;
-        }
-        
-        // Wrap other errors in BotResponseError for consistent handling
-        throw new BotResponseError(
-            'System error occurred during night initialization',
-            error instanceof Error ? error.message : 'Unknown error',
-            { originalError: error },
-            false // System errors are typically not recoverable
-        );
-    }
-}
 
 /**
  * Process the next item in the night action queue
+ * NEW LOGIC: Only processes if current player is a bot. Human players are handled by frontend UI.
  */
 async function processNightQueue(gameId: string, game: Game): Promise<Game> {
     // Firestore initialization check
@@ -370,7 +335,7 @@ async function processNightQueue(gameId: string, game: Game): Promise<Game> {
     }
     
     try {
-        // If queue is empty, end the night
+        // If process queue is empty, end the night
         if (game.gameStateProcessQueue.length === 0) {
             await db.collection('games').doc(gameId).update({
                 gameState: GAME_STATES.NIGHT_ENDS,
@@ -382,51 +347,114 @@ async function processNightQueue(gameId: string, game: Game): Promise<Game> {
             return await getGame(gameId) as Game;
         }
 
-        // Get the next role to act
+        // Param queue should always be populated when there are active roles
+        // If it's empty, this indicates a logic error in role transition
+        if (game.gameStateParamQueue.length === 0) {
+            console.error('🚨 CRITICAL ERROR: Empty param queue with active process queue', {
+                gameId,
+                currentRole: game.gameStateProcessQueue[0],
+                processQueue: game.gameStateProcessQueue,
+                paramQueue: game.gameStateParamQueue
+            });
+            throw new BotResponseError(
+                'Invalid game state: empty parameter queue',
+                'The gameStateParamQueue should be populated when there are active roles in gameStateProcessQueue',
+                {
+                    gameId,
+                    currentRole: game.gameStateProcessQueue[0],
+                    processQueue: game.gameStateProcessQueue,
+                    paramQueue: game.gameStateParamQueue
+                },
+                true
+            );
+        }
+
         const currentRole = game.gameStateProcessQueue[0];
-        const remainingQueue = game.gameStateProcessQueue.slice(1);
+        const currentPlayer = game.gameStateParamQueue[0];
+        
+        console.log(`🌙 PROCESS NIGHT QUEUE: Role=${currentRole}, Player=${currentPlayer}, ParamQueue=[${game.gameStateParamQueue.join(', ')}]`);
+
+        // NEW LOGIC: Check if current player is human - if so, skip processing and let frontend handle
+        if (currentPlayer === game.humanPlayerName) {
+            console.log(`🌙 SKIPPING NIGHT PROCESSING: Human player ${currentPlayer} needs to act via UI`);
+            return game; // Return current game state without changes
+        }
+
+        // Current player is a bot - process the action
+        const currentBot = game.bots.find(bot => bot.name === currentPlayer && bot.isAlive);
+        if (!currentBot) {
+            throw new BotResponseError(
+                `Bot not found: ${currentPlayer}`,
+                `Expected to find alive bot named ${currentPlayer} for role ${currentRole}`,
+                { currentPlayer, currentRole, gameId },
+                true
+            );
+        }
 
         // Create role processor for the current role
         const roleProcessor = RoleProcessorFactory.createProcessor(currentRole, gameId, game);
-        let result: any = { success: true };
         
         if (!roleProcessor) {
-            // This role doesn't have night actions, skip it
-            console.warn(`🌙 NIGHT ACTION: Role ${currentRole} has no processor, skipping`);
-        } else {
-            // Process the night action for this role
-            result = await roleProcessor.processNightAction();
-            
-            if (!result.success) {
-                console.error(`🌙 NIGHT ACTION ERROR: Failed to process ${currentRole} action: ${result.error}`);
-                // Throw error to trigger game error state handling
-                throw new BotResponseError(
-                    `Night action failed for ${currentRole}`,
-                    result.error || 'Unknown error in role processor',
-                    {
-                        role: currentRole,
-                        gameId,
-                        gameState: game.gameState,
-                        gameStateProcessQueue: game.gameStateProcessQueue,
-                        gameStateParamQueue: game.gameStateParamQueue
-                    },
-                    true // Recoverable - user can replay night phase
-                );
-            }
-
-            // Apply any game updates from the role processor
-            if (result.gameUpdates && Object.keys(result.gameUpdates).length > 0) {
-                await db.collection('games').doc(gameId).update(result.gameUpdates);
-            }
+            throw new BotResponseError(
+                `No processor for role: ${currentRole}`,
+                `Could not create processor for role ${currentRole}`,
+                { currentRole, gameId },
+                true
+            );
         }
 
-        // Update the queue (remove the processed role only if gameStateParamQueue is empty)
-        if (!result.gameUpdates?.gameStateParamQueue || result.gameUpdates.gameStateParamQueue.length === 0) {
-            // Add gameStateProcessQueue update to the existing gameUpdates if they exist
-            const finalUpdates = result.gameUpdates ? { ...result.gameUpdates } : {};
-            finalUpdates.gameStateProcessQueue = remainingQueue;
+        // Process the night action for this role
+        const result = await roleProcessor.processNightAction();
+        
+        if (!result.success) {
+            console.error(`🌙 NIGHT ACTION ERROR: Failed to process ${currentRole} action: ${result.error}`);
+            throw new BotResponseError(
+                `Night action failed for ${currentRole}`,
+                result.error || 'Unknown error in role processor',
+                {
+                    role: currentRole,
+                    player: currentPlayer,
+                    gameId,
+                    gameState: game.gameState,
+                    gameStateProcessQueue: game.gameStateProcessQueue,
+                    gameStateParamQueue: game.gameStateParamQueue
+                },
+                true // Recoverable - user can replay night phase
+            );
+        }
+
+        // Apply game updates from the role processor
+        if (result.gameUpdates && Object.keys(result.gameUpdates).length > 0) {
+            await db.collection('games').doc(gameId).update(result.gameUpdates);
+        }
+
+        // Check if we need to move to next role (param queue empty) or end night (no more roles)
+        const updatedGame = await getGame(gameId) as Game;
+        
+        if (updatedGame.gameStateParamQueue.length === 0) {
+            // Current role finished, move to next role or end night
+            const newProcessQueue = updatedGame.gameStateProcessQueue.slice(1);
             
-            await db.collection('games').doc(gameId).update(finalUpdates);
+            if (newProcessQueue.length === 0) {
+                // No more roles, end the night
+                await db.collection('games').doc(gameId).update({
+                    gameState: GAME_STATES.NIGHT_ENDS,
+                    gameStateProcessQueue: [],
+                    gameStateParamQueue: []
+                });
+                console.log('🌅 NIGHT_ENDS: All night actions completed');
+            } else {
+                // Move to next role
+                const nextRole = newProcessQueue[0];
+                const nextRoleParamQueue = populateParamQueueForRole(updatedGame, nextRole);
+                
+                await db.collection('games').doc(gameId).update({
+                    gameStateProcessQueue: newProcessQueue,
+                    gameStateParamQueue: nextRoleParamQueue
+                });
+                
+                console.log(`🌙 MOVED TO NEXT ROLE: ${nextRole} with players [${nextRoleParamQueue.join(', ')}]`);
+            }
         }
 
         // Return the updated game state
@@ -449,7 +477,101 @@ async function processNightQueue(gameId: string, game: Game): Promise<Game> {
     }
 }
 
+/**
+ * Handles human player talking during werewolves coordination phase
+ * This function is called when the human werewolf is not the last in the param queue
+ * and needs to participate in discussion without making the final target decision
+ */
+async function humanPlayerTalkWerewolvesImpl(gameId: string, message: string): Promise<Game> {
+    const session = await auth();
+    if (!session || !session.user?.email) {
+        throw new Error('Not authenticated');
+    }
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+
+    const game = await getGame(gameId);
+    if (!game) {
+        throw new Error('Game not found');
+    }
+
+    // Validate game state
+    if (game.gameState !== GAME_STATES.NIGHT) {
+        throw new Error('Game is not in night phase');
+    }
+
+    // Check if it's werewolf phase and human player's turn
+    if (game.gameStateProcessQueue.length === 0 || game.gameStateParamQueue.length === 0) {
+        throw new Error('No night actions in progress');
+    }
+
+    const currentRole = game.gameStateProcessQueue[0];
+    const currentPlayer = game.gameStateParamQueue[0];
+
+    if (currentRole !== GAME_ROLES.WEREWOLF) {
+        throw new Error('Not currently werewolf phase');
+    }
+
+    if (game.humanPlayerRole !== GAME_ROLES.WEREWOLF || currentPlayer !== game.humanPlayerName) {
+        throw new Error('Not your turn for werewolf discussion');
+    }
+
+    // Ensure this is NOT the last player in queue (coordination phase only)
+    if (game.gameStateParamQueue.length === 1) {
+        throw new Error('Use performHumanPlayerNightAction for final werewolf action');
+    }
+
+    try {
+        // Create werewolf coordination message
+        const werewolfMessage: GameMessage = {
+            id: null,
+            recipientName: RECIPIENT_WEREWOLVES,
+            authorName: game.humanPlayerName,
+            msg: { reply: message },
+            messageType: MessageType.BOT_ANSWER,
+            day: game.currentDay,
+            timestamp: Date.now()
+        };
+        
+        // Save message to database
+        await addMessageToChatAndSaveToDb(werewolfMessage, gameId);
+        
+        // Remove the human player from param queue
+        const newParamQueue = game.gameStateParamQueue.slice(1);
+        
+        // If param queue becomes empty after removing this player, populate it for the next role
+        let finalUpdates: any = {
+            gameStateParamQueue: newParamQueue
+        };
+
+        if (newParamQueue.length === 0) {
+            // Remove current role from process queue and move to next role
+            const newProcessQueue = game.gameStateProcessQueue.slice(1);
+            finalUpdates.gameStateProcessQueue = newProcessQueue;
+
+            // If there are more roles, populate param queue for the next role
+            if (newProcessQueue.length > 0) {
+                const nextRole = newProcessQueue[0];
+                finalUpdates.gameStateParamQueue = populateParamQueueForRole(game, nextRole);
+            }
+        }
+        
+        // Update game state
+        await db.collection('games').doc(gameId).update(finalUpdates);
+        
+        console.log(`Human player ${game.humanPlayerName} participated in werewolf discussion`);
+        
+        // Return updated game state
+        return await getGame(gameId) as Game;
+    } catch (error) {
+        console.error('Error in humanPlayerTalkWerewolves function:', error);
+        throw error;
+    }
+}
+
 // Wrapped exports with error handling
 export const performNightAction = withGameErrorHandling(performNightActionImpl);
 export const beginNight = withGameErrorHandling(beginNightImpl);
 export const replayNight = withGameErrorHandling(replayNightImpl);
+export const humanPlayerTalkWerewolves = withGameErrorHandling(humanPlayerTalkWerewolvesImpl);

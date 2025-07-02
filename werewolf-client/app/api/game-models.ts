@@ -253,6 +253,8 @@ export const MESSAGE_ROLE = {
 export const GAME_MASTER = 'Game Master';
 export const RECIPIENT_ALL = 'ALL';
 export const RECIPIENT_WEREWOLVES = 'WEREWOLVES';
+export const RECIPIENT_DOCTOR = 'DOCTOR';
+export const RECIPIENT_DETECTIVE = 'DETECTIVE';
 
 export interface GameMessage {
     id: string | null;           // Will be null for new messages, set by Firestore
