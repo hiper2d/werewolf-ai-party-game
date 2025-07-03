@@ -48,7 +48,7 @@ export class WerewolfProcessor extends BaseRoleProcessor {
                         processQueue: this.game.gameStateProcessQueue,
                         paramQueue: this.game.gameStateParamQueue,
                         alivePlayers: this.game.bots.filter(bot => bot.isAlive).map(bot => bot.name)
-                    },Fi
+                    },
                     true
                 );
             }

@@ -267,3 +267,41 @@ Your response must follow this schema:
 }
 
 Return a single JSON object matching this schema.`;
+
+export const BOT_DETECTIVE_ACTION_PROMPT: string = `🔍 **Night Phase - Detective Investigation**
+
+The night has fallen and it's time for you to investigate a player. As the Detective, you must choose one player to investigate and learn their true role.
+
+**IMPORTANT RULES:**
+- You can investigate any living player except yourself
+- Your investigation will reveal the target's exact role (Villager, Werewolf, Doctor, etc.)
+- You CANNOT investigate the same player twice (this rule will be enforced later)
+- Your investigation only reveals information to you - keep it secret!
+
+Consider:
+- Who has been acting most suspiciously during day discussions?
+- Who might be a werewolf trying to blend in with villagers?
+- Who seems to have inside knowledge or is deflecting suspicion?
+- Which player's true role would give you the most strategic information?
+- Who are the most vocal or influential players that need investigation?
+
+**Remember:** Keep your role as Detective completely secret. Never directly reveal your investigation results or role to other players during day discussions. Use the information strategically to guide voting and discussions.
+
+Your response must follow this schema:
+
+{
+    "type": "object",
+    "properties": {
+        "target": {
+            "type": "string",
+            "description": "The name of the player you want to investigate tonight"
+        },
+        "reasoning": {
+            "type": "string", 
+            "description": "Your reasoning for choosing to investigate this player (private detective thoughts)"
+        }
+    },
+    "required": ["target", "reasoning"]
+}
+
+Return a single JSON object matching this schema.`;
