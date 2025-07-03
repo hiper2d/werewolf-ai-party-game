@@ -290,7 +290,7 @@ export default function GamePage({
                             </button>
                         </div>
                     ) : (
-                        <div className="flex gap-2 justify-start">
+                        <div className="flex gap-2 justify-center">
                             {game.gameState === GAME_STATES.DAY_DISCUSSION && (
                                 <>
                                     <button
@@ -339,35 +339,37 @@ export default function GamePage({
                                     <div className="text-sm text-yellow-400 text-center">
                                         {game.gameState === GAME_STATES.NIGHT_ENDS ? '🌅 Night completed' : '🌙 Night in progress...'}
                                     </div>
-                                    <button
-                                        className={`${buttonTransparentStyle} bg-purple-600 hover:bg-purple-700 border-purple-500`}
-                                        onClick={async () => {
-                                            // First trigger UI message clearing
-                                            setClearNightMessages(true);
-                                            
-                                            // Then replay night in backend
-                                            const updatedGame = await replayNight(game.id);
-                                            setGame(updatedGame);
-                                            
-                                            // Reset the clear flag after a brief delay
-                                            setTimeout(() => setClearNightMessages(false), 100);
-                                        }}
-                                        title="Clear night messages and replay the night phase actions"
-                                    >
-                                        🔄 Replay Night
-                                    </button>
-                                    {game.gameState === GAME_STATES.NIGHT_ENDS && (
+                                    <div className="flex gap-2 justify-center">
                                         <button
-                                            className={`${buttonTransparentStyle} bg-green-600 hover:bg-green-700 border-green-500`}
+                                            className={`${buttonTransparentStyle} bg-purple-600 hover:bg-purple-700 border-purple-500`}
                                             onClick={async () => {
-                                                const updatedGame = await startNextDay(game.id);
+                                                // First trigger UI message clearing
+                                                setClearNightMessages(true);
+                                                
+                                                // Then replay night in backend
+                                                const updatedGame = await replayNight(game.id);
                                                 setGame(updatedGame);
+                                                
+                                                // Reset the clear flag after a brief delay
+                                                setTimeout(() => setClearNightMessages(false), 100);
                                             }}
-                                            title="Start the next day and begin discussion phase"
+                                            title="Clear night messages and replay the night phase actions"
                                         >
-                                            🌅 Start Next Day
+                                            🔄 Replay Night
                                         </button>
-                                    )}
+                                        {game.gameState === GAME_STATES.NIGHT_ENDS && (
+                                            <button
+                                                className={`${buttonTransparentStyle} bg-green-600 hover:bg-green-700 border-green-500`}
+                                                onClick={async () => {
+                                                    const updatedGame = await startNextDay(game.id);
+                                                    setGame(updatedGame);
+                                                }}
+                                                title="Start the next day and begin discussion phase"
+                                            >
+                                                🌅 Start Next Day
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
                             )}
                         </div>
