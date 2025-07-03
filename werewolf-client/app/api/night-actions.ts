@@ -19,6 +19,69 @@ import {auth} from "@/auth";
 import {getGame, addMessageToChatAndSaveToDb} from "./game-actions";
 import { RoleProcessorFactory } from "./roles";
 import {withGameErrorHandling} from "@/app/utils/server-action-wrapper";
+import { generateNightResultsMessage } from "@/app/utils/message-utils";
+
+/**
+ * Helper function to handle night end logic with results processing
+ * @param gameId - The game ID
+ * @param game - The current game state
+ */
+async function endNightWithResults(gameId: string, game: Game): Promise<Game> {
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+
+    // Generate night results message
+    const nightResultsMessage = generateNightResultsMessage(game.nightResults || {}, game);
+    
+    // Create Game Master message with night results
+    const gameMessage: GameMessage = {
+        id: null,
+        recipientName: RECIPIENT_ALL,
+        authorName: GAME_MASTER,
+        msg: { story: nightResultsMessage },
+        messageType: MessageType.GAME_STORY,
+        day: game.currentDay,
+        timestamp: Date.now()
+    };
+
+    // Save the Game Master message
+    await addMessageToChatAndSaveToDb(gameMessage, gameId);
+
+    // Handle player elimination if werewolf killed someone and doctor didn't protect them
+    let gameUpdates: any = {
+        gameState: GAME_STATES.NIGHT_ENDS,
+        gameStateProcessQueue: [],
+        gameStateParamQueue: []
+    };
+
+    if (game.nightResults?.werewolf) {
+        const target = game.nightResults.werewolf.target;
+        const wasProtected = game.nightResults.doctor && game.nightResults.doctor.target === target;
+        
+        if (!wasProtected) {
+            // Player was killed - eliminate them
+            if (target === game.humanPlayerName) {
+                // Human player was killed - game over
+                gameUpdates.gameState = GAME_STATES.GAME_OVER;
+            } else {
+                // Bot was killed - set isAlive = false
+                const updatedBots = game.bots.map(bot =>
+                    bot.name === target
+                        ? { ...bot, isAlive: false, eliminationDay: game.currentDay }
+                        : bot
+                );
+                gameUpdates.bots = updatedBots;
+            }
+        }
+    }
+
+    // Update game state
+    await db.collection('games').doc(gameId).update(gameUpdates);
+
+    console.log('🌅 NIGHT_ENDS: All night actions completed with results');
+    return await getGame(gameId) as Game;
+}
 
 /**
  * Helper function to populate gameStateParamQueue with players for a given role
@@ -335,16 +398,9 @@ async function processNightQueue(gameId: string, game: Game): Promise<Game> {
     }
     
     try {
-        // If process queue is empty, end the night
+        // If process queue is empty, end the night with results
         if (game.gameStateProcessQueue.length === 0) {
-            await db.collection('games').doc(gameId).update({
-                gameState: GAME_STATES.NIGHT_ENDS,
-                gameStateProcessQueue: [],
-                gameStateParamQueue: []
-            });
-
-            console.log('🌅 NIGHT_ENDS: All night actions completed');
-            return await getGame(gameId) as Game;
+            return await endNightWithResults(gameId, game);
         }
 
         // Param queue should always be populated when there are active roles
@@ -436,13 +492,8 @@ async function processNightQueue(gameId: string, game: Game): Promise<Game> {
             const newProcessQueue = updatedGame.gameStateProcessQueue.slice(1);
             
             if (newProcessQueue.length === 0) {
-                // No more roles, end the night
-                await db.collection('games').doc(gameId).update({
-                    gameState: GAME_STATES.NIGHT_ENDS,
-                    gameStateProcessQueue: [],
-                    gameStateParamQueue: []
-                });
-                console.log('🌅 NIGHT_ENDS: All night actions completed');
+                // No more roles, end the night with results
+                return await endNightWithResults(gameId, updatedGame);
             } else {
                 // Move to next role
                 const nextRole = newProcessQueue[0];

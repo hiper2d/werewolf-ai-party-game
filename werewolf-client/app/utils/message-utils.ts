@@ -302,3 +302,76 @@ export function generateVotingResultsMessage(results: Record<string, number>): s
 export function generateEliminationMessage(playerName: string, playerRole: string): string {
     return `${playerName} has been eliminated! They were a ${playerRole}.`;
 }
+
+export function generateNightResultsMessage(nightResults: Record<string, { target: string }>, game: any): string {
+    if (!nightResults || Object.keys(nightResults).length === 0) {
+        return "🌅 **Dawn breaks over the village.**\n\nThe night was peaceful... or was it? No special actions were taken during the night.";
+    }
+
+    const resultLines: string[] = [];
+    resultLines.push("🌅 **Dawn breaks over the village.**");
+    resultLines.push("");
+    resultLines.push("As the sun rises, the events of the night become clear...");
+    resultLines.push("");
+
+    // Process werewolf results (eliminations)
+    if (nightResults.werewolf) {
+        const target = nightResults.werewolf.target;
+        
+        // Check if target was protected by doctor
+        const wasProtected = nightResults.doctor && nightResults.doctor.target === target;
+        
+        if (wasProtected) {
+            resultLines.push(`🛡️ **${target}** was attacked by the werewolves during the night, but the doctor's protection saved their life!`);
+            resultLines.push(`**${target}** wakes up safely, unaware of how close they came to death.`);
+        } else {
+            resultLines.push(`💀 **${target}** was found dead at dawn. The werewolves have claimed another victim.`);
+            
+            // Reveal the victim's role
+            const targetBot = game.bots.find((bot: any) => bot.name === target);
+            if (targetBot) {
+                resultLines.push(`They were a **${targetBot.role}**.`);
+            } else if (target === game.humanPlayerName) {
+                resultLines.push(`They were a **${game.humanPlayerRole}**.`);
+            }
+        }
+        resultLines.push("");
+    }
+
+    // Process detective results (if detective investigated a werewolf, it's important information)
+    if (nightResults.detective) {
+        const investigatedTarget = nightResults.detective.target;
+        
+        // Get the investigated player's role
+        let targetRole: string;
+        const targetBot = game.bots.find((bot: any) => bot.name === investigatedTarget);
+        if (targetBot) {
+            targetRole = targetBot.role;
+        } else if (investigatedTarget === game.humanPlayerName) {
+            targetRole = game.humanPlayerRole;
+        } else {
+            targetRole = 'unknown';
+        }
+        
+        // Only reveal if a werewolf was discovered (this is significant public information)
+        if (targetRole === 'werewolf') {
+            resultLines.push(`🔍 The detective's investigation revealed shocking news: **${investigatedTarget}** is a werewolf!`);
+            resultLines.push(`This crucial information has been shared with the village.`);
+            resultLines.push("");
+        } else {
+            // For non-werewolf investigations, just mention detective was active but keep results private
+            resultLines.push(`🔍 The detective was seen investigating during the night, but their findings remain confidential.`);
+            resultLines.push("");
+        }
+    }
+
+    // Mention doctor activity (if active but didn't save anyone)
+    if (nightResults.doctor && (!nightResults.werewolf || nightResults.doctor.target !== nightResults.werewolf.target)) {
+        resultLines.push(`🏥 The doctor was active during the night, providing protection to someone in the village.`);
+        resultLines.push("");
+    }
+
+    resultLines.push("The surviving villagers gather in the town square to discuss the night's events and plan their next move.");
+
+    return resultLines.join("\n");
+}
