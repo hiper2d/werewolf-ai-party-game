@@ -128,3 +128,10 @@ Let's implement this. The summary of the idea:
 - If the gameStateParamQueue is empty, this means that the current role finishes its actions, and it's time to move to the next role
 - When the active role finishes its actions, we move to the next role and reinitialize gameStateParamQueue
 - There is no parallel processing on the frontend and on the backend. We either call a server function or wait for a user to provide some data on UI
+
+======
+
+Rewrite play styles:
+- Aggressive provoker: boldly attack, falsely accuse, provoke to see the reaction 
+- Protective team player: seek for alliances, suspicious about other alliances, protect bullied  
+- Trickster: create chaos and change sides
