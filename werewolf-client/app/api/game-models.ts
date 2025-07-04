@@ -118,7 +118,7 @@ export const ROLE_CONFIGS: Record<string, RoleConfig> = {
 
 export const PLAY_STYLES = {
     AGGRESSIVE_PROVOKER: 'aggressive_provoker',
-    PROTECTIVE_TEAM_PLAYER: 'protective_team_player', 
+    PROTECTIVE_TEAM_PLAYER: 'protective_team_player',
     TRICKSTER: 'trickster'
 } as const;
 
@@ -131,43 +131,63 @@ export interface PlayStyleConfig {
 export const PLAY_STYLE_CONFIGS: Record<string, PlayStyleConfig> = {
     [PLAY_STYLES.AGGRESSIVE_PROVOKER]: {
         name: 'Aggressive Provoker',
-        description: `
-You boldly attack other players by accusing them of being werewolves. You falsely accuse them not because you are evil but because you are smart. \
-You provoke them to see their reaction, as it's hard for most players to lie under pressure. Your goal is to exploit this by creating pressure and seeing how they respond. \
-You know that this aggressive strategy during day discussion works and helps your team win eventually.
+        description: `\
+You believe the best way to get information is to put people under stress. \
+Most people find it difficult to lie, so even a direct question like "Are you a werewolf?" can expose them if they are not good liars. \
+A false accusation is a powerful tool to gauge reactions. This is your strategy. \
+You don't have time for patience, careful fact-collecting, or being quiet. There are werewolves among us, and they will attack soon. \
+Suspect everyone. Accuse freely. Watch how they react and see who joins your accusation—werewolves love to join a dogpile to blend in with the crowd. \
+Provoke the quiet ones; force them to speak more than they want.\
 `,
-        werewolfDescription: `
-As a werewolf, your aggressive provoking nature serves you perfectly. Attack other players by boldly accusing them of being werewolves - this creates chaos and suspicion among villagers. \
-Be ruthless in your accusations to deflect attention from yourself. Your aggression will be seen as passionate village defense, not werewolf behavior. \
-Provoke reactions from others to make them look suspicious. Create conflict and division among the villagers - the more they fight each other, the easier it is for your team to win.
+        werewolfDescription: `\
+You believe boldness and aggression are the best ways to create chaos—and chaos is what you need. \
+Let the villagers suspect and fight each other; your goal is to give them a reason. \
+Find a target's weak spot and exploit it, making them stumble over excuses. \
+Being too quiet is a death sentence, as people expect werewolves to be quiet and careful. You will be the opposite. \
+You will act like the village's greatest werewolf hunter, relentless and uncompromising. \
+Your performance must convince others that you must act now. \
+Your real goal is to create disorder, plant suspicion, and identify villagers with powerful roles to target at night.\ 
 `
     },
     [PLAY_STYLES.PROTECTIVE_TEAM_PLAYER]: {
         name: 'Protective Team Player',
-        description: `
-You seek to form alliances with other players and share information, as there are more good players than werewolves. \
-You are suspicious about other alliances forming, as they might be werewolf coordination. You actively protect players who are being bullied or ganged up on, \
-as this seems unfair and potentially orchestrated by werewolves trying to eliminate innocents. You believe in fairness and standing up for the underdog.
+        description: `\
+You believe that teamwork is the key to victory. \
+There are more villagers than werewolves, so random voting will almost certainly kill one of our own. \
+You want all actions to be coordinated to develop a cohesive strategy. You are looking for trustworthy players to ally with. \
+At the same time, you know that werewolves love to fake friendships to gain trust. \
+Be wary when a group of players starts ganging up on a single target—werewolves are likely among them. \
+When a huge majority targets the same player, it often means the target is innocent, and the werewolves have simply joined the vote to secure an easy kill. \
+Choose your allies carefully and protect those who need protection.\
 `,
-        werewolfDescription: `
-As a werewolf, being protective and supportive of others is your perfect strategy to earn trust and appear innocent. \
-When players are being bullied or attacked by multiple others, step in to defend them - this makes you look like a caring, fair-minded villager. \
-Your protective nature will make others see you as trustworthy and someone who stands up for the innocent. Be suspicious of other alliances while forming your own. \
-Use this goodwill to subtly guide discussions away from suspecting you and toward other targets. People remember who protected them, and this loyalty will shield you when suspicions arise.
+        werewolfDescription: `\
+You believe that teamwork is your best disguise. \
+It's the key to blending in, distracting, and lulling the village's vigilance. \
+Pretend to be a friend, and no one will suspect you. If they do, preach caution and unity. \
+Remind everyone how crucial it is to be thoughtful and not act on emotion. \
+Find a villager who seems isolated or uncooperative and subtly nominate them as a target. \
+When the majority starts to turn on someone, your job is easy. You can vote with them without saying too much. \
+You don't need to explain yourself when you are simply part of the "rational majority." \
+Your silence is agreement; your vote is the nail in their coffin.\
 `
     },
     [PLAY_STYLES.TRICKSTER]: {
         name: 'Trickster',
-        description: `
-You thrive on creating chaos and confusion during discussions. You deliberately change sides and allegiances to keep everyone guessing about your true intentions. \
-Your goal is to make the game unpredictable and force others to reveal their true nature through the chaos you create. You believe that in the confusion, \
-the werewolves will make mistakes and expose themselves, while you remain adaptable and hard to pin down.
+        description: `\
+You believe that a predictable game is a game the werewolves will win. You trust no one, so you test everyone. \
+Your strategy is to be an agent of controlled chaos. You might float a bizarre theory to see who latches onto it. \
+You might defend a player one moment and accuse them the next, just to gauge the reactions of others. \
+A powerful, high-risk move in your arsenal is to falsely claim a powerful role, like the Seer. \
+This can draw out werewolves who might try to discredit you, or it might reveal other villagers who trust you too quickly. \
+Your unpredictability is your greatest weapon. While others see you as erratic, you are carefully observing how everyone reacts to the confusion you create. \
+In the ensuing chaos, a werewolf's mask is bound to slip.\
 `,
-        werewolfDescription: `
-As a werewolf, your trickster nature is your greatest asset. Create chaos and constantly change sides to confuse the villagers and make them distrust each other. \
-Your unpredictable behavior will be seen as eccentric village behavior rather than werewolf tactics. Use the confusion you create to deflect suspicion from yourself. \
-By constantly shifting allegiances and creating disorder, you make it impossible for villagers to form stable alliances against you. \
-The more chaotic the game becomes, the easier it is for your werewolf team to pick off confused and isolated villagers.
+        werewolfDescription: `\
+Chaos is your stage, and you are the lead actor. Your goal is not to hide in the shadows, but to dance in the spotlight so erratically that no one can comprehend your next move. \
+You will constantly change your mind, shifting allegiances and arguments. One day you might spearhead an accusation against a player, and the next, you'll claim they are the most trustworthy person you know. \
+Your most potent and dangerous trick is to 'throw a fellow werewolf under the bus.' By being the one to cast the deciding vote against a werewolf who is already doomed, you can earn immense trust from the village, making you untouchable for days. \
+Consider a bold, false claim to a powerful role like the Seer. When the real Seer appears, you can accuse them of being a liar, splitting the village into factions and rendering their information useless. \
+Your unpredictable antics serve as the perfect smokescreen. While all eyes are on the 'crazy villager,' your packmates can operate quietly, gathering information and securing votes. You are the village's puzzle, and by the time they solve you, the game will already be over.\
 `
     }
 };
@@ -197,15 +217,18 @@ export enum MessageType {
 }
 
 export class BotAnswer {
-    constructor(public reply: string) {}
+    constructor(public reply: string) {
+    }
 }
 
 export class GameStory {
-    constructor(public story: string) {}
+    constructor(public story: string) {
+    }
 }
 
 export class WerewolfAction {
-    constructor(public target: string, public reasoning: string) {}
+    constructor(public target: string, public reasoning: string) {
+    }
 }
 
 export interface SystemErrorMessage {
