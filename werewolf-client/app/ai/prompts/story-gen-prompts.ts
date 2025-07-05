@@ -68,10 +68,18 @@ You are an AI agent tasked with generating a game scene and character descriptio
 
   <Task2>
     <CharacterCreation>
+      <CharacterSourcingRule>
+        **First, evaluate the <Theme> to determine how to source characters:**
+        - **If the Theme is a well-known fictional universe** (e.g., "Harry Potter", "Lord of the Rings", "Star Wars", "The Avengers"): You MUST use the established, canonical main characters from that universe.
+          - **Name Selection**: Select a number of characters equal to <NumberOfPlayers>, prioritizing the most prominent figures. Use their common single name (e.g., "Harry", "Frodo", "Vader", "Tony").
+          - **Story Adaptation**: The character's <Story> must be adapted from their known biography but rephrased to create ambiguity for the Werewolf game. For instance, a story for Snape could be: "A master of potions with a shrouded past and divided loyalties, his motives are a constant source of debate and suspicion." This could fit a Doctor, a Werewolf, or a plain Villager.
+        - **If the Theme is generic** (e.g., "Medieval Village", "Space Station", "Enchanted Forest"): You must generate completely new, original characters as described below.
+      </CharacterSourcingRule>
+
       For each player (total of <NumberOfPlayers>NumberOfPlayers</NumberOfPlayers>), generate:
 
       <CharacterDetails>
-        - A unique, single-word <Name>name</Name> appropriate to the theme. Do not use the <ExcludedName>ExcludedName</ExcludedName> or any similar names.
+        - A unique, single-word <Name>name</Name> appropriate to the theme, following the Character Sourcing Rule above. Do not use the <ExcludedName>ExcludedName</ExcludedName> or any similar names.
         - A brief <Story>story</Story> (1-2 sentences) that:
           * Fits within the context of the scene and theme
           * **Includes ambiguous details that could hint at any role without revealing it**

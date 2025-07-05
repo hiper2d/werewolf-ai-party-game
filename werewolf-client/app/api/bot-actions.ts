@@ -24,7 +24,7 @@ import {
     GM_COMMAND_SELECT_RESPONDERS
 } from "@/app/ai/prompts/gm-commands";
 import {BOT_SYSTEM_PROMPT, BOT_VOTE_PROMPT} from "@/app/ai/prompts/bot-prompts";
-import {GM_ROUTER_SYSTEM_PROMPT} from "@/app/ai/prompts/gm-prompts";
+import {GM_ROUTER_SYSTEM_PROMPT, HUMAN_SUGGESTION_PROMPT} from "@/app/ai/prompts/gm-prompts";
 import {createBotAnswerSchema, createBotVoteSchema, createGmBotSelectionSchema} from "@/app/ai/prompts/ai-schemas";
 import {AgentFactory} from "@/app/ai/agent-factory";
 import {format} from "@/app/ai/prompts/utils";
@@ -288,7 +288,8 @@ async function keepBotsGoingImpl(gameId: string): Promise<Game> {
             dead_players_names_with_roles: game.bots
                 .filter(b => !b.isAlive)
                 .map(b => `${b.name} (${b.role})`)
-                .join(", ")
+                .join(", "),
+            humanPlayerName: game.humanPlayerName
         });
 
         const gmAgent = AgentFactory.createAgent(GAME_MASTER, gmPrompt, game.gameMasterAiType, apiKeys);
@@ -378,7 +379,8 @@ async function handleHumanPlayerMessage(
         dead_players_names_with_roles: game.bots
             .filter(b => !b.isAlive)
             .map(b => `${b.name} (${b.role})`)
-            .join(", ")
+            .join(", "),
+        humanPlayerName: game.humanPlayerName
     });
 
     const gmAgent = AgentFactory.createAgent(GAME_MASTER, gmPrompt, game.gameMasterAiType, apiKeys);
@@ -1168,6 +1170,70 @@ async function performHumanPlayerNightActionImpl(gameId: string, targetPlayer: s
     }
 }
 
+async function getSuggestionImpl(gameId: string): Promise<string> {
+    const session = await auth();
+    if (!session || !session.user?.email) {
+        throw new Error('Not authenticated');
+    }
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+
+    const game = await getGame(gameId);
+    if (!game) {
+        throw new Error('Game not found');
+    }
+
+    // Validate game state
+    if (game.gameState !== GAME_STATES.DAY_DISCUSSION) {
+        throw new Error('Suggestions are only available during day discussion');
+    }
+
+    try {
+        // Get all messages for the current day to provide context
+        const messages = await getGameMessages(gameId);
+        const dayMessages = messages.filter(m => m.day === game.currentDay);
+
+        // Get API keys for the human player
+        const apiKeys = await getUserFromFirestore(session.user.email)
+            .then((user) => getUserApiKeys(user!.email));
+
+        // Create prompt with game context
+        const suggestionPrompt = format(HUMAN_SUGGESTION_PROMPT, {
+            player_name: game.humanPlayerName,
+            players_names: [
+                ...game.bots.map(b => b.name),
+                game.humanPlayerName
+            ].join(", "),
+            dead_players_names_with_roles: game.bots
+                .filter(b => !b.isAlive)
+                .map(b => `${b.name} (${b.role})`)
+                .join(", ")
+        });
+
+        // Use the game master AI to generate suggestion
+        const agent = AgentFactory.createAgent('SuggestionBot', suggestionPrompt, game.gameMasterAiType, apiKeys);
+        
+        // Convert day messages to AI format for context
+        const history = convertToAIMessages('SuggestionBot', dayMessages);
+        
+        // Get suggestion from AI using schema to ensure consistent format
+        const schema = createBotAnswerSchema();
+        const rawSuggestion = await agent.askWithSchema(schema, history);
+        
+        if (!rawSuggestion) {
+            throw new Error('Failed to generate suggestion');
+        }
+
+        // Parse the response and extract the reply text
+        const suggestionResponse = parseResponseToObj(rawSuggestion, 'BotAnswer');
+        return suggestionResponse.reply.trim();
+    } catch (error) {
+        console.error('Error in getSuggestion function:', error);
+        throw error;
+    }
+}
+
 // Wrapped exports with error handling
 export const welcome = withGameErrorHandling(welcomeImpl);
 export const talkToAll = withGameErrorHandling(talkToAllImpl);
@@ -1175,3 +1241,4 @@ export const keepBotsGoing = withGameErrorHandling(keepBotsGoingImpl);
 export const vote = withGameErrorHandling(voteImpl);
 export const humanPlayerVote = withGameErrorHandling(humanPlayerVoteImpl);
 export const performHumanPlayerNightAction = withGameErrorHandling(performHumanPlayerNightActionImpl);
+export const getSuggestion = withGameErrorHandling(getSuggestionImpl);

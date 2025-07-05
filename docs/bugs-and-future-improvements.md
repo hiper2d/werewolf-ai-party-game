@@ -1,7 +1,9 @@
 # Bugs and improvements
 
-- Implement human player participat and chat role messages visibility for human player
-- Implement Detective night action
+- Complete the night results
+- Add option to read message out loud
+- Add suggestions for the reply
+- Resolve vote tie by asking Detective to choose
 - Get rid of transactions 
 - Implement night resolution
 - Implement the end of night summarization

@@ -208,13 +208,13 @@ async function beginNightImpl(gameId: string): Promise<Game> {
         
         // Check all bots for night actions
         game.bots
-            .filter(bot => bot.isAlive && ROLE_CONFIGS[bot.role]?.hasNightAction)
+            .filter(bot => bot.isAlive && ROLE_CONFIGS[bot.role])
             .forEach(bot => {
                 activeNightRoles.add(bot.role);
             });
 
         // Check human player for night actions
-        if (ROLE_CONFIGS[game.humanPlayerRole]?.hasNightAction) {
+        if (ROLE_CONFIGS[game.humanPlayerRole]) {
             activeNightRoles.add(game.humanPlayerRole);
         }
 
@@ -224,7 +224,7 @@ async function beginNightImpl(gameId: string): Promise<Game> {
 
         // Create Game Master message explaining the night phase
         const roleDescriptions = Object.values(ROLE_CONFIGS)
-            .filter(config => config.hasNightAction)
+            .filter(config => config)
             .sort((a, b) => a.nightActionOrder - b.nightActionOrder)
             .map(config => `• ${config.name}: ${config.description}`)
             .join('\n');
