@@ -1,5 +1,6 @@
 # Bugs and improvements
 
+- Make werewolves know about each other in the system prompt
 - Complete the night results
 - Add option to read message out loud
 - Add suggestions for the reply

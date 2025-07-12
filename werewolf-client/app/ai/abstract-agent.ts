@@ -31,8 +31,11 @@ export abstract class AbstractAgent {
     }
 
     async askWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<string | null> {
-        // this.logger(`Asking bot ${this.name} (${this.model})`);
-        // this.logMessages(messages);
+        /*this.logger(`Asking bot ${this.name} (${this.model})`);
+        if (this.instruction) {
+            this.logger(this.instruction);
+        }
+        this.logMessages(messages);*/
         
         try {
             const result = await this.doAskWithSchema(schema, messages);
