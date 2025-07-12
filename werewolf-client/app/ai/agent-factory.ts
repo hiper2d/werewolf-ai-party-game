@@ -39,8 +39,7 @@ export class AgentFactory {
             case LLM_CONSTANTS.DEEPSEEK_CHAT:
             case LLM_CONSTANTS.DEEPSEEK_REASONER:
                 return new DeepSeekAgent(name, instruction, model.modelApiName, key);
-            case LLM_CONSTANTS.GROK_3:
-            case LLM_CONSTANTS.GROK_3_MINI:
+            case LLM_CONSTANTS.GROK_4:
                 return new GrokAgent(name, instruction, model.modelApiName, key, 0.7);
             default:
                 throw new Error(`Unknown Key: ${modelName}`);

@@ -28,8 +28,7 @@ export const LLM_CONSTANTS = {
     // GPT_O3_PRO: 'o3-pro', // Disabled: doesn't support conversation history properly
     MISTRAL_2_LARGE: 'Mistral 2 Large',
     MISTRAL_3_SMALL: 'Mistral 3 Small',
-    GROK_3: 'Grok 3',
-    GROK_3_MINI: 'Grok 3 Mini',
+    GROK_4: 'Grok 4',
     RANDOM: 'Random',
 }
 
@@ -78,12 +77,8 @@ export const SupportedAiModels = {
         modelApiName: 'deepseek-reasoner',
         apiKeyName: API_KEY_CONSTANTS.DEEPSEEK
     },
-    [LLM_CONSTANTS.GROK_3]: {
-        modelApiName: 'grok-3-latest',
-        apiKeyName: API_KEY_CONSTANTS.GROK
-    },
-    [LLM_CONSTANTS.GROK_3_MINI]: {
-        modelApiName: 'grok-3-mini-latest',
+    [LLM_CONSTANTS.GROK_4]: {
+        modelApiName: 'grok-4',
         apiKeyName: API_KEY_CONSTANTS.GROK
     },
 } as const;
