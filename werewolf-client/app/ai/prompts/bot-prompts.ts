@@ -18,6 +18,7 @@ You are an AI participant in a verbal chat game called Werewolf, played with mul
   <PersonalStory>%personal_story%</PersonalStory>
   <PlayStyle>%play_style%</PlayStyle>
   <GameRole>%role%</GameRole>
+  %werewolf_teammates_section%
 </CharacterIdentity>
 
 <GameRules>

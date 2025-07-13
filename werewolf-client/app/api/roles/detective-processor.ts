@@ -73,6 +73,7 @@ export class DetectiveProcessor extends BaseRoleProcessor {
                 personal_story: detectiveBot.story,
                 play_style: generatePlayStyleDescription(detectiveBot),
                 role: detectiveBot.role,
+                werewolf_teammates_section: '',
                 players_names: [
                     ...this.game.bots
                         .filter(b => b.name !== detectiveBot.name)

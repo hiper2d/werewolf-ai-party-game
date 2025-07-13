@@ -3,7 +3,7 @@ import { GAME_ROLES, RECIPIENT_WEREWOLVES, GAME_MASTER, GameMessage, MessageType
 import { AgentFactory } from "@/app/ai/agent-factory";
 import { addMessageToChatAndSaveToDb, getBotMessages, getUserFromFirestore } from "@/app/api/game-actions";
 import { getUserApiKeys } from "@/app/api/user-actions";
-import { generatePlayStyleDescription } from "@/app/utils/bot-utils";
+import { generatePlayStyleDescription, generateWerewolfTeammatesSection } from "@/app/utils/bot-utils";
 import { auth } from "@/auth";
 import { convertToAIMessages, parseResponseToObj } from "@/app/utils/message-utils";
 import { BOT_SYSTEM_PROMPT, BOT_WEREWOLF_ACTION_PROMPT, BOT_WEREWOLF_DISCUSSION_PROMPT } from "@/app/ai/prompts/bot-prompts";
@@ -93,6 +93,7 @@ export class WerewolfProcessor extends BaseRoleProcessor {
                 personal_story: werewolfBot.story,
                 play_style: generatePlayStyleDescription(werewolfBot),
                 role: werewolfBot.role,
+                werewolf_teammates_section: generateWerewolfTeammatesSection(werewolfBot, this.game),
                 players_names: [
                     ...this.game.bots
                         .filter(b => b.name !== werewolfBot.name)

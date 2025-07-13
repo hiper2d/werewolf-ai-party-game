@@ -284,7 +284,7 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
 
         // Convert BotPreviews to Bots with roles
         const bots: Bot[] = gamePreview.bots.map((bot, index) => {
-            const baseBot = {
+            return {
                 name: bot.name,
                 story: bot.story,
                 role: roleDistribution[index + 1],
@@ -292,20 +292,6 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
                 aiType: bot.playerAiType,
                 playStyle: bot.playStyle
             };
-            
-            // For suspicious play style, add target player names
-            if (bot.playStyle === PLAY_STYLES.SUSPICIOUS) {
-                const otherPlayerNames = allPlayerNames.filter(name => name !== bot.name);
-                // Shuffle and take first 2
-                const shuffled = [...otherPlayerNames].sort(() => Math.random() - 0.5);
-                return {
-                    ...baseBot,
-                    playStyleParams: shuffled.slice(0, 2)
-                };
-            }
-
-            // For other play styles, don't include playStyleParams field at all
-            return baseBot;
         });
 
         // Create the game object

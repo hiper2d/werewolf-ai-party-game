@@ -1,6 +1,8 @@
 # Bugs and improvements
 
-- Make werewolves know about each other in the system prompt
+- User doesn't see werewolves messages at night while being werewolf
+- Werewolves queue has the same names in a row
+- Werewolves doesn't see that the detective has been killed and try to find the detective during the night discussion
 - Complete the night results
 - Add option to read message out loud
 - Add suggestions for the reply

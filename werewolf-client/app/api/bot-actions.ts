@@ -11,12 +11,10 @@ import {
     GAME_STATES,
     GameMessage,
     MessageType,
-    PLAY_STYLES,
-    PLAY_STYLE_CONFIGS,
     RECIPIENT_ALL,
-    RECIPIENT_WEREWOLVES,
+    RECIPIENT_DETECTIVE,
     RECIPIENT_DOCTOR,
-    RECIPIENT_DETECTIVE
+    RECIPIENT_WEREWOLVES
 } from "@/app/api/game-models";
 import {
     GM_COMMAND_INTRODUCE_YOURSELF,
@@ -44,7 +42,7 @@ import {
 } from "./game-actions";
 import {getUserApiKeys} from "./user-actions";
 import {withGameErrorHandling} from "@/app/utils/server-action-wrapper";
-import {generatePlayStyleDescription} from "@/app/utils/bot-utils";
+import {generatePlayStyleDescription, generateWerewolfTeammatesSection} from "@/app/utils/bot-utils";
 
 /**
  * Wraps Firestore operations in a transaction for atomicity
@@ -133,6 +131,7 @@ async function welcomeImpl(gameId: string): Promise<Game> {
                 personal_story: bot.story,
                 play_style: generatePlayStyleDescription(bot),
                 role: bot.role,
+                werewolf_teammates_section: generateWerewolfTeammatesSection(bot, game),
                 players_names: [
                     ...game.bots
                         .filter(b => b.name !== bot.name)
@@ -485,6 +484,7 @@ async function processNextBotInQueue(
         personal_story: bot.story,
         play_style: generatePlayStyleDescription(bot),
         role: bot.role,
+        werewolf_teammates_section: generateWerewolfTeammatesSection(bot, game),
         players_names: [
             ...game.bots
                 .filter(b => b.name !== bot.name)
@@ -775,6 +775,7 @@ async function voteImpl(gameId: string): Promise<Game> {
                     personal_story: bot.story,
                     play_style: generatePlayStyleDescription(bot),
                     role: bot.role,
+                    werewolf_teammates_section: generateWerewolfTeammatesSection(bot, currentGame),
                     players_names: [
                         ...currentGame.bots
                             .filter(b => b.name !== bot.name)
