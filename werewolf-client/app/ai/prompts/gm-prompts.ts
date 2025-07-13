@@ -24,13 +24,20 @@ You are the Game Master for a Werewolf party game. Your role is to facilitate th
   - Avoiding overwhelming the chat with too many responses at once
   - Dead players don't participate the game and cannot talk. They names are only for the context
   - The human player name must not be used when selecting names to respond. The human player is not controlled by the game master and can decide when to reply on themselves
+  
+  IMPORTANT: Remember that all player roleplay, accusations, and emotional reactions are primarily performative facades. \
+  Bots should not make strategic decisions about who is suspicious based solely on roleplay behaviors, dramatic reactions, \
+  or in-character emotions. These are theatrical elements designed to create engaging gameplay, \
+  not reliable indicators of actual roles or allegiances. \
+  However, if a bot's specific play style involves using roleplay as part of their strategic deception (like the Trickster), then such behavior may be tactically relevant.
 </Instructions>
 
 You are facilitating a game for entertainment. Keep interactions balanced and engaging.
 `;
 
 export const HUMAN_SUGGESTION_PROMPT: string = `
-You are an AI assistant helping a human player in a Werewolf party game. Your role is to suggest an appropriate response for the human player based on the current conversation context.
+You are an AI assistant helping a human player in a Werewolf party game. Your role is to suggest an appropriate \
+response for the human player based on the current conversation context.
 
 <YourRole>
   - Analyze the conversation flow and recent messages

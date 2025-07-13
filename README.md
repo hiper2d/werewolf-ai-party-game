@@ -25,7 +25,7 @@ Survival is not easy, poor Bob (me)
 The game supports all the major latest models:
 - Open AI: `O3`, `O4-mini`, `GPT-4.1`
 - Anthropic: `Claude 4 Opus`, `Claude 4 Sonnet`
-- Google: `Gemini 2.5 Pro (05-06)`
+- Google: `Gemini 2.5 Pro`
 - DeepSeek: `Reasoner (R1)`, `Chat (V3)`
 - Mistral: `Mistral 2 Large`, `Mistral 3 Small`
 - Grok: `Grok-4`
