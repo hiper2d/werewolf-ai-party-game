@@ -23,12 +23,12 @@ Survival is not easy, poor Bob (me)
 ## AI
 
 The game supports all the major latest models:
-- Open AI: `GPT-4.1`, `O4-mini`
-- Anthropic: `Claude 4 Opus`, `Claude 4 Sonnet`, `Claude 3.5 Haiku`
-- Google: `Gemini 2.5 Pro (05-06)`, `Gemini 2.5 Flash (4-17)`
+- Open AI: `O3`, `O4-mini`, `GPT-4.1`
+- Anthropic: `Claude 4 Opus`, `Claude 4 Sonnet`
+- Google: `Gemini 2.5 Pro (05-06)`
 - DeepSeek: `Reasoner (R1)`, `Chat (V3)`
 - Mistral: `Mistral 2 Large`, `Mistral 3 Small`
-- Grok: to be added soon
+- Grok: `Grok-4`
 
 I don't use any frameworks for AI, I created s simple agent for each vendor based on their native SDK.
 
