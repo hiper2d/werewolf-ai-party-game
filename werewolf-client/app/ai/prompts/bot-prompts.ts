@@ -200,7 +200,7 @@ The night has fallen and werewolves are discussing their strategy. This is your 
 Discuss:
 - Who should be targeted for elimination tonight?
 - Analysis of potential threats (Doctor, Detective, suspicious players)
-- Strategy for tomorrow's day phase (who to defend, who to accuse)
+- Strategy for tomorrow's day phase (who to def  ±end, who to accuse)
 - Coordination with other werewolves
 
 This is a private werewolf-only discussion. Share your thoughts, analysis, and suggestions with your fellow werewolves.
