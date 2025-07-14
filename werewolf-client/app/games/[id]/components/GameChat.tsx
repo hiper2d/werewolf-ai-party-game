@@ -162,10 +162,36 @@ function renderMessage(message: GameMessage, gameId: string, onDeleteAfter: (mes
                 </span>
                 {message.id && !isVoteMessage && displayContent.trim() && (
                     <div className="flex gap-1">
+                        {/* Reset icon - only for bot messages */}
+                        {isBotMessage && (
+                            <button
+                                onClick={() => onDeleteAfter(message.id!)}
+                                className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 rounded hover:bg-gray-600/50"
+                                title="Reset chat to this point (delete all messages after this one)"
+                            >
+                                <svg
+                                    width="14"
+                                    height="14"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    className="text-gray-400 hover:text-red-400"
+                                >
+                                    <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+                                    <path d="M21 3v5h-5"/>
+                                    <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+                                    <path d="M3 21v-5h5"/>
+                                </svg>
+                            </button>
+                        )}
+                        
                         {/* Speaker icon for TTS */}
                         <button
                             onClick={() => onSpeak(message.id!, displayContent)}
-                            className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 rounded hover:bg-gray-600/50"
+                            className="p-1 rounded hover:bg-gray-600/50"
                             title={speakingMessageId === message.id ? "Stop speaking" : "Read message aloud"}
                         >
                             {speakingMessageId === message.id ? (
@@ -200,32 +226,6 @@ function renderMessage(message: GameMessage, gameId: string, onDeleteAfter: (mes
                                 </svg>
                             )}
                         </button>
-                        
-                        {/* Reset icon - only for bot messages */}
-                        {isBotMessage && (
-                            <button
-                                onClick={() => onDeleteAfter(message.id!)}
-                                className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 rounded hover:bg-gray-600/50"
-                                title="Reset chat to this point (delete all messages after this one)"
-                            >
-                                <svg
-                                    width="14"
-                                    height="14"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    className="text-gray-400 hover:text-red-400"
-                                >
-                                    <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
-                                    <path d="M21 3v5h-5"/>
-                                    <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
-                                    <path d="M3 21v-5h5"/>
-                                </svg>
-                            </button>
-                        )}
                     </div>
                 )}
             </div>
