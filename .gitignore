@@ -9,5 +9,6 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+**/logs
 
 **/*.code-workspace

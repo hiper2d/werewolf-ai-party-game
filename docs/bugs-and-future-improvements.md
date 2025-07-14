@@ -9,6 +9,7 @@
 - Add suggestions for the reply
 - Resolve vote tie by asking Detective to choose
 - Get rid of transactions 
+- Refresh should not be available on the welcome messages
 - Implement night resolution
 - Implement the end of night summarization
 - Optimize indexes in DB
