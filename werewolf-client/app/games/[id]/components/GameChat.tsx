@@ -11,6 +11,7 @@ import { clearGameErrorState } from "@/app/api/game-actions";
 import VotingModal from "./VotingModal";
 import NightActionModal from "./NightActionModal";
 import { ttsService } from "@/app/services/tts-service";
+import { sttService } from "@/app/services/stt-service";
 
 interface GameChatProps {
     gameId: string;
@@ -252,6 +253,8 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
     const [isMultiline, setIsMultiline] = useState(false);
     const [isGettingSuggestion, setIsGettingSuggestion] = useState(false);
     const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
+    const [isRecording, setIsRecording] = useState(false);
+    const [isTranscribing, setIsTranscribing] = useState(false);
 
     // Function to clear messages from night phase onward
     const clearMessagesFromNight = () => {
@@ -442,6 +445,15 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
 
         return () => eventSource.close();
     }, [gameId]);
+
+    // Cleanup recording on component unmount
+    useEffect(() => {
+        return () => {
+            if (isRecording) {
+                sttService.cancelRecording();
+            }
+        };
+    }, [isRecording]);
 
     const sendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -681,6 +693,54 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
         }
     };
 
+    const handleStartRecording = async () => {
+        if (isRecording) {
+            return;
+        }
+        
+        try {
+            setIsRecording(true);
+            await sttService.startRecording();
+        } catch (error) {
+            console.error('Error starting recording:', error);
+            alert('Failed to start recording. Please check microphone permissions.');
+            setIsRecording(false);
+        }
+    };
+
+    const handleStopRecording = async () => {
+        if (!isRecording) {
+            return;
+        }
+        
+        try {
+            setIsRecording(false);
+            setIsTranscribing(true);
+            
+            const audioBlob = await sttService.stopRecording();
+            const transcription = await sttService.transcribeRecording(audioBlob);
+            
+            // Add transcribed text to current message
+            setNewMessage(prev => {
+                const separator = prev.trim() ? ' ' : '';
+                return prev + separator + transcription;
+            });
+        } catch (error) {
+            console.error('Error stopping recording:', error);
+            alert('Failed to transcribe audio. Please try again.');
+        } finally {
+            setIsTranscribing(false);
+        }
+    };
+
+    const handleToggleRecording = async () => {
+        if (isRecording) {
+            await handleStopRecording();
+        } else {
+            await handleStartRecording();
+        }
+    };
+
     // Check if chat input should be enabled
     const isInputEnabled = () => {
         // Day discussion - normal chat when no queue processing
@@ -848,6 +908,38 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
                                 )}
                             </button>
                         )}
+                        
+                        {/* Microphone button for voice input */}
+                        <button
+                            type="button"
+                            onClick={handleToggleRecording}
+                            disabled={!isInputEnabled() || isTranscribing}
+                            className={`p-3 rounded transition-colors ${
+                                isRecording 
+                                    ? 'bg-red-600 hover:bg-red-500 animate-pulse' 
+                                    : 'bg-green-600 hover:bg-green-500'
+                            } text-white ${!isInputEnabled() || isTranscribing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            title={
+                                isTranscribing 
+                                    ? "Transcribing audio..." 
+                                    : isRecording 
+                                        ? "Stop recording and transcribe" 
+                                        : "Start voice recording"
+                            }
+                        >
+                            {isTranscribing ? (
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin">
+                                    <path d="M21 12a9 9 0 11-6.219-8.56"/>
+                                </svg>
+                            ) : (
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                                    <line x1="12" y1="19" x2="12" y2="23"/>
+                                    <line x1="8" y1="23" x2="16" y2="23"/>
+                                </svg>
+                            )}
+                        </button>
                         
                         {/* Send button */}
                         <button
