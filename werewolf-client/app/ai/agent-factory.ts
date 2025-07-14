@@ -8,6 +8,7 @@ import {MistralAgent} from "@/app/ai/mistral-agent";
 import {OpenAiOAgent} from "@/app/ai/open-ai-o-agent";
 import {DeepSeekAgent} from "@/app/ai/deepseek-agent";
 import {GrokAgent} from "@/app/ai/grok-agent";
+import {KimiAgent} from "@/app/ai/kimi-agent";
 
 export class AgentFactory {
 
@@ -41,6 +42,8 @@ export class AgentFactory {
                 return new DeepSeekAgent(name, instruction, model.modelApiName, key);
             case LLM_CONSTANTS.GROK_4:
                 return new GrokAgent(name, instruction, model.modelApiName, key, 0.7);
+            case LLM_CONSTANTS.KIMI_K2:
+                return new KimiAgent(name, instruction, model.modelApiName, key, 0.6);
             default:
                 throw new Error(`Unknown Key: ${modelName}`);
         }

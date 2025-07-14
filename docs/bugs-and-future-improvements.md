@@ -1,5 +1,6 @@
 # Bugs and improvements
 
+- Update bot creation with temperature, voice, play style selections
 - User doesn't see werewolves messages at night while being werewolf
 - Werewolves queue has the same names in a row
 - Werewolves doesn't see that the detective has been killed and try to find the detective during the night discussion

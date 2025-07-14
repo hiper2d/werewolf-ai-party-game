@@ -4,7 +4,8 @@ export const API_KEY_CONSTANTS = {
     GOOGLE: 'GOOGLE_API_KEY',
     MISTRAL: 'MISTRAL_API_KEY',
     DEEPSEEK: 'DEEPSEEK_API_KEY',
-    GROK: 'GROK_API_KEY'
+    GROK: 'GROK_API_KEY',
+    MOONSHOT: 'MOONSHOT_API_KEY'
 } as const;
 
 export const SupportedAiKeyNames: Record<string, string> = {
@@ -13,7 +14,8 @@ export const SupportedAiKeyNames: Record<string, string> = {
     [API_KEY_CONSTANTS.GOOGLE]: 'Google',
     [API_KEY_CONSTANTS.MISTRAL]: 'Mistral',
     [API_KEY_CONSTANTS.DEEPSEEK]: 'DeepSeek',
-    [API_KEY_CONSTANTS.GROK]: 'Grok'
+    [API_KEY_CONSTANTS.GROK]: 'Grok',
+    [API_KEY_CONSTANTS.MOONSHOT]: 'Moonshot'
 };
 
 export const LLM_CONSTANTS = {
@@ -29,6 +31,7 @@ export const LLM_CONSTANTS = {
     MISTRAL_2_LARGE: 'Mistral 2 Large',
     MISTRAL_3_SMALL: 'Mistral 3 Small',
     GROK_4: 'Grok 4',
+    KIMI_K2: 'Kimi K2',
     RANDOM: 'Random',
 }
 
@@ -80,6 +83,10 @@ export const SupportedAiModels = {
     [LLM_CONSTANTS.GROK_4]: {
         modelApiName: 'grok-4',
         apiKeyName: API_KEY_CONSTANTS.GROK
+    },
+    [LLM_CONSTANTS.KIMI_K2]: {
+        modelApiName: 'kimi-k2-0711-preview',
+        apiKeyName: API_KEY_CONSTANTS.MOONSHOT
     },
 } as const;
 

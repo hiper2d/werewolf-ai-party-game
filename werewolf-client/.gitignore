@@ -37,3 +37,5 @@ next-env.d.ts
 
 firebase/firebase-keys.js
 firebase/serviceAccount.json
+
+.env

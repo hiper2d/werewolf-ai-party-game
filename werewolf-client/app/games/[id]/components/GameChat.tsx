@@ -10,6 +10,7 @@ import { convertMessageContent } from "@/app/utils/message-utils";
 import { clearGameErrorState } from "@/app/api/game-actions";
 import VotingModal from "./VotingModal";
 import NightActionModal from "./NightActionModal";
+import { ttsService } from "@/app/services/tts-service";
 
 interface GameChatProps {
     gameId: string;
@@ -46,11 +47,17 @@ function ErrorBanner({ error, onDismiss, onRetry }: ErrorBannerProps) {
     const textColor = isWarning ? 'text-yellow-200' : 'text-red-200';
     const iconColor = isWarning ? 'text-yellow-400' : 'text-red-400';
 
+    // Truncate very long error messages to prevent UI blocking
+    const truncateText = (text: string, maxLength: number = 200) => {
+        if (text.length <= maxLength) return text;
+        return text.substring(0, maxLength) + '...';
+    };
+
     return (
-        <div className={`mb-4 p-3 rounded-lg border ${bgColor} ${textColor}`}>
+        <div className={`mb-4 p-3 rounded-lg border ${bgColor} ${textColor} max-h-32 overflow-y-auto`}>
             <div className="flex items-start justify-between">
-                <div className="flex items-start space-x-2 flex-1">
-                    <div className={`mt-0.5 ${iconColor}`}>
+                <div className="flex items-start space-x-2 flex-1 min-w-0">
+                    <div className={`mt-0.5 flex-shrink-0 ${iconColor}`}>
                         {isWarning ? (
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                 <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
@@ -65,14 +72,14 @@ function ErrorBanner({ error, onDismiss, onRetry }: ErrorBannerProps) {
                             </svg>
                         )}
                     </div>
-                    <div className="flex-1">
-                        <div className="font-medium text-sm">{error.error}</div>
+                    <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm break-words">{truncateText(error.error)}</div>
                         {error.details && (
-                            <div className="text-xs mt-1 opacity-80">{error.details}</div>
+                            <div className="text-xs mt-1 opacity-80 break-words">{truncateText(error.details, 150)}</div>
                         )}
                     </div>
                 </div>
-                <div className="flex items-center space-x-2 ml-4">
+                <div className="flex items-center space-x-2 ml-4 flex-shrink-0">
                     {error.recoverable && onRetry && (
                         <button
                             onClick={onRetry}
@@ -98,7 +105,7 @@ function ErrorBanner({ error, onDismiss, onRetry }: ErrorBannerProps) {
     );
 }
 
-function renderMessage(message: GameMessage, gameId: string, onDeleteAfter: (messageId: string) => void, game: Game) {
+function renderMessage(message: GameMessage, gameId: string, onDeleteAfter: (messageId: string) => void, game: Game, onSpeak: (messageId: string, text: string) => void, speakingMessageId: string | null) {
     const isUserMessage = message.messageType === MessageType.HUMAN_PLAYER_MESSAGE || message.authorName === game.humanPlayerName;
     const isGameMaster = message.authorName === GAME_MASTER || message.messageType === MessageType.GM_COMMAND || message.messageType === MessageType.NIGHT_BEGINS;
     const isBotMessage = message.messageType === MessageType.BOT_ANSWER && !isGameMaster && !isUserMessage;
@@ -152,29 +159,73 @@ function renderMessage(message: GameMessage, gameId: string, onDeleteAfter: (mes
                 }`} style={!isUserMessage && !isGameMaster ? { color: getPlayerColor(message.authorName) } : undefined}>
                     {message.authorName}
                 </span>
-                {isBotMessage && message.id && !isVoteMessage && (
-                    <button
-                        onClick={() => onDeleteAfter(message.id!)}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 ml-2 p-1 rounded hover:bg-gray-600/50"
-                        title="Reset chat to this point (delete all messages after this one)"
-                    >
-                        <svg
-                            width="14"
-                            height="14"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            className="text-gray-400 hover:text-red-400"
+                {message.id && !isVoteMessage && displayContent.trim() && (
+                    <div className="flex gap-1">
+                        {/* Speaker icon for TTS */}
+                        <button
+                            onClick={() => onSpeak(message.id!, displayContent)}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 rounded hover:bg-gray-600/50"
+                            title={speakingMessageId === message.id ? "Stop speaking" : "Read message aloud"}
                         >
-                            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
-                            <path d="M21 3v5h-5"/>
-                            <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
-                            <path d="M3 21v-5h5"/>
-                        </svg>
-                    </button>
+                            {speakingMessageId === message.id ? (
+                                <svg
+                                    width="14"
+                                    height="14"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    className="text-blue-400 hover:text-blue-300"
+                                >
+                                    <rect x="6" y="4" width="4" height="16"/>
+                                    <rect x="14" y="4" width="4" height="16"/>
+                                </svg>
+                            ) : (
+                                <svg
+                                    width="14"
+                                    height="14"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    className="text-gray-400 hover:text-blue-400"
+                                >
+                                    <polygon points="11 5,6 9,2 9,2 15,6 15,11 19"/>
+                                    <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
+                                </svg>
+                            )}
+                        </button>
+                        
+                        {/* Reset icon - only for bot messages */}
+                        {isBotMessage && (
+                            <button
+                                onClick={() => onDeleteAfter(message.id!)}
+                                className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 rounded hover:bg-gray-600/50"
+                                title="Reset chat to this point (delete all messages after this one)"
+                            >
+                                <svg
+                                    width="14"
+                                    height="14"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    className="text-gray-400 hover:text-red-400"
+                                >
+                                    <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+                                    <path d="M21 3v5h-5"/>
+                                    <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+                                    <path d="M3 21v-5h5"/>
+                                </svg>
+                            </button>
+                        )}
+                    </div>
                 )}
             </div>
             <span className={`inline-block p-2 ${
@@ -200,6 +251,7 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
     const [isPerformingNightAction, setIsPerformingNightAction] = useState(false);
     const [isMultiline, setIsMultiline] = useState(false);
     const [isGettingSuggestion, setIsGettingSuggestion] = useState(false);
+    const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
 
     // Function to clear messages from night phase onward
     const clearMessagesFromNight = () => {
@@ -589,6 +641,29 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
         }
     };
 
+    const handleSpeak = async (messageId: string, text: string) => {
+        try {
+            // Stop any currently playing audio
+            if (speakingMessageId) {
+                ttsService.stopSpeaking();
+                setSpeakingMessageId(null);
+                
+                // If clicking the same message, just stop
+                if (speakingMessageId === messageId) {
+                    return;
+                }
+            }
+            
+            setSpeakingMessageId(messageId);
+            await ttsService.speakText(text);
+            setSpeakingMessageId(null);
+        } catch (error) {
+            console.error('TTS Error:', error);
+            alert(`Failed to play audio: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            setSpeakingMessageId(null);
+        }
+    };
+
     const handleGetSuggestion = async () => {
         if (game.gameState !== GAME_STATES.DAY_DISCUSSION) {
             return;
@@ -684,7 +759,7 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
             <div className="flex-grow overflow-y-auto mb-4 p-2 bg-black bg-opacity-30 rounded">
                 {messages.map((message, index) => (
                     <div key={index}>
-                        {renderMessage(message, gameId, handleDeleteAfter, game)}
+                        {renderMessage(message, gameId, handleDeleteAfter, game, handleSpeak, speakingMessageId)}
                     </div>
                 ))}
                 {isDeleting && (
