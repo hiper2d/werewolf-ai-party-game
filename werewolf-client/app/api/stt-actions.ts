@@ -51,7 +51,6 @@ export async function transcribeAudio(
       response_format: 'text'
     });
 
-    // When response_format is 'text', OpenAI returns a string directly
     return String(response).trim();
   } catch (error) {
     console.error('STT Error:', error);

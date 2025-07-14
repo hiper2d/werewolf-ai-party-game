@@ -250,11 +250,11 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
     const [isStartingNight, setIsStartingNight] = useState(false);
     const [showNightActionModal, setShowNightActionModal] = useState(false);
     const [isPerformingNightAction, setIsPerformingNightAction] = useState(false);
-    const [isMultiline, setIsMultiline] = useState(false);
     const [isGettingSuggestion, setIsGettingSuggestion] = useState(false);
     const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
     const [isRecording, setIsRecording] = useState(false);
     const [isTranscribing, setIsTranscribing] = useState(false);
+    const [textareaRows, setTextareaRows] = useState(2);
 
     // Function to clear messages from night phase onward
     const clearMessagesFromNight = () => {
@@ -816,7 +816,7 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
                     Bots in queue: {game.gameStateProcessQueue.join(', ')}
                 </div>
             )}
-            <div className="flex-grow overflow-y-auto mb-4 p-2 bg-black bg-opacity-30 rounded">
+            <div className="flex-1 overflow-y-auto mb-4 p-2 bg-black bg-opacity-30 rounded" style={{ minHeight: '200px' }}>
                 {messages.map((message, index) => (
                     <div key={index}>
                         {renderMessage(message, gameId, handleDeleteAfter, game, handleSpeak, speakingMessageId)}
@@ -840,73 +840,65 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
                     </button>
                 </div>
             )}
-            <form onSubmit={sendMessage} className="flex flex-col">
-                <div className="flex items-end">
-                    {isMultiline ? (
-                        <textarea
-                            value={newMessage}
-                            onChange={(e) => setNewMessage(e.target.value)}
-                            disabled={!isInputEnabled()}
-                            rows={3}
-                            className={`flex-grow p-3 rounded bg-black bg-opacity-30 text-white placeholder-gray-400 border
-                                mr-3 border-gray-600 focus:outline-none focus:border-gray-500 resize-none
-                                ${!isInputEnabled() ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            placeholder={getInputPlaceholder()}
-                        />
-                    ) : (
-                        <input
-                            type="text"
-                            value={newMessage}
-                            onChange={(e) => setNewMessage(e.target.value)}
-                            disabled={!isInputEnabled()}
-                            className={`flex-grow p-3 rounded bg-black bg-opacity-30 text-white placeholder-gray-400 border
-                                mr-3 border-gray-600 focus:outline-none focus:border-gray-500
-                                ${!isInputEnabled() ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            placeholder={getInputPlaceholder()}
-                        />
-                    )}
-                    <div className="flex gap-2">
-                        {/* Textarea toggle button */}
+            <form onSubmit={sendMessage} className="flex gap-2">
+                {/* Textarea on the left - expandable from 2 to 5 rows */}
+                <textarea
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    disabled={!isInputEnabled()}
+                    rows={textareaRows}
+                    className={`flex-grow p-3 rounded bg-black bg-opacity-30 text-white placeholder-gray-400 border
+                        border-gray-600 focus:outline-none focus:border-gray-500 resize-none
+                        ${!isInputEnabled() ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    placeholder={getInputPlaceholder()}
+                />
+                
+                {/* Button grid on the right - 2 rows x 2 columns */}
+                <div className="flex flex-col gap-1 min-w-[120px]">
+                    {/* First row - Send button (stretched across both columns) */}
+                    <button
+                        type="submit"
+                        disabled={!isInputEnabled()}
+                        className={`w-full h-12 ${buttonTransparentStyle} ${!isInputEnabled() ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        title={!isInputEnabled() ? "Game is not ready for input" : "Send your message to all players"}
+                    >
+                        Send
+                    </button>
+                    
+                    {/* Second row - Three icon buttons */}
+                    <div className="flex gap-1">
+                        {/* Expand/Shrink button */}
                         <button
                             type="button"
-                            onClick={() => setIsMultiline(!isMultiline)}
+                            onClick={() => setTextareaRows(prev => prev === 2 ? 10 : 2)}
                             disabled={!isInputEnabled()}
-                            className={`p-3 rounded bg-gray-600 hover:bg-gray-500 text-white transition-colors
-                                ${!isInputEnabled() ? 'opacity-50 cursor-not-allowed' : ''}
-                                ${isMultiline ? 'bg-blue-600 hover:bg-blue-500' : ''}`}
-                            title={isMultiline ? "Switch to single line input" : "Switch to multi-line input"}
+                            className={`flex-1 h-12 ${buttonTransparentStyle} ${!isInputEnabled() ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            title="Expand/shrink text area"
                         >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                                <polyline points="14,2 14,8 20,8"/>
-                                <line x1="16" y1="13" x2="8" y2="13"/>
-                                <line x1="16" y1="17" x2="8" y2="17"/>
-                                <polyline points="10,9 9,9 8,9"/>
-                            </svg>
+                            <span className="text-lg">
+                                {textareaRows === 2 ? '⬆️' : '⬇️'}
+                            </span>
                         </button>
                         
-                        {/* Suggestion button - only show during day discussion */}
-                        {game.gameState === GAME_STATES.DAY_DISCUSSION && (
+                        {/* AI Suggestion button - only show during day discussion */}
+                        {game.gameState === GAME_STATES.DAY_DISCUSSION ? (
                             <button
                                 type="button"
                                 onClick={handleGetSuggestion}
                                 disabled={!isInputEnabled() || isGettingSuggestion}
-                                className={`p-3 rounded bg-purple-600 hover:bg-purple-500 text-white transition-colors
-                                    ${!isInputEnabled() || isGettingSuggestion ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                className={`flex-1 h-12 ${buttonTransparentStyle} ${!isInputEnabled() || isGettingSuggestion ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 title={isGettingSuggestion ? "Getting suggestion..." : "Get AI suggestion for your response"}
                             >
                                 {isGettingSuggestion ? (
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin mx-auto">
                                         <path d="M21 12a9 9 0 11-6.219-8.56"/>
                                     </svg>
                                 ) : (
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
-                                        <circle cx="12" cy="12" r="10"/>
-                                        <path d="M12 17h.01"/>
-                                    </svg>
+                                    <span className="text-lg">💡</span>
                                 )}
                             </button>
+                        ) : (
+                            <div className="flex-1"></div>
                         )}
                         
                         {/* Microphone button for voice input */}
@@ -914,11 +906,11 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
                             type="button"
                             onClick={handleToggleRecording}
                             disabled={!isInputEnabled() || isTranscribing}
-                            className={`p-3 rounded transition-colors ${
+                            className={`flex-1 h-12 transition-colors ${
                                 isRecording 
-                                    ? 'bg-red-600 hover:bg-red-500 animate-pulse' 
-                                    : 'bg-green-600 hover:bg-green-500'
-                            } text-white ${!isInputEnabled() || isTranscribing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    ? `${buttonTransparentStyle} animate-pulse` 
+                                    : buttonTransparentStyle
+                            } ${!isInputEnabled() || isTranscribing ? 'opacity-50 cursor-not-allowed' : ''}`}
                             title={
                                 isTranscribing 
                                     ? "Transcribing audio..." 
@@ -928,27 +920,17 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
                             }
                         >
                             {isTranscribing ? (
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin mx-auto">
                                     <path d="M21 12a9 9 0 11-6.219-8.56"/>
                                 </svg>
                             ) : (
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mx-auto">
                                     <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
                                     <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
                                     <line x1="12" y1="19" x2="12" y2="23"/>
                                     <line x1="8" y1="23" x2="16" y2="23"/>
                                 </svg>
                             )}
-                        </button>
-                        
-                        {/* Send button */}
-                        <button
-                            type="submit"
-                            disabled={!isInputEnabled()}
-                            className={`${buttonTransparentStyle} ${!isInputEnabled() ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            title={!isInputEnabled() ? "Game is not ready for input" : "Send your message to all players"}
-                        >
-                            Send
                         </button>
                     </div>
                 </div>
