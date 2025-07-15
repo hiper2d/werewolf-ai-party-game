@@ -6,7 +6,7 @@ Who has its personal goals, a secret role and alliances.
 
 ## Gameplay
 
-Create a game in the setting you like, it can be literally anything as long as models censorship allow
+Create a game in the setting you like, it can be literally anything as long as AI censorship allows
 
 Configure your AI bots with:
 - names
@@ -17,7 +17,7 @@ Configure your AI bots with:
 
 <a href="images/create_game2.png" target="_blank"><img src="images/create_game2.png" width="600"></a>
 
-Chat or use Text-to-Sound and Sound-to-Text features.
+Chat with bots or use Text-to-Sound and Sound-to-Text features (this is way more convenient than read and type).
 
 You can follow the theme and roleplay, you can tell them that they are AI, you can try to jailbreak - whatever it takes to survive the voting and the game night.
 
