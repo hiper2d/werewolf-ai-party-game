@@ -11,6 +11,7 @@ import {
     GameMessage,
     GamePreview,
     GamePreviewWithGeneratedBots,
+    getRandomVoiceForGender,
     MessageType,
     PLAY_STYLES,
     RECIPIENT_ALL,
@@ -218,7 +219,7 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
     }
 
     const aiResponse = parseResponseToObj(rawResponse);
-    const bots: BotPreview[] = aiResponse.players.map((bot: { name: string; story: string }) => {
+    const bots: BotPreview[] = aiResponse.players.map((bot: { name: string; gender: string; story: string }) => {
         let aiType = gamePreview.playersAiType;
         
         if (aiType === LLM_CONSTANTS.RANDOM) {
@@ -233,17 +234,24 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
         const availablePlayStyles = Object.values(PLAY_STYLES);
         const randomPlayStyle = availablePlayStyles[Math.floor(Math.random() * availablePlayStyles.length)];
 
+        // Assign gender and voice
+        const gender = bot.gender as 'male' | 'female' | 'neutral';
+        const voice = getRandomVoiceForGender(gender);
+
         return {
             name: bot.name,
             story: bot.story,
             playerAiType: aiType,
-            playStyle: randomPlayStyle
+            playStyle: randomPlayStyle,
+            gender: gender,
+            voice: voice
         };
     });
 
     return {
         ...gamePreview,
         gameMasterAiType: resolvedGmAiType,
+        gameMasterVoice: getRandomVoiceForGender('male'),
         scene: aiResponse.scene,
         bots: bots
     };
@@ -290,7 +298,9 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
                 role: roleDistribution[index + 1],
                 isAlive: true,
                 aiType: bot.playerAiType,
-                playStyle: bot.playStyle
+                playStyle: bot.playStyle,
+                gender: bot.gender,
+                voice: bot.voice
             };
         });
 
@@ -301,6 +311,7 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
             werewolfCount: gamePreview.werewolfCount,
             specialRoles: gamePreview.specialRoles,
             gameMasterAiType: gamePreview.gameMasterAiType,
+            gameMasterVoice: gamePreview.gameMasterVoice,
             story: gamePreview.scene,
             bots: bots,
             humanPlayerName: gamePreview.name,
@@ -634,6 +645,7 @@ function gameFromFirestore(id: string, data: any): Game {
         werewolfCount: data.werewolfCount,
         specialRoles: data.specialRoles,
         gameMasterAiType: data.gameMasterAiType,
+        gameMasterVoice: data.gameMasterVoice || getRandomVoiceForGender('male'), // Fallback for existing games
         story: data.story,
         bots: data.bots,
         humanPlayerName: data.humanPlayerName,

@@ -743,6 +743,11 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
 
     // Check if chat input should be enabled
     const isInputEnabled = () => {
+        // Disable input during recording or transcription
+        if (isRecording || isTranscribing) {
+            return false;
+        }
+        
         // Day discussion - normal chat when no queue processing
         if (game.gameState === GAME_STATES.DAY_DISCUSSION &&
             game.gameStateProcessQueue.length === 0 &&
@@ -769,6 +774,14 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
     };
 
     const getInputPlaceholder = () => {
+        // Voice recording states take priority
+        if (isRecording) {
+            return "🎤 Recording in progress... Click mic to stop";
+        }
+        if (isTranscribing) {
+            return "✨ Transcribing audio, please wait...";
+        }
+        
         console.log(game.gameState.valueOf());
         if (game.gameState === GAME_STATES.GAME_OVER) {
             return "Game has ended - chat disabled";

@@ -4,8 +4,9 @@ import React, {useEffect, useState} from 'react';
 import {useRouter} from 'next/navigation';
 import {buttonBlackStyle, buttonTransparentStyle} from "@/app/constants";
 import {createGame, previewGame} from '@/app/api/game-actions';
-import {GAME_ROLES, GamePreview, GamePreviewWithGeneratedBots} from "@/app/api/game-models";
+import {GAME_ROLES, GamePreview, GamePreviewWithGeneratedBots, GENDER_OPTIONS, getVoicesForGender, getRandomVoiceForGender} from "@/app/api/game-models";
 import {LLM_CONSTANTS} from "@/app/ai/ai-models";
+import {ttsService} from "@/app/services/tts-service";
 
 export default function CreateNewGamePage() {
     const [name, setName] = useState('');
@@ -20,6 +21,7 @@ export default function CreateNewGamePage() {
     const [gameData, setGameData] = useState<GamePreviewWithGeneratedBots | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [isSpeaking, setIsSpeaking] = useState(false);
     const router = useRouter();
 
     const playerOptions = Array.from({ length: 7 }, (_, i) => i + 6);
@@ -39,6 +41,12 @@ export default function CreateNewGamePage() {
             theme.trim() !== ''
         );
     }, [name, theme]);
+
+    useEffect(() => {
+        if (gameData && !gameData.gameMasterVoice) {
+            setGameData({ ...gameData, gameMasterVoice: getRandomVoiceForGender('male') });
+        }
+    }, [gameData]);
 
     const handleGeneratePreview = async () => {
         const gamePreviewData: GamePreview = {
@@ -94,6 +102,22 @@ export default function CreateNewGamePage() {
             updatedPlayers[index] = { ...updatedPlayers[index], [field]: value };
             setGameData({ ...gameData, bots: updatedPlayers });
         }
+    };
+
+    const handlePlayStory = async (story: string, voice: string) => {
+        try {
+            setIsSpeaking(true);
+            await ttsService.speakText(story, { voice: voice as any });
+            setIsSpeaking(false);
+        } catch (error) {
+            console.error('TTS Error:', error);
+            setIsSpeaking(false);
+        }
+    };
+
+    const handleStopTTS = () => {
+        ttsService.stopSpeaking();
+        setIsSpeaking(false);
     };
 
     // Common styles
@@ -262,48 +286,128 @@ export default function CreateNewGamePage() {
 
                     <div className="mb-6">
                         <h3 className="text-xl font-bold text-white mb-4">Game Master:</h3>
-                        <div className={flexItemStyle}>
-                            <label className={labelStyle}>Game Master AI:</label>
-                            <select
-                                className={`${inputStyle} flex-1`}
-                                value={gameData.gameMasterAiType}
-                                onChange={(e) => setGameData({ ...gameData, gameMasterAiType: e.target.value })}
-                            >
-                                {supportedAi.filter(model => model !== LLM_CONSTANTS.RANDOM).map(model => (
-                                    <option key={model} value={model}>{model}</option>
-                                ))}
-                            </select>
+                        <div className="p-4 bg-gray-900 bg-opacity-50 rounded-lg">
+                            <div className="flex space-x-2 mb-2">
+                                <div className="flex-1">
+                                    <label className="block text-gray-400 text-sm mb-1">AI Model:</label>
+                                    <select
+                                        className="w-full h-10 p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
+                                        value={gameData.gameMasterAiType}
+                                        onChange={(e) => setGameData({ ...gameData, gameMasterAiType: e.target.value })}
+                                    >
+                                        {supportedAi.filter(model => model !== LLM_CONSTANTS.RANDOM).map(model => (
+                                            <option key={model} value={model}>{model}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="flex-1">
+                                    <label className="block text-gray-400 text-sm mb-1">Voice:</label>
+                                    <select
+                                        className="w-full h-10 p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
+                                        value={gameData.gameMasterVoice || getVoicesForGender('male')[0]}
+                                        onChange={(e) => setGameData({ ...gameData, gameMasterVoice: e.target.value })}
+                                    >
+                                        {getVoicesForGender('male').map(voice => (
+                                            <option key={voice} value={voice}>{voice}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="flex flex-col justify-end">
+                                    <button
+                                        className={`w-10 h-10 ${buttonTransparentStyle} ${(!gameData.scene || isSpeaking) ? 'opacity-50 cursor-not-allowed' : ''} flex items-center justify-center`}
+                                        onClick={() => isSpeaking ? handleStopTTS() : handlePlayStory(gameData.scene, gameData.gameMasterVoice || getVoicesForGender('male')[0])}
+                                        disabled={!gameData.scene}
+                                        title={isSpeaking ? "Stop speaking" : "Play game story"}
+                                    >
+                                        <span className="text-lg">
+                                            {isSpeaking ? '⏹️' : '🔊'}
+                                        </span>
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
                     <h3 className="text-xl font-bold text-white mb-4">Players:</h3>
                     {gameData.bots.map((player, index) => (
-                        <div key={index} className="mb-2">
-                            <div className="flex space-x-2">
-                                <input
-                                    type="text"
-                                    className="w-1/2 p-2 rounded bg-gray-900 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
-                                    value={player.name}
-                                    onChange={(e) => handlePlayerChange(index, 'name', e.target.value)}
-                                    placeholder="Player Name"
-                                />
-                                <select
-                                    className="w-1/2 p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
-                                    value={player.playerAiType}
-                                    onChange={(e) => handlePlayerChange(index, 'playerAiType', e.target.value)}
-                                >
-                                    {supportedPlayerAi.filter(model => model !== LLM_CONSTANTS.RANDOM).map(model => (
-                                        <option key={model} value={model}>{model}</option>
-                                    ))}
-                                </select>
+                        <div key={index} className="mb-4 p-4 bg-gray-900 bg-opacity-50 rounded-lg">
+                            <div className="flex space-x-2 mb-2">
+                                <div className="flex-1">
+                                    <label className="block text-gray-400 text-sm mb-1">Name:</label>
+                                    <input
+                                        type="text"
+                                        className="w-full h-10 p-2 rounded bg-gray-900 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
+                                        value={player.name}
+                                        onChange={(e) => handlePlayerChange(index, 'name', e.target.value)}
+                                        placeholder="Player Name"
+                                    />
+                                </div>
+                                <div className="flex-1">
+                                    <label className="block text-gray-400 text-sm mb-1">AI Model:</label>
+                                    <select
+                                        className="w-full h-10 p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
+                                        value={player.playerAiType}
+                                        onChange={(e) => handlePlayerChange(index, 'playerAiType', e.target.value)}
+                                    >
+                                        {supportedPlayerAi.filter(model => model !== LLM_CONSTANTS.RANDOM).map(model => (
+                                            <option key={model} value={model}>{model}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="w-10">
+                                    {/* Empty space to align with play button below */}
+                                </div>
                             </div>
-                            <textarea
-                                className="w-full p-2 mt-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
-                                rows={3}
-                                value={player.story}
-                                onChange={(e) => handlePlayerChange(index, 'story', e.target.value)}
-                                placeholder="Player's Story"
-                            />
+                            <div className="flex space-x-2 mb-2">
+                                <div className="flex-1">
+                                    <label className="block text-gray-400 text-sm mb-1">Gender:</label>
+                                    <select
+                                        className="w-full h-10 p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
+                                        value={player.gender}
+                                        onChange={(e) => handlePlayerChange(index, 'gender', e.target.value)}
+                                    >
+                                        {GENDER_OPTIONS.map(gender => (
+                                            <option key={gender} value={gender}>
+                                                {gender.charAt(0).toUpperCase() + gender.slice(1)}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="flex-1">
+                                    <label className="block text-gray-400 text-sm mb-1">Voice:</label>
+                                    <select
+                                        className="w-full h-10 p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
+                                        value={player.voice}
+                                        onChange={(e) => handlePlayerChange(index, 'voice', e.target.value)}
+                                    >
+                                        {getVoicesForGender(player.gender).map(voice => (
+                                            <option key={voice} value={voice}>{voice}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="flex flex-col justify-end">
+                                    <button
+                                        className={`w-10 h-10 ${buttonTransparentStyle} ${(!player.story || isSpeaking) ? 'opacity-50 cursor-not-allowed' : ''} flex items-center justify-center`}
+                                        onClick={() => isSpeaking ? handleStopTTS() : handlePlayStory(player.story, player.voice)}
+                                        disabled={!player.story}
+                                        title={isSpeaking ? "Stop speaking" : "Play story"}
+                                    >
+                                        <span className="text-lg">
+                                            {isSpeaking ? '⏹️' : '🔊'}
+                                        </span>
+                                    </button>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-gray-400 text-sm mb-1">Story:</label>
+                                <textarea
+                                    className="w-full p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
+                                    rows={3}
+                                    value={player.story}
+                                    onChange={(e) => handlePlayerChange(index, 'story', e.target.value)}
+                                    placeholder="Player's Story"
+                                />
+                            </div>
                         </div>
                     ))}
 

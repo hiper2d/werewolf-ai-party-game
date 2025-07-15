@@ -8,6 +8,7 @@ export interface GameSetup {
     scene: string;      // The vivid scene description
     players: Array<{
         name: string;   // Single-word unique name
+        gender: string; // male, female, or neutral
         story: string;  // 1-2 sentence character background
     }>;
 }
@@ -74,12 +75,16 @@ export const createGameSetupSchema = () => ({
                         type: 'string',
                         description: 'Single-word unique name'
                     },
+                    gender: {
+                        type: 'string',
+                        description: 'male, female, or neutral'
+                    },
                     story: {
                         type: 'string',
                         description: '1-2 sentence character background'
                     }
                 },
-                required: ['name', 'story']
+                required: ['name', 'gender', 'story']
             }
         }
     },

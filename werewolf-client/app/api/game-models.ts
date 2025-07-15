@@ -24,11 +24,14 @@ export interface BotPreview {
     story: string;
     playerAiType: string;
     playStyle: string;
+    gender: 'male' | 'female' | 'neutral';
+    voice: string;
 }
 
 export interface GamePreviewWithGeneratedBots extends GamePreview {
     scene: string;
     bots: BotPreview[];
+    gameMasterVoice: string;
 }
 
 export interface Bot {
@@ -38,6 +41,8 @@ export interface Bot {
     isAlive: boolean;
     aiType: string;
     playStyle: string;
+    gender: 'male' | 'female' | 'neutral';
+    voice: string;
     eliminationDay?: number; // Track which day this bot was eliminated (undefined if alive)
 }
 
@@ -48,6 +53,7 @@ export interface Game {
     werewolfCount: number;
     specialRoles: string[];
     gameMasterAiType: string;
+    gameMasterVoice: string;
     story: string;
     bots: Bot[];
     humanPlayerName: string;
@@ -121,6 +127,23 @@ export const PLAY_STYLES = {
     PROTECTIVE_TEAM_PLAYER: 'protective_team_player',
     TRICKSTER: 'trickster'
 } as const;
+
+export const VOICE_OPTIONS = {
+    MALE: ['echo', 'fable', 'onyx'],
+    FEMALE: ['nova', 'shimmer'],
+    NEUTRAL: ['alloy']
+} as const;
+
+export const GENDER_OPTIONS = ['male', 'female', 'neutral'] as const;
+
+export function getVoicesForGender(gender: 'male' | 'female' | 'neutral'): string[] {
+    return VOICE_OPTIONS[gender.toUpperCase() as keyof typeof VOICE_OPTIONS];
+}
+
+export function getRandomVoiceForGender(gender: 'male' | 'female' | 'neutral'): string {
+    const voices = getVoicesForGender(gender);
+    return voices[Math.floor(Math.random() * voices.length)];
+}
 
 export interface PlayStyleConfig {
     name: string;

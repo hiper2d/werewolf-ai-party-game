@@ -80,6 +80,7 @@ You are an AI agent tasked with generating a game scene and character descriptio
 
       <CharacterDetails>
         - A unique, single-word <Name>name</Name> appropriate to the theme, following the Character Sourcing Rule above. Do not use the <ExcludedName>ExcludedName</ExcludedName> or any similar names.
+        - A <Gender>gender</Gender> (male, female, or neutral) that fits the character
         - A brief <Story>story</Story> (1-2 sentences) that:
           * Fits within the context of the scene and theme
           * **Includes ambiguous details that could hint at any role without revealing it**
@@ -97,6 +98,7 @@ You are an AI agent tasked with generating a game scene and character descriptio
     scene: string;      // The vivid scene description
     players: Array<{
       name: string;     // Single-word unique name
+      gender: string;   // male, female, or neutral
       story: string;    // 1-2 sentence character background
     }>;
   }
@@ -107,6 +109,7 @@ You are an AI agent tasked with generating a game scene and character descriptio
     "players": [
       {
         "name": "Zenith",
+        "gender": "male",
         "story": "A veteran maintenance engineer with a mysterious past..."
       },
       // ... more players
@@ -141,7 +144,8 @@ Expected response format:
   "scene": string,        // Vivid scene description
   "players": Array<{
     "name": string,       // Single-word unique name
-    "story": string      // 1-2 sentence character background
+    "gender": string,     // male, female, or neutral
+    "story": string       // 1-2 sentence character background
   }>
 }
 `;
