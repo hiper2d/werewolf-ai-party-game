@@ -1,4 +1,4 @@
-<img src="images/werewolf-ai-logo-3.png" width="600">
+<a href="images/werewolf-ai-logo-3.png" target="_blank"><img src="images/werewolf-ai-logo-3.png" width="600"></a>
 
 This the Werewolf game with AI bots who are instructed to pretend to be humans. 
 Who doesn't know about other AI in the game.
@@ -6,23 +6,30 @@ Who has its personal goals, a secret role and alliances.
 
 ## Gameplay
 
-Create a game in the setting you like, choose models for the Game Master and for each player
+Create a game in the setting you like, it can be literally anything as long as models censorship allow
 
-<img src="images/game_create.png" width="600">
+Configure your AI bots with:
+- names
+- models
+- stories in the setting
+- play styles (aggressive, protective, trickster, etc)
+- voices
 
-Chat with other players. You can follow the theme and roleplay, you can tell them that they are AI, you can try to jailbreak - whatever it takes to survive the voting and the game night.
+<a href="images/create_game2.png" target="_blank"><img src="images/create_game2.png" width="600"></a>
 
-<img src="images/game_welcome.png" width="600">
+Chat or use Text-to-Sound and Sound-to-Text features.
 
-<img src="images/game_chat.png" width="600">
+You can follow the theme and roleplay, you can tell them that they are AI, you can try to jailbreak - whatever it takes to survive the voting and the game night.
+
+<a href="images/day_chat1.png" target="_blank"><img src="images/day_chat1.png" width="600"></a>
 
 Survival is not easy, poor Bob (me)
 
-<img src="images/game_vote_all_for_bob.png" width="600">
+<a href="images/game_vote_all_for_bob.png" target="_blank"><img src="images/game_vote_all_for_bob.png" width="600"></a>
 
 ## AI
 
-The game supports all the major latest models:
+The game supports all the major latest models for the game master and bots:
 - Open AI: `O3`, `O4-mini`, `GPT-4.1`
 - Anthropic: `Claude 4 Opus`, `Claude 4 Sonnet`
 - Google: `Gemini 2.5 Pro`
