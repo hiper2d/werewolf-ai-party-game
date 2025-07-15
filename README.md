@@ -11,7 +11,7 @@ Create a game in the setting you like, it can be literally anything as long as A
 Configure your AI bots with:
 - names
 - models
-- stories in the setting
+- origin stories in the game setting
 - play styles (aggressive, protective, trickster, etc)
 - voices
 
