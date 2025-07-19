@@ -109,6 +109,9 @@ function ErrorBanner({ error, onDismiss, onRetry }: ErrorBannerProps) {
 function renderMessage(message: GameMessage, gameId: string, onDeleteAfter: (messageId: string) => void, game: Game, onSpeak: (messageId: string, text: string) => void, speakingMessageId: string | null) {
     const isUserMessage = message.messageType === MessageType.HUMAN_PLAYER_MESSAGE || message.authorName === game.humanPlayerName;
     const isGameMaster = message.authorName === GAME_MASTER || message.messageType === MessageType.GM_COMMAND || message.messageType === MessageType.NIGHT_BEGINS;
+    const isNightMessage = message.messageType === MessageType.NIGHT_BEGINS || 
+        (message.messageType === MessageType.GM_COMMAND && 
+         message.recipientName === RECIPIENT_ALL);
     const isBotMessage = message.messageType === MessageType.BOT_ANSWER && !isGameMaster && !isUserMessage;
     
     let displayContent: string;
@@ -155,7 +158,7 @@ function renderMessage(message: GameMessage, gameId: string, onDeleteAfter: (mes
         <div className={`${isGameMaster ? 'py-2' : 'mb-2'} ${isUserMessage ? 'text-right' : 'text-left'} group`}>
             <div className="flex items-center justify-between mb-1">
                 <span className={`text-xs font-semibold ${
-                    isGameMaster ? 'text-green-400' : 
+                    isGameMaster ? (isNightMessage ? 'text-blue-400' : 'text-green-400') : 
                     isUserMessage ? 'text-gray-300' : ''
                 }`} style={!isUserMessage && !isGameMaster ? { color: getPlayerColor(message.authorName) } : undefined}>
                     {message.authorName}
@@ -230,7 +233,7 @@ function renderMessage(message: GameMessage, gameId: string, onDeleteAfter: (mes
                 )}
             </div>
             <span className={`inline-block p-2 ${
-                isGameMaster ? 'rounded-lg bg-green-900/50 border border-green-500/30' :
+                isGameMaster ? (isNightMessage ? 'rounded-lg bg-blue-900/50 border border-blue-500/30' : 'rounded-lg bg-green-900/50 border border-green-500/30') :
                 isVoteMessage ? 'rounded-lg bg-orange-900/50 border border-orange-500/30' :
                 isUserMessage ? 'rounded-lg bg-slate-700' : 'rounded-lg'
             } text-white`} style={!isUserMessage && !isGameMaster && !isVoteMessage ? { backgroundColor: `${getPlayerColor(message.authorName)}33` } : undefined}>
