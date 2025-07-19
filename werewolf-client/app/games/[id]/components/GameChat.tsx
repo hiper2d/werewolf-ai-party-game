@@ -666,8 +666,33 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
                 }
             }
             
+            // Find the message to get the author name
+            const message = messages.find(msg => msg.id === messageId);
+            if (!message) {
+                console.error('Message not found for voice mapping:', messageId);
+                setSpeakingMessageId(messageId);
+                await ttsService.speakText(text);
+                setSpeakingMessageId(null);
+                return;
+            }
+            
+            // Map author to their assigned voice
+            let voice: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer' = 'alloy'; // default fallback
+            
+            if (message.authorName === GAME_MASTER) {
+                // Use Game Master voice
+                voice = game.gameMasterVoice as typeof voice;
+            } else {
+                // Find the bot with matching name
+                const bot = game.bots.find(b => b.name === message.authorName);
+                if (bot) {
+                    voice = bot.voice as typeof voice;
+                }
+                // If no bot found (human player), use default voice 'alloy'
+            }
+            
             setSpeakingMessageId(messageId);
-            await ttsService.speakText(text);
+            await ttsService.speakText(text, { voice });
             setSpeakingMessageId(null);
         } catch (error) {
             console.error('TTS Error:', error);
@@ -714,10 +739,14 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
         }
         
         try {
-            setIsRecording(false);
+            // Set transcribing first, but keep recording state until we actually stop
             setIsTranscribing(true);
             
             const audioBlob = await sttService.stopRecording();
+            
+            // Only now set recording to false after we've actually stopped
+            setIsRecording(false);
+            
             const transcription = await sttService.transcribeRecording(audioBlob);
             
             // Add transcribed text to current message
@@ -727,13 +756,20 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
             });
         } catch (error) {
             console.error('Error stopping recording:', error);
-            alert('Failed to transcribe audio. Please try again.');
+            alert(`Failed to transcribe audio: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            // Make sure to reset recording state on error
+            setIsRecording(false);
         } finally {
             setIsTranscribing(false);
         }
     };
 
     const handleToggleRecording = async () => {
+        // Don't allow new recording during transcription
+        if (isTranscribing) {
+            return;
+        }
+        
         if (isRecording) {
             await handleStopRecording();
         } else {
@@ -773,6 +809,22 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
         return false;
     };
 
+    // Check if microphone should be enabled (separate from text input)
+    const isMicrophoneEnabled = () => {
+        // Disable during game over
+        if (game.gameState === GAME_STATES.GAME_OVER) {
+            return false;
+        }
+        
+        // Disable during any active requests (voting, processing, deleting, etc.)
+        if (isProcessing || isDeleting || isVoting || isPerformingNightAction || isGettingSuggestion) {
+            return false;
+        }
+        
+        // Allow microphone during day discussion, voting, night phases, etc.
+        return true;
+    };
+
     const getInputPlaceholder = () => {
         // Voice recording states take priority
         if (isRecording) {
@@ -782,7 +834,6 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
             return "✨ Transcribing audio, please wait...";
         }
         
-        console.log(game.gameState.valueOf());
         if (game.gameState === GAME_STATES.GAME_OVER) {
             return "Game has ended - chat disabled";
         }
@@ -918,12 +969,12 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
                         <button
                             type="button"
                             onClick={handleToggleRecording}
-                            disabled={!isInputEnabled() || isTranscribing}
+                            disabled={!isMicrophoneEnabled() || isTranscribing}
                             className={`flex-1 h-12 transition-colors ${
                                 isRecording 
                                     ? `${buttonTransparentStyle} animate-pulse` 
                                     : buttonTransparentStyle
-                            } ${!isInputEnabled() || isTranscribing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            } ${!isMicrophoneEnabled() || isTranscribing ? 'opacity-50 cursor-not-allowed' : ''}`}
                             title={
                                 isTranscribing 
                                     ? "Transcribing audio..." 
