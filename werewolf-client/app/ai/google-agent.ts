@@ -3,6 +3,7 @@ import {AIMessage} from "@/app/api/game-models";
 import {GoogleGenAI} from "@google/genai";
 import {ResponseSchema} from "@/app/ai/prompts/ai-schemas";
 import {cleanResponse} from "@/app/utils/message-utils";
+import {ModelOverloadError, ModelRateLimitError, ModelUnavailableError, ModelAuthenticationError, ModelQuotaExceededError} from "@/app/ai/errors";
 
 type GoogleRole = 'model' | 'user';
 
@@ -72,6 +73,10 @@ Ensure your response strictly follows the schema requirements.`,
             return cleanResponse(response.text);
         } catch (error) {
             this.logger(this.logTemplates.error(this.name, error));
+            
+            // Check for specific Gemini API errors and throw appropriate exceptions
+            this.handleGeminiError(error);
+            
             return null;
         }
     }
@@ -110,6 +115,10 @@ Ensure your response strictly follows the schema requirements.`,
             return cleanResponse(response.text);
         } catch (error) {
             this.logger(this.logTemplates.error(this.name, error));
+            
+            // Check for specific Gemini API errors and throw appropriate exceptions
+            this.handleGeminiError(error);
+            
             return null;
         }
     }
@@ -143,5 +152,88 @@ ${instructions}`;
             return 'user';
         }
         throw new Error(this.errorMessages.unsupportedRole(role));
+    }
+
+    /**
+     * Handles Gemini API errors and throws appropriate specific exceptions
+     * @param error - The error to handle
+     */
+    private handleGeminiError(error: unknown): void {
+        let errorMessage = '';
+        let errorCode: number | undefined;
+        let errorStatus = '';
+
+        // Extract error information from different error formats
+        if (error && typeof error === 'object') {
+            // Check if it's a standard Error object with message
+            if ('message' in error) {
+                errorMessage = String((error as any).message);
+            }
+            
+            // Try to parse if the message contains JSON (Gemini API format)
+            try {
+                const parsed = JSON.parse(errorMessage);
+                if (parsed.error) {
+                    errorMessage = parsed.error.message || errorMessage;
+                    errorCode = parsed.error.code;
+                    errorStatus = parsed.error.status;
+                }
+            } catch {
+                // Not JSON, use the original message
+            }
+        } else if (typeof error === 'string') {
+            // Try to parse JSON string directly
+            try {
+                const parsed = JSON.parse(error);
+                if (parsed.error) {
+                    errorMessage = parsed.error.message || error;
+                    errorCode = parsed.error.code;
+                    errorStatus = parsed.error.status;
+                }
+            } catch {
+                errorMessage = error;
+            }
+        }
+
+        // Throw specific exceptions based on error content
+        if (errorCode === 503 || errorStatus === 'UNAVAILABLE' || 
+            errorMessage.includes('model is overloaded') || 
+            errorMessage.includes('overloaded')) {
+            throw new ModelOverloadError(
+                errorMessage || 'Model is currently overloaded. Please try again later.',
+                'Gemini'
+            );
+        }
+
+        if (errorCode === 429 || errorMessage.includes('rate limit') || errorMessage.includes('quota')) {
+            throw new ModelRateLimitError(
+                errorMessage || 'Rate limit exceeded for Gemini model.',
+                'Gemini'
+            );
+        }
+
+        if (errorCode === 401 || errorCode === 403 || errorMessage.includes('authentication') || errorMessage.includes('unauthorized')) {
+            throw new ModelAuthenticationError(
+                errorMessage || 'Authentication failed for Gemini model.',
+                'Gemini'
+            );
+        }
+
+        if (errorMessage.includes('quota exceeded') || errorMessage.includes('billing')) {
+            throw new ModelQuotaExceededError(
+                errorMessage || 'Quota exceeded for Gemini model.',
+                'Gemini'
+            );
+        }
+
+        if (errorCode && errorCode >= 500) {
+            throw new ModelUnavailableError(
+                errorMessage || 'Gemini model is temporarily unavailable.',
+                'Gemini',
+                'server_error'
+            );
+        }
+
+        // If no specific error type is detected, don't throw - let the method return null
     }
 }

@@ -33,6 +33,7 @@ import {
     generateVotingResultsMessage,
     parseResponseToObj
 } from "@/app/utils/message-utils";
+import {ModelError} from "@/app/ai/errors";
 import {
     addMessageToChatAndSaveToDb,
     getBotMessages,
@@ -809,7 +810,23 @@ async function voteImpl(gameId: string): Promise<Game> {
             const history = convertToAIMessages(bot.name, [...botMessages, gmMessage]);
             const schema = createBotVoteSchema();
             
-            const rawVoteResponse = await agent.askWithSchema(schema, history);
+            let rawVoteResponse: string | null;
+            try {
+                rawVoteResponse = await agent.askWithSchema(schema, history);
+            } catch (error) {
+                // Handle specific model errors by using their message
+                if (error instanceof ModelError) {
+                    throw new BotResponseError(
+                        error.message, // Use the error's message directly
+                        `Bot ${bot.name} (${bot.aiType}) encountered an error during voting`,
+                        { botName: bot.name, aiType: bot.aiType, action: 'vote', originalError: error.constructor.name },
+                        true
+                    );
+                }
+                // Re-throw other errors as-is
+                throw error;
+            }
+            
             if (!rawVoteResponse) {
                 throw new BotResponseError(
                     'Bot failed to cast vote',
