@@ -196,17 +196,27 @@ export function parseResponseToObj(response: string, expectedType?: string): any
     try {
         parsedObj = JSON.parse(cleanResponse);
     } catch (e) {
-        const { BotResponseError } = require('@/app/api/game-models');
-        throw new BotResponseError(
-            'Failed to parse bot response as JSON',
-            `Invalid JSON format: ${(e as Error).message}`,
-            {
-                originalResponse: response,
-                cleanedResponse: cleanResponse,
-                expectedType: expectedType || 'unknown'
-            },
-            true
-        );
+        // If JSON parsing fails, try to handle common cases gracefully
+        if (expectedType === 'BotAnswer') {
+            // For BotAnswer, wrap the plain text response in the expected JSON structure
+            console.warn(`Bot response was not valid JSON, wrapping as BotAnswer: ${cleanResponse.substring(0, 100)}...`);
+            parsedObj = {
+                reply: cleanResponse
+            };
+        } else {
+            // For other types, still throw the error as they require specific structure
+            const { BotResponseError } = require('@/app/api/game-models');
+            throw new BotResponseError(
+                'Failed to parse bot response as JSON',
+                `Invalid JSON format: ${(e as Error).message}`,
+                {
+                    originalResponse: response,
+                    cleanedResponse: cleanResponse,
+                    expectedType: expectedType || 'unknown'
+                },
+                true
+            );
+        }
     }
 
     // Validate required fields based on expected type

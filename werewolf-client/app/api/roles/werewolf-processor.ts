@@ -1,15 +1,26 @@
-import { BaseRoleProcessor, NightActionResult } from "./base-role-processor";
-import { GAME_ROLES, RECIPIENT_WEREWOLVES, GAME_MASTER, GameMessage, MessageType, BotAnswer, BotResponseError } from "@/app/api/game-models";
-import { AgentFactory } from "@/app/ai/agent-factory";
-import { addMessageToChatAndSaveToDb, getBotMessages, getUserFromFirestore } from "@/app/api/game-actions";
-import { getUserApiKeys } from "@/app/api/user-actions";
-import { generatePlayStyleDescription, generateWerewolfTeammatesSection } from "@/app/utils/bot-utils";
-import { auth } from "@/auth";
-import { convertToAIMessages, parseResponseToObj } from "@/app/utils/message-utils";
-import { BOT_SYSTEM_PROMPT, BOT_WEREWOLF_ACTION_PROMPT, BOT_WEREWOLF_DISCUSSION_PROMPT } from "@/app/ai/prompts/bot-prompts";
-import { format } from "@/app/ai/prompts/utils";
-import { createWerewolfActionSchema, WerewolfAction, createBotAnswerSchema } from "@/app/ai/prompts/ai-schemas";
-import { db } from "@/firebase/server";
+import {BaseRoleProcessor, NightActionResult} from "./base-role-processor";
+import {
+    BotAnswer,
+    BotResponseError,
+    GAME_MASTER,
+    GAME_ROLES,
+    GameMessage,
+    MessageType,
+    RECIPIENT_WEREWOLVES
+} from "@/app/api/game-models";
+import {AgentFactory} from "@/app/ai/agent-factory";
+import {addMessageToChatAndSaveToDb, getBotMessages, getUserFromFirestore} from "@/app/api/game-actions";
+import {getUserApiKeys} from "@/app/api/user-actions";
+import {generatePlayStyleDescription, generateWerewolfTeammatesSection} from "@/app/utils/bot-utils";
+import {auth} from "@/auth";
+import {convertToAIMessages, parseResponseToObj} from "@/app/utils/message-utils";
+import {
+    BOT_SYSTEM_PROMPT,
+    BOT_WEREWOLF_ACTION_PROMPT,
+    BOT_WEREWOLF_DISCUSSION_PROMPT
+} from "@/app/ai/prompts/bot-prompts";
+import {format} from "@/app/ai/prompts/utils";
+import {createBotAnswerSchema, createWerewolfActionSchema, WerewolfAction} from "@/app/ai/prompts/ai-schemas";
 
 /**
  * Werewolf role processor
