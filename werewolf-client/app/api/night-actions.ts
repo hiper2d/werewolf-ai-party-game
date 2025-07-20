@@ -113,7 +113,7 @@ function populateParamQueueForRole(game: Game, role: string): string[] {
     }
     
     // Randomize the order
-    return playersWithRole;
+    return paramQueue;
 }
 
 /**
