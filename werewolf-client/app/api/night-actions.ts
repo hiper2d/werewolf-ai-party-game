@@ -102,6 +102,7 @@ function populateParamQueueForRole(game: Game, role: string): string[] {
     if (game.humanPlayerRole === role) {
         playersWithRole.push(game.humanPlayerName);
     }
+    playersWithRole.sort(() => Math.random() - 0.5)
     
     // For werewolves, duplicate the list if multiple werewolves exist (for coordination phase)
     let paramQueue: string[] = [];
@@ -112,7 +113,7 @@ function populateParamQueueForRole(game: Game, role: string): string[] {
     }
     
     // Randomize the order
-    return paramQueue.sort(() => Math.random() - 0.5);
+    return playersWithRole;
 }
 
 /**

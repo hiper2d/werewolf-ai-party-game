@@ -137,7 +137,7 @@ export const VOICE_OPTIONS = {
 export const GENDER_OPTIONS = ['male', 'female', 'neutral'] as const;
 
 export function getVoicesForGender(gender: 'male' | 'female' | 'neutral'): string[] {
-    return VOICE_OPTIONS[gender.toUpperCase() as keyof typeof VOICE_OPTIONS];
+    return [...VOICE_OPTIONS[gender.toUpperCase() as 'MALE' | 'FEMALE' | 'NEUTRAL']];
 }
 
 export function getRandomVoiceForGender(gender: 'male' | 'female' | 'neutral'): string {
