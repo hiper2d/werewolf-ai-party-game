@@ -21,9 +21,6 @@ export class DetectiveProcessor extends BaseRoleProcessor {
 
     async processNightAction(): Promise<NightActionResult> {
         try {
-            // First, announce that it's the detective's turn
-            await this.announceRoleTurn();
-
             const playersInfo = this.getPlayersWithRole();
             
             if (playersInfo.allPlayers.length === 0) {

@@ -83,38 +83,6 @@ async function endNightWithResults(gameId: string, game: Game): Promise<Game> {
     return await getGame(gameId) as Game;
 }
 
-/**
- * Helper function to populate gameStateParamQueue with players for a given role
- * @param game - The current game state
- * @param role - The role to get players for
- * @returns Array of player names for the param queue
- */
-function populateParamQueueForRole(game: Game, role: string): string[] {
-    // Get players with this role
-    const playersWithRole: string[] = [];
-    
-    // Check bots
-    game.bots
-        .filter(bot => bot.isAlive && bot.role === role)
-        .forEach(bot => playersWithRole.push(bot.name));
-    
-    // Check human player
-    if (game.humanPlayerRole === role) {
-        playersWithRole.push(game.humanPlayerName);
-    }
-    playersWithRole.sort(() => Math.random() - 0.5)
-    
-    // For werewolves, duplicate the list if multiple werewolves exist (for coordination phase)
-    let paramQueue: string[] = [];
-    if (role === GAME_ROLES.WEREWOLF && playersWithRole.length > 1) {
-        paramQueue = [...playersWithRole, ...playersWithRole];
-    } else {
-        paramQueue = [...playersWithRole];
-    }
-    
-    // Randomize the order
-    return paramQueue;
-}
 
 /**
  * Handles night phase progression
@@ -245,11 +213,25 @@ async function beginNightImpl(gameId: string): Promise<Game> {
         // Save the Game Master message
         await addMessageToChatAndSaveToDb(gameMessage, gameId);
 
-        // Initialize gameStateParamQueue with players for the first role
+        // Initialize gameStateParamQueue with players for the first role using processor's init method
         let initialParamQueue: string[] = [];
         if (sortedNightRoles.length > 0) {
             const firstRole = sortedNightRoles[0];
-            initialParamQueue = populateParamQueueForRole(game, firstRole);
+            const firstRoleProcessor = RoleProcessorFactory.createProcessor(firstRole, gameId, game);
+            
+            if (firstRoleProcessor) {
+                const initResult = await firstRoleProcessor.init();
+                if (initResult.success) {
+                    initialParamQueue = initResult.paramQueue;
+                } else {
+                    throw new BotResponseError(
+                        `Failed to initialize ${firstRole} processor`,
+                        initResult.error || 'Unknown initialization error',
+                        { role: firstRole, gameId },
+                        true
+                    );
+                }
+            }
         }
 
         // Update game state with night action queue
@@ -496,16 +478,35 @@ async function processNightQueue(gameId: string, game: Game): Promise<Game> {
                 // No more roles, end the night with results
                 return await endNightWithResults(gameId, updatedGame);
             } else {
-                // Move to next role
+                // Move to next role using processor's init method
                 const nextRole = newProcessQueue[0];
-                const nextRoleParamQueue = populateParamQueueForRole(updatedGame, nextRole);
+                const nextRoleProcessor = RoleProcessorFactory.createProcessor(nextRole, gameId, updatedGame);
+                
+                if (!nextRoleProcessor) {
+                    throw new BotResponseError(
+                        `No processor for role: ${nextRole}`,
+                        `Could not create processor for role ${nextRole}`,
+                        { role: nextRole, gameId },
+                        true
+                    );
+                }
+                
+                const initResult = await nextRoleProcessor.init();
+                if (!initResult.success) {
+                    throw new BotResponseError(
+                        `Failed to initialize ${nextRole} processor`,
+                        initResult.error || 'Unknown initialization error',
+                        { role: nextRole, gameId },
+                        true
+                    );
+                }
                 
                 await db.collection('games').doc(gameId).update({
                     gameStateProcessQueue: newProcessQueue,
-                    gameStateParamQueue: nextRoleParamQueue
+                    gameStateParamQueue: initResult.paramQueue
                 });
                 
-                console.log(`🌙 MOVED TO NEXT ROLE: ${nextRole} with players [${nextRoleParamQueue.join(', ')}]`);
+                console.log(`🌙 MOVED TO NEXT ROLE: ${nextRole} with players [${initResult.paramQueue.join(', ')}]`);
             }
         }
 
@@ -602,10 +603,23 @@ async function humanPlayerTalkWerewolvesImpl(gameId: string, message: string): P
             const newProcessQueue = game.gameStateProcessQueue.slice(1);
             finalUpdates.gameStateProcessQueue = newProcessQueue;
 
-            // If there are more roles, populate param queue for the next role
+            // If there are more roles, initialize param queue for the next role
             if (newProcessQueue.length > 0) {
                 const nextRole = newProcessQueue[0];
-                finalUpdates.gameStateParamQueue = populateParamQueueForRole(game, nextRole);
+                const nextRoleProcessor = RoleProcessorFactory.createProcessor(nextRole, gameId, game);
+                
+                if (nextRoleProcessor) {
+                    const initResult = await nextRoleProcessor.init();
+                    if (initResult.success) {
+                        finalUpdates.gameStateParamQueue = initResult.paramQueue;
+                    } else {
+                        // Log error but don't throw - let the main night processing handle it
+                        console.error(`Failed to initialize ${nextRole} processor:`, initResult.error);
+                        finalUpdates.gameStateParamQueue = [];
+                    }
+                } else {
+                    finalUpdates.gameStateParamQueue = [];
+                }
             }
         }
         

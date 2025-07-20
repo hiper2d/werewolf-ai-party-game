@@ -1,4 +1,4 @@
-import {BaseRoleProcessor, NightActionResult} from "./base-role-processor";
+import {BaseRoleProcessor, NightActionResult, RolePlayersInfo} from "./base-role-processor";
 import {
     BotAnswer,
     BotResponseError,
@@ -31,11 +31,34 @@ export class WerewolfProcessor extends BaseRoleProcessor {
         super(gameId, game, GAME_ROLES.WEREWOLF);
     }
 
+    /**
+     * Override to handle werewolf coordination logic
+     * For multiple werewolves, duplicate the list to allow coordination phase
+     */
+    protected createParamQueue(playersInfo: RolePlayersInfo): string[] {
+        const playersWithRole: string[] = [];
+        
+        // Add all werewolf players
+        playersInfo.allPlayers.forEach(player => {
+            playersWithRole.push(player.name);
+        });
+        
+        // Randomize the order
+        playersWithRole.sort(() => Math.random() - 0.5);
+        
+        // For werewolves, duplicate the list if multiple werewolves exist (for coordination phase)
+        let paramQueue: string[] = [];
+        if (playersWithRole.length > 1) {
+            paramQueue = [...playersWithRole, ...playersWithRole];
+        } else {
+            paramQueue = [...playersWithRole];
+        }
+        
+        return paramQueue;
+    }
+
     async processNightAction(): Promise<NightActionResult> {
         try {
-            // First, announce that it's the werewolves' turn
-            await this.announceRoleTurn();
-
             const playersInfo = this.getPlayersWithRole();
             
             if (playersInfo.allPlayers.length === 0) {

@@ -16,6 +16,18 @@ export interface NightActionResult {
 }
 
 /**
+ * Result of role processor initialization
+ */
+export interface RoleInitResult {
+    // Array of player names for the parameter queue
+    paramQueue: string[];
+    // Whether initialization was successful
+    success: boolean;
+    // Optional error message if initialization failed
+    error?: string;
+}
+
+/**
  * Information about players with a specific role
  */
 export interface RolePlayersInfo {
@@ -42,6 +54,62 @@ export abstract class BaseRoleProcessor {
         this.gameId = gameId;
         this.game = game;
         this.roleName = roleName;
+    }
+
+    /**
+     * Initialize the role processor when it's activated for the first time
+     * Announces the role turn and sets up the parameter queue
+     * This is called once per role per night, before any processNightAction() calls
+     */
+    async init(): Promise<RoleInitResult> {
+        try {
+            // Announce that it's this role's turn
+            await this.announceRoleTurn();
+
+            // Get players with this role
+            const playersInfo = this.getPlayersWithRole();
+            
+            if (playersInfo.allPlayers.length === 0) {
+                // No players with this role are alive
+                this.logNightAction("No players with this role are alive, skipping");
+                return { success: true, paramQueue: [] };
+            }
+
+            // Create parameter queue for this role
+            const paramQueue = this.createParamQueue(playersInfo);
+            
+            this.logNightAction(`Initialized with ${paramQueue.length} players in queue: [${paramQueue.join(', ')}]`);
+            
+            return {
+                success: true,
+                paramQueue: paramQueue
+            };
+        } catch (error) {
+            console.error(`Error initializing ${this.roleName} processor:`, error);
+            return {
+                success: false,
+                paramQueue: [],
+                error: error instanceof Error ? error.message : 'Unknown initialization error'
+            };
+        }
+    }
+
+    /**
+     * Create the parameter queue for this role
+     * Can be overridden by subclasses for role-specific logic
+     */
+    protected createParamQueue(playersInfo: RolePlayersInfo): string[] {
+        const playersWithRole: string[] = [];
+        
+        // Add all players with this role
+        playersInfo.allPlayers.forEach(player => {
+            playersWithRole.push(player.name);
+        });
+        
+        // Randomize the order
+        playersWithRole.sort(() => Math.random() - 0.5);
+        
+        return playersWithRole;
     }
 
     /**
