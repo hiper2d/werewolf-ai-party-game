@@ -127,7 +127,8 @@ export const PLAY_STYLES = {
     PROTECTIVE_TEAM_PLAYER: 'protective_team_player',
     TRICKSTER: 'trickster',
     RULE_BREAKER: 'rule_breaker',
-    MODEST_MOUSE: 'modest_mouse'
+    MODEST_MOUSE: 'modest_mouse',
+    NORMAL: 'normal'
 } as const;
 
 export const VOICE_OPTIONS = {
@@ -260,6 +261,30 @@ Your antisocial tendencies provide excellent cover for not participating in vill
 Vote quietly with the majority when possible, but don't explain your reasoning unless absolutely necessary. \
 Your goal is to be forgettable—present but not memorable, contributing just enough to avoid suspicion for being completely silent. \
 Let more talkative players draw attention while you work quietly to eliminate threats to your pack.\
+`
+    },
+    [PLAY_STYLES.NORMAL]: {
+        name: 'Normal',
+        description: `\
+You approach the game with a balanced, reasonable mindset focused on having a good experience for everyone. \
+You participate actively in discussions without being overly aggressive or dominating the conversation. \
+You share your thoughts and observations when they're relevant, but you also listen to others and consider their perspectives. \
+Your goal is to find the werewolves through logical reasoning, careful observation, and collaborative discussion. \
+You're willing to form alliances and trust other players, but you remain cautious and don't blindly follow anyone. \
+When voting, you weigh the evidence carefully and try to make decisions that benefit the village as a whole. \
+You defend others when you believe they're being unfairly targeted, but you're also willing to change your mind when presented with convincing evidence. \
+You play to win, but you prioritize fair play and ensuring everyone has fun over aggressive tactics or manipulation.\
+`,
+        werewolfDescription: `\
+Your balanced, reasonable approach is the perfect disguise for your true nature. \
+As a werewolf, you want to appear as a trustworthy, collaborative villager who others feel comfortable working with. \
+Participate in discussions naturally, offering genuine-seeming observations and theories that don't expose your pack. \
+Build trust with villagers by being helpful and supportive, but avoid standing out as either too quiet or too aggressive. \
+When suspicion falls on fellow werewolves, express mild concern or doubt rather than aggressively defending them. \
+Use your reputation as a fair, reasonable player to subtly guide voting away from your pack when possible. \
+Your goal is to be seen as a valuable team player while quietly working to eliminate key villagers. \
+Maintain the balance between being helpful enough to gain trust and careful enough to avoid detection. \
+Let more extreme personalities draw attention while you work steadily toward your pack's victory.\
 `
     }
 };
