@@ -1,21 +1,34 @@
 import dotenv from "dotenv";
 dotenv.config();
 import { OpenAiAgent } from "./open-ai-agent";
-import { AIMessage, BotAnswer } from "@/app/api/game-models";
+import { AIMessage, BotAnswer, PLAY_STYLES, GAME_ROLES } from "@/app/api/game-models";
 import { parseResponseToObj } from "@/app/utils/message-utils";
 import { LLM_CONSTANTS, SupportedAiModels } from "@/app/ai/ai-models";
 import { BOT_SYSTEM_PROMPT } from "@/app/ai/prompts/bot-prompts";
 import { format } from "@/app/ai/prompts/utils";
 import { GM_COMMAND_INTRODUCE_YOURSELF, HISTORY_PREFIX } from "@/app/ai/prompts/gm-commands";
 import { createBotAnswerSchema } from "@/app/ai/prompts/ai-schemas";
+import { generatePlayStyleDescription } from "@/app/utils/bot-utils";
 
 describe("OpenAiAgent integration", () => {
   const setupAgent = (botName: string, modelType: string): OpenAiAgent => {
-    const instruction = format(BOT_SYSTEM_PROMPT, {
+    const testBot = {
       name: botName,
-      personal_story: "A mysterious wanderer with a hidden past",
-      temperament: "You have a balanced and thoughtful personality.",
-      role: "Villager",
+      story: "A mysterious wanderer with a hidden past",
+      role: GAME_ROLES.VILLAGER,
+      isAlive: true,
+      aiType: modelType,
+      playStyle: PLAY_STYLES.MODEST_MOUSE,
+      gender: 'neutral' as const,
+      voice: 'alloy'
+    };
+    
+    const instruction = format(BOT_SYSTEM_PROMPT, {
+      name: testBot.name,
+      personal_story: testBot.story,
+      play_style: generatePlayStyleDescription(testBot),
+      role: testBot.role,
+      werewolf_teammates_section: "",
       players_names: "Alice, Bob, Charlie",
       dead_players_names_with_roles: "David (Werewolf)"
     });
@@ -43,10 +56,10 @@ describe("OpenAiAgent integration", () => {
     
     expect(response).not.toBeNull();
     expect(typeof response).toBe("string");
-    expect(response.length).toBeGreaterThan(0);
+    expect(response!.length).toBeGreaterThan(0);
 
     // Parse response and create BotAnswer instance
-    const parsedObj = parseResponseToObj(response);
+    const parsedObj = parseResponseToObj(response!);
     expect(parsedObj).toHaveProperty('reply');
     const botAnswer = new BotAnswer(parsedObj.reply);
     expect(botAnswer).toBeInstanceOf(BotAnswer);

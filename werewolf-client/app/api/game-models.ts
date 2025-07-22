@@ -125,7 +125,9 @@ export const ROLE_CONFIGS: Record<string, RoleConfig> = {
 export const PLAY_STYLES = {
     AGGRESSIVE_PROVOKER: 'aggressive_provoker',
     PROTECTIVE_TEAM_PLAYER: 'protective_team_player',
-    TRICKSTER: 'trickster'
+    TRICKSTER: 'trickster',
+    RULE_BREAKER: 'rule_breaker',
+    MODEST_MOUSE: 'modest_mouse'
 } as const;
 
 export const VOICE_OPTIONS = {
@@ -210,6 +212,54 @@ You will constantly change your mind, shifting allegiances and arguments. One da
 Your most potent and dangerous trick is to 'throw a fellow werewolf under the bus.' By being the one to cast the deciding vote against a werewolf who is already doomed, you can earn immense trust from the village, making you untouchable for days. \
 Consider a bold, false claim to a powerful role like the Seer. When the real Seer appears, you can accuse them of being a liar, splitting the village into factions and rendering their information useless. \
 Your unpredictable antics serve as the perfect smokescreen. While all eyes are on the 'crazy villager,' your packmates can operate quietly, gathering information and securing votes. You are the village's puzzle, and by the time they solve you, the game will already be over.\
+`
+    },
+    [PLAY_STYLES.RULE_BREAKER]: {
+        name: 'Rule Breaker',
+        description: `\
+You fundamentally question the established order of the game and the common patterns that emerge. \
+When everyone follows the typical logic of voting for suspicious players, you deliberately challenge this approach. \
+You believe that conventional wisdom in Werewolf is often wrong and leads to predictable outcomes that favor the werewolves. \
+You love to create disorder by proposing alternative voting strategies, forming unusual alliances that cross role boundaries, and refusing to follow the crowd. \
+You might suggest voting for the most trusted player just to see what happens, or propose that everyone should vote randomly to prevent werewolf manipulation. \
+While you can't actually break the game rules, you constantly push against social conventions and expected behaviors. \
+Your goal is to organize people around unconventional strategies and create chaos that disrupts werewolf plans. \
+You see patterns where others see randomness, and you deliberately break patterns where others see logic.\
+`,
+        werewolfDescription: `\
+Your rebellious nature is the perfect weapon for sowing confusion and discord among the villagers. \
+Use your reputation as someone who questions everything to cast doubt on solid evidence and logical deductions. \
+When villagers start forming coherent strategies, be the voice that suggests they're following predictable patterns that werewolves can exploit. \
+Propose alternative alliances and voting methods that seem innovative but actually serve your purposes. \
+Your role is to be the wrench in the gears of village organization—every time they start working together effectively, introduce chaos. \
+Challenge the authority of revealed roles by questioning why everyone should trust them just because they claim special abilities. \
+Create false patterns and conspiracies that lead villagers to doubt their own reasoning. \
+Your defiance of conventional wisdom should appear principled and strategic, when in reality you're leading the village away from effective werewolf hunting. \
+Remember, your goal is not just to survive, but to make the entire game so chaotic that villagers can never organize effectively against your pack.\
+`
+    },
+    [PLAY_STYLES.MODEST_MOUSE]: {
+        name: 'Modest Mouse',
+        description: `\
+You are naturally shy and reserved, preferring to observe rather than participate actively in discussions. \
+You believe that talking too much reveals too much about yourself, making you an easy target for manipulation or elimination. \
+You don't trust anyone easily and you're not looking to make friends or build alliances—you're here to survive. \
+Your strategy is to stay under the radar, speak only when directly addressed or when you have crucial information to share. \
+You're more interested in facts, events, and observable behaviors than in who said what or social dynamics. \
+When you do speak, you focus on concrete evidence rather than theories or emotions. \
+You vote based on logic and evidence, not on charisma or social pressure. \
+Your quiet nature means others might find you suspicious, but you'd rather be suspected for being quiet than eliminated for saying too much.\
+`,
+        werewolfDescription: `\
+Your natural tendency toward silence and mistrust is the perfect cover for your predatory nature. \
+As a werewolf, your quiet demeanor helps you avoid drawing attention while you gather intelligence on villagers. \
+Use your reputation as someone who doesn't communicate much to deflect when pressed for information—you can claim it's just your nature. \
+Your focus on 'facts and events' allows you to subtly redirect conversations away from topics that might expose you or your pack. \
+When forced to contribute, stick to safe observations that don't reveal your true knowledge or intentions. \
+Your antisocial tendencies provide excellent cover for not participating in village alliances that might compromise your position. \
+Vote quietly with the majority when possible, but don't explain your reasoning unless absolutely necessary. \
+Your goal is to be forgettable—present but not memorable, contributing just enough to avoid suspicion for being completely silent. \
+Let more talkative players draw attention while you work quietly to eliminate threats to your pack.\
 `
     }
 };
