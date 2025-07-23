@@ -1,27 +1,16 @@
 # Bugs and improvements
 
-- Update bot creation with temperature, voice, play style selections
-- User doesn't see werewolves messages at night while being werewolf
-- Werewolves queue has the same names in a row
-- Werewolves doesn't see that the detective has been killed and try to find the detective during the night discussion
-- Complete the night results
-- Add option to read message out loud
-- Add suggestions for the reply
-- Resolve vote tie by asking Detective to choose
-- Get rid of transactions 
-- Refresh should not be available on the welcome messages
-- Added turn on/off thinking for models supporting it
 - Implement night resolution
+- Create day summaries, keep them separate from messages, attach to bots history
+- When bot votes or speaks, the scroll is not moving on UI
+- Update bot creation with temperature, play style selections
+- Complete the night results
+- Resolve vote tie by asking Detective to choose
+- Get rid of transactions
+- Refresh should not be available on the welcome messages
+- Fix day actions hints: UI should show which bot/GM is taking action right now
+- Added turn on/off thinking for models supporting it
 - Implement the end of night summarization
 - Optimize indexes in DB
-- When bot votes or speaks, the scroll is not moving on UI
-- Make the user input expandable to dropdown
-- Clean chat messages when backend restarts
-- Updated indexes in the sources (for resetting messages and for resetting night)
-- Fix "Waiting for game to start" disabled input hit in GamePage
-- remove transactions
-- Add ability to switch bot models on UI
-- Create day summaries, keep them separate from messages, attach to bots history
 - Collect day statistics on how many messages each bot made. Make the Router take this into account. Display it on UI
 - Automatically end up day discussion when each bot replied X times min
-- Add banners for game phases: Welcome, Start Day discussion, Start voting, etc

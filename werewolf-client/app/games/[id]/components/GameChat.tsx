@@ -439,7 +439,15 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
         
         eventSource.onmessage = (event) => {
             const message = JSON.parse(event.data) as GameMessage;
-            setMessages(prev => [...prev, message]);
+            setMessages(prev => {
+                // Check if message already exists to prevent duplicates
+                const messageExists = prev.some(existingMsg => existingMsg.id === message.id);
+                if (messageExists) {
+                    console.log('🔄 Duplicate message ignored:', message.id);
+                    return prev;
+                }
+                return [...prev, message];
+            });
         };
 
         eventSource.onerror = (event) => {
