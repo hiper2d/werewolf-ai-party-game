@@ -135,3 +135,7 @@ Rewrite play styles:
 - Aggressive provoker: boldly attack, falsely accuse, provoke to see the reaction 
 - Protective team player: seek for alliances, suspicious about other alliances, protect bullied  
 - Trickster: create chaos and change sides
+
+======
+
+I need to implement endNightWithResults

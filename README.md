@@ -1,33 +1,9 @@
 <a href="images/werewolf-ai-logo-3.png" target="_blank"><img src="images/werewolf-ai-logo-3.png" width="600"></a>
 
 This the Werewolf game with AI bots who are instructed to pretend to be humans. 
-Who doesn't know about other AI in the game.
-Who has its personal goals, a secret role and alliances.
+Who don't know about other AI in the game and try their best to win. Who has its personal goals, secret roles, enemies and alliances.
 
-## Gameplay
-
-Create a game in the setting you like, it can be literally anything as long as AI censorship allows
-
-Configure your AI bots with:
-- names
-- models
-- origin stories in the game setting
-- play styles (aggressive, protective, trickster, etc)
-- voices
-
-<a href="images/create_game2.png" target="_blank"><img src="images/create_game2.png" width="600"></a>
-
-Chat with bots or use Text-to-Sound and Sound-to-Text features (this is way more convenient than read and type).
-
-You can follow the theme and roleplay, you can tell them that they are AI, you can try to jailbreak - whatever it takes to survive the voting and the game night.
-
-<a href="images/day_chat1.png" target="_blank"><img src="images/day_chat1.png" width="600"></a>
-
-Survival is not easy, poor Bob (me)
-
-<a href="images/game_vote_all_for_bob.png" target="_blank"><img src="images/game_vote_all_for_bob.png" width="600"></a>
-
-## AI
+## Chose from the following models
 
 The game supports all the major latest models for the game master and bots:
 - Open AI: `O3`, `O4-mini`, `GPT-4.1`
@@ -38,12 +14,33 @@ The game supports all the major latest models for the game master and bots:
 - Grok: `Grok-4`
 - Moonshot AI: `Kimi K2`
 
+## Create a game
+
+Create a game in the setting you like, it can be literally anything as long as the AI censorship is okay with that.
+
+A game master AI will generate a story and bots for you. Feel free to change anything:
+- bots' names and stories
+- bots' models, play styles, and voices
+
+<a href="images/create_game2.png" target="_blank"><img src="images/create_game2.png" width="600"></a>
+
+Chat with bots or use Text-to-Sound and Sound-to-Text features.
+
+You can follow the theme and roleplay, you can tell them that they are AI, you can try to jailbreak - whatever it takes to survive the voting and the game night.
+
+<a href="images/day_chat1.png" target="_blank"><img src="images/day_chat1.png" width="600"></a>
+
+Survival is not easy, poor Bob (me)
+
+<a href="images/game_vote_all_for_bob.png" target="_blank"><img src="images/game_vote_all_for_bob.png" width="600"></a>
+
 I don't use any frameworks for AI, I created s simple agent for each vendor based on their native SDK.
 
 ### Stack
 
-- next.js 15
-- firebase: auth, firestore
+- Next.js 15 and React 19
+- Firebase: auth, firestore
+- All AI providers SDKs
 
 ## Setup
 
