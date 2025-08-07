@@ -38,16 +38,42 @@ describe("OpenAiAgent integration", () => {
       instruction,
       SupportedAiModels[modelType].modelApiName,
       process.env.OPENAI_K!,
-      0.2
+      1 // GPT-5 models only support temperature=1
     );
   };
 
-  it("should respond with a valid schema-based answer for suspicion using GPT-4.1", async () => {
-    const agent = setupAgent("OpenAiBot", LLM_CONSTANTS.GPT_41);
+  it("should respond with a valid schema-based answer for suspicion using GPT-5", async () => {
+    const agent = setupAgent("OpenAiBot", LLM_CONSTANTS.GPT_5);
     const messages: AIMessage[] = [
       {
         role: 'user',
         content: 'Who do you suspect might be a werewolf and why?'
+      }
+    ];
+
+    const schema = createBotAnswerSchema();
+    const response = await agent.askWithSchema(schema, messages);
+    
+    expect(response).not.toBeNull();
+    expect(typeof response).toBe("string");
+    expect(response!.length).toBeGreaterThan(0);
+
+    // Parse response and create BotAnswer instance
+    const parsedObj = parseResponseToObj(response!);
+    expect(parsedObj).toHaveProperty('reply');
+    const botAnswer = new BotAnswer(parsedObj.reply);
+    expect(botAnswer).toBeInstanceOf(BotAnswer);
+    expect(botAnswer.reply).not.toBeNull();
+    expect(typeof botAnswer.reply).toBe('string');
+    expect(botAnswer.reply.length).toBeGreaterThan(0);
+  });
+
+  it("should respond with a valid schema-based answer for introduction using GPT-5-mini", async () => {
+    const agent = setupAgent("GPT5MiniBot", LLM_CONSTANTS.GPT_5_MINI);
+    const messages: AIMessage[] = [
+      {
+        role: 'user',
+        content: `${HISTORY_PREFIX}Alice: Hello everyone! I'm Alice.\nBob: Hi, I'm Bob.\n\n${GM_COMMAND_INTRODUCE_YOURSELF}`
       }
     ];
 

@@ -60,8 +60,8 @@ Ensure your response strictly follows the schema requirements.`,
             const completion = await this.client.chat.completions.create({
                 ...this.defaultParams,
                 messages: [
-                    { role: 'developer', content: this.instruction },
-                    ...preparedMessages
+                    { role: 'developer' as any, content: this.instruction },
+                    ...preparedMessages as OpenAI.Chat.Completions.ChatCompletionMessageParam[]
                 ],
             }) as OpenAI.Chat.Completions.ChatCompletion;
 
