@@ -56,10 +56,13 @@ Ensure your response strictly follows the schema requirements.`,
         ];
 
         try {
-            const preparedMessages = this.prepareMessagesWithInstruction(modifiedMessages);
+            const preparedMessages = this.prepareMessages(modifiedMessages);
             const completion = await this.client.chat.completions.create({
                 ...this.defaultParams,
-                messages: preparedMessages,
+                messages: [
+                    { role: 'developer', content: this.instruction },
+                    ...preparedMessages
+                ],
             }) as OpenAI.Chat.Completions.ChatCompletion;
 
             return this.processReply(completion);
@@ -69,13 +72,7 @@ Ensure your response strictly follows the schema requirements.`,
         }
     }
 
-    private prepareMessagesWithInstruction(messages: AIMessage[]): OpenAI.Chat.Completions.ChatCompletionMessageParam[] {
-        const preparedMessages = this.prepareMessages(messages);
-        if (preparedMessages.length > 0) {
-            preparedMessages[0].content = `${this.instruction}\n\n${preparedMessages[0].content}`;
-        }
-        return preparedMessages;
-    }
+    // Removed prepareMessagesWithInstruction - now using developer role for instructions
 
     private processReply(completion: OpenAI.Chat.Completions.ChatCompletion): string {
         const reply = completion.choices[0]?.message?.content;

@@ -23,10 +23,12 @@ export const LLM_CONSTANTS = {
     CLAUDE_4_SONNET: 'Claude 4 Sonnet',
     DEEPSEEK_CHAT: 'DeepSeek Chat',
     DEEPSEEK_REASONER: 'DeepSeek Reasoner',
-    GPT_41: 'GPT-4.1',
-    GPT_O4_MINI: 'o4-mini',
+    // GPT_41: 'GPT-4.1', // Disabled: replaced by GPT-5
+    GPT_5: 'GPT-5',
+    GPT_5_MINI: 'GPT-5-mini',
+    // GPT_O4_MINI: 'o4-mini', // Disabled: replaced by GPT-5
     GEMINI_25_PRO: 'Gemini 2.5 Pro',
-    GPT_O3: 'o3',
+    // GPT_O3: 'o3', // Disabled: replaced by GPT-5
     // GPT_O3_PRO: 'o3-pro', // Disabled: doesn't support conversation history properly
     MISTRAL_2_LARGE: 'Mistral 2 Large',
     MISTRAL_3_SMALL: 'Mistral 3 Small',
@@ -44,22 +46,30 @@ export const SupportedAiModels = {
         modelApiName: 'claude-sonnet-4-0',
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC
     },
-    [LLM_CONSTANTS.GPT_41]: {
-        modelApiName: 'gpt-4.1',
+    // [LLM_CONSTANTS.GPT_41]: {
+    //     modelApiName: 'gpt-4.1',
+    //     apiKeyName: API_KEY_CONSTANTS.OPENAI
+    // }, // Disabled: replaced by GPT-5
+    [LLM_CONSTANTS.GPT_5]: {
+        modelApiName: 'gpt-5',
         apiKeyName: API_KEY_CONSTANTS.OPENAI
     },
-    [LLM_CONSTANTS.GPT_O3]: {
-        modelApiName: 'o3',
+    [LLM_CONSTANTS.GPT_5_MINI]: {
+        modelApiName: 'gpt-5-mini',
         apiKeyName: API_KEY_CONSTANTS.OPENAI
     },
+    // [LLM_CONSTANTS.GPT_O3]: {
+    //     modelApiName: 'o3',
+    //     apiKeyName: API_KEY_CONSTANTS.OPENAI
+    // }, // Disabled: replaced by GPT-5
     // [LLM_CONSTANTS.GPT_O3_PRO]: {
     //     modelApiName: 'o3-pro',
     //     apiKeyName: API_KEY_CONSTANTS.OPENAI
     // }, // Disabled: doesn't support conversation history properly
-    [LLM_CONSTANTS.GPT_O4_MINI]: {
-        modelApiName: 'o4-mini',
-        apiKeyName: API_KEY_CONSTANTS.OPENAI
-    },
+    // [LLM_CONSTANTS.GPT_O4_MINI]: {
+    //     modelApiName: 'o4-mini',
+    //     apiKeyName: API_KEY_CONSTANTS.OPENAI
+    // }, // Disabled: replaced by GPT-5
     [LLM_CONSTANTS.GEMINI_25_PRO]: {
         modelApiName: 'gemini-2.5-pro',
         apiKeyName: API_KEY_CONSTANTS.GOOGLE

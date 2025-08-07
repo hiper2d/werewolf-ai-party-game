@@ -19,7 +19,13 @@ import {auth} from "@/auth";
 import {getGame, addMessageToChatAndSaveToDb} from "./game-actions";
 import { RoleProcessorFactory } from "./roles";
 import {withGameErrorHandling} from "@/app/utils/server-action-wrapper";
-import { generateNightResultsMessage } from "@/app/utils/message-utils";
+import { AgentFactory } from "@/app/ai/agent-factory";
+import { getUserFromFirestore } from "@/app/api/game-actions";
+import { getUserApiKeys } from "@/app/api/user-actions";
+import { NIGHT_RESULTS_STORY_PROMPT } from "@/app/ai/prompts/gm-prompts";
+import { createNightResultsStorySchema, NightResultsStory } from "@/app/ai/prompts/ai-schemas";
+import { format } from "@/app/ai/prompts/utils";
+import { parseResponseToObj, convertToAIMessages } from "@/app/utils/message-utils";
 
 /**
  * Helper function to handle night end logic with results processing
@@ -31,10 +37,111 @@ async function endNightWithResults(gameId: string, game: Game): Promise<Game> {
         throw new Error('Firestore is not initialized');
     }
 
-    // Generate night results message
-    const nightResultsMessage = generateNightResultsMessage(game.nightResults || {}, game);
+    // Analyze night results to determine outcomes
+    const nightResults = game.nightResults || {};
     
-    // Create Game Master message with night results
+    // 1. Determine if werewolves succeeded in killing their target
+    let killedPlayer: string | null = null;
+    let killedPlayerRole: string | null = null;
+    let wasKillPrevented = false;
+    let noWerewolfActivity = false;
+    
+    if (nightResults.werewolf) {
+        const werewolfTarget = nightResults.werewolf.target;
+        const wasProtected = nightResults.doctor && nightResults.doctor.target === werewolfTarget;
+        
+        if (wasProtected) {
+            wasKillPrevented = true;
+        } else {
+            killedPlayer = werewolfTarget;
+            // Get the killed player's role
+            if (killedPlayer === game.humanPlayerName) {
+                killedPlayerRole = game.humanPlayerRole;
+            } else {
+                const killedBot = game.bots.find(bot => bot.name === killedPlayer);
+                killedPlayerRole = killedBot ? killedBot.role : 'unknown';
+            }
+        }
+    } else {
+        noWerewolfActivity = true;
+    }
+    
+    // 2. Determine detective investigation outcome
+    let detectiveFoundEvil = false;
+    let detectiveTargetDied = false;
+    let detectiveWasActive = false;
+    
+    if (nightResults.detective) {
+        detectiveWasActive = true;
+        const detectiveTarget = nightResults.detective.target;
+        
+        // Check if detective target died
+        detectiveTargetDied = killedPlayer === detectiveTarget;
+        
+        // Get the investigated player's role to determine if evil was found
+        let detectiveTargetRole: string;
+        if (detectiveTarget === game.humanPlayerName) {
+            detectiveTargetRole = game.humanPlayerRole;
+        } else {
+            const targetBot = game.bots.find(bot => bot.name === detectiveTarget);
+            detectiveTargetRole = targetBot ? targetBot.role : 'unknown';
+        }
+        detectiveFoundEvil = detectiveTargetRole === GAME_ROLES.WEREWOLF;
+    }
+    
+    // 3. Use Game Master AI to generate the night results story
+    const session = await auth();
+    if (!session || !session.user?.email) {
+        throw new Error('Not authenticated');
+    }
+    
+    const user = await getUserFromFirestore(session.user.email);
+    const apiKeys = await getUserApiKeys(user!.email);
+    
+    // Create the night results prompt with all the collected details
+    const nightResultsPrompt = format(NIGHT_RESULTS_STORY_PROMPT, {
+        players_names: [
+            ...game.bots.filter(bot => bot.isAlive).map(bot => bot.name),
+            game.humanPlayerName
+        ].join(", "),
+        dead_players_names_with_roles: game.bots
+            .filter(bot => !bot.isAlive)
+            .map(bot => `${bot.name} (${bot.role})`)
+            .join(", "),
+        humanPlayerName: game.humanPlayerName,
+        currentDay: game.currentDay,
+        theme: game.theme || 'Werewolf Village',
+        killedPlayer: killedPlayer || 'NONE',
+        killedPlayerRole: killedPlayerRole || 'NONE',
+        wasKillPrevented: wasKillPrevented ? 'TRUE' : 'FALSE',
+        noWerewolfActivity: noWerewolfActivity ? 'TRUE' : 'FALSE',
+        detectiveFoundEvil: detectiveFoundEvil ? 'TRUE' : 'FALSE',
+        detectiveTargetDied: detectiveTargetDied ? 'TRUE' : 'FALSE',
+        detectiveWasActive: detectiveWasActive ? 'TRUE' : 'FALSE',
+        doctorWasActive: nightResults.doctor ? 'TRUE' : 'FALSE'
+    });
+    
+    // Create Game Master agent and generate story
+    const gmAgent = AgentFactory.createAgent(GAME_MASTER, nightResultsPrompt, game.gameMasterAiType, apiKeys);
+    
+    // Create empty conversation history for the GM (night results are generated fresh)
+    const history = convertToAIMessages(GAME_MASTER, []);
+    const schema = createNightResultsStorySchema();
+    
+    const rawStoryResponse = await gmAgent.askWithSchema(schema, history);
+    if (!rawStoryResponse) {
+        throw new BotResponseError(
+            'Game Master failed to generate night results story',
+            'GM did not respond to night results generation request',
+            { gmAiType: game.gameMasterAiType, action: 'night_results' },
+            true
+        );
+    }
+    
+    const storyResponse = parseResponseToObj(rawStoryResponse, 'NightResultsStory') as NightResultsStory;
+    const nightResultsMessage = storyResponse.story;
+    
+    // Create Game Master message with the AI-generated night results
     const gameMessage: GameMessage = {
         id: null,
         recipientName: RECIPIENT_ALL,
@@ -48,31 +155,27 @@ async function endNightWithResults(gameId: string, game: Game): Promise<Game> {
     // Save the Game Master message
     await addMessageToChatAndSaveToDb(gameMessage, gameId);
 
-    // Handle player elimination if werewolf killed someone and doctor didn't protect them
+    // 4. Handle player elimination and game over conditions
     let gameUpdates: any = {
         gameState: GAME_STATES.NIGHT_ENDS,
         gameStateProcessQueue: [],
         gameStateParamQueue: []
     };
 
-    if (game.nightResults?.werewolf) {
-        const target = game.nightResults.werewolf.target;
-        const wasProtected = game.nightResults.doctor && game.nightResults.doctor.target === target;
-        
-        if (!wasProtected) {
-            // Player was killed - eliminate them
-            if (target === game.humanPlayerName) {
-                // Human player was killed - game over
-                gameUpdates.gameState = GAME_STATES.GAME_OVER;
-            } else {
-                // Bot was killed - set isAlive = false
-                const updatedBots = game.bots.map(bot =>
-                    bot.name === target
-                        ? { ...bot, isAlive: false, eliminationDay: game.currentDay }
-                        : bot
-                );
-                gameUpdates.bots = updatedBots;
-            }
+    if (killedPlayer) {
+        if (killedPlayer === game.humanPlayerName) {
+            // Human player was killed - game over
+            gameUpdates.gameState = GAME_STATES.GAME_OVER;
+            console.log('🎯 GAME OVER: Human player was eliminated by werewolves');
+        } else {
+            // Bot was killed - set isAlive = false
+            const updatedBots = game.bots.map(bot =>
+                bot.name === killedPlayer
+                    ? { ...bot, isAlive: false, eliminationDay: game.currentDay }
+                    : bot
+            );
+            gameUpdates.bots = updatedBots;
+            console.log(`💀 PLAYER ELIMINATED: ${killedPlayer} (${killedPlayerRole}) was killed by werewolves`);
         }
     }
 

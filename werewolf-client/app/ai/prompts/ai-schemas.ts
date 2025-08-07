@@ -141,6 +141,23 @@ export const createWerewolfActionSchema = () => ({
     required: ['target', 'reasoning']
 });
 
+// Night results story interface
+export interface NightResultsStory {
+    story: string;
+}
+
+// Night results story schema for response validation
+export const createNightResultsStorySchema = () => ({
+    type: 'object',
+    properties: {
+        story: {
+            type: 'string',
+            description: 'The compelling night results narrative that follows all information disclosure rules'
+        }
+    },
+    required: ['story']
+});
+
 // Doctor action schema for response validation
 export const createDoctorActionSchema = () => ({
     type: 'object',

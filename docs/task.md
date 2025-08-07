@@ -138,4 +138,9 @@ Rewrite play styles:
 
 ======
 
-I need to implement endNightWithResults
+I need to implement endNightWithResults function properly:
+- The evaluation of night results from the nightResults field should happen before the game master creates its night summary language
+- When we evaluate, let's decide if the werewolves target has died or not. If yes, then let's check if the victim a human player or not.
+- Then, let's decide the detective's target check outcome: it can be good (not a werewolf), or bad (werewolf)
+- 
+

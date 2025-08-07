@@ -378,6 +378,6 @@ export interface GameMessage {
 }
 
 export interface AIMessage {
-    role: 'system' | 'user' | 'assistant';
+    role: 'system' | 'user' | 'assistant' | 'developer';
     content: string;
 }

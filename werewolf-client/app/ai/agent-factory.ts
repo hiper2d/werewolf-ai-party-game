@@ -5,7 +5,7 @@ import {LLM_CONSTANTS, SupportedAiModels} from "@/app/ai/ai-models";
 import {ClaudeAgent} from "@/app/ai/anthropic-agent";
 import {GoogleAgent} from "@/app/ai/google-agent";
 import {MistralAgent} from "@/app/ai/mistral-agent";
-import {OpenAiOAgent} from "@/app/ai/open-ai-o-agent";
+// import {OpenAiOAgent} from "@/app/ai/open-ai-o-agent"; // Disabled: not used with GPT-5
 import {DeepSeekAgent} from "@/app/ai/deepseek-agent";
 import {GrokAgent} from "@/app/ai/grok-agent";
 import {KimiAgent} from "@/app/ai/kimi-agent";
@@ -27,11 +27,13 @@ export class AgentFactory {
             case LLM_CONSTANTS.CLAUDE_4_OPUS:
             case LLM_CONSTANTS.CLAUDE_4_SONNET:
                 return new ClaudeAgent(name, instruction, model.modelApiName, key);
-            case LLM_CONSTANTS.GPT_41:
-                return new OpenAiAgent(name, instruction, model.modelApiName, key, 0.2);
-            case LLM_CONSTANTS.GPT_O3:
-            case LLM_CONSTANTS.GPT_O4_MINI:
-                return new OpenAiOAgent(name, instruction, model.modelApiName, key);
+            // case LLM_CONSTANTS.GPT_41: // Disabled: replaced by GPT-5
+            case LLM_CONSTANTS.GPT_5:
+            case LLM_CONSTANTS.GPT_5_MINI:
+                return new OpenAiAgent(name, instruction, model.modelApiName, key, 1); // GPT-5 only supports temperature=1
+            // case LLM_CONSTANTS.GPT_O3: // Disabled: replaced by GPT-5
+            // case LLM_CONSTANTS.GPT_O4_MINI: // Disabled: replaced by GPT-5
+            //     return new OpenAiOAgent(name, instruction, model.modelApiName, key);
             case LLM_CONSTANTS.GEMINI_25_PRO:
                 return new GoogleAgent(name, instruction, model.modelApiName, key);
             case LLM_CONSTANTS.MISTRAL_3_SMALL:
