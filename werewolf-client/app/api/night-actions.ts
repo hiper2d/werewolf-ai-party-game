@@ -489,26 +489,48 @@ async function processNightQueue(gameId: string, game: Game): Promise<Game> {
             return await endNightWithResults(gameId, game);
         }
 
-        // Param queue should always be populated when there are active roles
-        // If it's empty, this indicates a logic error in role transition
+        // If param queue is empty, handle role transition first
         if (game.gameStateParamQueue.length === 0) {
-            console.error('🚨 CRITICAL ERROR: Empty param queue with active process queue', {
-                gameId,
-                currentRole: game.gameStateProcessQueue[0],
-                processQueue: game.gameStateProcessQueue,
-                paramQueue: game.gameStateParamQueue
-            });
-            throw new BotResponseError(
-                'Invalid game state: empty parameter queue',
-                'The gameStateParamQueue should be populated when there are active roles in gameStateProcessQueue',
-                {
-                    gameId,
-                    currentRole: game.gameStateProcessQueue[0],
-                    processQueue: game.gameStateProcessQueue,
-                    paramQueue: game.gameStateParamQueue
-                },
-                true
-            );
+            // Current role finished, move to next role or end night
+            const newProcessQueue = game.gameStateProcessQueue.slice(1);
+            
+            if (newProcessQueue.length === 0) {
+                // No more roles, end the night with results
+                return await endNightWithResults(gameId, game);
+            } else {
+                // Move to next role using processor's init method
+                const nextRole = newProcessQueue[0];
+                const nextRoleProcessor = RoleProcessorFactory.createProcessor(nextRole, gameId, game);
+                
+                if (!nextRoleProcessor) {
+                    throw new BotResponseError(
+                        `No processor for role: ${nextRole}`,
+                        `Could not create processor for role ${nextRole}`,
+                        { role: nextRole, gameId },
+                        true
+                    );
+                }
+                
+                const initResult = await nextRoleProcessor.init();
+                if (!initResult.success) {
+                    throw new BotResponseError(
+                        `Failed to initialize ${nextRole} processor`,
+                        initResult.error || 'Unknown initialization error',
+                        { role: nextRole, gameId },
+                        true
+                    );
+                }
+                
+                await db.collection('games').doc(gameId).update({
+                    gameStateProcessQueue: newProcessQueue,
+                    gameStateParamQueue: initResult.paramQueue
+                });
+                
+                console.log(`🌙 MOVED TO NEXT ROLE: ${nextRole} with players [${initResult.paramQueue.join(', ')}]`);
+                
+                // Return the updated game state and continue processing
+                return await getGame(gameId) as Game;
+            }
         }
 
         const currentRole = game.gameStateProcessQueue[0];

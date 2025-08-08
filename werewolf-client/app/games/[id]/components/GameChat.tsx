@@ -133,6 +133,21 @@ function renderMessage(message: GameMessage, gameId: string, onDeleteAfter: (mes
                 displayContent = `🗳️ Votes for ${voteMessage.who}: "${voteMessage.why}"`;
                 break;
             }
+            case MessageType.WEREWOLF_ACTION: {
+                const werewolfAction = message.msg as { target: string; reasoning: string };
+                displayContent = `🐺 Selected ${werewolfAction.target} for elimination. Reasoning: ${werewolfAction.reasoning}`;
+                break;
+            }
+            case MessageType.DOCTOR_ACTION: {
+                const doctorAction = message.msg as { target: string; reasoning: string };
+                displayContent = `🏥 Protected ${doctorAction.target} from werewolf attacks. Reasoning: ${doctorAction.reasoning}`;
+                break;
+            }
+            case MessageType.DETECTIVE_ACTION: {
+                const detectiveAction = message.msg as { target: string; reasoning: string };
+                displayContent = `🔍 Investigated ${detectiveAction.target}. Reasoning: ${detectiveAction.reasoning}`;
+                break;
+            }
             case MessageType.GM_COMMAND:
                 displayContent = typeof message.msg === 'string' ? `🎭 ${message.msg}` : '🎭 Invalid message format';
                 break;

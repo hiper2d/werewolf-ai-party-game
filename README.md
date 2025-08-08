@@ -6,8 +6,8 @@ Who don't know about other AI in the game and try their best to win. Who has its
 ## Chose from the following models
 
 The game supports all the major latest models for the game master and bots:
-- Open AI: `O3`, `O4-mini`, `GPT-4.1`
-- Anthropic: `Claude 4 Opus`, `Claude 4 Sonnet`
+- Open AI: `GPT-5`, `GPT-5-mini`
+- Anthropic: `Claude 4.1 Opus`, `Claude 4 Sonnet`
 - Google: `Gemini 2.5 Pro`
 - DeepSeek: `Reasoner (R1)`, `Chat (V3)`
 - Mistral: `Mistral 2 Large`, `Mistral 3 Small`

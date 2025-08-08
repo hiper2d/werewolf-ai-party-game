@@ -19,7 +19,7 @@ export const SupportedAiKeyNames: Record<string, string> = {
 };
 
 export const LLM_CONSTANTS = {
-    CLAUDE_4_OPUS: 'Claude 4 Opus',
+    CLAUDE_4_OPUS: 'Claude 4.1 Opus',
     CLAUDE_4_SONNET: 'Claude 4 Sonnet',
     DEEPSEEK_CHAT: 'DeepSeek Chat',
     DEEPSEEK_REASONER: 'DeepSeek Reasoner',
@@ -39,7 +39,7 @@ export const LLM_CONSTANTS = {
 
 export const SupportedAiModels = {
     [LLM_CONSTANTS.CLAUDE_4_OPUS]: {
-        modelApiName: 'claude-opus-4-0',
+        modelApiName: 'claude-opus-4-1',
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC
     },
     [LLM_CONSTANTS.CLAUDE_4_SONNET]: {
