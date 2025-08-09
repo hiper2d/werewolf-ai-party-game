@@ -61,3 +61,64 @@ Your response must follow this schema:
 }
 
 Return a single JSON object matching this schema.`;
+
+export const GM_COMMAND_GENERATE_NIGHT_RESULTS: string = `Generate the night results story based on the following night events and conversation history.
+
+<NightEvents>
+<WerewolfAttack>
+  <TargetKilled>%killedPlayer%</TargetKilled>
+  <KilledPlayerRole>%killedPlayerRole%</KilledPlayerRole>
+  <AttackPrevented>%wasKillPrevented%</AttackPrevented>
+  <NoWerewolfActivity>%noWerewolfActivity%</NoWerewolfActivity>
+</WerewolfAttack>
+
+<DetectiveInvestigation>
+  <FoundEvil>%detectiveFoundEvil%</FoundEvil>
+  <InvestigatedDeadPlayer>%detectiveTargetDied%</InvestigatedDeadPlayer>
+  <DetectiveWasActive>%detectiveWasActive%</DetectiveWasActive>
+</DetectiveInvestigation>
+
+<DoctorProtection>
+  <DoctorWasActive>%doctorWasActive%</DoctorWasActive>
+  <SuccessfullyPrevented>%wasKillPrevented%</SuccessfullyPrevented>
+</DoctorProtection>
+</NightEvents>
+
+<StorytellingRules>
+**CRITICAL INFORMATION DISCLOSURE RULES:**
+1. **Names can ONLY be revealed if the player DIED during the night**
+2. **Roles can ONLY be revealed if the player DIED during the night** 
+3. **Detective findings can ONLY be revealed if:**
+   - The detective found evil AND the investigated player died, OR
+   - The detective investigated someone who died (regardless of finding)
+4. **All other activities must be described anonymously**
+
+**Story Requirements:**
+- Start with "🌅 **Dawn breaks over the village.**"
+- Create atmospheric, thematic narrative appropriate to the game setting
+- Use dramatic language and vivid descriptions
+- Build suspense and maintain the game's mood
+- End with transition to day discussion
+
+**Content Guidelines:**
+- If someone died: Reveal their name and role dramatically
+- If attack was prevented: Create suspense about the near-death experience
+- If detective found evil but target is alive: Do NOT reveal names or findings
+- If no werewolf activity: Create mysterious atmosphere about quiet night
+- Always maintain game balance and fairness in information revelation
+</StorytellingRules>
+
+Your response must follow this schema:
+
+{
+    type: "object",
+    properties: {
+        story: {
+            type: "string",
+            description: "The night results story that reveals what happened during the night"
+        }
+    },
+    required: ["story"]
+}
+
+Return a single JSON object matching this schema.`;

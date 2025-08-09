@@ -20,9 +20,10 @@ import {getGame, addMessageToChatAndSaveToDb} from "./game-actions";
 import { RoleProcessorFactory } from "./roles";
 import {withGameErrorHandling} from "@/app/utils/server-action-wrapper";
 import { AgentFactory } from "@/app/ai/agent-factory";
-import { getUserFromFirestore } from "@/app/api/game-actions";
+import { getUserFromFirestore, getBotMessages } from "@/app/api/game-actions";
 import { getUserApiKeys } from "@/app/api/user-actions";
-import { NIGHT_RESULTS_STORY_PROMPT } from "@/app/ai/prompts/gm-prompts";
+import { GM_NIGHT_RESULTS_SYSTEM_PROMPT } from "@/app/ai/prompts/gm-prompts";
+import { GM_COMMAND_GENERATE_NIGHT_RESULTS } from "@/app/ai/prompts/gm-commands";
 import { createNightResultsStorySchema, NightResultsStory } from "@/app/ai/prompts/ai-schemas";
 import { format } from "@/app/ai/prompts/utils";
 import { parseResponseToObj, convertToAIMessages } from "@/app/utils/message-utils";
@@ -98,8 +99,8 @@ async function endNightWithResults(gameId: string, game: Game): Promise<Game> {
     const user = await getUserFromFirestore(session.user.email);
     const apiKeys = await getUserApiKeys(user!.email);
     
-    // Create the night results prompt with all the collected details
-    const nightResultsPrompt = format(NIGHT_RESULTS_STORY_PROMPT, {
+    // Create GM system prompt with game context
+    const gmSystemPrompt = format(GM_NIGHT_RESULTS_SYSTEM_PROMPT, {
         players_names: [
             ...game.bots.filter(bot => bot.isAlive).map(bot => bot.name),
             game.humanPlayerName
@@ -110,7 +111,11 @@ async function endNightWithResults(gameId: string, game: Game): Promise<Game> {
             .join(", "),
         humanPlayerName: game.humanPlayerName,
         currentDay: game.currentDay,
-        theme: game.theme || 'Werewolf Village',
+        theme: game.theme || 'Werewolf Village'
+    });
+
+    // Create GM command with night events
+    const nightResultsCommand = format(GM_COMMAND_GENERATE_NIGHT_RESULTS, {
         killedPlayer: killedPlayer || 'NONE',
         killedPlayerRole: killedPlayerRole || 'NONE',
         wasKillPrevented: wasKillPrevented ? 'TRUE' : 'FALSE',
@@ -121,11 +126,25 @@ async function endNightWithResults(gameId: string, game: Game): Promise<Game> {
         doctorWasActive: nightResults.doctor ? 'TRUE' : 'FALSE'
     });
     
-    // Create Game Master agent and generate story
-    const gmAgent = AgentFactory.createAgent(GAME_MASTER, nightResultsPrompt, game.gameMasterAiType, apiKeys);
+    // Create Game Master agent with system prompt
+    const gmAgent = AgentFactory.createAgent(GAME_MASTER, gmSystemPrompt, game.gameMasterAiType, apiKeys);
     
-    // Create empty conversation history for the GM (night results are generated fresh)
-    const history = convertToAIMessages(GAME_MASTER, []);
+    // Get day discussion messages and night messages for context
+    const dayMessages = await getBotMessages(gameId, GAME_MASTER, game.currentDay);
+    
+    // Create GM command message
+    const gmCommandMessage: GameMessage = {
+        id: null,
+        recipientName: GAME_MASTER,
+        authorName: GAME_MASTER,
+        msg: nightResultsCommand,
+        messageType: MessageType.GM_COMMAND,
+        day: game.currentDay,
+        timestamp: Date.now()
+    };
+    
+    // Include conversation history for the GM (day + night messages + command)
+    const history = convertToAIMessages(GAME_MASTER, [...dayMessages, gmCommandMessage]);
     const schema = createNightResultsStorySchema();
     
     const rawStoryResponse = await gmAgent.askWithSchema(schema, history);
@@ -155,29 +174,12 @@ async function endNightWithResults(gameId: string, game: Game): Promise<Game> {
     // Save the Game Master message
     await addMessageToChatAndSaveToDb(gameMessage, gameId);
 
-    // 4. Handle player elimination and game over conditions
-    let gameUpdates: any = {
+    // 4. Update game state to NIGHT_ENDS (don't eliminate players yet - that happens when starting next day)
+    const gameUpdates: any = {
         gameState: GAME_STATES.NIGHT_ENDS,
         gameStateProcessQueue: [],
         gameStateParamQueue: []
     };
-
-    if (killedPlayer) {
-        if (killedPlayer === game.humanPlayerName) {
-            // Human player was killed - game over
-            gameUpdates.gameState = GAME_STATES.GAME_OVER;
-            console.log('🎯 GAME OVER: Human player was eliminated by werewolves');
-        } else {
-            // Bot was killed - set isAlive = false
-            const updatedBots = game.bots.map(bot =>
-                bot.name === killedPlayer
-                    ? { ...bot, isAlive: false, eliminationDay: game.currentDay }
-                    : bot
-            );
-            gameUpdates.bots = updatedBots;
-            console.log(`💀 PLAYER ELIMINATED: ${killedPlayer} (${killedPlayerRole}) was killed by werewolves`);
-        }
-    }
 
     // Update game state
     await db.collection('games').doc(gameId).update(gameUpdates);
@@ -443,11 +445,12 @@ async function replayNightImpl(gameId: string): Promise<Game> {
             }
         }
 
-        // Reset game state back to VOTE_RESULTS
+        // Reset game state back to VOTE_RESULTS and clear night results
         await db.collection('games').doc(gameId).update({
             gameState: GAME_STATES.VOTE_RESULTS,
             gameStateProcessQueue: [],
-            gameStateParamQueue: []
+            gameStateParamQueue: [],
+            nightResults: {}
         });
 
         console.log('🔄 REPLAY NIGHT: Game state reset to VOTE_RESULTS');
