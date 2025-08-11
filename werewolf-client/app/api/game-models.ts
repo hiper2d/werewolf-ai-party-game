@@ -64,6 +64,7 @@ export interface Game {
     gameStateProcessQueue: Array<string>; // some states need to keep intermediate results
     errorState?: SystemErrorMessage | null; // Persistent error state stored in the game object
     nightResults?: Record<string, { target: string }>; // Dynamic night results for each role that has night actions
+    messageCounter?: number; // Counter for generating incremental message IDs
 }
 
 export const GAME_ROLES = {

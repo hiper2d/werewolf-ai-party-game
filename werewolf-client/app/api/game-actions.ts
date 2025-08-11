@@ -319,7 +319,8 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
             currentDay: 1,
             gameState: GAME_STATES.WELCOME,
             gameStateParamQueue: bots.map(bot => bot.name),
-            gameStateProcessQueue: []
+            gameStateProcessQueue: [],
+            messageCounter: 0 // Initialize message counter for new games
         };
 
         const response = await db.collection('games').add(game);
@@ -347,14 +348,53 @@ export async function addMessageToChatAndSaveToDb(gameMessage: GameMessage, game
         throw new Error('Firestore is not initialized');
     }
     try {
-        const response = await db.collection('games').doc(gameId).collection('messages').add(
-            serializeMessageForFirestore(gameMessage)
-        );
-        return response.id;
+        // Use a transaction to atomically increment counter and add message with custom ID
+        return await db.runTransaction(async (transaction) => {
+            const gameRef = db.collection('games').doc(gameId);
+            const gameDoc = await transaction.get(gameRef);
+            
+            if (!gameDoc.exists) {
+                throw new Error('Game not found');
+            }
+            
+            const gameData = gameDoc.data();
+            const currentCounter = gameData?.messageCounter || 0;
+            const newCounter = currentCounter + 1;
+            
+            // Generate custom message ID: counter-author-to-recipient
+            const sanitizedAuthor = sanitizeForId(gameMessage.authorName);
+            const sanitizedRecipient = sanitizeForId(gameMessage.recipientName);
+            const customId = `${newCounter}-${sanitizedAuthor}-to-${sanitizedRecipient}`;
+            
+            // Update game counter
+            transaction.update(gameRef, { messageCounter: newCounter });
+            
+            // Add message with custom ID
+            const messageRef = db.collection('games').doc(gameId).collection('messages').doc(customId);
+            const messageData = {
+                ...serializeMessageForFirestore(gameMessage),
+                timestamp: Date.now() // Set timestamp if not provided
+            };
+            transaction.set(messageRef, messageData);
+            
+            return customId;
+        });
     } catch (error: any) {
         console.error("Error adding message: ", error);
         throw new Error(`Failed to add message: ${error.message}`);
     }
+}
+
+/**
+ * Sanitize names for use in message IDs
+ * Converts to lowercase, replaces spaces and special chars with hyphens
+ */
+function sanitizeForId(name: string): string {
+    return name.toLowerCase()
+        .replace(/\s+/g, '-')           // Replace spaces with hyphens
+        .replace(/[^a-z0-9-]/g, '')     // Remove non-alphanumeric chars except hyphens
+        .replace(/-+/g, '-')            // Replace multiple hyphens with single hyphen
+        .replace(/^-|-$/g, '');         // Remove leading/trailing hyphens
 }
 
 export async function updateBotModel(gameId: string, botName: string, newAiType: string): Promise<Game> {
@@ -655,6 +695,7 @@ function gameFromFirestore(id: string, data: any): Game {
         gameStateParamQueue: data.gameStateParamQueue,
         gameStateProcessQueue: data.gameStateProcessQueue,
         errorState: data.errorState || null,
-        nightResults: data.nightResults || {}
+        nightResults: data.nightResults || {},
+        messageCounter: data.messageCounter || 0 // Default to 0 for existing games
     };
 }
