@@ -44,6 +44,7 @@ export interface Bot {
     gender: 'male' | 'female' | 'neutral';
     voice: string;
     eliminationDay?: number; // Track which day this bot was eliminated (undefined if alive)
+    daySummaries?: string[]; // Array of summaries for each previous day (index 0 = day 1 summary)
 }
 
 export interface Game {

@@ -348,37 +348,35 @@ export async function addMessageToChatAndSaveToDb(gameMessage: GameMessage, game
         throw new Error('Firestore is not initialized');
     }
     try {
-        // Use a transaction to atomically increment counter and add message with custom ID
-        return await db.runTransaction(async (transaction) => {
-            const gameRef = db.collection('games').doc(gameId);
-            const gameDoc = await transaction.get(gameRef);
-            
-            if (!gameDoc.exists) {
-                throw new Error('Game not found');
-            }
-            
-            const gameData = gameDoc.data();
-            const currentCounter = gameData?.messageCounter || 0;
-            const newCounter = currentCounter + 1;
-            
-            // Generate custom message ID: counter-author-to-recipient
-            const sanitizedAuthor = sanitizeForId(gameMessage.authorName);
-            const sanitizedRecipient = sanitizeForId(gameMessage.recipientName);
-            const customId = `${newCounter}-${sanitizedAuthor}-to-${sanitizedRecipient}`;
-            
-            // Update game counter
-            transaction.update(gameRef, { messageCounter: newCounter });
-            
-            // Add message with custom ID
-            const messageRef = db.collection('games').doc(gameId).collection('messages').doc(customId);
-            const messageData = {
-                ...serializeMessageForFirestore(gameMessage),
-                timestamp: Date.now() // Set timestamp if not provided
-            };
-            transaction.set(messageRef, messageData);
-            
-            return customId;
-        });
+        const gameRef = db.collection('games').doc(gameId);
+        const gameDoc = await gameRef.get();
+        
+        if (!gameDoc.exists) {
+            throw new Error('Game not found');
+        }
+        
+        const gameData = gameDoc.data();
+        const currentCounter = gameData?.messageCounter || 0;
+        const newCounter = currentCounter + 1;
+        
+        // Generate custom message ID: zero-padded-counter-author-to-recipient
+        const sanitizedAuthor = sanitizeForId(gameMessage.authorName);
+        const sanitizedRecipient = sanitizeForId(gameMessage.recipientName);
+        const paddedCounter = newCounter.toString().padStart(6, '0'); // Zero-pad to 6 digits for proper sorting
+        const customId = `${paddedCounter}-${sanitizedAuthor}-to-${sanitizedRecipient}`;
+        
+        // Update game counter
+        await gameRef.update({ messageCounter: newCounter });
+        
+        // Add message with custom ID
+        const messageRef = db.collection('games').doc(gameId).collection('messages').doc(customId);
+        const messageData = {
+            ...serializeMessageForFirestore(gameMessage),
+            timestamp: Date.now() // Set timestamp if not provided
+        };
+        await messageRef.set(messageData);
+        
+        return customId;
     } catch (error: any) {
         console.error("Error adding message: ", error);
         throw new Error(`Failed to add message: ${error.message}`);
@@ -460,14 +458,14 @@ export async function updateGameMasterModel(gameId: string, newAiType: string): 
 
 /**
  * Get messages for a specific bot (messages sent to all players or directly to this bot)
- * Filters at the database level for better performance
+ * Includes day summaries from previous days and filters at the database level for better performance
  */
 export async function getBotMessages(gameId: string, botName: string, day: number): Promise<GameMessage[]> {
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
 
-    // Get the game to check if this bot is a werewolf
+    // Get the game to check if this bot is a werewolf and get summaries
     const game = await getGame(gameId);
     if (!game) {
         throw new Error('Game not found');
@@ -477,6 +475,29 @@ export async function getBotMessages(gameId: string, botName: string, day: numbe
     const bot = game.bots.find(b => b.name === botName);
     const isWerewolf = bot?.role === GAME_ROLES.WEREWOLF || 
                       (botName === game.humanPlayerName && game.humanPlayerRole === GAME_ROLES.WEREWOLF);
+
+    const allMessages: GameMessage[] = [];
+
+    // Add day summaries from previous days as system messages
+    if (bot && bot.daySummaries && bot.daySummaries.length > 0) {
+        // Add summaries for all days before the current day
+        for (let i = 0; i < Math.min(bot.daySummaries.length, day - 1); i++) {
+            if (bot.daySummaries[i] && bot.daySummaries[i].trim()) {
+                const summaryMessage: GameMessage = {
+                    id: `summary-day-${i + 1}-${botName}`, // Unique ID for summary
+                    recipientName: botName,
+                    authorName: GAME_MASTER,
+                    msg: {
+                        story: `Day ${i + 1} Summary: ${bot.daySummaries[i]}`
+                    },
+                    messageType: MessageType.GAME_STORY,
+                    day: day, // Associate with current day for proper ordering
+                    timestamp: 0 // Use timestamp 0 to ensure summaries appear first
+                };
+                allMessages.push(summaryMessage);
+            }
+        }
+    }
 
     // Base queries that all bots get:
     // 1. Messages where recipientName is RECIPIENT_ALL
@@ -512,8 +533,7 @@ export async function getBotMessages(gameId: string, botName: string, day: numbe
     // Execute all queries
     const snapshots = await Promise.all(queries.map(query => query.get()));
     
-    // Combine all messages
-    const allMessages: GameMessage[] = [];
+    // Combine all current day messages
     snapshots.forEach(snapshot => {
         snapshot.docs.forEach(doc => {
             allMessages.push({
@@ -528,7 +548,7 @@ export async function getBotMessages(gameId: string, botName: string, day: numbe
         });
     });
     
-    // Remove duplicates and sort by timestamp
+    // Remove duplicates and sort by timestamp (summaries with timestamp 0 will appear first)
     const uniqueMessages = allMessages.filter((message, index, array) => 
         array.findIndex(m => m.id === message.id) === index
     );
@@ -596,6 +616,7 @@ export async function clearGameErrorState(gameId: string): Promise<Game> {
 
 /**
  * Start the next day by incrementing the day counter and setting state to DAY_DISCUSSION
+ * Also generates day summaries for all bots for the previous day
  */
 export async function startNextDay(gameId: string): Promise<Game> {
     if (!db) {
@@ -611,15 +632,19 @@ export async function startNextDay(gameId: string): Promise<Game> {
         }
         
         const gameData = gameSnap.data();
+        const currentGame = gameFromFirestore(gameId, gameData);
         
         // Validate that we're in NIGHT_ENDS state
         if (gameData?.gameState !== GAME_STATES.NIGHT_ENDS) {
             throw new Error(`Cannot start next day from state: ${gameData?.gameState}. Expected: ${GAME_STATES.NIGHT_ENDS}`);
         }
         
-        // Increment day and set to DAY_DISCUSSION
-        const nextDay = (gameData.currentDay || 1) + 1;
+        const currentDay = gameData.currentDay || 1;
+        const nextDay = currentDay + 1;
         
+        console.log(`🌅 DAY ${nextDay}: Starting new day and generating summaries for day ${currentDay}`);
+
+        // Increment day and set to DAY_DISCUSSION
         await gameRef.update({
             currentDay: nextDay,
             gameState: GAME_STATES.DAY_DISCUSSION,
