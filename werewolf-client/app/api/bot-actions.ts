@@ -499,8 +499,13 @@ async function processNextBotInQueue(
     });
 
     const agent = AgentFactory.createAgent(bot.name, botPrompt, bot.aiType, apiKeys);
-    // Include the GM command in history without saving it yet
-    const history = convertToAIMessages(bot.name, [...botMessages, gmMessage]);
+    // Include the GM command in history with playstyle reminder without saving it yet
+    const playStyleReminder = `\n\n**Keep in mind that you must follow your core playstyle:** ${generatePlayStyleDescription(bot)}`;
+    const messagesWithPlaystyle = [...botMessages, {
+        ...gmMessage,
+        msg: gmMessage.msg + playStyleReminder
+    }];
+    const history = convertToAIMessages(bot.name, messagesWithPlaystyle);
     const schema = createBotAnswerSchema();
     
     const rawBotReply = await agent.askWithSchema(schema, history);
@@ -806,8 +811,13 @@ async function voteImpl(gameId: string): Promise<Game> {
             // Get messages for this bot
             const botMessages = await getBotMessages(gameId, bot.name, currentGame.currentDay);
             
-            // Create history including the voting command
-            const history = convertToAIMessages(bot.name, [...botMessages, gmMessage]);
+            // Create history including the voting command with playstyle reminder
+            const playStyleReminder = `\n\n**Keep in mind that you must follow your core playstyle:** ${generatePlayStyleDescription(bot)}`;
+            const messagesWithPlaystyle = [...botMessages, {
+                ...gmMessage,
+                msg: gmMessage.msg + playStyleReminder
+            }];
+            const history = convertToAIMessages(bot.name, messagesWithPlaystyle);
             const schema = createBotVoteSchema();
             
             let rawVoteResponse: string | null;

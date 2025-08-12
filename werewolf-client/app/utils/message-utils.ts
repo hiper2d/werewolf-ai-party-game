@@ -76,11 +76,10 @@ function flushGmMessages(
         let gmBlock: string = gmMessages.join("\n\n");
         let otherPlayerConcatBlock = "";
         if (otherPlayerMessages.length > 0) {
-            otherPlayerConcatBlock = `Below are messages from the other players you haven't yet seen. Each message with it's own tag with the player name attribute:\n<NewMessagesFromOtherPlayers>\n`;
-            otherPlayerConcatBlock += otherPlayerMessages
-                .map(pair => `  <Player name="${pair.name}">${pair.message}</Player>`)
-                .join('\n');
-            otherPlayerConcatBlock += `\n</NewMessagesFromOtherPlayers>`;
+            otherPlayerConcatBlock = `## Messages from Other Players\n\nBelow are messages from the other players you haven't yet seen, listed in order:\n\n`;
+            otherPlayerMessages.forEach((pair, index) => {
+                otherPlayerConcatBlock += `**${index + 1}. ${pair.name}:** ${pair.message}\n\n`;
+            });
             otherPlayerMessages.splice(0, otherPlayerMessages.length);
         }
         let fullGmMessage = gmBlock += "\n\n" + otherPlayerConcatBlock;
