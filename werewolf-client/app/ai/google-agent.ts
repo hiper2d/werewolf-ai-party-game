@@ -31,7 +31,7 @@ export class GoogleAgent extends AbstractAgent {
 
     // Error message templates
     private readonly errorMessages = {
-        emptyResponse: 'Empty response from Google API',
+        emptyResponse: 'Empty response from Google API - check logs for detailed response info',
         invalidFormat: 'Invalid response format from Google API',
         apiError: (error: unknown) =>
             `Failed to get response from Google API: ${error instanceof Error ? error.message : String(error)}`,
@@ -66,7 +66,22 @@ Ensure your response strictly follows the schema requirements.`,
                 }
             });
             
+            // Enhanced logging for debugging empty responses
+            this.logger(`[${this.name} ${this.model}]: Response received:`, {
+                hasText: !!response.text,
+                textLength: response.text ? response.text.length : 0,
+                responseKeys: Object.keys(response || {}),
+                fullResponse: JSON.stringify(response, null, 2)
+            });
+            
             if (!response.text) {
+                this.logger(`[${this.name} ${this.model}]: Empty response details:`, {
+                    response: response,
+                    responseType: typeof response,
+                    responseKeys: response ? Object.keys(response) : 'response is null/undefined',
+                    messagesCount: messages.length,
+                    contentsCount: contents.length
+                });
                 throw new Error(this.errorMessages.emptyResponse);
             }
 
@@ -108,7 +123,25 @@ Ensure your response strictly follows the schema requirements.`,
                 }
             });
             
+            // Enhanced logging for debugging empty responses
+            this.logger(`[${this.name} ${this.model}]: Schema response received:`, {
+                hasText: !!response.text,
+                textLength: response.text ? response.text.length : 0,
+                responseKeys: Object.keys(response || {}),
+                schemaUsed: schema,
+                fullResponse: JSON.stringify(response, null, 2)
+            });
+            
             if (!response.text) {
+                this.logger(`[${this.name} ${this.model}]: Empty schema response details:`, {
+                    response: response,
+                    responseType: typeof response,
+                    responseKeys: response ? Object.keys(response) : 'response is null/undefined',
+                    messagesCount: messages.length,
+                    contentsCount: contents.length,
+                    schema: schema,
+                    lastMessagePreview: lastMessage.content.substring(0, 200) + '...'
+                });
                 throw new Error(this.errorMessages.emptyResponse);
             }
 

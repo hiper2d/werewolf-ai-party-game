@@ -68,7 +68,7 @@ export class DetectiveProcessor extends BaseRoleProcessor {
             const detectivePrompt = format(BOT_SYSTEM_PROMPT, {
                 name: detectiveBot.name,
                 personal_story: detectiveBot.story,
-                play_style: generatePlayStyleDescription(detectiveBot),
+                play_style: "",
                 role: detectiveBot.role,
                 werewolf_teammates_section: '',
                 players_names: [

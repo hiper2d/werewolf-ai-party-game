@@ -21,7 +21,7 @@ import {
     GM_COMMAND_REPLY_TO_DISCUSSION,
     GM_COMMAND_SELECT_RESPONDERS
 } from "@/app/ai/prompts/gm-commands";
-import {BOT_SYSTEM_PROMPT, BOT_VOTE_PROMPT} from "@/app/ai/prompts/bot-prompts";
+import {BOT_REMINDER_POSTFIX, BOT_SYSTEM_PROMPT, BOT_VOTE_PROMPT} from "@/app/ai/prompts/bot-prompts";
 import {GM_ROUTER_SYSTEM_PROMPT, HUMAN_SUGGESTION_PROMPT} from "@/app/ai/prompts/gm-prompts";
 import {createBotAnswerSchema, createBotVoteSchema, createGmBotSelectionSchema} from "@/app/ai/prompts/ai-schemas";
 import {AgentFactory} from "@/app/ai/agent-factory";
@@ -130,7 +130,7 @@ async function welcomeImpl(gameId: string): Promise<Game> {
             {
                 name: bot.name,
                 personal_story: bot.story,
-                play_style: generatePlayStyleDescription(bot),
+                play_style: "",
                 role: bot.role,
                 werewolf_teammates_section: generateWerewolfTeammatesSection(bot, game),
                 players_names: [
@@ -483,7 +483,7 @@ async function processNextBotInQueue(
     const botPrompt = format(BOT_SYSTEM_PROMPT, {
         name: bot.name,
         personal_story: bot.story,
-        play_style: generatePlayStyleDescription(bot),
+        play_style: "",
         role: bot.role,
         werewolf_teammates_section: generateWerewolfTeammatesSection(bot, game),
         players_names: [
@@ -500,7 +500,7 @@ async function processNextBotInQueue(
 
     const agent = AgentFactory.createAgent(bot.name, botPrompt, bot.aiType, apiKeys);
     // Include the GM command in history with playstyle reminder without saving it yet
-    const playStyleReminder = `\n\n**Keep in mind that you must follow your core playstyle:** ${generatePlayStyleDescription(bot)}`;
+    const playStyleReminder = format(BOT_REMINDER_POSTFIX, { play_style: generatePlayStyleDescription(bot) });
     const messagesWithPlaystyle = [...botMessages, {
         ...gmMessage,
         msg: gmMessage.msg + playStyleReminder
@@ -779,7 +779,7 @@ async function voteImpl(gameId: string): Promise<Game> {
                 {
                     name: bot.name,
                     personal_story: bot.story,
-                    play_style: generatePlayStyleDescription(bot),
+                    play_style: "",
                     role: bot.role,
                     werewolf_teammates_section: generateWerewolfTeammatesSection(bot, currentGame),
                     players_names: [
@@ -812,7 +812,7 @@ async function voteImpl(gameId: string): Promise<Game> {
             const botMessages = await getBotMessages(gameId, bot.name, currentGame.currentDay);
             
             // Create history including the voting command with playstyle reminder
-            const playStyleReminder = `\n\n**Keep in mind that you must follow your core playstyle:** ${generatePlayStyleDescription(bot)}`;
+            const playStyleReminder = format(BOT_REMINDER_POSTFIX, { play_style: generatePlayStyleDescription(bot) });
             const messagesWithPlaystyle = [...botMessages, {
                 ...gmMessage,
                 msg: gmMessage.msg + playStyleReminder

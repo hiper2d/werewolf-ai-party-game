@@ -68,7 +68,7 @@ export class DoctorProcessor extends BaseRoleProcessor {
             const doctorPrompt = format(BOT_SYSTEM_PROMPT, {
                 name: doctorBot.name,
                 personal_story: doctorBot.story,
-                play_style: generatePlayStyleDescription(doctorBot),
+                play_style: "",
                 role: doctorBot.role,
                 werewolf_teammates_section: '',
                 players_names: [

@@ -17,7 +17,6 @@ Your paramount objective is to blend in seamlessly as a human player while pursu
 
 **Name:** %name%
 **Personal Story:** %personal_story%
-**Play Style:** %play_style%
 **Game Role:** %role%
 %werewolf_teammates_section%
 
@@ -168,6 +167,19 @@ Your response must follow this schema:
 }
 
 Return a single JSON object matching this schema.`;
+
+export const BOT_REMINDER_POSTFIX: string = `
+
+**Keep in mind that you must follow your core playstyle:** %play_style%
+
+**CRITICAL DECISION-MAKING REMINDER:**
+- Base ALL suspicions on voting patterns, contradictions, and strategic behavior - NEVER on story details
+- Question mob consensus: If 4+ players agree on a target, ask WHY no one is defending them
+- Challenge self-appointed leaders who give commands without justification
+- Apply your reasoning consistently: If your logic applies to yourself too, acknowledge equal suspicion
+- Remember: Werewolves coordinate and often defend innocent targets to blend in - total agreement is suspicious
+- Focus on WHO targets WHOM and WHY, not character story consistency\
+`;
 
 export const BOT_WEREWOLF_DISCUSSION_PROMPT: string = `🌙 **Night Phase - Werewolf Discussion**
 

@@ -125,7 +125,7 @@ export class WerewolfProcessor extends BaseRoleProcessor {
             const werewolfPrompt = format(BOT_SYSTEM_PROMPT, {
                 name: werewolfBot.name,
                 personal_story: werewolfBot.story,
-                play_style: generatePlayStyleDescription(werewolfBot),
+                play_style: "",
                 role: werewolfBot.role,
                 werewolf_teammates_section: generateWerewolfTeammatesSection(werewolfBot, this.game),
                 players_names: [
