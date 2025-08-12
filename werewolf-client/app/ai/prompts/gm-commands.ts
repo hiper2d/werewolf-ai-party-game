@@ -1,4 +1,4 @@
-export const GM_COMMAND_INTRODUCE_YOURSELF: string = `Welcome to the game! Please introduce yourself to the group.
+export const GM_COMMAND_INTRODUCE_YOURSELF: string = `Welcome to the game, %bot_name%! Please introduce yourself to the group.
 
 Your response must follow this schema:
 
@@ -45,7 +45,7 @@ Here are previous messages from other players you haven't yet seen:
 %player_name_to_message_list%
 `
 
-export const GM_COMMAND_REPLY_TO_DISCUSSION: string = `Reply to the players in the discussion. Be thoughtful and consider what has been said so far.
+export const GM_COMMAND_REPLY_TO_DISCUSSION: string = `%bot_name%, reply to the players in the discussion. Be thoughtful and consider what has been said so far.
 
 Your response must follow this schema:
 

@@ -192,6 +192,11 @@ export function parseResponseToObj(response: string, expectedType?: string): any
 
     cleanResponse = cleanResponse.trim();
 
+    // Sanitize line breaks in JSON string values
+    cleanResponse = cleanResponse.replace(/("(?:[^"\\]|\\.)*")/g, (match) => {
+        return match.replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+    });
+
     let parsedObj: any;
     try {
         parsedObj = JSON.parse(cleanResponse);

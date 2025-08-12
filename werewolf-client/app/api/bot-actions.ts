@@ -153,7 +153,7 @@ async function welcomeImpl(gameId: string): Promise<Game> {
             id: null,
             recipientName: bot.name,
             authorName: GAME_MASTER,
-            msg: GM_COMMAND_INTRODUCE_YOURSELF,
+            msg: format(GM_COMMAND_INTRODUCE_YOURSELF, { bot_name: bot.name }),
             messageType: MessageType.GM_COMMAND,
             day: game.currentDay,
             timestamp: Date.now()
@@ -464,7 +464,7 @@ async function processNextBotInQueue(
         id: null,
         recipientName: bot.name,
         authorName: GAME_MASTER,
-        msg: GM_COMMAND_REPLY_TO_DISCUSSION,
+        msg: format(GM_COMMAND_REPLY_TO_DISCUSSION, { bot_name: bot.name }),
         messageType: MessageType.GM_COMMAND,
         day: game.currentDay,
         timestamp: Date.now()
@@ -797,7 +797,7 @@ async function voteImpl(gameId: string): Promise<Game> {
                 id: null,
                 recipientName: bot.name,
                 authorName: GAME_MASTER,
-                msg: BOT_VOTE_PROMPT,
+                msg: format(BOT_VOTE_PROMPT, { bot_name: bot.name }),
                 messageType: MessageType.GM_COMMAND,
                 day: currentGame.currentDay,
                 timestamp: Date.now()

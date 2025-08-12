@@ -93,7 +93,7 @@ export class DetectiveProcessor extends BaseRoleProcessor {
             ];
             const targetNames = allLivePlayers.join(', ');
 
-            const detectiveActionPrompt = `${BOT_DETECTIVE_ACTION_PROMPT}\n\n**Available targets:** ${targetNames}`;
+            const detectiveActionPrompt = `${format(BOT_DETECTIVE_ACTION_PROMPT, { bot_name: detectiveBot.name })}\n\n**Available targets:** ${targetNames}`;
 
             const gmMessage: GameMessage = {
                 id: null,

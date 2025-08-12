@@ -155,7 +155,7 @@ export class WerewolfProcessor extends BaseRoleProcessor {
                 const targetablePlayers = this.getTargetablePlayers(true); // Exclude werewolves
                 const targetNames = targetablePlayers.map(p => p.name).join(', ');
                 
-                const werewolfActionPrompt = `${BOT_WEREWOLF_ACTION_PROMPT}\n\n**Available targets:** ${targetNames}`;
+                const werewolfActionPrompt = `${format(BOT_WEREWOLF_ACTION_PROMPT, { bot_name: werewolfBot.name })}\n\n**Available targets:** ${targetNames}`;
                 
                 gmMessage = {
                     id: null,
@@ -175,7 +175,7 @@ export class WerewolfProcessor extends BaseRoleProcessor {
                     id: null,
                     recipientName: werewolfBot.name,
                     authorName: GAME_MASTER,
-                    msg: BOT_WEREWOLF_DISCUSSION_PROMPT,
+                    msg: format(BOT_WEREWOLF_DISCUSSION_PROMPT, { bot_name: werewolfBot.name }),
                     messageType: MessageType.GM_COMMAND,
                     day: this.game.currentDay,
                     timestamp: Date.now()

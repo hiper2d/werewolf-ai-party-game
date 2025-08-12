@@ -93,7 +93,7 @@ export class DoctorProcessor extends BaseRoleProcessor {
             ];
             const targetNames = allLivePlayers.join(', ');
 
-            const doctorActionPrompt = `${BOT_DOCTOR_ACTION_PROMPT}\n\n**Available targets:** ${targetNames}`;
+            const doctorActionPrompt = `${format(BOT_DOCTOR_ACTION_PROMPT, { bot_name: doctorBot.name })}\n\n**Available targets:** ${targetNames}`;
 
             const gmMessage: GameMessage = {
                 id: null,
