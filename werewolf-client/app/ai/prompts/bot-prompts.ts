@@ -188,7 +188,7 @@ export const BOT_WEREWOLF_DISCUSSION_PROMPT: string = `🌙 **Night Phase - Were
 Discuss:
 - Who should be targeted for elimination tonight?
 - Analysis of potential threats (Doctor, Detective, suspicious players)
-- Strategy for tomorrow's day phase (who to def  ±end, who to accuse)
+- Strategy for tomorrow's day phase (who to defend, who to accuse)
 - Coordination with other werewolves
 
 This is a private werewolf-only discussion. Share your thoughts, analysis, and suggestions with your fellow werewolves.
@@ -313,3 +313,35 @@ Your response must follow this schema:
 }
 
 Return a single JSON object matching this schema.`;
+
+export const BOT_DAY_SUMMARY_PROMPT: string = `📝 **End of Day %day_number% - Summary Analysis**
+
+%bot_name%, the day has ended and it's time to reflect on what happened. Create a comprehensive summary of Day %day_number% that will help you remember important details for future days.
+
+**Your summary should include:**
+
+**SUSPICIONS & ANALYSIS:**
+- Who do you suspect and why? (based on voting patterns, contradictions, strategic behavior)
+- Who seems trustworthy and why?
+- Any contradictions or inconsistencies you noticed in players' claims or behavior
+- Voting patterns and alliances you observed
+
+**IMPORTANT EVENTS:**
+- Key accusations made during discussions
+- How each player voted and their reasoning
+- Night phase results (who was eliminated, who was saved, any investigation results you learned)
+- Any role claims or hints dropped by players
+
+**STRATEGIC INSIGHTS:**
+- What strategies do you think werewolves might be using?
+- Who might be working together?
+- Who poses the biggest threat to your team?
+- Who might be special roles (Doctor, Detective) based on their behavior?
+
+**PERSONAL NOTES:**
+- How did your interactions go?
+- What information did you reveal or conceal?
+- What's your plan for tomorrow's discussions?
+- Any mistakes you made that you should avoid?
+
+**Remember:** This summary is for your memory only - it won't be shared with other players. Be honest and analytical about what you observed and learned.`;

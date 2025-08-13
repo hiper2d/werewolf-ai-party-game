@@ -28,7 +28,10 @@ import {convertToAIMessage, parseResponseToObj} from "@/app/utils/message-utils"
 import {LLM_CONSTANTS} from "@/app/ai/ai-models";
 import {AbstractAgent} from "../ai/abstract-agent";
 import {format} from "@/app/ai/prompts/utils";
-import {createGameSetupSchema} from "@/app/ai/prompts/ai-schemas";
+import {createGameSetupSchema, createBotAnswerSchema} from "@/app/ai/prompts/ai-schemas";
+import {BOT_DAY_SUMMARY_PROMPT, BOT_SYSTEM_PROMPT} from "@/app/ai/prompts/bot-prompts";
+import {generatePlayStyleDescription, generateWerewolfTeammatesSection} from "@/app/utils/bot-utils";
+import {convertToAIMessages} from "@/app/utils/message-utils";
 
 export async function getAllGames(): Promise<Game[]> {
     if (!db) {
@@ -616,10 +619,9 @@ export async function clearGameErrorState(gameId: string): Promise<Game> {
 }
 
 /**
- * Start the next day by incrementing the day counter and setting state to DAY_DISCUSSION
- * Also generates day summaries for all bots for the previous day
+ * End the night by applying night results and transitioning to NIGHT_ENDS_SUMMARY state
  */
-export async function startNextDay(gameId: string): Promise<Game> {
+export async function endNight(gameId: string): Promise<Game> {
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
@@ -640,11 +642,251 @@ export async function startNextDay(gameId: string): Promise<Game> {
             throw new Error(`Cannot start next day from state: ${gameData?.gameState}. Expected: ${GAME_STATES.NIGHT_ENDS}`);
         }
         
+        console.log(`🌙 Applying night results and transitioning to NIGHT_ENDS_SUMMARY`);
+
+        // Apply night results - eliminate werewolf targets if successful
+        let updatedBots = [...currentGame.bots];
+        const nightResults = currentGame.nightResults || {};
+        
+        // Check if werewolves successfully killed someone
+        if (nightResults.werewolf && nightResults.werewolf.target) {
+            const targetName = nightResults.werewolf.target;
+            
+            // Check if doctor protected this target
+            const doctorProtectedTarget = nightResults.doctor && nightResults.doctor.target === targetName;
+            
+            if (!doctorProtectedTarget) {
+                // Eliminate the target
+                updatedBots = updatedBots.map(bot => {
+                    if (bot.name === targetName) {
+                        console.log(`💀 ${targetName} was eliminated by werewolves`);
+                        return { ...bot, isAlive: false, eliminationDay: currentGame.currentDay };
+                    }
+                    return bot;
+                });
+                
+                // Also check if human player was the target
+                if (targetName === currentGame.humanPlayerName) {
+                    // Human player elimination would be handled by game over logic elsewhere
+                    console.log(`💀 Human player ${targetName} was eliminated by werewolves`);
+                }
+            } else {
+                console.log(`🏥 ${targetName} was saved by the doctor`);
+            }
+        }
+        
+        // Get all alive bot names for the processing queue
+        const aliveBotNames = updatedBots.filter(bot => bot.isAlive).map(bot => bot.name);
+        
+        // Transition to NIGHT_ENDS_SUMMARY state and populate processing queue
+        await gameRef.update({
+            gameState: GAME_STATES.NIGHT_ENDS_SUMMARY,
+            gameStateParamQueue: [],
+            gameStateProcessQueue: aliveBotNames,
+            bots: updatedBots
+        });
+        
+        console.log(`📝 Transitioned to NIGHT_ENDS_SUMMARY with ${aliveBotNames.length} bots to summarize`);
+        
+        // Return the updated game
+        return await getGame(gameId) as Game;
+    } catch (error: any) {
+        console.error("Error ending night: ", error);
+        throw new Error(`Failed to end night: ${error.message}`);
+    }
+}
+
+/**
+ * Summarize current day for one bot (called sequentially from UI)
+ */
+export async function summarizeCurrentDay(gameId: string): Promise<Game> {
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+    
+    try {
+        const gameRef = db.collection('games').doc(gameId);
+        const gameSnap = await gameRef.get();
+        
+        if (!gameSnap.exists) {
+            throw new Error('Game not found');
+        }
+        
+        const gameData = gameSnap.data();
+        const currentGame = gameFromFirestore(gameId, gameData);
+        
+        // Validate that we're in NIGHT_ENDS_SUMMARY state
+        if (gameData?.gameState !== GAME_STATES.NIGHT_ENDS_SUMMARY) {
+            throw new Error(`Cannot summarize day from state: ${gameData?.gameState}. Expected: ${GAME_STATES.NIGHT_ENDS_SUMMARY}`);
+        }
+        
+        // Get the first bot from the processing queue
+        const processQueue = [...(gameData.gameStateProcessQueue || [])];
+        if (processQueue.length === 0) {
+            // No more bots to process, transition to NEW_DAY_BEGINS
+            await gameRef.update({
+                gameState: GAME_STATES.NEW_DAY_BEGINS,
+                gameStateProcessQueue: []
+            });
+            console.log(`📝 All bot summaries completed, transitioning to NEW_DAY_BEGINS`);
+            return await getGame(gameId) as Game;
+        }
+        
+        const botName = processQueue.shift()!; // Get first bot and remove from queue
+        const bot = currentGame.bots.find(b => b.name === botName);
+        
+        if (!bot || !bot.isAlive) {
+            // Bot not found or not alive, skip and continue with next
+            await gameRef.update({
+                gameStateProcessQueue: processQueue
+            });
+            console.log(`📝 Bot ${botName} not found or not alive, skipping`);
+            return await getGame(gameId) as Game;
+        }
+        
+        console.log(`📝 Generating day ${currentGame.currentDay} summary for bot: ${botName}`);
+        
+        // Get all messages visible to this bot for the current day
+        const botMessages = await getBotMessages(gameId, botName, currentGame.currentDay);
+        
+        if (botMessages.length === 0) {
+            console.log(`📝 No messages found for bot ${botName} on day ${currentGame.currentDay}, skipping summary`);
+            await gameRef.update({
+                gameStateProcessQueue: processQueue
+            });
+            return await getGame(gameId) as Game;
+        }
+        
+        const session = await auth();
+        if (!session || !session.user?.email) {
+            throw new Error('Not authenticated');
+        }
+        
+        // Get API keys
+        const user = await getUserFromFirestore(session.user.email);
+        const apiKeys = await getUserApiKeys(user!.email);
+        
+        // Create bot system prompt
+        const botPrompt = format(BOT_SYSTEM_PROMPT, {
+            name: bot.name,
+            personal_story: bot.story,
+            play_style: "",
+            role: bot.role,
+            werewolf_teammates_section: generateWerewolfTeammatesSection(bot, currentGame),
+            players_names: [
+                ...currentGame.bots
+                    .filter(b => b.name !== bot.name)
+                    .map(b => b.name),
+                currentGame.humanPlayerName
+            ].join(", "),
+            dead_players_names_with_roles: currentGame.bots
+                .filter(b => !b.isAlive)
+                .map(b => `${b.name} (${b.role})`)
+                .join(", ")
+        });
+        
+        // Create summary request message
+        const summaryPrompt = format(BOT_DAY_SUMMARY_PROMPT, {
+            bot_name: bot.name,
+            day_number: currentGame.currentDay
+        });
+        
+        const summaryMessage: GameMessage = {
+            id: null,
+            recipientName: bot.name,
+            authorName: GAME_MASTER,
+            msg: summaryPrompt,
+            messageType: MessageType.GM_COMMAND,
+            day: currentGame.currentDay,
+            timestamp: Date.now()
+        };
+        
+        // Create agent
+        const agent = AgentFactory.createAgent(bot.name, botPrompt, bot.aiType, apiKeys);
+        
+        // Create conversation history with all day messages + summary request
+        const history = convertToAIMessages(bot.name, [...botMessages, summaryMessage]);
+        
+        // Get summary using bot answer schema (returns { reply: "summary text" })
+        const rawResponse = await agent.askWithSchema(createBotAnswerSchema(), history);
+        
+        if (!rawResponse) {
+            console.warn(`📝 Bot ${bot.name} failed to generate summary for day ${currentGame.currentDay}`);
+            await gameRef.update({
+                gameStateProcessQueue: processQueue
+            });
+            return await getGame(gameId) as Game;
+        }
+        
+        const summaryResponse = parseResponseToObj(rawResponse);
+        const summary = summaryResponse.reply;
+        
+        // Update the bot with the new summary
+        const updatedBots = currentGame.bots.map(b => {
+            if (b.name === botName) {
+                // Initialize daySummaries array if needed
+                const daySummaries = b.daySummaries || [];
+                
+                // Ensure array is large enough for this day index (day 1 -> index 0)
+                while (daySummaries.length < currentGame.currentDay) {
+                    daySummaries.push("");
+                }
+                
+                // Store summary at correct index (day 1 -> index 0)
+                daySummaries[currentGame.currentDay - 1] = summary;
+                
+                return {
+                    ...b,
+                    daySummaries: daySummaries
+                };
+            }
+            return b;
+        });
+        
+        // Update game with new bot data and remaining queue
+        await gameRef.update({
+            bots: updatedBots,
+            gameStateProcessQueue: processQueue
+        });
+        
+        console.log(`📝 ✅ Generated summary for bot ${botName} (${summary.length} chars). ${processQueue.length} bots remaining.`);
+        
+        return await getGame(gameId) as Game;
+        
+    } catch (error: any) {
+        console.error("Error summarizing current day: ", error);
+        throw new Error(`Failed to summarize current day: ${error.message}`);
+    }
+}
+
+/**
+ * Begin new day (placeholder function for now)
+ */
+export async function newDayBegins(gameId: string): Promise<Game> {
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+    
+    try {
+        const gameRef = db.collection('games').doc(gameId);
+        const gameSnap = await gameRef.get();
+        
+        if (!gameSnap.exists) {
+            throw new Error('Game not found');
+        }
+        
+        const gameData = gameSnap.data();
+        
+        // Validate that we're in NEW_DAY_BEGINS state
+        if (gameData?.gameState !== GAME_STATES.NEW_DAY_BEGINS) {
+            throw new Error(`Cannot begin new day from state: ${gameData?.gameState}. Expected: ${GAME_STATES.NEW_DAY_BEGINS}`);
+        }
+        
         const currentDay = gameData.currentDay || 1;
         const nextDay = currentDay + 1;
         
-        console.log(`🌅 DAY ${nextDay}: Starting new day and generating summaries for day ${currentDay}`);
-
+        console.log(`🌅 DAY ${nextDay}: Beginning new day`);
+        
         // Increment day and set to DAY_DISCUSSION
         await gameRef.update({
             currentDay: nextDay,
@@ -655,11 +897,11 @@ export async function startNextDay(gameId: string): Promise<Game> {
         
         console.log(`🌅 DAY ${nextDay}: Started new day discussion phase`);
         
-        // Return the updated game
         return await getGame(gameId) as Game;
+        
     } catch (error: any) {
-        console.error("Error starting next day: ", error);
-        throw new Error(`Failed to start next day: ${error.message}`);
+        console.error("Error beginning new day: ", error);
+        throw new Error(`Failed to begin new day: ${error.message}`);
     }
 }
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getGame, updateBotModel, updateGameMasterModel, clearGameErrorState, startNextDay } from "@/app/api/game-actions";
+import { getGame, updateBotModel, updateGameMasterModel, clearGameErrorState, endNight } from "@/app/api/game-actions";
 import GameChat from "@/app/games/[id]/components/GameChat";
 import ModelSelectionDialog from "@/app/games/[id]/components/ModelSelectionDialog";
 import { buttonTransparentStyle } from "@/app/constants";
@@ -361,7 +361,7 @@ export default function GamePage({
                                             <button
                                                 className={`${buttonTransparentStyle} bg-green-600 hover:bg-green-700 border-green-500`}
                                                 onClick={async () => {
-                                                    const updatedGame = await startNextDay(game.id);
+                                                    const updatedGame = await endNight(game.id);
                                                     setGame(updatedGame);
                                                 }}
                                                 title="Start the next day and begin discussion phase"
