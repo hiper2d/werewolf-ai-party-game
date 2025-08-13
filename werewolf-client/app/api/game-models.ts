@@ -23,9 +23,9 @@ export interface BotPreview {
     name: string;
     story: string;
     playerAiType: string;
-    playStyle: string;
     gender: 'male' | 'female' | 'neutral';
     voice: string;
+    playStyle: string;
 }
 
 export interface GamePreviewWithGeneratedBots extends GamePreview {
@@ -40,9 +40,9 @@ export interface Bot {
     role: string;
     isAlive: boolean;
     aiType: string;
-    playStyle: string;
     gender: 'male' | 'female' | 'neutral';
     voice: string;
+    playStyle: string;
     eliminationDay?: number; // Track which day this bot was eliminated (undefined if alive)
     daySummaries?: string[]; // Array of summaries for each previous day (index 0 = day 1 summary)
 }

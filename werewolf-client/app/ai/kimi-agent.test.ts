@@ -7,7 +7,6 @@ import { LLM_CONSTANTS, SupportedAiModels } from "@/app/ai/ai-models";
 import { BOT_SYSTEM_PROMPT } from "@/app/ai/prompts/bot-prompts";
 import { format } from "@/app/ai/prompts/utils";
 import { createBotAnswerSchema } from "@/app/ai/prompts/ai-schemas";
-import { generatePlayStyleDescription } from "@/app/utils/bot-utils";
 
 describe("KimiAgent integration", () => {
   const setupAgent = (botName: string, modelType: string): KimiAgent => {
@@ -17,15 +16,15 @@ describe("KimiAgent integration", () => {
       role: GAME_ROLES.VILLAGER,
       isAlive: true,
       aiType: modelType,
-      playStyle: PLAY_STYLES.RULE_BREAKER,
       gender: 'neutral' as const,
-      voice: 'alloy'
+      voice: 'alloy',
+      playStyle: PLAY_STYLES.NORMAL
     };
     
     const instruction = format(BOT_SYSTEM_PROMPT, {
       name: testBot.name,
       personal_story: testBot.story,
-      play_style: generatePlayStyleDescription(testBot),
+      play_style: "",
       role: testBot.role,
       werewolf_teammates_section: "",
       players_names: "Alice, Bob, Charlie",

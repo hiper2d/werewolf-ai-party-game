@@ -3,7 +3,6 @@ import { GAME_ROLES, GAME_MASTER, GameMessage, MessageType, BotResponseError, RE
 import { AgentFactory } from "@/app/ai/agent-factory";
 import { addMessageToChatAndSaveToDb, getBotMessages, getUserFromFirestore } from "@/app/api/game-actions";
 import { getUserApiKeys } from "@/app/api/user-actions";
-import { generatePlayStyleDescription } from "@/app/utils/bot-utils";
 import { auth } from "@/auth";
 import { convertToAIMessages, parseResponseToObj } from "@/app/utils/message-utils";
 import { BOT_SYSTEM_PROMPT, BOT_DETECTIVE_ACTION_PROMPT } from "@/app/ai/prompts/bot-prompts";

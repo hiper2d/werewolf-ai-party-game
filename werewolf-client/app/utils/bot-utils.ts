@@ -1,7 +1,7 @@
 import { Bot, Game, GAME_ROLES, PLAY_STYLES, PLAY_STYLE_CONFIGS } from "@/app/api/game-models";
 
 /**
- * Generates the play style description for a bot
+ * Generates a random play style description for a bot
  */
 export function generatePlayStyleDescription(bot: Bot): string {
     const config = PLAY_STYLE_CONFIGS[bot.playStyle];

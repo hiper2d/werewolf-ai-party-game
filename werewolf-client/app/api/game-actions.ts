@@ -230,21 +230,22 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
             aiType = availableTypes[Math.floor(Math.random() * availableTypes.length)];
         }
 
-        // Randomly assign play style
-        const availablePlayStyles = Object.values(PLAY_STYLES);
-        const randomPlayStyle = availablePlayStyles[Math.floor(Math.random() * availablePlayStyles.length)];
 
         // Assign gender and voice
         const gender = bot.gender as 'male' | 'female' | 'neutral';
         const voice = getRandomVoiceForGender(gender);
 
+        // Randomly assign play style
+        const availablePlayStyles = Object.values(PLAY_STYLES);
+        const randomPlayStyle = availablePlayStyles[Math.floor(Math.random() * availablePlayStyles.length)];
+
         return {
             name: bot.name,
             story: bot.story,
             playerAiType: aiType,
-            playStyle: randomPlayStyle,
             gender: gender,
-            voice: voice
+            voice: voice,
+            playStyle: randomPlayStyle
         };
     });
 
@@ -298,9 +299,9 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
                 role: roleDistribution[index + 1],
                 isAlive: true,
                 aiType: bot.playerAiType,
-                playStyle: bot.playStyle,
                 gender: bot.gender,
-                voice: bot.voice
+                voice: bot.voice,
+                playStyle: bot.playStyle
             };
         });
 

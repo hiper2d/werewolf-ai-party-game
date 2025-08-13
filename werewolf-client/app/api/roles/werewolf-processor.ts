@@ -11,7 +11,7 @@ import {
 import {AgentFactory} from "@/app/ai/agent-factory";
 import {addMessageToChatAndSaveToDb, getBotMessages, getUserFromFirestore} from "@/app/api/game-actions";
 import {getUserApiKeys} from "@/app/api/user-actions";
-import {generatePlayStyleDescription, generateWerewolfTeammatesSection} from "@/app/utils/bot-utils";
+import {generateWerewolfTeammatesSection} from "@/app/utils/bot-utils";
 import {auth} from "@/auth";
 import {convertToAIMessages, parseResponseToObj} from "@/app/utils/message-utils";
 import {

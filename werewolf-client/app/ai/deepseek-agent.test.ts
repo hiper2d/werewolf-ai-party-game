@@ -8,7 +8,6 @@ import { BOT_SYSTEM_PROMPT } from "@/app/ai/prompts/bot-prompts";
 import { format } from "@/app/ai/prompts/utils";
 import { GM_COMMAND_INTRODUCE_YOURSELF, HISTORY_PREFIX } from "@/app/ai/prompts/gm-commands";
 import { createBotAnswerSchema } from "@/app/ai/prompts/ai-schemas";
-import { generatePlayStyleDescription } from "@/app/utils/bot-utils";
 
 describe("DeepSeekAgent integration", () => {
   const setupAgent = (botName: string, modelType: string): DeepSeekAgent => {
@@ -18,15 +17,15 @@ describe("DeepSeekAgent integration", () => {
       role: GAME_ROLES.VILLAGER,
       isAlive: true,
       aiType: modelType,
-      playStyle: PLAY_STYLES.PROTECTIVE_TEAM_PLAYER,
       gender: 'neutral' as const,
-      voice: 'alloy'
+      voice: 'alloy',
+      playStyle: PLAY_STYLES.NORMAL
     };
     
     const instruction = format(BOT_SYSTEM_PROMPT, {
       name: testBot.name,
       personal_story: testBot.story,
-      play_style: generatePlayStyleDescription(testBot),
+      play_style: "",
       role: testBot.role,
       werewolf_teammates_section: "",
       players_names: "Alice, Bob, Charlie",
