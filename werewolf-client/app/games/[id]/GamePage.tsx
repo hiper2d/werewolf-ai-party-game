@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getGame, updateBotModel, updateGameMasterModel, clearGameErrorState, endNight } from "@/app/api/game-actions";
+import { getGame, updateBotModel, updateGameMasterModel, clearGameErrorState, endNight, summarizeCurrentDay, newDayBegins } from "@/app/api/game-actions";
 import GameChat from "@/app/games/[id]/components/GameChat";
 import ModelSelectionDialog from "@/app/games/[id]/components/ModelSelectionDialog";
 import { buttonTransparentStyle } from "@/app/constants";
@@ -369,6 +369,44 @@ export default function GamePage({
                                                 🌅 Start Next Day
                                             </button>
                                         )}
+                                    </div>
+                                </div>
+                            )}
+                            {game.gameState === GAME_STATES.NIGHT_ENDS_SUMMARY && (
+                                <div className="flex flex-col gap-2">
+                                    <div className="text-sm text-blue-400 text-center">
+                                        📝 Generating day summaries... ({game.gameStateProcessQueue.length} bots remaining)
+                                    </div>
+                                    <div className="flex gap-2 justify-center">
+                                        <button
+                                            className={`${buttonTransparentStyle} bg-blue-600 hover:bg-blue-700 border-blue-500`}
+                                            onClick={async () => {
+                                                const updatedGame = await summarizeCurrentDay(game.id);
+                                                setGame(updatedGame);
+                                            }}
+                                            title="Generate summary for the next bot in queue"
+                                        >
+                                            📝 Summarize Next Bot
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                            {game.gameState === GAME_STATES.NEW_DAY_BEGINS && (
+                                <div className="flex flex-col gap-2">
+                                    <div className="text-sm text-green-400 text-center">
+                                        🌅 Ready to start Day {(game.currentDay || 1) + 1}
+                                    </div>
+                                    <div className="flex gap-2 justify-center">
+                                        <button
+                                            className={`${buttonTransparentStyle} bg-green-600 hover:bg-green-700 border-green-500`}
+                                            onClick={async () => {
+                                                const updatedGame = await newDayBegins(game.id);
+                                                setGame(updatedGame);
+                                            }}
+                                            title="Begin the new day and start discussion phase"
+                                        >
+                                            🌅 Begin New Day
+                                        </button>
                                     </div>
                                 </div>
                             )}

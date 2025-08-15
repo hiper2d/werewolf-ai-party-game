@@ -43,7 +43,7 @@ import {
 } from "./game-actions";
 import {getUserApiKeys} from "./user-actions";
 import {withGameErrorHandling} from "@/app/utils/server-action-wrapper";
-import {generatePlayStyleDescription, generateWerewolfTeammatesSection} from "@/app/utils/bot-utils";
+import {generatePlayStyleDescription, generateWerewolfTeammatesSection, generatePreviousDaySummariesSection} from "@/app/utils/bot-utils";
 
 /**
  * Wraps Firestore operations in a transaction for atomicity
@@ -142,7 +142,8 @@ async function welcomeImpl(gameId: string): Promise<Game> {
                 dead_players_names_with_roles: game.bots
                     .filter(b => !b.isAlive)
                     .map(b => `${b.name} (${b.role})`)
-                    .join(", ")
+                    .join(", "),
+                previous_day_summaries: generatePreviousDaySummariesSection(bot, game.currentDay)
             }
         );
 
@@ -495,7 +496,8 @@ async function processNextBotInQueue(
         dead_players_names_with_roles: game.bots
             .filter(b => !b.isAlive)
             .map(b => `${b.name} (${b.role})`)
-            .join(", ")
+            .join(", "),
+        previous_day_summaries: generatePreviousDaySummariesSection(bot, game.currentDay)
     });
 
     const agent = AgentFactory.createAgent(bot.name, botPrompt, bot.aiType, apiKeys);
@@ -791,7 +793,8 @@ async function voteImpl(gameId: string): Promise<Game> {
                     dead_players_names_with_roles: currentGame.bots
                         .filter(b => !b.isAlive)
                         .map(b => `${b.name} (${b.role})`)
-                        .join(", ")
+                        .join(", "),
+                    previous_day_summaries: generatePreviousDaySummariesSection(bot, currentGame.currentDay)
                 }
             );
             

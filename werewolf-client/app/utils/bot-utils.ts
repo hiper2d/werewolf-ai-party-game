@@ -46,3 +46,37 @@ export function generateWerewolfTeammatesSection(bot: Bot, game: Game): string {
     
     return `\n  <WerewolfTeammates>${werewolfTeammates.join(', ')}</WerewolfTeammates>`;
 }
+
+/**
+ * Generates the previous day summaries section for the bot prompt
+ * @param bot The current bot
+ * @param currentDay The current day number
+ * @returns Formatted previous day summaries section or empty string
+ */
+export function generatePreviousDaySummariesSection(bot: Bot, currentDay: number): string {
+    // No summaries needed for day 1
+    if (currentDay <= 1) {
+        return '';
+    }
+    
+    // No summaries if bot doesn't have them or has empty array
+    if (!bot.daySummaries || bot.daySummaries.length === 0) {
+        return '';
+    }
+    
+    const summaries: string[] = [];
+    
+    // Add summaries for all previous days (day 1 = index 0, day 2 = index 1, etc.)
+    for (let day = 1; day < currentDay; day++) {
+        const summaryIndex = day - 1; // Convert day number to array index
+        if (bot.daySummaries[summaryIndex] && bot.daySummaries[summaryIndex].trim()) {
+            summaries.push(`**Day ${day}:** ${bot.daySummaries[summaryIndex]}`);
+        }
+    }
+    
+    if (summaries.length === 0) {
+        return '';
+    }
+    
+    return `\n\n## Previous Day Summaries\n\nHere are your memories from previous days to help you remember important events and maintain consistency:\n\n${summaries.join('\n\n')}`;
+}

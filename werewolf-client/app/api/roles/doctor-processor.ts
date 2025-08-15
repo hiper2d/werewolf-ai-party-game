@@ -7,6 +7,7 @@ import { auth } from "@/auth";
 import { convertToAIMessages, parseResponseToObj } from "@/app/utils/message-utils";
 import { BOT_SYSTEM_PROMPT, BOT_DOCTOR_ACTION_PROMPT } from "@/app/ai/prompts/bot-prompts";
 import { format } from "@/app/ai/prompts/utils";
+import { generatePreviousDaySummariesSection } from "@/app/utils/bot-utils";
 import { createDoctorActionSchema, DoctorAction } from "@/app/ai/prompts/ai-schemas";
 
 /**
@@ -79,7 +80,8 @@ export class DoctorProcessor extends BaseRoleProcessor {
                 dead_players_names_with_roles: this.game.bots
                     .filter(b => !b.isAlive)
                     .map(b => `${b.name} (${b.role})`)
-                    .join(", ")
+                    .join(", "),
+                previous_day_summaries: generatePreviousDaySummariesSection(doctorBot, this.game.currentDay)
             });
 
             // Create agent

@@ -112,6 +112,7 @@ Before acting, ask: "Is this based on game mechanics and player behavior, or am 
 ## Game State
 **Alive Players:** %players_names%
 **Dead Players:** %dead_players_names_with_roles%
+%previous_day_summaries%
 
 ## Response Guidelines
 
