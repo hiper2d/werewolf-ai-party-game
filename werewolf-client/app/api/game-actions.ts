@@ -30,7 +30,7 @@ import {AbstractAgent} from "../ai/abstract-agent";
 import {format} from "@/app/ai/prompts/utils";
 import {createGameSetupSchema, createBotAnswerSchema} from "@/app/ai/prompts/ai-schemas";
 import {BOT_DAY_SUMMARY_PROMPT, BOT_SYSTEM_PROMPT} from "@/app/ai/prompts/bot-prompts";
-import {generatePlayStyleDescription, generateWerewolfTeammatesSection} from "@/app/utils/bot-utils";
+import {generatePlayStyleDescription, generateWerewolfTeammatesSection, generatePreviousDaySummariesSection} from "@/app/utils/bot-utils";
 import {convertToAIMessages} from "@/app/utils/message-utils";
 
 export async function getAllGames(): Promise<Game[]> {
@@ -686,7 +686,7 @@ export async function endNight(gameId: string): Promise<Game> {
             bots: updatedBots
         });
         
-        console.log(`📝 Transitioned to NIGHT_ENDS_SUMMARY with ${aliveBotNames.length} bots to summarize`);
+        console.log(`💭 Transitioned to NIGHT_ENDS_SUMMARY with ${aliveBotNames.length} bots to summarize`);
         
         // Return the updated game
         return await getGame(gameId) as Game;
@@ -728,7 +728,7 @@ export async function summarizeCurrentDay(gameId: string): Promise<Game> {
                 gameState: GAME_STATES.NEW_DAY_BEGINS,
                 gameStateProcessQueue: []
             });
-            console.log(`📝 All bot summaries completed, transitioning to NEW_DAY_BEGINS`);
+            console.log(`💭 All bot summaries completed, transitioning to NEW_DAY_BEGINS`);
             return await getGame(gameId) as Game;
         }
         
@@ -740,17 +740,17 @@ export async function summarizeCurrentDay(gameId: string): Promise<Game> {
             await gameRef.update({
                 gameStateProcessQueue: processQueue
             });
-            console.log(`📝 Bot ${botName} not found or not alive, skipping`);
+            console.log(`💭 Bot ${botName} not found or not alive, skipping`);
             return await getGame(gameId) as Game;
         }
         
-        console.log(`📝 Generating day ${currentGame.currentDay} summary for bot: ${botName}`);
+        console.log(`💭 Generating day ${currentGame.currentDay} summary for bot: ${botName}`);
         
         // Get all messages visible to this bot for the current day
         const botMessages = await getBotMessages(gameId, botName, currentGame.currentDay);
         
         if (botMessages.length === 0) {
-            console.log(`📝 No messages found for bot ${botName} on day ${currentGame.currentDay}, skipping summary`);
+            console.log(`💭 No messages found for bot ${botName} on day ${currentGame.currentDay}, skipping summary`);
             await gameRef.update({
                 gameStateProcessQueue: processQueue
             });
@@ -782,7 +782,8 @@ export async function summarizeCurrentDay(gameId: string): Promise<Game> {
             dead_players_names_with_roles: currentGame.bots
                 .filter(b => !b.isAlive)
                 .map(b => `${b.name} (${b.role})`)
-                .join(", ")
+                .join(", "),
+            previous_day_summaries: generatePreviousDaySummariesSection(bot, currentGame.currentDay)
         });
         
         // Create summary request message
@@ -811,15 +812,53 @@ export async function summarizeCurrentDay(gameId: string): Promise<Game> {
         const rawResponse = await agent.askWithSchema(createBotAnswerSchema(), history);
         
         if (!rawResponse) {
-            console.warn(`📝 Bot ${bot.name} failed to generate summary for day ${currentGame.currentDay}`);
+            console.warn(`💭 Bot ${bot.name} failed to generate summary for day ${currentGame.currentDay}`);
             await gameRef.update({
                 gameStateProcessQueue: processQueue
             });
             return await getGame(gameId) as Game;
         }
         
-        const summaryResponse = parseResponseToObj(rawResponse);
-        const summary = summaryResponse.reply;
+        let summary: string;
+        try {
+            const summaryResponse = parseResponseToObj(rawResponse);
+            summary = summaryResponse.reply;
+        } catch (parseError: any) {
+            console.error(`💭 Failed to parse summary JSON for bot ${bot.name}:`, parseError);
+            console.error('💭 Raw response:', rawResponse);
+            
+            // Try to extract summary from the raw response as fallback
+            try {
+                // If the response contains readable text but bad JSON, try to use it directly
+                if (typeof rawResponse === 'string' && rawResponse.length > 0) {
+                    // Clean up the response and use it as summary
+                    summary = rawResponse
+                        .replace(/```json/g, '')
+                        .replace(/```/g, '')
+                        .replace(/^\s*{\s*"reply"\s*:\s*"/, '')
+                        .replace(/"\s*}\s*$/, '')
+                        .trim();
+                    
+                    if (summary.length > 10) { // Basic validation
+                        console.log(`💭 Using cleaned raw response as summary for bot ${bot.name}: ${summary.substring(0, 100)}...`);
+                    } else {
+                        throw new Error('Cleaned response too short');
+                    }
+                } else {
+                    throw new Error('Empty or invalid response');
+                }
+            } catch (fallbackError) {
+                console.error(`💭 Fallback summary extraction failed for bot ${bot.name}:`, fallbackError);
+                
+                // Skip this bot and continue with next
+                await gameRef.update({
+                    gameStateProcessQueue: processQueue
+                });
+                
+                // Create a meaningful error that will be shown to the user
+                throw new Error(`Bot ${bot.name} response parsing failed: ${parseError.message}. Raw response: ${rawResponse?.substring(0, 200)}...`);
+            }
+        }
         
         // Update the bot with the new summary
         const updatedBots = currentGame.bots.map(b => {
@@ -849,7 +888,7 @@ export async function summarizeCurrentDay(gameId: string): Promise<Game> {
             gameStateProcessQueue: processQueue
         });
         
-        console.log(`📝 ✅ Generated summary for bot ${botName} (${summary.length} chars). ${processQueue.length} bots remaining.`);
+        console.log(`💭 ✅ Generated summary for bot ${botName} (${summary.length} chars). ${processQueue.length} bots remaining.`);
         
         return await getGame(gameId) as Game;
         

@@ -315,34 +315,26 @@ Your response must follow this schema:
 
 Return a single JSON object matching this schema.`;
 
-export const BOT_DAY_SUMMARY_PROMPT: string = `📝 **End of Day %day_number% - Summary Analysis**
+export const BOT_DAY_SUMMARY_PROMPT: string = `💭 **End of Day %day_number% - Compact Summary**
 
-%bot_name%, the day has ended and it's time to reflect on what happened. Create a comprehensive summary of Day %day_number% that will help you remember important details for future days.
+%bot_name%, the day has ended and it's time to create a COMPACT summary of Day %day_number% that will help you remember key details for future days.
 
-**Your summary should include:**
+**IMPORTANT: Keep your summary concise and focused. Aim for 2-3 short sentences per section maximum.**
 
-**SUSPICIONS & ANALYSIS:**
-- Who do you suspect and why? (based on voting patterns, contradictions, strategic behavior)
-- Who seems trustworthy and why?
-- Any contradictions or inconsistencies you noticed in players' claims or behavior
-- Voting patterns and alliances you observed
+**Key Points to Include:**
 
-**IMPORTANT EVENTS:**
-- Key accusations made during discussions
-- How each player voted and their reasoning
-- Night phase results (who was eliminated, who was saved, any investigation results you learned)
-- Any role claims or hints dropped by players
+**🔍 SUSPICIONS:** Who do you most suspect and why? Who seems most trustworthy?
 
-**STRATEGIC INSIGHTS:**
-- What strategies do you think werewolves might be using?
-- Who might be working together?
-- Who poses the biggest threat to your team?
-- Who might be special roles (Doctor, Detective) based on their behavior?
+**🗳️ VOTING:** What were the key voting patterns and accusations?
 
-**PERSONAL NOTES:**
-- How did your interactions go?
-- What information did you reveal or conceal?
-- What's your plan for tomorrow's discussions?
-- Any mistakes you made that you should avoid?
+**🌙 NIGHT RESULTS:** What happened during the night phase (eliminations, protections, investigations)?
 
-**Remember:** This summary is for your memory only - it won't be shared with other players. Be honest and analytical about what you observed and learned.`;
+**🎯 STRATEGY:** What's your main theory about werewolf strategy and who might be special roles?
+
+**📋 TOMORROW:** What's your key plan for the next day's discussions?
+
+**Remember:** 
+- Keep this COMPACT and FOCUSED - only the most important information
+- This summary is for your memory only - it won't be shared with other players
+- Be honest and analytical about what you observed and learned
+- Focus on actionable insights rather than detailed descriptions`;

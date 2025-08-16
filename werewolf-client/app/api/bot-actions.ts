@@ -46,6 +46,18 @@ import {withGameErrorHandling} from "@/app/utils/server-action-wrapper";
 import {generatePlayStyleDescription, generateWerewolfTeammatesSection, generatePreviousDaySummariesSection} from "@/app/utils/bot-utils";
 
 /**
+ * Sanitize names for use in message IDs
+ * Converts to lowercase, replaces spaces and special chars with hyphens
+ */
+function sanitizeForId(name: string): string {
+    return name.toLowerCase()
+        .replace(/\s+/g, '-')           // Replace spaces with hyphens
+        .replace(/[^a-z0-9-]/g, '')     // Remove non-alphanumeric chars except hyphens
+        .replace(/-+/g, '-')            // Replace multiple hyphens with single hyphen
+        .replace(/^-|-$/g, '');         // Remove leading/trailing hyphens
+}
+
+/**
  * Wraps Firestore operations in a transaction for atomicity
  * Ensures all game state updates are atomic and can be rolled back on errors
  */
@@ -1003,12 +1015,27 @@ async function humanPlayerVoteImpl(gameId: string, targetPlayer: string, reason:
                 timestamp: Date.now()
             };
             
-            // Save vote message to database within transaction
+            // Save vote message to database within transaction using proper incremental ID
             if (!db) {
                 throw new Error('Firestore is not initialized');
             }
-            const messagesRef = db.collection('games').doc(gameId).collection('messages');
-            await transaction.create(messagesRef.doc(), {
+            
+            // Get current message counter and increment it
+            const currentCounter = currentGame.messageCounter || 0;
+            const newCounter = currentCounter + 1;
+            
+            // Generate custom message ID: zero-padded-counter-author-to-recipient
+            const sanitizedAuthor = sanitizeForId(voteMessage.authorName);
+            const sanitizedRecipient = sanitizeForId(voteMessage.recipientName);
+            const paddedCounter = newCounter.toString().padStart(6, '0'); // Zero-pad to 6 digits for proper sorting
+            const customId = `${paddedCounter}-${sanitizedAuthor}-to-${sanitizedRecipient}`;
+            
+            // Update game counter in the same transaction
+            transaction.update(gameRef, { messageCounter: newCounter });
+            
+            // Add message with custom ID
+            const messageRef = db.collection('games').doc(gameId).collection('messages').doc(customId);
+            await transaction.create(messageRef, {
                 ...voteMessage,
                 timestamp: Date.now()
             });

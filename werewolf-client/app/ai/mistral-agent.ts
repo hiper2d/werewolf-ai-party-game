@@ -59,6 +59,7 @@ Ensure your response strictly follows the schema requirements.`,
                     { role: MESSAGE_ROLE.SYSTEM, content: this.instruction },
                     ...modifiedMessages
                 ],
+                responseFormat: {type: 'json_object'}
             });
 
             return this.processReply(chatResponse);
