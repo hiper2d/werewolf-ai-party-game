@@ -61,7 +61,7 @@ Ensure your response strictly follows the schema requirements.`,
                 ...this.defaultParams,
                 messages: [
                     { role: 'developer' as any, content: this.instruction },
-                    ...preparedMessages as OpenAI.Chat.Completions.ChatCompletionMessageParam[]
+                    ...this.convertToOpenAIMessages(preparedMessages)
                 ],
             }) as OpenAI.Chat.Completions.ChatCompletion;
 
@@ -73,6 +73,13 @@ Ensure your response strictly follows the schema requirements.`,
     }
 
     // Removed prepareMessagesWithInstruction - now using developer role for instructions
+
+    private convertToOpenAIMessages(messages: AIMessage[]): OpenAI.Chat.Completions.ChatCompletionMessageParam[] {
+        return messages.map(msg => ({
+            role: msg.role as 'system' | 'user' | 'assistant',
+            content: msg.content
+        }));
+    }
 
     private processReply(completion: OpenAI.Chat.Completions.ChatCompletion): string {
         const reply = completion.choices[0]?.message?.content;

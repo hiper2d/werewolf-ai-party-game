@@ -109,7 +109,14 @@ Ensure your response strictly follows the schema requirements.`,
         if (preparedMessages.length > 0) {
             preparedMessages[0].content = `${this.instruction}\n\n${preparedMessages[0].content}`;
         }
-        return preparedMessages;
+        return this.convertToOpenAIMessages(preparedMessages);
+    }
+
+    private convertToOpenAIMessages(messages: AIMessage[]): OpenAI.Chat.Completions.ChatCompletionMessageParam[] {
+        return messages.map(msg => ({
+            role: msg.role as 'system' | 'user' | 'assistant',
+            content: msg.content
+        }));
     }
 
     private processCompletion(completion: DeepSeekCompletion): string {

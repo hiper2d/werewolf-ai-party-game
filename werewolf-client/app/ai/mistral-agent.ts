@@ -57,7 +57,7 @@ Ensure your response strictly follows the schema requirements.`,
                 ...this.defaultParams,
                 messages: [
                     { role: MESSAGE_ROLE.SYSTEM, content: this.instruction },
-                    ...modifiedMessages
+                    ...this.convertToMistralMessages(modifiedMessages)
                 ],
                 responseFormat: {type: 'json_object'}
             });
@@ -67,6 +67,13 @@ Ensure your response strictly follows the schema requirements.`,
             this.logger(this.logTemplates.error(this.name, error));
             throw new Error(this.errorMessages.apiError(error));
         }
+    }
+
+    private convertToMistralMessages(messages: AIMessage[]) {
+        return messages.map(msg => ({
+            role: msg.role === 'developer' ? 'system' : msg.role,
+            content: msg.content
+        }));
     }
 
     private processReply(response: ChatCompletionResponse | undefined): string {
