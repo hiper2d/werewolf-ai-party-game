@@ -1,4 +1,6 @@
-export const GM_COMMAND_INTRODUCE_YOURSELF: string = `Welcome to the game, %bot_name%! Please introduce yourself to the group.
+export const GM_COMMAND_INTRODUCE_YOURSELF: string = `Welcome to the game, %bot_name%! Please introduce yourself to the group. \
+Use your character and story to create a thematic introduction. Don't reveal you tactics and strategies. \
+Push your store a little further in your introduction, add some development to it.
 
 Your response must follow this schema:
 

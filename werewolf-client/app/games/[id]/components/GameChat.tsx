@@ -306,8 +306,10 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
     useEffect(() => {
         console.log('🔍 AUTO-PROCESS QUEUE CHECK:', {
             gameState: game.gameState,
-            queueLength: game.gameStateProcessQueue.length,
-            queue: game.gameStateProcessQueue,
+            processQueueLength: game.gameStateProcessQueue.length,
+            paramQueueLength: game.gameStateParamQueue.length,
+            processQueue: game.gameStateProcessQueue,
+            paramQueue: game.gameStateParamQueue,
             isProcessing,
             hasError: !!game.errorState,
             gameId,
@@ -900,11 +902,6 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
                     error={game.errorState}
                     onDismiss={handleDismissError}
                 />
-            )}
-            {game.gameStateProcessQueue.length > 0 && (
-                <div className="mb-4 text-sm text-gray-400">
-                    Bots in queue: {game.gameStateProcessQueue.join(', ')}
-                </div>
             )}
             <div className="flex-1 overflow-y-auto mb-4 p-2 bg-black bg-opacity-30 rounded" style={{ minHeight: '200px' }}>
                 {messages.map((message, index) => (

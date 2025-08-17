@@ -40,8 +40,16 @@ export default function GamePage({
     // Handle welcome state
     useEffect(() => {
         const handleWelcome = async () => {
-            if (game.gameState === GAME_STATES.WELCOME && !game.errorState) {
+            if (game.gameState === GAME_STATES.WELCOME &&
+                game.gameStateParamQueue.length > 0 &&
+                !game.errorState) {
+                console.log('🎭 GAMEPAGE: CALLING WELCOME API for bot introductions:', {
+                    gameId: game.id,
+                    paramQueue: game.gameStateParamQueue,
+                    timestamp: new Date().toISOString()
+                });
                 const updatedGame = await welcome(game.id);
+                console.log('✅ GAMEPAGE: Welcome API completed');
                 setGame(updatedGame);
             }
         };
@@ -333,11 +341,11 @@ export default function GamePage({
                 };
             case GAME_STATES.WELCOME:
                 return {
-                    title: "🎮 Game Starting",
-                    description: "Preparing game...",
-                    items: [],
-                    currentItem: null,
-                    showProgress: false
+                    title: "👋 Introductions",
+                    description: paramQueue.length > 0 ? "Bots introducing themselves:" : "Introductions complete",
+                    items: paramQueue,
+                    currentItem: paramQueue[0] || null,
+                    showProgress: paramQueue.length > 0
                 };
             case GAME_STATES.VOTE_RESULTS:
                 return {
