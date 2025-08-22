@@ -322,17 +322,17 @@ export enum MessageType {
 }
 
 export class BotAnswer {
-    constructor(public reply: string) {
+    constructor(public reply: string, public thinking?: string) {
     }
 }
 
 export class GameStory {
-    constructor(public story: string) {
+    constructor(public story: string, public thinking?: string) {
     }
 }
 
 export class WerewolfAction {
-    constructor(public target: string, public reasoning: string) {
+    constructor(public target: string, public reasoning: string, public thinking?: string) {
     }
 }
 

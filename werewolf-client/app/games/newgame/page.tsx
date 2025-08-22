@@ -17,8 +17,6 @@ export default function CreateNewGamePage() {
     const [specialRoles, setSpecialRoles] = useState([GAME_ROLES.DOCTOR, GAME_ROLES.DETECTIVE]);
     const [gameMasterAiType, setGameMasterAiType] = useState<string>(LLM_CONSTANTS.RANDOM);
     const [playersAiType, setPlayersAiType] = useState<string>(LLM_CONSTANTS.RANDOM);
-    const [gameMasterThinking, setGameMasterThinking] = useState<boolean>(false);
-    const [allBotsThinking, setAllBotsThinking] = useState<boolean>(false);
     const [isFormValid, setIsFormValid] = useState(false);
     const [gameData, setGameData] = useState<GamePreviewWithGeneratedBots | null>(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -58,18 +56,6 @@ export default function CreateNewGamePage() {
         }
     }, [gameData]);
 
-    // Reset thinking mode when AI model changes to unsupported model
-    useEffect(() => {
-        if (!supportsThinkingMode(gameMasterAiType)) {
-            setGameMasterThinking(false);
-        }
-    }, [gameMasterAiType]);
-
-    useEffect(() => {
-        if (!supportsThinkingMode(playersAiType)) {
-            setAllBotsThinking(false);
-        }
-    }, [playersAiType]);
 
     const handleGeneratePreview = async () => {
         const gamePreviewData: GamePreview = {
@@ -88,13 +74,13 @@ export default function CreateNewGamePage() {
         try {
             const game: GamePreviewWithGeneratedBots = await previewGame(gamePreviewData);
             
-            // Apply global thinking mode settings to the generated data
+            // Set all thinking modes to false by default
             const updatedGame: GamePreviewWithGeneratedBots = {
                 ...game,
-                gameMasterThinking: gameMasterThinking,
+                gameMasterThinking: false,
                 bots: game.bots.map(bot => ({
                     ...bot,
-                    enableThinking: allBotsThinking
+                    enableThinking: false
                 }))
             };
             
@@ -135,12 +121,6 @@ export default function CreateNewGamePage() {
             const updatedPlayers = [...gameData.bots];
             updatedPlayers[index] = { ...updatedPlayers[index], [field]: value };
             setGameData({ ...gameData, bots: updatedPlayers });
-        }
-    };
-
-    const handleGameMasterThinkingChange = (enabled: boolean) => {
-        if (gameData) {
-            setGameData({ ...gameData, gameMasterThinking: enabled });
         }
     };
 
@@ -302,45 +282,6 @@ export default function CreateNewGamePage() {
                     </div>
                 </div>
 
-                {/* Global Thinking Mode Checkboxes */}
-                <div className={flexRowStyle}>
-                    <div className={flexItemStyle}>
-                        <label className={labelStyle}>GM Thinking Mode:</label>
-                        <div className="flex items-center">
-                            <input
-                                type="checkbox"
-                                id="gameMasterThinking"
-                                checked={gameMasterThinking}
-                                onChange={(e) => setGameMasterThinking(e.target.checked)}
-                                disabled={!supportsThinkingMode(gameMasterAiType)}
-                                className="mr-2"
-                            />
-                            <label htmlFor="gameMasterThinking" className={`text-sm ${
-                                supportsThinkingMode(gameMasterAiType) ? 'text-white' : 'text-gray-500'
-                            }`}>
-                                Enable thinking mode for Game Master
-                            </label>
-                        </div>
-                    </div>
-                    <div className={flexItemStyle}>
-                        <label className={labelStyle}>All Bots Thinking:</label>
-                        <div className="flex items-center">
-                            <input
-                                type="checkbox"
-                                id="allBotsThinking"
-                                checked={allBotsThinking}
-                                onChange={(e) => setAllBotsThinking(e.target.checked)}
-                                disabled={!supportsThinkingMode(playersAiType)}
-                                className="mr-2"
-                            />
-                            <label htmlFor="allBotsThinking" className={`text-sm ${
-                                supportsThinkingMode(playersAiType) ? 'text-white' : 'text-gray-500'
-                            }`}>
-                                Enable thinking mode for all bots
-                            </label>
-                        </div>
-                    </div>
-                </div>
 
                 <div className={flexRowStyle}>
                     <div className={flexItemStyle}>
@@ -437,7 +378,11 @@ export default function CreateNewGamePage() {
                                         type="checkbox"
                                         id="gmThinking"
                                         checked={gameData.gameMasterThinking || false}
-                                        onChange={(e) => handleGameMasterThinkingChange(e.target.checked)}
+                                        onChange={(e) => {
+                                            if (gameData) {
+                                                setGameData({ ...gameData, gameMasterThinking: e.target.checked });
+                                            }
+                                        }}
                                         className="mr-2"
                                     />
                                     <label htmlFor="gmThinking" className="text-sm text-gray-300">

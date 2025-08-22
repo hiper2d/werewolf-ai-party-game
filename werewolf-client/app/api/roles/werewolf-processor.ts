@@ -199,6 +199,7 @@ export class WerewolfProcessor extends BaseRoleProcessor {
             }
             
             const werewolfResponse = parseResponseToObj(rawResponse, responseType);
+            const thinking = agent.getCurrentThinking();
             
             // Validate and save target if this is the final werewolf decision
             let gameUpdates: any = {
@@ -233,11 +234,16 @@ export class WerewolfProcessor extends BaseRoleProcessor {
             }
             
             // Create werewolf response message with WEREWOLVES recipient
+            // Add thinking content to the response object
+            const msgWithThinking = isLastWerewolf 
+                ? { ...(werewolfResponse as WerewolfAction), thinking: thinking || "" }
+                : { ...(werewolfResponse as any), thinking: thinking || "" };
+            
             const werewolfMessage: GameMessage = {
                 id: null,
                 recipientName: RECIPIENT_WEREWOLVES,
                 authorName: werewolfBot.name,
-                msg: werewolfResponse,
+                msg: msgWithThinking,
                 messageType: isLastWerewolf ? MessageType.WEREWOLF_ACTION : MessageType.BOT_ANSWER,
                 day: this.game.currentDay,
                 timestamp: Date.now()

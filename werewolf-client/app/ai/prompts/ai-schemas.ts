@@ -117,12 +117,14 @@ export interface WerewolfAction {
 export interface DoctorAction {
     target: string;
     reasoning: string;
+    thinking?: string;
 }
 
 // Detective action interface
 export interface DetectiveAction {
     target: string;
     reasoning: string;
+    thinking?: string;
 }
 
 // Werewolf action schema for response validation

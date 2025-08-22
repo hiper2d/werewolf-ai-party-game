@@ -401,7 +401,7 @@ function sanitizeForId(name: string): string {
         .replace(/^-|-$/g, '');         // Remove leading/trailing hyphens
 }
 
-export async function updateBotModel(gameId: string, botName: string, newAiType: string): Promise<Game> {
+export async function updateBotModel(gameId: string, botName: string, newAiType: string, enableThinking?: boolean): Promise<Game> {
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
@@ -420,7 +420,12 @@ export async function updateBotModel(gameId: string, botName: string, newAiType:
         // Find and update the bot
         const updatedBots = bots.map((bot: Bot) => {
             if (bot.name === botName) {
-                return { ...bot, aiType: newAiType };
+                const updatedBot = { ...bot, aiType: newAiType };
+                // Update thinking mode if provided
+                if (enableThinking !== undefined) {
+                    updatedBot.enableThinking = enableThinking;
+                }
+                return updatedBot;
             }
             return bot;
         });
@@ -436,7 +441,7 @@ export async function updateBotModel(gameId: string, botName: string, newAiType:
     }
 }
 
-export async function updateGameMasterModel(gameId: string, newAiType: string): Promise<Game> {
+export async function updateGameMasterModel(gameId: string, newAiType: string, enableThinking?: boolean): Promise<Game> {
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
@@ -451,11 +456,20 @@ export async function updateGameMasterModel(gameId: string, newAiType: string): 
         
         const gameData = gameSnap.data();
         
-        // Update the Game Master AI type in Firestore
-        await gameRef.update({ gameMasterAiType: newAiType });
+        // Update the Game Master AI type and thinking mode in Firestore
+        const updateData: any = { gameMasterAiType: newAiType };
+        if (enableThinking !== undefined) {
+            updateData.gameMasterThinking = enableThinking;
+        }
+        await gameRef.update(updateData);
         
         // Return the updated game
-        return gameFromFirestore(gameId, { ...gameData, gameMasterAiType: newAiType });
+        const updatedGameData = { 
+            ...gameData, 
+            gameMasterAiType: newAiType,
+            ...(enableThinking !== undefined && { gameMasterThinking: enableThinking })
+        };
+        return gameFromFirestore(gameId, updatedGameData);
     } catch (error: any) {
         console.error("Error updating Game Master model: ", error);
         throw new Error(`Failed to update Game Master model: ${error.message}`);

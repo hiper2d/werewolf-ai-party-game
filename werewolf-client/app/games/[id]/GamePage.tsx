@@ -18,6 +18,7 @@ interface Participant {
     isHuman: boolean;
     isAlive: boolean;
     aiType?: string;
+    enableThinking?: boolean;
 }
 
 export default function GamePage({ 
@@ -29,7 +30,7 @@ export default function GamePage({
 }) {
     const [game, setGame] = useState(initialGame);
     const [modelDialogOpen, setModelDialogOpen] = useState(false);
-    const [selectedBot, setSelectedBot] = useState<{ name: string; aiType: string } | null>(null);
+    const [selectedBot, setSelectedBot] = useState<{ name: string; aiType: string; enableThinking?: boolean } | null>(null);
     const [clearNightMessages, setClearNightMessages] = useState(false);
 
     // Handle exit game
@@ -261,15 +262,15 @@ export default function GamePage({
     const isGameOver = game.gameState === GAME_STATES.GAME_OVER;
 
     // Handle model update
-    const handleModelUpdate = async (newModel: string) => {
+    const handleModelUpdate = async (newModel: string, enableThinking?: boolean) => {
         if (!selectedBot) return;
         
         try {
             let updatedGame;
             if (selectedBot.name === 'Game Master') {
-                updatedGame = await updateGameMasterModel(game.id, newModel);
+                updatedGame = await updateGameMasterModel(game.id, newModel, enableThinking);
             } else {
-                updatedGame = await updateBotModel(game.id, selectedBot.name, newModel);
+                updatedGame = await updateBotModel(game.id, selectedBot.name, newModel, enableThinking);
             }
             setGame(updatedGame);
         } catch (error) {
@@ -278,8 +279,8 @@ export default function GamePage({
         }
     };
 
-    const openModelDialog = (botName: string, currentModel: string) => {
-        setSelectedBot({ name: botName, aiType: currentModel });
+    const openModelDialog = (botName: string, currentModel: string, enableThinking?: boolean) => {
+        setSelectedBot({ name: botName, aiType: currentModel, enableThinking });
         setModelDialogOpen(true);
     };
 
@@ -296,7 +297,8 @@ export default function GamePage({
             role: bot.role,
             isHuman: false,
             isAlive: bot.isAlive,
-            aiType: bot.aiType
+            aiType: bot.aiType,
+            enableThinking: bot.enableThinking
         }))
     ];
 
@@ -407,7 +409,7 @@ export default function GamePage({
                     </div>
                     <div className="text-xs">
                         <button
-                            onClick={() => openModelDialog('Game Master', game.gameMasterAiType)}
+                            onClick={() => openModelDialog('Game Master', game.gameMasterAiType, game.gameMasterThinking)}
                             className="text-gray-500 hover:text-gray-300 transition-colors duration-200"
                             title="Click to change Game Master AI model"
                         >
@@ -441,7 +443,7 @@ export default function GamePage({
                                 {!participant.isHuman && participant.aiType && (
                                     <div className="text-xs mt-1 ml-2">
                                         <button
-                                            onClick={() => openModelDialog(participant.name, participant.aiType!)}
+                                            onClick={() => openModelDialog(participant.name, participant.aiType!, participant.enableThinking)}
                                             className="text-gray-500 hover:text-gray-300 transition-colors duration-200"
                                             title="Click to change AI model"
                                         >
@@ -654,6 +656,7 @@ export default function GamePage({
                 }}
                 onSelect={handleModelUpdate}
                 currentModel={selectedBot?.aiType || ''}
+                currentThinkingMode={selectedBot?.enableThinking === true}
                 botName={selectedBot?.name || ''}
             />
         </div>

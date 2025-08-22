@@ -190,12 +190,13 @@ async function welcomeImpl(gameId: string): Promise<Game> {
         }
 
         const answer = parseResponseToObj(rawIntroduction, 'BotAnswer');
+        const thinking = agent.getCurrentThinking();
 
         const botMessage: GameMessage = {
             id: null,
             recipientName: RECIPIENT_ALL,
             authorName: bot.name,
-            msg: { reply: answer.reply },
+            msg: { reply: answer.reply, thinking: thinking || "" },
             messageType: MessageType.BOT_ANSWER,
             day: game.currentDay,
             timestamp: Date.now()
@@ -533,11 +534,12 @@ async function processNextBotInQueue(
     }
 
     const botReply = parseResponseToObj(rawBotReply, 'BotAnswer');
+    const thinking = agent.getCurrentThinking();
     const botMessage: GameMessage = {
         id: null,
         recipientName: RECIPIENT_ALL,
         authorName: bot.name,
-        msg: { reply: botReply.reply },
+        msg: { reply: botReply.reply, thinking: thinking || "" },
         messageType: MessageType.BOT_ANSWER,
         day: game.currentDay,
         timestamp: Date.now()
