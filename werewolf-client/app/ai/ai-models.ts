@@ -21,8 +21,7 @@ export const SupportedAiKeyNames: Record<string, string> = {
 export const LLM_CONSTANTS = {
     CLAUDE_4_OPUS: 'Claude 4.1 Opus',
     CLAUDE_4_SONNET: 'Claude 4 Sonnet',
-    DEEPSEEK_CHAT: 'DeepSeek Chat',
-    DEEPSEEK_REASONER: 'DeepSeek Reasoner',
+    DEEPSEEK: 'DeepSeek',
     // GPT_41: 'GPT-4.1', // Disabled: replaced by GPT-5
     GPT_5: 'GPT-5',
     GPT_5_MINI: 'GPT-5-mini',
@@ -40,11 +39,13 @@ export const LLM_CONSTANTS = {
 export const SupportedAiModels = {
     [LLM_CONSTANTS.CLAUDE_4_OPUS]: {
         modelApiName: 'claude-opus-4-1',
-        apiKeyName: API_KEY_CONSTANTS.ANTHROPIC
+        apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
+        supportsThinking: true
     },
     [LLM_CONSTANTS.CLAUDE_4_SONNET]: {
         modelApiName: 'claude-sonnet-4-0',
-        apiKeyName: API_KEY_CONSTANTS.ANTHROPIC
+        apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
+        supportsThinking: true
     },
     // [LLM_CONSTANTS.GPT_41]: {
     //     modelApiName: 'gpt-4.1',
@@ -52,11 +53,13 @@ export const SupportedAiModels = {
     // }, // Disabled: replaced by GPT-5
     [LLM_CONSTANTS.GPT_5]: {
         modelApiName: 'gpt-5',
-        apiKeyName: API_KEY_CONSTANTS.OPENAI
+        apiKeyName: API_KEY_CONSTANTS.OPENAI,
+        supportsThinking: true
     },
     [LLM_CONSTANTS.GPT_5_MINI]: {
         modelApiName: 'gpt-5-mini',
-        apiKeyName: API_KEY_CONSTANTS.OPENAI
+        apiKeyName: API_KEY_CONSTANTS.OPENAI,
+        supportsThinking: true
     },
     // [LLM_CONSTANTS.GPT_O3]: {
     //     modelApiName: 'o3',
@@ -72,31 +75,34 @@ export const SupportedAiModels = {
     // }, // Disabled: replaced by GPT-5
     [LLM_CONSTANTS.GEMINI_25_PRO]: {
         modelApiName: 'gemini-2.5-pro',
-        apiKeyName: API_KEY_CONSTANTS.GOOGLE
+        apiKeyName: API_KEY_CONSTANTS.GOOGLE,
+        supportsThinking: true
     },
     [LLM_CONSTANTS.MISTRAL_2_LARGE]: {
         modelApiName: 'mistral-large-latest',
-        apiKeyName: API_KEY_CONSTANTS.MISTRAL
+        apiKeyName: API_KEY_CONSTANTS.MISTRAL,
+        supportsThinking: false
     },
     [LLM_CONSTANTS.MISTRAL_3_SMALL]: {
         modelApiName: 'mistral-small-latest',
-        apiKeyName: API_KEY_CONSTANTS.MISTRAL
+        apiKeyName: API_KEY_CONSTANTS.MISTRAL,
+        supportsThinking: false
     },
-    [LLM_CONSTANTS.DEEPSEEK_CHAT]: {
+    [LLM_CONSTANTS.DEEPSEEK]: {
         modelApiName: 'deepseek-chat',
-        apiKeyName: API_KEY_CONSTANTS.DEEPSEEK
-    },
-    [LLM_CONSTANTS.DEEPSEEK_REASONER]: {
-        modelApiName: 'deepseek-reasoner',
-        apiKeyName: API_KEY_CONSTANTS.DEEPSEEK
+        reasonerModelApiName: 'deepseek-reasoner',
+        apiKeyName: API_KEY_CONSTANTS.DEEPSEEK,
+        supportsThinking: true
     },
     [LLM_CONSTANTS.GROK_4]: {
         modelApiName: 'grok-4',
-        apiKeyName: API_KEY_CONSTANTS.GROK
+        apiKeyName: API_KEY_CONSTANTS.GROK,
+        supportsThinking: true
     },
     [LLM_CONSTANTS.KIMI_K2]: {
-        modelApiName: 'kimi-k2-0711-preview',
-        apiKeyName: API_KEY_CONSTANTS.MOONSHOT
+        modelApiName: 'kimi-latest',
+        apiKeyName: API_KEY_CONSTANTS.MOONSHOT,
+        supportsThinking: false
     },
 } as const;
 

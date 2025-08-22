@@ -34,8 +34,8 @@ ${JSON.stringify(schema, null, 2)}
 Ensure your response strictly follows the schema requirements.`,
     };
 
-    constructor(name: string, instruction: string, model: string, apiKey: string) {
-        super(name, instruction, model, 0.2);
+    constructor(name: string, instruction: string, model: string, apiKey: string, enableThinking: boolean = false) {
+        super(name, instruction, model, 0.2, enableThinking);
         this.client = new Mistral({apiKey: apiKey});
     }
 
@@ -53,10 +53,15 @@ Ensure your response strictly follows the schema requirements.`,
         ];
 
         try {
+            // Add thinking mode instructions if enabled
+            const systemContent = this.enableThinking ? 
+                `${this.instruction}\n\nThinking Mode: Before providing your final answer, think through the problem step by step. Consider multiple perspectives and reasoning paths.` :
+                this.instruction;
+
             const chatResponse = await this.client.chat.complete({
                 ...this.defaultParams,
                 messages: [
-                    { role: MESSAGE_ROLE.SYSTEM, content: this.instruction },
+                    { role: MESSAGE_ROLE.SYSTEM, content: systemContent },
                     ...this.convertToMistralMessages(modifiedMessages)
                 ],
                 responseFormat: {type: 'json_object'}

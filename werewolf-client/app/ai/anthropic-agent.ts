@@ -45,8 +45,8 @@ ${JSON.stringify(schema, null, 2)}
 Ensure your response strictly follows the schema requirements.`,
     };
 
-    constructor(name: string, instruction: string, model: string, apiKey: string) {
-        super(name, instruction, model, 0.2);
+    constructor(name: string, instruction: string, model: string, apiKey: string, enableThinking: boolean = false) {
+        super(name, instruction, model, 0.2, enableThinking);
         this.client = new Anthropic({
             apiKey: apiKey,
         });
@@ -69,6 +69,18 @@ Ensure your response strictly follows the schema requirements.`,
             messages: this.convertToAnthropicMessages(aiMessages),
         };
 
+        // Add thinking config for Anthropic models with thinking mode
+        if (this.enableThinking) {
+            (params as any).thinking = {
+                type: "enabled",
+                budget_tokens: 1024
+            };
+            // Anthropic requires temperature to be 1 when thinking is enabled
+            params.temperature = 1;
+            // Increase max_tokens to be greater than budget_tokens
+            params.max_tokens = 2048;
+        }
+
         let response;
         try {
             // fixms: for some reason, the last message has the assistant type from Sparks, i.e. self = what to do with it?
@@ -76,11 +88,27 @@ Ensure your response strictly follows the schema requirements.`,
             if (!('content' in response) || !Array.isArray(response.content) || response.content.length === 0) {
                 throw new Error(this.errorMessages.emptyResponse);
             }
-            const content = response.content[0];
-            if (!('text' in content)) {
+
+            // Handle thinking content if present and find text content
+            let textContent = null;
+            
+            for (const block of response.content) {
+                // Log thinking content
+                if (this.enableThinking && (block as any).type === 'thinking' && 'thinking' in block) {
+                    this.logReasoningTokens((block as any).thinking);
+                }
+                
+                // Find the text content block
+                if ('text' in block && !textContent) {
+                    textContent = block.text;
+                }
+            }
+
+            if (!textContent) {
                 throw new Error(this.errorMessages.invalidFormat);
             }
-            return cleanResponse(content.text);
+            
+            return cleanResponse(textContent);
         } catch (error) {
             const errorDetails = error instanceof Error ? error.message : String(error);
             

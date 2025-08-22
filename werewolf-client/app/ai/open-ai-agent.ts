@@ -35,8 +35,8 @@ ${JSON.stringify(schema, null, 2)}
 Ensure your response strictly follows the schema requirements.`,
     };
 
-    constructor(name: string, instruction: string, model: string, apiKey: string, temperature: number) {
-        super(name, instruction, model, temperature);
+    constructor(name: string, instruction: string, model: string, apiKey: string, temperature: number, enableThinking: boolean = false) {
+        super(name, instruction, model, temperature, enableThinking);
         this.client = new OpenAI({
             apiKey: apiKey,
         });
@@ -57,13 +57,18 @@ Ensure your response strictly follows the schema requirements.`,
 
         try {
             const preparedMessages = this.prepareMessages(modifiedMessages);
-            const completion = await this.client.chat.completions.create({
+            const params: any = {
                 ...this.defaultParams,
                 messages: [
                     { role: 'developer' as any, content: this.instruction },
                     ...this.convertToOpenAIMessages(preparedMessages)
                 ],
-            }) as OpenAI.Chat.Completions.ChatCompletion;
+            };
+
+            // Note: OpenAI reasoning models require Responses API, not Chat Completions API
+            // Thinking mode is disabled for OpenAI models until proper implementation
+
+            const completion = await this.client.chat.completions.create(params) as OpenAI.Chat.Completions.ChatCompletion;
 
             return this.processReply(completion);
         } catch (error) {
@@ -83,6 +88,9 @@ Ensure your response strictly follows the schema requirements.`,
 
     private processReply(completion: OpenAI.Chat.Completions.ChatCompletion): string {
         const reply = completion.choices[0]?.message?.content;
+
+        // Note: Reasoning content logging removed as OpenAI models don't support thinking mode
+        // via Chat Completions API (requires Responses API)
 
         if (!reply) {
             throw new Error(this.errorMessages.emptyResponse);

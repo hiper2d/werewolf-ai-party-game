@@ -26,12 +26,14 @@ export interface BotPreview {
     gender: 'male' | 'female' | 'neutral';
     voice: string;
     playStyle: string;
+    enableThinking?: boolean;
 }
 
 export interface GamePreviewWithGeneratedBots extends GamePreview {
     scene: string;
     bots: BotPreview[];
     gameMasterVoice: string;
+    gameMasterThinking?: boolean;
 }
 
 export interface Bot {
@@ -45,6 +47,7 @@ export interface Bot {
     playStyle: string;
     eliminationDay?: number; // Track which day this bot was eliminated (undefined if alive)
     daySummaries?: string[]; // Array of summaries for each previous day (index 0 = day 1 summary)
+    enableThinking?: boolean;
 }
 
 export interface Game {
@@ -66,6 +69,7 @@ export interface Game {
     errorState?: SystemErrorMessage | null; // Persistent error state stored in the game object
     nightResults?: Record<string, { target: string }>; // Dynamic night results for each role that has night actions
     messageCounter?: number; // Counter for generating incremental message IDs
+    gameMasterThinking?: boolean;
 }
 
 export const GAME_ROLES = {

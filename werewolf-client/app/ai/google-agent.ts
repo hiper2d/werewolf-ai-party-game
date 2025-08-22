@@ -47,8 +47,8 @@ ${JSON.stringify(schema, null, 2)}
 Ensure your response strictly follows the schema requirements.`,
     };
 
-    constructor(name: string, instruction: string, model: string, apiKey: string) {
-        super(name, instruction, model, 0.2);
+    constructor(name: string, instruction: string, model: string, apiKey: string, enableThinking: boolean = false) {
+        super(name, instruction, model, 0.2, enableThinking);
         this.client = new GoogleGenAI({
             apiKey: apiKey
         });
@@ -58,30 +58,39 @@ Ensure your response strictly follows the schema requirements.`,
         try {
             const contents = this.convertToContents(messages);
             
+            const config: any = {
+                temperature: this.temperature
+            };
+
+            // Add thinking config for Google models with thinking mode
+            if (this.enableThinking) {
+                config.thinkingConfig = {
+                    includeThoughts: true,
+                    thinkingBudget: 1024  // Use reasonable budget, -1 for dynamic thinking
+                };
+            }
+            
             const response = await this.client.models.generateContent({
                 model: this.model,
                 contents: contents,
-                config: {
-                    temperature: this.temperature
-                }
+                config: config
             });
+            
+            // Handle thinking content if present and thinking mode is enabled
+            if (this.enableThinking && (response as any).candidates?.[0]?.content?.parts) {
+                const parts = (response as any).candidates[0].content.parts;
+                for (const part of parts) {
+                    if (part.thought && part.text) {
+                        this.logReasoningTokens(part.text);
+                    }
+                }
+            }
             
             // Enhanced logging for debugging empty responses
-            this.logger(`[${this.name} ${this.model}]: Response received:`, {
-                hasText: !!response.text,
-                textLength: response.text ? response.text.length : 0,
-                responseKeys: Object.keys(response || {}),
-                fullResponse: JSON.stringify(response, null, 2)
-            });
+            this.logger(`Response received - hasText: ${!!response.text}, textLength: ${response.text ? response.text.length : 0}, responseKeys: ${Object.keys(response || {}).join(', ')}`);
             
             if (!response.text) {
-                this.logger(`[${this.name} ${this.model}]: Empty response details:`, {
-                    response: response,
-                    responseType: typeof response,
-                    responseKeys: response ? Object.keys(response) : 'response is null/undefined',
-                    messagesCount: messages.length,
-                    contentsCount: contents.length
-                });
+                this.logger(`Empty response details - responseType: ${typeof response}, responseKeys: ${response ? Object.keys(response).join(', ') : 'response is null/undefined'}, messagesCount: ${messages.length}, contentsCount: ${contents.length}`);
                 throw new Error(this.errorMessages.emptyResponse);
             }
 
@@ -113,35 +122,41 @@ Ensure your response strictly follows the schema requirements.`,
                 parts: [{ text: fullPrompt }]
             });
             
+            const config: any = {
+                temperature: this.temperature,
+                responseMimeType: "application/json",
+                responseSchema: schema
+            };
+
+            // Add thinking config for Google models with thinking mode
+            if (this.enableThinking) {
+                config.thinkingConfig = {
+                    includeThoughts: true,
+                    thinkingBudget: 1024  // Use reasonable budget, -1 for dynamic thinking
+                };
+            }
+
             const response = await this.client.models.generateContent({
                 model: this.model,
                 contents: contents,
-                config: {
-                    temperature: this.temperature,
-                    responseMimeType: "application/json",
-                    responseSchema: schema
-                }
+                config: config
             });
             
+            // Handle thinking content if present and thinking mode is enabled
+            if (this.enableThinking && (response as any).candidates?.[0]?.content?.parts) {
+                const parts = (response as any).candidates[0].content.parts;
+                for (const part of parts) {
+                    if (part.thought && part.text) {
+                        this.logReasoningTokens(part.text);
+                    }
+                }
+            }
+
             // Enhanced logging for debugging empty responses
-            this.logger(`[${this.name} ${this.model}]: Schema response received:`, {
-                hasText: !!response.text,
-                textLength: response.text ? response.text.length : 0,
-                responseKeys: Object.keys(response || {}),
-                schemaUsed: schema,
-                fullResponse: JSON.stringify(response, null, 2)
-            });
+            this.logger(`Schema response received - hasText: ${!!response.text}, textLength: ${response.text ? response.text.length : 0}, responseKeys: ${Object.keys(response || {}).join(', ')}`);
             
             if (!response.text) {
-                this.logger(`[${this.name} ${this.model}]: Empty schema response details:`, {
-                    response: response,
-                    responseType: typeof response,
-                    responseKeys: response ? Object.keys(response) : 'response is null/undefined',
-                    messagesCount: messages.length,
-                    contentsCount: contents.length,
-                    schema: schema,
-                    lastMessagePreview: lastMessage.content.substring(0, 200) + '...'
-                });
+                this.logger(`Empty schema response details - responseType: ${typeof response}, responseKeys: ${response ? Object.keys(response).join(', ') : 'response is null/undefined'}, messagesCount: ${messages.length}, contentsCount: ${contents.length}, lastMessagePreview: ${lastMessage.content.substring(0, 200)}...`);
                 throw new Error(this.errorMessages.emptyResponse);
             }
 

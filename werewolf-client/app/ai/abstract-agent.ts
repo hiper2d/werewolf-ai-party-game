@@ -7,18 +7,20 @@ export abstract class AbstractAgent {
     protected readonly instruction: string;
     protected readonly temperature: number;
     protected readonly model: string;
+    protected readonly enableThinking: boolean;
 
-    protected constructor(name: string, instruction: string, model: string, temperature: number) {
+    protected constructor(name: string, instruction: string, model: string, temperature: number, enableThinking: boolean = false) {
         this.name = name;
         this.instruction = instruction;
         this.temperature = temperature;
         this.model = model;
+        this.enableThinking = enableThinking;
     }
 
     // Template Method pattern: public methods with logging, calling protected abstract methods
     async ask(messages: AIMessage[]): Promise<string | null> {
-        this.logger(`Asking bot ${this.name} (${this.model})`);
-        this.logMessages(messages);
+        // this.logger(`Asking bot ${this.name} (${this.model})`);
+        // this.logMessages(messages);
         
         try {
             const result = await this.doAsk(messages);

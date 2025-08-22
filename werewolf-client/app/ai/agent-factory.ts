@@ -1,11 +1,12 @@
 import {ApiKeyMap} from '@/app/api/game-models';
 import {AbstractAgent} from "@/app/ai/abstract-agent";
 import {OpenAiAgent} from "@/app/ai/open-ai-agent";
+import {Gpt5Agent} from "@/app/ai/gpt-5-agent";
 import {LLM_CONSTANTS, SupportedAiModels} from "@/app/ai/ai-models";
 import {ClaudeAgent} from "@/app/ai/anthropic-agent";
 import {GoogleAgent} from "@/app/ai/google-agent";
 import {MistralAgent} from "@/app/ai/mistral-agent";
-import {DeepSeekAgent} from "@/app/ai/deepseek-agent";
+import {DeepSeekV2Agent} from "@/app/ai/deepseek-v2-agent";
 import {GrokAgent} from "@/app/ai/grok-agent";
 import {KimiAgent} from "@/app/ai/kimi-agent";
 
@@ -15,7 +16,8 @@ export class AgentFactory {
         name: string,
         instruction: string,
         llmType: string,
-        apiKeys: ApiKeyMap
+        apiKeys: ApiKeyMap,
+        enableThinking: boolean = false
     ): AbstractAgent {
         const modelName = this.validateLlmTypeAndGet(llmType)
         const model = SupportedAiModels[modelName]
@@ -25,22 +27,21 @@ export class AgentFactory {
         switch (modelName) {
             case LLM_CONSTANTS.CLAUDE_4_OPUS:
             case LLM_CONSTANTS.CLAUDE_4_SONNET:
-                return new ClaudeAgent(name, instruction, model.modelApiName, key);
+                return new ClaudeAgent(name, instruction, model.modelApiName, key, enableThinking);
             case LLM_CONSTANTS.GPT_5:
             case LLM_CONSTANTS.GPT_5_MINI:
-                return new OpenAiAgent(name, instruction, model.modelApiName, key, 1); // GPT-5 only supports temperature=1
+                return new Gpt5Agent(name, instruction, model.modelApiName, key, 1, enableThinking); // GPT-5 with Responses API
             case LLM_CONSTANTS.GEMINI_25_PRO:
-                return new GoogleAgent(name, instruction, model.modelApiName, key);
+                return new GoogleAgent(name, instruction, model.modelApiName, key, enableThinking);
             case LLM_CONSTANTS.MISTRAL_3_SMALL:
             case LLM_CONSTANTS.MISTRAL_2_LARGE:
-                return new MistralAgent(name, instruction, model.modelApiName, key);
-            case LLM_CONSTANTS.DEEPSEEK_CHAT:
-            case LLM_CONSTANTS.DEEPSEEK_REASONER:
-                return new DeepSeekAgent(name, instruction, model.modelApiName, key);
+                return new MistralAgent(name, instruction, model.modelApiName, key, enableThinking);
+            case LLM_CONSTANTS.DEEPSEEK:
+                return new DeepSeekV2Agent(name, instruction, model.modelApiName, key, 0.6, enableThinking);
             case LLM_CONSTANTS.GROK_4:
-                return new GrokAgent(name, instruction, model.modelApiName, key, 0.7);
+                return new GrokAgent(name, instruction, model.modelApiName, key, 0.7, enableThinking);
             case LLM_CONSTANTS.KIMI_K2:
-                return new KimiAgent(name, instruction, model.modelApiName, key, 0.6);
+                return new KimiAgent(name, instruction, model.modelApiName, key, 0.6, enableThinking);
             default:
                 throw new Error(`Unknown Key: ${modelName}`);
         }

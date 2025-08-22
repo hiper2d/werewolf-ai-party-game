@@ -173,10 +173,11 @@ export default function GamePage({
                     
                     // Set error state so user can see the issue and take action
                     const errorState = {
-                        message: `Failed to generate summary: ${error.message}`,
+                        error: `Failed to generate summary: ${error.message}`,
                         details: error.details || 'Summary generation encountered an error',
                         context: error.context || {},
-                        recoverable: error.recoverable !== false // Default to recoverable unless explicitly set to false
+                        recoverable: error.recoverable !== false, // Default to recoverable unless explicitly set to false
+                        timestamp: Date.now()
                     };
                     
                     try {
@@ -212,10 +213,11 @@ export default function GamePage({
                     
                     // Set error state so user can see the issue and take action
                     const errorState = {
-                        message: `Failed to start new day: ${error.message}`,
+                        error: `Failed to start new day: ${error.message}`,
                         details: error.details || 'New day transition encountered an error',
                         context: error.context || {},
-                        recoverable: error.recoverable !== false // Default to recoverable unless explicitly set to false
+                        recoverable: error.recoverable !== false, // Default to recoverable unless explicitly set to false
+                        timestamp: Date.now()
                     };
                     
                     try {
@@ -628,13 +630,13 @@ export default function GamePage({
                     {queueInfo.showProgress && queueInfo.items.length > 0 && (
                         <div className="mt-3 pt-3 border-t border-gray-600">
                             <div className="text-xs text-gray-400 mb-1">
-                                Progress: {queueInfo.items.length - (queueInfo.items.indexOf(queueInfo.currentItem) + 1)} remaining
+                                Progress: {queueInfo.currentItem ? queueInfo.items.length - (queueInfo.items.indexOf(queueInfo.currentItem) + 1) : queueInfo.items.length} remaining
                             </div>
                             <div className="w-full bg-gray-700 rounded-full h-2">
                                 <div
                                     className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                                     style={{
-                                        width: `${((queueInfo.items.indexOf(queueInfo.currentItem) + 1) / queueInfo.items.length) * 100}%`
+                                        width: `${queueInfo.currentItem ? ((queueInfo.items.indexOf(queueInfo.currentItem) + 1) / queueInfo.items.length) * 100 : 0}%`
                                     }}
                                 ></div>
                             </div>

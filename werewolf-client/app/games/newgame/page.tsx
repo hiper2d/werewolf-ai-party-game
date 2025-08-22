@@ -5,7 +5,7 @@ import {useRouter} from 'next/navigation';
 import {buttonBlackStyle, buttonTransparentStyle} from "@/app/constants";
 import {createGame, previewGame} from '@/app/api/game-actions';
 import {GAME_ROLES, GamePreview, GamePreviewWithGeneratedBots, GENDER_OPTIONS, getVoicesForGender, getRandomVoiceForGender} from "@/app/api/game-models";
-import {LLM_CONSTANTS} from "@/app/ai/ai-models";
+import {LLM_CONSTANTS, SupportedAiModels} from "@/app/ai/ai-models";
 import {ttsService} from "@/app/services/tts-service";
 
 export default function CreateNewGamePage() {
@@ -17,6 +17,8 @@ export default function CreateNewGamePage() {
     const [specialRoles, setSpecialRoles] = useState([GAME_ROLES.DOCTOR, GAME_ROLES.DETECTIVE]);
     const [gameMasterAiType, setGameMasterAiType] = useState<string>(LLM_CONSTANTS.RANDOM);
     const [playersAiType, setPlayersAiType] = useState<string>(LLM_CONSTANTS.RANDOM);
+    const [gameMasterThinking, setGameMasterThinking] = useState<boolean>(false);
+    const [allBotsThinking, setAllBotsThinking] = useState<boolean>(false);
     const [isFormValid, setIsFormValid] = useState(false);
     const [gameData, setGameData] = useState<GamePreviewWithGeneratedBots | null>(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -27,6 +29,14 @@ export default function CreateNewGamePage() {
     const playerOptions = Array.from({ length: 7 }, (_, i) => i + 6);
     const supportedAi = Object.values(LLM_CONSTANTS); // todo: this list should be limited to ApiKeys player uploaded
     const supportedPlayerAi = Object.values(LLM_CONSTANTS);
+
+    // Helper function to check if a model supports thinking mode
+    const supportsThinkingMode = (aiType: string): boolean => {
+        if (aiType === LLM_CONSTANTS.RANDOM) return true; // Allow thinking mode for random (will be applied to actual model)
+        const modelConfig = SupportedAiModels[aiType];
+        return modelConfig?.supportsThinking === true;
+    };
+
     const availableRoles = [GAME_ROLES.DOCTOR, GAME_ROLES.DETECTIVE];
 
     useEffect(() => {
@@ -48,6 +58,19 @@ export default function CreateNewGamePage() {
         }
     }, [gameData]);
 
+    // Reset thinking mode when AI model changes to unsupported model
+    useEffect(() => {
+        if (!supportsThinkingMode(gameMasterAiType)) {
+            setGameMasterThinking(false);
+        }
+    }, [gameMasterAiType]);
+
+    useEffect(() => {
+        if (!supportsThinkingMode(playersAiType)) {
+            setAllBotsThinking(false);
+        }
+    }, [playersAiType]);
+
     const handleGeneratePreview = async () => {
         const gamePreviewData: GamePreview = {
             name,
@@ -64,7 +87,18 @@ export default function CreateNewGamePage() {
         setError(null);
         try {
             const game: GamePreviewWithGeneratedBots = await previewGame(gamePreviewData);
-            setGameData(game);
+            
+            // Apply global thinking mode settings to the generated data
+            const updatedGame: GamePreviewWithGeneratedBots = {
+                ...game,
+                gameMasterThinking: gameMasterThinking,
+                bots: game.bots.map(bot => ({
+                    ...bot,
+                    enableThinking: allBotsThinking
+                }))
+            };
+            
+            setGameData(updatedGame);
         } catch (err: any) {
             setError(err.message);
             console.error("Error previewing game:", err);
@@ -96,10 +130,41 @@ export default function CreateNewGamePage() {
         }
     };
 
-    const handlePlayerChange = (index: number, field: string, value: string) => {
+    const handlePlayerChange = (index: number, field: string, value: string | boolean) => {
         if (gameData) {
             const updatedPlayers = [...gameData.bots];
             updatedPlayers[index] = { ...updatedPlayers[index], [field]: value };
+            setGameData({ ...gameData, bots: updatedPlayers });
+        }
+    };
+
+    const handleGameMasterThinkingChange = (enabled: boolean) => {
+        if (gameData) {
+            setGameData({ ...gameData, gameMasterThinking: enabled });
+        }
+    };
+
+    // Reset individual bot thinking mode when the game master AI model changes in preview
+    const handleGameMasterAiChange = (newAiType: string) => {
+        if (gameData) {
+            const updatedData = { ...gameData, gameMasterAiType: newAiType };
+            // If the new model doesn't support thinking, disable it
+            if (!supportsThinkingMode(newAiType)) {
+                updatedData.gameMasterThinking = false;
+            }
+            setGameData(updatedData);
+        }
+    };
+
+    // Reset individual bot thinking mode when a bot's AI model changes in preview
+    const handleBotAiChange = (index: number, newAiType: string) => {
+        if (gameData) {
+            const updatedPlayers = [...gameData.bots];
+            updatedPlayers[index] = { ...updatedPlayers[index], playerAiType: newAiType };
+            // If the new model doesn't support thinking, disable it for this bot
+            if (!supportsThinkingMode(newAiType)) {
+                updatedPlayers[index].enableThinking = false;
+            }
             setGameData({ ...gameData, bots: updatedPlayers });
         }
     };
@@ -237,6 +302,46 @@ export default function CreateNewGamePage() {
                     </div>
                 </div>
 
+                {/* Global Thinking Mode Checkboxes */}
+                <div className={flexRowStyle}>
+                    <div className={flexItemStyle}>
+                        <label className={labelStyle}>GM Thinking Mode:</label>
+                        <div className="flex items-center">
+                            <input
+                                type="checkbox"
+                                id="gameMasterThinking"
+                                checked={gameMasterThinking}
+                                onChange={(e) => setGameMasterThinking(e.target.checked)}
+                                disabled={!supportsThinkingMode(gameMasterAiType)}
+                                className="mr-2"
+                            />
+                            <label htmlFor="gameMasterThinking" className={`text-sm ${
+                                supportsThinkingMode(gameMasterAiType) ? 'text-white' : 'text-gray-500'
+                            }`}>
+                                Enable thinking mode for Game Master
+                            </label>
+                        </div>
+                    </div>
+                    <div className={flexItemStyle}>
+                        <label className={labelStyle}>All Bots Thinking:</label>
+                        <div className="flex items-center">
+                            <input
+                                type="checkbox"
+                                id="allBotsThinking"
+                                checked={allBotsThinking}
+                                onChange={(e) => setAllBotsThinking(e.target.checked)}
+                                disabled={!supportsThinkingMode(playersAiType)}
+                                className="mr-2"
+                            />
+                            <label htmlFor="allBotsThinking" className={`text-sm ${
+                                supportsThinkingMode(playersAiType) ? 'text-white' : 'text-gray-500'
+                            }`}>
+                                Enable thinking mode for all bots
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
                 <div className={flexRowStyle}>
                     <div className={flexItemStyle}>
                         <label className={labelStyle}>Special Roles:</label>
@@ -293,7 +398,7 @@ export default function CreateNewGamePage() {
                                     <select
                                         className="w-full h-10 p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
                                         value={gameData.gameMasterAiType}
-                                        onChange={(e) => setGameData({ ...gameData, gameMasterAiType: e.target.value })}
+                                        onChange={(e) => handleGameMasterAiChange(e.target.value)}
                                     >
                                         {supportedAi.filter(model => model !== LLM_CONSTANTS.RANDOM).map(model => (
                                             <option key={model} value={model}>{model}</option>
@@ -325,6 +430,21 @@ export default function CreateNewGamePage() {
                                     </button>
                                 </div>
                             </div>
+                            {/* Thinking Mode Checkbox for Game Master */}
+                            {supportsThinkingMode(gameData.gameMasterAiType) && (
+                                <div className="flex items-center mt-2">
+                                    <input
+                                        type="checkbox"
+                                        id="gmThinking"
+                                        checked={gameData.gameMasterThinking || false}
+                                        onChange={(e) => handleGameMasterThinkingChange(e.target.checked)}
+                                        className="mr-2"
+                                    />
+                                    <label htmlFor="gmThinking" className="text-sm text-gray-300">
+                                        Enable thinking mode for Game Master
+                                    </label>
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -347,7 +467,7 @@ export default function CreateNewGamePage() {
                                     <select
                                         className="w-full h-10 p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
                                         value={player.playerAiType}
-                                        onChange={(e) => handlePlayerChange(index, 'playerAiType', e.target.value)}
+                                        onChange={(e) => handleBotAiChange(index, e.target.value)}
                                     >
                                         {supportedPlayerAi.filter(model => model !== LLM_CONSTANTS.RANDOM).map(model => (
                                             <option key={model} value={model}>{model}</option>
@@ -408,6 +528,21 @@ export default function CreateNewGamePage() {
                                     placeholder="Player's Story"
                                 />
                             </div>
+                            {/* Thinking Mode Checkbox for Player */}
+                            {supportsThinkingMode(player.playerAiType) && (
+                                <div className="flex items-center mt-2">
+                                    <input
+                                        type="checkbox"
+                                        id={`player${index}Thinking`}
+                                        checked={player.enableThinking || false}
+                                        onChange={(e) => handlePlayerChange(index, 'enableThinking', e.target.checked)}
+                                        className="mr-2"
+                                    />
+                                    <label htmlFor={`player${index}Thinking`} className="text-sm text-gray-300">
+                                        Enable thinking mode for {player.name}
+                                    </label>
+                                </div>
+                            )}
                         </div>
                     ))}
 

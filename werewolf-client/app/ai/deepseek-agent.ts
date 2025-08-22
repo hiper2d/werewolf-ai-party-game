@@ -61,9 +61,10 @@ Ensure your response strictly follows the schema requirements.`,
         instruction: string,
         model: string,
         apiKey: string,
+        enableThinking: boolean = false,
         temperature: number = 0.6
     ) {
-        super(name, instruction, model, temperature);
+        super(name, instruction, model, temperature, enableThinking);
         this.client = new OpenAI({
             baseURL: "https://api.deepseek.com",
             apiKey: apiKey,
@@ -85,13 +86,20 @@ Ensure your response strictly follows the schema requirements.`,
 
         try {
             const preparedMessages = this.prepareMessagesWithInstruction(modifiedMessages);
+            
+            // Determine which model to use based on thinking mode
+            const modelToUse = this.enableThinking ? 
+                (SupportedAiModels[LLM_CONSTANTS.DEEPSEEK] as any).reasonerModelApiName : 
+                this.model;
+
             const params = {
                 ...this.defaultParams,
+                model: modelToUse,
                 messages: preparedMessages,
             };
 
-            // Only add response_format for DeepSeek Chat model
-            if (this.model === SupportedAiModels[LLM_CONSTANTS.DEEPSEEK_CHAT].modelApiName) {
+            // Only add response_format for DeepSeek Chat model (not for reasoner model)
+            if (!this.enableThinking && this.model === SupportedAiModels[LLM_CONSTANTS.DEEPSEEK].modelApiName) {
                 params.response_format = { type: 'json_object' };
             }
 

@@ -35,8 +35,8 @@ ${JSON.stringify(schema, null, 2)}
 Ensure your response strictly follows the schema requirements.`,
     };
 
-    constructor(name: string, instruction: string, model: string, apiKey: string, temperature: number) {
-        super(name, instruction, model, temperature);
+    constructor(name: string, instruction: string, model: string, apiKey: string, temperature: number, enableThinking: boolean = false) {
+        super(name, instruction, model, temperature, enableThinking);
         this.client = new OpenAI({
             apiKey: apiKey,
             baseURL: 'https://api.x.ai/v1',
@@ -84,6 +84,7 @@ Ensure your response strictly follows the schema requirements.`,
     private prepareMessagesWithInstruction(messages: AIMessage[]): OpenAI.Chat.Completions.ChatCompletionMessageParam[] {
         const preparedMessages = this.prepareMessages(messages);
         if (preparedMessages.length > 0) {
+            // Grok-4 is a reasoning-only model - no additional thinking instructions needed
             preparedMessages[0].content = `${this.instruction}\n\n${preparedMessages[0].content}`;
         }
         return this.convertToOpenAIMessages(preparedMessages);
@@ -98,6 +99,12 @@ Ensure your response strictly follows the schema requirements.`,
 
     private processReply(completion: OpenAI.Chat.Completions.ChatCompletion): string {
         const reply = completion.choices[0]?.message?.content;
+
+        // Log reasoning content if available (grok-4 is reasoning-only)
+        const reasoningContent = (completion.choices[0]?.message as any)?.reasoning_content;
+        if (reasoningContent && this.enableThinking) {
+            this.logReasoningTokens(reasoningContent);
+        }
 
         if (!reply) {
             throw new Error(this.errorMessages.emptyResponse);

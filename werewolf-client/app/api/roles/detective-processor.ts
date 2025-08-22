@@ -85,7 +85,7 @@ export class DetectiveProcessor extends BaseRoleProcessor {
             });
 
             // Create agent
-            const agent = AgentFactory.createAgent(detectiveBot.name, detectivePrompt, detectiveBot.aiType, apiKeys);
+            const agent = AgentFactory.createAgent(detectiveBot.name, detectivePrompt, detectiveBot.aiType, apiKeys, detectiveBot.enableThinking || false);
 
             // Get all living players except the detective for investigation
             const allLivePlayers = [

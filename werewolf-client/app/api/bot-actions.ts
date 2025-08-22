@@ -159,7 +159,7 @@ async function welcomeImpl(gameId: string): Promise<Game> {
             }
         );
 
-        const agent = AgentFactory.createAgent(bot.name, botPrompt, bot.aiType, apiKeys);
+        const agent = AgentFactory.createAgent(bot.name, botPrompt, bot.aiType, apiKeys, bot.enableThinking || false);
 
         // Create the game master command message
         const gmMessage: GameMessage = {
@@ -305,7 +305,7 @@ async function keepBotsGoingImpl(gameId: string): Promise<Game> {
             humanPlayerName: game.humanPlayerName
         });
 
-        const gmAgent = AgentFactory.createAgent(GAME_MASTER, gmPrompt, game.gameMasterAiType, apiKeys);
+        const gmAgent = AgentFactory.createAgent(GAME_MASTER, gmPrompt, game.gameMasterAiType, apiKeys, game.gameMasterThinking || false);
         const gmMessage: GameMessage = {
             id: null,
             recipientName: GAME_MASTER,
@@ -396,7 +396,7 @@ async function handleHumanPlayerMessage(
         humanPlayerName: game.humanPlayerName
     });
 
-    const gmAgent = AgentFactory.createAgent(GAME_MASTER, gmPrompt, game.gameMasterAiType, apiKeys);
+    const gmAgent = AgentFactory.createAgent(GAME_MASTER, gmPrompt, game.gameMasterAiType, apiKeys, game.gameMasterThinking || false);
     const gmMessage: GameMessage = {
         id: null,
         recipientName: GAME_MASTER,
@@ -512,7 +512,7 @@ async function processNextBotInQueue(
         previous_day_summaries: generatePreviousDaySummariesSection(bot, game.currentDay)
     });
 
-    const agent = AgentFactory.createAgent(bot.name, botPrompt, bot.aiType, apiKeys);
+    const agent = AgentFactory.createAgent(bot.name, botPrompt, bot.aiType, apiKeys, bot.enableThinking || false);
     // Include the GM command in history with playstyle reminder without saving it yet
     const playStyleReminder = format(BOT_REMINDER_POSTFIX, { play_style: generatePlayStyleDescription(bot) });
     const messagesWithPlaystyle = [...botMessages, {
@@ -810,7 +810,7 @@ async function voteImpl(gameId: string): Promise<Game> {
                 }
             );
             
-            const agent = AgentFactory.createAgent(bot.name, botPrompt, bot.aiType, apiKeys);
+            const agent = AgentFactory.createAgent(bot.name, botPrompt, bot.aiType, apiKeys, bot.enableThinking || false);
             
             // Create the voting command message
             const gmMessage: GameMessage = {
@@ -1270,7 +1270,7 @@ async function getSuggestionImpl(gameId: string): Promise<string> {
         });
 
         // Use the game master AI to generate suggestion
-        const agent = AgentFactory.createAgent('SuggestionBot', suggestionPrompt, game.gameMasterAiType, apiKeys);
+        const agent = AgentFactory.createAgent('SuggestionBot', suggestionPrompt, game.gameMasterAiType, apiKeys, game.gameMasterThinking || false);
         
         // Convert day messages to AI format for context
         const history = convertToAIMessages('SuggestionBot', dayMessages);

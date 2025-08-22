@@ -171,7 +171,7 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
     }
 
     const storyTellAgent: AbstractAgent = AgentFactory.createAgent(
-        GAME_MASTER, STORY_SYSTEM_PROMPT, resolvedGmAiType, apiKeys
+        GAME_MASTER, STORY_SYSTEM_PROMPT, resolvedGmAiType, apiKeys, false
     )
         
     // Gather role configurations for the story generation
@@ -304,7 +304,8 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
                 aiType: bot.playerAiType,
                 gender: bot.gender,
                 voice: bot.voice,
-                playStyle: bot.playStyle
+                playStyle: bot.playStyle,
+                enableThinking: bot.enableThinking || false
             };
         });
 
@@ -324,7 +325,8 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
             gameState: GAME_STATES.WELCOME,
             gameStateParamQueue: bots.map(bot => bot.name),
             gameStateProcessQueue: [],
-            messageCounter: 0 // Initialize message counter for new games
+            messageCounter: 0, // Initialize message counter for new games
+            gameMasterThinking: gamePreview.gameMasterThinking || false
         };
 
         const response = await db.collection('games').add(game);
@@ -803,7 +805,7 @@ export async function summarizeCurrentDay(gameId: string): Promise<Game> {
         };
         
         // Create agent
-        const agent = AgentFactory.createAgent(bot.name, botPrompt, bot.aiType, apiKeys);
+        const agent = AgentFactory.createAgent(bot.name, botPrompt, bot.aiType, apiKeys, bot.enableThinking || false);
         
         // Create conversation history with all day messages + summary request
         const history = convertToAIMessages(bot.name, [...botMessages, summaryMessage]);
@@ -1003,6 +1005,7 @@ function gameFromFirestore(id: string, data: any): Game {
         gameStateProcessQueue: data.gameStateProcessQueue,
         errorState: data.errorState || null,
         nightResults: data.nightResults || {},
-        messageCounter: data.messageCounter || 0 // Default to 0 for existing games
+        messageCounter: data.messageCounter || 0, // Default to 0 for existing games
+        gameMasterThinking: data.gameMasterThinking || false
     };
 }

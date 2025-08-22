@@ -142,7 +142,7 @@ export class WerewolfProcessor extends BaseRoleProcessor {
             });
             
             // Create agent
-            const agent = AgentFactory.createAgent(werewolfBot.name, werewolfPrompt, werewolfBot.aiType, apiKeys);
+            const agent = AgentFactory.createAgent(werewolfBot.name, werewolfPrompt, werewolfBot.aiType, apiKeys, werewolfBot.enableThinking || false);
             
             // Determine if this is the last werewolf in queue (decision maker)
             const isLastWerewolf = remainingQueue.length === 0;

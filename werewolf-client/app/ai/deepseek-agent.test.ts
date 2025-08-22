@@ -1,6 +1,6 @@
 import dotenv from "dotenv";
 dotenv.config();
-import { DeepSeekAgent } from "./deepseek-agent";
+import { DeepSeekV2Agent } from "./deepseek-v2-agent";
 import { AIMessage, BotAnswer, PLAY_STYLES, GAME_ROLES } from "@/app/api/game-models";
 import { parseResponseToObj } from "@/app/utils/message-utils";
 import { LLM_CONSTANTS, SupportedAiModels } from "@/app/ai/ai-models";
@@ -9,8 +9,8 @@ import { format } from "@/app/ai/prompts/utils";
 import { GM_COMMAND_INTRODUCE_YOURSELF, HISTORY_PREFIX } from "@/app/ai/prompts/gm-commands";
 import { createBotAnswerSchema } from "@/app/ai/prompts/ai-schemas";
 
-describe("DeepSeekAgent integration", () => {
-  const setupAgent = (botName: string, modelType: string): DeepSeekAgent => {
+describe("DeepSeekV2Agent integration", () => {
+  const setupAgent = (botName: string, modelType: string, enableThinking: boolean = false): DeepSeekV2Agent => {
     const testBot = {
       name: botName,
       story: "A mysterious wanderer with a hidden past",
@@ -32,17 +32,18 @@ describe("DeepSeekAgent integration", () => {
       dead_players_names_with_roles: "David (Werewolf)"
     });
 
-    return new DeepSeekAgent(
+    return new DeepSeekV2Agent(
       botName,
       instruction,
       SupportedAiModels[modelType].modelApiName,
       process.env.DEEP_SEEK_K!,
-      0.7
+      0.7,
+      enableThinking
     );
   };
 
   it("should respond with a valid schema-based answer for introduction using DeepSeek Chat", async () => {
-    const agent = setupAgent("DeepSeekBot", LLM_CONSTANTS.DEEPSEEK_CHAT);
+    const agent = setupAgent("DeepSeekBot", LLM_CONSTANTS.DEEPSEEK, false);
     const messages: AIMessage[] = [
       {
         role: 'user',
@@ -71,7 +72,7 @@ describe("DeepSeekAgent integration", () => {
   });
 
   it("should respond with a valid schema-based answer for introduction using DeepSeek Reasoner", async () => {
-    const agent = setupAgent("DeepSeekReasonerBot", LLM_CONSTANTS.DEEPSEEK_REASONER);
+    const agent = setupAgent("DeepSeekReasonerBot", LLM_CONSTANTS.DEEPSEEK, true);
     const messages: AIMessage[] = [
       {
         role: 'user',
@@ -100,7 +101,7 @@ describe("DeepSeekAgent integration", () => {
   }, 60000); // 60 second timeout for DeepSeek Reasoner
 
   it("should respond with a valid schema-based answer for suspicion using DeepSeek Chat", async () => {
-    const agent = setupAgent("DeepSeekBot", LLM_CONSTANTS.DEEPSEEK_CHAT);
+    const agent = setupAgent("DeepSeekBot", LLM_CONSTANTS.DEEPSEEK, false);
     const messages: AIMessage[] = [
       {
         role: 'user',
@@ -126,7 +127,7 @@ describe("DeepSeekAgent integration", () => {
   });
 
   it("should respond with a valid schema-based answer for suspicion using DeepSeek Reasoner", async () => {
-    const agent = setupAgent("DeepSeekReasonerBot", LLM_CONSTANTS.DEEPSEEK_REASONER);
+    const agent = setupAgent("DeepSeekReasonerBot", LLM_CONSTANTS.DEEPSEEK, true);
     const messages: AIMessage[] = [
       {
         role: 'user',
@@ -152,7 +153,7 @@ describe("DeepSeekAgent integration", () => {
   }, 60000); // 60 second timeout for DeepSeek Reasoner
 
   it("should throw error when API response is empty", async () => {
-    const agent = setupAgent("DeepSeekBot", LLM_CONSTANTS.DEEPSEEK_CHAT);
+    const agent = setupAgent("DeepSeekBot", LLM_CONSTANTS.DEEPSEEK, false);
     const messages: AIMessage[] = [
       {
         role: 'user',

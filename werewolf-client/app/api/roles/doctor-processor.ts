@@ -85,7 +85,7 @@ export class DoctorProcessor extends BaseRoleProcessor {
             });
 
             // Create agent
-            const agent = AgentFactory.createAgent(doctorBot.name, doctorPrompt, doctorBot.aiType, apiKeys);
+            const agent = AgentFactory.createAgent(doctorBot.name, doctorPrompt, doctorBot.aiType, apiKeys, doctorBot.enableThinking || false);
 
             // Get all living players for protection
             const allLivePlayers = [

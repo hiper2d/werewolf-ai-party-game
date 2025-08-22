@@ -127,7 +127,7 @@ async function endNightWithResults(gameId: string, game: Game): Promise<Game> {
     });
     
     // Create Game Master agent with system prompt
-    const gmAgent = AgentFactory.createAgent(GAME_MASTER, gmSystemPrompt, game.gameMasterAiType, apiKeys);
+    const gmAgent = AgentFactory.createAgent(GAME_MASTER, gmSystemPrompt, game.gameMasterAiType, apiKeys, game.gameMasterThinking || false);
     
     // Get day discussion messages and night messages for context
     const dayMessages = await getBotMessages(gameId, GAME_MASTER, game.currentDay);

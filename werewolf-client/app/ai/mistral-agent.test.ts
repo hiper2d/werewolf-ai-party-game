@@ -10,7 +10,7 @@ import { GM_COMMAND_INTRODUCE_YOURSELF, HISTORY_PREFIX } from "@/app/ai/prompts/
 import { createBotAnswerSchema } from "@/app/ai/prompts/ai-schemas";
 
 // Helper function to create a MistralAgent instance
-const createAgent = (botName: string, modelType: string): MistralAgent => {
+const createAgent = (botName: string, modelType: string, enableThinking: boolean = false): MistralAgent => {
   const testBot = {
     name: botName,
     story: "A mysterious wanderer with a hidden past",
@@ -35,7 +35,8 @@ const createAgent = (botName: string, modelType: string): MistralAgent => {
     botName,
     instruction,
     SupportedAiModels[modelType].modelApiName,
-    process.env.MISTRAL_K!
+    process.env.MISTRAL_K!,
+    enableThinking
   );
 };
 
