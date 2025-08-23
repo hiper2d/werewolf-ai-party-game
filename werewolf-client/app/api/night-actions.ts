@@ -147,7 +147,7 @@ async function endNightWithResults(gameId: string, game: Game): Promise<Game> {
     const history = convertToAIMessages(GAME_MASTER, [...dayMessages, gmCommandMessage]);
     const schema = createNightResultsStorySchema();
     
-    const rawStoryResponse = await gmAgent.askWithSchema(schema, history);
+    const [rawStoryResponse, thinking] = await gmAgent.askWithSchema(schema, history);
     if (!rawStoryResponse) {
         throw new BotResponseError(
             'Game Master failed to generate night results story',

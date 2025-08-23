@@ -113,7 +113,7 @@ export class DoctorProcessor extends BaseRoleProcessor {
             const history = convertToAIMessages(doctorBot.name, [...botMessages, gmMessage]);
 
             const schema = createDoctorActionSchema();
-            const rawResponse = await agent.askWithSchema(schema, history);
+            const [rawResponse, thinking] = await agent.askWithSchema(schema, history);
 
             if (!rawResponse) {
                 throw new Error(`Doctor ${doctorBot.name} failed to respond to protection prompt`);

@@ -70,7 +70,7 @@ describe("MistralAgent integration", () => {
         content: 'What do you think about the current situation in the village?'
       }];
       const schema = createBotAnswerSchema();
-      const response = await agent.askWithSchema(schema, messages);
+      const [response, thinking] = await agent.askWithSchema(schema, messages);
 
       expect(typeof response).toBe("string");
       expect(response?.length).toBeGreaterThan(0);

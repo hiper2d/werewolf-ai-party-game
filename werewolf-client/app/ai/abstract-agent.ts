@@ -32,8 +32,7 @@ export abstract class AbstractAgent {
         }
     }
 
-    async askWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<string | null> {
-        this.clearThinking(); // Clear any previous thinking content
+    async askWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<[string, string]> {
         /*this.logger(`Asking bot ${this.name} (${this.model})`);
         if (this.instruction) {
             this.logger(this.instruction);
@@ -43,9 +42,12 @@ export abstract class AbstractAgent {
         }*/
 
         try {
-            const result = await this.doAskWithSchema(schema, messages);
+            const [result, thinking] = await this.doAskWithSchema(schema, messages);
             this.logger(`Bot ${this.name} replied: ${result}`);
-            return result;
+            if (thinking) {
+                this.logger(`Bot ${this.name} thoughts: ${thinking}`);
+            }
+            return [result, thinking];
         } catch (error) {
             this.logger(`${error instanceof Error ? error.message : String(error)}`);
             throw error;
@@ -54,7 +56,7 @@ export abstract class AbstractAgent {
 
     // Abstract methods that child classes must implement
     protected abstract doAsk(messages: AIMessage[]): Promise<string | null>;
-    protected abstract doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<string | null>;
+    protected abstract doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<[string, string]>;
 
     protected logger(message: string): void {
         logger(`[${this.name} ${this.model}]: ${message}`);
@@ -68,22 +70,6 @@ export abstract class AbstractAgent {
         });
     }
 
-    private currentThinkingContent: string[] = [];
-
-    protected logReasoningTokens(reasoningTokens: string): void {
-        this.logger(`Bot ${this.name} thoughts: ${reasoningTokens}`);
-        // Store thinking content for database storage
-        this.currentThinkingContent.push(reasoningTokens);
-    }
-
-    getCurrentThinking(): string | undefined {
-        if (this.currentThinkingContent.length === 0) return undefined;
-        return this.currentThinkingContent.join('\n');
-    }
-
-    protected clearThinking(): void {
-        this.currentThinkingContent = [];
-    }
 
     protected prepareMessages(messages: AIMessage[]): AIMessage[] {
         return messages;

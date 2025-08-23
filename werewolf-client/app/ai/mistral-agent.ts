@@ -43,7 +43,7 @@ Ensure your response strictly follows the schema requirements.`,
         return null; // Method kept empty to maintain inheritance
     }
 
-    protected async doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<string> {
+    protected async doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<[string, string]> {
         const schemaInstructions = this.schemaTemplate.instructions(schema);
         const lastMessage = messages[messages.length - 1];
         const fullPrompt = `${lastMessage.content}\n\n${schemaInstructions}`;
@@ -81,7 +81,7 @@ Ensure your response strictly follows the schema requirements.`,
         }));
     }
 
-    private processReply(response: ChatCompletionResponse | undefined): string {
+    private processReply(response: ChatCompletionResponse | undefined): [string, string] {
         let reply = response?.choices?.[0]?.message?.content;
 
         if (reply === undefined || reply === null) {
@@ -92,7 +92,7 @@ Ensure your response strictly follows the schema requirements.`,
             reply = this.processArrayReply(reply);
         }
 
-        return cleanResponse(reply);
+        return [cleanResponse(reply), ""];
     }
 
     private processArrayReply(reply: unknown[]): string {

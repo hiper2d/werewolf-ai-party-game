@@ -62,11 +62,6 @@ Ensure your response strictly follows the schema requirements.`,
             
             const response = await (this.client as any).responses.create(requestParams);
 
-            // Log reasoning content if available
-            if (this.enableThinking && response.output) {
-                this.logReasoningFromOutput(response.output);
-            }
-
             return response.output_text ? cleanResponse(response.output_text) : null;
         } catch (error) {
             this.logger(this.logTemplates.error(this.name, error));
@@ -74,7 +69,7 @@ Ensure your response strictly follows the schema requirements.`,
         }
     }
 
-    protected async doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<string> {
+    protected async doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<[string, string]> {
         try {
             const input = this.convertToOpenAIInput(messages);
             
@@ -99,6 +94,7 @@ Ensure your response strictly follows the schema requirements.`,
                 input: input,
                 instructions: this.instruction,
                 text: {
+                    verbosity: "low",
                     format: {
                         type: "json_schema",
                         strict: true,
@@ -111,7 +107,7 @@ Ensure your response strictly follows the schema requirements.`,
             // Add reasoning for thinking mode (only for reasoning models)
             if (this.enableThinking && this.isReasoningModel()) {
                 requestParams.reasoning = { 
-                    effort: "medium",
+                    effort: "low",
                     summary: "auto"
                 };
             }
@@ -123,16 +119,17 @@ Ensure your response strictly follows the schema requirements.`,
             
             const response = await (this.client as any).responses.create(requestParams);
 
-            // Log reasoning content if available
+            // Extract reasoning content if available
+            let thinkingContent = "";
             if (this.enableThinking && response.output) {
-                this.logReasoningFromOutput(response.output);
+                thinkingContent = this.extractReasoningFromOutput(response.output);
             }
 
             if (!response.output_text) {
                 throw new Error(this.errorMessages.emptyResponse);
             }
 
-            return cleanResponse(response.output_text);
+            return [cleanResponse(response.output_text), thinkingContent];
         } catch (error) {
             this.logger(this.logTemplates.error(this.name, error));
             throw new Error(this.errorMessages.apiError(error));
@@ -154,8 +151,10 @@ Ensure your response strictly follows the schema requirements.`,
                this.model.includes('o3');
     }
 
-    private logReasoningFromOutput(output: any[]): void {
-        if (!Array.isArray(output)) return;
+    private extractReasoningFromOutput(output: any[]): string {
+        if (!Array.isArray(output)) return "";
+        
+        const thinkingParts: string[] = [];
         
         for (const item of output) {
             if (item.type === 'reasoning' && item.summary) {
@@ -171,13 +170,13 @@ Ensure your response strictly follows the schema requirements.`,
                         return '';
                     }).filter(Boolean);
                     
-                    if (summaryTexts.length > 0) {
-                        this.logReasoningTokens(summaryTexts.join('\n'));
-                    }
+                    thinkingParts.push(...summaryTexts);
                 } else if (typeof item.summary === 'string') {
-                    this.logReasoningTokens(item.summary);
+                    thinkingParts.push(item.summary);
                 }
             }
         }
+        
+        return thinkingParts.join('\n');
     }
 }

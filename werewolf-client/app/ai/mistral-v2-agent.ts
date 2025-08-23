@@ -69,7 +69,7 @@ Ensure your response strictly follows the schema requirements.`,
         }
     }
 
-    protected async doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<string> {
+    protected async doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<[string, string]> {
         try {
             const modelToUse = this.getModelForThinkingMode();
             
@@ -98,9 +98,13 @@ Ensure your response strictly follows the schema requirements.`,
 
             const chatResponse = await this.client.chat.complete(requestParams);
 
-            // Process and log thinking content if available
+            // Extract thinking content if available
+            let thinkingContent = "";
             if (this.enableThinking && chatResponse?.choices?.[0]?.message?.content) {
-                this.processThinkingContent(chatResponse.choices[0].message.content);
+                const content = chatResponse.choices[0].message.content;
+                if (typeof content === "string") {
+                    thinkingContent = this.extractThinkingContent(content);
+                }
             }
 
             const finalAnswer = this.extractFinalAnswer(chatResponse);
@@ -108,7 +112,7 @@ Ensure your response strictly follows the schema requirements.`,
                 throw new Error(this.errorMessages.emptyResponse);
             }
 
-            return cleanResponse(finalAnswer);
+            return [cleanResponse(finalAnswer), thinkingContent];
         } catch (error) {
             this.logger(this.logTemplates.error(this.name, error));
             throw new Error(this.errorMessages.apiError(error));
@@ -213,10 +217,7 @@ Ensure your response strictly follows the schema requirements.`,
         if (Array.isArray(content)) {
             for (const chunk of content) {
                 if (chunk?.type === "thinking" && chunk?.thinking) {
-                    const thinkingText = this.extractThinkingText(chunk.thinking);
-                    if (thinkingText) {
-                        this.logReasoningTokens(thinkingText);
-                    }
+                    // Thinking text extraction is now handled in extractThinkingContent method
                 }
             }
         }
@@ -254,5 +255,11 @@ Ensure your response strictly follows the schema requirements.`,
         }
 
         return null;
+    }
+
+    private extractThinkingContent(content: string): string {
+        // For Mistral reasoning models, extract thinking tags
+        const thinkingMatch = content.match(/<thinking>([\s\S]*?)<\/thinking>/);
+        return thinkingMatch ? thinkingMatch[1].trim() : "";
     }
 }

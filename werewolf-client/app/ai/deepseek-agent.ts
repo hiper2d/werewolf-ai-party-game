@@ -75,7 +75,7 @@ Ensure your response strictly follows the schema requirements.`,
         return null; // Method kept empty to maintain inheritance
     }
 
-    protected async doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<string> {
+    protected async doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<[string, string]> {
         const schemaInstructions = this.schemaTemplate.instructions(schema);
         const lastMessage = messages[messages.length - 1];
         const fullPrompt = `${lastMessage.content}\n\n${schemaInstructions}`;
@@ -127,18 +127,14 @@ Ensure your response strictly follows the schema requirements.`,
         }));
     }
 
-    private processCompletion(completion: DeepSeekCompletion): string {
+    private processCompletion(completion: DeepSeekCompletion): [string, string] {
         const reply = completion.choices[0]?.message?.content;
-
-        const reasoning = completion.choices[0]?.message?.reasoning_content;
-        if (reasoning !== undefined) {
-            this.logReasoningTokens(reasoning);
-        }
+        const reasoning = completion.choices[0]?.message?.reasoning_content || "";
 
         if (!reply) {
             throw new Error(this.errorMessages.emptyResponse);
         }
 
-        return cleanResponse(reply);
+        return [cleanResponse(reply), reasoning];
     }
 }

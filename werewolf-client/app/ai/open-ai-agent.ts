@@ -46,7 +46,7 @@ Ensure your response strictly follows the schema requirements.`,
         return null; // Method kept empty to maintain inheritance
     }
 
-    protected async doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<string> {
+    protected async doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<[string, string]> {
         const schemaInstructions = this.schemaTemplate.instructions(schema);
         const lastMessage = messages[messages.length - 1];
         const fullPrompt = `${lastMessage.content}\n\n${schemaInstructions}`;
@@ -70,7 +70,7 @@ Ensure your response strictly follows the schema requirements.`,
 
             const completion = await this.client.chat.completions.create(params) as OpenAI.Chat.Completions.ChatCompletion;
 
-            return this.processReply(completion);
+            return [this.processReply(completion), ""];
         } catch (error) {
             this.logger(this.logTemplates.error(this.name, error));
             throw new Error(this.errorMessages.apiError(error));

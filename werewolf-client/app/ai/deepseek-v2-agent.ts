@@ -55,13 +55,8 @@ Ensure your response strictly follows the schema requirements.`,
 
             const response = await this.client.chat.completions.create(requestParams);
 
-            // Log reasoning content if available (from deepseek-reasoner)
-            if (this.enableThinking && response.choices[0]?.message) {
-                const reasoning = (response.choices[0].message as any).reasoning_content;
-                if (reasoning) {
-                    this.logReasoningTokens(reasoning);
-                }
-            }
+            // Extract reasoning content if available (from deepseek-reasoner)
+            // (already handled in processCompletion method)
 
             const content = response.choices[0]?.message?.content;
             return content ? cleanResponse(content) : null;
@@ -71,7 +66,7 @@ Ensure your response strictly follows the schema requirements.`,
         }
     }
 
-    protected async doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<string> {
+    protected async doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<[string, string]> {
         try {
             const input = this.convertToOpenAIMessages(messages);
             const modelToUse = this.getModelForThinkingMode();
@@ -102,11 +97,12 @@ Ensure your response strictly follows the schema requirements.`,
 
             const response = await this.client.chat.completions.create(requestParams);
 
-            // Log reasoning content if available (from deepseek-reasoner)
+            // Extract reasoning content if available (from deepseek-reasoner)
+            let thinkingContent = "";
             if (this.enableThinking && response.choices[0]?.message) {
                 const reasoning = (response.choices[0].message as any).reasoning_content;
                 if (reasoning) {
-                    this.logReasoningTokens(reasoning);
+                    thinkingContent = reasoning;
                 }
             }
 
@@ -115,7 +111,7 @@ Ensure your response strictly follows the schema requirements.`,
                 throw new Error(this.errorMessages.emptyResponse);
             }
 
-            return cleanResponse(content);
+            return [cleanResponse(content), thinkingContent];
         } catch (error) {
             this.logger(this.logTemplates.error(this.name, error));
             throw new Error(this.errorMessages.apiError(error));

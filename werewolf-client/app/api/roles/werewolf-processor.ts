@@ -192,14 +192,13 @@ export class WerewolfProcessor extends BaseRoleProcessor {
             // Create conversation history
             const history = convertToAIMessages(werewolfBot.name, [...botMessages, gmMessage]);
             
-            const rawResponse = await agent.askWithSchema(schema, history);
+            const [rawResponse, thinking] = await agent.askWithSchema(schema, history);
             
             if (!rawResponse) {
                 throw new Error(`Werewolf ${werewolfBot.name} failed to respond to ${isLastWerewolf ? 'action' : 'discussion'} prompt`);
             }
             
             const werewolfResponse = parseResponseToObj(rawResponse, responseType);
-            const thinking = agent.getCurrentThinking();
             
             // Validate and save target if this is the final werewolf decision
             let gameUpdates: any = {

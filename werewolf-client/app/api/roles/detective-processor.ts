@@ -113,7 +113,7 @@ export class DetectiveProcessor extends BaseRoleProcessor {
             const history = convertToAIMessages(detectiveBot.name, [...botMessages, gmMessage]);
 
             const schema = createDetectiveActionSchema();
-            const rawResponse = await agent.askWithSchema(schema, history);
+            const [rawResponse, thinking] = await agent.askWithSchema(schema, history);
 
             if (!rawResponse) {
                 throw new Error(`Detective ${detectiveBot.name} failed to respond to investigation prompt`);

@@ -80,9 +80,7 @@ Ensure your response strictly follows the schema requirements.`,
             if (this.enableThinking && (response as any).candidates?.[0]?.content?.parts) {
                 const parts = (response as any).candidates[0].content.parts;
                 for (const part of parts) {
-                    if (part.thought && part.text) {
-                        this.logReasoningTokens(part.text);
-                    }
+                    // Thoughts are handled in doAskWithSchema method
                 }
             }
             
@@ -105,7 +103,7 @@ Ensure your response strictly follows the schema requirements.`,
         }
     }
 
-    protected async doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<string | null> {
+    protected async doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<[string, string]> {
         try {
             // Convert all messages except the last one
             const historyMessages = messages.slice(0, -1);
@@ -143,13 +141,16 @@ Ensure your response strictly follows the schema requirements.`,
             });
             
             // Handle thinking content if present and thinking mode is enabled
+            let thinkingContent = "";
             if (this.enableThinking && (response as any).candidates?.[0]?.content?.parts) {
                 const parts = (response as any).candidates[0].content.parts;
+                const thinkingParts: string[] = [];
                 for (const part of parts) {
                     if (part.thought && part.text) {
-                        this.logReasoningTokens(part.text);
+                        thinkingParts.push(part.text);
                     }
                 }
+                thinkingContent = thinkingParts.join('\n');
             }
 
             // Enhanced logging for debugging empty responses
@@ -160,14 +161,14 @@ Ensure your response strictly follows the schema requirements.`,
                 throw new Error(this.errorMessages.emptyResponse);
             }
 
-            return cleanResponse(response.text);
+            return [cleanResponse(response.text), thinkingContent];
         } catch (error) {
             this.logger(this.logTemplates.error(this.name, error));
             
             // Check for specific Gemini API errors and throw appropriate exceptions
             this.handleGeminiError(error);
             
-            return null;
+            throw error;
         }
     }
 

@@ -43,7 +43,7 @@ describe("GoogleAgent integration", () => {
     const agent = setupAgent();
     const messages = createTestMessages();
     
-    const response = await agent.askWithSchema(createBotAnswerSchema(), messages);
+    const [response, thinking] = await agent.askWithSchema(createBotAnswerSchema(), messages);
     expect(response).not.toBeNull();
     expect(typeof response).toBe("string");
     expect(response!.length).toBeGreaterThan(0);
@@ -59,7 +59,7 @@ describe("GoogleAgent integration", () => {
     const agent = setupAgent("invalid_api_key");
     const messages = createTestMessages();
     
-    const response = await agent.askWithSchema(createBotAnswerSchema(), messages);
+    const [response, thinking] = await agent.askWithSchema(createBotAnswerSchema(), messages);
     expect(response).toBeNull();
   });
 
@@ -70,7 +70,7 @@ describe("GoogleAgent integration", () => {
       content: 'Test message'
     }];
     
-    const response = await agent.askWithSchema(createBotAnswerSchema(), messages);
+    const [response, thinking] = await agent.askWithSchema(createBotAnswerSchema(), messages);
     expect(response).toBeNull();
   });
 
@@ -93,7 +93,7 @@ describe("GoogleAgent integration", () => {
     );
 
     const messages = createTestMessages();
-    const response = await agent.askWithSchema(createBotAnswerSchema(), messages);
+    const [response, thinking] = await agent.askWithSchema(createBotAnswerSchema(), messages);
     
     expect(response).not.toBeNull();
     expect(typeof response).toBe("string");

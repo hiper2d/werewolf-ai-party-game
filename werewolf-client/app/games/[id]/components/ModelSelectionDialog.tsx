@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { LLM_CONSTANTS, SupportedAiModels } from '@/app/ai/ai-models';
 import { buttonTransparentStyle } from '@/app/constants';
 
@@ -21,22 +21,19 @@ export default function ModelSelectionDialog({
     currentThinkingMode = false,
     botName
 }: ModelSelectionDialogProps) {
-    const availableModels = Object.values(LLM_CONSTANTS).filter(model => model !== LLM_CONSTANTS.RANDOM);
+    const availableModels = useMemo(() => 
+        Object.values(LLM_CONSTANTS).filter(model => model !== LLM_CONSTANTS.RANDOM), 
+    []);
     
-    // Ensure we have a valid default model if currentModel is empty
-    const defaultModel = currentModel && availableModels.includes(currentModel) 
-        ? currentModel 
-        : availableModels[0];
-    
-    const [selectedModel, setSelectedModel] = useState(defaultModel);
-    const [enableThinking, setEnableThinking] = useState(currentThinkingMode);
-    const [isUpdating, setIsUpdating] = useState(false);
-
     // Helper function to check if a model supports thinking mode
     const supportsThinkingMode = (aiType: string): boolean => {
         const modelConfig = SupportedAiModels[aiType];
         return modelConfig?.supportsThinking === true;
     };
+
+    const [selectedModel, setSelectedModel] = useState('');
+    const [enableThinking, setEnableThinking] = useState(false);
+    const [isUpdating, setIsUpdating] = useState(false);
 
     // Update state when dialog opens with new bot data
     useEffect(() => {
@@ -56,7 +53,7 @@ export default function ModelSelectionDialog({
             setSelectedModel(validModel);
             setEnableThinking(currentThinkingMode);
         }
-    }, [isOpen, currentModel, currentThinkingMode, availableModels, botName]);
+    }, [isOpen, currentModel, currentThinkingMode, botName]);
 
     const handleConfirm = async () => {
         // Only skip update if we have a valid currentModel and it matches selectedModel and thinking mode hasn't changed

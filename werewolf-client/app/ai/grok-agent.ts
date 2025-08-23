@@ -51,14 +51,15 @@ Ensure your response strictly follows the schema requirements.`,
                 messages: preparedMessages,
             }) as OpenAI.Chat.Completions.ChatCompletion;
 
-            return this.processReply(completion);
+            const [reply, thinking] = this.processReply(completion);
+            return reply;
         } catch (error) {
             this.logger(this.logTemplates.error(this.name, error));
             throw new Error(this.errorMessages.apiError(error));
         }
     }
 
-    protected async doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<string> {
+    protected async doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<[string, string]> {
         const schemaInstructions = this.schemaTemplate.instructions(schema);
         const lastMessage = messages[messages.length - 1];
         const fullPrompt = `${lastMessage.content}\n\n${schemaInstructions}`;
@@ -69,10 +70,16 @@ Ensure your response strictly follows the schema requirements.`,
 
         try {
             const preparedMessages = this.prepareMessagesWithInstruction(modifiedMessages);
-            const completion = await this.client.chat.completions.create({
+            
+            const requestParams = {
                 ...this.defaultParams,
                 messages: preparedMessages,
-            }) as OpenAI.Chat.Completions.ChatCompletion;
+            };
+            
+            this.logger(`Grok Agent - Request params: ${JSON.stringify(requestParams, null, 2)}`);
+            this.logger(`Grok Agent - enableThinking: ${this.enableThinking}`);
+            
+            const completion = await this.client.chat.completions.create(requestParams) as OpenAI.Chat.Completions.ChatCompletion;
 
             return this.processReply(completion);
         } catch (error) {
@@ -97,19 +104,22 @@ Ensure your response strictly follows the schema requirements.`,
         }));
     }
 
-    private processReply(completion: OpenAI.Chat.Completions.ChatCompletion): string {
+    private processReply(completion: OpenAI.Chat.Completions.ChatCompletion): [string, string] {
         const reply = completion.choices[0]?.message?.content;
+        const message = completion.choices[0]?.message;
 
-        // Log reasoning content if available (grok-4 is reasoning-only)
-        const reasoningContent = (completion.choices[0]?.message as any)?.reasoning_content;
-        if (reasoningContent && this.enableThinking) {
-            this.logReasoningTokens(reasoningContent);
-        }
+        // Debug: Log the entire message structure
+        this.logger(`Grok Agent - Full message structure: ${JSON.stringify(message, null, 2)}`);
+
+        // Extract reasoning content if available (grok-4 is reasoning-only)
+        const reasoningContent = (message as any)?.reasoning_content || "";
+        
+        this.logger(`Grok Agent - Found reasoning_content: ${!!reasoningContent}, length: ${reasoningContent.length}`);
 
         if (!reply) {
             throw new Error(this.errorMessages.emptyResponse);
         }
 
-        return cleanResponse(reply);
+        return [cleanResponse(reply), reasoningContent];
     }
 }

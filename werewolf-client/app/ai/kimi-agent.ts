@@ -51,14 +51,15 @@ Ensure your response strictly follows the schema requirements.`,
                 messages: preparedMessages,
             }) as OpenAI.Chat.Completions.ChatCompletion;
 
-            return this.processReply(completion);
+            const [reply, thinking] = this.processReply(completion);
+            return reply;
         } catch (error) {
             this.logger(this.logTemplates.error(this.name, error));
             throw new Error(this.errorMessages.apiError(error));
         }
     }
 
-    protected async doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<string> {
+    protected async doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<[string, string]> {
         const schemaInstructions = this.schemaTemplate.instructions(schema);
         const lastMessage = messages[messages.length - 1];
         const fullPrompt = `${lastMessage.content}\n\n${schemaInstructions}`;
@@ -96,13 +97,13 @@ Ensure your response strictly follows the schema requirements.`,
         }));
     }
 
-    private processReply(completion: OpenAI.Chat.Completions.ChatCompletion): string {
+    private processReply(completion: OpenAI.Chat.Completions.ChatCompletion): [string, string] {
         const reply = completion.choices[0]?.message?.content;
 
         if (!reply) {
             throw new Error(this.errorMessages.emptyResponse);
         }
 
-        return cleanResponse(reply);
+        return [cleanResponse(reply), ""];
     }
 }

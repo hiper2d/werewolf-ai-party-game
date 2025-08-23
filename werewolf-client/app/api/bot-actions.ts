@@ -179,7 +179,7 @@ async function welcomeImpl(gameId: string): Promise<Game> {
         const history = convertToAIMessages(bot.name, [...botMessages, gmMessage]);
         const schema = createBotAnswerSchema();
         
-        const rawIntroduction = await agent.askWithSchema(schema, history);
+        const [rawIntroduction, thinking] = await agent.askWithSchema(schema, history);
         if (!rawIntroduction) {
             throw new BotResponseError(
                 'Bot failed to provide introduction',
@@ -190,7 +190,6 @@ async function welcomeImpl(gameId: string): Promise<Game> {
         }
 
         const answer = parseResponseToObj(rawIntroduction, 'BotAnswer');
-        const thinking = agent.getCurrentThinking();
 
         const botMessage: GameMessage = {
             id: null,
@@ -321,7 +320,7 @@ async function keepBotsGoingImpl(gameId: string): Promise<Game> {
         const history = convertToAIMessages(GAME_MASTER, [...dayMessages, gmMessage]);
         const schema = createGmBotSelectionSchema();
 
-        const rawGmResponse = await gmAgent.askWithSchema(schema, history);
+        const [rawGmResponse, thinking] = await gmAgent.askWithSchema(schema, history);
         if (!rawGmResponse) {
             throw new BotResponseError(
                 'Game Master failed to select responding bots',
@@ -412,7 +411,7 @@ async function handleHumanPlayerMessage(
     const history = convertToAIMessages(GAME_MASTER, [...dayMessages, userChatMessage, gmMessage]);
     const schema = createGmBotSelectionSchema();
 
-    const rawGmResponse = await gmAgent.askWithSchema(schema, history);
+    const [rawGmResponse, thinking] = await gmAgent.askWithSchema(schema, history);
     if (!rawGmResponse) {
         throw new BotResponseError(
             'Game Master failed to select responding bots',
@@ -523,7 +522,7 @@ async function processNextBotInQueue(
     const history = convertToAIMessages(bot.name, messagesWithPlaystyle);
     const schema = createBotAnswerSchema();
     
-    const rawBotReply = await agent.askWithSchema(schema, history);
+    const [rawBotReply, thinking] = await agent.askWithSchema(schema, history);
     if (!rawBotReply) {
         throw new BotResponseError(
             'Bot failed to respond to discussion',
@@ -534,7 +533,6 @@ async function processNextBotInQueue(
     }
 
     const botReply = parseResponseToObj(rawBotReply, 'BotAnswer');
-    const thinking = agent.getCurrentThinking();
     const botMessage: GameMessage = {
         id: null,
         recipientName: RECIPIENT_ALL,
@@ -838,8 +836,9 @@ async function voteImpl(gameId: string): Promise<Game> {
             const schema = createBotVoteSchema();
             
             let rawVoteResponse: string | null;
+            let thinking: string;
             try {
-                rawVoteResponse = await agent.askWithSchema(schema, history);
+                [rawVoteResponse, thinking] = await agent.askWithSchema(schema, history);
             } catch (error) {
                 // Handle specific model errors by using their message
                 if (error instanceof ModelError) {
@@ -1279,7 +1278,7 @@ async function getSuggestionImpl(gameId: string): Promise<string> {
         
         // Get suggestion from AI using schema to ensure consistent format
         const schema = createBotAnswerSchema();
-        const rawSuggestion = await agent.askWithSchema(schema, history);
+        const [rawSuggestion, thinking] = await agent.askWithSchema(schema, history);
         
         if (!rawSuggestion) {
             throw new Error('Failed to generate suggestion');

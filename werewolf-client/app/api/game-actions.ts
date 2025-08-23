@@ -216,7 +216,7 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
 
     const schema = createGameSetupSchema();
     
-    const rawResponse = await storyTellAgent.askWithSchema(schema, [convertToAIMessage(storyMessage)]);
+    const [rawResponse, thinking] = await storyTellAgent.askWithSchema(schema, [convertToAIMessage(storyMessage)]);
     if (!rawResponse) {
         throw new Error('Failed to get AI response');
     }
@@ -825,7 +825,7 @@ export async function summarizeCurrentDay(gameId: string): Promise<Game> {
         const history = convertToAIMessages(bot.name, [...botMessages, summaryMessage]);
         
         // Get summary using bot answer schema (returns { reply: "summary text" })
-        const rawResponse = await agent.askWithSchema(createBotAnswerSchema(), history);
+        const [rawResponse, thinking] = await agent.askWithSchema(createBotAnswerSchema(), history);
         
         if (!rawResponse) {
             console.warn(`💭 Bot ${bot.name} failed to generate summary for day ${currentGame.currentDay}`);

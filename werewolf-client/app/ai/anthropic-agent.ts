@@ -56,7 +56,7 @@ Ensure your response strictly follows the schema requirements.`,
         return null; // Method kept empty to maintain inheritance
     }
 
-    protected async doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<string> {
+    protected async doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<[string, string]> {
         const aiMessages = this.prepareMessages(messages);
 
         const schemaInstructions = this.buildSchemaInstructions(schema);
@@ -91,11 +91,12 @@ Ensure your response strictly follows the schema requirements.`,
 
             // Handle thinking content if present and find text content
             let textContent = null;
+            let thinkingContent = "";
             
             for (const block of response.content) {
-                // Log thinking content
+                // Extract thinking content
                 if (this.enableThinking && (block as any).type === 'thinking' && 'thinking' in block) {
-                    this.logReasoningTokens((block as any).thinking);
+                    thinkingContent = (block as any).thinking;
                 }
                 
                 // Find the text content block
@@ -108,7 +109,7 @@ Ensure your response strictly follows the schema requirements.`,
                 throw new Error(this.errorMessages.invalidFormat);
             }
             
-            return cleanResponse(textContent);
+            return [cleanResponse(textContent), thinkingContent];
         } catch (error) {
             const errorDetails = error instanceof Error ? error.message : String(error);
             

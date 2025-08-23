@@ -50,7 +50,7 @@ describe("KimiAgent integration", () => {
     ];
 
     const schema = createBotAnswerSchema();
-    const response = await agent.askWithSchema(schema, messages);
+    const [response, thinking] = await agent.askWithSchema(schema, messages);
     
     expect(response).not.toBeNull();
     expect(typeof response).toBe("string");
@@ -76,7 +76,7 @@ describe("KimiAgent integration", () => {
     ];
 
     const schema = createBotAnswerSchema();
-    const response = await agent.askWithSchema(schema, messages);
+    const [response, thinking] = await agent.askWithSchema(schema, messages);
     
     expect(response).not.toBeNull();
     expect(typeof response).toBe("string");
