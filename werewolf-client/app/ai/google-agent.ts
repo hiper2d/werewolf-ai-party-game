@@ -54,54 +54,6 @@ Ensure your response strictly follows the schema requirements.`,
         });
     }
 
-    protected async doAsk(messages: AIMessage[]): Promise<string | null> {
-        try {
-            const contents = this.convertToContents(messages);
-            
-            const config: any = {
-                temperature: this.temperature
-            };
-
-            // Add thinking config for Google models with thinking mode
-            if (this.enableThinking) {
-                config.thinkingConfig = {
-                    includeThoughts: true,
-                    thinkingBudget: 1024  // Use reasonable budget, -1 for dynamic thinking
-                };
-            }
-            
-            const response = await this.client.models.generateContent({
-                model: this.model,
-                contents: contents,
-                config: config
-            });
-            
-            // Handle thinking content if present and thinking mode is enabled
-            if (this.enableThinking && (response as any).candidates?.[0]?.content?.parts) {
-                const parts = (response as any).candidates[0].content.parts;
-                for (const part of parts) {
-                    // Thoughts are handled in doAskWithSchema method
-                }
-            }
-            
-            // Enhanced logging for debugging empty responses
-            this.logger(`Response received - hasText: ${!!response.text}, textLength: ${response.text ? response.text.length : 0}, responseKeys: ${Object.keys(response || {}).join(', ')}`);
-            
-            if (!response.text) {
-                this.logger(`Empty response details - responseType: ${typeof response}, responseKeys: ${response ? Object.keys(response).join(', ') : 'response is null/undefined'}, messagesCount: ${messages.length}, contentsCount: ${contents.length}`);
-                throw new Error(this.errorMessages.emptyResponse);
-            }
-
-            return cleanResponse(response.text);
-        } catch (error) {
-            this.logger(this.logTemplates.error(this.name, error));
-            
-            // Check for specific Gemini API errors and throw appropriate exceptions
-            this.handleGeminiError(error);
-            
-            return null;
-        }
-    }
 
     protected async doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<[string, string]> {
         try {

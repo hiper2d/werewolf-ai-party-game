@@ -38,36 +38,6 @@ Ensure your response strictly follows the schema requirements.`,
         this.client = new Mistral({apiKey: apiKey});
     }
 
-    protected async doAsk(messages: AIMessage[]): Promise<string | null> {
-        try {
-            const modelToUse = this.getModelForThinkingMode();
-            const mistralMessages = this.convertToMistralMessages(messages);
-            
-            this.logger(this.logTemplates.askingAgent(this.name, modelToUse));
-
-            const requestParams: any = {
-                model: modelToUse,
-                messages: this.addSystemInstruction(mistralMessages),
-            };
-
-            // Set prompt_mode for reasoning models
-            if (this.enableThinking && this.isReasoningModel(modelToUse)) {
-                requestParams.prompt_mode = "reasoning";
-            }
-
-            const chatResponse = await this.client.chat.complete(requestParams);
-
-            // Process and log thinking content if available
-            if (this.enableThinking && chatResponse?.choices?.[0]?.message?.content) {
-                this.processThinkingContent(chatResponse.choices[0].message.content);
-            }
-
-            return this.extractFinalAnswer(chatResponse);
-        } catch (error) {
-            this.logger(this.logTemplates.error(this.name, error));
-            throw new Error(this.errorMessages.apiError(error));
-        }
-    }
 
     protected async doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<[string, string]> {
         try {

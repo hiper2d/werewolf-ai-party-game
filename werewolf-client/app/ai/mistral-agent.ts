@@ -39,9 +39,6 @@ Ensure your response strictly follows the schema requirements.`,
         this.client = new Mistral({apiKey: apiKey});
     }
 
-    protected async doAsk(messages: AIMessage[]): Promise<string | null> {
-        return null; // Method kept empty to maintain inheritance
-    }
 
     protected async doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<[string, string]> {
         const schemaInstructions = this.schemaTemplate.instructions(schema);

@@ -37,37 +37,6 @@ Ensure your response strictly follows the schema requirements.`,
         });
     }
 
-    protected async doAsk(messages: AIMessage[]): Promise<string | null> {
-        try {
-            const input = this.convertToOpenAIInput(messages);
-            
-            const requestParams: any = {
-                model: this.model,
-                input: input,
-                instructions: this.instruction,
-            };
-
-            // Add reasoning for thinking mode (only for reasoning models)
-            if (this.enableThinking && this.isReasoningModel()) {
-                requestParams.reasoning = { 
-                    effort: "medium",
-                    summary: "auto"
-                };
-            }
-
-            // Check if Responses API is available
-            if (!(this.client as any).responses) {
-                throw new Error('OpenAI Responses API not available in current SDK version');
-            }
-            
-            const response = await (this.client as any).responses.create(requestParams);
-
-            return response.output_text ? cleanResponse(response.output_text) : null;
-        } catch (error) {
-            this.logger(this.logTemplates.error(this.name, error));
-            throw new Error(this.errorMessages.apiError(error));
-        }
-    }
 
     protected async doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<[string, string]> {
         try {
@@ -107,7 +76,7 @@ Ensure your response strictly follows the schema requirements.`,
             // Add reasoning for thinking mode (only for reasoning models)
             if (this.enableThinking && this.isReasoningModel()) {
                 requestParams.reasoning = { 
-                    effort: "low",
+                    effort: "high",
                     summary: "auto"
                 };
             }

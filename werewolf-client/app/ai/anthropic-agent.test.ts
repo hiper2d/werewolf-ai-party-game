@@ -41,17 +41,6 @@ describe("ClaudeAgent integration", () => {
     );
   }
 
-  it("should return null for ask method to maintain inheritance", async () => {
-    const agent = setupAgent();
-    const messages: AIMessage[] = [
-      {
-        role: 'user',
-        content: 'Test message'
-      }
-    ];
-    const response = await agent.ask(messages);
-    expect(response).toBeNull();
-  });
 
   it("should respond with a valid schema-based answer", async () => {
     const agent = setupAgent();

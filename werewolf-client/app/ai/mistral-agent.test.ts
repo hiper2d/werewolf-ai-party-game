@@ -55,13 +55,6 @@ const createMessages = (): AIMessage[] => {
 };
 
 describe("MistralAgent integration", () => {
-  it("should return null for ask method to maintain inheritance", async () => {
-    const agent = createAgent("TestBot", LLM_CONSTANTS.MISTRAL_2_LARGE);
-    const messages = createMessages();
-    const response = await agent.ask(messages);
-    expect(response).toBeNull();
-  });
-
   describe("askWithSchema", () => {
     const testSchemaResponse = async (modelType: string) => {
       const agent = createAgent("TestBot", modelType);

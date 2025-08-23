@@ -43,41 +43,17 @@ Ensure your response strictly follows the schema requirements.`,
         });
     }
 
-    protected async doAsk(messages: AIMessage[]): Promise<string | null> {
-        try {
-            const preparedMessages = this.prepareMessagesWithInstruction(messages);
-            const completion = await this.client.chat.completions.create({
-                ...this.defaultParams,
-                messages: preparedMessages,
-            }) as OpenAI.Chat.Completions.ChatCompletion;
-
-            const [reply, thinking] = this.processReply(completion);
-            return reply;
-        } catch (error) {
-            this.logger(this.logTemplates.error(this.name, error));
-            throw new Error(this.errorMessages.apiError(error));
-        }
-    }
 
     protected async doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<[string, string]> {
         const schemaInstructions = this.schemaTemplate.instructions(schema);
-        const lastMessage = messages[messages.length - 1];
-        const fullPrompt = `${lastMessage.content}\n\n${schemaInstructions}`;
-        const modifiedMessages = [
-            ...messages.slice(0, -1),
-            { ...lastMessage, content: fullPrompt }
-        ];
 
         try {
-            const preparedMessages = this.prepareMessagesWithInstruction(modifiedMessages);
+            const preparedMessages = this.prepareMessagesWithInstruction(messages, schemaInstructions);
             
             const requestParams = {
                 ...this.defaultParams,
                 messages: preparedMessages,
             };
-            
-            this.logger(`Grok Agent - Request params: ${JSON.stringify(requestParams, null, 2)}`);
-            this.logger(`Grok Agent - enableThinking: ${this.enableThinking}`);
             
             const completion = await this.client.chat.completions.create(requestParams) as OpenAI.Chat.Completions.ChatCompletion;
 
@@ -88,13 +64,22 @@ Ensure your response strictly follows the schema requirements.`,
         }
     }
 
-    private prepareMessagesWithInstruction(messages: AIMessage[]): OpenAI.Chat.Completions.ChatCompletionMessageParam[] {
+    private prepareMessagesWithInstruction(messages: AIMessage[], schemaInstructions?: string): OpenAI.Chat.Completions.ChatCompletionMessageParam[] {
         const preparedMessages = this.prepareMessages(messages);
-        if (preparedMessages.length > 0) {
-            // Grok-4 is a reasoning-only model - no additional thinking instructions needed
-            preparedMessages[0].content = `${this.instruction}\n\n${preparedMessages[0].content}`;
-        }
-        return this.convertToOpenAIMessages(preparedMessages);
+        
+        // Combine instruction with schema instructions if provided
+        const fullInstruction = schemaInstructions 
+            ? `${this.instruction}\n\n${schemaInstructions}`
+            : this.instruction;
+        
+        // Add system message with instruction at the beginning
+        const systemMessage: AIMessage = {
+            role: 'system',
+            content: fullInstruction
+        };
+        
+        const messagesWithSystem = [systemMessage, ...preparedMessages];
+        return this.convertToOpenAIMessages(messagesWithSystem);
     }
 
     private convertToOpenAIMessages(messages: AIMessage[]): OpenAI.Chat.Completions.ChatCompletionMessageParam[] {

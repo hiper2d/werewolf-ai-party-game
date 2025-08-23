@@ -329,7 +329,12 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
             gameMasterThinking: gamePreview.gameMasterThinking || false
         };
 
-        const response = await db.collection('games').add(game);
+        // Generate custom game ID: theme-timestamp
+        const sanitizedTheme = sanitizeForId(gamePreview.theme);
+        const timestamp = Date.now();
+        const customGameId = `${sanitizedTheme}-${timestamp}`;
+        
+        const response = await db.collection('games').doc(customGameId).set(game);
         
         const gameStoryMessage: GameMessage = {
             id: null,
@@ -341,8 +346,8 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
             timestamp: null
         };
 
-        await addMessageToChatAndSaveToDb(gameStoryMessage, response.id);
-        return response.id;
+        await addMessageToChatAndSaveToDb(gameStoryMessage, customGameId);
+        return customGameId;
     } catch (error: any) {
         console.error("Error adding document: ", error);
         throw new Error(`Failed to create game: ${error.message}`);

@@ -43,21 +43,6 @@ Ensure your response strictly follows the schema requirements.`,
         });
     }
 
-    protected async doAsk(messages: AIMessage[]): Promise<string | null> {
-        try {
-            const preparedMessages = this.prepareMessagesWithInstruction(messages);
-            const completion = await this.client.chat.completions.create({
-                ...this.defaultParams,
-                messages: preparedMessages,
-            }) as OpenAI.Chat.Completions.ChatCompletion;
-
-            const [reply, thinking] = this.processReply(completion);
-            return reply;
-        } catch (error) {
-            this.logger(this.logTemplates.error(this.name, error));
-            throw new Error(this.errorMessages.apiError(error));
-        }
-    }
 
     protected async doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<[string, string]> {
         const schemaInstructions = this.schemaTemplate.instructions(schema);

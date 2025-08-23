@@ -40,31 +40,6 @@ Ensure your response strictly follows the schema requirements.`,
         });
     }
 
-    protected async doAsk(messages: AIMessage[]): Promise<string | null> {
-        try {
-            const input = this.convertToOpenAIMessages(messages);
-            const modelToUse = this.getModelForThinkingMode();
-            
-            this.logger(this.logTemplates.askingAgent(this.name, modelToUse));
-            
-            const requestParams: any = {
-                model: modelToUse,
-                messages: this.addSystemInstruction(input),
-                temperature: this.temperature,
-            };
-
-            const response = await this.client.chat.completions.create(requestParams);
-
-            // Extract reasoning content if available (from deepseek-reasoner)
-            // (already handled in processCompletion method)
-
-            const content = response.choices[0]?.message?.content;
-            return content ? cleanResponse(content) : null;
-        } catch (error) {
-            this.logger(this.logTemplates.error(this.name, error));
-            throw new Error(this.errorMessages.apiError(error));
-        }
-    }
 
     protected async doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<[string, string]> {
         try {

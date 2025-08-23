@@ -97,7 +97,7 @@ export const SupportedAiModels = {
     [LLM_CONSTANTS.GROK_4]: {
         modelApiName: 'grok-4',
         apiKeyName: API_KEY_CONSTANTS.GROK,
-        supportsThinking: false  // Disabled: Grok thinking implementation is problematic
+        supportsThinking: true
     },
     [LLM_CONSTANTS.KIMI_K2]: {
         modelApiName: 'kimi-latest',

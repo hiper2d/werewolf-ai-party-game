@@ -18,20 +18,6 @@ export abstract class AbstractAgent {
     }
 
     // Template Method pattern: public methods with logging, calling protected abstract methods
-    async ask(messages: AIMessage[]): Promise<string | null> {
-        // this.logger(`Asking bot ${this.name} (${this.model})`);
-        // this.logMessages(messages);
-        
-        try {
-            const result = await this.doAsk(messages);
-            this.logger(`Bot ${this.name}: ${result}`);
-            return result;
-        } catch (error) {
-            this.logger(`${error instanceof Error ? error.message : String(error)}`);
-            throw error;
-        }
-    }
-
     async askWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<[string, string]> {
         /*this.logger(`Asking bot ${this.name} (${this.model})`);
         if (this.instruction) {
@@ -55,7 +41,6 @@ export abstract class AbstractAgent {
     }
 
     // Abstract methods that child classes must implement
-    protected abstract doAsk(messages: AIMessage[]): Promise<string | null>;
     protected abstract doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<[string, string]>;
 
     protected logger(message: string): void {
