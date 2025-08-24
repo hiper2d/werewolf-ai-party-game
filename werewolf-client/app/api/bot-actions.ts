@@ -95,6 +95,48 @@ async function incrementDayActivity(gameId: string, botName: string, currentDay:
 }
 
 /**
+ * Recalculate day activity counter from actual messages in the database
+ * This ensures accuracy after message resets or other operations
+ */
+export async function recalculateDayActivity(gameId: string, currentDay: number): Promise<void> {
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+
+    try {
+        // Get all messages for the current day
+        const messages = await getGameMessages(gameId);
+        const dayMessages = messages.filter(m => m.day === currentDay);
+
+        // Count BOT_ANSWER messages for each bot
+        const activityCounter: Record<string, number> = {};
+        
+        dayMessages.forEach(message => {
+            // Only count BOT_ANSWER messages as these are replies during discussions
+            if (message.messageType === MessageType.BOT_ANSWER && 
+                message.authorName !== GAME_MASTER &&
+                message.authorName && 
+                message.authorName.trim() !== '') {
+                
+                activityCounter[message.authorName] = (activityCounter[message.authorName] || 0) + 1;
+            }
+        });
+
+        console.log(`Recalculated day ${currentDay} activity:`, activityCounter);
+
+        // Update the game with recalculated counter
+        const gameRef = db.collection('games').doc(gameId);
+        await gameRef.update({
+            dayActivityCounter: activityCounter
+        });
+
+    } catch (error) {
+        console.error(`Failed to recalculate day activity for game ${gameId}, day ${currentDay}:`, error);
+        // Don't throw here - activity tracking shouldn't break the game flow
+    }
+}
+
+/**
  * Format day activity data for the GM prompt
  * Returns a human-readable string showing activity levels for each alive bot
  */
@@ -353,6 +395,7 @@ async function keepBotsGoingImpl(gameId: string): Promise<Game> {
         // Ask GM which bots should continue the conversation (without human input)
         const apiKeys = await getUserFromFirestore(session.user.email).then((user) => getUserApiKeys(user!.email));
 
+        // Use existing activity counter - it's maintained incrementally and only recalculated after resets
         const gmPrompt = format(GM_ROUTER_SYSTEM_PROMPT, {
             players_names: [
                 ...game.bots.map(b => b.name),
@@ -445,6 +488,7 @@ async function handleHumanPlayerMessage(
     // Ask GM which bots should respond
     const apiKeys = await getUserFromFirestore(userEmail).then((user) => getUserApiKeys(user!.email));
 
+    // Use existing activity counter - it's maintained incrementally and only recalculated after resets
     const gmPrompt = format(GM_ROUTER_SYSTEM_PROMPT, {
         players_names: [
             ...game.bots.map(b => b.name),

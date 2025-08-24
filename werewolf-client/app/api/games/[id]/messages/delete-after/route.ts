@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/firebase/server';
 import {GAME_STATES, Bot, Game} from "@/app/api/game-models";
+import {recalculateDayActivity} from "@/app/api/bot-actions";
 
 export async function DELETE(
     request: NextRequest,
@@ -122,6 +123,10 @@ export async function DELETE(
                 await deleteBatch.commit();
                 console.log('✅ Message deletion batch successful');
             }
+
+            // Recalculate day activity counter from remaining messages
+            await recalculateDayActivity(gameId, currentDay);
+            console.log('✅ Day activity counter recalculated');
         } catch (error) {
             console.error('❌ Operations failed:', error);
             throw new Error(`Failed to reset game: ${error instanceof Error ? error.message : String(error)}`);
