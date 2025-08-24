@@ -20,89 +20,101 @@ export const SupportedAiKeyNames: Record<string, string> = {
 
 export const LLM_CONSTANTS = {
     CLAUDE_4_OPUS: 'Claude 4.1 Opus',
+    CLAUDE_4_OPUS_THINKING: 'Claude 4.1 Opus (Thinking)',
     CLAUDE_4_SONNET: 'Claude 4 Sonnet',
-    DEEPSEEK: 'DeepSeek',
-    // GPT_41: 'GPT-4.1', // Disabled: replaced by GPT-5
+    CLAUDE_4_SONNET_THINKING: 'Claude 4 Sonnet (Thinking)',
+    DEEPSEEK_CHAT: 'DeepSeek Chat',
+    DEEPSEEK_REASONER: 'DeepSeek Reasoner',
     GPT_5: 'GPT-5',
     GPT_5_MINI: 'GPT-5-mini',
-    // GPT_O4_MINI: 'o4-mini', // Disabled: replaced by GPT-5
     GEMINI_25_PRO: 'Gemini 2.5 Pro',
-    // GPT_O3: 'o3', // Disabled: replaced by GPT-5
-    // GPT_O3_PRO: 'o3-pro', // Disabled: doesn't support conversation history properly
-    MISTRAL_2_LARGE: 'Mistral 2 Large',
-    MISTRAL_3_SMALL: 'Mistral 3 Small',
+    MISTRAL_2_LARGE: 'Mistral Large 2.1',
+    MISTRAL_3_MEDIUM: 'Mistral Medium 3.1',
+    MISTRAL_MAGISTRAL: 'Magistral Medium 1.1 (Thinking)',
     GROK_4: 'Grok 4',
     KIMI_K2: 'Kimi K2',
     RANDOM: 'Random',
 }
 
 export const SupportedAiModels = {
+    // Claude models - separate with/without thinking versions
     [LLM_CONSTANTS.CLAUDE_4_OPUS]: {
         modelApiName: 'claude-opus-4-1',
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
-        supportsThinking: true
+        hasThinking: false
+    },
+    [LLM_CONSTANTS.CLAUDE_4_OPUS_THINKING]: {
+        modelApiName: 'claude-opus-4-1',
+        apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
+        hasThinking: true
     },
     [LLM_CONSTANTS.CLAUDE_4_SONNET]: {
         modelApiName: 'claude-sonnet-4-0',
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
-        supportsThinking: true
+        hasThinking: false
     },
-    // [LLM_CONSTANTS.GPT_41]: {
-    //     modelApiName: 'gpt-4.1',
-    //     apiKeyName: API_KEY_CONSTANTS.OPENAI
-    // }, // Disabled: replaced by GPT-5
+    [LLM_CONSTANTS.CLAUDE_4_SONNET_THINKING]: {
+        modelApiName: 'claude-sonnet-4-0',
+        apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
+        hasThinking: true
+    },
+    
+    // DeepSeek models - separate Chat and Reasoner
+    [LLM_CONSTANTS.DEEPSEEK_CHAT]: {
+        modelApiName: 'deepseek-chat',
+        apiKeyName: API_KEY_CONSTANTS.DEEPSEEK,
+        hasThinking: false
+    },
+    [LLM_CONSTANTS.DEEPSEEK_REASONER]: {
+        modelApiName: 'deepseek-reasoner',
+        apiKeyName: API_KEY_CONSTANTS.DEEPSEEK,
+        hasThinking: true
+    },
+    
+    // Models with always-on reasoning
     [LLM_CONSTANTS.GPT_5]: {
         modelApiName: 'gpt-5',
         apiKeyName: API_KEY_CONSTANTS.OPENAI,
-        supportsThinking: true
+        hasThinking: true
     },
     [LLM_CONSTANTS.GPT_5_MINI]: {
         modelApiName: 'gpt-5-mini',
         apiKeyName: API_KEY_CONSTANTS.OPENAI,
-        supportsThinking: true
+        hasThinking: true
     },
-    // [LLM_CONSTANTS.GPT_O3]: {
-    //     modelApiName: 'o3',
-    //     apiKeyName: API_KEY_CONSTANTS.OPENAI
-    // }, // Disabled: replaced by GPT-5
-    // [LLM_CONSTANTS.GPT_O3_PRO]: {
-    //     modelApiName: 'o3-pro',
-    //     apiKeyName: API_KEY_CONSTANTS.OPENAI
-    // }, // Disabled: doesn't support conversation history properly
-    // [LLM_CONSTANTS.GPT_O4_MINI]: {
-    //     modelApiName: 'o4-mini',
-    //     apiKeyName: API_KEY_CONSTANTS.OPENAI
-    // }, // Disabled: replaced by GPT-5
     [LLM_CONSTANTS.GEMINI_25_PRO]: {
         modelApiName: 'gemini-2.5-pro',
         apiKeyName: API_KEY_CONSTANTS.GOOGLE,
-        supportsThinking: true
-    },
-    [LLM_CONSTANTS.MISTRAL_2_LARGE]: {
-        modelApiName: 'mistral-large-latest',
-        apiKeyName: API_KEY_CONSTANTS.MISTRAL,
-        supportsThinking: false
-    },
-    [LLM_CONSTANTS.MISTRAL_3_SMALL]: {
-        modelApiName: 'mistral-small-latest',
-        apiKeyName: API_KEY_CONSTANTS.MISTRAL,
-        supportsThinking: false
-    },
-    [LLM_CONSTANTS.DEEPSEEK]: {
-        modelApiName: 'deepseek-chat',
-        reasonerModelApiName: 'deepseek-reasoner',
-        apiKeyName: API_KEY_CONSTANTS.DEEPSEEK,
-        supportsThinking: true
+        hasThinking: true
     },
     [LLM_CONSTANTS.GROK_4]: {
         modelApiName: 'grok-4',
         apiKeyName: API_KEY_CONSTANTS.GROK,
-        supportsThinking: true
+        hasThinking: true
     },
+    
+    // Mistral models
+    [LLM_CONSTANTS.MISTRAL_2_LARGE]: {
+        modelApiName: 'mistral-large-latest',
+        apiKeyName: API_KEY_CONSTANTS.MISTRAL,
+        hasThinking: false
+    },
+    [LLM_CONSTANTS.MISTRAL_3_MEDIUM]: {
+        modelApiName: 'mistral-medium-latest',
+        apiKeyName: API_KEY_CONSTANTS.MISTRAL,
+        hasThinking: false
+    },
+    [LLM_CONSTANTS.MISTRAL_MAGISTRAL]: {
+        modelApiName: 'magistral-medium-latest',
+        apiKeyName: API_KEY_CONSTANTS.MISTRAL,
+        hasThinking: true
+    },
+    
+    // Models without reasoning
     [LLM_CONSTANTS.KIMI_K2]: {
         modelApiName: 'kimi-latest',
         apiKeyName: API_KEY_CONSTANTS.MOONSHOT,
-        supportsThinking: false
+        hasThinking: false
     },
 } as const;
 

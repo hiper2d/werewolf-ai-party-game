@@ -121,16 +121,8 @@ Ensure your response strictly follows the schema requirements.`,
     }
 
     private getModelForThinkingMode(): string {
-        const deepSeekConfig = SupportedAiModels[LLM_CONSTANTS.DEEPSEEK] as any;
-        
-        if (this.enableThinking) {
-            const reasonerModel = deepSeekConfig.reasonerModelApiName;
-            if (reasonerModel !== this.model) {
-                this.logger(this.logTemplates.switchingModel(this.model, reasonerModel));
-            }
-            return reasonerModel;
-        }
-        
-        return deepSeekConfig.modelApiName;
+        // Since we now have separate model constants for DEEPSEEK_CHAT and DEEPSEEK_REASONER,
+        // we just return the model that was passed during construction
+        return this.model;
     }
 }

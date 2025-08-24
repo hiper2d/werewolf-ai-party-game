@@ -28,11 +28,11 @@ export default function CreateNewGamePage() {
     const supportedAi = Object.values(LLM_CONSTANTS); // todo: this list should be limited to ApiKeys player uploaded
     const supportedPlayerAi = Object.values(LLM_CONSTANTS);
 
-    // Helper function to check if a model supports thinking mode
-    const supportsThinkingMode = (aiType: string): boolean => {
+    // Helper function to check if a model has thinking capabilities
+    const hasThinkingMode = (aiType: string): boolean => {
         if (aiType === LLM_CONSTANTS.RANDOM) return true; // Allow thinking mode for random (will be applied to actual model)
         const modelConfig = SupportedAiModels[aiType];
-        return modelConfig?.supportsThinking === true;
+        return modelConfig?.hasThinking === true;
     };
 
     const availableRoles = [GAME_ROLES.DOCTOR, GAME_ROLES.DETECTIVE];
@@ -129,7 +129,7 @@ export default function CreateNewGamePage() {
         if (gameData) {
             const updatedData = { ...gameData, gameMasterAiType: newAiType };
             // If the new model doesn't support thinking, disable it
-            if (!supportsThinkingMode(newAiType)) {
+            if (!hasThinkingMode(newAiType)) {
                 updatedData.gameMasterThinking = false;
             }
             setGameData(updatedData);
@@ -142,7 +142,7 @@ export default function CreateNewGamePage() {
             const updatedPlayers = [...gameData.bots];
             updatedPlayers[index] = { ...updatedPlayers[index], playerAiType: newAiType };
             // If the new model doesn't support thinking, disable it for this bot
-            if (!supportsThinkingMode(newAiType)) {
+            if (!hasThinkingMode(newAiType)) {
                 updatedPlayers[index].enableThinking = false;
             }
             setGameData({ ...gameData, bots: updatedPlayers });
@@ -371,25 +371,6 @@ export default function CreateNewGamePage() {
                                     </button>
                                 </div>
                             </div>
-                            {/* Thinking Mode Checkbox for Game Master */}
-                            {supportsThinkingMode(gameData.gameMasterAiType) && (
-                                <div className="flex items-center mt-2">
-                                    <input
-                                        type="checkbox"
-                                        id="gmThinking"
-                                        checked={gameData.gameMasterThinking || false}
-                                        onChange={(e) => {
-                                            if (gameData) {
-                                                setGameData({ ...gameData, gameMasterThinking: e.target.checked });
-                                            }
-                                        }}
-                                        className="mr-2"
-                                    />
-                                    <label htmlFor="gmThinking" className="text-sm text-gray-300">
-                                        Enable thinking mode for Game Master
-                                    </label>
-                                </div>
-                            )}
                         </div>
                     </div>
 
@@ -473,21 +454,6 @@ export default function CreateNewGamePage() {
                                     placeholder="Player's Story"
                                 />
                             </div>
-                            {/* Thinking Mode Checkbox for Player */}
-                            {supportsThinkingMode(player.playerAiType) && (
-                                <div className="flex items-center mt-2">
-                                    <input
-                                        type="checkbox"
-                                        id={`player${index}Thinking`}
-                                        checked={player.enableThinking || false}
-                                        onChange={(e) => handlePlayerChange(index, 'enableThinking', e.target.checked)}
-                                        className="mr-2"
-                                    />
-                                    <label htmlFor={`player${index}Thinking`} className="text-sm text-gray-300">
-                                        Enable thinking mode for {player.name}
-                                    </label>
-                                </div>
-                            )}
                         </div>
                     ))}
 

@@ -42,24 +42,16 @@ Ensure your response strictly follows the schema requirements.`,
 
     protected async doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<[string, string]> {
         const schemaInstructions = this.schemaTemplate.instructions(schema);
-        const lastMessage = messages[messages.length - 1];
-        const fullPrompt = `${lastMessage.content}\n\n${schemaInstructions}`;
-        const modifiedMessages = [
-            ...messages.slice(0, -1),
-            { ...lastMessage, content: fullPrompt }
-        ];
 
         try {
-            // Add thinking mode instructions if enabled
-            const systemContent = this.enableThinking ? 
-                `${this.instruction}\n\nThinking Mode: Before providing your final answer, think through the problem step by step. Consider multiple perspectives and reasoning paths.` :
-                this.instruction;
+            // Combine system instruction with schema instructions
+            const systemContent = `${this.instruction}\n\n${schemaInstructions}`;
 
             const chatResponse = await this.client.chat.complete({
                 ...this.defaultParams,
                 messages: [
                     { role: MESSAGE_ROLE.SYSTEM, content: systemContent },
-                    ...this.convertToMistralMessages(modifiedMessages)
+                    ...this.convertToMistralMessages(messages)
                 ],
                 responseFormat: {type: 'json_object'}
             });

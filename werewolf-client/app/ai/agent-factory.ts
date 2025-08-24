@@ -1,6 +1,5 @@
 import {ApiKeyMap} from '@/app/api/game-models';
 import {AbstractAgent} from "@/app/ai/abstract-agent";
-import {OpenAiAgent} from "@/app/ai/open-ai-agent";
 import {Gpt5Agent} from "@/app/ai/gpt-5-agent";
 import {LLM_CONSTANTS, SupportedAiModels} from "@/app/ai/ai-models";
 import {ClaudeAgent} from "@/app/ai/anthropic-agent";
@@ -24,24 +23,38 @@ export class AgentFactory {
         const apiKeyName = model.apiKeyName
         const key = apiKeys[apiKeyName]
 
+        // Determine if thinking should be enabled based on model configuration
+        const shouldEnableThinking = model.hasThinking;
+
         switch (modelName) {
+            // Claude models - both regular and thinking versions
             case LLM_CONSTANTS.CLAUDE_4_OPUS:
+            case LLM_CONSTANTS.CLAUDE_4_OPUS_THINKING:
             case LLM_CONSTANTS.CLAUDE_4_SONNET:
-                return new ClaudeAgent(name, instruction, model.modelApiName, key, enableThinking);
+            case LLM_CONSTANTS.CLAUDE_4_SONNET_THINKING:
+                return new ClaudeAgent(name, instruction, model.modelApiName, key, shouldEnableThinking);
+                
+            // Always-on reasoning models
             case LLM_CONSTANTS.GPT_5:
             case LLM_CONSTANTS.GPT_5_MINI:
-                return new Gpt5Agent(name, instruction, model.modelApiName, key, 1, enableThinking); // GPT-5 with Responses API
+                return new Gpt5Agent(name, instruction, model.modelApiName, key, 1, shouldEnableThinking);
             case LLM_CONSTANTS.GEMINI_25_PRO:
-                return new GoogleAgent(name, instruction, model.modelApiName, key, enableThinking);
-            case LLM_CONSTANTS.MISTRAL_3_SMALL:
-            case LLM_CONSTANTS.MISTRAL_2_LARGE:
-                return new MistralAgent(name, instruction, model.modelApiName, key, enableThinking);
-            case LLM_CONSTANTS.DEEPSEEK:
-                return new DeepSeekV2Agent(name, instruction, model.modelApiName, key, 0.6, enableThinking);
+                return new GoogleAgent(name, instruction, model.modelApiName, key, shouldEnableThinking);
             case LLM_CONSTANTS.GROK_4:
-                return new GrokAgent(name, instruction, model.modelApiName, key, 0.7, enableThinking);
+                return new GrokAgent(name, instruction, model.modelApiName, key, 0.7, shouldEnableThinking);
+                
+            // DeepSeek models - separate chat and reasoner
+            case LLM_CONSTANTS.DEEPSEEK_CHAT:
+            case LLM_CONSTANTS.DEEPSEEK_REASONER:
+                return new DeepSeekV2Agent(name, instruction, model.modelApiName, key, 0.6, shouldEnableThinking);
+                
+            // Mistral models
+            case LLM_CONSTANTS.MISTRAL_3_MEDIUM:
+            case LLM_CONSTANTS.MISTRAL_2_LARGE:
+            case LLM_CONSTANTS.MISTRAL_MAGISTRAL:
+                return new MistralAgent(name, instruction, model.modelApiName, key, shouldEnableThinking);
             case LLM_CONSTANTS.KIMI_K2:
-                return new KimiAgent(name, instruction, model.modelApiName, key, 0.6, enableThinking);
+                return new KimiAgent(name, instruction, model.modelApiName, key, 0.6, shouldEnableThinking);
             default:
                 throw new Error(`Unknown Key: ${modelName}`);
         }
@@ -65,9 +78,5 @@ export class AgentFactory {
 
         // Return the llmType as it is
         return llmType;
-    }
-
-    private static logger(message: string, model: string, instruction: string): void {
-        console.log(`[${this.name} ${model}]: Creating agent, system instruction: ${instruction}`);
     }
 }
