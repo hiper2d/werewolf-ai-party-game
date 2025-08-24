@@ -78,11 +78,21 @@ async function incrementDayActivity(gameId: string, botName: string, currentDay:
             const game = gameDoc.data() as Game;
             const currentCounter = game.dayActivityCounter || {};
             
+            console.log(`🔄 Incrementing activity for ${botName} on day ${currentDay}:`, {
+                gameId,
+                botName,
+                currentDay,
+                currentCounterForBot: currentCounter[botName] || 0,
+                totalCurrentCounter: currentCounter
+            });
+            
             // Initialize counter for the bot if it doesn't exist
             const updatedCounter = {
                 ...currentCounter,
                 [botName]: (currentCounter[botName] || 0) + 1
             };
+            
+            console.log(`✅ Updated counter:`, updatedCounter);
             
             transaction.update(gameRef, {
                 dayActivityCounter: updatedCounter
@@ -108,12 +118,14 @@ export async function recalculateDayActivity(gameId: string, currentDay: number)
         const messages = await getGameMessages(gameId);
         const dayMessages = messages.filter(m => m.day === currentDay);
 
-        // Count BOT_ANSWER messages for each bot
+        // Count BOT_ANSWER messages for each bot that are sent to ALL
         const activityCounter: Record<string, number> = {};
         
         dayMessages.forEach(message => {
-            // Only count BOT_ANSWER messages as these are replies during discussions
+            // Only count BOT_ANSWER messages sent to ALL (public discussion messages)
+            // This excludes private messages like werewolf coordination or detective reports
             if (message.messageType === MessageType.BOT_ANSWER && 
+                message.recipientName === RECIPIENT_ALL &&
                 message.authorName !== GAME_MASTER &&
                 message.authorName && 
                 message.authorName.trim() !== '') {
@@ -137,12 +149,52 @@ export async function recalculateDayActivity(gameId: string, currentDay: number)
 }
 
 /**
+ * Ensure the game has a day activity counter initialized
+ * For backward compatibility with games created before this feature
+ */
+async function ensureDayActivityCounter(gameId: string): Promise<void> {
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+
+    try {
+        const gameRef = db.collection('games').doc(gameId);
+        const gameDoc = await gameRef.get();
+        
+        if (!gameDoc.exists) {
+            return;
+        }
+        
+        const game = gameDoc.data() as Game;
+        
+        // If the game doesn't have a dayActivityCounter, initialize it
+        if (!game.dayActivityCounter) {
+            console.log(`🆕 Initializing day activity counter for game ${gameId}`);
+            await gameRef.update({
+                dayActivityCounter: {}
+            });
+        }
+    } catch (error) {
+        console.error(`Failed to ensure day activity counter for game ${gameId}:`, error);
+        // Don't throw - this is a best-effort initialization
+    }
+}
+
+/**
  * Format day activity data for the GM prompt
  * Returns a human-readable string showing activity levels for each alive bot
  */
 function formatDayActivityData(game: Game): string {
     const activityCounter = game.dayActivityCounter || {};
     const aliveBots = game.bots.filter(bot => bot.isAlive);
+    
+    console.log(`🔍 Debug formatDayActivityData:`, {
+        gameId: game.id,
+        currentDay: game.currentDay,
+        hasActivityCounter: !!game.dayActivityCounter,
+        activityCounter,
+        aliveBotNames: aliveBots.map(b => b.name)
+    });
     
     if (aliveBots.length === 0) {
         return "No alive bots to track activity.";
@@ -153,7 +205,10 @@ function formatDayActivityData(game: Game): string {
         return `${bot.name}: ${messageCount} messages`;
     }).join(", ");
     
-    return `Today's activity levels - ${activityData}`;
+    const result = `Today's activity levels - ${activityData}`;
+    console.log(`📊 Activity data formatted:`, result);
+    
+    return result;
 }
 
 /**
@@ -395,6 +450,9 @@ async function keepBotsGoingImpl(gameId: string): Promise<Game> {
         // Ask GM which bots should continue the conversation (without human input)
         const apiKeys = await getUserFromFirestore(session.user.email).then((user) => getUserApiKeys(user!.email));
 
+        // Ensure day activity counter is initialized for backward compatibility
+        await ensureDayActivityCounter(gameId);
+
         // Use existing activity counter - it's maintained incrementally and only recalculated after resets
         const gmPrompt = format(GM_ROUTER_SYSTEM_PROMPT, {
             players_names: [
@@ -487,6 +545,9 @@ async function handleHumanPlayerMessage(
 
     // Ask GM which bots should respond
     const apiKeys = await getUserFromFirestore(userEmail).then((user) => getUserApiKeys(user!.email));
+
+    // Ensure day activity counter is initialized for backward compatibility
+    await ensureDayActivityCounter(gameId);
 
     // Use existing activity counter - it's maintained incrementally and only recalculated after resets
     const gmPrompt = format(GM_ROUTER_SYSTEM_PROMPT, {

@@ -216,7 +216,7 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
 
     const schema = createGameSetupSchema();
     
-    const [rawResponse, thinking] = await storyTellAgent.askWithSchema(schema, [convertToAIMessage(storyMessage)]);
+    const [rawResponse] = await storyTellAgent.askWithSchema(schema, [convertToAIMessage(storyMessage)]);
     if (!rawResponse) {
         throw new Error('Failed to get AI response');
     }
@@ -305,7 +305,6 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
                 gender: bot.gender,
                 voice: bot.voice,
                 playStyle: bot.playStyle,
-                enableThinking: bot.enableThinking || false
             };
         });
 
@@ -325,8 +324,7 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
             gameState: GAME_STATES.WELCOME,
             gameStateParamQueue: bots.map(bot => bot.name),
             gameStateProcessQueue: [],
-            messageCounter: 0, // Initialize message counter for new games
-            gameMasterThinking: gamePreview.gameMasterThinking || false
+            messageCounter: 0 // Initialize message counter for new games
         };
 
         // Generate custom game ID: theme-timestamp
@@ -334,7 +332,7 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
         const timestamp = Date.now();
         const customGameId = `${sanitizedTheme}-${timestamp}`;
         
-        const response = await db.collection('games').doc(customGameId).set(game);
+        await db.collection('games').doc(customGameId).set(game);
         
         const gameStoryMessage: GameMessage = {
             id: null,
@@ -406,7 +404,7 @@ function sanitizeForId(name: string): string {
         .replace(/^-|-$/g, '');         // Remove leading/trailing hyphens
 }
 
-export async function updateBotModel(gameId: string, botName: string, newAiType: string, enableThinking?: boolean): Promise<Game> {
+export async function updateBotModel(gameId: string, botName: string, newAiType: string): Promise<Game> {
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
@@ -425,12 +423,7 @@ export async function updateBotModel(gameId: string, botName: string, newAiType:
         // Find and update the bot
         const updatedBots = bots.map((bot: Bot) => {
             if (bot.name === botName) {
-                const updatedBot = { ...bot, aiType: newAiType };
-                // Update thinking mode if provided
-                if (enableThinking !== undefined) {
-                    updatedBot.enableThinking = enableThinking;
-                }
-                return updatedBot;
+                return { ...bot, aiType: newAiType };
             }
             return bot;
         });
@@ -446,7 +439,7 @@ export async function updateBotModel(gameId: string, botName: string, newAiType:
     }
 }
 
-export async function updateGameMasterModel(gameId: string, newAiType: string, enableThinking?: boolean): Promise<Game> {
+export async function updateGameMasterModel(gameId: string, newAiType: string): Promise<Game> {
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
@@ -461,18 +454,13 @@ export async function updateGameMasterModel(gameId: string, newAiType: string, e
         
         const gameData = gameSnap.data();
         
-        // Update the Game Master AI type and thinking mode in Firestore
-        const updateData: any = { gameMasterAiType: newAiType };
-        if (enableThinking !== undefined) {
-            updateData.gameMasterThinking = enableThinking;
-        }
-        await gameRef.update(updateData);
+        // Update the Game Master AI type in Firestore
+        await gameRef.update({ gameMasterAiType: newAiType });
         
         // Return the updated game
         const updatedGameData = { 
             ...gameData, 
-            gameMasterAiType: newAiType,
-            ...(enableThinking !== undefined && { gameMasterThinking: enableThinking })
+            gameMasterAiType: newAiType
         };
         return gameFromFirestore(gameId, updatedGameData);
     } catch (error: any) {
@@ -824,13 +812,13 @@ export async function summarizeCurrentDay(gameId: string): Promise<Game> {
         };
         
         // Create agent
-        const agent = AgentFactory.createAgent(bot.name, botPrompt, bot.aiType, apiKeys, bot.enableThinking || false);
+        const agent = AgentFactory.createAgent(bot.name, botPrompt, bot.aiType, apiKeys, false);
         
         // Create conversation history with all day messages + summary request
         const history = convertToAIMessages(bot.name, [...botMessages, summaryMessage]);
         
         // Get summary using bot answer schema (returns { reply: "summary text" })
-        const [rawResponse, thinking] = await agent.askWithSchema(createBotAnswerSchema(), history);
+        const [rawResponse] = await agent.askWithSchema(createBotAnswerSchema(), history);
         
         if (!rawResponse) {
             console.warn(`💭 Bot ${bot.name} failed to generate summary for day ${currentGame.currentDay}`);
@@ -1026,6 +1014,6 @@ function gameFromFirestore(id: string, data: any): Game {
         errorState: data.errorState || null,
         nightResults: data.nightResults || {},
         messageCounter: data.messageCounter || 0, // Default to 0 for existing games
-        gameMasterThinking: data.gameMasterThinking || false
+        dayActivityCounter: data.dayActivityCounter || {} // Default to empty object for existing games
     };
 }
