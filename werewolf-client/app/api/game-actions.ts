@@ -947,12 +947,13 @@ export async function newDayBegins(gameId: string): Promise<Game> {
         
         console.log(`🌅 DAY ${nextDay}: Beginning new day`);
         
-        // Increment day and set to DAY_DISCUSSION
+        // Increment day and set to DAY_DISCUSSION, reset activity counter for new day
         await gameRef.update({
             currentDay: nextDay,
             gameState: GAME_STATES.DAY_DISCUSSION,
             gameStateParamQueue: [],
-            gameStateProcessQueue: []
+            gameStateProcessQueue: [],
+            dayActivityCounter: {} // Reset activity counter for new day
         });
         
         console.log(`🌅 DAY ${nextDay}: Started new day discussion phase`);

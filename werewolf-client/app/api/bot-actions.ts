@@ -58,6 +58,63 @@ function sanitizeForId(name: string): string {
 }
 
 /**
+ * Increment day activity counter for a bot
+ * Initializes the counter if it doesn't exist for the current day
+ */
+async function incrementDayActivity(gameId: string, botName: string, currentDay: number): Promise<void> {
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+
+    const gameRef = db.collection('games').doc(gameId);
+    
+    try {
+        await db.runTransaction(async (transaction) => {
+            const gameDoc = await transaction.get(gameRef);
+            if (!gameDoc.exists) {
+                throw new Error('Game not found during activity increment');
+            }
+            
+            const game = gameDoc.data() as Game;
+            const currentCounter = game.dayActivityCounter || {};
+            
+            // Initialize counter for the bot if it doesn't exist
+            const updatedCounter = {
+                ...currentCounter,
+                [botName]: (currentCounter[botName] || 0) + 1
+            };
+            
+            transaction.update(gameRef, {
+                dayActivityCounter: updatedCounter
+            });
+        });
+    } catch (error) {
+        console.error(`Failed to increment day activity for ${botName}:`, error);
+        // Don't throw here - activity tracking shouldn't break the game flow
+    }
+}
+
+/**
+ * Format day activity data for the GM prompt
+ * Returns a human-readable string showing activity levels for each alive bot
+ */
+function formatDayActivityData(game: Game): string {
+    const activityCounter = game.dayActivityCounter || {};
+    const aliveBots = game.bots.filter(bot => bot.isAlive);
+    
+    if (aliveBots.length === 0) {
+        return "No alive bots to track activity.";
+    }
+    
+    const activityData = aliveBots.map(bot => {
+        const messageCount = activityCounter[bot.name] || 0;
+        return `${bot.name}: ${messageCount} messages`;
+    }).join(", ");
+    
+    return `Today's activity levels - ${activityData}`;
+}
+
+/**
  * Wraps Firestore operations in a transaction for atomicity
  * Ensures all game state updates are atomic and can be rolled back on errors
  */
@@ -207,6 +264,9 @@ async function welcomeImpl(gameId: string): Promise<Game> {
         // Then save the bot's response
         await addMessageToChatAndSaveToDb(botMessage, gameId);
 
+        // Increment day activity counter for the bot
+        await incrementDayActivity(gameId, bot.name, game.currentDay);
+
         // Update game with the modified queue
         await db.collection('games').doc(gameId).update({
             gameStateParamQueue: newQueue
@@ -302,7 +362,8 @@ async function keepBotsGoingImpl(gameId: string): Promise<Game> {
                 .filter(b => !b.isAlive)
                 .map(b => `${b.name} (${b.role})`)
                 .join(", "),
-            humanPlayerName: game.humanPlayerName
+            humanPlayerName: game.humanPlayerName,
+            day_activity_data: formatDayActivityData(game)
         });
 
         const gmAgent = AgentFactory.createAgent(GAME_MASTER, gmPrompt, game.gameMasterAiType, apiKeys, game.gameMasterThinking || false);
@@ -393,7 +454,8 @@ async function handleHumanPlayerMessage(
             .filter(b => !b.isAlive)
             .map(b => `${b.name} (${b.role})`)
             .join(", "),
-        humanPlayerName: game.humanPlayerName
+        humanPlayerName: game.humanPlayerName,
+        day_activity_data: formatDayActivityData(game)
     });
 
     const gmAgent = AgentFactory.createAgent(GAME_MASTER, gmPrompt, game.gameMasterAiType, apiKeys, game.gameMasterThinking || false);
@@ -548,6 +610,9 @@ async function processNextBotInQueue(
     
     // Then save the bot's response
     await addMessageToChatAndSaveToDb(botMessage, gameId);
+
+    // Increment day activity counter for the bot
+    await incrementDayActivity(gameId, bot.name, game.currentDay);
 
     // Update queue
     if (!db) {

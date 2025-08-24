@@ -70,6 +70,7 @@ export interface Game {
     nightResults?: Record<string, { target: string }>; // Dynamic night results for each role that has night actions
     messageCounter?: number; // Counter for generating incremental message IDs
     gameMasterThinking?: boolean;
+    dayActivityCounter?: Record<string, number>; // Track number of messages each bot has sent during current day
 }
 
 export const GAME_ROLES = {
