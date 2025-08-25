@@ -47,7 +47,8 @@ Here are previous messages from other players you haven't yet seen:
 %player_name_to_message_list%
 `
 
-export const GM_COMMAND_REPLY_TO_DISCUSSION: string = `%bot_name%, reply to the players in the discussion. Be thoughtful and consider what has been said so far.
+export const GM_COMMAND_REPLY_TO_DISCUSSION: string = `%bot_name%, reply to the players in the discussion. Be thoughtful and consider what has been said so far. \
+Use your character and story to add thematic flavor to your response. Push your story a little further or keep it consistent with your background.
 
 Your response must follow this schema:
 

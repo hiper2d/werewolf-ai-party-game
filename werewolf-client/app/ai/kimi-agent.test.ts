@@ -71,7 +71,7 @@ describe("KimiAgent integration", () => {
     const messages: AIMessage[] = [
       {
         role: 'user',
-        content: 'Please introduce yourself to the group.'
+        content: 'Please self to the group.'
       }
     ];
 
