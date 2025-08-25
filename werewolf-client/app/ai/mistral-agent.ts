@@ -48,7 +48,7 @@ Ensure your response strictly follows the schema requirements.`,
             const systemContent = `${this.instruction}\n\n${schemaInstructions}`;
 
             const chatResponse = await this.client.chat.complete({
-                ...this.defaultParams,
+                model: this.model,
                 messages: [
                     { role: MESSAGE_ROLE.SYSTEM, content: systemContent },
                     ...this.convertToMistralMessages(messages)

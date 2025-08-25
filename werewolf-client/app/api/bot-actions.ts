@@ -43,7 +43,11 @@ import {
 } from "./game-actions";
 import {getUserApiKeys} from "./user-actions";
 import {withGameErrorHandling} from "@/app/utils/server-action-wrapper";
-import {generatePlayStyleDescription, generateWerewolfTeammatesSection, generatePreviousDaySummariesSection} from "@/app/utils/bot-utils";
+import {
+    generatePlayStyleDescription,
+    generatePreviousDaySummariesSection,
+    generateWerewolfTeammatesSection
+} from "@/app/utils/bot-utils";
 
 /**
  * Sanitize names for use in message IDs
@@ -78,21 +82,11 @@ async function incrementDayActivity(gameId: string, botName: string, currentDay:
             const game = gameDoc.data() as Game;
             const currentCounter = game.dayActivityCounter || {};
             
-            console.log(`🔄 Incrementing activity for ${botName} on day ${currentDay}:`, {
-                gameId,
-                botName,
-                currentDay,
-                currentCounterForBot: currentCounter[botName] || 0,
-                totalCurrentCounter: currentCounter
-            });
-            
             // Initialize counter for the bot if it doesn't exist
             const updatedCounter = {
                 ...currentCounter,
                 [botName]: (currentCounter[botName] || 0) + 1
             };
-            
-            console.log(`✅ Updated counter:`, updatedCounter);
             
             transaction.update(gameRef, {
                 dayActivityCounter: updatedCounter
@@ -188,14 +182,6 @@ function formatDayActivityData(game: Game): string {
     const activityCounter = game.dayActivityCounter || {};
     const aliveBots = game.bots.filter(bot => bot.isAlive);
     
-    console.log(`🔍 Debug formatDayActivityData:`, {
-        gameId: game.id,
-        currentDay: game.currentDay,
-        hasActivityCounter: !!game.dayActivityCounter,
-        activityCounter,
-        aliveBotNames: aliveBots.map(b => b.name)
-    });
-    
     if (aliveBots.length === 0) {
         return "No alive bots to track activity.";
     }
@@ -204,11 +190,8 @@ function formatDayActivityData(game: Game): string {
         const messageCount = activityCounter[bot.name] || 0;
         return `${bot.name}: ${messageCount} messages`;
     }).join(", ");
-    
-    const result = `Today's activity levels - ${activityData}`;
-    console.log(`📊 Activity data formatted:`, result);
-    
-    return result;
+
+    return `Today's activity levels - ${activityData}`;
 }
 
 /**
@@ -313,7 +296,7 @@ async function welcomeImpl(gameId: string): Promise<Game> {
             }
         );
 
-        const agent = AgentFactory.createAgent(bot.name, botPrompt, bot.aiType, apiKeys, bot.enableThinking || false);
+        const agent = AgentFactory.createAgent(bot.name, botPrompt, bot.aiType, apiKeys, false);
 
         // Create the game master command message
         const gmMessage: GameMessage = {
@@ -467,7 +450,7 @@ async function keepBotsGoingImpl(gameId: string): Promise<Game> {
             day_activity_data: formatDayActivityData(game)
         });
 
-        const gmAgent = AgentFactory.createAgent(GAME_MASTER, gmPrompt, game.gameMasterAiType, apiKeys, game.gameMasterThinking || false);
+        const gmAgent = AgentFactory.createAgent(GAME_MASTER, gmPrompt, game.gameMasterAiType, apiKeys, false);
         const gmMessage: GameMessage = {
             id: null,
             recipientName: GAME_MASTER,
@@ -679,7 +662,7 @@ async function processNextBotInQueue(
         previous_day_summaries: generatePreviousDaySummariesSection(bot, game.currentDay)
     });
 
-    const agent = AgentFactory.createAgent(bot.name, botPrompt, bot.aiType, apiKeys, bot.enableThinking || false);
+    const agent = AgentFactory.createAgent(bot.name, botPrompt, bot.aiType, apiKeys, false);
     // Include the GM command in history with playstyle reminder without saving it yet
     const playStyleReminder = format(BOT_REMINDER_POSTFIX, { play_style: generatePlayStyleDescription(bot) });
     const messagesWithPlaystyle = [...botMessages, {
@@ -980,7 +963,7 @@ async function voteImpl(gameId: string): Promise<Game> {
                 }
             );
             
-            const agent = AgentFactory.createAgent(bot.name, botPrompt, bot.aiType, apiKeys, bot.enableThinking || false);
+            const agent = AgentFactory.createAgent(bot.name, botPrompt, bot.aiType, apiKeys, false);
             
             // Create the voting command message
             const gmMessage: GameMessage = {

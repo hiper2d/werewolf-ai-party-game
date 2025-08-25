@@ -127,7 +127,7 @@ async function endNightWithResults(gameId: string, game: Game): Promise<Game> {
     });
     
     // Create Game Master agent with system prompt
-    const gmAgent = AgentFactory.createAgent(GAME_MASTER, gmSystemPrompt, game.gameMasterAiType, apiKeys, game.gameMasterThinking || false);
+    const gmAgent = AgentFactory.createAgent(GAME_MASTER, gmSystemPrompt, game.gameMasterAiType, apiKeys, false);
     
     // Get day discussion messages and night messages for context
     const dayMessages = await getBotMessages(gameId, GAME_MASTER, game.currentDay);
@@ -160,12 +160,17 @@ async function endNightWithResults(gameId: string, game: Game): Promise<Game> {
     const storyResponse = parseResponseToObj(rawStoryResponse, 'NightResultsStory') as NightResultsStory;
     const nightResultsMessage = storyResponse.story;
     
+    // Log thinking for debugging
+    if (thinking) {
+        console.log(`🎭 Game Master thinking captured (${thinking.length} chars)`);
+    }
+    
     // Create Game Master message with the AI-generated night results
     const gameMessage: GameMessage = {
         id: null,
         recipientName: RECIPIENT_ALL,
         authorName: GAME_MASTER,
-        msg: { story: nightResultsMessage },
+        msg: { story: nightResultsMessage, thinking: thinking || "" },
         messageType: MessageType.GAME_STORY,
         day: game.currentDay,
         timestamp: Date.now()
