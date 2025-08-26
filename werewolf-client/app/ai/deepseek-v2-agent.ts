@@ -3,7 +3,6 @@ import OpenAI from "openai";
 import {AIMessage} from "@/app/api/game-models";
 import {ResponseSchema} from "@/app/ai/prompts/ai-schemas";
 import {cleanResponse} from "@/app/utils/message-utils";
-import {LLM_CONSTANTS, SupportedAiModels} from "@/app/ai/ai-models";
 
 export class DeepSeekV2Agent extends AbstractAgent {
     private readonly client: OpenAI;
