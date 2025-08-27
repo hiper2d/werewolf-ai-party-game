@@ -178,7 +178,7 @@ function renderMessage(message: GameMessage, gameId: string, onDeleteAfter: (mes
                 }`} style={!isUserMessage && !isGameMaster ? { color: getPlayerColor(message.authorName) } : undefined}>
                     {message.authorName}
                 </span>
-                {message.id && !isVoteMessage && displayContent.trim() && (
+                {message.id && !isVoteMessage && displayContent && displayContent.trim() && (
                     <div className="flex gap-1">
                         {/* Reset icon - only for bot messages */}
                         {isBotMessage && (

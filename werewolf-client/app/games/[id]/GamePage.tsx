@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getGame, updateBotModel, updateGameMasterModel, clearGameErrorState, setGameErrorState, endNight, summarizeCurrentDay, newDayBegins } from "@/app/api/game-actions";
+import { getGame, updateBotModel, updateGameMasterModel, clearGameErrorState, setGameErrorState, newDayBegins } from "@/app/api/game-actions";
+import { endNight, summarizeCurrentDay } from "@/app/api/night-actions";
 import GameChat from "@/app/games/[id]/components/GameChat";
 import ModelSelectionDialog from "@/app/games/[id]/components/ModelSelectionDialog";
 import { buttonTransparentStyle } from "@/app/constants";
@@ -106,12 +107,23 @@ export default function GamePage({
     // Handle NIGHT state - process night actions when in NIGHT state
     useEffect(() => {
         const handleNightAction = async () => {
-            if (game.gameState === GAME_STATES.NIGHT && 
-                game.gameStateProcessQueue.length > 0 && 
-                !game.errorState) {
+            if (game.gameState === GAME_STATES.NIGHT && !game.errorState) {
+                // Check if queues are empty - this means all night actions are done and we need to generate summary
+                if (game.gameStateProcessQueue.length === 0) {
+                    console.log('🌙 GAMEPAGE: Night queues empty, generating night summary', {
+                        gameId: game.id,
+                        timestamp: new Date().toISOString()
+                    });
+                    const updatedGame = await performNightAction(game.id);
+                    console.log('✅ GAMEPAGE: Night summary generation completed');
+                    setGame(updatedGame);
+                    return;
+                }
                 
-                const currentRole = game.gameStateProcessQueue[0];
-                const currentPlayer = game.gameStateParamQueue.length > 0 ? game.gameStateParamQueue[0] : null;
+                // Process night actions if queue has items
+                if (game.gameStateProcessQueue.length > 0) {
+                    const currentRole = game.gameStateProcessQueue[0];
+                    const currentPlayer = game.gameStateParamQueue.length > 0 ? game.gameStateParamQueue[0] : null;
                 
                 console.log('🔍 GAMEPAGE: AUTO-PROCESS NIGHT CHECK:', {
                     currentRole,
@@ -141,9 +153,10 @@ export default function GamePage({
                     gameId: game.id,
                     timestamp: new Date().toISOString()
                 });
-                const updatedGame = await performNightAction(game.id);
-                console.log('✅ GAMEPAGE: PerformNightAction API completed');
-                setGame(updatedGame);
+                    const updatedGame = await performNightAction(game.id);
+                    console.log('✅ GAMEPAGE: PerformNightAction API completed');
+                    setGame(updatedGame);
+                }
             }
         };
 
@@ -319,13 +332,36 @@ export default function GamePage({
             case GAME_STATES.NIGHT:
                 const currentRole = processQueue[0];
                 const currentPlayer = paramQueue[0];
+                
+                // Calculate progress for current role
+                let progressText = '';
+                
+                if (currentRole === 'werewolf') {
+                    // For werewolves, show remaining messages in the discussion queue
+                    const remainingMessages = paramQueue.length;
+                    
+                    // Only show counter if there are multiple werewolves (more than 1 message)
+                    if (remainingMessages > 1) {
+                        progressText = ` (${remainingMessages} messages remaining)`;
+                    } else if (remainingMessages === 1) {
+                        progressText = ` (final action)`;
+                    }
+                } else {
+                    // For other roles, just show simple counter if multiple players have the role
+                    const totalPlayersForRole = paramQueue.length;
+                    if (totalPlayersForRole > 1) {
+                        const currentPosition = totalPlayersForRole - paramQueue.length + 1;
+                        progressText = ` (${currentPosition} of ${totalPlayersForRole})`;
+                    }
+                }
+                
                 return {
                     title: "🌙 Night Actions",
-                    description: currentRole ? `Current: ${currentRole}` : "No night actions currently",
-                    items: paramQueue,
-                    currentItem: currentPlayer || null,
-                    showProgress: paramQueue.length > 0,
-                    subtitle: currentRole ? `Role: ${currentRole}` : undefined
+                    description: currentRole ? `Current: ${currentRole}${progressText}` : "No night actions currently",
+                    items: processQueue,
+                    currentItem: currentRole || null,
+                    showProgress: processQueue.length > 0,
+                    subtitle: paramQueue.length > 0 ? `Processing night actions...` : undefined
                 };
             case GAME_STATES.NIGHT_ENDS_SUMMARY:
                 return {

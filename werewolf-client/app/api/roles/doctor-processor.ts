@@ -1,5 +1,5 @@
 import { BaseRoleProcessor, NightActionResult } from "./base-role-processor";
-import { GAME_ROLES, GAME_MASTER, GameMessage, MessageType, BotResponseError } from "@/app/api/game-models";
+import { GAME_ROLES, GAME_MASTER, GameMessage, MessageType, BotResponseError, RECIPIENT_DOCTOR } from "@/app/api/game-models";
 import { AgentFactory } from "@/app/ai/agent-factory";
 import { addMessageToChatAndSaveToDb, getBotMessages, getUserFromFirestore } from "@/app/api/game-actions";
 import { getUserApiKeys } from "@/app/api/user-actions";
@@ -139,10 +139,10 @@ export class DoctorProcessor extends BaseRoleProcessor {
             const currentNightResults = this.game.nightResults || {};
             currentNightResults[GAME_ROLES.DOCTOR] = { target: doctorResponse.target };
 
-            // Create doctor response message (sent only to the doctor)
+            // Create doctor response message (sent only to the doctor role)
             const doctorMessage: GameMessage = {
                 id: null,
-                recipientName: doctorBot.name,
+                recipientName: RECIPIENT_DOCTOR,
                 authorName: doctorBot.name,
                 msg: doctorResponse,
                 messageType: MessageType.DOCTOR_ACTION,

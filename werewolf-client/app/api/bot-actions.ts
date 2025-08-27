@@ -1297,7 +1297,7 @@ async function performHumanPlayerNightActionImpl(gameId: string, targetPlayer: s
             messageType = MessageType.DOCTOR_ACTION;
         } else if (currentRole === GAME_ROLES.DETECTIVE) {
             recipient = RECIPIENT_DETECTIVE;
-            messageType = MessageType.BOT_ANSWER; // No specific detective action type yet
+            messageType = MessageType.DETECTIVE_ACTION;
         } else {
             // Fallback for other roles
             recipient = RECIPIENT_ALL;
@@ -1364,8 +1364,9 @@ async function performHumanPlayerNightActionImpl(gameId: string, targetPlayer: s
                 // Randomize the order
                 finalUpdates.gameStateParamQueue = nextParamQueue.sort(() => Math.random() - 0.5);
             } else {
-                // No more roles, night ends
-                finalUpdates.gameState = GAME_STATES.NIGHT_ENDS;
+                // No more roles, keep NIGHT state but with empty queues
+                // The frontend will detect this and trigger night summary generation
+                // Don't set NIGHT_ENDS here - let endNightWithResults in night-actions.ts handle it
             }
         }
         
