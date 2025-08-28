@@ -773,9 +773,10 @@ async function humanPlayerTalkWerewolvesImpl(gameId: string, message: string): P
 }
 
 /**
- * Apply night results and transition to NEW_DAY_BOT_SUMMARIES state
+ * Start new day by applying night results and transitioning to NEW_DAY_BOT_SUMMARIES state
+ * Merges the functionality of newDayBegins + endNight
  */
-async function endNightImpl(gameId: string): Promise<Game> {
+async function startNewDayImpl(gameId: string): Promise<Game> {
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
@@ -791,12 +792,12 @@ async function endNightImpl(gameId: string): Promise<Game> {
         const gameData = gameSnap.data();
         const currentGame = { id: gameId, ...gameData } as Game;
         
-        // Validate that we're in NEW_DAY_BEGINS state
-        if (gameData?.gameState !== GAME_STATES.NEW_DAY_BEGINS) {
-            throw new Error(`Cannot apply night results from state: ${gameData?.gameState}. Expected: ${GAME_STATES.NEW_DAY_BEGINS}`);
+        // Validate that we're in NIGHT_RESULTS state
+        if (gameData?.gameState !== GAME_STATES.NIGHT_RESULTS) {
+            throw new Error(`Cannot start new day from state: ${gameData?.gameState}. Expected: ${GAME_STATES.NIGHT_RESULTS}`);
         }
         
-        console.log(`🌙 Applying night results and transitioning to NEW_DAY_BOT_SUMMARIES`);
+        console.log(`🌅 Starting new day by applying night results and transitioning to NEW_DAY_BOT_SUMMARIES`);
 
         // Apply night results - eliminate werewolf targets if successful
         let updatedBots = [...currentGame.bots];
@@ -845,15 +846,15 @@ async function endNightImpl(gameId: string): Promise<Game> {
         // Return the updated game
         return await getGame(gameId) as Game;
     } catch (error: any) {
-        console.error("Error ending night: ", error);
-        throw new Error(`Failed to end night: ${error.message}`);
+        console.error("Error starting new day: ", error);
+        throw new Error(`Failed to start new day: ${error.message}`);
     }
 }
 
 /**
- * Summarize current day for one bot (called sequentially from UI)
+ * Summarize past day for one bot (called sequentially from UI)
  */
-async function summarizeCurrentDayImpl(gameId: string): Promise<Game> {
+async function summarizePastDayImpl(gameId: string): Promise<Game> {
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
@@ -1107,5 +1108,5 @@ export const performNightAction = withGameErrorHandling(performNightActionImpl);
 export const beginNight = withGameErrorHandling(beginNightImpl);
 export const replayNight = withGameErrorHandling(replayNightImpl);
 export const humanPlayerTalkWerewolves = withGameErrorHandling(humanPlayerTalkWerewolvesImpl);
-export const endNight = withGameErrorHandling(endNightImpl);
-export const summarizeCurrentDay = withGameErrorHandling(summarizeCurrentDayImpl);
+export const startNewDay = withGameErrorHandling(startNewDayImpl);
+export const summarizePastDay = withGameErrorHandling(summarizePastDayImpl);

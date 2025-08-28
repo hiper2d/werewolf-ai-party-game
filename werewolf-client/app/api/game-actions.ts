@@ -626,47 +626,6 @@ export async function clearGameErrorState(gameId: string): Promise<Game> {
 
 
 
-/**
- * Transition from NIGHT_RESULTS to NEW_DAY_BEGINS (ready to apply night results)
- */
-export async function newDayBegins(gameId: string): Promise<Game> {
-    if (!db) {
-        throw new Error('Firestore is not initialized');
-    }
-    
-    try {
-        const gameRef = db.collection('games').doc(gameId);
-        const gameSnap = await gameRef.get();
-        
-        if (!gameSnap.exists) {
-            throw new Error('Game not found');
-        }
-        
-        const gameData = gameSnap.data();
-        
-        // Validate that we're in NIGHT_RESULTS state
-        if (gameData?.gameState !== GAME_STATES.NIGHT_RESULTS) {
-            throw new Error(`Cannot begin new day from state: ${gameData?.gameState}. Expected: ${GAME_STATES.NIGHT_RESULTS}`);
-        }
-        
-        console.log(`🌅 Transitioning from NIGHT_RESULTS to NEW_DAY_BEGINS`);
-        
-        // Transition to NEW_DAY_BEGINS state (night results will be applied by endNight)
-        await gameRef.update({
-            gameState: GAME_STATES.NEW_DAY_BEGINS,
-            gameStateParamQueue: [],
-            gameStateProcessQueue: []
-        });
-        
-        console.log(`🌅 Ready to apply night results and generate summaries`);
-        
-        return await getGame(gameId) as Game;
-        
-    } catch (error: any) {
-        console.error("Error transitioning to new day: ", error);
-        throw new Error(`Failed to transition to new day: ${error.message}`);
-    }
-}
 
 /**
  * Exported so bot-actions can access user details

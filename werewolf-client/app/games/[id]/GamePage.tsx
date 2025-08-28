@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getGame, updateBotModel, updateGameMasterModel, clearGameErrorState, setGameErrorState, newDayBegins } from "@/app/api/game-actions";
-import { endNight, summarizeCurrentDay } from "@/app/api/night-actions";
+import { getGame, updateBotModel, updateGameMasterModel, clearGameErrorState, setGameErrorState } from "@/app/api/game-actions";
+import { startNewDay, summarizePastDay } from "@/app/api/night-actions";
 import GameChat from "@/app/games/[id]/components/GameChat";
 import ModelSelectionDialog from "@/app/games/[id]/components/ModelSelectionDialog";
 import { buttonTransparentStyle } from "@/app/constants";
@@ -178,7 +178,7 @@ export default function GamePage({
                 });
                 
                 try {
-                    const updatedGame = await summarizeCurrentDay(game.id);
+                    const updatedGame = await summarizePastDay(game.id);
                     console.log('✅ GAMEPAGE: SummarizeCurrentDay API completed');
                     setGame(updatedGame);
                 } catch (error: any) {
@@ -207,45 +207,6 @@ export default function GamePage({
         handleSummaryGeneration();
     }, [game.gameState, game.gameStateProcessQueue.length, game.gameStateProcessQueue.join(','), game.id, game.errorState]);
 
-    // Handle NEW_DAY_BEGINS state - automatically apply night results and start summaries
-    useEffect(() => {
-        const handleNewDayBegins = async () => {
-            if (game.gameState === GAME_STATES.NEW_DAY_BEGINS && !game.errorState) {
-                console.log('🌅 GAMEPAGE: AUTO-APPLY NIGHT RESULTS:', {
-                    gameState: game.gameState,
-                    gameId: game.id,
-                    timestamp: new Date().toISOString()
-                });
-                
-                try {
-                    const updatedGame = await endNight(game.id);
-                    console.log('✅ GAMEPAGE: EndNight (apply results) API completed');
-                    setGame(updatedGame);
-                } catch (error: any) {
-                    console.error('🌅 GAMEPAGE: EndNight (apply results) failed:', error);
-                    
-                    // Set error state so user can see the issue and take action
-                    const errorState = {
-                        error: `Failed to start new day: ${error.message}`,
-                        details: error.details || 'New day transition encountered an error',
-                        context: error.context || {},
-                        recoverable: error.recoverable !== false, // Default to recoverable unless explicitly set to false
-                        timestamp: Date.now()
-                    };
-                    
-                    try {
-                        const gameWithError = await setGameErrorState(game.id, errorState);
-                        setGame(gameWithError);
-                    } catch (setErrorError) {
-                        console.error('🌅 GAMEPAGE: Failed to set error state:', setErrorError);
-                        // Fallback: just log the error if we can't set the error state
-                    }
-                }
-            }
-        };
-
-        handleNewDayBegins();
-    }, [game.gameState, game.id, game.errorState]);
 
     // Handle state changes logging
     useEffect(() => {
@@ -397,14 +358,6 @@ export default function GamePage({
                 return {
                     title: "🌅 Night Complete",
                     description: "Night phase finished - ready to start new day",
-                    items: [],
-                    currentItem: null,
-                    showProgress: false
-                };
-            case GAME_STATES.NEW_DAY_BEGINS:
-                return {
-                    title: "🌅 New Day Starting",
-                    description: "Transitioning to new day...",
                     items: [],
                     currentItem: null,
                     showProgress: false
@@ -568,49 +521,39 @@ export default function GamePage({
                                 </div>
                             )}
                             {game.gameState === GAME_STATES.NIGHT_RESULTS && (
-                                <div className="flex flex-col gap-2">
-                                    <div className="text-sm text-yellow-400 text-center">
-                                        🌅 Night completed
-                                    </div>
-                                    <div className="flex gap-2 justify-center">
-                                        <button
-                                            className={`${buttonTransparentStyle} bg-purple-600 hover:bg-purple-700 border-purple-500`}
-                                            onClick={async () => {
-                                                // First trigger UI message clearing
-                                                setClearNightMessages(true);
-                                                
-                                                // Then replay night in backend
-                                                const updatedGame = await replayNight(game.id);
-                                                setGame(updatedGame);
-                                                
-                                                // Reset the clear flag after a brief delay
-                                                setTimeout(() => setClearNightMessages(false), 100);
-                                            }}
-                                            title="Clear night messages and replay the night phase actions"
-                                        >
-                                            🔄 Replay Night
-                                        </button>
-                                        <button
-                                            className={`${buttonTransparentStyle} bg-green-600 hover:bg-green-700 border-green-500`}
-                                            onClick={async () => {
-                                                const updatedGame = await newDayBegins(game.id);
-                                                setGame(updatedGame);
-                                            }}
-                                            title="Continue to apply night results and start new day"
-                                        >
-                                            🌅 Start Next Day
-                                        </button>
-                                    </div>
+                                <div className="flex gap-2 justify-center">
+                                    <button
+                                        className={buttonTransparentStyle}
+                                        onClick={async () => {
+                                            // First trigger UI message clearing
+                                            setClearNightMessages(true);
+                                            
+                                            // Then replay night in backend
+                                            const updatedGame = await replayNight(game.id);
+                                            setGame(updatedGame);
+                                            
+                                            // Reset the clear flag after a brief delay
+                                            setTimeout(() => setClearNightMessages(false), 100);
+                                        }}
+                                        title="Clear night messages and replay the night phase actions"
+                                    >
+                                        Replay
+                                    </button>
+                                    <button
+                                        className={buttonTransparentStyle}
+                                        onClick={async () => {
+                                            const updatedGame = await startNewDay(game.id);
+                                            setGame(updatedGame);
+                                        }}
+                                        title="Continue to apply night results and start new day"
+                                    >
+                                        Next Day
+                                    </button>
                                 </div>
                             )}
                             {game.gameState === GAME_STATES.NEW_DAY_BOT_SUMMARIES && (
                                 <div className="text-sm text-blue-400 text-center">
                                     💭 Generating day summaries... ({game.gameStateProcessQueue.length} bots remaining)
-                                </div>
-                            )}
-                            {game.gameState === GAME_STATES.NEW_DAY_BEGINS && (
-                                <div className="text-sm text-green-400 text-center">
-                                    🌅 Starting Day {(game.currentDay || 1) + 1}...
                                 </div>
                             )}
                         </div>
