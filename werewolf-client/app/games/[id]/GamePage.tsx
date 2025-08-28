@@ -562,10 +562,15 @@ export default function GamePage({
                                     🌙 Start Night
                                 </button>
                             )}
-                            {(game.gameState === GAME_STATES.NIGHT || game.gameState === GAME_STATES.NIGHT_RESULTS) && (
+                            {game.gameState === GAME_STATES.NIGHT && (
+                                <div className="text-sm text-yellow-400 text-center">
+                                    🌙 Night in progress...
+                                </div>
+                            )}
+                            {game.gameState === GAME_STATES.NIGHT_RESULTS && (
                                 <div className="flex flex-col gap-2">
                                     <div className="text-sm text-yellow-400 text-center">
-                                        {game.gameState === GAME_STATES.NIGHT_RESULTS ? '🌅 Night completed' : '🌙 Night in progress...'}
+                                        🌅 Night completed
                                     </div>
                                     <div className="flex gap-2 justify-center">
                                         <button
@@ -585,18 +590,16 @@ export default function GamePage({
                                         >
                                             🔄 Replay Night
                                         </button>
-                                        {game.gameState === GAME_STATES.NIGHT_RESULTS && (
-                                            <button
-                                                className={`${buttonTransparentStyle} bg-green-600 hover:bg-green-700 border-green-500`}
-                                                onClick={async () => {
-                                                    const updatedGame = await newDayBegins(game.id);
-                                                    setGame(updatedGame);
-                                                }}
-                                                title="Continue to apply night results and start new day"
-                                            >
-                                                🌅 Start Next Day
-                                            </button>
-                                        )}
+                                        <button
+                                            className={`${buttonTransparentStyle} bg-green-600 hover:bg-green-700 border-green-500`}
+                                            onClick={async () => {
+                                                const updatedGame = await newDayBegins(game.id);
+                                                setGame(updatedGame);
+                                            }}
+                                            title="Continue to apply night results and start new day"
+                                        >
+                                            🌅 Start Next Day
+                                        </button>
                                     </div>
                                 </div>
                             )}

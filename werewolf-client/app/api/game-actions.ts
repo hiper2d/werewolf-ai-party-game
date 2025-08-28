@@ -702,7 +702,8 @@ function serializeMessageForFirestore(gameMessage: GameMessage) {
              gameMessage.messageType === MessageType.GAME_STORY ||
              gameMessage.messageType === MessageType.VOTE_MESSAGE ||
              gameMessage.messageType === MessageType.WEREWOLF_ACTION ||
-             gameMessage.messageType === MessageType.DOCTOR_ACTION
+             gameMessage.messageType === MessageType.DOCTOR_ACTION ||
+             gameMessage.messageType === MessageType.NIGHT_SUMMARY
             ? gameMessage.msg  // keep as object
             : gameMessage.msg as string  // it's a string for most other message types
     };

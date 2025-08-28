@@ -173,7 +173,7 @@ async function endNightWithResults(gameId: string, game: Game): Promise<Game> {
         recipientName: RECIPIENT_ALL,
         authorName: GAME_MASTER,
         msg: { story: nightResultsMessage, thinking: thinking || "" },
-        messageType: MessageType.GAME_STORY,
+        messageType: MessageType.NIGHT_SUMMARY,
         day: game.currentDay,
         timestamp: Date.now()
     };
@@ -412,13 +412,14 @@ async function replayNightImpl(gameId: string): Promise<Game> {
     }
 
     try {
-        // Find the NIGHT_BEGINS message for the current day using the specific message type
+        // Find the FIRST (earliest) NIGHT_BEGINS message for the current day
+        // This ensures we delete ALL night-related messages, even from previous replay attempts
         const nightBeginsSnapshot = await db.collection('games')
             .doc(gameId)
             .collection('messages')
             .where('messageType', '==', MessageType.NIGHT_BEGINS)
             .where('day', '==', game.currentDay)
-            .orderBy('timestamp', 'desc')
+            .orderBy('timestamp', 'asc')  // Get the EARLIEST/FIRST one
             .limit(1)
             .get();
 
@@ -428,7 +429,7 @@ async function replayNightImpl(gameId: string): Promise<Game> {
             const nightBeginsDoc = nightBeginsSnapshot.docs[0];
             const nightBeginsTimestamp = nightBeginsDoc.data().timestamp;
             
-            console.log(`🔍 REPLAY NIGHT: Found NIGHT_BEGINS message for day ${game.currentDay} at timestamp ${nightBeginsTimestamp}`);
+            console.log(`🔍 REPLAY NIGHT: Found FIRST NIGHT_BEGINS message for day ${game.currentDay} at timestamp ${nightBeginsTimestamp}`);
 
             // Use Firestore query to find all messages FROM the NIGHT_BEGINS message onward (including the night message itself)
             const messagesToDeleteSnapshot = await db.collection('games')

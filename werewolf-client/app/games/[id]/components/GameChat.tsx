@@ -123,7 +123,8 @@ function renderMessage(message: GameMessage, gameId: string, onDeleteAfter: (mes
                 displayContent = botAnswer.reply;
                 break;
             }
-            case MessageType.GAME_STORY: {
+            case MessageType.GAME_STORY:
+            case MessageType.NIGHT_SUMMARY: {
                 const gameStory = message.msg as GameStory;
                 displayContent = gameStory.story;
                 break;
