@@ -92,7 +92,7 @@ export const GM_COMMAND_GENERATE_NIGHT_RESULTS: string = `Generate the night res
 1. **Names can ONLY be revealed if the player DIED during the night**
 2. **Roles can ONLY be revealed if the player DIED during the night** 
 3. **Detective findings MUST ALWAYS be revealed but anonymously:**
-   - If detective found evil: Use "shadows clung deep" or similar dark language
+   - If detective found evil: Use "shadows clung deep" or similar dark language.
    - If detective found innocent: Use "bore no stain of evil" or similar pure language
    - NEVER reveal the target's name or identity unless they died
 4. **All other activities must be described anonymously**
@@ -103,6 +103,11 @@ export const GM_COMMAND_GENERATE_NIGHT_RESULTS: string = `Generate the night res
 - Use dramatic language and vivid descriptions
 - Build suspense and maintain the game's mood
 - End with transition to day discussion
+
+**CRITICAL: Role Naming Rules:**
+- ALWAYS use the exact role names: "werewolves", "detective", "doctor"
+- NEVER use synonyms like "healer", "seeker", "wolves", "investigator", etc.
+- When referring to roles, use the exact terms: "the werewolves", "the detective", "the doctor"
 
 **Content Guidelines:**
 - If someone died: Reveal their name and role dramatically

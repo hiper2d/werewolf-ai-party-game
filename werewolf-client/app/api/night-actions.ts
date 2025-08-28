@@ -181,9 +181,9 @@ async function endNightWithResults(gameId: string, game: Game): Promise<Game> {
     // Save the Game Master message
     await addMessageToChatAndSaveToDb(gameMessage, gameId);
 
-    // 4. Update game state to NIGHT_ENDS (don't eliminate players yet - that happens when starting next day)
+    // 4. Update game state to NIGHT_RESULTS (don't eliminate players yet - that happens when starting next day)
     const gameUpdates: any = {
-        gameState: GAME_STATES.NIGHT_ENDS,
+        gameState: GAME_STATES.NIGHT_RESULTS,
         gameStateProcessQueue: [],
         gameStateParamQueue: []
     };
@@ -191,7 +191,7 @@ async function endNightWithResults(gameId: string, game: Game): Promise<Game> {
     // Update game state
     await db.collection('games').doc(gameId).update(gameUpdates);
 
-    console.log('🌅 NIGHT_ENDS: All night actions completed with results');
+    console.log('🌅 NIGHT_RESULTS: All night actions completed with results');
     return await getGame(gameId) as Game;
 }
 
@@ -226,17 +226,17 @@ async function performNightActionImpl(gameId: string): Promise<Game> {
     } else if (game.gameState === GAME_STATES.NIGHT) {
         // Process next night action or end night if queue is empty
         return await processNightQueue(gameId, game);
-    } else if (game.gameState === GAME_STATES.NIGHT_ENDS) {
+    } else if (game.gameState === GAME_STATES.NIGHT_RESULTS) {
         // Night has already ended, return current game state
         console.log('🌅 Night actions already completed, returning current game state');
         return game;
     } else {
         throw new BotResponseError(
             'Invalid game state for night action',
-            `Game must be in VOTE_RESULTS, NIGHT, or NIGHT_ENDS state. Current state: ${game.gameState}`,
+            `Game must be in VOTE_RESULTS, NIGHT, or NIGHT_RESULTS state. Current state: ${game.gameState}`,
             { 
                 currentState: game.gameState, 
-                expectedStates: [GAME_STATES.VOTE_RESULTS, GAME_STATES.NIGHT, GAME_STATES.NIGHT_ENDS],
+                expectedStates: [GAME_STATES.VOTE_RESULTS, GAME_STATES.NIGHT, GAME_STATES.NIGHT_RESULTS],
                 gameId 
             },
             true
@@ -398,13 +398,13 @@ async function replayNightImpl(gameId: string): Promise<Game> {
     }
 
     // Validate game state (should be in a night phase)
-    if (game.gameState !== GAME_STATES.NIGHT && game.gameState !== GAME_STATES.NIGHT_ENDS) {
+    if (game.gameState !== GAME_STATES.NIGHT && game.gameState !== GAME_STATES.NIGHT_RESULTS) {
         throw new BotResponseError(
             'Invalid game state for replaying night',
-            `Game must be in NIGHT or NIGHT_ENDS state to replay night. Current state: ${game.gameState}`,
+            `Game must be in NIGHT or NIGHT_RESULTS state to replay night. Current state: ${game.gameState}`,
             { 
                 currentState: game.gameState, 
-                expectedStates: [GAME_STATES.NIGHT, GAME_STATES.NIGHT_ENDS],
+                expectedStates: [GAME_STATES.NIGHT, GAME_STATES.NIGHT_RESULTS],
                 gameId 
             },
             true
@@ -772,7 +772,7 @@ async function humanPlayerTalkWerewolvesImpl(gameId: string, message: string): P
 }
 
 /**
- * End the night by applying night results and transitioning to NIGHT_ENDS_SUMMARY state
+ * Apply night results and transition to NEW_DAY_BOT_SUMMARIES state
  */
 async function endNightImpl(gameId: string): Promise<Game> {
     if (!db) {
@@ -790,12 +790,12 @@ async function endNightImpl(gameId: string): Promise<Game> {
         const gameData = gameSnap.data();
         const currentGame = { id: gameId, ...gameData } as Game;
         
-        // Validate that we're in NIGHT_ENDS state
-        if (gameData?.gameState !== GAME_STATES.NIGHT_ENDS) {
-            throw new Error(`Cannot start next day from state: ${gameData?.gameState}. Expected: ${GAME_STATES.NIGHT_ENDS}`);
+        // Validate that we're in NEW_DAY_BEGINS state
+        if (gameData?.gameState !== GAME_STATES.NEW_DAY_BEGINS) {
+            throw new Error(`Cannot apply night results from state: ${gameData?.gameState}. Expected: ${GAME_STATES.NEW_DAY_BEGINS}`);
         }
         
-        console.log(`🌙 Applying night results and transitioning to NIGHT_ENDS_SUMMARY`);
+        console.log(`🌙 Applying night results and transitioning to NEW_DAY_BOT_SUMMARIES`);
 
         // Apply night results - eliminate werewolf targets if successful
         let updatedBots = [...currentGame.bots];
@@ -831,15 +831,15 @@ async function endNightImpl(gameId: string): Promise<Game> {
         // Get all alive bot names for the processing queue
         const aliveBotNames = updatedBots.filter(bot => bot.isAlive).map(bot => bot.name);
         
-        // Transition to NIGHT_ENDS_SUMMARY state and populate processing queue
+        // Transition to NEW_DAY_BOT_SUMMARIES state and populate processing queue
         await gameRef.update({
-            gameState: GAME_STATES.NIGHT_ENDS_SUMMARY,
+            gameState: GAME_STATES.NEW_DAY_BOT_SUMMARIES,
             gameStateParamQueue: [],
             gameStateProcessQueue: aliveBotNames,
             bots: updatedBots
         });
         
-        console.log(`💭 Transitioned to NIGHT_ENDS_SUMMARY with ${aliveBotNames.length} bots to summarize`);
+        console.log(`💭 Transitioned to NEW_DAY_BOT_SUMMARIES with ${aliveBotNames.length} bots to summarize`);
         
         // Return the updated game
         return await getGame(gameId) as Game;
@@ -868,20 +868,41 @@ async function summarizeCurrentDayImpl(gameId: string): Promise<Game> {
         const gameData = gameSnap.data();
         const currentGame = gameFromFirestore(gameId, gameData);
         
-        // Validate that we're in NIGHT_ENDS_SUMMARY state
-        if (gameData?.gameState !== GAME_STATES.NIGHT_ENDS_SUMMARY) {
-            throw new Error(`Cannot summarize day from state: ${gameData?.gameState}. Expected: ${GAME_STATES.NIGHT_ENDS_SUMMARY}`);
+        // Validate that we're in NEW_DAY_BOT_SUMMARIES state
+        if (gameData?.gameState !== GAME_STATES.NEW_DAY_BOT_SUMMARIES) {
+            throw new Error(`Cannot summarize day from state: ${gameData?.gameState}. Expected: ${GAME_STATES.NEW_DAY_BOT_SUMMARIES}`);
         }
         
         // Get the first bot from the processing queue
         const processQueue = [...(gameData.gameStateProcessQueue || [])];
         if (processQueue.length === 0) {
-            // No more bots to process, transition to NEW_DAY_BEGINS
+            // No more bots to process, transition to DAY_DISCUSSION and increment day
+            const nextDay = (currentGame.currentDay || 1) + 1;
+            
+            // Create Game Master message for new day
+            const gmMessage = `☀️ **Day ${nextDay} begins.**\n\nThe village awakens to a new day. The events of the night have left their mark. Now is the time to discuss what happened and decide who among you might be a threat to the village.\n\nDiscuss the night's events, share your suspicions, and prepare to vote when ready.`;
+            
+            const gameMessage: GameMessage = {
+                id: null,
+                recipientName: RECIPIENT_ALL,
+                authorName: GAME_MASTER,
+                msg: gmMessage,
+                messageType: MessageType.GM_COMMAND,
+                day: nextDay,
+                timestamp: Date.now()
+            };
+            
+            // Save the Game Master message
+            await addMessageToChatAndSaveToDb(gameMessage, gameId);
+            
             await gameRef.update({
-                gameState: GAME_STATES.NEW_DAY_BEGINS,
-                gameStateProcessQueue: []
+                gameState: GAME_STATES.DAY_DISCUSSION,
+                gameStateProcessQueue: [],
+                gameStateParamQueue: [],
+                currentDay: nextDay,
+                dayActivityCounter: {} // Reset activity counter for new day
             });
-            console.log(`💭 All bot summaries completed, transitioning to NEW_DAY_BEGINS`);
+            console.log(`💭 All bot summaries completed, starting Day ${nextDay}`);
             return await getGame(gameId) as Game;
         }
         
@@ -972,10 +993,10 @@ async function summarizeCurrentDayImpl(gameId: string): Promise<Game> {
             return await getGame(gameId) as Game;
         }
         
-        let summary: string;
+        let summary: string = ""; // Initialize with empty string
         try {
             const summaryResponse = parseResponseToObj(rawResponse);
-            summary = summaryResponse.reply;
+            summary = summaryResponse.reply || ""; // Ensure not undefined
         } catch (parseError: any) {
             console.error(`💭 Failed to parse summary JSON for bot ${bot.name}:`, parseError);
             console.error('💭 Raw response:', rawResponse);
@@ -1013,15 +1034,20 @@ async function summarizeCurrentDayImpl(gameId: string): Promise<Game> {
             }
         }
         
+        // Ensure summary is never undefined or null
+        if (!summary || summary === "undefined" || summary === "null") {
+            summary = `Summary for day ${currentGame.currentDay}`;
+        }
+        
         // Update the bot with the new summary
         const updatedBots = currentGame.bots.map(b => {
             if (b.name === botName) {
                 // Initialize daySummaries array if needed
-                const daySummaries = b.daySummaries || [];
+                const daySummaries = [...(b.daySummaries || [])]; // Create a copy
                 
                 // Ensure array is large enough for this day index (day 1 -> index 0)
                 while (daySummaries.length < currentGame.currentDay) {
-                    daySummaries.push("");
+                    daySummaries.push(""); // Push empty string, never undefined
                 }
                 
                 // Store summary at correct index (day 1 -> index 0)

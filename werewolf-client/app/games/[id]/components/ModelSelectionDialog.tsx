@@ -18,7 +18,6 @@ export default function ModelSelectionDialog({
     onClose,
     onSelect,
     currentModel,
-    currentThinkingMode = false,
     botName
 }: ModelSelectionDialogProps) {
     const availableModels = useMemo(() => 

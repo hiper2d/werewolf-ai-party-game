@@ -627,7 +627,7 @@ export async function clearGameErrorState(gameId: string): Promise<Game> {
 
 
 /**
- * Begin new day (placeholder function for now)
+ * Transition from NIGHT_RESULTS to NEW_DAY_BEGINS (ready to apply night results)
  */
 export async function newDayBegins(gameId: string): Promise<Game> {
     if (!db) {
@@ -644,32 +644,27 @@ export async function newDayBegins(gameId: string): Promise<Game> {
         
         const gameData = gameSnap.data();
         
-        // Validate that we're in NEW_DAY_BEGINS state
-        if (gameData?.gameState !== GAME_STATES.NEW_DAY_BEGINS) {
-            throw new Error(`Cannot begin new day from state: ${gameData?.gameState}. Expected: ${GAME_STATES.NEW_DAY_BEGINS}`);
+        // Validate that we're in NIGHT_RESULTS state
+        if (gameData?.gameState !== GAME_STATES.NIGHT_RESULTS) {
+            throw new Error(`Cannot begin new day from state: ${gameData?.gameState}. Expected: ${GAME_STATES.NIGHT_RESULTS}`);
         }
         
-        const currentDay = gameData.currentDay || 1;
-        const nextDay = currentDay + 1;
+        console.log(`🌅 Transitioning from NIGHT_RESULTS to NEW_DAY_BEGINS`);
         
-        console.log(`🌅 DAY ${nextDay}: Beginning new day`);
-        
-        // Increment day and set to DAY_DISCUSSION, reset activity counter for new day
+        // Transition to NEW_DAY_BEGINS state (night results will be applied by endNight)
         await gameRef.update({
-            currentDay: nextDay,
-            gameState: GAME_STATES.DAY_DISCUSSION,
+            gameState: GAME_STATES.NEW_DAY_BEGINS,
             gameStateParamQueue: [],
-            gameStateProcessQueue: [],
-            dayActivityCounter: {} // Reset activity counter for new day
+            gameStateProcessQueue: []
         });
         
-        console.log(`🌅 DAY ${nextDay}: Started new day discussion phase`);
+        console.log(`🌅 Ready to apply night results and generate summaries`);
         
         return await getGame(gameId) as Game;
         
     } catch (error: any) {
-        console.error("Error beginning new day: ", error);
-        throw new Error(`Failed to begin new day: ${error.message}`);
+        console.error("Error transitioning to new day: ", error);
+        throw new Error(`Failed to transition to new day: ${error.message}`);
     }
 }
 

@@ -163,11 +163,10 @@ export default function GamePage({
         handleNightAction();
     }, [game.gameState, game.gameStateProcessQueue.length, game.gameStateProcessQueue.join(','), game.gameStateParamQueue.length, game.gameStateParamQueue.join(','), game.humanPlayerRole, game.humanPlayerName, game.id, game.errorState]);
 
-    // Handle NIGHT_ENDS_SUMMARY state - automatically process bot summaries
+    // Handle NEW_DAY_BOT_SUMMARIES state - automatically process bot summaries
     useEffect(() => {
         const handleSummaryGeneration = async () => {
-            if (game.gameState === GAME_STATES.NIGHT_ENDS_SUMMARY && 
-                game.gameStateProcessQueue.length > 0 && 
+            if (game.gameState === GAME_STATES.NEW_DAY_BOT_SUMMARIES && 
                 !game.errorState) {
                 
                 console.log('💭 GAMEPAGE: AUTO-PROCESS SUMMARY CHECK:', {
@@ -208,22 +207,22 @@ export default function GamePage({
         handleSummaryGeneration();
     }, [game.gameState, game.gameStateProcessQueue.length, game.gameStateProcessQueue.join(','), game.id, game.errorState]);
 
-    // Handle NEW_DAY_BEGINS state - automatically start the new day
+    // Handle NEW_DAY_BEGINS state - automatically apply night results and start summaries
     useEffect(() => {
         const handleNewDayBegins = async () => {
             if (game.gameState === GAME_STATES.NEW_DAY_BEGINS && !game.errorState) {
-                console.log('🌅 GAMEPAGE: AUTO-PROCESS NEW DAY CHECK:', {
+                console.log('🌅 GAMEPAGE: AUTO-APPLY NIGHT RESULTS:', {
                     gameState: game.gameState,
                     gameId: game.id,
                     timestamp: new Date().toISOString()
                 });
                 
                 try {
-                    const updatedGame = await newDayBegins(game.id);
-                    console.log('✅ GAMEPAGE: NewDayBegins API completed');
+                    const updatedGame = await endNight(game.id);
+                    console.log('✅ GAMEPAGE: EndNight (apply results) API completed');
                     setGame(updatedGame);
                 } catch (error: any) {
-                    console.error('🌅 GAMEPAGE: NewDayBegins failed:', error);
+                    console.error('🌅 GAMEPAGE: EndNight (apply results) failed:', error);
                     
                     // Set error state so user can see the issue and take action
                     const errorState = {
@@ -275,15 +274,15 @@ export default function GamePage({
     const isGameOver = game.gameState === GAME_STATES.GAME_OVER;
 
     // Handle model update
-    const handleModelUpdate = async (newModel: string, enableThinking?: boolean) => {
+    const handleModelUpdate = async (newModel: string) => {
         if (!selectedBot) return;
         
         try {
             let updatedGame;
             if (selectedBot.name === 'Game Master') {
-                updatedGame = await updateGameMasterModel(game.id, newModel, enableThinking);
+                updatedGame = await updateGameMasterModel(game.id, newModel);
             } else {
-                updatedGame = await updateBotModel(game.id, selectedBot.name, newModel, enableThinking);
+                updatedGame = await updateBotModel(game.id, selectedBot.name, newModel);
             }
             setGame(updatedGame);
         } catch (error) {
@@ -337,17 +336,16 @@ export default function GamePage({
                 let progressText = '';
                 
                 if (currentRole === 'werewolf') {
-                    // For werewolves, show remaining messages in the discussion queue
+                    // For werewolves, show remaining messages in the discussion
                     const remainingMessages = paramQueue.length;
                     
-                    // Only show counter if there are multiple werewolves (more than 1 message)
                     if (remainingMessages > 1) {
-                        progressText = ` (${remainingMessages} messages remaining)`;
+                        progressText = `s are talking (${remainingMessages} messages remain)`;
                     } else if (remainingMessages === 1) {
                         progressText = ` (final action)`;
                     }
                 } else {
-                    // For other roles, just show simple counter if multiple players have the role
+                    // For other roles, show simple counter if multiple players have the role
                     const totalPlayersForRole = paramQueue.length;
                     if (totalPlayersForRole > 1) {
                         const currentPosition = totalPlayersForRole - paramQueue.length + 1;
@@ -363,7 +361,7 @@ export default function GamePage({
                     showProgress: processQueue.length > 0,
                     subtitle: paramQueue.length > 0 ? `Processing night actions...` : undefined
                 };
-            case GAME_STATES.NIGHT_ENDS_SUMMARY:
+            case GAME_STATES.NEW_DAY_BOT_SUMMARIES:
                 return {
                     title: "💭 Summary Generation",
                     description: processQueue.length > 0 ? "Generating summaries for:" : "Summary generation complete",
@@ -395,10 +393,10 @@ export default function GamePage({
                     currentItem: null,
                     showProgress: false
                 };
-            case GAME_STATES.NIGHT_ENDS:
+            case GAME_STATES.NIGHT_RESULTS:
                 return {
                     title: "🌅 Night Complete",
-                    description: "Night phase finished",
+                    description: "Night phase finished - ready to start new day",
                     items: [],
                     currentItem: null,
                     showProgress: false
@@ -564,10 +562,10 @@ export default function GamePage({
                                     🌙 Start Night
                                 </button>
                             )}
-                            {(game.gameState === GAME_STATES.NIGHT || game.gameState === GAME_STATES.NIGHT_ENDS) && (
+                            {(game.gameState === GAME_STATES.NIGHT || game.gameState === GAME_STATES.NIGHT_RESULTS) && (
                                 <div className="flex flex-col gap-2">
                                     <div className="text-sm text-yellow-400 text-center">
-                                        {game.gameState === GAME_STATES.NIGHT_ENDS ? '🌅 Night completed' : '🌙 Night in progress...'}
+                                        {game.gameState === GAME_STATES.NIGHT_RESULTS ? '🌅 Night completed' : '🌙 Night in progress...'}
                                     </div>
                                     <div className="flex gap-2 justify-center">
                                         <button
@@ -587,14 +585,14 @@ export default function GamePage({
                                         >
                                             🔄 Replay Night
                                         </button>
-                                        {game.gameState === GAME_STATES.NIGHT_ENDS && (
+                                        {game.gameState === GAME_STATES.NIGHT_RESULTS && (
                                             <button
                                                 className={`${buttonTransparentStyle} bg-green-600 hover:bg-green-700 border-green-500`}
                                                 onClick={async () => {
-                                                    const updatedGame = await endNight(game.id);
+                                                    const updatedGame = await newDayBegins(game.id);
                                                     setGame(updatedGame);
                                                 }}
-                                                title="Start the next day and begin discussion phase"
+                                                title="Continue to apply night results and start new day"
                                             >
                                                 🌅 Start Next Day
                                             </button>
@@ -602,7 +600,7 @@ export default function GamePage({
                                     </div>
                                 </div>
                             )}
-                            {game.gameState === GAME_STATES.NIGHT_ENDS_SUMMARY && (
+                            {game.gameState === GAME_STATES.NEW_DAY_BOT_SUMMARIES && (
                                 <div className="text-sm text-blue-400 text-center">
                                     💭 Generating day summaries... ({game.gameStateProcessQueue.length} bots remaining)
                                 </div>
@@ -697,7 +695,6 @@ export default function GamePage({
                 }}
                 onSelect={handleModelUpdate}
                 currentModel={selectedBot?.aiType || ''}
-                currentThinkingMode={selectedBot?.enableThinking === true}
                 botName={selectedBot?.name || ''}
             />
         </div>
