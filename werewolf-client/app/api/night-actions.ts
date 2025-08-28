@@ -803,6 +803,9 @@ async function startNewDayImpl(gameId: string): Promise<Game> {
         let updatedBots = [...currentGame.bots];
         const nightResults = currentGame.nightResults || {};
         
+        // Store night results for future reference before clearing
+        const previousNightResults = { ...nightResults };
+        
         // Check if werewolves successfully killed someone
         if (nightResults.werewolf && nightResults.werewolf.target) {
             const targetName = nightResults.werewolf.target;
@@ -834,11 +837,14 @@ async function startNewDayImpl(gameId: string): Promise<Game> {
         const aliveBotNames = updatedBots.filter(bot => bot.isAlive).map(bot => bot.name);
         
         // Transition to NEW_DAY_BOT_SUMMARIES state and populate processing queue
+        // Move nightResults to previousNightResults and clear nightResults for next night
         await gameRef.update({
             gameState: GAME_STATES.NEW_DAY_BOT_SUMMARIES,
             gameStateParamQueue: [],
             gameStateProcessQueue: aliveBotNames,
-            bots: updatedBots
+            bots: updatedBots,
+            previousNightResults: previousNightResults,
+            nightResults: {} // Clear night results for the next night phase
         });
         
         console.log(`💭 Transitioned to NEW_DAY_BOT_SUMMARIES with ${aliveBotNames.length} bots to summarize`);
@@ -1098,6 +1104,7 @@ function gameFromFirestore(id: string, data: any): Game {
         gameStateProcessQueue: data.gameStateProcessQueue,
         errorState: data.errorState || null,
         nightResults: data.nightResults || {},
+        previousNightResults: data.previousNightResults || {},
         messageCounter: data.messageCounter || 0,
         dayActivityCounter: data.dayActivityCounter || {}
     };

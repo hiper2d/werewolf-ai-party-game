@@ -546,7 +546,7 @@ async function handleHumanPlayerMessage(
         day_activity_data: formatDayActivityData(game)
     });
 
-    const gmAgent = AgentFactory.createAgent(GAME_MASTER, gmPrompt, game.gameMasterAiType, apiKeys, game.gameMasterThinking || false);
+    const gmAgent = AgentFactory.createAgent(GAME_MASTER, gmPrompt, game.gameMasterAiType, apiKeys, false);
     const gmMessage: GameMessage = {
         id: null,
         recipientName: GAME_MASTER,
@@ -1425,7 +1425,7 @@ async function getSuggestionImpl(gameId: string): Promise<string> {
         });
 
         // Use the game master AI to generate suggestion
-        const agent = AgentFactory.createAgent('SuggestionBot', suggestionPrompt, game.gameMasterAiType, apiKeys, game.gameMasterThinking || false);
+        const agent = AgentFactory.createAgent('SuggestionBot', suggestionPrompt, game.gameMasterAiType, apiKeys, false);
         
         // Convert day messages to AI format for context
         const history = convertToAIMessages('SuggestionBot', dayMessages);

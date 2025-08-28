@@ -396,7 +396,7 @@ export default function GamePage({
                     </div>
                     <div className="text-xs text-left w-full mb-1">
                         <button
-                            onClick={() => openModelDialog('Game Master', game.gameMasterAiType, game.gameMasterThinking)}
+                            onClick={() => openModelDialog('Game Master', game.gameMasterAiType)}
                             className="text-gray-500 hover:text-gray-300 transition-colors duration-200 text-left w-full"
                             title="Click to change Game Master AI model"
                         >

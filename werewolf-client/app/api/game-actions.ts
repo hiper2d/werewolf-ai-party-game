@@ -687,6 +687,7 @@ function gameFromFirestore(id: string, data: any): Game {
         gameStateProcessQueue: data.gameStateProcessQueue,
         errorState: data.errorState || null,
         nightResults: data.nightResults || {},
+        previousNightResults: data.previousNightResults || {},
         messageCounter: data.messageCounter || 0, // Default to 0 for existing games
         dayActivityCounter: data.dayActivityCounter || {} // Default to empty object for existing games
     };

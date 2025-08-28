@@ -68,8 +68,8 @@ export interface Game {
     gameStateProcessQueue: Array<string>; // some states need to keep intermediate results
     errorState?: SystemErrorMessage | null; // Persistent error state stored in the game object
     nightResults?: Record<string, { target: string }>; // Dynamic night results for each role that has night actions
+    previousNightResults?: Record<string, { target: string }>; // Previous night's results for reference
     messageCounter?: number; // Counter for generating incremental message IDs
-    gameMasterThinking?: boolean;
     dayActivityCounter?: Record<string, number>; // Track number of messages each bot has sent during current day
 }
 
