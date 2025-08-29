@@ -173,13 +173,21 @@ export const BOT_REMINDER_POSTFIX: string = `
 
 **Keep in mind that you must follow your core playstyle:** %play_style%
 
+**RELATIONSHIP & CONVERSATION CONTINUITY:**
+- REMEMBER your previous interactions with each player - reference past conversations naturally
+- CONTINUE unfinished discussions from previous days - don't let important threads drop
+- BUILD on established relationships - if someone defended you yesterday, acknowledge it
+- EVOLVE your opinions - explain how your view of someone has changed and why
+- ADDRESS people you've been talking with - don't ignore ongoing dialogues
+
 **CRITICAL DECISION-MAKING REMINDER:**
 - Base ALL suspicions on voting patterns, contradictions, and strategic behavior - NEVER on story details
 - Question mob consensus: If 4+ players agree on a target, ask WHY no one is defending them
 - Challenge self-appointed leaders who give commands without justification
 - Apply your reasoning consistently: If your logic applies to yourself too, acknowledge equal suspicion
 - Remember: Werewolves coordinate and often defend innocent targets to blend in - total agreement is suspicious
-- Focus on WHO targets WHOM and WHY, not character story consistency\
+- Focus on WHO targets WHOM and WHY, not character story consistency
+- Consider how relationships and alliances affect voting patterns\
 `;
 
 export const BOT_WEREWOLF_DISCUSSION_PROMPT: string = `🌙 **Night Phase - Werewolf Discussion**
@@ -315,26 +323,40 @@ Your response must follow this schema:
 
 Return a single JSON object matching this schema.`;
 
-export const BOT_DAY_SUMMARY_PROMPT: string = `💭 **End of Day %day_number% - Compact Summary**
+export const BOT_DAY_SUMMARY_PROMPT: string = `💭 **End of Day %day_number% - Personal Reflection & Relationship Summary**
 
-%bot_name%, the day has ended and it's time to create a COMPACT summary of Day %day_number% that will help you remember key details for future days.
+%bot_name%, the day has ended. Create a personal reflection on Day %day_number% that captures your evolving understanding of other players and ongoing conversations.
 
-**IMPORTANT: Keep your summary concise and focused. Aim for 2-3 short sentences per section maximum.**
+**IMPORTANT: Focus on RELATIONSHIPS and INTERACTIONS, not just facts. Aim for 2-3 sentences per section.**
 
-**Key Points to Include:**
+**Key Reflections to Record:**
 
-**🔍 SUSPICIONS:** Who do you most suspect and why? Who seems most trustworthy?
+**🤝 INTERACTIONS & CONVERSATIONS:** 
+- Who did you have meaningful exchanges with? What topics were you discussing?
+- Which conversations need to continue tomorrow? What questions were left unanswered?
+- Who supported or challenged your ideas? How did that make you feel about them?
 
-**🗳️ VOTING:** What were the key voting patterns and accusations?
+**💭 YOUR EVOLVING OPINIONS:**
+- How has your opinion of specific players changed based on today's interactions?
+- Who surprised you with their behavior or reasoning? Who confirmed your suspicions?
+- What's your gut feeling about each active player now? Trust them more or less?
 
-**🌙 NIGHT RESULTS:** What happened during the night phase (eliminations, protections, investigations)?
+**🎭 SOCIAL DYNAMICS:**
+- What alliances or tensions did you notice forming between players?
+- Who seems to be working together? Who are natural opponents?
+- Where do you fit in these social dynamics? Who might be your allies?
 
-**🎯 STRATEGY:** What's your main theory about werewolf strategy and who might be special roles?
+**🌙 NIGHT EVENTS & THEIR MEANING:**
+- What happened during the night and how does it change the social landscape?
+- Who might be grieving, scared, or emboldened by the night's events?
 
-**📋 TOMORROW:** What's your key plan for the next day's discussions?
+**🎯 YOUR PERSONAL AGENDA:**
+- What specific conversations or confrontations do you need to have tomorrow?
+- Which relationships need strengthening or challenging?
+- What's your emotional state and how will that affect your approach?
 
 **Remember:** 
-- Keep this COMPACT and FOCUSED - only the most important information
-- This summary is for your memory only - it won't be shared with other players
-- Be honest and analytical about what you observed and learned
-- Focus on actionable insights rather than detailed descriptions`;
+- This is YOUR PERSONAL DIARY - capture your feelings and hunches, not just facts
+- Think about continuing threads of conversation - relationships build over multiple days
+- Form OPINIONS about players - don't just observe, JUDGE them
+- Consider how today's events affect your social position for tomorrow`;

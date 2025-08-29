@@ -888,14 +888,14 @@ async function summarizePastDayImpl(gameId: string): Promise<Game> {
             const nextDay = (currentGame.currentDay || 1) + 1;
             
             // Create Game Master message for new day
-            const gmMessage = `☀️ **Day ${nextDay} begins.**\n\nThe village awakens to a new day. The events of the night have left their mark. Now is the time to discuss what happened and decide who among you might be a threat to the village.\n\nDiscuss the night's events, share your suspicions, and prepare to vote when ready.`;
+            const gmStory = `☀️ **Day ${nextDay} begins.**\n\nThe village awakens to a new day. The events of the night have left their mark. Now is the time to discuss what happened and decide who among you might be a threat to the village.\n\nDiscuss the night's events, share your suspicions, and prepare to vote when ready.`;
             
             const gameMessage: GameMessage = {
                 id: null,
                 recipientName: RECIPIENT_ALL,
                 authorName: GAME_MASTER,
-                msg: gmMessage,
-                messageType: MessageType.GM_COMMAND,
+                msg: { story: gmStory },
+                messageType: MessageType.GAME_STORY,
                 day: nextDay,
                 timestamp: Date.now()
             };
