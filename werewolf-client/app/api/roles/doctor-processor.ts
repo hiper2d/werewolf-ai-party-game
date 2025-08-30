@@ -92,9 +92,25 @@ export class DoctorProcessor extends BaseRoleProcessor {
                 ...this.game.bots.filter(bot => bot.isAlive).map(bot => bot.name),
                 this.game.humanPlayerName
             ];
-            const targetNames = allLivePlayers.join(', ');
-
-            const doctorActionPrompt = `${format(BOT_DOCTOR_ACTION_PROMPT, { bot_name: doctorBot.name })}\n\n**Available targets:** ${targetNames}`;
+            
+            // Check who was protected last night (cannot protect same target twice in a row)
+            const previousProtectedTarget = this.game.previousNightResults?.doctor?.target || null;
+            
+            // Filter out the previous target if it exists
+            const availableTargets = previousProtectedTarget 
+                ? allLivePlayers.filter(player => player !== previousProtectedTarget)
+                : allLivePlayers;
+            
+            const targetNames = availableTargets.join(', ');
+            
+            // Create prompt with previous target restriction info
+            let doctorActionPrompt = format(BOT_DOCTOR_ACTION_PROMPT, { bot_name: doctorBot.name });
+            
+            if (previousProtectedTarget) {
+                doctorActionPrompt += `\n\n**IMPORTANT RESTRICTION:** You protected **${previousProtectedTarget}** last night. You CANNOT protect the same player two nights in a row, so ${previousProtectedTarget} is NOT available as a target tonight.`;
+            }
+            
+            doctorActionPrompt += `\n\n**Available targets for protection:** ${targetNames}`;
 
             const gmMessage: GameMessage = {
                 id: null,
@@ -121,18 +137,45 @@ export class DoctorProcessor extends BaseRoleProcessor {
 
             const doctorResponse = parseResponseToObj(rawResponse, 'DoctorAction') as DoctorAction;
 
-            // Validate target - doctor can protect any living player
-            if (!allLivePlayers.includes(doctorResponse.target)) {
-                throw new BotResponseError(
-                    `Invalid doctor target: ${doctorResponse.target}`,
-                    `The target must be a living player. Available targets: ${allLivePlayers.join(', ')}`,
-                    {
-                        selectedTarget: doctorResponse.target,
-                        availableTargets: allLivePlayers,
-                        doctorName: doctorBot.name
-                    },
-                    true
-                );
+            // Validate target - must be a living player AND not the same as last night
+            if (!availableTargets.includes(doctorResponse.target)) {
+                if (doctorResponse.target === previousProtectedTarget) {
+                    throw new BotResponseError(
+                        `Doctor cannot protect same target twice in a row`,
+                        `Doctor ${doctorBot.name} tried to protect ${doctorResponse.target} again, but they protected this player last night. Must choose a different target.`,
+                        {
+                            selectedTarget: doctorResponse.target,
+                            previousTarget: previousProtectedTarget,
+                            availableTargets: availableTargets,
+                            doctorName: doctorBot.name
+                        },
+                        true
+                    );
+                } else if (!allLivePlayers.includes(doctorResponse.target)) {
+                    throw new BotResponseError(
+                        `Invalid doctor target: ${doctorResponse.target}`,
+                        `The target must be a living player. Available targets: ${availableTargets.join(', ')}`,
+                        {
+                            selectedTarget: doctorResponse.target,
+                            availableTargets: availableTargets,
+                            doctorName: doctorBot.name
+                        },
+                        true
+                    );
+                } else {
+                    // This shouldn't happen, but catch any other validation issues
+                    throw new BotResponseError(
+                        `Invalid doctor target: ${doctorResponse.target}`,
+                        `The target is not available. Available targets: ${availableTargets.join(', ')}`,
+                        {
+                            selectedTarget: doctorResponse.target,
+                            availableTargets: availableTargets,
+                            previousTarget: previousProtectedTarget,
+                            doctorName: doctorBot.name
+                        },
+                        true
+                    );
+                }
             }
 
             // Save the target to nightResults

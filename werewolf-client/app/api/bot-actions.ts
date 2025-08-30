@@ -1277,8 +1277,22 @@ async function performHumanPlayerNightActionImpl(gameId: string, targetPlayer: s
         if (!validTargets.includes(targetPlayer)) {
             throw new Error(`Invalid werewolf target. Available targets: ${validTargets.join(', ')}`);
         }
+    } else if (currentRole === GAME_ROLES.DOCTOR) {
+        // Doctor cannot protect the same player two nights in a row
+        const previousProtectedTarget = game.previousNightResults?.doctor?.target || null;
+        const validTargets = previousProtectedTarget 
+            ? alivePlayerNames.filter(name => name !== previousProtectedTarget)
+            : alivePlayerNames;
+            
+        if (!validTargets.includes(targetPlayer)) {
+            if (targetPlayer === previousProtectedTarget) {
+                throw new Error(`Cannot protect ${targetPlayer} again - you protected them last night. Available targets: ${validTargets.join(', ')}`);
+            } else {
+                throw new Error(`Invalid doctor target. Available targets: ${validTargets.join(', ')}`);
+            }
+        }
     } else {
-        // Doctor and detective can target any alive player
+        // Detective and other roles can target any alive player
         if (!alivePlayerNames.includes(targetPlayer)) {
             throw new Error(`Invalid target. Available targets: ${alivePlayerNames.join(', ')}`);
         }

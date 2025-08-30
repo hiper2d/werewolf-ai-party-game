@@ -254,15 +254,17 @@ export const BOT_DOCTOR_ACTION_PROMPT: string = `🏥 **Night Phase - Doctor Pro
 **IMPORTANT RULES:**
 - You can protect any living player, including yourself
 - If you protect yourself, you will survive even if werewolves target you tonight
-- You CANNOT protect the same player two nights in a row (this rule will be enforced later)
+- You CANNOT protect the same player two nights in a row (whoever you protect tonight cannot be protected tomorrow night - this includes yourself)
+- If you protect yourself tonight, you will NOT be able to protect yourself tomorrow night
 - Your protection only works against werewolf attacks, not voting eliminations
 
 Consider:
 - Who is most likely to be targeted by werewolves tonight?
 - Who poses the greatest threat to werewolves (detectives, vocal villagers)?
-- Should you protect yourself to guarantee your survival?
+- Should you protect yourself to guarantee your survival tonight (knowing you can't do it again tomorrow)?
 - Who has been acting suspiciously and might need protection?
 - Strategic value of keeping this player alive
+- The trade-off of protecting someone tonight vs. needing to protect them tomorrow
 
 **Remember:** Keep your role as Doctor completely secret. Never reveal your protection choices or role to other players during day discussions.
 
