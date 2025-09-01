@@ -144,3 +144,13 @@ I need to implement endNightWithResults function properly:
 - Then, let's decide the detective's target check outcome: it can be good (not a werewolf), or bad (werewolf)
 - 
 
+======
+
+We need to add a check if the game has ended of not. Check should happen in the VOTE_RESULTS and NIGHT_RESULTS game stages.
+There are following end game conditions:
+- the human player has died: the game is over for the human player and thus stops
+- all werewolves are dead while there are alive villagers: villagers win
+- the amount of alive werewolves greater or equals to the amount of alive villagers: werewolves win
+When the game ends during the VOTE_RESULTS, UI should show the Game Over button, but it should be possible to reset to any of the day discussion message as it is now
+When the game ends during the NIGHT_RESULTS, UI should show the Game Over button as well as the Replay button as it is now
+The Game over button should move the game to the new AFTER_GAME_DISCUSSION state. We need to create the new function in game-actions with no implementation yet.

@@ -624,6 +624,45 @@ export async function clearGameErrorState(gameId: string): Promise<Game> {
     }
 }
 
+/**
+ * Move game to AFTER_GAME_DISCUSSION state
+ * This is called when the Game Over button is clicked
+ */
+export async function afterGameDiscussion(gameId: string): Promise<Game> {
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+    
+    try {
+        const gameRef = db.collection('games').doc(gameId);
+        const gameSnap = await gameRef.get();
+        
+        if (!gameSnap.exists) {
+            throw new Error('Game not found');
+        }
+        
+        const gameData = gameSnap.data();
+        
+        // Update the game state to AFTER_GAME_DISCUSSION
+        await gameRef.update({ 
+            gameState: GAME_STATES.AFTER_GAME_DISCUSSION,
+            gameStateProcessQueue: [],
+            gameStateParamQueue: []
+        });
+        
+        // Return the updated game
+        return gameFromFirestore(gameId, { 
+            ...gameData, 
+            gameState: GAME_STATES.AFTER_GAME_DISCUSSION,
+            gameStateProcessQueue: [],
+            gameStateParamQueue: []
+        });
+    } catch (error: any) {
+        console.error("Error moving to after game discussion: ", error);
+        throw new Error(`Failed to move to after game discussion: ${error.message}`);
+    }
+}
+
 
 
 

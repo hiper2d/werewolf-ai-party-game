@@ -48,6 +48,7 @@ import {
     generatePreviousDaySummariesSection,
     generateWerewolfTeammatesSection
 } from "@/app/utils/bot-utils";
+import {checkGameEndConditions} from "@/app/utils/game-utils";
 
 /**
  * Sanitize names for use in message IDs
@@ -885,6 +886,31 @@ async function voteImpl(gameId: string): Promise<Game> {
                             bots: updatedBots
                         });
                         console.log(`🤖 ELIMINATION: Bot ${eliminatedPlayer} eliminated`);
+                        
+                        // Check for game end conditions after updating bots
+                        const tempGame = { ...updatedGame, bots: updatedBots };
+                        const endCheck = checkGameEndConditions(tempGame);
+                        
+                        if (endCheck.isEnded) {
+                            console.log(`🎮 GAME END: ${endCheck.reason}`);
+                            
+                            // Create game end message
+                            const gameEndMessage: GameMessage = {
+                                id: null,
+                                recipientName: RECIPIENT_ALL,
+                                authorName: GAME_MASTER,
+                                msg: { story: endCheck.reason || 'Game has ended!' },
+                                messageType: MessageType.GAME_STORY,
+                                day: updatedGame.currentDay,
+                                timestamp: Date.now(),
+                            };
+                            await addMessageToChatAndSaveToDb(gameEndMessage, gameId);
+                            
+                            // Update game state to GAME_OVER
+                            await db.collection('games').doc(gameId).update({
+                                gameState: GAME_STATES.GAME_OVER
+                            });
+                        }
                     }
                     
                     console.log('✅ ELIMINATION: Successfully processed elimination logic');

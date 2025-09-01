@@ -29,6 +29,7 @@ import { BOT_DAY_SUMMARY_PROMPT, BOT_SYSTEM_PROMPT } from "@/app/ai/prompts/bot-
 import { generateWerewolfTeammatesSection, generatePreviousDaySummariesSection } from "@/app/utils/bot-utils";
 import { format } from "@/app/ai/prompts/utils";
 import { parseResponseToObj, convertToAIMessages } from "@/app/utils/message-utils";
+import {checkGameEndConditions} from "@/app/utils/game-utils";
 
 /**
  * Helper function to handle night end logic with results processing
@@ -835,6 +836,38 @@ async function startNewDayImpl(gameId: string): Promise<Game> {
         
         // Get all alive bot names for the processing queue
         const aliveBotNames = updatedBots.filter(bot => bot.isAlive).map(bot => bot.name);
+        
+        // Check for game end conditions after applying night results
+        const tempGame = { ...currentGame, bots: updatedBots };
+        const endCheck = checkGameEndConditions(tempGame);
+        
+        if (endCheck.isEnded) {
+            console.log(`🎮 GAME END: ${endCheck.reason}`);
+            
+            // Create game end message
+            const gameEndMessage: GameMessage = {
+                id: null,
+                recipientName: RECIPIENT_ALL,
+                authorName: GAME_MASTER,
+                msg: { story: endCheck.reason || 'Game has ended!' },
+                messageType: MessageType.GAME_STORY,
+                day: currentGame.currentDay,
+                timestamp: Date.now(),
+            };
+            await addMessageToChatAndSaveToDb(gameEndMessage, gameId);
+            
+            // Update game state to GAME_OVER
+            await gameRef.update({
+                gameState: GAME_STATES.GAME_OVER,
+                gameStateParamQueue: [],
+                gameStateProcessQueue: [],
+                bots: updatedBots,
+                previousNightResults: previousNightResults,
+                nightResults: {}
+            });
+            
+            return await getGame(gameId) as Game;
+        }
         
         // Transition to NEW_DAY_BOT_SUMMARIES state and populate processing queue
         // Move nightResults to previousNightResults and clear nightResults for next night

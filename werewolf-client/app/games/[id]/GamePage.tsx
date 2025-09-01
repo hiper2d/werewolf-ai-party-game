@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getGame, updateBotModel, updateGameMasterModel, clearGameErrorState, setGameErrorState } from "@/app/api/game-actions";
+import { getGame, updateBotModel, updateGameMasterModel, clearGameErrorState, setGameErrorState, afterGameDiscussion } from "@/app/api/game-actions";
 import { startNewDay, summarizePastDay } from "@/app/api/night-actions";
 import GameChat from "@/app/games/[id]/components/GameChat";
 import ModelSelectionDialog from "@/app/games/[id]/components/ModelSelectionDialog";
@@ -232,7 +232,7 @@ export default function GamePage({
     };
 
     // Check if game is over
-    const isGameOver = game.gameState === GAME_STATES.GAME_OVER;
+    const isGameOver = game.gameState === GAME_STATES.GAME_OVER || game.gameState === GAME_STATES.AFTER_GAME_DISCUSSION;
 
     // Handle model update
     const handleModelUpdate = async (newModel: string) => {
@@ -370,6 +370,14 @@ export default function GamePage({
                     currentItem: null,
                     showProgress: false
                 };
+            case GAME_STATES.AFTER_GAME_DISCUSSION:
+                return {
+                    title: "💬 After Game Discussion",
+                    description: "Discussing the game after it has ended",
+                    items: [],
+                    currentItem: null,
+                    showProgress: false
+                };
             default:
                 return {
                     title: "🤖 Bot Status",
@@ -498,22 +506,34 @@ export default function GamePage({
                                 </>
                             )}
                             {game.gameState === GAME_STATES.VOTE_RESULTS && (
-                                <button
-                                    className={`${buttonTransparentStyle} bg-blue-600 hover:bg-blue-700 border-blue-500`}
-                                    onClick={async () => {
-                                        console.log('🌙 GAMEPAGE: START NIGHT BUTTON CLICKED:', {
-                                            gameId: game.id,
-                                            currentState: game.gameState,
-                                            timestamp: new Date().toISOString()
-                                        });
-                                        const updatedGame = await performNightAction(game.id);
-                                        console.log('✅ GAMEPAGE: Start Night button - PerformNightAction API completed');
-                                        setGame(updatedGame);
-                                    }}
-                                    title="Begin the night phase where werewolves and special roles take their actions"
-                                >
-                                    🌙 Start Night
-                                </button>
+                                <div className="flex gap-2 justify-center">
+                                    <button
+                                        className={`${buttonTransparentStyle} bg-blue-600 hover:bg-blue-700 border-blue-500`}
+                                        onClick={async () => {
+                                            console.log('🌙 GAMEPAGE: START NIGHT BUTTON CLICKED:', {
+                                                gameId: game.id,
+                                                currentState: game.gameState,
+                                                timestamp: new Date().toISOString()
+                                            });
+                                            const updatedGame = await performNightAction(game.id);
+                                            console.log('✅ GAMEPAGE: Start Night button - PerformNightAction API completed');
+                                            setGame(updatedGame);
+                                        }}
+                                        title="Begin the night phase where werewolves and special roles take their actions"
+                                    >
+                                        🌙 Start Night
+                                    </button>
+                                    <button
+                                        className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500`}
+                                        onClick={async () => {
+                                            const updatedGame = await afterGameDiscussion(game.id);
+                                            setGame(updatedGame);
+                                        }}
+                                        title="End the game and move to after-game discussion"
+                                    >
+                                        🎭 Game Over
+                                    </button>
+                                </div>
                             )}
                             {game.gameState === GAME_STATES.NIGHT && (
                                 <div className="text-sm text-yellow-400 text-center">
@@ -548,6 +568,16 @@ export default function GamePage({
                                         title="Continue to apply night results and start new day"
                                     >
                                         Next Day
+                                    </button>
+                                    <button
+                                        className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500`}
+                                        onClick={async () => {
+                                            const updatedGame = await afterGameDiscussion(game.id);
+                                            setGame(updatedGame);
+                                        }}
+                                        title="End the game and move to after-game discussion"
+                                    >
+                                        🎭 Game Over
                                     </button>
                                 </div>
                             )}
