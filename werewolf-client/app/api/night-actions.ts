@@ -442,14 +442,9 @@ async function replayNightImpl(gameId: string): Promise<Game> {
             if (messagesToDeleteSnapshot.empty) {
                 console.log(`ℹ️ REPLAY NIGHT: No messages found from night start onward`);
             } else {
-                // Create batch operation to delete messages
-                const batch = db.batch();
-                
-                messagesToDeleteSnapshot.docs.forEach(doc => {
-                    batch.delete(doc.ref);
-                });
-
-                await batch.commit();
+                // Delete messages individually
+                const deletePromises = messagesToDeleteSnapshot.docs.map(doc => doc.ref.delete());
+                await Promise.all(deletePromises);
                 console.log(`🔄 REPLAY NIGHT: Successfully deleted ${messagesToDeleteSnapshot.size} night messages from database`);
             }
         }

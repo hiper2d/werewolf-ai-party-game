@@ -24,24 +24,22 @@ async function copyGame(sourceGameId: string): Promise<string> {
         .orderBy('timestamp', 'asc')
         .get();
 
-    // Start a new batch write
-    const batch = db.batch();
-
     // Create the new game
     const newGameRef = db.collection('games').doc();
-    batch.set(newGameRef, gameSnap.data());
+    const gameData = gameSnap.data();
+    if (!gameData) {
+        throw new Error('Source game data is empty');
+    }
+    await newGameRef.set(gameData);
 
     // Create a messages subcollection in the new game
     const messagesPromises = messagesSnapshot.docs.map(async (messageDoc) => {
         const newMessageRef = newGameRef.collection('messages').doc();
-        batch.set(newMessageRef, messageDoc.data());
+        return newMessageRef.set(messageDoc.data());
     });
 
     // Wait for all message promises to resolve
     await Promise.all(messagesPromises);
-
-    // Commit the batch
-    await batch.commit();
 
     return newGameRef.id;
 }

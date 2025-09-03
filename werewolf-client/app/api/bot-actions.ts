@@ -74,24 +74,22 @@ async function incrementDayActivity(gameId: string, botName: string, currentDay:
     const gameRef = db.collection('games').doc(gameId);
     
     try {
-        await db.runTransaction(async (transaction) => {
-            const gameDoc = await transaction.get(gameRef);
-            if (!gameDoc.exists) {
-                throw new Error('Game not found during activity increment');
-            }
-            
-            const game = gameDoc.data() as Game;
-            const currentCounter = game.dayActivityCounter || {};
-            
-            // Initialize counter for the bot if it doesn't exist
-            const updatedCounter = {
-                ...currentCounter,
-                [botName]: (currentCounter[botName] || 0) + 1
-            };
-            
-            transaction.update(gameRef, {
-                dayActivityCounter: updatedCounter
-            });
+        const gameDoc = await gameRef.get();
+        if (!gameDoc.exists) {
+            throw new Error('Game not found during activity increment');
+        }
+        
+        const game = gameDoc.data() as Game;
+        const currentCounter = game.dayActivityCounter || {};
+        
+        // Initialize counter for the bot if it doesn't exist
+        const updatedCounter = {
+            ...currentCounter,
+            [botName]: (currentCounter[botName] || 0) + 1
+        };
+        
+        await gameRef.update({
+            dayActivityCounter: updatedCounter
         });
     } catch (error) {
         console.error(`Failed to increment day activity for ${botName}:`, error);
@@ -195,50 +193,6 @@ function formatDayActivityData(game: Game): string {
     return `Today's activity levels - ${activityData}`;
 }
 
-/**
- * Wraps Firestore operations in a transaction for atomicity
- * Ensures all game state updates are atomic and can be rolled back on errors
- */
-async function processWithTransaction<T>(
-    gameId: string,
-    operation: (transaction: FirebaseFirestore.Transaction, gameRef: FirebaseFirestore.DocumentReference) => Promise<T>
-): Promise<T> {
-    if (!db) {
-        throw new Error('Firestore is not initialized');
-    }
-
-    const gameRef = db.collection('games').doc(gameId);
-    
-    try {
-        return await db.runTransaction(async (transaction) => {
-            console.log(`Starting transaction for game ${gameId}`);
-            const result = await operation(transaction, gameRef);
-            console.log(`Transaction completed successfully for game ${gameId}`);
-            return result;
-        });
-    } catch (error) {
-        console.error(`Transaction failed for game ${gameId}:`, error);
-        
-        // Re-throw BotResponseError as-is for frontend handling
-        if (error instanceof BotResponseError) {
-            console.error('BotResponseError details:', {
-                message: error.message,
-                details: error.details,
-                context: error.context,
-                recoverable: error.recoverable
-            });
-            throw error;
-        }
-        
-        // Wrap other errors in BotResponseError for consistent handling
-        throw new BotResponseError(
-            'System error occurred',
-            error instanceof Error ? error.message : 'Unknown error',
-            { originalError: error },
-            false // System errors are typically not recoverable
-        );
-    }
-}
 
 async function welcomeImpl(gameId: string): Promise<Game> {
     const session = await auth();
@@ -1146,97 +1100,71 @@ async function humanPlayerVoteImpl(gameId: string, targetPlayer: string, reason:
     }
 
     try {
-        // Process the vote using a transaction for atomicity
-        return await processWithTransaction(gameId, async (transaction, gameRef) => {
-            console.log(`Processing vote for human player ${game.humanPlayerName}`);
-            
-            // Re-read game state within transaction to ensure consistency
-            const gameDoc = await transaction.get(gameRef);
-            if (!gameDoc.exists) {
-                throw new Error('Game not found in transaction');
+        console.log(`Processing vote for human player ${game.humanPlayerName}`);
+        
+        // Re-read current game state to ensure consistency
+        const currentGame = await getGame(gameId);
+        if (!currentGame) {
+            throw new Error('Game not found');
+        }
+        
+        // Verify human player is still in the queue
+        if (!currentGame.gameStateProcessQueue.includes(currentGame.humanPlayerName)) {
+            throw new Error('Human player already voted');
+        }
+        
+        // Validate game state hasn't changed
+        if (currentGame.gameState !== GAME_STATES.VOTE) {
+            throw new Error(`Game state changed during processing: ${currentGame.gameState}`);
+        }
+        
+        // Update voting results in gameStateParamQueue
+        let votingResults: Record<string, number> = {};
+        if (currentGame.gameStateParamQueue.length > 0) {
+            try {
+                votingResults = JSON.parse(currentGame.gameStateParamQueue[0]);
+            } catch (e) {
+                votingResults = {};
             }
-            
-            const currentGame = { id: gameDoc.id, ...gameDoc.data() } as Game;
-            
-            // Verify human player is still in the queue
-            if (!currentGame.gameStateProcessQueue.includes(currentGame.humanPlayerName)) {
-                throw new Error('Human player already voted');
-            }
-            
-            // Validate game state hasn't changed
-            if (currentGame.gameState !== GAME_STATES.VOTE) {
-                throw new Error(`Game state changed during processing: ${currentGame.gameState}`);
-            }
-            
-            // Update voting results in gameStateParamQueue
-            let votingResults: Record<string, number> = {};
-            if (currentGame.gameStateParamQueue.length > 0) {
-                try {
-                    votingResults = JSON.parse(currentGame.gameStateParamQueue[0]);
-                } catch (e) {
-                    votingResults = {};
-                }
-            }
-            
-            // Add this vote
-            votingResults[targetPlayer] = (votingResults[targetPlayer] || 0) + 1;
-            
-            // Create the vote message
-            const voteMessage: GameMessage = {
-                id: null,
-                recipientName: RECIPIENT_ALL,
-                authorName: currentGame.humanPlayerName,
-                msg: {
-                    who: targetPlayer,
-                    why: reason
-                },
-                messageType: MessageType.VOTE_MESSAGE,
-                day: currentGame.currentDay,
-                timestamp: Date.now()
-            };
-            
-            // Save vote message to database within transaction using proper incremental ID
-            if (!db) {
-                throw new Error('Firestore is not initialized');
-            }
-            
-            // Get current message counter and increment it
-            const currentCounter = currentGame.messageCounter || 0;
-            const newCounter = currentCounter + 1;
-            
-            // Generate custom message ID: zero-padded-counter-author-to-recipient
-            const sanitizedAuthor = sanitizeForId(voteMessage.authorName);
-            const sanitizedRecipient = sanitizeForId(voteMessage.recipientName);
-            const paddedCounter = newCounter.toString().padStart(6, '0'); // Zero-pad to 6 digits for proper sorting
-            const customId = `${paddedCounter}-${sanitizedAuthor}-to-${sanitizedRecipient}`;
-            
-            // Update game counter in the same transaction
-            transaction.update(gameRef, { messageCounter: newCounter });
-            
-            // Add message with custom ID
-            const messageRef = db.collection('games').doc(gameId).collection('messages').doc(customId);
-            await transaction.create(messageRef, {
-                ...voteMessage,
-                timestamp: Date.now()
-            });
-            
-            // Remove the human player from queue and update voting results
-            const newQueue = currentGame.gameStateProcessQueue.slice(1);
-            
-            transaction.update(gameRef, {
-                gameStateProcessQueue: newQueue,
-                gameStateParamQueue: [JSON.stringify(votingResults)]
-            });
-            
-            console.log(`Successfully processed vote for human player ${currentGame.humanPlayerName}, removed from queue`);
-            
-            // Return updated game state
-            return {
-                ...currentGame,
-                gameStateProcessQueue: newQueue,
-                gameStateParamQueue: [JSON.stringify(votingResults)]
-            };
+        }
+        
+        // Add this vote
+        votingResults[targetPlayer] = (votingResults[targetPlayer] || 0) + 1;
+        
+        // Create the vote message
+        const voteMessage: GameMessage = {
+            id: null,
+            recipientName: RECIPIENT_ALL,
+            authorName: currentGame.humanPlayerName,
+            msg: {
+                who: targetPlayer,
+                why: reason
+            },
+            messageType: MessageType.VOTE_MESSAGE,
+            day: currentGame.currentDay,
+            timestamp: Date.now()
+        };
+        
+        // Save vote message to database using the existing helper function
+        await addMessageToChatAndSaveToDb(voteMessage, gameId);
+        
+        // Remove the human player from queue and update voting results
+        const newQueue = currentGame.gameStateProcessQueue.slice(1);
+        
+        const gameRef = db.collection('games').doc(gameId);
+        await gameRef.update({
+            gameStateProcessQueue: newQueue,
+            gameStateParamQueue: [JSON.stringify(votingResults)]
         });
+        
+        console.log(`Successfully processed vote for human player ${currentGame.humanPlayerName}, removed from queue`);
+        
+        // Return updated game state
+        return {
+            ...currentGame,
+            gameStateProcessQueue: newQueue,
+            gameStateParamQueue: [JSON.stringify(votingResults)]
+        };
     } catch (error) {
         console.error('Error in humanPlayerVote function:', error);
         throw error;

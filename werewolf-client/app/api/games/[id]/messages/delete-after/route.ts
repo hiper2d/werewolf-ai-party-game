@@ -113,15 +113,11 @@ export async function DELETE(
             });
             console.log('✅ Game state update successful');
 
-            // Then delete messages in a separate batch
+            // Then delete messages individually
             if (!messagesToDeleteSnapshot.empty) {
-                const deleteBatch = db.batch();
-                messagesToDeleteSnapshot.docs.forEach(doc => {
-                    deleteBatch.delete(doc.ref);
-                });
-                
-                await deleteBatch.commit();
-                console.log('✅ Message deletion batch successful');
+                const deletePromises = messagesToDeleteSnapshot.docs.map(doc => doc.ref.delete());
+                await Promise.all(deletePromises);
+                console.log('✅ Message deletion successful');
             }
 
             // Recalculate day activity counter from remaining messages

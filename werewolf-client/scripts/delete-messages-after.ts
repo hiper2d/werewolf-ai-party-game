@@ -55,18 +55,16 @@ async function deleteMessagesAfter(gameId: string, messageId: string): Promise<v
             return;
         }
 
-        // Create a batch operation
-        const batch = db.batch();
+        // Delete messages individually
         const messagesRef = db.collection('games').doc(gameId).collection('messages');
         
-        // Add each message deletion to the batch
-        messagesToDelete.forEach(message => {
+        const deletePromises = messagesToDelete.map(message => {
             const messageRef = messagesRef.doc(message.id!);
-            batch.delete(messageRef);
+            return messageRef.delete();
         });
 
-        // Execute all deletions in a single atomic operation
-        await batch.commit();
+        // Execute all deletions
+        await Promise.all(deletePromises);
         console.log(`Successfully deleted ${messagesToDelete.length} messages after message ${messageId}`);
     } catch (error) {
         console.error('Error deleting messages:', error);
