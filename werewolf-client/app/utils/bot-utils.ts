@@ -9,10 +9,10 @@ export function generatePlayStyleDescription(bot: Bot): string {
         return 'You have a balanced and thoughtful personality.';
     }
     
-    // Use werewolfDescription for werewolf bots, regular description for others
+    // Use werewolfDescription for werewolf bots, villagerDescription for others
     const description = bot.role === GAME_ROLES.WEREWOLF 
         ? config.werewolfDescription 
-        : config.description;
+        : config.villagerDescription;
     
     return description;
 }

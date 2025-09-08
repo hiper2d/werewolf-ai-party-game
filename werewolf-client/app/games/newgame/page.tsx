@@ -4,7 +4,7 @@ import React, {useEffect, useState} from 'react';
 import {useRouter} from 'next/navigation';
 import {buttonBlackStyle, buttonTransparentStyle} from "@/app/constants";
 import {createGame, previewGame} from '@/app/api/game-actions';
-import {GAME_ROLES, GamePreview, GamePreviewWithGeneratedBots, GENDER_OPTIONS, getVoicesForGender, getRandomVoiceForGender} from "@/app/api/game-models";
+import {GAME_ROLES, GamePreview, GamePreviewWithGeneratedBots, GENDER_OPTIONS, getVoicesForGender, getRandomVoiceForGender, PLAY_STYLES, PLAY_STYLE_CONFIGS} from "@/app/api/game-models";
 import {LLM_CONSTANTS, SupportedAiModels} from "@/app/ai/ai-models";
 import {ttsService} from "@/app/services/tts-service";
 
@@ -22,6 +22,7 @@ export default function CreateNewGamePage() {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [isSpeaking, setIsSpeaking] = useState(false);
+    const [showPlayStyleTooltip, setShowPlayStyleTooltip] = useState<number | null>(null);
     const router = useRouter();
 
     const playerOptions = Array.from({ length: 7 }, (_, i) => i + 6);
@@ -399,6 +400,46 @@ export default function CreateNewGamePage() {
                                             <option key={model} value={model}>{model}</option>
                                         ))}
                                     </select>
+                                </div>
+                                <div className="flex-1">
+                                    <label className="block text-gray-400 text-sm mb-1">
+                                        Play Style:
+                                    </label>
+                                    <div className="relative flex items-center space-x-2">
+                                        <select
+                                            className="flex-1 h-10 p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
+                                            value={player.playStyle}
+                                            onChange={(e) => handlePlayerChange(index, 'playStyle', e.target.value)}
+                                        >
+                                            {Object.values(PLAY_STYLES).map(style => (
+                                                <option key={style} value={style}>
+                                                    {style.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <button
+                                            type="button"
+                                            className="w-6 h-6 rounded-full bg-gray-700 hover:bg-gray-600 text-white text-xs flex items-center justify-center transition-colors"
+                                            onMouseEnter={() => setShowPlayStyleTooltip(index)}
+                                            onMouseLeave={() => setShowPlayStyleTooltip(null)}
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                setShowPlayStyleTooltip(showPlayStyleTooltip === index ? null : index);
+                                            }}
+                                        >
+                                            ?
+                                        </button>
+                                        {showPlayStyleTooltip === index && (
+                                            <div className="absolute z-10 w-80 p-3 bg-gray-900 border border-gray-700 rounded-lg shadow-lg text-sm text-white top-full mt-2 right-0">
+                                                <div className="font-semibold mb-2">
+                                                    {PLAY_STYLE_CONFIGS[player.playStyle]?.name || player.playStyle}
+                                                </div>
+                                                <div className="text-gray-300">
+                                                    {PLAY_STYLE_CONFIGS[player.playStyle]?.uiDescription || 'No description available'}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                                 <div className="w-10">
                                     {/* Empty space to align with play button below */}

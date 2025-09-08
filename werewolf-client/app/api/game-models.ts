@@ -157,14 +157,16 @@ export function getRandomVoiceForGender(gender: 'male' | 'female' | 'neutral'): 
 
 export interface PlayStyleConfig {
     name: string;
-    description: string;
+    uiDescription: string;
+    villagerDescription: string;
     werewolfDescription: string;
 }
 
 export const PLAY_STYLE_CONFIGS: Record<string, PlayStyleConfig> = {
     [PLAY_STYLES.AGGRESSIVE_PROVOKER]: {
         name: 'Aggressive Provoker',
-        description: `\
+        uiDescription: 'Confrontational player who uses direct accusations and provocation to expose werewolves through stress reactions.',
+        villagerDescription: `\
 You believe the best way to get information is to put people under stress. \
 Most people find it difficult to lie, so even a direct question like "Are you a werewolf?" can expose them if they are not good liars. \
 A false accusation is a powerful tool to gauge reactions. This is your strategy. \
@@ -184,7 +186,8 @@ Your real goal is to create disorder, plant suspicion, and identify villagers wi
     },
     [PLAY_STYLES.PROTECTIVE_TEAM_PLAYER]: {
         name: 'Protective Team Player',
-        description: `\
+        uiDescription: 'Defends vulnerable players and challenges mob mentality, believing werewolves hide in majority votes.',
+        villagerDescription: `\
 You are naturally protective of those who are vulnerable or being unfairly targeted. \
 When the majority of players gang up on someone during discussions or votes, you instinctively want to defend them and redirect attention elsewhere. \
 You believe that mob mentality often leads to innocent deaths, as werewolves love to join majority votes to blend in. \
@@ -205,7 +208,8 @@ Use your protective facade to position yourself as a voice of reason, all while 
     },
     [PLAY_STYLES.TRICKSTER]: {
         name: 'Trickster',
-        description: `\
+        uiDescription: 'Creates controlled chaos through unpredictable behavior and false claims to expose werewolf reactions.',
+        villagerDescription: `\
 You believe that a predictable game is a game the werewolves will win. You trust no one, so you test everyone. \
 Your strategy is to be an agent of controlled chaos. You might float a bizarre theory to see who latches onto it. \
 You might defend a player one moment and accuse them the next, just to gauge the reactions of others. \
@@ -224,7 +228,8 @@ Your unpredictable antics serve as the perfect smokescreen. While all eyes are o
     },
     [PLAY_STYLES.RULE_BREAKER]: {
         name: 'Rule Breaker',
-        description: `\
+        uiDescription: 'Challenges conventional strategies and proposes unconventional alliances to disrupt werewolf plans.',
+        villagerDescription: `\
 You fundamentally question the established order of the game and the common patterns that emerge. \
 When everyone follows the typical logic of voting for suspicious players, you deliberately challenge this approach. \
 You believe that conventional wisdom in Werewolf is often wrong and leads to predictable outcomes that favor the werewolves. \
@@ -248,7 +253,8 @@ Remember, your goal is not just to survive, but to make the entire game so chaot
     },
     [PLAY_STYLES.MODEST_MOUSE]: {
         name: 'Modest Mouse',
-        description: `\
+        uiDescription: 'Quiet observer who prefers to stay under the radar, speaking only when necessary with concrete evidence.',
+        villagerDescription: `\
 You are naturally shy and reserved, preferring to observe rather than participate actively in discussions. \
 You believe that talking too much reveals too much about yourself, making you an easy target for manipulation or elimination. \
 You don't trust anyone easily and you're not looking to make friends or build alliances—you're here to survive. \
@@ -272,7 +278,8 @@ Let more talkative players draw attention while you work quietly to eliminate th
     },
     [PLAY_STYLES.NORMAL]: {
         name: 'Normal',
-        description: `\
+        uiDescription: 'Balanced player who participates reasonably, using logical reasoning and collaborative discussion.',
+        villagerDescription: `\
 You approach the game with a balanced, reasonable mindset focused on having a good experience for everyone. \
 You participate actively in discussions without being overly aggressive or dominating the conversation. \
 You share your thoughts and observations when they're relevant, but you also listen to others and consider their perspectives. \
