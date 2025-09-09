@@ -14,6 +14,7 @@ import {
     getRandomVoiceForGender,
     MessageType,
     PLAY_STYLES,
+    PLAY_STYLE_CONFIGS,
     RECIPIENT_ALL,
     RECIPIENT_WEREWOLVES,
     ROLE_CONFIGS,
@@ -184,13 +185,19 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
         `- **${role.name}** (${role.alignment}): ${role.description}`
     ).join('\n');
 
+    // Format playstyle configurations for the prompt
+    const playStylesText = Object.entries(PLAY_STYLE_CONFIGS).map(([key, config]) => 
+        `* ${key}: ${config.name} - ${config.uiDescription}`
+    ).join('\n');
+
     const userPrompt = format(STORY_USER_PROMPT, {
         theme: gamePreview.theme,
         description: gamePreview.description,
         excluded_name: gamePreview.name,
         number_of_players: botCount,
         game_roles: gameRolesText,
-        werewolf_count: gamePreview.werewolfCount
+        werewolf_count: gamePreview.werewolfCount,
+        play_styles: playStylesText
     });
 
     const storyMessage: GameMessage = {
@@ -211,7 +218,7 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
     }
 
     const aiResponse = parseResponseToObj(rawResponse);
-    const bots: BotPreview[] = aiResponse.players.map((bot: { name: string; gender: string; story: string }) => {
+    const bots: BotPreview[] = aiResponse.players.map((bot: { name: string; gender: string; story: string; playStyle?: string }) => {
         let aiType = gamePreview.playersAiType;
         
         if (aiType === LLM_CONSTANTS.RANDOM) {
@@ -227,9 +234,13 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
         const gender = bot.gender as 'male' | 'female' | 'neutral';
         const voice = getRandomVoiceForGender(gender);
 
-        // Randomly assign play style
-        const availablePlayStyles = Object.values(PLAY_STYLES);
-        const randomPlayStyle = availablePlayStyles[Math.floor(Math.random() * availablePlayStyles.length)];
+        // Use AI-selected playstyle if available, otherwise fallback to random
+        let playStyle = bot.playStyle;
+        if (!playStyle || !Object.values(PLAY_STYLES).includes(playStyle as any)) {
+            // Fallback to random if AI didn't provide a valid playstyle
+            const availablePlayStyles = Object.values(PLAY_STYLES);
+            playStyle = availablePlayStyles[Math.floor(Math.random() * availablePlayStyles.length)];
+        }
 
         return {
             name: bot.name,
@@ -237,7 +248,7 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
             playerAiType: aiType,
             gender: gender,
             voice: voice,
-            playStyle: randomPlayStyle
+            playStyle: playStyle
         };
     });
 

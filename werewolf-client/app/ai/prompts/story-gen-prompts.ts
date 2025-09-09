@@ -45,6 +45,13 @@ You are an AI agent tasked with generating a game scene and character descriptio
     - **Definition**: The exact number of werewolves that will be present in the game.
     - **Usage**: Mention this specific number in the scene to create tension and inform players of the threat level.
   </WerewolfCount>
+
+  <PlayStyles>
+    - **Definition**: Available playstyles that define how characters behave in the game.
+    - **Format**: Each playstyle has an identifier, name, and description.
+    - **Usage**: Select one playstyle identifier for each character that matches their personality and story.
+    - **Note**: The available playstyles will be provided in the parameters.
+  </PlayStyles>
 </Parameters>
 
 <Tasks>
@@ -81,11 +88,15 @@ You are an AI agent tasked with generating a game scene and character descriptio
       <CharacterDetails>
         - A unique, single-word <Name>name</Name> appropriate to the theme, following the Character Sourcing Rule above. Do not use the <ExcludedName>ExcludedName</ExcludedName> or any similar names.
         - A <Gender>gender</Gender> (male, female, or neutral) that fits the character
-        - A brief <Story>story</Story> (1-2 sentences) that:
+        - A brief <Story>story</Story> (3-5 sentences) that:
           * Fits within the context of the scene and theme
           * **Includes ambiguous details that could hint at any role without revealing it**
           * References backgrounds, skills, or motivations that could relate to the GameRoles in subtle ways
           * Creates intrigue about their true nature and intentions
+        - A <PlayStyle>playStyle</PlayStyle> identifier (must be one of the provided playstyle identifiers) that:
+          * Matches the character's personality and background story
+          * Creates variety across the player group (avoid having all players with the same playstyle)
+          * Fits the character's theme and role in the narrative
       </CharacterDetails>
     </CharacterCreation>
   </Task2>
@@ -99,7 +110,8 @@ You are an AI agent tasked with generating a game scene and character descriptio
     players: Array<{
       name: string;     // Single-word unique name
       gender: string;   // male, female, or neutral
-      story: string;    // 1-2 sentence character background
+      story: string;    // 3-5 sentence character background
+      playStyle: string; // Playstyle identifier (e.g., aggressive_provoker, protective_team_player, etc.)
     }>;
   }
 
@@ -110,7 +122,8 @@ You are an AI agent tasked with generating a game scene and character descriptio
       {
         "name": "Zenith",
         "gender": "male",
-        "story": "A veteran maintenance engineer with a mysterious past..."
+        "story": "A veteran maintenance engineer with a mysterious past...",
+        "playStyle": "modest_mouse"
       },
       // ... more players
     ]
@@ -122,7 +135,7 @@ You are an AI agent tasked with generating a game scene and character descriptio
   - Return ONLY the JSON object, no additional text
   - Ensure valid JSON syntax with proper escaping of special characters
   - Make all character names unique single words
-  - Keep character stories to 1-2 sentences
+  - Keep character stories to 3-5 sentences
   - Never use or reference the excluded name
   - Include exactly the number of players specified
   - Make sure the scene description is relevant to the theme
@@ -137,6 +150,7 @@ export const STORY_USER_PROMPT: string = `
   <ExcludedName>%excluded_name%</ExcludedName>
   <GameRoles>%game_roles%</GameRoles>
   <WerewolfCount>%werewolf_count%</WerewolfCount>
+  <PlayStyles>%play_styles%</PlayStyles>
 </Parameters>
 
 Expected response format:
@@ -145,7 +159,8 @@ Expected response format:
   "players": Array<{
     "name": string,       // Single-word unique name
     "gender": string,     // male, female, or neutral
-    "story": string       // 1-2 sentence character background
+    "story": string,      // 3-5 sentence character background
+    "playStyle": string   // Playstyle identifier
   }>
 }
 `;

@@ -9,7 +9,8 @@ export interface GameSetup {
     players: Array<{
         name: string;   // Single-word unique name
         gender: string; // male, female, or neutral
-        story: string;  // 1-2 sentence character background
+        story: string;  // 3-5 sentence character background
+        playStyle: string; // The playstyle identifier for this character
     }>;
 }
 
@@ -82,9 +83,13 @@ export const createGameSetupSchema = () => ({
                     story: {
                         type: 'string',
                         description: '1-2 sentence character background'
+                    },
+                    playStyle: {
+                        type: 'string',
+                        description: 'The playstyle identifier for this character (e.g., aggressive_provoker, protective_team_player, etc.)'
                     }
                 },
-                required: ['name', 'gender', 'story']
+                required: ['name', 'gender', 'story', 'playStyle']
             }
         }
     },
