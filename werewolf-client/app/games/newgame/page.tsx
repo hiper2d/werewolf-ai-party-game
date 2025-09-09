@@ -378,99 +378,44 @@ export default function CreateNewGamePage() {
                     <h3 className="text-xl font-bold text-white mb-4">Players:</h3>
                     {gameData.bots.map((player, index) => (
                         <div key={index} className="mb-4 p-4 bg-gray-900 bg-opacity-50 rounded-lg">
-                            <div className="flex space-x-2 mb-2">
-                                <div className="flex-1">
-                                    <label className="block text-gray-400 text-sm mb-1">Name:</label>
-                                    <input
-                                        type="text"
-                                        className="w-full h-10 p-2 rounded bg-gray-900 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
-                                        value={player.name}
-                                        onChange={(e) => handlePlayerChange(index, 'name', e.target.value)}
-                                        placeholder="Player Name"
-                                    />
-                                </div>
-                                <div className="flex-1">
-                                    <label className="block text-gray-400 text-sm mb-1">AI Model:</label>
-                                    <select
-                                        className="w-full h-10 p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
-                                        value={player.playerAiType}
-                                        onChange={(e) => handleBotAiChange(index, e.target.value)}
-                                    >
-                                        {supportedPlayerAi.filter(model => model !== LLM_CONSTANTS.RANDOM).map(model => (
-                                            <option key={model} value={model}>{model}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div className="flex-1">
-                                    <label className="block text-gray-400 text-sm mb-1">
-                                        Play Style:
-                                    </label>
-                                    <div className="relative flex items-center space-x-2">
+                            <div className="flex gap-2 mb-2">
+                                <div className="flex gap-2 flex-1">
+                                    <div className="flex-1">
+                                        <label className="block text-gray-400 text-sm mb-1">Name:</label>
+                                        <input
+                                            type="text"
+                                            className="w-full h-10 p-2 rounded bg-gray-900 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
+                                            value={player.name}
+                                            onChange={(e) => handlePlayerChange(index, 'name', e.target.value)}
+                                            placeholder="Player Name"
+                                        />
+                                    </div>
+                                    <div className="flex-1">
+                                        <label className="block text-gray-400 text-sm mb-1">Gender:</label>
                                         <select
-                                            className="flex-1 h-10 p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
-                                            value={player.playStyle}
-                                            onChange={(e) => handlePlayerChange(index, 'playStyle', e.target.value)}
+                                            className="w-full h-10 p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
+                                            value={player.gender}
+                                            onChange={(e) => handlePlayerChange(index, 'gender', e.target.value)}
                                         >
-                                            {Object.values(PLAY_STYLES).map(style => (
-                                                <option key={style} value={style}>
-                                                    {style.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                                            {GENDER_OPTIONS.map(gender => (
+                                                <option key={gender} value={gender}>
+                                                    {gender.charAt(0).toUpperCase() + gender.slice(1)}
                                                 </option>
                                             ))}
                                         </select>
-                                        <button
-                                            type="button"
-                                            className="w-6 h-6 rounded-full bg-gray-700 hover:bg-gray-600 text-white text-xs flex items-center justify-center transition-colors"
-                                            onMouseEnter={() => setShowPlayStyleTooltip(index)}
-                                            onMouseLeave={() => setShowPlayStyleTooltip(null)}
-                                            onClick={(e) => {
-                                                e.preventDefault();
-                                                setShowPlayStyleTooltip(showPlayStyleTooltip === index ? null : index);
-                                            }}
-                                        >
-                                            ?
-                                        </button>
-                                        {showPlayStyleTooltip === index && (
-                                            <div className="absolute z-10 w-80 p-3 bg-gray-900 border border-gray-700 rounded-lg shadow-lg text-sm text-white top-full mt-2 right-0">
-                                                <div className="font-semibold mb-2">
-                                                    {PLAY_STYLE_CONFIGS[player.playStyle]?.name || player.playStyle}
-                                                </div>
-                                                <div className="text-gray-300">
-                                                    {PLAY_STYLE_CONFIGS[player.playStyle]?.uiDescription || 'No description available'}
-                                                </div>
-                                            </div>
-                                        )}
                                     </div>
-                                </div>
-                                <div className="w-10">
-                                    {/* Empty space to align with play button below */}
-                                </div>
-                            </div>
-                            <div className="flex space-x-2 mb-2">
-                                <div className="flex-1">
-                                    <label className="block text-gray-400 text-sm mb-1">Gender:</label>
-                                    <select
-                                        className="w-full h-10 p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
-                                        value={player.gender}
-                                        onChange={(e) => handlePlayerChange(index, 'gender', e.target.value)}
-                                    >
-                                        {GENDER_OPTIONS.map(gender => (
-                                            <option key={gender} value={gender}>
-                                                {gender.charAt(0).toUpperCase() + gender.slice(1)}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div className="flex-1">
-                                    <label className="block text-gray-400 text-sm mb-1">Voice:</label>
-                                    <select
-                                        className="w-full h-10 p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
-                                        value={player.voice}
-                                        onChange={(e) => handlePlayerChange(index, 'voice', e.target.value)}
-                                    >
-                                        {getVoicesForGender(player.gender).map(voice => (
-                                            <option key={voice} value={voice}>{voice}</option>
-                                        ))}
-                                    </select>
+                                    <div className="flex-1">
+                                        <label className="block text-gray-400 text-sm mb-1">Voice:</label>
+                                        <select
+                                            className="w-full h-10 p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
+                                            value={player.voice}
+                                            onChange={(e) => handlePlayerChange(index, 'voice', e.target.value)}
+                                        >
+                                            {getVoicesForGender(player.gender).map(voice => (
+                                                <option key={voice} value={voice}>{voice}</option>
+                                            ))}
+                                        </select>
+                                    </div>
                                 </div>
                                 <div className="flex flex-col justify-end">
                                     <button
@@ -483,6 +428,62 @@ export default function CreateNewGamePage() {
                                             {isSpeaking ? '⏹️' : '🔊'}
                                         </span>
                                     </button>
+                                </div>
+                            </div>
+                            <div className="flex gap-2 mb-2">
+                                <div className="flex gap-2 flex-1">
+                                    <div className="flex-1">
+                                        <label className="block text-gray-400 text-sm mb-1">AI Model:</label>
+                                        <select
+                                            className="w-full h-10 p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
+                                            value={player.playerAiType}
+                                            onChange={(e) => handleBotAiChange(index, e.target.value)}
+                                        >
+                                            {supportedPlayerAi.filter(model => model !== LLM_CONSTANTS.RANDOM).map(model => (
+                                                <option key={model} value={model}>{model}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="flex-1">
+                                        <label className="block text-gray-400 text-sm mb-1">
+                                            Play Style:
+                                        </label>
+                                        <select
+                                            className="w-full h-10 p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
+                                            value={player.playStyle}
+                                            onChange={(e) => handlePlayerChange(index, 'playStyle', e.target.value)}
+                                        >
+                                            {Object.values(PLAY_STYLES).map(style => (
+                                                <option key={style} value={style}>
+                                                    {style.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+                                <div className="relative flex flex-col justify-end">
+                                    <button
+                                        type="button"
+                                        className="w-10 h-10 rounded-full bg-gray-700 hover:bg-gray-600 text-white text-xs flex items-center justify-center transition-colors"
+                                        onMouseEnter={() => setShowPlayStyleTooltip(index)}
+                                        onMouseLeave={() => setShowPlayStyleTooltip(null)}
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            setShowPlayStyleTooltip(showPlayStyleTooltip === index ? null : index);
+                                        }}
+                                    >
+                                        ?
+                                    </button>
+                                    {showPlayStyleTooltip === index && (
+                                        <div className="absolute z-10 w-80 p-3 bg-gray-900 border border-gray-700 rounded-lg shadow-lg text-sm text-white top-full mt-2 right-0">
+                                            <div className="font-semibold mb-2">
+                                                {PLAY_STYLE_CONFIGS[player.playStyle]?.name || player.playStyle}
+                                            </div>
+                                            <div className="text-gray-300">
+                                                {PLAY_STYLE_CONFIGS[player.playStyle]?.uiDescription || 'No description available'}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                             <div>
