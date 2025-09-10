@@ -114,6 +114,13 @@ Ensure your response strictly follows the schema requirements.`,
                 }
             }
 
+            // Log reasoning token breakdown if available and thinking is enabled
+            if (this.enableThinking && tokenUsage && response.usage?.output_tokens_details?.reasoning_tokens) {
+                const reasoningTokens = response.usage.output_tokens_details.reasoning_tokens;
+                const finalAnswerTokens = tokenUsage.outputTokens - reasoningTokens;
+                this.logger(`Output breakdown: ${reasoningTokens} reasoning tokens, ${finalAnswerTokens} final answer tokens`);
+            }
+
             // For responses API, the content is in output_text
             const content = response.output_text;
             if (!content) {

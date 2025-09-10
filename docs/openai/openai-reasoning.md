@@ -3,6 +3,21 @@ Reasoning models
 
 Explore advanced reasoning and problem-solving models.
 
+## Implementation in Werewolf AI Party Game
+
+Our implementation uses the OpenAI Responses API for GPT-5 reasoning models. The key integration points are:
+
+- **Agent Implementation**: `werewolf-client/app/ai/gpt-5-agent.ts`
+- **Model Configuration**: `werewolf-client/app/ai/ai-models.ts` (GPT-5 models have `hasThinking: true`)
+- **Pricing Calculation**: `werewolf-client/app/utils/openai-pricing.ts`
+
+### Key Features
+
+- **Structured JSON Output** with strict schema validation
+- **Reasoning Summary Extraction** when thinking is enabled
+- **Token Cost Calculation** including reasoning tokens
+- **Proper API Integration** using Responses API instead of Chat Completions
+
 **Reasoning models** like [GPT-5](/docs/models/gpt-5) are LLMs trained with reinforcement learning to perform reasoning. Reasoning models [think before they answer](https://openai.com/index/introducing-openai-o1-preview/), producing a long internal chain of thought before responding to the user. Reasoning models excel in complex problem solving, coding, scientific reasoning, and multi-step planning for agentic workflows. They're also the best models for [Codex CLI](https://github.com/openai/codex), our lightweight coding agent.
 
 We provide smaller, faster models (`gpt-5-mini` and `gpt-5-nano`) that are less expensive per token. The larger model (`gpt-5`) is slower and more expensive but often generates better responses for complex tasks and broad domains.
@@ -541,23 +556,89 @@ response = client.responses.create(
 print(response.output_text)
 ```
 
-Use case examples
------------------
+## Our Implementation Example
 
-Some examples of using reasoning models for real-world use cases can be found in [the cookbook](https://cookbook.openai.com).
+Here's how we implement reasoning models in the Werewolf AI Party Game:
 
-[
+```typescript
+// From werewolf-client/app/ai/gpt-5-agent.ts
+protected async doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<[string, string, TokenUsage?]> {
+    const input = this.convertToOpenAIInput(messages);
 
-Using reasoning for data validation
+    const strictSchema = {
+        ...schema,
+        additionalProperties: false,
+        // Ensure nested objects also have additionalProperties: false
+        ...(schema.properties && {
+            properties: Object.fromEntries(
+                Object.entries(schema.properties).map(([key, prop]: [string, any]) => [
+                    key,
+                    typeof prop === 'object' && prop.type === 'object' 
+                        ? { ...prop, additionalProperties: false }
+                        : prop
+                ])
+            )
+        })
+    };
 
-Evaluate a synthetic medical data set for discrepancies.
+    const requestParams: any = {
+        model: this.model,
+        input: input,
+        instructions: this.instruction,
+        text: {
+            verbosity: "low",
+            format: {
+                type: "json_schema",
+                strict: true,
+                name: "response_schema",
+                schema: strictSchema
+            }
+        }
+    };
 
-](https://cookbook.openai.com/examples/o1/using_reasoning_for_data_validation)[
+    // Add reasoning parameters if thinking is enabled
+    if (this.enableThinking) {
+        requestParams.reasoning = {
+            effort: "low",
+            summary: "auto"
+        };
+    }
 
-Using reasoning for routine generation
+    const response = await this.client.responses.create(requestParams);
 
-Use help center articles to generate actions that an agent could perform.
+    // Extract token usage (reasoning tokens are included in output_tokens)
+    let tokenUsage: TokenUsage | undefined;
+    if (response.usage) {
+        const cost = calculateOpenAICost(
+            this.model,
+            response.usage.input_tokens || 0,
+            response.usage.output_tokens || 0
+        );
+        
+        tokenUsage = {
+            inputTokens: response.usage.input_tokens || 0,
+            outputTokens: response.usage.output_tokens || 0,
+            totalTokens: response.usage.total_tokens || 0,
+            costUSD: cost
+        };
+    }
 
-](https://cookbook.openai.com/examples/o1/using_reasoning_for_routine_generation)
+    // Extract reasoning summaries if available
+    let thinkingContent = "";
+    if (this.enableThinking) {
+        const responseWithOutput = response as any;
+        if (responseWithOutput.output && Array.isArray(responseWithOutput.output)) {
+            const reasoningItem = responseWithOutput.output.find((item: any) => item.type === 'reasoning');
+            if (reasoningItem?.summary && Array.isArray(reasoningItem.summary)) {
+                const summaryTexts = reasoningItem.summary
+                    .filter((s: any) => s.type === 'summary_text')
+                    .map((s: any) => s.text);
+                thinkingContent = summaryTexts.join('\n');
+            }
+        }
+    }
 
-Was this page useful?
+    const content = response.output_text;
+    return [cleanResponse(content), thinkingContent, tokenUsage];
+}
+```

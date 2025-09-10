@@ -3,6 +3,7 @@ import {AIMessage, BotResponseError, TokenUsage} from "@/app/api/game-models";
 import {Anthropic} from '@anthropic-ai/sdk';
 import {ResponseSchema} from "@/app/ai/prompts/ai-schemas";
 import {cleanResponse} from "@/app/utils/message-utils";
+import {calculateAnthropicCost} from "@/app/utils/anthropic-pricing";
 
 type AnthropicRole = 'user' | 'assistant';
 
@@ -105,8 +106,31 @@ Ensure your response strictly follows the schema requirements.`,
             if (!textContent) {
                 throw new Error(this.errorMessages.invalidFormat);
             }
+
+            // Extract token usage information
+            let tokenUsage: TokenUsage | undefined;
+            if (response.usage) {
+                const cost = calculateAnthropicCost(
+                    this.model,
+                    response.usage.input_tokens || 0,
+                    response.usage.output_tokens || 0
+                );
+                
+                tokenUsage = {
+                    inputTokens: response.usage.input_tokens || 0,
+                    outputTokens: response.usage.output_tokens || 0,
+                    totalTokens: (response.usage.input_tokens || 0) + (response.usage.output_tokens || 0),
+                    costUSD: cost
+                };
+                
+                // Log thinking information if available
+                if (this.enableThinking && thinkingContent) {
+                    this.logger(`Thinking enabled: ${thinkingContent.length} characters of thinking content`);
+                    this.logger(`Note: Thinking tokens are included in output token count and cost`);
+                }
+            }
             
-            return [cleanResponse(textContent), thinkingContent, undefined];
+            return [cleanResponse(textContent), thinkingContent, tokenUsage];
         } catch (error) {
             const errorDetails = error instanceof Error ? error.message : String(error);
             
