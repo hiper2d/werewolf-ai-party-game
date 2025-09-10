@@ -1,7 +1,7 @@
 import {AbstractAgent} from "@/app/ai/abstract-agent";
 import {Mistral} from "@mistralai/mistralai";
 import {ChatCompletionResponse} from "@mistralai/mistralai/models/components";
-import {AIMessage, MESSAGE_ROLE} from "@/app/api/game-models";
+import {AIMessage, MESSAGE_ROLE, TokenUsage} from "@/app/api/game-models";
 import {ResponseSchema} from "@/app/ai/prompts/ai-schemas";
 import {cleanResponse} from "@/app/utils/message-utils";
 
@@ -40,7 +40,7 @@ Ensure your response strictly follows the schema requirements.`,
     }
 
 
-    protected async doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<[string, string]> {
+    protected async doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<[string, string, TokenUsage?]> {
         const schemaInstructions = this.schemaTemplate.instructions(schema);
 
         try {
@@ -70,7 +70,7 @@ Ensure your response strictly follows the schema requirements.`,
         }));
     }
 
-    private processReply(response: ChatCompletionResponse | undefined): [string, string] {
+    private processReply(response: ChatCompletionResponse | undefined): [string, string, TokenUsage?] {
         let reply = response?.choices?.[0]?.message?.content;
 
         if (reply === undefined || reply === null) {
@@ -81,7 +81,7 @@ Ensure your response strictly follows the schema requirements.`,
             reply = this.processArrayReply(reply);
         }
 
-        return [cleanResponse(reply), ""];
+        return [cleanResponse(reply), "", undefined];
     }
 
     private processArrayReply(reply: unknown[]): string {

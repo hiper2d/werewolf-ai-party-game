@@ -1,8 +1,9 @@
 import {AbstractAgent} from "@/app/ai/abstract-agent";
 import OpenAI from "openai";
-import {AIMessage} from "@/app/api/game-models";
+import {AIMessage, TokenUsage} from "@/app/api/game-models";
 import {ResponseSchema} from "@/app/ai/prompts/ai-schemas";
 import {cleanResponse} from "@/app/utils/message-utils";
+import {calculateOpenAICost} from "@/app/utils/openai-pricing";
 
 export class Gpt5Agent extends AbstractAgent {
     private readonly client: OpenAI;
@@ -38,11 +39,10 @@ Ensure your response strictly follows the schema requirements.`,
     }
 
 
-    protected async doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<[string, string]> {
+    protected async doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<[string, string, TokenUsage?]> {
         try {
             const input = this.convertToOpenAIInput(messages);
-            
-            // Ensure schema has additionalProperties: false for OpenAI strict mode
+
             const strictSchema = {
                 ...schema,
                 additionalProperties: false,
@@ -73,32 +73,54 @@ Ensure your response strictly follows the schema requirements.`,
                 }
             };
 
-            // Add reasoning for thinking mode (only for reasoning models)
-            if (this.enableThinking && this.isReasoningModel()) {
-                requestParams.reasoning = { 
-                    effort: "high",
+            if (this.enableThinking) {
+                requestParams.reasoning = {
+                    effort: "low",
                     summary: "auto"
                 };
             }
 
-            // Check if Responses API is available
-            if (!(this.client as any).responses) {
-                throw new Error('OpenAI Responses API not available in current SDK version');
-            }
-            
-            const response = await (this.client as any).responses.create(requestParams);
+            const response = await this.client.responses.create(requestParams);
 
-            // Extract reasoning content if available
+            // Extract token usage information
+            let tokenUsage: TokenUsage | undefined;
+            if (response.usage) {
+                const cost = calculateOpenAICost(
+                    this.model,
+                    response.usage.input_tokens || 0,
+                    response.usage.output_tokens || 0
+                );
+                
+                tokenUsage = {
+                    inputTokens: response.usage.input_tokens || 0,
+                    outputTokens: response.usage.output_tokens || 0,
+                    totalTokens: response.usage.total_tokens || 0,
+                    costUSD: cost
+                };
+            }
+
+            // Extract reasoning content if available (for reasoning models)
             let thinkingContent = "";
-            if (this.enableThinking && response.output) {
-                thinkingContent = this.extractReasoningFromOutput(response.output);
+            if (this.enableThinking) {
+                const responseWithOutput = response as any;
+                if (responseWithOutput.output && Array.isArray(responseWithOutput.output)) {
+                    const reasoningItem = responseWithOutput.output.find((item: any) => item.type === 'reasoning');
+                    if (reasoningItem?.summary && Array.isArray(reasoningItem.summary)) {
+                        const summaryTexts = reasoningItem.summary
+                            .filter((s: any) => s.type === 'summary_text')
+                            .map((s: any) => s.text);
+                        thinkingContent = summaryTexts.join('\n');
+                    }
+                }
             }
 
-            if (!response.output_text) {
+            // For responses API, the content is in output_text
+            const content = response.output_text;
+            if (!content) {
                 throw new Error(this.errorMessages.emptyResponse);
             }
 
-            return [cleanResponse(response.output_text), thinkingContent];
+            return [cleanResponse(content), thinkingContent, tokenUsage];
         } catch (error) {
             this.logger(this.logTemplates.error(this.name, error));
             throw new Error(this.errorMessages.apiError(error));
@@ -111,41 +133,5 @@ Ensure your response strictly follows the schema requirements.`,
             role: msg.role === 'developer' ? 'developer' : msg.role === 'assistant' ? 'assistant' : 'user',
             content: msg.content
         }));
-    }
-
-    private isReasoningModel(): boolean {
-        // Check if this is a reasoning model (GPT-5, o1, o3 series)
-        return this.model.includes('gpt-5') || 
-               this.model.includes('o1') || 
-               this.model.includes('o3');
-    }
-
-    private extractReasoningFromOutput(output: any[]): string {
-        if (!Array.isArray(output)) return "";
-        
-        const thinkingParts: string[] = [];
-        
-        for (const item of output) {
-            if (item.type === 'reasoning' && item.summary) {
-                // Extract reasoning summary from the summary array
-                if (Array.isArray(item.summary)) {
-                    const summaryTexts = item.summary.map((summaryItem: any) => {
-                        if (typeof summaryItem === 'string') {
-                            return summaryItem;
-                        }
-                        if (summaryItem && typeof summaryItem === 'object') {
-                            return summaryItem.text || summaryItem.content || JSON.stringify(summaryItem);
-                        }
-                        return '';
-                    }).filter(Boolean);
-                    
-                    thinkingParts.push(...summaryTexts);
-                } else if (typeof item.summary === 'string') {
-                    thinkingParts.push(item.summary);
-                }
-            }
-        }
-        
-        return thinkingParts.join('\n');
     }
 }

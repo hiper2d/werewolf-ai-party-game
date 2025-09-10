@@ -2,6 +2,22 @@ export interface ApiKeyMap {
     [id: string]: string
 }
 
+export interface TokenUsage {
+    inputTokens: number;
+    outputTokens: number;
+    totalTokens: number;
+    costUSD: number;
+}
+
+export interface GameTokenUsage {
+    totalInputTokens: number;
+    totalOutputTokens: number;
+    totalTokens: number;
+    totalCostUSD: number;
+    botUsage: Record<string, TokenUsage>; // Bot name -> token usage
+    gameMasterUsage: TokenUsage;
+}
+
 export interface User {
     name: string;
     email: string;
@@ -48,6 +64,7 @@ export interface Bot {
     eliminationDay?: number; // Track which day this bot was eliminated (undefined if alive)
     daySummaries?: string[]; // Array of summaries for each previous day (index 0 = day 1 summary)
     enableThinking?: boolean;
+    tokenUsage?: TokenUsage; // Track token usage for this bot
 }
 
 export interface Game {
@@ -71,6 +88,7 @@ export interface Game {
     previousNightResults?: Record<string, { target: string }>; // Previous night's results for reference
     messageCounter?: number; // Counter for generating incremental message IDs
     dayActivityCounter?: Record<string, number>; // Track number of messages each bot has sent during current day
+    tokenUsage?: GameTokenUsage; // Track token usage for the entire game
 }
 
 export const GAME_ROLES = {

@@ -1,5 +1,5 @@
 import {AbstractAgent} from "@/app/ai/abstract-agent";
-import {AIMessage, BotResponseError} from "@/app/api/game-models";
+import {AIMessage, BotResponseError, TokenUsage} from "@/app/api/game-models";
 import {Anthropic} from '@anthropic-ai/sdk';
 import {ResponseSchema} from "@/app/ai/prompts/ai-schemas";
 import {cleanResponse} from "@/app/utils/message-utils";
@@ -53,7 +53,7 @@ Ensure your response strictly follows the schema requirements.`,
     }
 
 
-    protected async doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<[string, string]> {
+    protected async doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<[string, string, TokenUsage?]> {
         const aiMessages = this.prepareMessages(messages);
 
         const schemaInstructions = this.buildSchemaInstructions(schema);
@@ -106,7 +106,7 @@ Ensure your response strictly follows the schema requirements.`,
                 throw new Error(this.errorMessages.invalidFormat);
             }
             
-            return [cleanResponse(textContent), thinkingContent];
+            return [cleanResponse(textContent), thinkingContent, undefined];
         } catch (error) {
             const errorDetails = error instanceof Error ? error.message : String(error);
             

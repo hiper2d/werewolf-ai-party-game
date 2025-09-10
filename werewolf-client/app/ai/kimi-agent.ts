@@ -1,6 +1,6 @@
 import {AbstractAgent} from "@/app/ai/abstract-agent";
 import {OpenAI} from "openai";
-import {AIMessage} from "@/app/api/game-models";
+import {AIMessage, TokenUsage} from "@/app/api/game-models";
 import {ResponseSchema} from "@/app/ai/prompts/ai-schemas";
 import {cleanResponse} from "@/app/utils/message-utils";
 
@@ -44,7 +44,7 @@ Ensure your response strictly follows the schema requirements.`,
     }
 
 
-    protected async doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<[string, string]> {
+    protected async doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<[string, string, TokenUsage?]> {
         const schemaInstructions = this.schemaTemplate.instructions(schema);
         const lastMessage = messages[messages.length - 1];
         const fullPrompt = `${lastMessage.content}\n\n${schemaInstructions}`;
@@ -82,13 +82,13 @@ Ensure your response strictly follows the schema requirements.`,
         }));
     }
 
-    private processReply(completion: OpenAI.Chat.Completions.ChatCompletion): [string, string] {
+    private processReply(completion: OpenAI.Chat.Completions.ChatCompletion): [string, string, TokenUsage?] {
         const reply = completion.choices[0]?.message?.content;
 
         if (!reply) {
             throw new Error(this.errorMessages.emptyResponse);
         }
 
-        return [cleanResponse(reply), ""];
+        return [cleanResponse(reply), "", undefined];
     }
 }

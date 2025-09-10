@@ -1,6 +1,6 @@
 import {AbstractAgent} from "@/app/ai/abstract-agent";
 import OpenAI from "openai";
-import {AIMessage} from "@/app/api/game-models";
+import {AIMessage, TokenUsage} from "@/app/api/game-models";
 import {ResponseSchema} from "@/app/ai/prompts/ai-schemas";
 import {cleanResponse} from "@/app/utils/message-utils";
 
@@ -40,7 +40,7 @@ Ensure your response strictly follows the schema requirements.`,
     }
 
 
-    protected async doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<[string, string]> {
+    protected async doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<[string, string, TokenUsage?]> {
         try {
             const input = this.convertToOpenAIMessages(messages);
             const modelToUse = this.getModelForThinkingMode();
@@ -85,7 +85,7 @@ Ensure your response strictly follows the schema requirements.`,
                 throw new Error(this.errorMessages.emptyResponse);
             }
 
-            return [cleanResponse(content), thinkingContent];
+            return [cleanResponse(content), thinkingContent, undefined];
         } catch (error) {
             this.logger(this.logTemplates.error(this.name, error));
             throw new Error(this.errorMessages.apiError(error));

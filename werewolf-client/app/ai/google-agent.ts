@@ -1,5 +1,5 @@
 import {AbstractAgent} from "@/app/ai/abstract-agent";
-import {AIMessage} from "@/app/api/game-models";
+import {AIMessage, TokenUsage} from "@/app/api/game-models";
 import {GoogleGenAI} from "@google/genai";
 import {ResponseSchema} from "@/app/ai/prompts/ai-schemas";
 import {cleanResponse} from "@/app/utils/message-utils";
@@ -55,7 +55,7 @@ Ensure your response strictly follows the schema requirements.`,
     }
 
 
-    protected async doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<[string, string]> {
+    protected async doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<[string, string, TokenUsage?]> {
         try {
             // Convert all messages except the last one
             const historyMessages = messages.slice(0, -1);
@@ -113,7 +113,7 @@ Ensure your response strictly follows the schema requirements.`,
                 throw new Error(this.errorMessages.emptyResponse);
             }
 
-            return [cleanResponse(response.text), thinkingContent];
+            return [cleanResponse(response.text), thinkingContent, undefined];
         } catch (error) {
             this.logger(this.logTemplates.error(this.name, error));
             
