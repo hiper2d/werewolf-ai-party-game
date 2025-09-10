@@ -588,9 +588,6 @@ async function processNextBotInQueue(
         timestamp: Date.now()
     };
 
-    // Save the game master command to the database
-    await addMessageToChatAndSaveToDb(gmMessage, gameId);
-
     // Get messages for this bot (ALL + direct) using the optimized query
     const botMessages = await getBotMessages(gameId, bot.name, game.currentDay);
 
@@ -998,11 +995,13 @@ async function voteImpl(gameId: string): Promise<Game> {
             const voteResponse = parseResponseToObj(rawVoteResponse, 'VoteMessage');
             
             // Validate the vote target is alive and valid
-            // fixme: we should not have a random logic in case of a bot's mistake; we should throw an error
             if (!alivePlayerNames.includes(voteResponse.who)) {
-                // If invalid target, vote for a random valid target
-                voteResponse.who = alivePlayerNames[Math.floor(Math.random() * alivePlayerNames.length)];
-                voteResponse.why = "Voting for a suspicious player";
+                throw new BotResponseError(
+                    `Invalid vote target: ${voteResponse.who}`,
+                    `Bot ${bot.name} attempted to vote for an invalid target. Valid targets: ${alivePlayerNames.join(', ')}`,
+                    { botName: bot.name, aiType: bot.aiType, action: 'vote', invalidTarget: voteResponse.who },
+                    true
+                );
             }
             
             // Update voting results in gameStateParamQueue (as a map of names to vote counts)
