@@ -3,6 +3,7 @@ import {OpenAI} from "openai";
 import {AIMessage, TokenUsage} from "@/app/api/game-models";
 import {ResponseSchema} from "@/app/ai/prompts/ai-schemas";
 import {cleanResponse} from "@/app/utils/message-utils";
+import {calculateGrokCost} from "@/app/utils/grok-pricing";
 
 export class GrokAgent extends AbstractAgent {
     private readonly client: OpenAI;
@@ -105,6 +106,30 @@ Ensure your response strictly follows the schema requirements.`,
             throw new Error(this.errorMessages.emptyResponse);
         }
 
-        return [cleanResponse(reply), reasoningContent, undefined];
+        // Extract token usage information
+        let tokenUsage: TokenUsage | undefined;
+        if (completion.usage) {
+            const cost = calculateGrokCost(
+                this.model,
+                completion.usage.prompt_tokens || 0,
+                completion.usage.completion_tokens || 0
+            );
+            
+            tokenUsage = {
+                inputTokens: completion.usage.prompt_tokens || 0,
+                outputTokens: completion.usage.completion_tokens || 0,
+                totalTokens: completion.usage.total_tokens || 0,
+                costUSD: cost
+            };
+
+            // Log reasoning token breakdown if available and thinking is enabled
+            if (this.enableThinking && (completion.usage as any).completion_tokens_details?.reasoning_tokens) {
+                const reasoningTokens = (completion.usage as any).completion_tokens_details.reasoning_tokens;
+                const finalAnswerTokens = tokenUsage.outputTokens - reasoningTokens;
+                this.logger(`Output breakdown: ${reasoningTokens} reasoning tokens, ${finalAnswerTokens} final answer tokens`);
+            }
+        }
+
+        return [cleanResponse(reply), reasoningContent, tokenUsage];
     }
 }

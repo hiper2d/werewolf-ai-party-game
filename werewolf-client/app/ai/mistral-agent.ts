@@ -35,7 +35,7 @@ Ensure your response strictly follows the schema requirements.`,
     };
 
     constructor(name: string, instruction: string, model: string, apiKey: string, enableThinking: boolean = false) {
-        super(name, instruction, model, 0.2, enableThinking);
+        super(name, instruction, model, 0.7, enableThinking);
         this.client = new Mistral({apiKey: apiKey});
     }
 
@@ -44,13 +44,14 @@ Ensure your response strictly follows the schema requirements.`,
         const schemaInstructions = this.schemaTemplate.instructions(schema);
 
         try {
-            // Combine system instruction with schema instructions
-            const systemContent = `${this.instruction}\n\n${schemaInstructions}`;
+            const systemMessage = this.enableThinking 
+                ? this.createThinkingSystemMessage(schemaInstructions)
+                : { role: MESSAGE_ROLE.SYSTEM, content: `${this.instruction}\n\n${schemaInstructions}` };
 
             const chatResponse = await this.client.chat.complete({
                 model: this.model,
                 messages: [
-                    { role: MESSAGE_ROLE.SYSTEM, content: systemContent },
+                    systemMessage,
                     ...this.convertToMistralMessages(messages)
                 ],
                 responseFormat: {type: 'json_object'}
@@ -70,31 +71,107 @@ Ensure your response strictly follows the schema requirements.`,
         }));
     }
 
-    private processReply(response: ChatCompletionResponse | undefined): [string, string, TokenUsage?] {
-        let reply = response?.choices?.[0]?.message?.content;
+    private createThinkingSystemMessage(schemaInstructions: string) {
+        const combinedInstructions = `${this.instruction}\n\n${schemaInstructions}`;
+        
+        return {
+            role: MESSAGE_ROLE.SYSTEM,
+            content: [
+                {
+                    type: "text" as const,
+                    text: combinedInstructions
+                },
+                {
+                    type: "thinking" as const,
+                    thinking: [
+                        {
+                            type: "text" as const,
+                            text: "Think through your response step by step. Consider the instructions carefully and plan your approach before providing the final answer."
+                        }
+                    ]
+                }
+            ]
+        } as any; // Type assertion needed until SDK supports thinking types
+    }
 
-        if (reply === undefined || reply === null) {
+    private processReply(response: ChatCompletionResponse | undefined): [string, string, TokenUsage?] {
+        const message = response?.choices?.[0]?.message;
+        
+        if (!message || !message.content) {
             throw new Error(this.errorMessages.emptyResponse);
         }
 
+        let reply = message.content;
+        
+        // Handle structured content (thinking models)
         if (Array.isArray(reply)) {
-            reply = this.processArrayReply(reply);
+            const { content, thinking } = this.processStructuredReply(reply);
+            
+            // Log thinking information if available
+            if (this.enableThinking && thinking) {
+                this.logger(`Thinking content: ${thinking.length} characters of reasoning`);
+            }
+            
+            return [cleanResponse(content), thinking, this.extractTokenUsage(response)];
         }
 
-        return [cleanResponse(reply), "", undefined];
+        // Handle string content (regular models)
+        return [cleanResponse(reply), "", this.extractTokenUsage(response)];
     }
 
-    private processArrayReply(reply: unknown[]): string {
-        return reply.map(chunk => {
-            if (typeof chunk === "string") {
-                return chunk;
+    private processStructuredReply(reply: unknown[]): { content: string; thinking: string } {
+        let content = "";
+        let thinking = "";
+
+        // Response should have 2 parts: thinking block and text block
+        for (const chunk of reply) {
+            if (typeof chunk === "object" && chunk !== null && "type" in chunk) {
+                if (chunk.type === "thinking" && "thinking" in chunk) {
+                    // Extract thinking content from the thinking block
+                    const thinkingArray = chunk.thinking as any[];
+                    thinking = thinkingArray
+                        .filter((item: any) => item?.type === "text" && item?.text)
+                        .map((item: any) => item.text)
+                        .join("");
+                } else if (chunk.type === "text" && "text" in chunk) {
+                    // Extract the final answer from the text block
+                    content = chunk.text as string;
+                }
             }
-            if (typeof chunk === "object" && chunk !== null &&
-                "type" in chunk && chunk.type === "text" &&
-                "text" in chunk) {
-                return chunk.text;
-            }
-            return "";
-        }).join("");
+        }
+
+        return { content, thinking };
+    }
+
+    private extractTokenUsage(response: ChatCompletionResponse | undefined): TokenUsage | undefined {
+        const usage = response?.usage;
+        if (!usage) return undefined;
+
+        const inputTokens = usage.promptTokens || 0;
+        const outputTokens = usage.completionTokens || 0;
+        const totalTokens = usage.totalTokens || inputTokens + outputTokens;
+        
+        // Calculate cost based on model pricing
+        const costUSD = this.calculateCost(inputTokens, outputTokens);
+
+        return {
+            inputTokens,
+            outputTokens,
+            totalTokens,
+            costUSD
+        };
+    }
+
+    private calculateCost(inputTokens: number, outputTokens: number): number {
+        // Mistral pricing per 1M tokens (as of documentation)
+        // Magistral models: $4 per 1M input, $12 per 1M output
+        // These are example prices - should be updated based on actual Mistral pricing
+        const pricePerMillionInput = this.model.includes('magistral') ? 4 : 0.15;
+        const pricePerMillionOutput = this.model.includes('magistral') ? 12 : 0.45;
+        
+        const inputCost = (inputTokens / 1_000_000) * pricePerMillionInput;
+        const outputCost = (outputTokens / 1_000_000) * pricePerMillionOutput;
+        
+        return inputCost + outputCost;
     }
 }
