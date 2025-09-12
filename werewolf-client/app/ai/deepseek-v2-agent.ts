@@ -3,6 +3,7 @@ import OpenAI from "openai";
 import {AIMessage, TokenUsage} from "@/app/api/game-models";
 import {ResponseSchema} from "@/app/ai/prompts/ai-schemas";
 import {cleanResponse} from "@/app/utils/message-utils";
+import {extractUsageAndCalculateCost} from "@/app/utils/pricing";
 
 export class DeepSeekV2Agent extends AbstractAgent {
     private readonly client: OpenAI;
@@ -43,9 +44,8 @@ Ensure your response strictly follows the schema requirements.`,
     protected async doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<[string, string, TokenUsage?]> {
         try {
             const input = this.convertToOpenAIMessages(messages);
-            const modelToUse = this.getModelForThinkingMode();
-            
-            this.logger(this.logTemplates.askingAgent(this.name, modelToUse));
+
+            this.logger(this.logTemplates.askingAgent(this.name, this.model));
             
             // Add schema instructions to the last message
             const schemaInstructions = this.schemaTemplate.instructions(schema);
@@ -59,7 +59,7 @@ Ensure your response strictly follows the schema requirements.`,
             }
 
             const requestParams: any = {
-                model: modelToUse,
+                model: this.model,
                 messages: this.addSystemInstruction(modifiedInput),
                 temperature: this.temperature,
             };
@@ -85,7 +85,20 @@ Ensure your response strictly follows the schema requirements.`,
                 throw new Error(this.errorMessages.emptyResponse);
             }
 
-            return [cleanResponse(content), thinkingContent, undefined];
+            // Extract token usage and calculate cost
+            const usageResult = extractUsageAndCalculateCost(this.model, response);
+            let tokenUsage: TokenUsage | undefined;
+            
+            if (usageResult) {
+                tokenUsage = {
+                    inputTokens: usageResult.usage.promptTokens,
+                    outputTokens: usageResult.usage.completionTokens,
+                    totalTokens: usageResult.usage.totalTokens,
+                    costUSD: usageResult.cost
+                };
+            }
+
+            return [cleanResponse(content), thinkingContent, tokenUsage];
         } catch (error) {
             this.logger(this.logTemplates.error(this.name, error));
             throw new Error(this.errorMessages.apiError(error));
@@ -117,11 +130,5 @@ Ensure your response strictly follows the schema requirements.`,
         };
         
         return updatedMessages;
-    }
-
-    private getModelForThinkingMode(): string {
-        // Since we now have separate model constants for DEEPSEEK_CHAT and DEEPSEEK_REASONER,
-        // we just return the model that was passed during construction
-        return this.model;
     }
 }

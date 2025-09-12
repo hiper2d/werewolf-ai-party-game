@@ -112,10 +112,133 @@ export const SupportedAiModels = {
     
     // Models without reasoning
     [LLM_CONSTANTS.KIMI_K2]: {
-        modelApiName: 'kimi-latest',
+        modelApiName: 'kimi-k2-0905-preview',
         apiKeyName: API_KEY_CONSTANTS.MOONSHOT,
         hasThinking: false
     },
 } as const;
 
 export type LLMModel = keyof typeof SupportedAiModels;
+
+/**
+ * Model pricing configuration
+ * All prices are in USD per 1,000,000 tokens
+ */
+export interface ModelPricing {
+    inputPrice: number;      // Price per million input tokens
+    outputPrice: number;     // Price per million output tokens
+    cacheHitPrice?: number;  // Optional: Price per million cached tokens (if applicable)
+}
+
+/**
+ * Centralized pricing configuration for all AI models
+ * All prices are per million (1,000,000) tokens
+ * Updated as of January 2025
+ */
+export const MODEL_PRICING: Record<string, ModelPricing> = {
+    // OpenAI models
+    [SupportedAiModels[LLM_CONSTANTS.GPT_5].modelApiName]: {
+        inputPrice: 1.250,
+        outputPrice: 10.000,
+        cacheHitPrice: 0.125
+    },
+    [SupportedAiModels[LLM_CONSTANTS.GPT_5_MINI].modelApiName]: {
+        inputPrice: 0.250,
+        outputPrice: 2.000,
+        cacheHitPrice: 0.025
+    },
+    
+    // DeepSeek models (both models have the same pricing)
+    [SupportedAiModels[LLM_CONSTANTS.DEEPSEEK_CHAT].modelApiName]: {
+        inputPrice: 0.56,
+        outputPrice: 1.68,
+        cacheHitPrice: 0.07
+    },
+    [SupportedAiModels[LLM_CONSTANTS.DEEPSEEK_REASONER].modelApiName]: {
+        inputPrice: 0.56,
+        outputPrice: 1.68,
+        cacheHitPrice: 0.07
+    },
+    
+    // Kimi/Moonshot models
+    [SupportedAiModels[LLM_CONSTANTS.KIMI_K2].modelApiName]: {
+        inputPrice: 0.6,
+        outputPrice: 2.50,
+        cacheHitPrice: 0.15
+    },
+    
+    // Anthropic models (placeholder pricing)
+    [SupportedAiModels[LLM_CONSTANTS.CLAUDE_4_OPUS].modelApiName]: {
+        inputPrice: 15.0,
+        outputPrice: 75.0
+    },
+    [SupportedAiModels[LLM_CONSTANTS.CLAUDE_4_SONNET].modelApiName]: {
+        inputPrice: 3.0,
+        outputPrice: 15.0
+    },
+    
+    // Google models (placeholder pricing)
+    [SupportedAiModels[LLM_CONSTANTS.GEMINI_25_PRO].modelApiName]: {
+        inputPrice: 1.25,    // < 200k tokens; otherwise 2.5
+        outputPrice: 10.0   // < 200k tokens; otherwise 15
+    },
+    
+    // Mistral models (placeholder pricing)
+    [SupportedAiModels[LLM_CONSTANTS.MISTRAL_2_LARGE].modelApiName]: {
+        inputPrice: 2.0,
+        outputPrice: 6.0
+    },
+    [SupportedAiModels[LLM_CONSTANTS.MISTRAL_3_MEDIUM].modelApiName]: {
+        inputPrice: 0.4,
+        outputPrice: 2
+    },
+    [SupportedAiModels[LLM_CONSTANTS.MISTRAL_MAGISTRAL].modelApiName]: {
+        inputPrice: 2.0,
+        outputPrice: 5.0
+    },
+    
+    // Grok models (placeholder pricing)
+    [SupportedAiModels[LLM_CONSTANTS.GROK_4].modelApiName]: {
+        inputPrice: 3.0,
+        outputPrice: 15.0,
+        cacheHitPrice: 0.75
+    }
+};
+
+/**
+ * Helper function to calculate cost based on model pricing
+ * @param modelApiName - The API name of the model
+ * @param inputTokens - Number of input tokens
+ * @param outputTokens - Number of output tokens
+ * @param cacheHitTokens - Number of cached tokens (optional)
+ * @returns Cost in USD
+ */
+export function calculateModelCost(
+    modelApiName: string, 
+    inputTokens: number, 
+    outputTokens: number,
+    cacheHitTokens: number = 0
+): number {
+    const pricing = MODEL_PRICING[modelApiName];
+    
+    if (!pricing) {
+        console.warn(`No pricing information available for model: ${modelApiName}`);
+        return 0;
+    }
+    
+    // All prices are per million tokens
+    const divisor = 1_000_000;
+    
+    // Calculate cached vs uncached input tokens
+    const actualCacheHits = Math.min(cacheHitTokens, inputTokens);
+    const uncachedInputTokens = Math.max(0, inputTokens - actualCacheHits);
+    
+    // Calculate costs
+    const uncachedInputCost = (uncachedInputTokens * pricing.inputPrice) / divisor;
+    const cachedInputCost = pricing.cacheHitPrice 
+        ? (actualCacheHits * pricing.cacheHitPrice) / divisor
+        : (actualCacheHits * pricing.inputPrice) / divisor;
+    const outputCost = (outputTokens * pricing.outputPrice) / divisor;
+    
+    return uncachedInputCost + cachedInputCost + outputCost;
+}

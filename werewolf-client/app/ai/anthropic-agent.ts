@@ -3,7 +3,7 @@ import {AIMessage, BotResponseError, TokenUsage} from "@/app/api/game-models";
 import {Anthropic} from '@anthropic-ai/sdk';
 import {ResponseSchema} from "@/app/ai/prompts/ai-schemas";
 import {cleanResponse} from "@/app/utils/message-utils";
-import {calculateAnthropicCost} from "@/app/utils/anthropic-pricing";
+import {calculateAnthropicCost} from "@/app/utils/pricing";
 
 type AnthropicRole = 'user' | 'assistant';
 

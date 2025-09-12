@@ -3,7 +3,7 @@ import OpenAI from "openai";
 import {AIMessage, TokenUsage} from "@/app/api/game-models";
 import {ResponseSchema} from "@/app/ai/prompts/ai-schemas";
 import {cleanResponse} from "@/app/utils/message-utils";
-import {calculateOpenAICost} from "@/app/utils/openai-pricing";
+import {calculateOpenAICost} from "@/app/utils/pricing";
 
 export class Gpt5Agent extends AbstractAgent {
     private readonly client: OpenAI;

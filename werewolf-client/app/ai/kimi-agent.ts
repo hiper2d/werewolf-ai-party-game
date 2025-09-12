@@ -3,6 +3,7 @@ import {OpenAI} from "openai";
 import {AIMessage, TokenUsage} from "@/app/api/game-models";
 import {ResponseSchema} from "@/app/ai/prompts/ai-schemas";
 import {cleanResponse} from "@/app/utils/message-utils";
+import {extractUsageAndCalculateCost} from "@/app/utils/pricing";
 
 export class KimiAgent extends AbstractAgent {
     private readonly client: OpenAI;
@@ -89,6 +90,19 @@ Ensure your response strictly follows the schema requirements.`,
             throw new Error(this.errorMessages.emptyResponse);
         }
 
-        return [cleanResponse(reply), "", undefined];
+        // Extract token usage and calculate cost
+        const usageResult = extractUsageAndCalculateCost(this.model, completion);
+        let tokenUsage: TokenUsage | undefined;
+        
+        if (usageResult) {
+            tokenUsage = {
+                inputTokens: usageResult.usage.promptTokens,
+                outputTokens: usageResult.usage.completionTokens,
+                totalTokens: usageResult.usage.totalTokens,
+                costUSD: usageResult.cost
+            };
+        }
+
+        return [cleanResponse(reply), "", tokenUsage];
     }
 }

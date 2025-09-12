@@ -80,8 +80,8 @@ describe("MistralAgent integration", () => {
       await testSchemaResponse(LLM_CONSTANTS.MISTRAL_2_LARGE);
     });
 
-    it("should respond with valid schema-based answer using Mistral 3 Small", async () => {
-      await testSchemaResponse(LLM_CONSTANTS.MISTRAL_3_SMALL);
+    it("should respond with valid schema-based answer using Mistral 3 Medium", async () => {
+      await testSchemaResponse(LLM_CONSTANTS.MISTRAL_3_MEDIUM);
     });
 
     it("should handle API errors", async () => {

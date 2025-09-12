@@ -3,7 +3,7 @@ import {OpenAI} from "openai";
 import {AIMessage, TokenUsage} from "@/app/api/game-models";
 import {ResponseSchema} from "@/app/ai/prompts/ai-schemas";
 import {cleanResponse} from "@/app/utils/message-utils";
-import {calculateGrokCost} from "@/app/utils/grok-pricing";
+import {calculateGrokCost} from "@/app/utils/pricing";
 
 export class GrokAgent extends AbstractAgent {
     private readonly client: OpenAI;
