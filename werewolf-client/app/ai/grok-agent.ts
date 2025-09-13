@@ -41,6 +41,7 @@ Ensure your response strictly follows the schema requirements.`,
         this.client = new OpenAI({
             apiKey: apiKey,
             baseURL: 'https://api.x.ai/v1',
+            timeout: 60000,
         });
     }
 
@@ -56,6 +57,7 @@ Ensure your response strictly follows the schema requirements.`,
                 messages: preparedMessages,
             };
             
+            this.logger(this.logTemplates.askingAgent(this.name, this.model));
             const completion = await this.client.chat.completions.create(requestParams) as OpenAI.Chat.Completions.ChatCompletion;
 
             return this.processReply(completion);

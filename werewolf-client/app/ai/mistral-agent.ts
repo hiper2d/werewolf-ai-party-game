@@ -44,11 +44,11 @@ Ensure your response strictly follows the schema requirements.`,
         const schemaInstructions = this.schemaTemplate.instructions(schema);
 
         try {
-            const systemMessage = this.enableThinking 
+            const systemMessage = (this.enableThinking)
                 ? this.createThinkingSystemMessage(schemaInstructions)
-                : { role: MESSAGE_ROLE.SYSTEM, content: `${this.instruction}\n\n${schemaInstructions}` };
+                : {type: "system", content: `${this.instruction}\n\n${schemaInstructions}`};
 
-            const chatResponse = await this.client.chat.complete({
+            const chatResponse: ChatCompletionResponse = await this.client.chat.complete({
                 model: this.model,
                 messages: [
                     systemMessage,
@@ -78,14 +78,14 @@ Ensure your response strictly follows the schema requirements.`,
             role: MESSAGE_ROLE.SYSTEM,
             content: [
                 {
-                    type: "text" as const,
+                    type: "text",
                     text: combinedInstructions
                 },
                 {
-                    type: "thinking" as const,
+                    type: "thinking",
                     thinking: [
                         {
-                            type: "text" as const,
+                            type: "text",
                             text: "Think through your response step by step. Consider the instructions carefully and plan your approach before providing the final answer."
                         }
                     ]
