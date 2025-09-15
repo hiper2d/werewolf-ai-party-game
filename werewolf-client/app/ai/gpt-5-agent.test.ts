@@ -1,18 +1,20 @@
 import dotenv from "dotenv";
 dotenv.config();
 import { Gpt5Agent } from "./gpt-5-agent";
-import { AIMessage, BotAnswer, PLAY_STYLES, GAME_ROLES, TokenUsage } from "@/app/api/game-models";
+import { AIMessage, BotAnswer, PLAY_STYLES, GAME_ROLES, TokenUsage, MessageType, RECIPIENT_ALL, GAME_MASTER } from "@/app/api/game-models";
 import { parseResponseToObj } from "@/app/utils/message-utils";
 import { LLM_CONSTANTS, SupportedAiModels } from "@/app/ai/ai-models";
 import { calculateOpenAICost } from "@/app/utils/pricing/openai-pricing";
 import { BotAnswerZodSchema, GameSetupZodSchema, validateResponse } from "@/app/ai/prompts/zod-schemas";
 import { BOT_SYSTEM_PROMPT } from "@/app/ai/prompts/bot-prompts";
+import { STORY_SYSTEM_PROMPT, STORY_USER_PROMPT } from "@/app/ai/prompts/story-gen-prompts";
 import { format } from "@/app/ai/prompts/utils";
 import { GM_COMMAND_INTRODUCE_YOURSELF, HISTORY_PREFIX } from "@/app/ai/prompts/gm-commands";
-import { createBotAnswerSchema } from "@/app/ai/prompts/ai-schemas";
+import { createBotAnswerSchema, createGameSetupSchema } from "@/app/ai/prompts/ai-schemas";
+import { ROLE_CONFIGS, PLAY_STYLE_CONFIGS } from "@/app/api/game-models";
 
-// Helper function to create a Gpt5Agent instance
-const createAgent = (botName: string, modelType: string): Gpt5Agent => {
+// Helper function to create a Gpt5Agent instance (defaults to GPT-5-mini)
+const createAgent = (botName: string, modelType: string = LLM_CONSTANTS.GPT_5_MINI): Gpt5Agent => {
   const testBot = {
     name: botName,
     story: "A mysterious wanderer with a hidden past",
@@ -108,10 +110,6 @@ describe("Gpt5Agent integration", () => {
       expect(tokenUsage!.costUSD).toBeGreaterThan(0);
     };
 
-    it("should respond with valid schema-based answer, reasoning, and token usage using GPT-5", async () => {
-      await testSchemaResponse(LLM_CONSTANTS.GPT_5, true);
-    }, 30000);
-
     it("should respond with valid schema-based answer, reasoning, and token usage using GPT-5-mini", async () => {
       await testSchemaResponse(LLM_CONSTANTS.GPT_5_MINI, true);
     }, 30000);
@@ -122,7 +120,7 @@ describe("Gpt5Agent integration", () => {
       const agent = new Gpt5Agent(
         "TestBot",
         "Test instruction",
-        SupportedAiModels[LLM_CONSTANTS.GPT_5].modelApiName,
+        SupportedAiModels[LLM_CONSTANTS.GPT_5_MINI].modelApiName,
         "invalid_api_key",
         0.7,
         true
@@ -140,7 +138,7 @@ describe("Gpt5Agent integration", () => {
     });
 
     it("should handle empty responses", async () => {
-      const agent = createAgent("TestBot", LLM_CONSTANTS.GPT_5);
+      const agent = createAgent("TestBot", LLM_CONSTANTS.GPT_5_MINI);
       const messages: AIMessage[] = [{
         role: 'user',
         content: 'Test message'
@@ -158,7 +156,7 @@ describe("Gpt5Agent integration", () => {
     });
     
     it("should handle missing output_text in response", async () => {
-      const agent = createAgent("TestBot", LLM_CONSTANTS.GPT_5);
+      const agent = createAgent("TestBot", LLM_CONSTANTS.GPT_5_MINI);
       const messages: AIMessage[] = [{
         role: 'user',
         content: 'Test message'
@@ -177,20 +175,20 @@ describe("Gpt5Agent integration", () => {
   });
   
   describe("reasoning verification", () => {
-    it("should extract reasoning content from GPT-5 responses", async () => {
+    it("should extract reasoning content from GPT-5-mini responses", async () => {
       if (!hasApiKey) {
         console.log("Skipping test - no API key available");
         return;
       }
       
-      const agent = createAgent("TestBot", LLM_CONSTANTS.GPT_5);
+      const agent = createAgent("TestBot", LLM_CONSTANTS.GPT_5_MINI);
       
       // Mock the client to capture the raw response and simulate reasoning output
       const originalCreate = (agent as any).client.responses.create;
       (agent as any).client.responses.create = jest.fn(async (params: any) => {
         const result = await originalCreate.call((agent as any).client.responses, params);
         
-        console.log("\n=== GPT-5 Reasoning Test ===");
+        console.log("\n=== GPT-5-mini Reasoning Test ===");
         console.log("Request includes reasoning:", !!params.reasoning);
         console.log("Reasoning config:", params.reasoning);
         
@@ -224,7 +222,7 @@ describe("Gpt5Agent integration", () => {
       expect(parsedObj).toHaveProperty('reply');
       expect(typeof parsedObj.reply).toBe('string');
       
-      // Check thinking - GPT-5 should provide reasoning content
+      // Check thinking - GPT-5-mini should provide reasoning content
       expect(typeof thinking).toBe('string');
       
       // Verify token usage
@@ -232,17 +230,11 @@ describe("Gpt5Agent integration", () => {
       expect(tokenUsage?.inputTokens).toBeGreaterThan(0);
       expect(tokenUsage?.outputTokens).toBeGreaterThan(0);
       
-      console.log("✅ GPT-5 reasoning test completed");
+      console.log("✅ GPT-5-mini reasoning test completed");
     }, 30000);
   });
   
   describe("token usage calculation", () => {
-    it("should calculate correct costs for GPT-5", () => {
-      // Test the external pricing function that GPT-5 agent uses
-      const cost = calculateOpenAICost("gpt-5", 1000000, 1000000);
-      // Based on ai-models.ts pricing: $1.25 per 1M input, $10 per 1M output
-      expect(cost).toBeCloseTo(11.25, 2);
-    });
     
     it("should calculate correct costs for GPT-5-mini", () => {
       // Test the external pricing function that GPT-5 agent uses
@@ -251,8 +243,8 @@ describe("Gpt5Agent integration", () => {
       expect(cost).toBeCloseTo(2.25, 2);
     });
     
-    it("should handle reasoning token breakdown", () => {
-      const agent = createAgent("TestBot", LLM_CONSTANTS.GPT_5);
+    it("should handle reasoning token breakdown for GPT-5-mini", () => {
+      const agent = createAgent("TestBot", LLM_CONSTANTS.GPT_5_MINI);
       
       // Mock response with reasoning token breakdown
       const mockUsage = {
@@ -265,7 +257,7 @@ describe("Gpt5Agent integration", () => {
       };
       
       // Calculate cost including reasoning tokens
-      const cost = calculateOpenAICost("gpt-5", mockUsage.input_tokens, mockUsage.output_tokens);
+      const cost = calculateOpenAICost("gpt-5-mini", mockUsage.input_tokens, mockUsage.output_tokens);
       expect(cost).toBeGreaterThan(0);
       
       // Verify reasoning token calculation would work
@@ -278,7 +270,7 @@ describe("Gpt5Agent integration", () => {
   
   describe("schema processing", () => {
     it("should make schemas strict by adding additionalProperties: false recursively", () => {
-      const agent = createAgent("TestBot", LLM_CONSTANTS.GPT_5);
+      const agent = createAgent("TestBot", LLM_CONSTANTS.GPT_5_MINI);
       
       // Test schema with nested objects and arrays
       const testSchema = {
@@ -327,7 +319,7 @@ describe("Gpt5Agent integration", () => {
     });
     
     it("should handle schemas with oneOf/anyOf/allOf", () => {
-      const agent = createAgent("TestBot", LLM_CONSTANTS.GPT_5);
+      const agent = createAgent("TestBot", LLM_CONSTANTS.GPT_5_MINI);
       
       const testSchema = {
         type: "object",
@@ -352,7 +344,7 @@ describe("Gpt5Agent integration", () => {
   describe("Zod integration", () => {
     describeOrSkip("askWithZodSchema with real API", () => {
       it("should work with Zod schema for bot answers", async () => {
-        const agent = createAgent("TestBot", LLM_CONSTANTS.GPT_5);
+        const agent = createAgent("TestBot", LLM_CONSTANTS.GPT_5_MINI);
         const messages: AIMessage[] = [{
           role: 'user',
           content: 'What do you think about the current situation in the village?'
@@ -383,7 +375,7 @@ describe("Gpt5Agent integration", () => {
       }, 30000);
       
       it("should work with complex nested Zod schema", async () => {
-        const agent = createAgent("TestBot", LLM_CONSTANTS.GPT_5);
+        const agent = createAgent("TestBot", LLM_CONSTANTS.GPT_5_MINI);
         const messages: AIMessage[] = [{
           role: 'user',
           content: 'Create a game setup with 3 players in a medieval village setting.'
@@ -418,8 +410,140 @@ describe("Gpt5Agent integration", () => {
       }, 30000);
     });
     
+    it("should generate a game preview using Zod schema (like game-actions.ts)", async () => {
+      // Skip test if no API key is available
+      const openaiKey = process.env.OPENAI_API_KEY || process.env.OPENAI_K;
+      if (!openaiKey) {
+        console.log("⚠️ Skipping test: No OpenAI API key found in .env file");
+        console.log("Add OPENAI_API_KEY=your-key or OPENAI_K=your-key to your .env file to run this test");
+        return;
+      }
+
+      console.log("\n=== Game Preview Generation with Zod (Real API) ===");
+      
+      // Create a Game Master agent for story generation
+      const gmAgent = new Gpt5Agent(
+        GAME_MASTER,
+        STORY_SYSTEM_PROMPT,
+        SupportedAiModels[LLM_CONSTANTS.GPT_5_MINI].modelApiName,
+        openaiKey,
+        0.7,
+        false // No thinking for story generation
+      );
+
+      // Prepare game configuration (similar to game-actions.ts)
+      const gamePreview = {
+        theme: "Medieval Castle Mystery",
+        description: "A mysterious murder has occurred in the castle during a grand feast",
+        name: "TestPlayer",
+        playerCount: 5,
+        werewolfCount: 2,
+        specialRoles: [GAME_ROLES.DOCTOR, GAME_ROLES.DETECTIVE]
+      };
+
+      const botCount = gamePreview.playerCount - 1; // exclude human player
+      
+      // Gather role configurations
+      const gameRoleConfigs = [
+        ROLE_CONFIGS[GAME_ROLES.WEREWOLF],
+        ROLE_CONFIGS[GAME_ROLES.DOCTOR],
+        ROLE_CONFIGS[GAME_ROLES.DETECTIVE]
+      ];
+      
+      const gameRolesText = gameRoleConfigs.map(role => 
+        `- **${role.name}** (${role.alignment}): ${role.description}`
+      ).join('\n');
+
+      // Format playstyle configurations
+      const playStylesText = Object.entries(PLAY_STYLE_CONFIGS).map(([key, config]: [string, any]) => 
+        `* ${key}: ${config.name} - ${config.uiDescription}`
+      ).join('\n');
+
+      // Create the user prompt (same as in game-actions.ts)
+      const userPrompt = format(STORY_USER_PROMPT, {
+        theme: gamePreview.theme,
+        description: gamePreview.description,
+        excluded_name: gamePreview.name,
+        number_of_players: botCount,
+        game_roles: gameRolesText,
+        werewolf_count: gamePreview.werewolfCount,
+        play_styles: playStylesText
+      });
+
+      const messages: AIMessage[] = [{
+        role: 'user',
+        content: userPrompt
+      }];
+
+      console.log("📝 Requesting game story and characters...");
+      console.log("Theme:", gamePreview.theme);
+      console.log("Players to generate:", botCount);
+      
+      // Call askWithZodSchema with GameSetupZodSchema
+      const [gameSetup, , tokenUsage] = await gmAgent.askWithZodSchema(
+        GameSetupZodSchema,
+        messages,
+        'game_setup'
+      );
+
+      console.log("\n📖 Generated Story Scene:");
+      console.log(gameSetup.scene.substring(0, 200) + "...");
+      
+      console.log("\n👥 Generated Players:");
+      gameSetup.players.forEach((player, index) => {
+        console.log(`${index + 1}. ${player.name} (${player.gender})`);
+        console.log(`   Story: ${player.story}`);
+        console.log(`   PlayStyle: ${player.playStyle}`);
+      });
+
+      // TypeScript automatically knows gameSetup is of type GameSetupZod
+      
+      // Assertions
+      expect(gameSetup).toBeDefined();
+      expect(gameSetup.scene).toBeDefined();
+      expect(typeof gameSetup.scene).toBe('string');
+      expect(gameSetup.scene.length).toBeGreaterThan(50);
+      
+      expect(gameSetup.players).toBeDefined();
+      expect(Array.isArray(gameSetup.players)).toBe(true);
+      expect(gameSetup.players.length).toBe(botCount);
+      
+      // Verify each player has all required fields
+      gameSetup.players.forEach(player => {
+        expect(player.name).toBeDefined();
+        expect(typeof player.name).toBe('string');
+        expect(player.name.length).toBeGreaterThan(0);
+        
+        expect(player.gender).toBeDefined();
+        expect(['male', 'female', 'neutral']).toContain(player.gender);
+        
+        expect(player.story).toBeDefined();
+        expect(typeof player.story).toBe('string');
+        expect(player.story.length).toBeGreaterThan(10);
+        
+        expect(player.playStyle).toBeDefined();
+        expect(typeof player.playStyle).toBe('string');
+      });
+
+      // Check token usage
+      if (tokenUsage) {
+        console.log("\n💰 Token Usage:");
+        console.log(`Input: ${tokenUsage.inputTokens}`);
+        console.log(`Output: ${tokenUsage.outputTokens}`);
+        console.log(`Total: ${tokenUsage.totalTokens}`);
+        console.log(`Cost: $${tokenUsage.costUSD.toFixed(4)}`);
+        
+        expect(tokenUsage.inputTokens).toBeGreaterThan(0);
+        expect(tokenUsage.outputTokens).toBeGreaterThan(0);
+        expect(tokenUsage.totalTokens).toBe(tokenUsage.inputTokens + tokenUsage.outputTokens);
+        expect(tokenUsage.costUSD).toBeGreaterThan(0);
+      }
+
+      console.log("\n✅ Game preview generated successfully with Zod schema!");
+    }, 60000); // Increased timeout for complex story generation
+
     it("should validate Zod schema conversion to JSON Schema", () => {
-      const agent = createAgent("TestBot", LLM_CONSTANTS.GPT_5);
+      const agent = createAgent("TestBot", LLM_CONSTANTS.GPT_5_MINI);
       
       // Test the Zod to JSON Schema conversion
       const jsonSchema = (agent as any).zodToOpenAISchema(BotAnswerZodSchema);

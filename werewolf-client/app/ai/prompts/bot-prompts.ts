@@ -129,11 +129,9 @@ All inputs come from the Game Master (GM) as specific commands requiring action.
 1. Action requests (choose elimination target)
 2. Response requests to other players (with recent messages provided)
 
-GM may specify custom JSON response formats that you must follow exactly.
-
 ## Output Format
 
-Each GM command specifies its required response schema. All responses must be valid JSON matching the schema. Message content should be natural and conversational without including your name at the start.`;
+All responses must be valid JSON. The specific schema will be provided by the API. Message content should be natural and conversational without including your name at the start.`;
 
 export const BOT_VOTE_PROMPT: string = `%bot_name%, it's time to vote for someone to eliminate from the game. \
 You must choose one player who you believe should be voted out.
@@ -150,24 +148,7 @@ Consider:
 - Always prioritize your team's victory over individual survival
 - Consider how your vote will be perceived by other players
 
-Your response must follow this schema:
-
-{
-    type: "object",
-    properties: {
-        who: {
-            type: "string",
-            description: "The name of the player you are voting to eliminate"
-        },
-        why: {
-            type: "string",
-            description: "Your reasoning for voting for this player (keep it brief but convincing)"
-        }
-    },
-    required: ["who", "why"]
-}
-
-Return a single JSON object matching this schema.`;
+Your response must be a valid JSON object with your vote choice and reasoning.`;
 
 export const BOT_REMINDER_POSTFIX: string = `
 
@@ -202,20 +183,7 @@ Discuss:
 
 This is a private werewolf-only discussion. Share your thoughts, analysis, and suggestions with your fellow werewolves.
 
-Your response must follow this schema:
-
-{
-    "type": "object",
-    "properties": {
-        "reply": {
-            "type": "string",
-            "description": "Your discussion message to other werewolves about strategy and plans"
-        }
-    },
-    "required": ["reply"]
-}
-
-Return a single JSON object matching this schema.`;
+Your response must be a valid JSON object with your discussion message.`;
 
 export const BOT_WEREWOLF_ACTION_PROMPT: string = `🌙 **Night Phase - Werewolf Final Decision**
 
@@ -228,24 +196,7 @@ Consider:
 - Who has been most suspicious of werewolves during discussions?
 - Strategic value of eliminating this player
 
-Your response must follow this schema:
-
-{
-    "type": "object",
-    "properties": {
-        "target": {
-            "type": "string",
-            "description": "The name of the player you want to eliminate tonight"
-        },
-        "reasoning": {
-            "type": "string", 
-            "description": "Your reasoning for choosing this target (private werewolf discussion)"
-        }
-    },
-    "required": ["target", "reasoning"]
-}
-
-Return a single JSON object matching this schema.`;
+Your response must be a valid JSON object with your target choice and reasoning.`;
 
 export const BOT_DOCTOR_ACTION_PROMPT: string = `🏥 **Night Phase - Doctor Protection**
 
@@ -268,24 +219,7 @@ Consider:
 
 **Remember:** Keep your role as Doctor completely secret. Never reveal your protection choices or role to other players during day discussions.
 
-Your response must follow this schema:
-
-{
-    "type": "object",
-    "properties": {
-        "target": {
-            "type": "string",
-            "description": "The name of the player you want to protect tonight"
-        },
-        "reasoning": {
-            "type": "string", 
-            "description": "Your reasoning for choosing to protect this player (private doctor thoughts)"
-        }
-    },
-    "required": ["target", "reasoning"]
-}
-
-Return a single JSON object matching this schema.`;
+Your response must be a valid JSON object with your target choice and reasoning.`;
 
 export const BOT_DETECTIVE_ACTION_PROMPT: string = `🔍 **Night Phase - Detective Investigation**
 
@@ -306,24 +240,7 @@ Consider:
 
 **Remember:** Keep your role as Detective completely secret. Never directly reveal your investigation results or role to other players during day discussions. Use the information strategically to guide voting and discussions.
 
-Your response must follow this schema:
-
-{
-    "type": "object",
-    "properties": {
-        "target": {
-            "type": "string",
-            "description": "The name of the player you want to investigate tonight"
-        },
-        "reasoning": {
-            "type": "string", 
-            "description": "Your reasoning for choosing to investigate this player (private detective thoughts)"
-        }
-    },
-    "required": ["target", "reasoning"]
-}
-
-Return a single JSON object matching this schema.`;
+Your response must be a valid JSON object with your target choice and reasoning.`;
 
 export const BOT_DAY_SUMMARY_PROMPT: string = `💭 **End of Day %day_number% - Personal Reflection & Relationship Summary**
 

@@ -4,6 +4,9 @@ import {ChatCompletionResponse} from "@mistralai/mistralai/models/components";
 import {AIMessage, MESSAGE_ROLE, TokenUsage} from "@/app/api/game-models";
 import {ResponseSchema} from "@/app/ai/prompts/ai-schemas";
 import {cleanResponse} from "@/app/utils/message-utils";
+import { z } from 'zod';
+import { ZodSchemaConverter } from './zod-schema-converter';
+import { safeValidateResponse } from './prompts/zod-schemas';
 
 export class MistralAgent extends AbstractAgent {
     private readonly client: Mistral;
@@ -178,5 +181,100 @@ Ensure your response strictly follows the schema requirements.`,
         const outputCost = (outputTokens / 1_000_000) * pricePerMillionOutput;
         
         return inputCost + outputCost;
+    }
+
+    /**
+     * New method using Zod with Mistral API
+     * This provides better schema handling and runtime validation
+     * 
+     * According to Mistral documentation, we should:
+     * 1. Set responseFormat to { type: 'json_object' }
+     * 2. Add the schema description to the last message content
+     */
+    async askWithZodSchema<T>(zodSchema: z.ZodSchema<T>, messages: AIMessage[]): Promise<[T, string, TokenUsage?]> {
+        try {
+            // Convert Zod schema to human-readable prompt description
+            const schemaDescription = ZodSchemaConverter.toPromptDescription(zodSchema);
+            
+            // Convert messages to Mistral format and add schema to last message
+            const convertedMessages = this.convertToMistralMessages(messages);
+            
+            // Add schema description to the last message content
+            if (convertedMessages.length > 0) {
+                const lastMessage = convertedMessages[convertedMessages.length - 1];
+                if (lastMessage && lastMessage.content) {
+                    lastMessage.content += `\n\nYour response must be a valid JSON object matching this schema:\n${schemaDescription}`;
+                }
+            } else {
+                // If no messages, create a default user message with schema
+                convertedMessages.push({
+                    role: 'user',
+                    content: `Please respond with a valid JSON object matching this schema:\n${schemaDescription}`
+                });
+            }
+            
+            // Prepare system message
+            const systemMessage = {
+                role: MESSAGE_ROLE.SYSTEM,
+                content: this.instruction
+            };
+            
+            const allMessages = [systemMessage, ...convertedMessages];
+
+            // Build request parameters with JSON format (no jsonSchema parameter)
+            const requestParams = {
+                ...this.defaultParams,
+                messages: allMessages,
+                responseFormat: {
+                    type: 'json_object' as const
+                }
+            };
+
+            this.logger(this.logTemplates.askingAgent(this.name, this.model));
+            const response = await this.client.chat.complete(requestParams);
+
+            if (!response || !response.choices || response.choices.length === 0) {
+                throw new Error(this.errorMessages.emptyResponse);
+            }
+
+            const choice = response.choices[0];
+            const content = choice.message?.content;
+            
+            if (!content) {
+                throw new Error(this.errorMessages.invalidFormat);
+            }
+
+            // Note: Thinking content is not available with JSON format for Mistral
+            const thinkingContent = "";
+
+            // Parse and validate the response using Zod
+            let parsedContent: unknown;
+            try {
+                // Handle both string and structured content
+                const responseText = typeof content === 'string' ? content : JSON.stringify(content);
+                const cleanedResponse = cleanResponse(responseText);
+                parsedContent = JSON.parse(cleanedResponse);
+            } catch (parseError) {
+                throw new Error(`Failed to parse JSON response: ${parseError}`);
+            }
+
+            // Validate using Zod schema
+            const validationResult = safeValidateResponse(zodSchema, parsedContent);
+            if (!validationResult.success) {
+                this.logger(`Zod validation failed: ${JSON.stringify(validationResult.error.errors)}`);
+                throw new Error(`Response validation failed: ${validationResult.error.message}`);
+            }
+
+            this.logger(`✅ Response validated successfully with Zod schema`);
+
+            // Extract token usage
+            const tokenUsage = this.extractTokenUsage(response);
+            
+            return [validationResult.data, thinkingContent, tokenUsage];
+            
+        } catch (error) {
+            this.logger(this.logTemplates.error(this.name, error));
+            throw new Error(this.errorMessages.apiError(error));
+        }
     }
 }

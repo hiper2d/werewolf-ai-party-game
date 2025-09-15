@@ -4,6 +4,9 @@ import {AIMessage, TokenUsage} from "@/app/api/game-models";
 import {ResponseSchema} from "@/app/ai/prompts/ai-schemas";
 import {cleanResponse} from "@/app/utils/message-utils";
 import {extractUsageAndCalculateCost} from "@/app/utils/pricing";
+import { z } from 'zod';
+import { ZodSchemaConverter } from './zod-schema-converter';
+import { safeValidateResponse } from './prompts/zod-schemas';
 
 export class DeepSeekV2Agent extends AbstractAgent {
     private readonly client: OpenAI;
@@ -130,5 +133,103 @@ Ensure your response strictly follows the schema requirements.`,
         };
         
         return updatedMessages;
+    }
+
+    /**
+     * New method using Zod with DeepSeek API
+     * This provides better schema handling and runtime validation
+     * 
+     * According to DeepSeek documentation, similar to OpenAI:
+     * 1. Set response_format to { type: 'json_object' } for non-reasoning models
+     * 2. For reasoning models (deepseek-reasoner), schema guidance via prompts
+     */
+    async askWithZodSchema<T>(zodSchema: z.ZodSchema<T>, messages: AIMessage[]): Promise<[T, string, TokenUsage?]> {
+        try {
+            const input = this.convertToOpenAIMessages(messages);
+            
+            this.logger(this.logTemplates.askingAgent(this.name, this.model));
+            
+            // For reasoning models, add schema description to prompt
+            // For non-reasoning models, use JSON schema format
+            let modifiedInput = [...input];
+            let requestParams: any = {
+                model: this.model,
+                messages: this.addSystemInstruction(modifiedInput),
+                temperature: this.temperature,
+            };
+
+            if (this.enableThinking) {
+                // For deepseek-reasoner: Add schema description to the last message
+                const schemaDescription = ZodSchemaConverter.toPromptDescription(zodSchema);
+                const lastMessage = modifiedInput[modifiedInput.length - 1];
+                if (lastMessage && lastMessage.role === 'user') {
+                    modifiedInput[modifiedInput.length - 1] = {
+                        ...lastMessage,
+                        content: `${lastMessage.content}\n\nYour response must be a valid JSON object matching this schema:\n${schemaDescription}`
+                    };
+                    requestParams.messages = this.addSystemInstruction(modifiedInput);
+                }
+            } else {
+                // For deepseek-chat: Use JSON schema format
+                const deepseekSchema = ZodSchemaConverter.toMistralSchema(zodSchema);
+                requestParams.response_format = {
+                    type: 'json_object',
+                    schema: deepseekSchema
+                };
+            }
+
+            const response = await this.client.chat.completions.create(requestParams);
+
+            // Extract reasoning content if available (from deepseek-reasoner)
+            let thinkingContent = "";
+            if (this.enableThinking && response.choices[0]?.message) {
+                const reasoning = (response.choices[0].message as any).reasoning_content;
+                if (reasoning) {
+                    thinkingContent = reasoning;
+                }
+            }
+
+            const content = response.choices[0]?.message?.content;
+            if (!content) {
+                throw new Error(this.errorMessages.emptyResponse);
+            }
+
+            // Parse and validate the response using Zod
+            let parsedContent: unknown;
+            try {
+                const cleanedResponse = cleanResponse(content);
+                parsedContent = JSON.parse(cleanedResponse);
+            } catch (parseError) {
+                throw new Error(`Failed to parse JSON response: ${parseError}`);
+            }
+
+            // Validate using Zod schema
+            const validationResult = safeValidateResponse(zodSchema, parsedContent);
+            if (!validationResult.success) {
+                this.logger(`Zod validation failed: ${JSON.stringify(validationResult.error.errors)}`);
+                throw new Error(`Response validation failed: ${validationResult.error.message}`);
+            }
+
+            this.logger(`✅ Response validated successfully with Zod schema`);
+
+            // Extract token usage and calculate cost
+            const usageResult = extractUsageAndCalculateCost(this.model, response);
+            let tokenUsage: TokenUsage | undefined;
+            
+            if (usageResult) {
+                tokenUsage = {
+                    inputTokens: usageResult.usage.promptTokens,
+                    outputTokens: usageResult.usage.completionTokens,
+                    totalTokens: usageResult.usage.totalTokens,
+                    costUSD: usageResult.cost
+                };
+            }
+
+            return [validationResult.data, thinkingContent, tokenUsage];
+            
+        } catch (error) {
+            this.logger(this.logTemplates.error(this.name, error));
+            throw new Error(this.errorMessages.apiError(error));
+        }
     }
 }

@@ -1,9 +1,12 @@
 import {AbstractAgent} from "@/app/ai/abstract-agent";
 import {AIMessage, TokenUsage} from "@/app/api/game-models";
-import {GoogleGenAI} from "@google/genai";
+import {GoogleGenAI, Type} from "@google/genai";
 import {ResponseSchema} from "@/app/ai/prompts/ai-schemas";
 import {cleanResponse} from "@/app/utils/message-utils";
 import {ModelOverloadError, ModelRateLimitError, ModelUnavailableError, ModelAuthenticationError, ModelQuotaExceededError} from "@/app/ai/errors";
+import { z } from 'zod';
+import { ZodSchemaConverter } from './zod-schema-converter';
+import { safeValidateResponse } from './prompts/zod-schemas';
 
 type GoogleRole = 'model' | 'user';
 
@@ -153,6 +156,91 @@ ${instructions}`;
             return 'user';
         }
         throw new Error(this.errorMessages.unsupportedRole(role));
+    }
+
+    /**
+     * New method using Zod with Google's Gemini API
+     * This provides better schema handling and runtime validation
+     */
+    async askWithZodSchema<T>(zodSchema: z.ZodSchema<T>, messages: AIMessage[]): Promise<[T, string, TokenUsage?]> {
+        try {
+            // Convert Zod schema to Google-compatible format using Type constants
+            const googleSchema = ZodSchemaConverter.toGoogleSchema(zodSchema);
+            
+            
+            // Convert all messages to Google format
+            const contents = this.convertToContents(messages);
+            
+            const config: any = {
+                temperature: this.temperature,
+                responseMimeType: "application/json",
+                responseSchema: googleSchema
+            };
+
+            // Add thinking config for Google models with thinking mode
+            if (this.enableThinking) {
+                config.thinkingConfig = {
+                    includeThoughts: true,
+                    thinkingBudget: 1024
+                };
+            }
+
+            this.logger(this.logTemplates.askingAgent(this.name, this.model));
+            
+            const response = await this.client.models.generateContent({
+                model: this.model,
+                contents: contents,
+                config: config
+            });
+            
+            // Handle thinking content if present
+            let thinkingContent = "";
+            if (this.enableThinking && (response as any).candidates?.[0]?.content?.parts) {
+                const parts = (response as any).candidates[0].content.parts;
+                const thinkingParts: string[] = [];
+                for (const part of parts) {
+                    if (part.thought && part.text) {
+                        thinkingParts.push(part.text);
+                    }
+                }
+                thinkingContent = thinkingParts.join('\n');
+            }
+
+            this.logger(`Zod schema response received - hasText: ${!!response.text}, textLength: ${response.text ? response.text.length : 0}`);
+            
+            if (!response.text) {
+                throw new Error(this.errorMessages.emptyResponse);
+            }
+
+            // Parse and validate the response using Zod
+            let parsedContent: unknown;
+            try {
+                const cleanedResponse = cleanResponse(response.text);
+                parsedContent = JSON.parse(cleanedResponse);
+            } catch (parseError) {
+                throw new Error(`Failed to parse JSON response: ${parseError}`);
+            }
+
+            // Validate using Zod schema
+            const validationResult = safeValidateResponse(zodSchema, parsedContent);
+            if (!validationResult.success) {
+                this.logger(`Zod validation failed: ${JSON.stringify(validationResult.error.errors)}`);
+                throw new Error(`Response validation failed: ${validationResult.error.message}`);
+            }
+
+            this.logger(`✅ Response validated successfully with Zod schema`);
+            
+            // Token usage is not available in Google GenAI SDK yet
+            return [validationResult.data, thinkingContent, undefined];
+            
+        } catch (error) {
+            this.logger(this.logTemplates.error(this.name, error));
+            
+            // Check for specific Gemini API errors
+            this.handleGeminiError(error);
+            
+            throw error;
+        }
     }
 
     /**

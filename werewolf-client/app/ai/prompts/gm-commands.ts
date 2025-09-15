@@ -2,45 +2,11 @@ export const GM_COMMAND_INTRODUCE_YOURSELF: string = `Welcome to the game, %bot_
 Use your character and story to create a thematic introduction. Don't reveal you tactics and strategies. \
 Push your store a little further in your introduction, add some development to it.
 
-Your response must follow this schema:
-
-{
-    type: "object",
-    properties: {
-        reply: {
-            type: "string",
-            description: "Your introduction message to the group"
-        }
-    },
-    required: ["reply"]
-}
-
-Return a single JSON object matching this schema.`;
+Your response must be a valid JSON object with your introduction message.`;
 
 export const GM_COMMAND_SELECT_RESPONDERS: string = `Based on the recent chat messages, select 1-3 bots who should respond next.
 
-Your response must follow this schema:
-{
-    type: "object",
-    properties: {
-        selected_bots: {
-            type: "array",
-            description: "Array of 1-3 bot names who should respond next",
-            items: {
-                type: "string"
-            },
-            minItems: 1,
-            maxItems: 3
-        },
-        reasoning: {
-            type: "string",
-            description: "Brief explanation of why these bots were selected"
-        }
-    },
-    required: ["selected_bots", "reasoning"]
-}
-
-Return a single JSON object matching this schema.`;
+Your response must be a valid JSON object with the selected bot names and reasoning.`;
 
 export const HISTORY_PREFIX = `
 Here are previous messages from other players you haven't yet seen:
@@ -50,20 +16,7 @@ Here are previous messages from other players you haven't yet seen:
 export const GM_COMMAND_REPLY_TO_DISCUSSION: string = `%bot_name%, reply to the players in the discussion. Be thoughtful and consider what has been said so far. \
 Use your character and story to add thematic flavor to your response. Push your story a little further or keep it consistent with your background.
 
-Your response must follow this schema:
-
-{
-    type: "object",
-    properties: {
-        reply: {
-            type: "string",
-            description: "Your response to the ongoing discussion"
-        }
-    },
-    required: ["reply"]
-}
-
-Return a single JSON object matching this schema.`;
+Your response must be a valid JSON object with your discussion reply.`;
 
 export const GM_COMMAND_GENERATE_NIGHT_RESULTS: string = `Generate the night results story based on the following night events and conversation history.
 
@@ -117,17 +70,4 @@ export const GM_COMMAND_GENERATE_NIGHT_RESULTS: string = `Generate the night res
 - Always maintain game balance and fairness in information revelation
 </StorytellingRules>
 
-Your response must follow this schema:
-
-{
-    type: "object",
-    properties: {
-        story: {
-            type: "string",
-            description: "The night results story that reveals what happened during the night"
-        }
-    },
-    required: ["story"]
-}
-
-Return a single JSON object matching this schema.`;
+Your response must be a valid JSON object with the night results story.`;
