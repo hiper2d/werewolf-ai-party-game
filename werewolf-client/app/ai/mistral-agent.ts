@@ -37,6 +37,11 @@ Ensure your response strictly follows the schema requirements.`,
     constructor(name: string, instruction: string, model: string, apiKey: string, enableThinking: boolean = false) {
         super(name, instruction, model, 0.7, enableThinking);
         this.client = new Mistral({apiKey: apiKey});
+        
+        // Note: Magistral reasoning models can generate thinking content, but only when
+        // responseFormat is not set to 'json_object'. Since this game requires JSON responses,
+        // thinking content will be suppressed. The models still benefit from internal reasoning
+        // during generation, but thinking traces are not returned in the response.
     }
 
 
@@ -46,7 +51,7 @@ Ensure your response strictly follows the schema requirements.`,
         try {
             const systemMessage = (this.enableThinking)
                 ? this.createThinkingSystemMessage(schemaInstructions)
-                : {type: "system", content: `${this.instruction}\n\n${schemaInstructions}`};
+                : {role: "system", content: `${this.instruction}\n\n${schemaInstructions}`};
 
             const chatResponse: ChatCompletionResponse = await this.client.chat.complete({
                 model: this.model,
