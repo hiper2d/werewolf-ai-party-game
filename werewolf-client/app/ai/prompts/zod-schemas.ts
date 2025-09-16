@@ -4,7 +4,6 @@
  */
 
 import { z } from 'zod';
-import { zodToJsonSchema } from 'zod-to-json-schema';
 
 // =============================================================================
 // ZOD SCHEMAS (Primary definitions)
@@ -78,77 +77,12 @@ export type DetectiveActionZod = z.infer<typeof DetectiveActionZodSchema>;
 export type NightResultsStoryZod = z.infer<typeof NightResultsStoryZodSchema>;
 
 // =============================================================================
-// JSON SCHEMA CONVERSION (For non-OpenAI providers)
+// DEPRECATED JSON SCHEMA CONVERSION
 // =============================================================================
-
-/**
- * Converts a Zod schema to JSON Schema format for APIs that don't support Zod natively
- * @param zodSchema - The Zod schema to convert
- * @returns JSON Schema object
- */
-export function zodToJsonSchemaCustom(zodSchema: z.ZodSchema): any {
-  const jsonSchema = zodToJsonSchema(zodSchema, {
-    // Use more descriptive names
-    $refStrategy: 'none'
-  });
-  
-  // Recursively add additionalProperties: false to all object types
-  return addAdditionalPropertiesFalse(jsonSchema);
-}
-
-/**
- * Recursively adds additionalProperties: false to all object types in a JSON schema
- */
-function addAdditionalPropertiesFalse(schema: any): any {
-  if (typeof schema !== 'object' || schema === null) {
-    return schema;
-  }
-
-  const result = { ...schema };
-
-  // Add additionalProperties: false for object types
-  if (result.type === 'object') {
-    result.additionalProperties = false;
-  }
-
-  // Recursively process properties
-  if (result.properties) {
-    result.properties = Object.fromEntries(
-      Object.entries(result.properties).map(([key, prop]: [string, any]) => [
-        key,
-        addAdditionalPropertiesFalse(prop)
-      ])
-    );
-  }
-
-  // Recursively process array items
-  if (result.items) {
-    result.items = addAdditionalPropertiesFalse(result.items);
-  }
-
-  // Recursively process oneOf, anyOf, allOf
-  if (result.oneOf) {
-    result.oneOf = result.oneOf.map((subSchema: any) => addAdditionalPropertiesFalse(subSchema));
-  }
-  if (result.anyOf) {
-    result.anyOf = result.anyOf.map((subSchema: any) => addAdditionalPropertiesFalse(subSchema));
-  }
-  if (result.allOf) {
-    result.allOf = result.allOf.map((subSchema: any) => addAdditionalPropertiesFalse(subSchema));
-  }
-
-  return result;
-}
-
-// Pre-converted JSON schemas for backward compatibility
-export const BotAnswerJsonSchema = zodToJsonSchemaCustom(BotAnswerZodSchema);
-export const GameSetupJsonSchema = zodToJsonSchemaCustom(GameSetupZodSchema);
-export const GmBotSelectionJsonSchema = zodToJsonSchemaCustom(GmBotSelectionZodSchema);
-export const BotVoteJsonSchema = zodToJsonSchemaCustom(BotVoteZodSchema);
-export const WerewolfActionJsonSchema = zodToJsonSchemaCustom(WerewolfActionZodSchema);
-export const DoctorActionJsonSchema = zodToJsonSchemaCustom(DoctorActionZodSchema);
-export const DetectiveActionJsonSchema = zodToJsonSchemaCustom(DetectiveActionZodSchema);
-export const NightResultsStoryJsonSchema = zodToJsonSchemaCustom(NightResultsStoryZodSchema);
+// NOTE: This section has been replaced by ZodSchemaConverter in zod-schema-converter.ts
+// The ZodSchemaConverter provides better provider-specific schema conversion
+// and is used by all AI agents. This section is preserved for backward compatibility
+// but should not be used in new code.
 
 // =============================================================================
 // VALIDATION HELPERS

@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "jest"
+    "test": "jest",
+    "fix-stuck-welcome": "npx tsx scripts/fix-stuck-welcome.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.60.0",

@@ -696,6 +696,7 @@ function serializeMessageForFirestore(gameMessage: GameMessage) {
     return {
         ...gameMessage,
         msg: gameMessage.messageType === MessageType.BOT_ANSWER ||
+             gameMessage.messageType === MessageType.BOT_WELCOME ||
              gameMessage.messageType === MessageType.GAME_STORY ||
              gameMessage.messageType === MessageType.VOTE_MESSAGE ||
              gameMessage.messageType === MessageType.WEREWOLF_ACTION ||

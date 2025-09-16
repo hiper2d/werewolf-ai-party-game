@@ -34,7 +34,7 @@ export class GrokAgent extends AbstractAgent {
         this.client = new OpenAI({
             apiKey: apiKey,
             baseURL: 'https://api.x.ai/v1',
-            timeout: 60000,
+            timeout: 1200000,
         });
     }
 
@@ -113,11 +113,13 @@ export class GrokAgent extends AbstractAgent {
             this.logger(this.logTemplates.askingAgent(this.name, this.model));
 
             // Use the official structured output API for grok-4
+            // Note: Grok-4 needs high max_tokens because it consumes many tokens for reasoning
             const completion = await this.client.chat.completions.parse({
                 model: this.model,
                 temperature: this.temperature,
                 messages: openAIMessages,
-                response_format: zodResponseFormat(zodSchema, "response")
+                response_format: zodResponseFormat(zodSchema, "response"),
+                max_tokens: 16384  // Increased for Grok-4's extensive reasoning
             });
 
             // Get the parsed structured response

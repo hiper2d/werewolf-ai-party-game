@@ -98,11 +98,19 @@ export class DeepSeekV2Agent extends AbstractAgent {
                     requestParams.messages = this.addSystemInstruction(modifiedInput);
                 }
             } else {
-                // For deepseek-chat: Use JSON schema format
-                const deepseekSchema = ZodSchemaConverter.toMistralSchema(zodSchema);
+                // For deepseek-chat: Use JSON object format with schema description in prompt
+                // DeepSeek doesn't support structured schemas like OpenAI, so we use prompt-based approach
+                const schemaDescription = ZodSchemaConverter.toPromptDescription(zodSchema);
+                const lastMessage = modifiedInput[modifiedInput.length - 1];
+                if (lastMessage && lastMessage.role === 'user') {
+                    modifiedInput[modifiedInput.length - 1] = {
+                        ...lastMessage,
+                        content: `${lastMessage.content}\n\nYour response must be a valid JSON object matching this schema:\n${schemaDescription}`
+                    };
+                    requestParams.messages = this.addSystemInstruction(modifiedInput);
+                }
                 requestParams.response_format = {
-                    type: 'json_object',
-                    schema: deepseekSchema
+                    type: 'json_object'
                 };
             }
 

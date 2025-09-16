@@ -1,3 +1,13 @@
+/**
+ * AI Model Configuration and Pricing
+ * 
+ * This file contains the current AI model definitions, API key mappings,
+ * and pricing information for all supported AI providers.
+ * 
+ * All model definitions are actively used and up-to-date.
+ * Pricing is updated as of January 2025.
+ */
+
 export const API_KEY_CONSTANTS = {
     OPENAI: 'OPENAI_API_KEY',
     ANTHROPIC: 'ANTHROPIC_API_KEY',

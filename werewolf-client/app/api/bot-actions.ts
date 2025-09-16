@@ -115,9 +115,9 @@ export async function recalculateDayActivity(gameId: string, currentDay: number)
         const activityCounter: Record<string, number> = {};
         
         dayMessages.forEach(message => {
-            // Only count BOT_ANSWER messages sent to ALL (public discussion messages)
+            // Only count BOT_ANSWER and BOT_WELCOME messages sent to ALL (public discussion messages)
             // This excludes private messages like werewolf coordination or detective reports
-            if (message.messageType === MessageType.BOT_ANSWER && 
+            if ((message.messageType === MessageType.BOT_ANSWER || message.messageType === MessageType.BOT_WELCOME) && 
                 message.recipientName === RECIPIENT_ALL &&
                 message.authorName !== GAME_MASTER &&
                 message.authorName && 
@@ -210,6 +210,7 @@ async function welcomeImpl(gameId: string): Promise<Game> {
     try {
         // If queue is empty, move to DAY_DISCUSSION state
         if (game.gameStateParamQueue.length === 0) {
+            console.log(`🎭 WELCOME: Queue is empty, transitioning to DAY_DISCUSSION for game ${gameId}`);
             await db.collection('games').doc(gameId).update({
                 gameState: GAME_STATES.DAY_DISCUSSION,
                 gameStateProcessQueue: [] // Ensure the process queue is empty for DAY_DISCUSSION
@@ -284,7 +285,7 @@ async function welcomeImpl(gameId: string): Promise<Game> {
             recipientName: RECIPIENT_ALL,
             authorName: bot.name,
             msg: { reply: answer.reply, thinking: thinking || "" },
-            messageType: MessageType.BOT_ANSWER,
+            messageType: MessageType.BOT_WELCOME,
             day: game.currentDay,
             timestamp: Date.now()
         };
@@ -298,10 +299,22 @@ async function welcomeImpl(gameId: string): Promise<Game> {
         // Increment day activity counter for the bot
         await incrementDayActivity(gameId, bot.name, game.currentDay);
 
-        // Update game with the modified queue
-        await db.collection('games').doc(gameId).update({
-            gameStateParamQueue: newQueue
-        });
+        // Check if this was the last bot in the queue
+        if (newQueue.length === 0) {
+            // Transition to DAY_DISCUSSION state
+            console.log(`🎭 WELCOME: Last bot introduced, transitioning to DAY_DISCUSSION for game ${gameId}`);
+            await db.collection('games').doc(gameId).update({
+                gameStateParamQueue: newQueue,
+                gameState: GAME_STATES.DAY_DISCUSSION,
+                gameStateProcessQueue: [] // Ensure the process queue is empty for DAY_DISCUSSION
+            });
+        } else {
+            // Update game with the modified queue but stay in WELCOME state
+            console.log(`🎭 WELCOME: ${newQueue.length} bots remaining in introduction queue for game ${gameId}`);
+            await db.collection('games').doc(gameId).update({
+                gameStateParamQueue: newQueue
+            });
+        }
 
         // Return the updated game state
         return await getGame(gameId) as Game;

@@ -118,7 +118,8 @@ function renderMessage(message: GameMessage, gameId: string, onDeleteAfter: (mes
     try {
         console.log(message)
         switch (message.messageType) {
-            case MessageType.BOT_ANSWER: {
+            case MessageType.BOT_ANSWER:
+            case MessageType.BOT_WELCOME: {
                 const botAnswer: BotAnswer = message.msg as BotAnswer;
                 displayContent = botAnswer.reply;
                 break;

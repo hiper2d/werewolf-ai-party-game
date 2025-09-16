@@ -1,32 +1,25 @@
-import { BotAnswer } from "@/app/api/game-models";
+/**
+ * Legacy AI schema definitions - DEPRECATED
+ * 
+ * This file contains legacy schema definitions that have been replaced by Zod schemas.
+ * New code should use the schemas from @/app/ai/prompts/zod-schemas.ts instead.
+ * 
+ * These exports are maintained for backward compatibility with existing tests
+ * and will be removed in a future cleanup.
+ */
 
-// Make ResponseSchema completely flexible
+// =============================================================================
+// DEPRECATED - Use Zod schemas instead
+// =============================================================================
+
+/**
+ * @deprecated Use BotAnswerZodSchema from zod-schemas.ts instead
+ */
 export type ResponseSchema = Record<string, any>;
 
-// Story generation interface
-export interface GameSetup {
-    scene: string;      // The vivid scene description
-    players: Array<{
-        name: string;   // Single-word unique name
-        gender: string; // male, female, or neutral
-        story: string;  // 3-5 sentence character background
-        playStyle: string; // The playstyle identifier for this character
-    }>;
-}
-
-// GM bot selection interface
-export interface GmBotSelection {
-    selected_bots: string[];  // Array of 1-3 bot names
-    reasoning: string;        // Explanation for the selection
-}
-
-// Bot vote interface
-export interface BotVote {
-    who: string;    // Name of the player being voted for
-    why: string;    // Reasoning for the vote
-}
-
-// Bot answer schema for response validation
+/**
+ * @deprecated Use BotAnswerZodSchema from zod-schemas.ts instead
+ */
 export const createBotAnswerSchema = () => ({
     type: 'object',
     properties: {
@@ -38,7 +31,9 @@ export const createBotAnswerSchema = () => ({
     required: ['reply']
 });
 
-// GM bot selection schema for response validation
+/**
+ * @deprecated Use GmBotSelectionZodSchema from zod-schemas.ts instead
+ */
 export const createGmBotSelectionSchema = () => ({
     type: 'object',
     properties: {
@@ -59,7 +54,9 @@ export const createGmBotSelectionSchema = () => ({
     required: ['selected_bots', 'reasoning']
 });
 
-// Game setup schema for story generation
+/**
+ * @deprecated Use GameSetupZodSchema from zod-schemas.ts instead
+ */
 export const createGameSetupSchema = () => ({
     type: 'object',
     properties: {
@@ -96,7 +93,9 @@ export const createGameSetupSchema = () => ({
     required: ['scene', 'players']
 });
 
-// Bot vote schema for response validation
+/**
+ * @deprecated Use BotVoteZodSchema from zod-schemas.ts instead
+ */
 export const createBotVoteSchema = () => ({
     type: 'object',
     properties: {
@@ -112,27 +111,9 @@ export const createBotVoteSchema = () => ({
     required: ['who', 'why']
 });
 
-// Werewolf action interface
-export interface WerewolfAction {
-    target: string;
-    reasoning: string;
-}
-
-// Doctor action interface
-export interface DoctorAction {
-    target: string;
-    reasoning: string;
-    thinking?: string;
-}
-
-// Detective action interface
-export interface DetectiveAction {
-    target: string;
-    reasoning: string;
-    thinking?: string;
-}
-
-// Werewolf action schema for response validation
+/**
+ * @deprecated Use WerewolfActionZodSchema from zod-schemas.ts instead
+ */
 export const createWerewolfActionSchema = () => ({
     type: 'object',
     properties: {
@@ -148,24 +129,9 @@ export const createWerewolfActionSchema = () => ({
     required: ['target', 'reasoning']
 });
 
-// Night results story interface
-export interface NightResultsStory {
-    story: string;
-}
-
-// Night results story schema for response validation
-export const createNightResultsStorySchema = () => ({
-    type: 'object',
-    properties: {
-        story: {
-            type: 'string',
-            description: 'The compelling night results narrative that follows all information disclosure rules'
-        }
-    },
-    required: ['story']
-});
-
-// Doctor action schema for response validation
+/**
+ * @deprecated Use DoctorActionZodSchema from zod-schemas.ts instead
+ */
 export const createDoctorActionSchema = () => ({
     type: 'object',
     properties: {
@@ -181,7 +147,9 @@ export const createDoctorActionSchema = () => ({
     required: ['target', 'reasoning']
 });
 
-// Detective action schema for response validation
+/**
+ * @deprecated Use DetectiveActionZodSchema from zod-schemas.ts instead
+ */
 export const createDetectiveActionSchema = () => ({
     type: 'object',
     properties: {
@@ -196,3 +164,69 @@ export const createDetectiveActionSchema = () => ({
     },
     required: ['target', 'reasoning']
 });
+
+// =============================================================================
+// DEPRECATED INTERFACES - Use Zod inferred types instead
+// =============================================================================
+
+/**
+ * @deprecated Use GameSetupZod type from zod-schemas.ts instead
+ */
+export interface GameSetup {
+    scene: string;
+    players: Array<{
+        name: string;
+        gender: string;
+        story: string;
+        playStyle: string;
+    }>;
+}
+
+/**
+ * @deprecated Use GmBotSelectionZod type from zod-schemas.ts instead
+ */
+export interface GmBotSelection {
+    selected_bots: string[];
+    reasoning: string;
+}
+
+/**
+ * @deprecated Use BotVoteZod type from zod-schemas.ts instead
+ */
+export interface BotVote {
+    who: string;
+    why: string;
+}
+
+/**
+ * @deprecated Use WerewolfActionZod type from zod-schemas.ts instead
+ */
+export interface WerewolfAction {
+    target: string;
+    reasoning: string;
+}
+
+/**
+ * @deprecated Use DoctorActionZod type from zod-schemas.ts instead
+ */
+export interface DoctorAction {
+    target: string;
+    reasoning: string;
+    thinking?: string;
+}
+
+/**
+ * @deprecated Use DetectiveActionZod type from zod-schemas.ts instead
+ */
+export interface DetectiveAction {
+    target: string;
+    reasoning: string;
+    thinking?: string;
+}
+
+/**
+ * @deprecated Use NightResultsStoryZod type from zod-schemas.ts instead
+ */
+export interface NightResultsStory {
+    story: string;
+}

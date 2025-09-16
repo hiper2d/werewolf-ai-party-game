@@ -336,6 +336,7 @@ export const GAME_STATES = {
 export enum MessageType {
     GM_COMMAND = 'GM_COMMAND',
     BOT_ANSWER = 'BOT_ANSWER', // Response from a bot to GM command
+    BOT_WELCOME = 'BOT_WELCOME', // Bot introduction message during welcome phase
     WEREWOLF_ACTION = 'WEREWOLF_ACTION', // Werewolf night action response
     DOCTOR_ACTION = 'DOCTOR_ACTION', // Doctor night action response
     DETECTIVE_ACTION = 'DETECTIVE_ACTION', // Detective night action response

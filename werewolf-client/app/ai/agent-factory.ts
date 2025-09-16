@@ -41,7 +41,7 @@ export class AgentFactory {
             case LLM_CONSTANTS.GEMINI_25_PRO:
                 return new GoogleAgent(name, instruction, model.modelApiName, key, shouldEnableThinking);
             case LLM_CONSTANTS.GROK_4:
-                return new GrokAgent(name, instruction, model.modelApiName, key, 2, shouldEnableThinking);
+                return new GrokAgent(name, instruction, model.modelApiName, key, 0.7, shouldEnableThinking);
 
             // DeepSeek models - separate chat and reasoner
             case LLM_CONSTANTS.DEEPSEEK_CHAT:

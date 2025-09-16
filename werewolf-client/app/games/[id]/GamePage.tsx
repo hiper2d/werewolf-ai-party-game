@@ -42,14 +42,20 @@ export default function GamePage({
     // Handle welcome state
     useEffect(() => {
         const handleWelcome = async () => {
-            if (game.gameState === GAME_STATES.WELCOME &&
-                game.gameStateParamQueue.length > 0 &&
-                !game.errorState) {
-                console.log('🎭 GAMEPAGE: CALLING WELCOME API for bot introductions:', {
-                    gameId: game.id,
-                    paramQueue: game.gameStateParamQueue,
-                    timestamp: new Date().toISOString()
-                });
+            if (game.gameState === GAME_STATES.WELCOME && !game.errorState) {
+                // Call welcome API if there are bots to introduce OR if queue is empty (to transition state)
+                if (game.gameStateParamQueue.length > 0) {
+                    console.log('🎭 GAMEPAGE: CALLING WELCOME API for bot introductions:', {
+                        gameId: game.id,
+                        paramQueue: game.gameStateParamQueue,
+                        timestamp: new Date().toISOString()
+                    });
+                } else {
+                    console.log('🎭 GAMEPAGE: CALLING WELCOME API to transition from empty queue:', {
+                        gameId: game.id,
+                        timestamp: new Date().toISOString()
+                    });
+                }
                 const updatedGame = await welcome(game.id);
                 console.log('✅ GAMEPAGE: Welcome API completed');
                 setGame(updatedGame);

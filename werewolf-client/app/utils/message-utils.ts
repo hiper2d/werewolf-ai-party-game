@@ -15,6 +15,7 @@ export function convertMessageContent(message: GameMessage): string {
             return `🗳️ Votes for ${voteMsg.who}: "${voteMsg.why}"`;
         
         case MessageType.BOT_ANSWER:
+        case MessageType.BOT_WELCOME:
             const botMsg = message.msg as { reply: string };
             return botMsg.reply;
         
@@ -127,7 +128,7 @@ export function convertToAIMessages(currentBotName: string, messages: GameMessag
             flushGmMessages(currentBotName, gmMessages, otherPlayerMessages, aiMessages);
 
             // Prepare own message (assistant type)
-            if (message.messageType === MessageType.BOT_ANSWER) {
+            if (message.messageType === MessageType.BOT_ANSWER || message.messageType === MessageType.BOT_WELCOME) {
                 content = (message.msg as { reply: string }).reply;
             } else if (message.messageType === MessageType.WEREWOLF_ACTION) {
                 const werewolfMsg = message.msg as { target: string; reasoning: string };
