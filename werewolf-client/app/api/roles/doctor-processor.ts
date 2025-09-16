@@ -8,7 +8,8 @@ import { convertToAIMessages, parseResponseToObj } from "@/app/utils/message-uti
 import { BOT_SYSTEM_PROMPT, BOT_DOCTOR_ACTION_PROMPT } from "@/app/ai/prompts/bot-prompts";
 import { format } from "@/app/ai/prompts/utils";
 import { generatePreviousDaySummariesSection } from "@/app/utils/bot-utils";
-import { createDoctorActionSchema, DoctorAction } from "@/app/ai/prompts/ai-schemas";
+import { DoctorActionZodSchema } from "@/app/ai/prompts/zod-schemas";
+import { DoctorAction } from "@/app/ai/prompts/ai-schemas";
 
 /**
  * Doctor role processor
@@ -128,14 +129,11 @@ export class DoctorProcessor extends BaseRoleProcessor {
             // Create conversation history
             const history = convertToAIMessages(doctorBot.name, [...botMessages, gmMessage]);
 
-            const schema = createDoctorActionSchema();
-            const [rawResponse, thinking] = await agent.askWithSchema(schema, history);
+            const [doctorResponse, thinking] = await agent.askWithZodSchema(DoctorActionZodSchema, history);
 
-            if (!rawResponse) {
+            if (!doctorResponse) {
                 throw new Error(`Doctor ${doctorBot.name} failed to respond to protection prompt`);
             }
-
-            const doctorResponse = parseResponseToObj(rawResponse, 'DoctorAction') as DoctorAction;
 
             // Validate target - must be a living player AND not the same as last night
             if (!availableTargets.includes(doctorResponse.target)) {

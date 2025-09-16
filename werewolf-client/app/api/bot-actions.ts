@@ -23,7 +23,7 @@ import {
 } from "@/app/ai/prompts/gm-commands";
 import {BOT_REMINDER_POSTFIX, BOT_SYSTEM_PROMPT, BOT_VOTE_PROMPT} from "@/app/ai/prompts/bot-prompts";
 import {GM_ROUTER_SYSTEM_PROMPT, HUMAN_SUGGESTION_PROMPT} from "@/app/ai/prompts/gm-prompts";
-import {createBotAnswerSchema, createBotVoteSchema, createGmBotSelectionSchema} from "@/app/ai/prompts/ai-schemas";
+import {BotAnswerZodSchema, BotVoteZodSchema, GmBotSelectionZodSchema} from "@/app/ai/prompts/zod-schemas";
 import {AgentFactory} from "@/app/ai/agent-factory";
 import {format} from "@/app/ai/prompts/utils";
 import {auth} from "@/auth";
@@ -269,10 +269,8 @@ async function welcomeImpl(gameId: string): Promise<Game> {
 
         // Create history from filtered messages, including the GM command that hasn't been saved yet
         const history = convertToAIMessages(bot.name, [...botMessages, gmMessage]);
-        const schema = createBotAnswerSchema();
-        
-        const [rawIntroduction, thinking] = await agent.askWithSchema(schema, history);
-        if (!rawIntroduction) {
+        const [answer, thinking] = await agent.askWithZodSchema(BotAnswerZodSchema, history);
+        if (!answer) {
             throw new BotResponseError(
                 'Bot failed to provide introduction',
                 `Bot ${bot.name} did not respond to introduction request`,
@@ -280,8 +278,6 @@ async function welcomeImpl(gameId: string): Promise<Game> {
                 true
             );
         }
-
-        const answer = parseResponseToObj(rawIntroduction, 'BotAnswer');
 
         const botMessage: GameMessage = {
             id: null,
@@ -418,10 +414,8 @@ async function keepBotsGoingImpl(gameId: string): Promise<Game> {
 
         // Include recent conversation in the GM's history for bot selection
         const history = convertToAIMessages(GAME_MASTER, [...dayMessages, gmMessage]);
-        const schema = createGmBotSelectionSchema();
-
-        const [rawGmResponse, thinking] = await gmAgent.askWithSchema(schema, history);
-        if (!rawGmResponse) {
+        const [gmResponse, thinking] = await gmAgent.askWithZodSchema(GmBotSelectionZodSchema, history);
+        if (!gmResponse) {
             throw new BotResponseError(
                 'Game Master failed to select responding bots',
                 'GM did not respond to bot selection request',
@@ -429,8 +423,6 @@ async function keepBotsGoingImpl(gameId: string): Promise<Game> {
                 true
             );
         }
-
-        const gmResponse = parseResponseToObj(rawGmResponse);
         if (!gmResponse.selected_bots || !Array.isArray(gmResponse.selected_bots)) {
             throw new BotResponseError(
                 'Game Master provided invalid bot selection',
@@ -514,10 +506,8 @@ async function handleHumanPlayerMessage(
 
     // Include the user's message in the GM's history for bot selection
     const history = convertToAIMessages(GAME_MASTER, [...dayMessages, userChatMessage, gmMessage]);
-    const schema = createGmBotSelectionSchema();
-
-    const [rawGmResponse, thinking] = await gmAgent.askWithSchema(schema, history);
-    if (!rawGmResponse) {
+    const [gmResponse, thinking] = await gmAgent.askWithZodSchema(GmBotSelectionZodSchema, history);
+    if (!gmResponse) {
         throw new BotResponseError(
             'Game Master failed to select responding bots',
             'GM did not respond to bot selection request',
@@ -525,8 +515,6 @@ async function handleHumanPlayerMessage(
             true
         );
     }
-
-    const gmResponse = parseResponseToObj(rawGmResponse);
     if (!gmResponse.selected_bots || !Array.isArray(gmResponse.selected_bots)) {
         throw new BotResponseError(
             'Game Master provided invalid bot selection',
@@ -622,10 +610,8 @@ async function processNextBotInQueue(
         msg: gmMessage.msg + playStyleReminder
     }];
     const history = convertToAIMessages(bot.name, messagesWithPlaystyle);
-    const schema = createBotAnswerSchema();
-    
-    const [rawBotReply, thinking] = await agent.askWithSchema(schema, history);
-    if (!rawBotReply) {
+    const [botReply, thinking] = await agent.askWithZodSchema(BotAnswerZodSchema, history);
+    if (!botReply) {
         throw new BotResponseError(
             'Bot failed to respond to discussion',
             `Bot ${bot.name} did not respond to discussion prompt`,
@@ -633,8 +619,6 @@ async function processNextBotInQueue(
             true
         );
     }
-
-    const botReply = parseResponseToObj(rawBotReply, 'BotAnswer');
     const botMessage: GameMessage = {
         id: null,
         recipientName: RECIPIENT_ALL,
@@ -963,12 +947,11 @@ async function voteImpl(gameId: string): Promise<Game> {
                 msg: gmMessage.msg + playStyleReminder
             }];
             const history = convertToAIMessages(bot.name, messagesWithPlaystyle);
-            const schema = createBotVoteSchema();
             
-            let rawVoteResponse: string | null;
+            let voteResponse: any;
             let thinking: string;
             try {
-                [rawVoteResponse, thinking] = await agent.askWithSchema(schema, history);
+                [voteResponse, thinking] = await agent.askWithZodSchema(BotVoteZodSchema, history);
             } catch (error) {
                 // Handle specific model errors by using their message
                 if (error instanceof ModelError) {
@@ -983,7 +966,7 @@ async function voteImpl(gameId: string): Promise<Game> {
                 throw error;
             }
             
-            if (!rawVoteResponse) {
+            if (!voteResponse) {
                 throw new BotResponseError(
                     'Bot failed to cast vote',
                     `Bot ${bot.name} did not respond to voting prompt`,
@@ -991,8 +974,6 @@ async function voteImpl(gameId: string): Promise<Game> {
                     true
                 );
             }
-            
-            const voteResponse = parseResponseToObj(rawVoteResponse, 'VoteMessage');
             
             // Validate the vote target is alive and valid
             if (!alivePlayerNames.includes(voteResponse.who)) {
@@ -1398,15 +1379,13 @@ async function getSuggestionImpl(gameId: string): Promise<string> {
         const history = convertToAIMessages('SuggestionBot', dayMessages);
         
         // Get suggestion from AI using schema to ensure consistent format
-        const schema = createBotAnswerSchema();
-        const [rawSuggestion, thinking] = await agent.askWithSchema(schema, history);
+        const [suggestionResponse, thinking] = await agent.askWithZodSchema(BotAnswerZodSchema, history);
         
-        if (!rawSuggestion) {
+        if (!suggestionResponse) {
             throw new Error('Failed to generate suggestion');
         }
 
-        // Parse the response and extract the reply text
-        const suggestionResponse = parseResponseToObj(rawSuggestion, 'BotAnswer');
+        // Extract the reply text
         return suggestionResponse.reply.trim();
     } catch (error) {
         console.error('Error in getSuggestion function:', error);

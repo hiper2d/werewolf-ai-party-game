@@ -29,7 +29,7 @@ import {convertToAIMessage, parseResponseToObj} from "@/app/utils/message-utils"
 import {LLM_CONSTANTS} from "@/app/ai/ai-models";
 import {AbstractAgent} from "../ai/abstract-agent";
 import {format} from "@/app/ai/prompts/utils";
-import {createGameSetupSchema} from "@/app/ai/prompts/ai-schemas";
+import {GameSetupZodSchema} from "@/app/ai/prompts/zod-schemas";
 
 export async function getAllGames(): Promise<Game[]> {
     if (!db) {
@@ -210,14 +210,10 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
         timestamp: null
     };
 
-    const schema = createGameSetupSchema();
-    
-    const [rawResponse] = await storyTellAgent.askWithSchema(schema, [convertToAIMessage(storyMessage)]);
-    if (!rawResponse) {
+    const [aiResponse] = await storyTellAgent.askWithZodSchema(GameSetupZodSchema, [convertToAIMessage(storyMessage)]);
+    if (!aiResponse) {
         throw new Error('Failed to get AI response');
     }
-
-    const aiResponse = parseResponseToObj(rawResponse);
     const bots: BotPreview[] = aiResponse.players.map((bot: { name: string; gender: string; story: string; playStyle?: string }) => {
         let aiType = gamePreview.playersAiType;
         

@@ -41,7 +41,8 @@ describe("ClaudeAgent integration", () => {
       botName,
       instruction,
       SupportedAiModels[modelConstant as keyof typeof SupportedAiModels].modelApiName,
-      process.env.ANTHROPIC_K!
+      process.env.ANTHROPIC_K!,
+      false // enableThinking parameter
     );
   }
 
@@ -55,18 +56,16 @@ describe("ClaudeAgent integration", () => {
       }
     ];
 
-    const schema = createBotAnswerSchema();
-    const [response, thinking] = await agent.askWithSchema(schema, messages);
+    const schema = BotAnswerZodSchema;
+    const [response, thinking] = await agent.askWithZodSchema(schema, messages);
 
     expect(response).not.toBeNull();
-    expect(typeof response).toBe("string");
-    expect(response!.length).toBeGreaterThan(0);
+    expect(typeof response).toBe("object");
 
-    // Verify the response is valid JSON matching the schema
-    const parsedResponse = JSON.parse(response!);
-    expect(parsedResponse).toHaveProperty('reply');
-    expect(typeof parsedResponse.reply).toBe('string');
-    expect(parsedResponse.reply.length).toBeGreaterThan(0);
+    // Verify the response has the expected structure
+    expect(response).toHaveProperty('reply');
+    expect(typeof response.reply).toBe('string');
+    expect(response.reply.length).toBeGreaterThan(0);
   });
 
   it("should handle invalid role type", async () => {
@@ -78,8 +77,8 @@ describe("ClaudeAgent integration", () => {
       }
     ];
 
-    const schema = createBotAnswerSchema();
-    await expect(agent.askWithSchema(schema, messages))
+    const schema = BotAnswerZodSchema;
+    await expect(agent.askWithZodSchema(schema, messages))
       .rejects
       .toThrow('Unsupported role type: invalid_role');
   });
@@ -89,7 +88,8 @@ describe("ClaudeAgent integration", () => {
       "TestBot",
       "Test instruction",
       SupportedAiModels[LLM_CONSTANTS.CLAUDE_4_SONNET].modelApiName,
-      "invalid_api_key"
+      "invalid_api_key",
+      false
     );
 
     const messages: AIMessage[] = [
@@ -99,8 +99,8 @@ describe("ClaudeAgent integration", () => {
       }
     ];
 
-    const schema = createBotAnswerSchema();
-    await expect(agent.askWithSchema(schema, messages))
+    const schema = BotAnswerZodSchema;
+    await expect(agent.askWithZodSchema(schema, messages))
       .rejects
       .toThrow('Failed to get response from Anthropic API');
   });
@@ -139,7 +139,7 @@ describe("ClaudeAgent integration", () => {
         instruction,
         SupportedAiModels[modelType].modelApiName,
         process.env.ANTHROPIC_K!,
-        false // No thinking mode for regular tests
+        true
       );
     };
 
@@ -233,7 +233,7 @@ describe("ClaudeAgent integration", () => {
         console.log("📝 Requesting game story and characters...");
         console.log("Theme:", gamePreview.theme);
         console.log("Players to generate:", botCount);
-        console.log("Model:", "claude-3-5-sonnet");
+        console.log("Model:", SupportedAiModels[LLM_CONSTANTS.CLAUDE_4_SONNET].modelApiName);
         
         // Call askWithZodSchema with GameSetupZodSchema
         const [gameSetup, thinking, tokenUsage] = await gmAgent.askWithZodSchema(

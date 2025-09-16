@@ -53,17 +53,17 @@ describe("KimiAgent integration", () => {
       }
     ];
 
-    const schema = createBotAnswerSchema();
-    const [response, thinking] = await agent.askWithSchema(schema, messages);
+    const schema = BotAnswerZodSchema;
+    const [response, thinking] = await agent.askWithZodSchema(schema, messages);
     
     expect(response).not.toBeNull();
-    expect(typeof response).toBe("string");
-    expect(response!.length).toBeGreaterThan(0);
+    expect(typeof response).toBe("object");
+    expect(response).toHaveProperty('reply');
+    expect(typeof response.reply).toBe('string');
+    expect(response.reply.length).toBeGreaterThan(0);
 
-    // Parse response and create BotAnswer instance
-    const parsedObj = parseResponseToObj(response!);
-    expect(parsedObj).toHaveProperty('reply');
-    const botAnswer = new BotAnswer(parsedObj.reply);
+    // Create BotAnswer instance directly from parsed response
+    const botAnswer = new BotAnswer(response.reply);
     expect(botAnswer).toBeInstanceOf(BotAnswer);
     expect(botAnswer.reply).not.toBeNull();
     expect(typeof botAnswer.reply).toBe('string');
@@ -79,17 +79,17 @@ describe("KimiAgent integration", () => {
       }
     ];
 
-    const schema = createBotAnswerSchema();
-    const [response, thinking] = await agent.askWithSchema(schema, messages);
+    const schema = BotAnswerZodSchema;
+    const [response, thinking] = await agent.askWithZodSchema(schema, messages);
     
     expect(response).not.toBeNull();
-    expect(typeof response).toBe("string");
-    expect(response!.length).toBeGreaterThan(0);
+    expect(typeof response).toBe("object");
+    expect(response).toHaveProperty('reply');
+    expect(typeof response.reply).toBe('string');
+    expect(response.reply.length).toBeGreaterThan(0);
 
-    // Parse response and create BotAnswer instance
-    const parsedObj = parseResponseToObj(response!);
-    expect(parsedObj).toHaveProperty('reply');
-    const botAnswer = new BotAnswer(parsedObj.reply);
+    // Create BotAnswer instance directly from parsed response
+    const botAnswer = new BotAnswer(response.reply);
     expect(botAnswer).toBeInstanceOf(BotAnswer);
     expect(botAnswer.reply).not.toBeNull();
     expect(typeof botAnswer.reply).toBe('string');

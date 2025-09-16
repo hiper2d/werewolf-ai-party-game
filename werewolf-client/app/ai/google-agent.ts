@@ -1,7 +1,6 @@
 import {AbstractAgent} from "@/app/ai/abstract-agent";
 import {AIMessage, TokenUsage} from "@/app/api/game-models";
 import {GoogleGenAI, Type} from "@google/genai";
-import {ResponseSchema} from "@/app/ai/prompts/ai-schemas";
 import {cleanResponse} from "@/app/utils/message-utils";
 import {ModelOverloadError, ModelRateLimitError, ModelUnavailableError, ModelAuthenticationError, ModelQuotaExceededError} from "@/app/ai/errors";
 import { z } from 'zod';
@@ -41,14 +40,6 @@ export class GoogleAgent extends AbstractAgent {
         unsupportedRole: (role: string) => `Unsupported role type: ${role}`,
     };
 
-    // Schema instruction template
-    private readonly schemaTemplate = {
-        instructions: (schema: ResponseSchema) =>
-            `Your response must be a valid JSON object matching this schema:
-${JSON.stringify(schema, null, 2)}
-
-Ensure your response strictly follows the schema requirements.`,
-    };
 
     constructor(name: string, instruction: string, model: string, apiKey: string, enableThinking: boolean = false) {
         super(name, instruction, model, 0.2, enableThinking);
@@ -58,84 +49,7 @@ Ensure your response strictly follows the schema requirements.`,
     }
 
 
-    protected async doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<[string, string, TokenUsage?]> {
-        try {
-            // Convert all messages except the last one
-            const historyMessages = messages.slice(0, -1);
-            const contents = this.convertToContents(historyMessages);
-            
-            // Get the last message and add schema instructions
-            const lastMessage = messages[messages.length - 1];
-            const schemaInstructions = this.buildSchemaInstructions(schema);
-            const fullPrompt = this.buildFullPrompt(lastMessage.content, schemaInstructions);
-            
-            // Add the last message with schema instructions
-            contents.push({
-                role: this.convertRole(lastMessage.role),
-                parts: [{ text: fullPrompt }]
-            });
-            
-            const config: any = {
-                temperature: this.temperature,
-                responseMimeType: "application/json",
-                responseSchema: schema
-            };
 
-            // Add thinking config for Google models with thinking mode
-            if (this.enableThinking) {
-                config.thinkingConfig = {
-                    includeThoughts: true,
-                    thinkingBudget: 1024  // Use reasonable budget, -1 for dynamic thinking
-                };
-            }
-
-            const response = await this.client.models.generateContent({
-                model: this.model,
-                contents: contents,
-                config: config
-            });
-            
-            // Handle thinking content if present and thinking mode is enabled
-            let thinkingContent = "";
-            if (this.enableThinking && (response as any).candidates?.[0]?.content?.parts) {
-                const parts = (response as any).candidates[0].content.parts;
-                const thinkingParts: string[] = [];
-                for (const part of parts) {
-                    if (part.thought && part.text) {
-                        thinkingParts.push(part.text);
-                    }
-                }
-                thinkingContent = thinkingParts.join('\n');
-            }
-
-            // Enhanced logging for debugging empty responses
-            this.logger(`Schema response received - hasText: ${!!response.text}, textLength: ${response.text ? response.text.length : 0}, responseKeys: ${Object.keys(response || {}).join(', ')}`);
-            
-            if (!response.text) {
-                this.logger(`Empty schema response details - responseType: ${typeof response}, responseKeys: ${response ? Object.keys(response).join(', ') : 'response is null/undefined'}, messagesCount: ${messages.length}, contentsCount: ${contents.length}, lastMessagePreview: ${lastMessage.content.substring(0, 200)}...`);
-                throw new Error(this.errorMessages.emptyResponse);
-            }
-
-            return [cleanResponse(response.text), thinkingContent, undefined];
-        } catch (error) {
-            this.logger(this.logTemplates.error(this.name, error));
-            
-            // Check for specific Gemini API errors and throw appropriate exceptions
-            this.handleGeminiError(error);
-            
-            throw error;
-        }
-    }
-
-    private buildSchemaInstructions(schema: ResponseSchema): string {
-        return this.schemaTemplate.instructions(schema);
-    }
-
-    private buildFullPrompt(content: string, instructions: string): string {
-        return `${content}
-
-${instructions}`;
-    }
 
     private convertToContents(messages: AIMessage[]): Content[] {
         try {
@@ -163,13 +77,13 @@ ${instructions}`;
      * This provides better schema handling and runtime validation
      */
     async askWithZodSchema<T>(zodSchema: z.ZodSchema<T>, messages: AIMessage[]): Promise<[T, string, TokenUsage?]> {
+        // Validate roles first, before entering the main try-catch block
+        // This ensures role validation errors are thrown directly
+        const contents = this.convertToContents(messages);
+        
         try {
             // Convert Zod schema to Google-compatible format using Type constants
             const googleSchema = ZodSchemaConverter.toGoogleSchema(zodSchema);
-            
-            
-            // Convert all messages to Google format
-            const contents = this.convertToContents(messages);
             
             const config: any = {
                 temperature: this.temperature,
@@ -187,11 +101,18 @@ ${instructions}`;
 
             this.logger(this.logTemplates.askingAgent(this.name, this.model));
             
-            const response = await this.client.models.generateContent({
-                model: this.model,
-                contents: contents,
-                config: config
-            });
+            let response;
+            try {
+                response = await this.client.models.generateContent({
+                    model: this.model,
+                    contents: contents,
+                    config: config
+                });
+            } catch (apiError) {
+                // Re-throw API errors immediately without wrapping them in schema validation errors
+                this.logger(this.logTemplates.error(this.name, apiError));
+                throw new Error(this.errorMessages.apiError(apiError));
+            }
             
             // Handle thinking content if present
             let thinkingContent = "";

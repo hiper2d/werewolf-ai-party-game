@@ -8,7 +8,8 @@ import { convertToAIMessages, parseResponseToObj } from "@/app/utils/message-uti
 import { BOT_SYSTEM_PROMPT, BOT_DETECTIVE_ACTION_PROMPT } from "@/app/ai/prompts/bot-prompts";
 import { format } from "@/app/ai/prompts/utils";
 import { generatePreviousDaySummariesSection } from "@/app/utils/bot-utils";
-import { createDetectiveActionSchema, DetectiveAction } from "@/app/ai/prompts/ai-schemas";
+import { DetectiveActionZodSchema } from "@/app/ai/prompts/zod-schemas";
+import { DetectiveAction } from "@/app/ai/prompts/ai-schemas";
 
 /**
  * Detective role processor
@@ -112,14 +113,11 @@ export class DetectiveProcessor extends BaseRoleProcessor {
             // Create conversation history
             const history = convertToAIMessages(detectiveBot.name, [...botMessages, gmMessage]);
 
-            const schema = createDetectiveActionSchema();
-            const [rawResponse, thinking] = await agent.askWithSchema(schema, history);
+            const [detectiveResponse, thinking] = await agent.askWithZodSchema(DetectiveActionZodSchema, history);
 
-            if (!rawResponse) {
+            if (!detectiveResponse) {
                 throw new Error(`Detective ${detectiveBot.name} failed to respond to investigation prompt`);
             }
-
-            const detectiveResponse = parseResponseToObj(rawResponse, 'DetectiveAction') as DetectiveAction;
 
             // Validate target - detective can investigate any living player except themselves
             if (!allLivePlayers.includes(detectiveResponse.target)) {

@@ -20,7 +20,8 @@ import {
     BOT_WEREWOLF_DISCUSSION_PROMPT
 } from "@/app/ai/prompts/bot-prompts";
 import {format} from "@/app/ai/prompts/utils";
-import {createBotAnswerSchema, createWerewolfActionSchema, WerewolfAction} from "@/app/ai/prompts/ai-schemas";
+import {BotAnswerZodSchema, WerewolfActionZodSchema} from "@/app/ai/prompts/zod-schemas";
+import {WerewolfAction} from "@/app/ai/prompts/ai-schemas";
 
 /**
  * Werewolf role processor
@@ -168,7 +169,7 @@ export class WerewolfProcessor extends BaseRoleProcessor {
                     timestamp: Date.now()
                 };
                 
-                schema = createWerewolfActionSchema();
+                schema = WerewolfActionZodSchema;
                 responseType = 'WerewolfAction';
             } else {
                 // Regular werewolf discussion
@@ -182,7 +183,7 @@ export class WerewolfProcessor extends BaseRoleProcessor {
                     timestamp: Date.now()
                 };
                 
-                schema = createBotAnswerSchema();
+                schema = BotAnswerZodSchema;
                 responseType = 'BotAnswer';
             }
             
@@ -192,13 +193,11 @@ export class WerewolfProcessor extends BaseRoleProcessor {
             // Create conversation history
             const history = convertToAIMessages(werewolfBot.name, [...botMessages, gmMessage]);
             
-            const [rawResponse, thinking] = await agent.askWithSchema(schema, history);
+            const [werewolfResponse, thinking] = await agent.askWithZodSchema(schema, history);
             
-            if (!rawResponse) {
+            if (!werewolfResponse) {
                 throw new Error(`Werewolf ${werewolfBot.name} failed to respond to ${isLastWerewolf ? 'action' : 'discussion'} prompt`);
             }
-            
-            const werewolfResponse = parseResponseToObj(rawResponse, responseType);
             
             // Validate and save target if this is the final werewolf decision
             let gameUpdates: any = {

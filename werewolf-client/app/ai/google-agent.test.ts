@@ -48,24 +48,18 @@ describe("GoogleAgent integration", () => {
     const agent = setupAgent();
     const messages = createTestMessages();
     
-    const [response, thinking] = await agent.askWithSchema(createBotAnswerSchema(), messages);
+    const [response, thinking] = await agent.askWithZodSchema(BotAnswerZodSchema, messages);
     expect(response).not.toBeNull();
-    expect(typeof response).toBe("string");
-    expect(response!.length).toBeGreaterThan(0);
-    
-    // Verify the response is valid JSON matching the schema
-    const parsed = parseResponseToObj(response!);
-    expect(parsed).toHaveProperty('reply');
-    expect(typeof parsed.reply).toBe('string');
-    expect(parsed.reply.length).toBeGreaterThan(0);
+    expect(response).toHaveProperty('reply');
+    expect(typeof response.reply).toBe('string');
+    expect(response.reply.length).toBeGreaterThan(0);
   }, 30000); // Increase timeout for real API calls
 
   it("should handle API errors", async () => {
     const agent = setupAgent("invalid_api_key");
     const messages = createTestMessages();
     
-    const [response, thinking] = await agent.askWithSchema(createBotAnswerSchema(), messages);
-    expect(response).toBeNull();
+    await expect(agent.askWithZodSchema(BotAnswerZodSchema, messages)).rejects.toThrow();
   });
 
   it("should handle invalid role type", async () => {
@@ -75,8 +69,7 @@ describe("GoogleAgent integration", () => {
       content: 'Test message'
     }];
     
-    const [response, thinking] = await agent.askWithSchema(createBotAnswerSchema(), messages);
-    expect(response).toBeNull();
+    await expect(agent.askWithZodSchema(BotAnswerZodSchema, messages)).rejects.toThrow();
   });
 
   it("should respond with a valid answer using Gemini Flash", async () => {
@@ -100,16 +93,12 @@ describe("GoogleAgent integration", () => {
     );
 
     const messages = createTestMessages();
-    const [response, thinking] = await agent.askWithSchema(createBotAnswerSchema(), messages);
+    const [response] = await agent.askWithZodSchema(BotAnswerZodSchema, messages);
     
     expect(response).not.toBeNull();
-    expect(typeof response).toBe("string");
-    expect(response!.length).toBeGreaterThan(0);
-    
-    const parsed = parseResponseToObj(response!);
-    expect(parsed).toHaveProperty('reply');
-    expect(typeof parsed.reply).toBe('string');
-    expect(parsed.reply.length).toBeGreaterThan(0);
+    expect(response).toHaveProperty('reply');
+    expect(typeof response.reply).toBe('string');
+    expect(response.reply.length).toBeGreaterThan(0);
   }, 30000); // Increase timeout for real API calls
   
   describe("Zod integration with Google Type constants", () => {

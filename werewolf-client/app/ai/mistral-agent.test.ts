@@ -67,24 +67,24 @@ describe("MistralAgent integration", () => {
   const hasApiKey = process.env.MISTRAL_API_KEY || process.env.MISTRAL_K;
   const describeOrSkip = hasApiKey ? describe : describe.skip;
   
-  describeOrSkip("askWithSchema with real API", () => {
+  describeOrSkip("askWithZodSchema with real API", () => {
     const testSchemaResponse = async (modelType: string, expectThinking: boolean = false) => {
       const agent = createAgent("TestBot", modelType);
       const messages: AIMessage[] = [{
         role: 'user',
         content: 'What do you think about the current situation in the village?'
       }];
-      const schema = createBotAnswerSchema();
-      const [response, thinking, tokenUsage] = await agent.askWithSchema(schema, messages);
+      const schema = BotAnswerZodSchema;
+      const [response, thinking, tokenUsage] = await agent.askWithZodSchema(schema, messages);
 
-      // Verify response
-      expect(typeof response).toBe("string");
-      expect(response?.length).toBeGreaterThan(0);
+      // Verify response is a parsed object
+      expect(typeof response).toBe("object");
+      expect(response).toHaveProperty('reply');
+      expect(typeof response.reply).toBe('string');
+      expect(response.reply.length).toBeGreaterThan(0);
 
-      // Verify the response can be parsed
-      const parsedObj = parseResponseToObj(response!);
-      expect(parsedObj).toHaveProperty('reply');
-      const botAnswer = new BotAnswer(parsedObj.reply);
+      // Verify it works with BotAnswer class
+      const botAnswer = new BotAnswer(response.reply);
       expect(botAnswer).toBeInstanceOf(BotAnswer);
       expect(typeof botAnswer.reply).toBe('string');
       expect(botAnswer.reply.length).toBeGreaterThan(0);
@@ -136,8 +136,8 @@ describe("MistralAgent integration", () => {
         content: 'Test message'
       }];
 
-      const schema = createBotAnswerSchema();
-      await expect(agent.askWithSchema(schema, messages))
+      const schema = BotAnswerZodSchema;
+      await expect(agent.askWithZodSchema(schema, messages))
         .rejects
         .toThrow('Failed to get response from Mistral API');
     });
@@ -154,8 +154,8 @@ describe("MistralAgent integration", () => {
         choices: []
       });
 
-      const schema = createBotAnswerSchema();
-      await expect(agent.askWithSchema(schema, messages))
+      const schema = BotAnswerZodSchema;
+      await expect(agent.askWithZodSchema(schema, messages))
         .rejects
         .toThrow('Empty or undefined response from Mistral API');
     });
@@ -172,10 +172,10 @@ describe("MistralAgent integration", () => {
         choices: [{ message: {} }]
       });
 
-      const schema = createBotAnswerSchema();
-      await expect(agent.askWithSchema(schema, messages))
+      const schema = BotAnswerZodSchema;
+      await expect(agent.askWithZodSchema(schema, messages))
         .rejects
-        .toThrow('Empty or undefined response from Mistral API');
+        .toThrow('Failed to get response from Mistral API: Invalid response format from Mistral API');
     });
   });
   
@@ -191,24 +191,21 @@ describe("MistralAgent integration", () => {
         role: 'user',
         content: 'Think step by step: If there are 3 werewolves and we eliminated 1, how many remain?'
       }];
-      const schema = createBotAnswerSchema();
+      const schema = BotAnswerZodSchema;
       
-      const [response, thinking, tokenUsage] = await agent.askWithSchema(schema, messages);
+      const [response, thinking, tokenUsage] = await agent.askWithZodSchema(schema, messages);
       
       console.log("\n=== Magistral Model with JSON Format ===");
       console.log("Response received:", response ? "Yes" : "No");
       console.log("Thinking content type:", typeof thinking);
       console.log("Thinking content length:", thinking.length);
       
-      // Verify response exists and is valid JSON
+      // Verify response exists and is a parsed object
       expect(response).toBeDefined();
-      expect(response.length).toBeGreaterThan(0);
-      
-      // Parse the JSON to ensure it's valid
-      const parsedObj = JSON.parse(response);
-      expect(parsedObj).toHaveProperty('reply');
-      expect(typeof parsedObj.reply).toBe('string');
-      expect(parsedObj.reply.length).toBeGreaterThan(0);
+      expect(typeof response).toBe('object');
+      expect(response).toHaveProperty('reply');
+      expect(typeof response.reply).toBe('string');
+      expect(response.reply.length).toBeGreaterThan(0);
       
       // With JSON format, thinking content will be empty (expected behavior)
       expect(typeof thinking).toBe('string');

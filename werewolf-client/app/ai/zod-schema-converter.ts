@@ -21,7 +21,7 @@ export class ZodSchemaConverter {
    * Convert Zod schema to OpenAI-compatible JSON Schema
    */
   static toOpenAIJsonSchema(zodSchema: z.ZodSchema, schemaName: string): any {
-    const baseSchema = this.zodToJsonSchema(zodSchema, { strict: true });
+    const baseSchema = this.zodToJsonSchema(zodSchema, { strict: true, includeDescription: true });
     return {
       name: schemaName,
       schema: baseSchema,
@@ -30,41 +30,54 @@ export class ZodSchemaConverter {
   }
 
   /**
-   * Convert Zod schema to Google Gemini responseSchema format using Type constants
+   * Convert Zod schema to Google Gemini responseSchema format
    * This follows the official Gemini structured output format
    */
   static toGoogleSchema(zodSchema: z.ZodSchema): any {
-    return this.convertZodToGoogleType(zodSchema);
+    return this.convertZodToGoogleType(zodSchema, true);
   }
 
   /**
-   * Internal method to convert Zod types to Google Type constants
+   * Internal method to convert Zod types to Google schema format
    */
-  private static convertZodToGoogleType(zodType: z.ZodSchema): any {
-    // Import Type dynamically to avoid import issues
-    const Type = require('@google/genai').Type;
-    
+  private static convertZodToGoogleType(zodType: z.ZodSchema, includeDescriptions: boolean = false): any {
     // Handle ZodString
     if (zodType instanceof z.ZodString) {
-      return { type: Type.STRING };
+      const schema: any = { type: "string" };
+      if (includeDescriptions && zodType.description) {
+        schema.description = zodType.description;
+      }
+      return schema;
     }
     
     // Handle ZodNumber
     if (zodType instanceof z.ZodNumber) {
-      return { type: Type.NUMBER };
+      const schema: any = { type: "number" };
+      if (includeDescriptions && zodType.description) {
+        schema.description = zodType.description;
+      }
+      return schema;
     }
     
     // Handle ZodBoolean
     if (zodType instanceof z.ZodBoolean) {
-      return { type: Type.BOOLEAN };
+      const schema: any = { type: "boolean" };
+      if (includeDescriptions && zodType.description) {
+        schema.description = zodType.description;
+      }
+      return schema;
     }
     
     // Handle ZodArray
     if (zodType instanceof z.ZodArray) {
-      return {
-        type: Type.ARRAY,
-        items: this.convertZodToGoogleType(zodType.element)
+      const schema: any = {
+        type: "array",
+        items: this.convertZodToGoogleType(zodType.element, includeDescriptions)
       };
+      if (includeDescriptions && zodType.description) {
+        schema.description = zodType.description;
+      }
+      return schema;
     }
     
     // Handle ZodObject
@@ -76,7 +89,7 @@ export class ZodSchemaConverter {
       const shape = zodType.shape;
       for (const [key, value] of Object.entries(shape)) {
         const zodValue = value as z.ZodSchema;
-        properties[key] = this.convertZodToGoogleType(zodValue);
+        properties[key] = this.convertZodToGoogleType(zodValue, includeDescriptions);
         propertyOrdering.push(key);
         
         // Check if field is required (not optional)
@@ -86,9 +99,10 @@ export class ZodSchemaConverter {
       }
       
       const schema: any = {
-        type: Type.OBJECT,
+        type: "object",
         properties,
-        propertyOrdering
+        propertyOrdering,
+        additionalProperties: false
       };
       
       // Add required fields if any exist
@@ -96,41 +110,85 @@ export class ZodSchemaConverter {
         schema.required = required;
       }
       
+      // Add description if provided
+      if (includeDescriptions && zodType.description) {
+        schema.description = zodType.description;
+      }
+      
       return schema;
     }
     
     // Handle ZodOptional
     if (zodType instanceof z.ZodOptional) {
-      return this.convertZodToGoogleType(zodType._def.innerType);
+      const innerSchema = this.convertZodToGoogleType(zodType._def.innerType, includeDescriptions);
+      // Preserve description from the optional wrapper if it exists
+      if (includeDescriptions && zodType.description) {
+        innerSchema.description = zodType.description;
+      }
+      return innerSchema;
     }
     
     // Handle ZodNullable
     if (zodType instanceof z.ZodNullable) {
-      // Google Type doesn't have nullable in the same way, just return the inner type
-      return this.convertZodToGoogleType(zodType._def.innerType);
+      const innerSchema = this.convertZodToGoogleType(zodType._def.innerType, includeDescriptions);
+      innerSchema.nullable = true;
+      return innerSchema;
     }
     
     // Handle ZodEnum
     if (zodType instanceof z.ZodEnum) {
-      return {
-        type: Type.STRING,
+      const schema: any = {
+        type: "string",
         enum: zodType.options
       };
+      if (includeDescriptions && zodType.description) {
+        schema.description = zodType.description;
+      }
+      return schema;
+    }
+    
+    // Handle ZodLiteral
+    if (zodType instanceof z.ZodLiteral) {
+      const value = zodType.value;
+      const schema: any = {
+        type: typeof value,
+        const: value
+      };
+      if (includeDescriptions && zodType.description) {
+        schema.description = zodType.description;
+      }
+      return schema;
     }
     
     // Handle ZodUnion (for simple unions)
     if (zodType instanceof z.ZodUnion) {
-      // For Google, we'll use the first option as the base type
-      // This is a limitation - Google doesn't support complex unions like JSON Schema
       const options = zodType._def.options;
       if (options.length > 0) {
-        return this.convertZodToGoogleType(options[0]);
+        const schema: any = {
+          oneOf: options.map((option: z.ZodSchema) => this.convertZodToGoogleType(option, includeDescriptions))
+        };
+        if (includeDescriptions && zodType.description) {
+          schema.description = zodType.description;
+        }
+        return schema;
       }
     }
     
     // Fallback for other types
     console.warn(`Unsupported Zod type for Google schema: ${zodType.constructor.name}. Falling back to STRING.`);
-    return { type: Type.STRING };
+    const schema: any = { type: "string" };
+    if (includeDescriptions && zodType.description) {
+      schema.description = zodType.description;
+    }
+    return schema;
+  }
+
+  /**
+   * Convert Zod schema to standard JSON Schema format
+   * Public method for external use (e.g., Grok structured outputs)
+   */
+  static toJsonSchema(zodSchema: z.ZodSchema, options: JsonSchemaOptions = {}): any {
+    return this.zodToJsonSchema(zodSchema, options);
   }
 
   /**
@@ -302,7 +360,12 @@ IMPORTANT:
 
     // Handle ZodOptional
     if (zodType instanceof z.ZodOptional) {
-      return this.convertZodType(zodType._def.innerType, includeDescription);
+      const innerSchema = this.convertZodType(zodType._def.innerType, includeDescription);
+      // Preserve description from the optional wrapper if it exists
+      if (includeDescription && zodType.description) {
+        innerSchema.description = zodType.description;
+      }
+      return innerSchema;
     }
 
     // Handle ZodNullable
@@ -422,7 +485,13 @@ IMPORTANT:
         const requiredMark = isRequired ? ' (required)' : ' (optional)';
         const description = prop.description ? ` // ${prop.description}` : '';
         
-        result += `${indent}  "${key}": ${typeDesc}${requiredMark}${description}`;
+        // For nested objects, format them inline
+        if (prop.type === 'object') {
+          result += `${indent}  "${key}": ${typeDesc}${requiredMark}${description}`;
+        } else {
+          result += `${indent}  "${key}": ${typeDesc}${requiredMark}${description}`;
+        }
+        
         if (!isLast) result += ',';
         result += '\n';
       }
@@ -459,7 +528,8 @@ IMPORTANT:
     }
     
     if (schema.type === 'object') {
-      return this.buildSchemaDescription(schema, depth);
+      // For inline nested objects, build without indentation prefix
+      return this.buildInlineObjectDescription(schema, depth);
     }
     
     if (schema.oneOf) {
@@ -467,6 +537,40 @@ IMPORTANT:
     }
     
     return schema?.type || 'any';
+  }
+
+  /**
+   * Build inline object description without leading indentation
+   */
+  private static buildInlineObjectDescription(schema: any, depth: number): string {
+    if (!schema || typeof schema !== 'object' || schema.type !== 'object') {
+      return 'any';
+    }
+    
+    let result = '{\n';
+    
+    const properties = schema.properties || {};
+    const required = schema.required || [];
+    const indent = '  '.repeat(depth + 1);
+    
+    const entries = Object.entries(properties);
+    for (let i = 0; i < entries.length; i++) {
+      const [key, prop] = entries[i] as [string, any];
+      const isRequired = required.includes(key);
+      const isLast = i === entries.length - 1;
+      
+      const typeDesc = this.getTypeDescription(prop as any, depth + 1);
+      const requiredMark = isRequired ? ' (required)' : ' (optional)';
+      const description = prop.description ? ` // ${prop.description}` : '';
+      
+      result += `${indent}\"${key}\": ${typeDesc}${requiredMark}${description}`;
+      
+      if (!isLast) result += ',';
+      result += '\n';
+    }
+    
+    result += `${'  '.repeat(depth)}}`;
+    return result;
   }
 }
 

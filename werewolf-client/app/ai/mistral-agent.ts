@@ -2,7 +2,6 @@ import {AbstractAgent} from "@/app/ai/abstract-agent";
 import {Mistral} from "@mistralai/mistralai";
 import {ChatCompletionResponse} from "@mistralai/mistralai/models/components";
 import {AIMessage, MESSAGE_ROLE, TokenUsage} from "@/app/api/game-models";
-import {ResponseSchema} from "@/app/ai/prompts/ai-schemas";
 import {cleanResponse} from "@/app/utils/message-utils";
 import { z } from 'zod';
 import { ZodSchemaConverter } from './zod-schema-converter';
@@ -28,14 +27,6 @@ export class MistralAgent extends AbstractAgent {
             `Failed to get response from Mistral API: ${error instanceof Error ? error.message : String(error)}`,
     };
 
-    // Schema instruction template
-    private readonly schemaTemplate = {
-        instructions: (schema: ResponseSchema) =>
-            `Your response must be a valid JSON object matching this schema:
-${JSON.stringify(schema, null, 2)}
-
-Ensure your response strictly follows the schema requirements.`,
-    };
 
     constructor(name: string, instruction: string, model: string, apiKey: string, enableThinking: boolean = false) {
         super(name, instruction, model, 0.7, enableThinking);
@@ -48,29 +39,6 @@ Ensure your response strictly follows the schema requirements.`,
     }
 
 
-    protected async doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<[string, string, TokenUsage?]> {
-        const schemaInstructions = this.schemaTemplate.instructions(schema);
-
-        try {
-            const systemMessage = (this.enableThinking)
-                ? this.createThinkingSystemMessage(schemaInstructions)
-                : {role: "system", content: `${this.instruction}\n\n${schemaInstructions}`};
-
-            const chatResponse: ChatCompletionResponse = await this.client.chat.complete({
-                model: this.model,
-                messages: [
-                    systemMessage,
-                    ...this.convertToMistralMessages(messages)
-                ],
-                responseFormat: {type: 'json_object'}
-            });
-
-            return this.processReply(chatResponse);
-        } catch (error) {
-            this.logger(this.logTemplates.error(this.name, error));
-            throw new Error(this.errorMessages.apiError(error));
-        }
-    }
 
     private convertToMistralMessages(messages: AIMessage[]) {
         return messages.map(msg => ({
@@ -79,28 +47,6 @@ Ensure your response strictly follows the schema requirements.`,
         }));
     }
 
-    private createThinkingSystemMessage(schemaInstructions: string) {
-        const combinedInstructions = `${this.instruction}\n\n${schemaInstructions}`;
-        
-        return {
-            role: MESSAGE_ROLE.SYSTEM,
-            content: [
-                {
-                    type: "text",
-                    text: combinedInstructions
-                },
-                {
-                    type: "thinking",
-                    thinking: [
-                        {
-                            type: "text",
-                            text: "Think through your response step by step. Consider the instructions carefully and plan your approach before providing the final answer."
-                        }
-                    ]
-                }
-            ]
-        } as any; // Type assertion needed until SDK supports thinking types
-    }
 
     private processReply(response: ChatCompletionResponse | undefined): [string, string, TokenUsage?] {
         const message = response?.choices?.[0]?.message;
@@ -231,7 +177,15 @@ Ensure your response strictly follows the schema requirements.`,
             };
 
             this.logger(this.logTemplates.askingAgent(this.name, this.model));
-            const response = await this.client.chat.complete(requestParams);
+            
+            let response;
+            try {
+                response = await this.client.chat.complete(requestParams);
+            } catch (apiError) {
+                // Re-throw API errors immediately without wrapping them in schema validation errors
+                this.logger(this.logTemplates.error(this.name, apiError));
+                throw new Error(this.errorMessages.apiError(apiError));
+            }
 
             if (!response || !response.choices || response.choices.length === 0) {
                 throw new Error(this.errorMessages.emptyResponse);

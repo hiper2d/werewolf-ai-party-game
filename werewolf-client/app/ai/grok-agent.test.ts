@@ -1,17 +1,17 @@
 import dotenv from "dotenv";
 dotenv.config();
-import { Gpt5Agent } from "./gpt-5-agent";
+import { GrokAgent } from "./grok-agent";
 import { AIMessage, BotAnswer, PLAY_STYLES, GAME_ROLES, TokenUsage, GAME_MASTER } from "@/app/api/game-models";
 import { LLM_CONSTANTS, SupportedAiModels } from "@/app/ai/ai-models";
-import { calculateOpenAICost } from "@/app/utils/pricing/openai-pricing";
+import { calculateGrokCost } from "@/app/utils/pricing";
 import { BotAnswerZodSchema, GameSetupZodSchema, validateResponse } from "@/app/ai/prompts/zod-schemas";
 import { BOT_SYSTEM_PROMPT } from "@/app/ai/prompts/bot-prompts";
 import { STORY_SYSTEM_PROMPT, STORY_USER_PROMPT } from "@/app/ai/prompts/story-gen-prompts";
 import { format } from "@/app/ai/prompts/utils";
 import { ROLE_CONFIGS, PLAY_STYLE_CONFIGS } from "@/app/api/game-models";
 
-// Helper function to create a Gpt5Agent instance (defaults to GPT-5-mini)
-const createAgent = (botName: string, modelType: string = LLM_CONSTANTS.GPT_5_MINI, enableThinking: boolean = true): Gpt5Agent => {
+// Helper function to create a GrokAgent instance (defaults to GROK-4)
+const createAgent = (botName: string, modelType: string = LLM_CONSTANTS.GROK_4, enableThinking: boolean = true): GrokAgent => {
   const testBot = {
     name: botName,
     story: "A mysterious wanderer with a hidden past",
@@ -34,24 +34,24 @@ const createAgent = (botName: string, modelType: string = LLM_CONSTANTS.GPT_5_MI
     previous_day_summaries: ""
   });
   
-  return new Gpt5Agent(
+  return new GrokAgent(
     botName,
     instruction,
     SupportedAiModels[modelType].modelApiName,
-    process.env.OPENAI_K || "test_key",
+    process.env.GROK_K || "test_key",
     0.7, // temperature
     enableThinking // Use parameter instead of model default
   );
 };
 
-describe("Gpt5Agent integration", () => {
+describe("GrokAgent integration", () => {
   // Skip tests if no API key is provided
-  const hasApiKey = process.env.OPENAI_K;
+  const hasApiKey = process.env.GROK_K;
   const describeOrSkip = hasApiKey ? describe : describe.skip;
   
   describeOrSkip("askWithZodSchema with real API", () => {
-    it("should respond with valid schema-based answer using GPT-5-mini (with reasoning)", async () => {
-      const agent = createAgent("TestBot", LLM_CONSTANTS.GPT_5_MINI, true);
+    it("should respond with valid schema-based answer using grok-4 (with reasoning)", async () => {
+      const agent = createAgent("TestBot", LLM_CONSTANTS.GROK_4, true);
       const messages: AIMessage[] = [{
         role: 'user',
         content: 'What do you think about the current situation in the village?'
@@ -59,7 +59,7 @@ describe("Gpt5Agent integration", () => {
       
       const [response, thinking, tokenUsage] = await agent.askWithZodSchema(BotAnswerZodSchema, messages);
 
-      console.log("\n=== GPT-5-mini Zod Integration Test (With Reasoning) ===");
+      console.log("\n=== Grok-4 Zod Integration Test (With Reasoning) ===");
       console.log("Response type:", typeof response);
       console.log("Response structure:", Object.keys(response));
       console.log("Thinking length:", thinking.length);
@@ -88,18 +88,18 @@ describe("Gpt5Agent integration", () => {
       expect(tokenUsage!.totalTokens).toBeGreaterThan(0);
       expect(tokenUsage!.costUSD).toBeGreaterThan(0);
       
-      console.log("✅ GPT-5-mini Zod schema validation passed (with reasoning)");
-    }, 60000);
+      console.log("✅ Grok-4 Zod schema validation passed (with reasoning)");
+    }, 30000);
 
-    it("should generate a game preview using Zod schema with GPT-5-mini", async () => {
-      console.log("\n=== GPT-5-mini Game Preview Generation with Zod (Real API) ===");
+    it("should generate a game preview using Zod schema with grok-4", async () => {
+      console.log("\n=== Grok-4 Game Preview Generation with Zod (Real API) ===");
       
-      // Create a Game Master agent for story generation using GPT-5-mini
-      const gmAgent = new Gpt5Agent(
+      // Create a Game Master agent for story generation using grok-4
+      const gmAgent = new GrokAgent(
         GAME_MASTER,
         STORY_SYSTEM_PROMPT,
-        SupportedAiModels[LLM_CONSTANTS.GPT_5_MINI].modelApiName,
-        process.env.OPENAI_K!,
+        SupportedAiModels[LLM_CONSTANTS.GROK_4].modelApiName,
+        process.env.GROK_K!,
         0.7,
         false // Disable reasoning for this test
       );
@@ -150,7 +150,7 @@ describe("Gpt5Agent integration", () => {
       console.log("📝 Requesting game story and characters...");
       console.log("Theme:", gamePreview.theme);
       console.log("Players to generate:", botCount);
-      console.log("Model: gpt-5-mini (with reasoning)");
+      console.log("Model: grok-4 (with reasoning)");
       
       // Call askWithZodSchema with GameSetupZodSchema
       const [gameSetup, , tokenUsage] = await gmAgent.askWithZodSchema(
@@ -195,16 +195,16 @@ describe("Gpt5Agent integration", () => {
         expect(typeof player.playStyle).toBe('string');
       });
 
-      console.log("\n✅ GPT-5-mini game preview generated successfully with Zod schema!");
+      console.log("\n✅ Grok-4 game preview generated successfully with Zod schema!");
     }, 60000); // Increased timeout for complex story generation
   });
 
   describe("error handling", () => {
     it("should handle API errors gracefully", async () => {
-      const agent = new Gpt5Agent(
+      const agent = new GrokAgent(
         "TestBot",
         "Test instruction",
-        SupportedAiModels[LLM_CONSTANTS.GPT_5_MINI].modelApiName,
+        SupportedAiModels[LLM_CONSTANTS.GROK_4].modelApiName,
         "invalid_api_key",
         0.7,
         false
@@ -217,16 +217,16 @@ describe("Gpt5Agent integration", () => {
 
       await expect(agent.askWithZodSchema(BotAnswerZodSchema, messages))
         .rejects
-        .toThrow('Failed to get response from OpenAI API');
+        .toThrow('Failed to get response from Grok API');
     });
   });
   
   describe("token usage calculation", () => {
-    it("should calculate correct costs for GPT-5-mini", () => {
-      // Test the external pricing function that GPT-5 agent uses
-      const cost = calculateOpenAICost("gpt-5-mini", 1000000, 1000000);
-      // Based on ai-models.ts pricing: $0.25 per 1M input, $2 per 1M output
-      expect(cost).toBeCloseTo(2.25, 2);
+    it("should calculate correct costs for grok-4", () => {
+      // Test the external pricing function that Grok agent uses
+      const cost = calculateGrokCost("grok-4", 1000000, 1000000);
+      // Based on ai-models.ts pricing: $3 per 1M input, $15 per 1M output
+      expect(cost).toBeCloseTo(18, 2);
     });
   });
 
@@ -245,7 +245,7 @@ describe("Gpt5Agent integration", () => {
         validateResponse(BotAnswerZodSchema, invalidData);
       }).toThrow();
       
-      console.log("✅ GPT-5 validation error handling works correctly");
+      console.log("✅ Grok validation error handling works correctly");
     });
   });
 });

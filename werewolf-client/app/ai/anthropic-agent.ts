@@ -1,7 +1,6 @@
 import {AbstractAgent} from "@/app/ai/abstract-agent";
 import {AIMessage, BotResponseError, TokenUsage} from "@/app/api/game-models";
 import {Anthropic} from '@anthropic-ai/sdk';
-import {ResponseSchema} from "@/app/ai/prompts/ai-schemas";
 import {cleanResponse} from "@/app/utils/message-utils";
 import {calculateAnthropicCost} from "@/app/utils/pricing";
 import { z } from 'zod';
@@ -40,14 +39,6 @@ export class ClaudeAgent extends AbstractAgent {
         unsupportedRole: (role: string) => `Unsupported role type: ${role}`,
     };
 
-    // Schema instruction template
-    private readonly schemaTemplate = {
-        instructions: (schema: ResponseSchema) =>
-            `Your response must be a valid JSON object matching this schema:
-${JSON.stringify(schema, null, 2)}
-
-Ensure your response strictly follows the schema requirements.`,
-    };
 
     constructor(name: string, instruction: string, model: string, apiKey: string, enableThinking: boolean = false) {
         super(name, instruction, model, 0.2, enableThinking);
@@ -57,113 +48,6 @@ Ensure your response strictly follows the schema requirements.`,
     }
 
 
-    protected async doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<[string, string, TokenUsage?]> {
-        const aiMessages = this.prepareMessages(messages);
-
-        const schemaInstructions = this.buildSchemaInstructions(schema);
-        const lastMessage = aiMessages[aiMessages.length - 1];
-        const fullPrompt = this.buildFullPrompt(lastMessage.content, schemaInstructions);
-        aiMessages[aiMessages.length - 1] = { ...lastMessage, content: fullPrompt };
-
-        const params: Anthropic.MessageCreateParams = {
-            ...this.defaultParams,
-            messages: this.convertToAnthropicMessages(aiMessages),
-        };
-
-        // Add thinking config for Anthropic models with thinking mode
-        if (this.enableThinking) {
-            (params as any).thinking = {
-                type: "enabled",
-                budget_tokens: 1024
-            };
-            // Anthropic requires temperature to be 1 when thinking is enabled
-            params.temperature = 1;
-            // Increase max_tokens to be greater than budget_tokens
-            params.max_tokens = 2048;
-        }
-
-        let response;
-        try {
-            // fixms: for some reason, the last message has the assistant type from Sparks, i.e. self = what to do with it?
-            response = await this.client.messages.create(params);
-            if (!('content' in response) || !Array.isArray(response.content) || response.content.length === 0) {
-                throw new Error(this.errorMessages.emptyResponse);
-            }
-
-            // Handle thinking content if present and find text content
-            let textContent = null;
-            let thinkingContent = "";
-            
-            for (const block of response.content) {
-                // Extract thinking content
-                if (this.enableThinking && (block as any).type === 'thinking' && 'thinking' in block) {
-                    thinkingContent = (block as any).thinking;
-                }
-                
-                // Find the text content block
-                if ('text' in block && !textContent) {
-                    textContent = block.text;
-                }
-            }
-
-            if (!textContent) {
-                throw new Error(this.errorMessages.invalidFormat);
-            }
-
-            // Extract token usage information
-            let tokenUsage: TokenUsage | undefined;
-            if (response.usage) {
-                const cost = calculateAnthropicCost(
-                    this.model,
-                    response.usage.input_tokens || 0,
-                    response.usage.output_tokens || 0
-                );
-                
-                tokenUsage = {
-                    inputTokens: response.usage.input_tokens || 0,
-                    outputTokens: response.usage.output_tokens || 0,
-                    totalTokens: (response.usage.input_tokens || 0) + (response.usage.output_tokens || 0),
-                    costUSD: cost
-                };
-                
-                // Log thinking information if available
-                if (this.enableThinking && thinkingContent) {
-                    this.logger(`Thinking enabled: ${thinkingContent.length} characters of thinking content`);
-                    this.logger(`Note: Thinking tokens are included in output token count and cost`);
-                }
-            }
-            
-            return [cleanResponse(textContent), thinkingContent, tokenUsage];
-        } catch (error) {
-            const errorDetails = error instanceof Error ? error.message : String(error);
-            
-            // Check if this is an API overload error (529) which is recoverable
-            const isRecoverable = errorDetails.includes('overloaded_error') || 
-                                errorDetails.includes('529') || 
-                                errorDetails.includes('rate_limit');
-            
-            throw new BotResponseError(
-                'Failed to get response from Anthropic API',
-                errorDetails,
-                { 
-                    model: this.model, 
-                    agentName: this.name,
-                    apiProvider: 'Anthropic'
-                },
-                isRecoverable
-            );
-        }
-    }
-
-    private buildSchemaInstructions(schema: ResponseSchema): string {
-        return this.schemaTemplate.instructions(schema);
-    }
-
-    private buildFullPrompt(content: string, instructions: string): string {
-        return `${content}
-
-${instructions}`;
-    }
 
     private convertToAnthropicMessages(messages: AIMessage[]): AnthropicMessage[] {
         return messages.map(msg => ({
@@ -187,19 +71,27 @@ ${instructions}`;
      * Since Anthropic doesn't support native JSON schemas, we generate prompt descriptions
      */
     async askWithZodSchema<T>(zodSchema: z.ZodSchema<T>, messages: AIMessage[]): Promise<[T, string, TokenUsage?]> {
+        // Validate roles first, before entering the main try-catch block
+        // This ensures role validation errors are thrown directly
+        const aiMessages = this.prepareMessages(messages);
+        const anthropicMessages = this.convertToAnthropicMessages(aiMessages);
+        
         try {
             // Generate human-readable schema description for Anthropic
             const schemaDescription = ZodSchemaConverter.toPromptDescription(zodSchema);
             
-            // Prepare messages with schema instructions in the last message
-            const aiMessages = this.prepareMessages(messages);
+            // Add schema instructions to the last message
             const lastMessage = aiMessages[aiMessages.length - 1];
             const fullPrompt = `${lastMessage.content}\n\n${schemaDescription}`;
-            aiMessages[aiMessages.length - 1] = { ...lastMessage, content: fullPrompt };
+            const updatedMessages = [...anthropicMessages];
+            updatedMessages[updatedMessages.length - 1] = { 
+                ...updatedMessages[updatedMessages.length - 1], 
+                content: fullPrompt 
+            };
 
             const params: Anthropic.MessageCreateParams = {
                 ...this.defaultParams,
-                messages: this.convertToAnthropicMessages(aiMessages),
+                messages: updatedMessages,
             };
 
             // Add thinking config for Anthropic models with thinking mode
@@ -214,7 +106,14 @@ ${instructions}`;
                 params.max_tokens = 2048;
             }
 
-            const response = await this.client.messages.create(params);
+            let response;
+            try {
+                response = await this.client.messages.create(params);
+            } catch (apiError) {
+                // Re-throw API errors immediately without wrapping them in schema validation errors
+                this.logger(this.logTemplates.error(this.name, apiError));
+                throw new Error(this.errorMessages.apiError(apiError));
+            }
             
             if (!('content' in response) || !Array.isArray(response.content) || response.content.length === 0) {
                 throw new Error(this.errorMessages.emptyResponse);

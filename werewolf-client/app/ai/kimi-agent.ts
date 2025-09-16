@@ -1,7 +1,6 @@
 import {AbstractAgent} from "@/app/ai/abstract-agent";
 import {OpenAI} from "openai";
 import {AIMessage, TokenUsage} from "@/app/api/game-models";
-import {ResponseSchema} from "@/app/ai/prompts/ai-schemas";
 import {cleanResponse} from "@/app/utils/message-utils";
 import {extractUsageAndCalculateCost} from "@/app/utils/pricing";
 import { z } from 'zod';
@@ -30,14 +29,6 @@ export class KimiAgent extends AbstractAgent {
             `Failed to get response from Kimi API: ${error instanceof Error ? error.message : String(error)}`,
     };
 
-    // Schema instruction template
-    private readonly schemaTemplate = {
-        instructions: (schema: ResponseSchema) =>
-            `Your response must be a valid JSON object matching this schema:
-${JSON.stringify(schema, null, 2)}
-
-Ensure your response strictly follows the schema requirements.`,
-    };
 
     constructor(name: string, instruction: string, model: string, apiKey: string, temperature: number, enableThinking: boolean = false) {
         super(name, instruction, model, temperature, enableThinking);
@@ -48,36 +39,7 @@ Ensure your response strictly follows the schema requirements.`,
     }
 
 
-    protected async doAskWithSchema(schema: ResponseSchema, messages: AIMessage[]): Promise<[string, string, TokenUsage?]> {
-        const schemaInstructions = this.schemaTemplate.instructions(schema);
-        const lastMessage = messages[messages.length - 1];
-        const fullPrompt = `${lastMessage.content}\n\n${schemaInstructions}`;
-        const modifiedMessages = [
-            ...messages.slice(0, -1),
-            { ...lastMessage, content: fullPrompt }
-        ];
 
-        try {
-            const preparedMessages = this.prepareMessagesWithInstruction(modifiedMessages);
-            const completion = await this.client.chat.completions.create({
-                ...this.defaultParams,
-                messages: preparedMessages,
-            }) as OpenAI.Chat.Completions.ChatCompletion;
-
-            return this.processReply(completion);
-        } catch (error) {
-            this.logger(this.logTemplates.error(this.name, error));
-            throw new Error(this.errorMessages.apiError(error));
-        }
-    }
-
-    private prepareMessagesWithInstruction(messages: AIMessage[]): OpenAI.Chat.Completions.ChatCompletionMessageParam[] {
-        const preparedMessages = this.prepareMessages(messages);
-        if (preparedMessages.length > 0) {
-            preparedMessages[0].content = `${this.instruction}\n\n${preparedMessages[0].content}`;
-        }
-        return this.convertToOpenAIMessages(preparedMessages);
-    }
 
     private convertToOpenAIMessages(messages: AIMessage[]): OpenAI.Chat.Completions.ChatCompletionMessageParam[] {
         return messages.map(msg => ({
@@ -137,14 +99,21 @@ Ensure your response strictly follows the schema requirements.`,
             try {
                 const kimiSchema = ZodSchemaConverter.toOpenAIJsonSchema(zodSchema, 'response_schema');
                 
-                const completion = await this.client.chat.completions.create({
-                    ...this.defaultParams,
-                    messages: openAIMessages,
-                    response_format: { 
-                        type: 'json_schema',
-                        json_schema: kimiSchema
-                    }
-                }) as OpenAI.Chat.Completions.ChatCompletion;
+                let completion;
+                try {
+                    completion = await this.client.chat.completions.create({
+                        ...this.defaultParams,
+                        messages: openAIMessages,
+                        response_format: { 
+                            type: 'json_schema',
+                            json_schema: kimiSchema
+                        }
+                    }) as OpenAI.Chat.Completions.ChatCompletion;
+                } catch (apiError) {
+                    // Re-throw API errors immediately without wrapping them in schema validation errors
+                    this.logger(this.logTemplates.error(this.name, apiError));
+                    throw new Error(this.errorMessages.apiError(apiError));
+                }
 
                 const reply = completion.choices[0]?.message?.content;
                 if (!reply) {
@@ -195,10 +164,17 @@ Ensure your response strictly follows the schema requirements.`,
                     lastMessage.content += `\n\nYour response must be a valid JSON object matching this schema:\n${schemaDescription}`;
                 }
 
-                const completion = await this.client.chat.completions.create({
-                    ...this.defaultParams,
-                    messages: openAIMessages
-                }) as OpenAI.Chat.Completions.ChatCompletion;
+                let completion;
+                try {
+                    completion = await this.client.chat.completions.create({
+                        ...this.defaultParams,
+                        messages: openAIMessages
+                    }) as OpenAI.Chat.Completions.ChatCompletion;
+                } catch (apiError) {
+                    // Re-throw API errors immediately without wrapping them in schema validation errors
+                    this.logger(this.logTemplates.error(this.name, apiError));
+                    throw new Error(this.errorMessages.apiError(apiError));
+                }
 
                 const reply = completion.choices[0]?.message?.content;
                 if (!reply) {

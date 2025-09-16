@@ -24,7 +24,8 @@ import { getUserFromFirestore, getBotMessages } from "@/app/api/game-actions";
 import { getUserApiKeys } from "@/app/api/user-actions";
 import { GM_NIGHT_RESULTS_SYSTEM_PROMPT } from "@/app/ai/prompts/gm-prompts";
 import { GM_COMMAND_GENERATE_NIGHT_RESULTS } from "@/app/ai/prompts/gm-commands";
-import { createNightResultsStorySchema, NightResultsStory, createBotAnswerSchema } from "@/app/ai/prompts/ai-schemas";
+import { NightResultsStoryZodSchema, BotAnswerZodSchema } from "@/app/ai/prompts/zod-schemas";
+import { NightResultsStory } from "@/app/ai/prompts/ai-schemas";
 import { BOT_DAY_SUMMARY_PROMPT, BOT_SYSTEM_PROMPT } from "@/app/ai/prompts/bot-prompts";
 import { generateWerewolfTeammatesSection, generatePreviousDaySummariesSection } from "@/app/utils/bot-utils";
 import { format } from "@/app/ai/prompts/utils";
@@ -148,10 +149,8 @@ async function endNightWithResults(gameId: string, game: Game): Promise<Game> {
     
     // Include conversation history for the GM (day + night messages + command)
     const history = convertToAIMessages(GAME_MASTER, [...dayMessages, gmCommandMessage]);
-    const schema = createNightResultsStorySchema();
-    
-    const [rawStoryResponse, thinking] = await gmAgent.askWithSchema(schema, history);
-    if (!rawStoryResponse) {
+    const [storyResponse, thinking] = await gmAgent.askWithZodSchema(NightResultsStoryZodSchema, history);
+    if (!storyResponse) {
         throw new BotResponseError(
             'Game Master failed to generate night results story',
             'GM did not respond to night results generation request',
@@ -159,8 +158,6 @@ async function endNightWithResults(gameId: string, game: Game): Promise<Game> {
             true
         );
     }
-    
-    const storyResponse = parseResponseToObj(rawStoryResponse, 'NightResultsStory') as NightResultsStory;
     const nightResultsMessage = storyResponse.story;
     
     // Log thinking for debugging
@@ -1019,9 +1016,9 @@ async function summarizePastDayImpl(gameId: string): Promise<Game> {
         const history = convertToAIMessages(bot.name, [...botMessages, summaryMessage]);
         
         // Get summary using bot answer schema (returns { reply: "summary text" })
-        const [rawResponse] = await agent.askWithSchema(createBotAnswerSchema(), history);
+        const [summaryResponse] = await agent.askWithZodSchema(BotAnswerZodSchema, history);
         
-        if (!rawResponse) {
+        if (!summaryResponse) {
             console.warn(`💭 Bot ${bot.name} failed to generate summary for day ${currentGame.currentDay}`);
             await gameRef.update({
                 gameStateProcessQueue: processQueue
@@ -1031,26 +1028,20 @@ async function summarizePastDayImpl(gameId: string): Promise<Game> {
         
         let summary: string = ""; // Initialize with empty string
         try {
-            const summaryResponse = parseResponseToObj(rawResponse);
             summary = summaryResponse.reply || ""; // Ensure not undefined
         } catch (parseError: any) {
             console.error(`💭 Failed to parse summary JSON for bot ${bot.name}:`, parseError);
-            console.error('💭 Raw response:', rawResponse);
+            console.error('💭 Raw response:', summaryResponse);
             
-            // Try to extract summary from the raw response as fallback
+            // Try to extract summary from the response as fallback
             try {
-                // If the response contains readable text but bad JSON, try to use it directly
-                if (typeof rawResponse === 'string' && rawResponse.length > 0) {
-                    // Clean up the response and use it as summary
-                    summary = rawResponse
-                        .replace(/```json/g, '')
-                        .replace(/```/g, '')
-                        .replace(/^\s*{\s*"reply"\s*:\s*"/, '')
-                        .replace(/"\s*}\s*$/, '')
-                        .trim();
+                // The response is now a typed object from Zod schema
+                if (summaryResponse && summaryResponse.reply) {
+                    summary = summaryResponse.reply;
+                    console.log(`💭 Using reply property as summary for bot ${bot.name}: ${summary.substring(0, 100)}...`);
                     
                     if (summary.length > 10) { // Basic validation
-                        console.log(`💭 Using cleaned raw response as summary for bot ${bot.name}: ${summary.substring(0, 100)}...`);
+                        console.log(`💭 Using cleaned response as summary for bot ${bot.name}: ${summary.substring(0, 100)}...`);
                     } else {
                         throw new Error('Cleaned response too short');
                     }
@@ -1066,7 +1057,7 @@ async function summarizePastDayImpl(gameId: string): Promise<Game> {
                 });
                 
                 // Create a meaningful error that will be shown to the user
-                throw new Error(`Bot ${bot.name} response parsing failed: ${parseError.message}. Raw response: ${rawResponse?.substring(0, 200)}...`);
+                throw new Error(`Bot ${bot.name} response parsing failed: ${parseError.message}. Response: ${JSON.stringify(summaryResponse)?.substring(0, 200)}...`);
             }
         }
         
