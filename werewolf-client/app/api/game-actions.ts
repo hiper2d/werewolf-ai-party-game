@@ -305,6 +305,7 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
         });
 
         // Create the game object
+        const timestamp = Date.now();
         const game = {
             description: gamePreview.description,
             theme: gamePreview.theme,
@@ -320,12 +321,12 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
             gameState: GAME_STATES.WELCOME,
             gameStateParamQueue: bots.map(bot => bot.name),
             gameStateProcessQueue: [],
-            messageCounter: 0 // Initialize message counter for new games
+            messageCounter: 0, // Initialize message counter for new games
+            createdAt: timestamp // Store creation timestamp
         };
 
         // Generate custom game ID: theme-timestamp
         const sanitizedTheme = sanitizeForId(gamePreview.theme);
-        const timestamp = Date.now();
         const customGameId = `${sanitizedTheme}-${timestamp}`;
         
         await db.collection('games').doc(customGameId).set(game);
@@ -707,6 +708,31 @@ function serializeMessageForFirestore(gameMessage: GameMessage) {
     };
 }
 
+/**
+ * Extracts timestamp from game ID for backward compatibility
+ * Game IDs are in format: "theme-timestamp"
+ */
+function extractTimestampFromGameId(gameId: string): number {
+    try {
+        const lastHyphenIndex = gameId.lastIndexOf('-');
+        if (lastHyphenIndex === -1) {
+            return Date.now(); // Fallback to current time
+        }
+        
+        const timestampStr = gameId.substring(lastHyphenIndex + 1);
+        const timestamp = parseInt(timestampStr, 10);
+        
+        // Validate that it's a reasonable timestamp (after year 2000)
+        if (isNaN(timestamp) || timestamp < 946684800000) {
+            return Date.now(); // Fallback to current time
+        }
+        
+        return timestamp;
+    } catch {
+        return Date.now(); // Fallback to current time
+    }
+}
+
 function gameFromFirestore(id: string, data: any): Game {
     return {
         id,
@@ -728,6 +754,7 @@ function gameFromFirestore(id: string, data: any): Game {
         nightResults: data.nightResults || {},
         previousNightResults: data.previousNightResults || {},
         messageCounter: data.messageCounter || 0, // Default to 0 for existing games
-        dayActivityCounter: data.dayActivityCounter || {} // Default to empty object for existing games
+        dayActivityCounter: data.dayActivityCounter || {}, // Default to empty object for existing games
+        createdAt: data.createdAt || extractTimestampFromGameId(id) // Use stored timestamp or extract from ID for existing games
     };
 }

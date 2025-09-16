@@ -434,13 +434,24 @@ export default function GamePage({
                                 className={`mb-3 flex flex-col ${!participant.isAlive ? 'opacity-60' : ''}`}
                             >
                                 <div className="flex items-center justify-between">
-                                    <span
-                                        style={{ color: getPlayerColor(participant.name) }}
-                                        className={!participant.isAlive ? 'line-through' : ''}
-                                    >
-                                        {participant.name}
-                                        {participant.isHuman && ' (You)'}
-                                    </span>
+                                    <div className="flex items-center gap-2">
+                                        <span
+                                            style={{ color: getPlayerColor(participant.name) }}
+                                            className={!participant.isAlive ? 'line-through' : ''}
+                                        >
+                                            {participant.name}
+                                            {participant.isHuman && ' (You)'}
+                                        </span>
+                                        {!participant.isHuman && (() => {
+                                            const bot = game.bots.find(b => b.name === participant.name);
+                                            const cost = bot?.tokenUsage?.costUSD;
+                                            return cost && cost > 0 ? (
+                                                <span className="text-xs text-gray-400 bg-gray-800/50 px-1.5 py-0.5 rounded">
+                                                    ${cost.toFixed(4)}
+                                                </span>
+                                            ) : null;
+                                        })()}
+                                    </div>
                                     {!participant.isAlive && (
                                         <span className="text-sm text-red-400">💀 Eliminated</span>
                                     )}

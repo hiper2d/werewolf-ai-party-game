@@ -63,6 +63,93 @@ function sanitizeForId(name: string): string {
 }
 
 /**
+ * Update bot's token usage in the database
+ */
+async function updateBotTokenUsage(gameId: string, botName: string, tokenUsage: any): Promise<void> {
+    if (!db || !tokenUsage) {
+        return;
+    }
+
+    try {
+        const gameRef = db.collection('games').doc(gameId);
+        const gameDoc = await gameRef.get();
+        
+        if (!gameDoc.exists) {
+            return;
+        }
+        
+        const game = gameDoc.data() as Game;
+        const updatedBots = game.bots.map(bot => {
+            if (bot.name === botName) {
+                const currentUsage = bot.tokenUsage || { inputTokens: 0, outputTokens: 0, totalTokens: 0, costUSD: 0 };
+                return {
+                    ...bot,
+                    tokenUsage: {
+                        inputTokens: currentUsage.inputTokens + tokenUsage.inputTokens,
+                        outputTokens: currentUsage.outputTokens + tokenUsage.outputTokens,
+                        totalTokens: currentUsage.totalTokens + tokenUsage.totalTokens,
+                        costUSD: currentUsage.costUSD + tokenUsage.costUSD
+                    }
+                };
+            }
+            return bot;
+        });
+        
+        await gameRef.update({ bots: updatedBots });
+    } catch (error) {
+        console.error(`Failed to update token usage for bot ${botName}:`, error);
+        // Don't throw here - cost tracking shouldn't break the game flow
+    }
+}
+
+/**
+ * Update game master's token usage in the database
+ */
+async function updateGameMasterTokenUsage(gameId: string, tokenUsage: any): Promise<void> {
+    if (!db || !tokenUsage) {
+        return;
+    }
+
+    try {
+        const gameRef = db.collection('games').doc(gameId);
+        const gameDoc = await gameRef.get();
+        
+        if (!gameDoc.exists) {
+            return;
+        }
+        
+        const game = gameDoc.data() as Game;
+        const currentGameUsage = game.tokenUsage || {
+            totalInputTokens: 0,
+            totalOutputTokens: 0,
+            totalTokens: 0,
+            totalCostUSD: 0,
+            botUsage: {},
+            gameMasterUsage: { inputTokens: 0, outputTokens: 0, totalTokens: 0, costUSD: 0 }
+        };
+        
+        const updatedGameUsage = {
+            ...currentGameUsage,
+            totalInputTokens: currentGameUsage.totalInputTokens + tokenUsage.inputTokens,
+            totalOutputTokens: currentGameUsage.totalOutputTokens + tokenUsage.outputTokens,
+            totalTokens: currentGameUsage.totalTokens + tokenUsage.totalTokens,
+            totalCostUSD: currentGameUsage.totalCostUSD + tokenUsage.costUSD,
+            gameMasterUsage: {
+                inputTokens: currentGameUsage.gameMasterUsage.inputTokens + tokenUsage.inputTokens,
+                outputTokens: currentGameUsage.gameMasterUsage.outputTokens + tokenUsage.outputTokens,
+                totalTokens: currentGameUsage.gameMasterUsage.totalTokens + tokenUsage.totalTokens,
+                costUSD: currentGameUsage.gameMasterUsage.costUSD + tokenUsage.costUSD
+            }
+        };
+        
+        await gameRef.update({ tokenUsage: updatedGameUsage });
+    } catch (error) {
+        console.error('Failed to update game master token usage:', error);
+        // Don't throw here - cost tracking shouldn't break the game flow
+    }
+}
+
+/**
  * Increment day activity counter for a bot
  * Initializes the counter if it doesn't exist for the current day
  */
@@ -270,7 +357,7 @@ async function welcomeImpl(gameId: string): Promise<Game> {
 
         // Create history from filtered messages, including the GM command that hasn't been saved yet
         const history = convertToAIMessages(bot.name, [...botMessages, gmMessage]);
-        const [answer, thinking] = await agent.askWithZodSchema(BotAnswerZodSchema, history);
+        const [answer, thinking, tokenUsage] = await agent.askWithZodSchema(BotAnswerZodSchema, history);
         if (!answer) {
             throw new BotResponseError(
                 'Bot failed to provide introduction',
@@ -287,7 +374,8 @@ async function welcomeImpl(gameId: string): Promise<Game> {
             msg: { reply: answer.reply, thinking: thinking || "" },
             messageType: MessageType.BOT_WELCOME,
             day: game.currentDay,
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            cost: tokenUsage?.costUSD
         };
 
         // Save the game master command to the database first
@@ -295,6 +383,11 @@ async function welcomeImpl(gameId: string): Promise<Game> {
         
         // Then save the bot's response
         await addMessageToChatAndSaveToDb(botMessage, gameId);
+
+        // Update bot's token usage
+        if (tokenUsage) {
+            await updateBotTokenUsage(gameId, bot.name, tokenUsage);
+        }
 
         // Increment day activity counter for the bot
         await incrementDayActivity(gameId, bot.name, game.currentDay);
@@ -427,7 +520,7 @@ async function keepBotsGoingImpl(gameId: string): Promise<Game> {
 
         // Include recent conversation in the GM's history for bot selection
         const history = convertToAIMessages(GAME_MASTER, [...dayMessages, gmMessage]);
-        const [gmResponse, thinking] = await gmAgent.askWithZodSchema(GmBotSelectionZodSchema, history);
+        const [gmResponse, thinking, tokenUsage] = await gmAgent.askWithZodSchema(GmBotSelectionZodSchema, history);
         if (!gmResponse) {
             throw new BotResponseError(
                 'Game Master failed to select responding bots',
@@ -435,6 +528,11 @@ async function keepBotsGoingImpl(gameId: string): Promise<Game> {
                 { gmAiType: game.gameMasterAiType, action: 'bot_selection' },
                 true
             );
+        }
+        
+        // Update game master's token usage
+        if (tokenUsage) {
+            await updateGameMasterTokenUsage(gameId, tokenUsage);
         }
         if (!gmResponse.selected_bots || !Array.isArray(gmResponse.selected_bots)) {
             throw new BotResponseError(
@@ -519,7 +617,7 @@ async function handleHumanPlayerMessage(
 
     // Include the user's message in the GM's history for bot selection
     const history = convertToAIMessages(GAME_MASTER, [...dayMessages, userChatMessage, gmMessage]);
-    const [gmResponse, thinking] = await gmAgent.askWithZodSchema(GmBotSelectionZodSchema, history);
+    const [gmResponse, thinking, tokenUsage] = await gmAgent.askWithZodSchema(GmBotSelectionZodSchema, history);
     if (!gmResponse) {
         throw new BotResponseError(
             'Game Master failed to select responding bots',
@@ -527,6 +625,11 @@ async function handleHumanPlayerMessage(
             { gmAiType: game.gameMasterAiType, action: 'bot_selection' },
             true
         );
+    }
+    
+    // Update game master's token usage
+    if (tokenUsage) {
+        await updateGameMasterTokenUsage(gameId, tokenUsage);
     }
     if (!gmResponse.selected_bots || !Array.isArray(gmResponse.selected_bots)) {
         throw new BotResponseError(
@@ -623,7 +726,7 @@ async function processNextBotInQueue(
         msg: gmMessage.msg + playStyleReminder
     }];
     const history = convertToAIMessages(bot.name, messagesWithPlaystyle);
-    const [botReply, thinking] = await agent.askWithZodSchema(BotAnswerZodSchema, history);
+    const [botReply, thinking, tokenUsage] = await agent.askWithZodSchema(BotAnswerZodSchema, history);
     if (!botReply) {
         throw new BotResponseError(
             'Bot failed to respond to discussion',
@@ -639,7 +742,8 @@ async function processNextBotInQueue(
         msg: { reply: botReply.reply, thinking: thinking || "" },
         messageType: MessageType.BOT_ANSWER,
         day: game.currentDay,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        cost: tokenUsage?.costUSD
     };
 
     // Save the game master command to the database first
@@ -647,6 +751,11 @@ async function processNextBotInQueue(
     
     // Then save the bot's response
     await addMessageToChatAndSaveToDb(botMessage, gameId);
+
+    // Update bot's token usage
+    if (tokenUsage) {
+        await updateBotTokenUsage(gameId, bot.name, tokenUsage);
+    }
 
     // Increment day activity counter for the bot
     await incrementDayActivity(gameId, bot.name, game.currentDay);
@@ -963,8 +1072,9 @@ async function voteImpl(gameId: string): Promise<Game> {
             
             let voteResponse: any;
             let thinking: string;
+            let tokenUsage: any;
             try {
-                [voteResponse, thinking] = await agent.askWithZodSchema(BotVoteZodSchema, history);
+                [voteResponse, thinking, tokenUsage] = await agent.askWithZodSchema(BotVoteZodSchema, history);
             } catch (error) {
                 // Handle specific model errors by using their message
                 if (error instanceof ModelError) {
@@ -1028,6 +1138,11 @@ async function voteImpl(gameId: string): Promise<Game> {
             // Save messages to database sequentially
             await addMessageToChatAndSaveToDb(gmMessage, gameId);
             await addMessageToChatAndSaveToDb(voteMessage, gameId);
+            
+            // Update bot's token usage
+            if (tokenUsage) {
+                await updateBotTokenUsage(gameId, bot.name, tokenUsage);
+            }
             
             // Remove the bot from queue and update voting results
             const newQueue = currentGame.gameStateProcessQueue.slice(1);
@@ -1392,10 +1507,15 @@ async function getSuggestionImpl(gameId: string): Promise<string> {
         const history = convertToAIMessages('SuggestionBot', dayMessages);
         
         // Get suggestion from AI using schema to ensure consistent format
-        const [suggestionResponse, thinking] = await agent.askWithZodSchema(BotAnswerZodSchema, history);
+        const [suggestionResponse, thinking, tokenUsage] = await agent.askWithZodSchema(BotAnswerZodSchema, history);
         
         if (!suggestionResponse) {
             throw new Error('Failed to generate suggestion');
+        }
+
+        // Update game master's token usage (since suggestion uses GM AI)
+        if (tokenUsage) {
+            await updateGameMasterTokenUsage(gameId, tokenUsage);
         }
 
         // Extract the reply text

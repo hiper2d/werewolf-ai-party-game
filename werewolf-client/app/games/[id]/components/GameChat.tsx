@@ -174,12 +174,19 @@ function renderMessage(message: GameMessage, gameId: string, onDeleteAfter: (mes
     return (
         <div className={`${isGameMaster ? 'py-2' : 'mb-2'} ${isUserMessage ? 'text-right' : 'text-left'} group`}>
             <div className="flex items-center justify-between mb-1">
-                <span className={`text-xs font-semibold ${
-                    isGameMaster ? (isNightMessage ? 'text-blue-300' : 'text-green-400') : 
-                    isUserMessage ? 'text-gray-300' : ''
-                }`} style={!isUserMessage && !isGameMaster ? { color: getPlayerColor(message.authorName) } : undefined}>
-                    {message.authorName}
-                </span>
+                <div className="flex items-center gap-2">
+                    <span className={`text-xs font-semibold ${
+                        isGameMaster ? (isNightMessage ? 'text-blue-300' : 'text-green-400') : 
+                        isUserMessage ? 'text-gray-300' : ''
+                    }`} style={!isUserMessage && !isGameMaster ? { color: getPlayerColor(message.authorName) } : undefined}>
+                        {message.authorName}
+                    </span>
+                    {message.cost && message.cost > 0 && (
+                        <span className="text-xs text-gray-400 bg-gray-800/50 px-1.5 py-0.5 rounded">
+                            ${message.cost.toFixed(4)}
+                        </span>
+                    )}
+                </div>
                 {message.id && !isVoteMessage && displayContent && displayContent.trim() && (
                     <div className="flex gap-1">
                         {/* Reset icon - only for bot messages */}

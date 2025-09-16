@@ -74,10 +74,11 @@ export async function DELETE(
         const currentDay = gameData.currentDay;
         
         // Reset bots that were eliminated on the current day
+        // Preserve token usage costs even when resetting bots
         const restoredBots = gameData.bots.map((bot: Bot) => {
             if (!bot.isAlive && bot.eliminationDay === currentDay) {
-                // Bot was eliminated today, restore them
-                console.log(`🔄 RESTORING BOT: ${bot.name} (eliminated on day ${bot.eliminationDay})`);
+                // Bot was eliminated today, restore them but preserve costs
+                console.log(`🔄 RESTORING BOT: ${bot.name} (eliminated on day ${bot.eliminationDay}), preserving costs: $${bot.tokenUsage?.costUSD?.toFixed(4) || '0.0000'}`);
                 const { eliminationDay, ...botWithoutEliminationDay } = bot;
                 return { ...botWithoutEliminationDay, isAlive: true };
             }

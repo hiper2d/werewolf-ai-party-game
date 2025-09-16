@@ -89,6 +89,7 @@ export interface Game {
     messageCounter?: number; // Counter for generating incremental message IDs
     dayActivityCounter?: Record<string, number>; // Track number of messages each bot has sent during current day
     tokenUsage?: GameTokenUsage; // Track token usage for the entire game
+    createdAt?: number; // UTC timestamp when the game was created
 }
 
 export const GAME_ROLES = {
@@ -411,6 +412,7 @@ export interface GameMessage {
     messageType: string;        // Type of the message (e.g., BOT_ANSWER, GAME_STORY)
     day: number;                // The game day when this message was created
     timestamp: number | null;   // UTC epoch timestamp in milliseconds, null for new messages
+    cost?: number;              // Cost in USD for this message (for AI-generated messages)
 }
 
 export interface AIMessage {

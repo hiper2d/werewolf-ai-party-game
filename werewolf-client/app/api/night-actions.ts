@@ -33,6 +33,93 @@ import { parseResponseToObj, convertToAIMessages } from "@/app/utils/message-uti
 import {checkGameEndConditions} from "@/app/utils/game-utils";
 
 /**
+ * Update game master's token usage in the database
+ */
+async function updateGameMasterTokenUsage(gameId: string, tokenUsage: any): Promise<void> {
+    if (!db || !tokenUsage) {
+        return;
+    }
+
+    try {
+        const gameRef = db.collection('games').doc(gameId);
+        const gameDoc = await gameRef.get();
+        
+        if (!gameDoc.exists) {
+            return;
+        }
+        
+        const game = gameDoc.data() as Game;
+        const currentGameUsage = game.tokenUsage || {
+            totalInputTokens: 0,
+            totalOutputTokens: 0,
+            totalTokens: 0,
+            totalCostUSD: 0,
+            botUsage: {},
+            gameMasterUsage: { inputTokens: 0, outputTokens: 0, totalTokens: 0, costUSD: 0 }
+        };
+        
+        const updatedGameUsage = {
+            ...currentGameUsage,
+            totalInputTokens: currentGameUsage.totalInputTokens + tokenUsage.inputTokens,
+            totalOutputTokens: currentGameUsage.totalOutputTokens + tokenUsage.outputTokens,
+            totalTokens: currentGameUsage.totalTokens + tokenUsage.totalTokens,
+            totalCostUSD: currentGameUsage.totalCostUSD + tokenUsage.costUSD,
+            gameMasterUsage: {
+                inputTokens: currentGameUsage.gameMasterUsage.inputTokens + tokenUsage.inputTokens,
+                outputTokens: currentGameUsage.gameMasterUsage.outputTokens + tokenUsage.outputTokens,
+                totalTokens: currentGameUsage.gameMasterUsage.totalTokens + tokenUsage.totalTokens,
+                costUSD: currentGameUsage.gameMasterUsage.costUSD + tokenUsage.costUSD
+            }
+        };
+        
+        await gameRef.update({ tokenUsage: updatedGameUsage });
+    } catch (error) {
+        console.error('Failed to update game master token usage:', error);
+        // Don't throw here - cost tracking shouldn't break the game flow
+    }
+}
+
+/**
+ * Update bot's token usage in the database
+ */
+async function updateBotTokenUsage(gameId: string, botName: string, tokenUsage: any): Promise<void> {
+    if (!db || !tokenUsage) {
+        return;
+    }
+
+    try {
+        const gameRef = db.collection('games').doc(gameId);
+        const gameDoc = await gameRef.get();
+        
+        if (!gameDoc.exists) {
+            return;
+        }
+        
+        const game = gameDoc.data() as Game;
+        const updatedBots = game.bots.map(bot => {
+            if (bot.name === botName) {
+                const currentUsage = bot.tokenUsage || { inputTokens: 0, outputTokens: 0, totalTokens: 0, costUSD: 0 };
+                return {
+                    ...bot,
+                    tokenUsage: {
+                        inputTokens: currentUsage.inputTokens + tokenUsage.inputTokens,
+                        outputTokens: currentUsage.outputTokens + tokenUsage.outputTokens,
+                        totalTokens: currentUsage.totalTokens + tokenUsage.totalTokens,
+                        costUSD: currentUsage.costUSD + tokenUsage.costUSD
+                    }
+                };
+            }
+            return bot;
+        });
+        
+        await gameRef.update({ bots: updatedBots });
+    } catch (error) {
+        console.error(`Failed to update token usage for bot ${botName}:`, error);
+        // Don't throw here - cost tracking shouldn't break the game flow
+    }
+}
+
+/**
  * Helper function to handle night end logic with results processing
  * @param gameId - The game ID
  * @param game - The current game state
@@ -149,7 +236,7 @@ async function endNightWithResults(gameId: string, game: Game): Promise<Game> {
     
     // Include conversation history for the GM (day + night messages + command)
     const history = convertToAIMessages(GAME_MASTER, [...dayMessages, gmCommandMessage]);
-    const [storyResponse, thinking] = await gmAgent.askWithZodSchema(NightResultsStoryZodSchema, history);
+    const [storyResponse, thinking, tokenUsage] = await gmAgent.askWithZodSchema(NightResultsStoryZodSchema, history);
     if (!storyResponse) {
         throw new BotResponseError(
             'Game Master failed to generate night results story',
@@ -159,6 +246,11 @@ async function endNightWithResults(gameId: string, game: Game): Promise<Game> {
         );
     }
     const nightResultsMessage = storyResponse.story;
+    
+    // Update game master's token usage
+    if (tokenUsage) {
+        await updateGameMasterTokenUsage(gameId, tokenUsage);
+    }
     
     // Log thinking for debugging
     if (thinking) {
@@ -1016,7 +1108,12 @@ async function summarizePastDayImpl(gameId: string): Promise<Game> {
         const history = convertToAIMessages(bot.name, [...botMessages, summaryMessage]);
         
         // Get summary using bot answer schema (returns { reply: "summary text" })
-        const [summaryResponse] = await agent.askWithZodSchema(BotAnswerZodSchema, history);
+        const [summaryResponse, thinking, tokenUsage] = await agent.askWithZodSchema(BotAnswerZodSchema, history);
+        
+        // Update bot's token usage
+        if (tokenUsage) {
+            await updateBotTokenUsage(gameId, bot.name, tokenUsage);
+        }
         
         if (!summaryResponse) {
             console.warn(`💭 Bot ${bot.name} failed to generate summary for day ${currentGame.currentDay}`);
