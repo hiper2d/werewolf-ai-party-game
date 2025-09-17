@@ -160,9 +160,14 @@ function renderMessage(message: GameMessage, gameId: string, onDeleteAfter: (mes
                 displayContent = typeof message.msg === 'string' ? message.msg : 'Invalid message format';
                 break;
             default:
-                displayContent = typeof message.msg === 'string'
-                    ? message.msg
-                    : JSON.stringify(message.msg);
+                if (typeof message.msg === 'string') {
+                    displayContent = message.msg;
+                } else if (message.msg && typeof message.msg === 'object' && 'reply' in message.msg) {
+                    // Handle any BotAnswer-like objects that might fall through
+                    displayContent = message.msg.reply;
+                } else {
+                    displayContent = 'Unknown message format';
+                }
         }
     } catch (error) {
         console.error('Error rendering message:', error);
@@ -181,8 +186,8 @@ function renderMessage(message: GameMessage, gameId: string, onDeleteAfter: (mes
                     }`} style={!isUserMessage && !isGameMaster ? { color: getPlayerColor(message.authorName) } : undefined}>
                         {message.authorName}
                     </span>
-                    {message.cost && message.cost > 0 && (
-                        <span className="text-xs text-gray-400 bg-gray-800/50 px-1.5 py-0.5 rounded">
+                    {message.cost !== undefined && message.cost > 0 && (
+                        <span className="text-xs text-gray-500 bg-gray-800/30 px-1 py-0.5 rounded text-xs font-mono">
                             ${message.cost.toFixed(4)}
                         </span>
                     )}

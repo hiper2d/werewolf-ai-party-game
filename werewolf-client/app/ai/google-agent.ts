@@ -6,6 +6,7 @@ import {ModelOverloadError, ModelRateLimitError, ModelUnavailableError, ModelAut
 import { z } from 'zod';
 import { ZodSchemaConverter } from './zod-schema-converter';
 import { safeValidateResponse } from './prompts/zod-schemas';
+import { calculateGoogleCost } from '@/app/utils/pricing/google-pricing';
 
 type GoogleRole = 'model' | 'user';
 
@@ -72,6 +73,10 @@ export class GoogleAgent extends AbstractAgent {
         throw new Error(this.errorMessages.unsupportedRole(role));
     }
 
+    private calculateCost(inputTokens: number, outputTokens: number): number {
+        return calculateGoogleCost(this.model, inputTokens, outputTokens);
+    }
+
     /**
      * New method using Zod with Google's Gemini API
      * This provides better schema handling and runtime validation
@@ -127,6 +132,25 @@ export class GoogleAgent extends AbstractAgent {
                 thinkingContent = thinkingParts.join('\n');
             }
 
+            // Extract token usage from response metadata
+            const usageMetadata = (response as any).usageMetadata;
+            let tokenUsage: TokenUsage | undefined;
+            if (usageMetadata) {
+                const inputTokens = usageMetadata.promptTokenCount || 0;
+                const outputTokens = usageMetadata.candidatesTokenCount || 0;
+                const totalTokens = usageMetadata.totalTokenCount || 0;
+                
+                // Calculate cost using the pricing utility
+                const costUSD = this.calculateCost(inputTokens, outputTokens);
+                
+                tokenUsage = {
+                    inputTokens,
+                    outputTokens,
+                    totalTokens,
+                    costUSD
+                };
+            }
+
             this.logger(`Zod schema response received - hasText: ${!!response.text}, textLength: ${response.text ? response.text.length : 0}`);
             
             if (!response.text) {
@@ -151,8 +175,7 @@ export class GoogleAgent extends AbstractAgent {
 
             this.logger(`✅ Response validated successfully with Zod schema`);
             
-            // Token usage is not available in Google GenAI SDK yet
-            return [validationResult.data, thinkingContent, undefined];
+            return [validationResult.data, thinkingContent, tokenUsage];
             
         } catch (error) {
             this.logger(this.logTemplates.error(this.name, error));

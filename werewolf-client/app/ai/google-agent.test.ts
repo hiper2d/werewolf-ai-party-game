@@ -44,15 +44,37 @@ describe("GoogleAgent integration", () => {
     )
   }];
 
-  it("should respond with a valid schema-based answer", async () => {
+  it("should respond with a valid schema-based answer and token usage", async () => {
     const agent = setupAgent();
     const messages = createTestMessages();
     
-    const [response, thinking] = await agent.askWithZodSchema(BotAnswerZodSchema, messages);
+    const [response, thinking, tokenUsage] = await agent.askWithZodSchema(BotAnswerZodSchema, messages);
     expect(response).not.toBeNull();
     expect(response).toHaveProperty('reply');
     expect(typeof response.reply).toBe('string');
     expect(response.reply.length).toBeGreaterThan(0);
+    
+    // Verify token usage is returned
+    expect(tokenUsage).toBeDefined();
+    expect(tokenUsage).toHaveProperty('inputTokens');
+    expect(tokenUsage).toHaveProperty('outputTokens');
+    expect(tokenUsage).toHaveProperty('totalTokens');
+    expect(tokenUsage).toHaveProperty('costUSD');
+    expect(tokenUsage!.inputTokens).toBeGreaterThan(0);
+    expect(tokenUsage!.outputTokens).toBeGreaterThan(0);
+    expect(tokenUsage!.costUSD).toBeGreaterThan(0);
+    
+    // Google reasoning models (like Gemini 2.5 Pro) include thoughtsTokenCount in totalTokenCount
+    // even when thinking is not explicitly enabled, so total will be greater than input + output
+    const modelName = SupportedAiModels[LLM_CONSTANTS.GEMINI_25_PRO].modelApiName;
+    const isReasoningModel = modelName.includes('2.5') || modelName.includes('thinking');
+    
+    if (isReasoningModel) {
+      expect(tokenUsage!.totalTokens).toBeGreaterThan(tokenUsage!.inputTokens + tokenUsage!.outputTokens);
+      console.log(`  Note: Reasoning model detected (${modelName}), total includes ${tokenUsage!.totalTokens - tokenUsage!.inputTokens - tokenUsage!.outputTokens} reasoning tokens`);
+    } else {
+      expect(tokenUsage!.totalTokens).toBe(tokenUsage!.inputTokens + tokenUsage!.outputTokens);
+    }
   }, 30000); // Increase timeout for real API calls
 
   it("should handle API errors", async () => {
@@ -147,7 +169,7 @@ describe("GoogleAgent integration", () => {
           content: 'What do you think about the current situation in the village?'
         }];
         
-        const [response, thinking] = await agent.askWithZodSchema(
+        const [response, thinking, tokenUsage] = await agent.askWithZodSchema(
           BotAnswerZodSchema, 
           messages
         );
@@ -161,6 +183,15 @@ describe("GoogleAgent integration", () => {
         expect(response).toHaveProperty('reply');
         expect(typeof response.reply).toBe('string');
         expect(response.reply.length).toBeGreaterThan(0);
+        
+        // Verify token usage
+        if (tokenUsage) {
+          console.log("\n📊 Token Usage:");
+          console.log("  Input tokens:", tokenUsage.inputTokens);
+          console.log("  Output tokens:", tokenUsage.outputTokens);
+          console.log("  Total tokens:", tokenUsage.totalTokens);
+          console.log(`  Cost: $${tokenUsage.costUSD.toFixed(6)} USD`);
+        }
         
         console.log("✅ Google Gemini Zod schema validation passed");
         console.log("ℹ️  Note: Schema uses Google Type constants as per Gemini documentation");
@@ -309,5 +340,36 @@ describe("GoogleAgent integration", () => {
       
       console.log("✅ Google validation error handling works correctly");
     });
+    
+    it("should calculate correct USD cost for token usage", async () => {
+      const agent = createAgent(LLM_CONSTANTS.GEMINI_25_PRO);
+      const messages: AIMessage[] = [{
+        role: 'user',
+        content: 'Hello, how are you today?'
+      }];
+      
+      const [response, thinking, tokenUsage] = await agent.askWithZodSchema(
+        BotAnswerZodSchema,
+        messages
+      );
+      
+      expect(tokenUsage).toBeDefined();
+      expect(tokenUsage!.inputTokens).toBeGreaterThan(0);
+      expect(tokenUsage!.outputTokens).toBeGreaterThan(0);
+      expect(tokenUsage!.costUSD).toBeGreaterThan(0);
+      
+      console.log("\n=== Token Usage & Cost Calculation Test ===");
+      console.log(`Model: ${SupportedAiModels[LLM_CONSTANTS.GEMINI_25_PRO].modelApiName}`);
+      console.log(`Input tokens: ${tokenUsage!.inputTokens}`);
+      console.log(`Output tokens: ${tokenUsage!.outputTokens}`);
+      console.log(`Total tokens: ${tokenUsage!.totalTokens}`);
+      console.log(`Cost: $${tokenUsage!.costUSD.toFixed(6)} USD`);
+      
+      // Verify cost is reasonable (greater than 0, less than $1 for this simple request)
+      expect(tokenUsage!.costUSD).toBeGreaterThan(0);
+      expect(tokenUsage!.costUSD).toBeLessThan(1);
+      
+      console.log("✅ Token usage tracking and cost calculation verified");
+    }, 30000);
   });
 });

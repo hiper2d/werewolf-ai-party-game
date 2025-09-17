@@ -70,7 +70,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
                             msg: data.msg,
                             messageType: data.messageType,
                             day: data.day || 1,
-                            timestamp: data.timestamp || Date.now()
+                            timestamp: data.timestamp || Date.now(),
+                            cost: data.cost
                         };
                         controller.enqueue(encoder.encode(`data: ${JSON.stringify(message)}\n\n`));
                     }

@@ -417,11 +417,18 @@ export default function GamePage({
                             Game Master Model: {game.gameMasterAiType}
                         </button>
                     </div>
-                    <div className="text-xs text-left w-full">
+                    <div className="text-xs text-left w-full mb-1">
                         <span className="text-gray-500">
                             Your Role: {game.humanPlayerRole}
                         </span>
                     </div>
+                    {game.totalGameCost !== undefined && game.totalGameCost > 0 && (
+                        <div className="text-xs text-left w-full">
+                            <span className="text-gray-600 font-mono">
+                                Total Game Cost: ${game.totalGameCost.toFixed(4)}
+                            </span>
+                        </div>
+                    )}
                 </div>
 
                 {/* Participants list */}
@@ -434,31 +441,31 @@ export default function GamePage({
                                 className={`mb-3 flex flex-col ${!participant.isAlive ? 'opacity-60' : ''}`}
                             >
                                 <div className="flex items-center justify-between">
+                                    <span
+                                        style={{ color: getPlayerColor(participant.name) }}
+                                        className={!participant.isAlive ? 'line-through' : ''}
+                                    >
+                                        {participant.name}
+                                        {participant.isHuman && ' (You)'}
+                                    </span>
                                     <div className="flex items-center gap-2">
-                                        <span
-                                            style={{ color: getPlayerColor(participant.name) }}
-                                            className={!participant.isAlive ? 'line-through' : ''}
-                                        >
-                                            {participant.name}
-                                            {participant.isHuman && ' (You)'}
-                                        </span>
                                         {!participant.isHuman && (() => {
                                             const bot = game.bots.find(b => b.name === participant.name);
                                             const cost = bot?.tokenUsage?.costUSD;
                                             return cost && cost > 0 ? (
-                                                <span className="text-xs text-gray-400 bg-gray-800/50 px-1.5 py-0.5 rounded">
+                                                <span className="text-xs text-gray-600 font-mono">
                                                     ${cost.toFixed(4)}
                                                 </span>
                                             ) : null;
                                         })()}
+                                        {!participant.isAlive && (
+                                            <span className="text-sm text-red-400">💀 Eliminated</span>
+                                        )}
                                     </div>
-                                    {!participant.isAlive && (
-                                        <span className="text-sm text-red-400">💀 Eliminated</span>
-                                    )}
                                 </div>
                                 {/* Show AI model for all bots */}
                                 {!participant.isHuman && participant.aiType && (
-                                    <div className="text-xs mt-1 ml-2 text-left w-full">
+                                    <div className="text-xs mt-1 text-left w-full">
                                         <button
                                             onClick={() => openModelDialog(participant.name, participant.aiType!, participant.enableThinking)}
                                             className="text-gray-500 hover:text-gray-300 transition-colors duration-200 text-left w-full"

@@ -95,7 +95,14 @@ async function updateBotTokenUsage(gameId: string, botName: string, tokenUsage: 
             return bot;
         });
         
-        await gameRef.update({ bots: updatedBots });
+        // Also update the total game cost
+        const currentTotalCost = game.totalGameCost || 0;
+        const newTotalCost = currentTotalCost + tokenUsage.costUSD;
+        
+        await gameRef.update({ 
+            bots: updatedBots,
+            totalGameCost: newTotalCost 
+        });
     } catch (error) {
         console.error(`Failed to update token usage for bot ${botName}:`, error);
         // Don't throw here - cost tracking shouldn't break the game flow
@@ -119,30 +126,28 @@ async function updateGameMasterTokenUsage(gameId: string, tokenUsage: any): Prom
         }
         
         const game = gameDoc.data() as Game;
-        const currentGameUsage = game.tokenUsage || {
-            totalInputTokens: 0,
-            totalOutputTokens: 0,
+        const currentGMUsage = game.gameMasterTokenUsage || {
+            inputTokens: 0,
+            outputTokens: 0,
             totalTokens: 0,
-            totalCostUSD: 0,
-            botUsage: {},
-            gameMasterUsage: { inputTokens: 0, outputTokens: 0, totalTokens: 0, costUSD: 0 }
+            costUSD: 0
         };
         
-        const updatedGameUsage = {
-            ...currentGameUsage,
-            totalInputTokens: currentGameUsage.totalInputTokens + tokenUsage.inputTokens,
-            totalOutputTokens: currentGameUsage.totalOutputTokens + tokenUsage.outputTokens,
-            totalTokens: currentGameUsage.totalTokens + tokenUsage.totalTokens,
-            totalCostUSD: currentGameUsage.totalCostUSD + tokenUsage.costUSD,
-            gameMasterUsage: {
-                inputTokens: currentGameUsage.gameMasterUsage.inputTokens + tokenUsage.inputTokens,
-                outputTokens: currentGameUsage.gameMasterUsage.outputTokens + tokenUsage.outputTokens,
-                totalTokens: currentGameUsage.gameMasterUsage.totalTokens + tokenUsage.totalTokens,
-                costUSD: currentGameUsage.gameMasterUsage.costUSD + tokenUsage.costUSD
-            }
+        const updatedGMUsage = {
+            inputTokens: currentGMUsage.inputTokens + tokenUsage.inputTokens,
+            outputTokens: currentGMUsage.outputTokens + tokenUsage.outputTokens,
+            totalTokens: currentGMUsage.totalTokens + tokenUsage.totalTokens,
+            costUSD: currentGMUsage.costUSD + tokenUsage.costUSD
         };
         
-        await gameRef.update({ tokenUsage: updatedGameUsage });
+        // Also update the total game cost
+        const currentTotalCost = game.totalGameCost || 0;
+        const newTotalCost = currentTotalCost + tokenUsage.costUSD;
+        
+        await gameRef.update({ 
+            gameMasterTokenUsage: updatedGMUsage,
+            totalGameCost: newTotalCost 
+        });
     } catch (error) {
         console.error('Failed to update game master token usage:', error);
         // Don't throw here - cost tracking shouldn't break the game flow
@@ -358,6 +363,7 @@ async function welcomeImpl(gameId: string): Promise<Game> {
         // Create history from filtered messages, including the GM command that hasn't been saved yet
         const history = convertToAIMessages(bot.name, [...botMessages, gmMessage]);
         const [answer, thinking, tokenUsage] = await agent.askWithZodSchema(BotAnswerZodSchema, history);
+        
         if (!answer) {
             throw new BotResponseError(
                 'Bot failed to provide introduction',
@@ -377,6 +383,7 @@ async function welcomeImpl(gameId: string): Promise<Game> {
             timestamp: Date.now(),
             cost: tokenUsage?.costUSD
         };
+        
 
         // Save the game master command to the database first
         await addMessageToChatAndSaveToDb(gmMessage, gameId);

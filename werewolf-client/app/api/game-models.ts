@@ -50,6 +50,7 @@ export interface GamePreviewWithGeneratedBots extends GamePreview {
     bots: BotPreview[];
     gameMasterVoice: string;
     gameMasterThinking?: boolean;
+    tokenUsage?: any; // Token usage from preview generation
 }
 
 export interface Bot {
@@ -88,7 +89,8 @@ export interface Game {
     previousNightResults?: Record<string, { target: string }>; // Previous night's results for reference
     messageCounter?: number; // Counter for generating incremental message IDs
     dayActivityCounter?: Record<string, number>; // Track number of messages each bot has sent during current day
-    tokenUsage?: GameTokenUsage; // Track token usage for the entire game
+    gameMasterTokenUsage?: TokenUsage; // Track token usage for the Game Master only
+    totalGameCost?: number; // Total cost in USD for all AI calls in this game (bots + game master)
     createdAt?: number; // UTC timestamp when the game was created
 }
 

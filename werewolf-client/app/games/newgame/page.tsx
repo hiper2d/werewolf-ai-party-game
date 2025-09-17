@@ -23,6 +23,8 @@ export default function CreateNewGamePage() {
     const [error, setError] = useState<string | null>(null);
     const [isSpeaking, setIsSpeaking] = useState(false);
     const [showPlayStyleTooltip, setShowPlayStyleTooltip] = useState<number | null>(null);
+    const [nameError, setNameError] = useState<string | null>(null);
+    const [botNameErrors, setBotNameErrors] = useState<{[key: number]: string}>({});
     const router = useRouter();
 
     const playerOptions = Array.from({ length: 7 }, (_, i) => i + 6);
@@ -36,6 +38,17 @@ export default function CreateNewGamePage() {
         return modelConfig?.hasThinking === true;
     };
 
+    // Helper function to validate names (only letters, numbers, no spaces)
+    const validateName = (name: string): string | null => {
+        if (!name.trim()) {
+            return "Name cannot be empty";
+        }
+        if (!/^[a-zA-Z0-9]+$/.test(name.trim())) {
+            return "Name can only contain letters and numbers (no spaces)";
+        }
+        return null;
+    };
+
     const availableRoles = [GAME_ROLES.DOCTOR, GAME_ROLES.DETECTIVE];
 
     useEffect(() => {
@@ -45,9 +58,13 @@ export default function CreateNewGamePage() {
     }, [playerCount, werewolfCount]);
 
     useEffect(() => {
+        const nameValidationError = validateName(name);
+        setNameError(nameValidationError);
+        
         setIsFormValid(
             name.trim() !== '' &&
-            theme.trim() !== ''
+            theme.trim() !== '' &&
+            !nameValidationError
         );
     }, [name, theme]);
 
@@ -85,6 +102,16 @@ export default function CreateNewGamePage() {
                 }))
             };
             
+            // Validate initial bot names
+            const initialBotNameErrors: {[key: number]: string} = {};
+            updatedGame.bots.forEach((bot, index) => {
+                const nameValidationError = validateName(bot.name);
+                if (nameValidationError) {
+                    initialBotNameErrors[index] = nameValidationError;
+                }
+            });
+            setBotNameErrors(initialBotNameErrors);
+            
             setGameData(updatedGame);
         } catch (err: any) {
             setError(err.message);
@@ -98,6 +125,14 @@ export default function CreateNewGamePage() {
         if (!gameData) {
             return;
         }
+
+        // Check for any validation errors in bot names
+        const hasNameErrors = Object.values(botNameErrors).some(error => error);
+        if (hasNameErrors) {
+            setError("Please fix all name validation errors before creating the game");
+            return;
+        }
+
         setIsLoading(true);
         setError(null);
         try {
@@ -122,6 +157,15 @@ export default function CreateNewGamePage() {
             const updatedPlayers = [...gameData.bots];
             updatedPlayers[index] = { ...updatedPlayers[index], [field]: value };
             setGameData({ ...gameData, bots: updatedPlayers });
+
+            // Validate bot names
+            if (field === 'name' && typeof value === 'string') {
+                const nameValidationError = validateName(value);
+                setBotNameErrors(prev => ({
+                    ...prev,
+                    [index]: nameValidationError || ''
+                }));
+            }
         }
     };
 
@@ -199,14 +243,17 @@ export default function CreateNewGamePage() {
 
             <form id="create-game-form" className="space-y-2">
                 <div className="flex space-x-2">
-                    <input
-                        className="w-1/2 p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
-                        type="text"
-                        placeholder="Name"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        required
-                    />
+                    <div className="w-1/2">
+                        <input
+                            className={`w-full p-2 rounded bg-black bg-opacity-30 text-white border ${nameError ? 'border-red-500' : 'border-white border-opacity-30'} focus:outline-none focus:border-white focus:border-opacity-50`}
+                            type="text"
+                            placeholder="Name"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            required
+                        />
+                        {nameError && <p className="text-red-500 text-sm mt-1">{nameError}</p>}
+                    </div>
                     <input
                         className="w-1/2 p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
                         type="text"
@@ -386,11 +433,12 @@ export default function CreateNewGamePage() {
                                         <label className="block text-gray-400 text-sm mb-1">Name:</label>
                                         <input
                                             type="text"
-                                            className="w-full h-10 p-2 rounded bg-gray-900 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
+                                            className={`w-full h-10 p-2 rounded bg-gray-900 text-white border ${botNameErrors[index] ? 'border-red-500' : 'border-white border-opacity-30'} focus:outline-none focus:border-white focus:border-opacity-50`}
                                             value={player.name}
                                             onChange={(e) => handlePlayerChange(index, 'name', e.target.value)}
                                             placeholder="Player Name"
                                         />
+                                        {botNameErrors[index] && <p className="text-red-500 text-xs mt-1">{botNameErrors[index]}</p>}
                                     </div>
                                     <div className="flex-1">
                                         <label className="block text-gray-400 text-sm mb-1">Gender:</label>

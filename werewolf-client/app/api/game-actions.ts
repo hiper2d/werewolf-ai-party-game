@@ -210,7 +210,7 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
         timestamp: null
     };
 
-    const [aiResponse] = await storyTellAgent.askWithZodSchema(GameSetupZodSchema, [convertToAIMessage(storyMessage)]);
+    const [aiResponse, thinking, tokenUsage] = await storyTellAgent.askWithZodSchema(GameSetupZodSchema, [convertToAIMessage(storyMessage)]);
     if (!aiResponse) {
         throw new Error('Failed to get AI response');
     }
@@ -253,7 +253,8 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
         gameMasterAiType: resolvedGmAiType,
         gameMasterVoice: getRandomVoiceForGender('male'),
         scene: aiResponse.scene,
-        bots: bots
+        bots: bots,
+        tokenUsage: tokenUsage // Include token usage from preview generation
     };
 }
 
@@ -306,6 +307,8 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
 
         // Create the game object
         const timestamp = Date.now();
+        const previewCost = gamePreview.tokenUsage?.costUSD || 0;
+        
         const game = {
             description: gamePreview.description,
             theme: gamePreview.theme,
@@ -322,7 +325,19 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
             gameStateParamQueue: bots.map(bot => bot.name),
             gameStateProcessQueue: [],
             messageCounter: 0, // Initialize message counter for new games
-            createdAt: timestamp // Store creation timestamp
+            createdAt: timestamp, // Store creation timestamp
+            totalGameCost: previewCost, // Total cost starts with preview generation cost
+            gameMasterTokenUsage: gamePreview.tokenUsage ? {
+                inputTokens: gamePreview.tokenUsage.inputTokens || 0,
+                outputTokens: gamePreview.tokenUsage.outputTokens || 0,
+                totalTokens: gamePreview.tokenUsage.totalTokens || 0,
+                costUSD: previewCost
+            } : {
+                inputTokens: 0,
+                outputTokens: 0,
+                totalTokens: 0,
+                costUSD: 0
+            }
         };
 
         // Generate custom game ID: theme-timestamp
@@ -338,7 +353,8 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
             msg: { story: game.story },  
             messageType: MessageType.GAME_STORY,
             day: game.currentDay,
-            timestamp: null
+            timestamp: null,
+            cost: previewCost
         };
 
         await addMessageToChatAndSaveToDb(gameStoryMessage, customGameId);
@@ -704,7 +720,8 @@ function serializeMessageForFirestore(gameMessage: GameMessage) {
              gameMessage.messageType === MessageType.DOCTOR_ACTION ||
              gameMessage.messageType === MessageType.NIGHT_SUMMARY
             ? gameMessage.msg  // keep as object
-            : gameMessage.msg as string  // it's a string for most other message types
+            : gameMessage.msg as string,  // it's a string for most other message types
+        cost: gameMessage.cost || 0 // Ensure cost is never undefined
     };
 }
 
@@ -755,6 +772,8 @@ function gameFromFirestore(id: string, data: any): Game {
         previousNightResults: data.previousNightResults || {},
         messageCounter: data.messageCounter || 0, // Default to 0 for existing games
         dayActivityCounter: data.dayActivityCounter || {}, // Default to empty object for existing games
-        createdAt: data.createdAt || extractTimestampFromGameId(id) // Use stored timestamp or extract from ID for existing games
+        createdAt: data.createdAt || extractTimestampFromGameId(id), // Use stored timestamp or extract from ID for existing games
+        totalGameCost: data.totalGameCost || 0,
+        gameMasterTokenUsage: data.gameMasterTokenUsage || data.tokenUsage?.gameMasterUsage || null
     };
 }
