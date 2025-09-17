@@ -168,9 +168,9 @@ export default function CreateNewGamePage() {
 
     // Common styles
     const inputStyle = "p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50";
-    const labelStyle = "text-white whitespace-nowrap w-36";
-    const flexRowStyle = "flex space-x-4";
-    const flexItemStyle = "flex-1 flex items-center space-x-2";
+    const labelStyle = "text-white whitespace-nowrap w-full sm:w-36";
+    const flexRowStyle = "flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4";
+    const flexItemStyle = "flex-1 flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-2";
     const buttonDisabledStyle = "opacity-50 cursor-not-allowed";
 
     return (
@@ -255,10 +255,10 @@ export default function CreateNewGamePage() {
                 </div>
 
                 <div className={flexRowStyle}>
-                    <div className={flexItemStyle}>
+                    <div className="flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-2 sm:flex-1">
                         <label className={labelStyle}>Game Master AI:</label>
                         <select
-                            className={`${inputStyle} flex-1`}
+                            className={`${inputStyle} w-full sm:flex-1`}
                             value={gameMasterAiType}
                             onChange={(e) => setGameMasterAiType(e.target.value as string)}
                             required
@@ -268,10 +268,10 @@ export default function CreateNewGamePage() {
                             ))}
                         </select>
                     </div>
-                    <div className={flexItemStyle}>
+                    <div className="flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-2 sm:flex-1">
                         <label className={labelStyle}>Players AI:</label>
                         <select
-                            className={`${inputStyle} flex-1`}
+                            className={`${inputStyle} w-full sm:flex-1`}
                             value={playersAiType}
                             onChange={(e) => setPlayersAiType(e.target.value)}
                             required
@@ -334,7 +334,7 @@ export default function CreateNewGamePage() {
                     <div className="mb-6">
                         <h3 className="text-xl font-bold text-white mb-4">Game Master:</h3>
                         <div className="p-4 bg-gray-900 bg-opacity-50 rounded-lg">
-                            <div className="flex space-x-2 mb-2">
+                            <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 mb-2">
                                 <div className="flex-1">
                                     <label className="block text-gray-400 text-sm mb-1">AI Model:</label>
                                     <select
@@ -378,8 +378,8 @@ export default function CreateNewGamePage() {
                     <h3 className="text-xl font-bold text-white mb-4">Players:</h3>
                     {gameData.bots.map((player, index) => (
                         <div key={index} className="mb-4 p-4 bg-gray-900 bg-opacity-50 rounded-lg">
-                            <div className="flex gap-2 mb-2">
-                                <div className="flex gap-2 flex-1">
+                            <div className="flex flex-col lg:flex-row gap-2 mb-2">
+                                <div className="flex flex-col sm:flex-row gap-2 flex-1">
                                     <div className="flex-1">
                                         <label className="block text-gray-400 text-sm mb-1">Name:</label>
                                         <input
@@ -430,8 +430,8 @@ export default function CreateNewGamePage() {
                                     </button>
                                 </div>
                             </div>
-                            <div className="flex gap-2 mb-2">
-                                <div className="flex gap-2 flex-1">
+                            <div className="flex flex-col lg:flex-row gap-2 mb-2">
+                                <div className="flex flex-col sm:flex-row gap-2 flex-1">
                                     <div className="flex-1">
                                         <label className="block text-gray-400 text-sm mb-1">AI Model:</label>
                                         <select
