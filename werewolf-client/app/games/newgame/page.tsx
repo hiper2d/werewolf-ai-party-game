@@ -347,29 +347,31 @@ export default function CreateNewGamePage() {
                                         ))}
                                     </select>
                                 </div>
-                                <div className="flex-1">
-                                    <label className="block text-gray-400 text-sm mb-1">Voice:</label>
-                                    <select
-                                        className="w-full h-10 p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
-                                        value={gameData.gameMasterVoice || getVoicesForGender('male')[0]}
-                                        onChange={(e) => setGameData({ ...gameData, gameMasterVoice: e.target.value })}
-                                    >
-                                        {getVoicesForGender('male').map(voice => (
-                                            <option key={voice} value={voice}>{voice}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div className="flex flex-col justify-end">
-                                    <button
-                                        className={`w-10 h-10 ${buttonTransparentStyle} ${(!gameData.scene || isSpeaking) ? 'opacity-50 cursor-not-allowed' : ''} flex items-center justify-center`}
-                                        onClick={() => isSpeaking ? handleStopTTS() : handlePlayStory(gameData.scene, gameData.gameMasterVoice || getVoicesForGender('male')[0])}
-                                        disabled={!gameData.scene}
-                                        title={isSpeaking ? "Stop speaking" : "Play game story"}
-                                    >
-                                        <span className="text-lg">
-                                            {isSpeaking ? '⏹️' : '🔊'}
-                                        </span>
-                                    </button>
+                                <div className="flex-1 flex gap-2">
+                                    <div className="flex-1">
+                                        <label className="block text-gray-400 text-sm mb-1">Voice:</label>
+                                        <select
+                                            className="w-full h-10 p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
+                                            value={gameData.gameMasterVoice || getVoicesForGender('male')[0]}
+                                            onChange={(e) => setGameData({ ...gameData, gameMasterVoice: e.target.value })}
+                                        >
+                                            {getVoicesForGender('male').map(voice => (
+                                                <option key={voice} value={voice}>{voice}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="flex flex-col justify-end">
+                                        <button
+                                            className={`w-10 h-10 ${buttonTransparentStyle} ${(!gameData.scene || isSpeaking) ? 'opacity-50 cursor-not-allowed' : ''} flex items-center justify-center`}
+                                            onClick={() => isSpeaking ? handleStopTTS() : handlePlayStory(gameData.scene, gameData.gameMasterVoice || getVoicesForGender('male')[0])}
+                                            disabled={!gameData.scene}
+                                            title={isSpeaking ? "Stop speaking" : "Play game story"}
+                                        >
+                                            <span className="text-lg">
+                                                {isSpeaking ? '⏹️' : '🔊'}
+                                            </span>
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -378,8 +380,8 @@ export default function CreateNewGamePage() {
                     <h3 className="text-xl font-bold text-white mb-4">Players:</h3>
                     {gameData.bots.map((player, index) => (
                         <div key={index} className="mb-4 p-4 bg-gray-900 bg-opacity-50 rounded-lg">
-                            <div className="flex flex-col lg:flex-row gap-2 mb-2">
-                                <div className="flex flex-col sm:flex-row gap-2 flex-1">
+                            <div className="flex flex-col gap-2 mb-2">
+                                <div className="flex flex-col sm:flex-row gap-2">
                                     <div className="flex-1">
                                         <label className="block text-gray-400 text-sm mb-1">Name:</label>
                                         <input
@@ -404,46 +406,48 @@ export default function CreateNewGamePage() {
                                             ))}
                                         </select>
                                     </div>
-                                    <div className="flex-1">
-                                        <label className="block text-gray-400 text-sm mb-1">Voice:</label>
-                                        <select
-                                            className="w-full h-10 p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
-                                            value={player.voice}
-                                            onChange={(e) => handlePlayerChange(index, 'voice', e.target.value)}
-                                        >
-                                            {getVoicesForGender(player.gender).map(voice => (
-                                                <option key={voice} value={voice}>{voice}</option>
-                                            ))}
-                                        </select>
+                                    <div className="flex-1 flex gap-2">
+                                        <div className="flex-1">
+                                            <label className="block text-gray-400 text-sm mb-1">Voice:</label>
+                                            <select
+                                                className="w-full h-10 p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
+                                                value={player.voice}
+                                                onChange={(e) => handlePlayerChange(index, 'voice', e.target.value)}
+                                            >
+                                                {getVoicesForGender(player.gender).map(voice => (
+                                                    <option key={voice} value={voice}>{voice}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div className="flex flex-col justify-end">
+                                            <button
+                                                className={`w-10 h-10 ${buttonTransparentStyle} ${(!player.story || isSpeaking) ? 'opacity-50 cursor-not-allowed' : ''} flex items-center justify-center`}
+                                                onClick={() => isSpeaking ? handleStopTTS() : handlePlayStory(player.story, player.voice)}
+                                                disabled={!player.story}
+                                                title={isSpeaking ? "Stop speaking" : "Play story"}
+                                            >
+                                                <span className="text-lg">
+                                                    {isSpeaking ? '⏹️' : '🔊'}
+                                                </span>
+                                            </button>
+                                        </div>
                                     </div>
-                                </div>
-                                <div className="flex flex-col justify-end">
-                                    <button
-                                        className={`w-10 h-10 ${buttonTransparentStyle} ${(!player.story || isSpeaking) ? 'opacity-50 cursor-not-allowed' : ''} flex items-center justify-center`}
-                                        onClick={() => isSpeaking ? handleStopTTS() : handlePlayStory(player.story, player.voice)}
-                                        disabled={!player.story}
-                                        title={isSpeaking ? "Stop speaking" : "Play story"}
-                                    >
-                                        <span className="text-lg">
-                                            {isSpeaking ? '⏹️' : '🔊'}
-                                        </span>
-                                    </button>
                                 </div>
                             </div>
-                            <div className="flex flex-col lg:flex-row gap-2 mb-2">
-                                <div className="flex flex-col sm:flex-row gap-2 flex-1">
-                                    <div className="flex-1">
-                                        <label className="block text-gray-400 text-sm mb-1">AI Model:</label>
-                                        <select
-                                            className="w-full h-10 p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
-                                            value={player.playerAiType}
-                                            onChange={(e) => handleBotAiChange(index, e.target.value)}
-                                        >
-                                            {supportedPlayerAi.filter(model => model !== LLM_CONSTANTS.RANDOM).map(model => (
-                                                <option key={model} value={model}>{model}</option>
-                                            ))}
-                                        </select>
-                                    </div>
+                            <div className="flex flex-col sm:flex-row gap-2 mb-2">
+                                <div className="flex-1">
+                                    <label className="block text-gray-400 text-sm mb-1">AI Model:</label>
+                                    <select
+                                        className="w-full h-10 p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
+                                        value={player.playerAiType}
+                                        onChange={(e) => handleBotAiChange(index, e.target.value)}
+                                    >
+                                        {supportedPlayerAi.filter(model => model !== LLM_CONSTANTS.RANDOM).map(model => (
+                                            <option key={model} value={model}>{model}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="flex-1 flex gap-2">
                                     <div className="flex-1">
                                         <label className="block text-gray-400 text-sm mb-1">
                                             Play Style:
@@ -460,30 +464,30 @@ export default function CreateNewGamePage() {
                                             ))}
                                         </select>
                                     </div>
-                                </div>
-                                <div className="relative flex flex-col justify-end">
-                                    <button
-                                        type="button"
-                                        className="w-10 h-10 rounded-full bg-gray-700 hover:bg-gray-600 text-white text-xs flex items-center justify-center transition-colors"
-                                        onMouseEnter={() => setShowPlayStyleTooltip(index)}
-                                        onMouseLeave={() => setShowPlayStyleTooltip(null)}
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            setShowPlayStyleTooltip(showPlayStyleTooltip === index ? null : index);
-                                        }}
-                                    >
-                                        ?
-                                    </button>
-                                    {showPlayStyleTooltip === index && (
-                                        <div className="absolute z-10 w-80 p-3 bg-gray-900 border border-gray-700 rounded-lg shadow-lg text-sm text-white top-full mt-2 right-0">
-                                            <div className="font-semibold mb-2">
-                                                {PLAY_STYLE_CONFIGS[player.playStyle]?.name || player.playStyle}
+                                    <div className="relative flex flex-col justify-end">
+                                        <button
+                                            type="button"
+                                            className="w-10 h-10 rounded-full bg-gray-700 hover:bg-gray-600 text-white text-xs flex items-center justify-center transition-colors"
+                                            onMouseEnter={() => setShowPlayStyleTooltip(index)}
+                                            onMouseLeave={() => setShowPlayStyleTooltip(null)}
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                setShowPlayStyleTooltip(showPlayStyleTooltip === index ? null : index);
+                                            }}
+                                        >
+                                            ?
+                                        </button>
+                                        {showPlayStyleTooltip === index && (
+                                            <div className="absolute z-10 w-64 sm:w-72 md:w-80 p-3 bg-gray-900 border border-gray-700 rounded-lg shadow-lg text-sm text-white top-full mt-2 right-0 transform -translate-x-full sm:-translate-x-3/4 md:translate-x-0">
+                                                <div className="font-semibold mb-2">
+                                                    {PLAY_STYLE_CONFIGS[player.playStyle]?.name || player.playStyle}
+                                                </div>
+                                                <div className="text-gray-300">
+                                                    {PLAY_STYLE_CONFIGS[player.playStyle]?.uiDescription || 'No description available'}
+                                                </div>
                                             </div>
-                                            <div className="text-gray-300">
-                                                {PLAY_STYLE_CONFIGS[player.playStyle]?.uiDescription || 'No description available'}
-                                            </div>
-                                        </div>
-                                    )}
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                             <div>
