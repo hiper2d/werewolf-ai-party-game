@@ -6,8 +6,10 @@ import { OpenAI } from "openai";
 import { API_KEY_CONSTANTS } from "@/app/ai/ai-models";
 
 export interface TTSOptions {
-  voice?: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
+  voice?: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer' | 'ash' | 'ballad' | 'coral' | 'sage';
+  instructions?: string;
   speed?: number;
+  format?: 'mp3' | 'wav' | 'opus' | 'aac' | 'flac' | 'pcm';
 }
 
 export async function generateSpeech(
@@ -38,12 +40,20 @@ export async function generateSpeech(
     });
 
     // Generate speech
-    const response = await client.audio.speech.create({
-      model: 'tts-1',
+    const speechOptions: any = {
+      model: 'gpt-4o-mini-tts', // Use the newer model that supports instructions
       voice: options.voice || 'alloy',
       input: text,
       speed: options.speed || 1.0,
-    });
+      response_format: options.format || 'wav', // Default to WAV for faster playback
+    };
+
+    // Add instructions if provided (only supported in gpt-4o-mini-tts model)
+    if (options.instructions) {
+      speechOptions.instructions = options.instructions;
+    }
+
+    const response = await client.audio.speech.create(speechOptions);
 
     // Return the audio data as ArrayBuffer
     return await response.arrayBuffer();

@@ -84,6 +84,7 @@ export class DeepSeekV2Agent extends AbstractAgent {
                 model: this.model,
                 messages: this.addSystemInstruction(modifiedInput),
                 temperature: this.temperature,
+                max_tokens: 16384,  // Set to 16k to handle longer JSON responses
             };
 
             if (this.enableThinking) {

@@ -16,7 +16,7 @@ interface AnthropicMessage {
 
 export class ClaudeAgent extends AbstractAgent {
     private readonly client: Anthropic;
-    private readonly maxTokens = 8192;
+    private readonly maxTokens = 16384; // Set to 16k to handle longer JSON responses
     private readonly defaultParams: Omit<Anthropic.MessageCreateParams, 'messages'> = {
         max_tokens: this.maxTokens,
         system: this.instruction,
@@ -104,7 +104,7 @@ export class ClaudeAgent extends AbstractAgent {
                 params.temperature = 1;
                 // Increase max_tokens to be greater than budget_tokens
                 // Use a larger value for complex responses like game generation
-                params.max_tokens = 8192;
+                params.max_tokens = 16384; // Set to 16k
             }
 
             let response;

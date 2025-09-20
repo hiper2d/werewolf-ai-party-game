@@ -39,8 +39,9 @@ export interface BotPreview {
     name: string;
     story: string;
     playerAiType: string;
-    gender: 'male' | 'female' | 'neutral';
+    gender: 'male' | 'female';
     voice: string;
+    voiceInstructions?: string;
     playStyle: string;
     enableThinking?: boolean;
 }
@@ -49,6 +50,7 @@ export interface GamePreviewWithGeneratedBots extends GamePreview {
     scene: string;
     bots: BotPreview[];
     gameMasterVoice: string;
+    gameMasterVoiceInstructions?: string;
     gameMasterThinking?: boolean;
     tokenUsage?: any; // Token usage from preview generation
 }
@@ -59,8 +61,9 @@ export interface Bot {
     role: string;
     isAlive: boolean;
     aiType: string;
-    gender: 'male' | 'female' | 'neutral';
+    gender: 'male' | 'female';
     voice: string;
+    voiceInstructions?: string;
     playStyle: string;
     eliminationDay?: number; // Track which day this bot was eliminated (undefined if alive)
     daySummaries?: string[]; // Array of summaries for each previous day (index 0 = day 1 summary)
@@ -76,6 +79,7 @@ export interface Game {
     specialRoles: string[];
     gameMasterAiType: string;
     gameMasterVoice: string;
+    gameMasterVoiceInstructions?: string;
     story: string;
     bots: Bot[];
     humanPlayerName: string;
@@ -160,18 +164,17 @@ export const PLAY_STYLES = {
 } as const;
 
 export const VOICE_OPTIONS = {
-    MALE: ['echo', 'fable', 'onyx'], // ash, ballad, verse
-    FEMALE: ['nova', 'shimmer'], // coral, sage
-    NEUTRAL: ['alloy']
+    MALE: ['echo', 'fable', 'onyx', 'ash', 'ballad'], // Male voices from OpenAI
+    FEMALE: ['alloy', 'nova', 'shimmer', 'coral', 'sage'], // Female voices from OpenAI (alloy is female)
 } as const;
 
-export const GENDER_OPTIONS = ['male', 'female', 'neutral'] as const;
+export const GENDER_OPTIONS = ['male', 'female'] as const;
 
-export function getVoicesForGender(gender: 'male' | 'female' | 'neutral'): string[] {
-    return [...VOICE_OPTIONS[gender.toUpperCase() as 'MALE' | 'FEMALE' | 'NEUTRAL']];
+export function getVoicesForGender(gender: 'male' | 'female'): string[] {
+    return [...VOICE_OPTIONS[gender.toUpperCase() as 'MALE' | 'FEMALE']];
 }
 
-export function getRandomVoiceForGender(gender: 'male' | 'female' | 'neutral'): string {
+export function getRandomVoiceForGender(gender: 'male' | 'female'): string {
     const voices = getVoicesForGender(gender);
     return voices[Math.floor(Math.random() * voices.length)];
 }

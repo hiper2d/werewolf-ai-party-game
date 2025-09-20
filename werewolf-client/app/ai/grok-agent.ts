@@ -119,7 +119,7 @@ export class GrokAgent extends AbstractAgent {
                 temperature: this.temperature,
                 messages: openAIMessages,
                 response_format: zodResponseFormat(zodSchema, "response"),
-                max_tokens: 16384  // Increased for Grok-4's extensive reasoning
+                max_tokens: 16384  // Set to 16k to handle longer JSON responses
             });
 
             // Get the parsed structured response

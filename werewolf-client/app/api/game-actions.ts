@@ -214,7 +214,7 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
     if (!aiResponse) {
         throw new Error('Failed to get AI response');
     }
-    const bots: BotPreview[] = aiResponse.players.map((bot: { name: string; gender: string; story: string; playStyle?: string }) => {
+    const bots: BotPreview[] = aiResponse.players.map((bot: { name: string; gender: string; story: string; playStyle?: string; voiceInstructions: string }) => {
         let aiType = gamePreview.playersAiType;
         
         if (aiType === LLM_CONSTANTS.RANDOM) {
@@ -225,9 +225,8 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
             aiType = availableTypes[Math.floor(Math.random() * availableTypes.length)];
         }
 
-
         // Assign gender and voice
-        const gender = bot.gender as 'male' | 'female' | 'neutral';
+        const gender = bot.gender as 'male' | 'female';
         const voice = getRandomVoiceForGender(gender);
 
         // Use AI-selected playstyle if available, otherwise fallback to random
@@ -244,6 +243,7 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
             playerAiType: aiType,
             gender: gender,
             voice: voice,
+            voiceInstructions: bot.voiceInstructions,
             playStyle: playStyle
         };
     });
@@ -252,9 +252,10 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
         ...gamePreview,
         gameMasterAiType: resolvedGmAiType,
         gameMasterVoice: getRandomVoiceForGender('male'),
+        gameMasterVoiceInstructions: aiResponse.gameMasterVoiceInstructions,
         scene: aiResponse.scene,
         bots: bots,
-        tokenUsage: tokenUsage // Include token usage from preview generation
+        tokenUsage: tokenUsage
     };
 }
 
@@ -301,6 +302,7 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
                 aiType: bot.playerAiType,
                 gender: bot.gender,
                 voice: bot.voice,
+                voiceInstructions: bot.voiceInstructions,
                 playStyle: bot.playStyle,
             };
         });
@@ -316,6 +318,7 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
             specialRoles: gamePreview.specialRoles,
             gameMasterAiType: gamePreview.gameMasterAiType,
             gameMasterVoice: gamePreview.gameMasterVoice,
+            gameMasterVoiceInstructions: gamePreview.gameMasterVoiceInstructions,
             story: gamePreview.scene,
             bots: bots,
             humanPlayerName: gamePreview.name,
@@ -759,6 +762,7 @@ function gameFromFirestore(id: string, data: any): Game {
         specialRoles: data.specialRoles,
         gameMasterAiType: data.gameMasterAiType,
         gameMasterVoice: data.gameMasterVoice || getRandomVoiceForGender('male'), // Fallback for existing games
+        gameMasterVoiceInstructions: data.gameMasterVoiceInstructions,
         story: data.story,
         bots: data.bots,
         humanPlayerName: data.humanPlayerName,

@@ -87,7 +87,7 @@ You are an AI agent tasked with generating a game scene and character descriptio
 
       <CharacterDetails>
         - A unique, single-word <Name>name</Name> appropriate to the theme, following the Character Sourcing Rule above. Do not use the <ExcludedName>ExcludedName</ExcludedName> or any similar names.
-        - A <Gender>gender</Gender> (male, female, or neutral) that fits the character
+        - A <Gender>gender</Gender> (male or female) that fits the character
         - A brief <Story>story</Story> (3-5 sentences) that:
           * Fits within the context of the scene and theme
           * **Includes ambiguous details that could hint at any role without revealing it**
@@ -102,28 +102,58 @@ You are an AI agent tasked with generating a game scene and character descriptio
   </Task2>
 </Tasks>
 
+<VoiceInstructions>
+  For each character AND the Game Master, you must also generate voice instructions for text-to-speech synthesis. These instructions must follow the OpenAI TTS format with labeled sections:
+
+  **Required Voice Instruction Sections:**
+  - Affect: Overall voice quality and emotional character
+  - Tone: Emotional quality and attitude
+  - Pacing: Speed, rhythm, and cadence
+  - Emotion: Emotional expression and range
+  - Pronunciation: Emphasis patterns and articulation
+  - Pauses: When and how to use pauses
+
+  **Voice Instructions Must:**
+  - Match the character's personality, story, and play style
+  - Reflect the game theme (medieval = formal, sci-fi = technical, etc.)
+  - Be distinct for each character
+  - Follow professional TTS instruction format
+
+  **Play Style Voice Mapping:**
+  - Aggressive Provoker: Bold affect, accusatory tone, fast pacing
+  - Protective Team Player: Warm affect, reassuring tone, measured pacing  
+  - Trickster: Playful affect, alternating tone, varied pacing
+  - Rule Breaker: Rebellious affect, skeptical tone, interrupting rhythm
+  - Modest Mouse: Quiet affect, hesitant tone, slow pacing
+  - Normal: Balanced affect, collaborative tone, natural rhythm
+</VoiceInstructions>
+
 <JSONSchema>
   Your response must exactly match this TypeScript interface:
 
   interface GameSetup {
     scene: string;      // The vivid scene description
+    gameMasterVoiceInstructions: string; // Voice instructions for Game Master
     players: Array<{
       name: string;     // Single-word unique name
-      gender: string;   // male, female, or neutral
+      gender: string;   // male or female
       story: string;    // 3-5 sentence character background
       playStyle: string; // Playstyle identifier (e.g., aggressive_provoker, protective_team_player, etc.)
+      voiceInstructions: string; // Character-specific voice instructions
     }>;
   }
 
   Example response structure:
   {
     "scene": "In the heart of a bustling space station...",
+    "gameMasterVoiceInstructions": "Affect: Authoritative and commanding, like a ship's AI computer system...",
     "players": [
       {
-        "name": "Zenith",
+        "name": "Zenith", 
         "gender": "male",
         "story": "A veteran maintenance engineer with a mysterious past...",
-        "playStyle": "modest_mouse"
+        "playStyle": "modest_mouse",
+        "voiceInstructions": "Affect: Quiet and withdrawn, with technical precision..."
       },
       // ... more players
     ]
@@ -155,12 +185,14 @@ export const STORY_USER_PROMPT: string = `
 
 Expected response format:
 {
-  "scene": string,        // Vivid scene description
+  "scene": string,              // Vivid scene description
+  "gameMasterVoiceInstructions": string, // Voice instructions for Game Master
   "players": Array<{
-    "name": string,       // Single-word unique name
-    "gender": string,     // male, female, or neutral
-    "story": string,      // 3-5 sentence character background
-    "playStyle": string   // Playstyle identifier
+    "name": string,             // Single-word unique name
+    "gender": string,           // male or female
+    "story": string,            // 3-5 sentence character background
+    "playStyle": string,        // Playstyle identifier
+    "voiceInstructions": string // Character voice instructions
   }>
 }
 `;

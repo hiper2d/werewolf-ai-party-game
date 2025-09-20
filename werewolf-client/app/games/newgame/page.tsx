@@ -13,7 +13,7 @@ export default function CreateNewGamePage() {
     const [theme, setTheme] = useState('');
     const [description, setDescription] = useState('');
     const [playerCount, setPlayerCount] = useState(8);
-    const [werewolfCount, setWerewolfCount] = useState(3);
+    const [werewolfCount, setWerewolfCount] = useState(2);
     const [specialRoles, setSpecialRoles] = useState([GAME_ROLES.DOCTOR, GAME_ROLES.DETECTIVE]);
     const [gameMasterAiType, setGameMasterAiType] = useState<string>(LLM_CONSTANTS.RANDOM);
     const [playersAiType, setPlayersAiType] = useState<string>(LLM_CONSTANTS.RANDOM);
@@ -114,7 +114,18 @@ export default function CreateNewGamePage() {
             
             setGameData(updatedGame);
         } catch (err: any) {
-            setError(err.message);
+            // Provide user-friendly error messages for common issues
+            let userFriendlyError = err.message;
+            
+            if (err.message.includes('Failed to parse JSON response') || err.message.includes('JSON mode failed')) {
+                userFriendlyError = `The AI model had trouble generating a properly formatted response. This sometimes happens with certain models. Please try again, or consider using a different AI model for the Game Master.`;
+            } else if (err.message.includes('Response validation failed')) {
+                userFriendlyError = `The AI model generated an invalid response format. Please try again or use a different AI model.`;
+            } else if (err.message.includes('Failed to get response') || err.message.includes('API')) {
+                userFriendlyError = `Unable to connect to the AI service. Please check your API keys and try again.`;
+            }
+            
+            setError(userFriendlyError);
             console.error("Error previewing game:", err);
         } finally {
             setIsLoading(false);
@@ -194,10 +205,13 @@ export default function CreateNewGamePage() {
         }
     };
 
-    const handlePlayStory = async (story: string, voice: string) => {
+    const handlePlayStory = async (story: string, voice: string, voiceInstructions?: string) => {
         try {
             setIsSpeaking(true);
-            await ttsService.speakText(story, { voice: voice as any });
+            await ttsService.speakText(story, { 
+                voice: voice as any,
+                instructions: voiceInstructions 
+            });
             setIsSpeaking(false);
         } catch (error) {
             console.error('TTS Error:', error);
@@ -227,7 +241,12 @@ export default function CreateNewGamePage() {
                         onClick={handleGeneratePreview}
                         disabled={!isFormValid || isLoading}
                     >
-                        {isLoading ? 'Processing...' : (gameData ? 'Generate Preview Again' : 'Generate Preview')}
+                        {isLoading ? (
+                            <span className="flex items-center space-x-2">
+                                <span className="animate-spin">⏳</span>
+                                <span>Generating Preview...</span>
+                            </span>
+                        ) : (gameData ? 'Generate Preview Again' : 'Generate Preview')}
                     </button>
                     {gameData && (
                         <button
@@ -360,7 +379,29 @@ export default function CreateNewGamePage() {
                 </div>
             </form>
 
-            {error && <p className="text-red-500 mt-2">{error}</p>}
+            {isLoading && (
+                <div className="mt-4 p-4 bg-blue-900 bg-opacity-50 border border-blue-500 rounded-lg">
+                    <div className="flex items-start space-x-2">
+                        <span className="text-blue-400 text-lg animate-spin">⏳</span>
+                        <div>
+                            <h3 className="text-blue-400 font-semibold mb-1">Generating Game Preview...</h3>
+                            <p className="text-blue-300 text-sm">The AI is creating your game story and characters. This may take a moment.</p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {error && (
+                <div className="mt-4 p-4 bg-red-900 bg-opacity-50 border border-red-500 rounded-lg">
+                    <div className="flex items-start space-x-2">
+                        <span className="text-red-400 text-lg">⚠️</span>
+                        <div>
+                            <h3 className="text-red-400 font-semibold mb-1">Game Preview Generation Failed</h3>
+                            <p className="text-red-300 text-sm">{error}</p>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Preview section remains unchanged */}
             {gameData && (
@@ -410,7 +451,7 @@ export default function CreateNewGamePage() {
                                     <div className="flex flex-col justify-end">
                                         <button
                                             className={`w-10 h-10 ${buttonTransparentStyle} ${(!gameData.scene || isSpeaking) ? 'opacity-50 cursor-not-allowed' : ''} flex items-center justify-center`}
-                                            onClick={() => isSpeaking ? handleStopTTS() : handlePlayStory(gameData.scene, gameData.gameMasterVoice || getVoicesForGender('male')[0])}
+                                            onClick={() => isSpeaking ? handleStopTTS() : handlePlayStory(gameData.scene, gameData.gameMasterVoice || getVoicesForGender('male')[0], gameData.gameMasterVoiceInstructions)}
                                             disabled={!gameData.scene}
                                             title={isSpeaking ? "Stop speaking" : "Play game story"}
                                         >
@@ -421,6 +462,18 @@ export default function CreateNewGamePage() {
                                     </div>
                                 </div>
                             </div>
+                            {gameData.gameMasterVoiceInstructions && (
+                                <div className="mt-2">
+                                    <label className="block text-gray-400 text-sm mb-1">Voice Instructions:</label>
+                                    <textarea
+                                        className="w-full p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
+                                        rows={2}
+                                        value={gameData.gameMasterVoiceInstructions}
+                                        onChange={(e) => setGameData({ ...gameData, gameMasterVoiceInstructions: e.target.value })}
+                                        placeholder="Voice instructions for the Game Master..."
+                                    />
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -470,7 +523,7 @@ export default function CreateNewGamePage() {
                                         <div className="flex flex-col justify-end">
                                             <button
                                                 className={`w-10 h-10 ${buttonTransparentStyle} ${(!player.story || isSpeaking) ? 'opacity-50 cursor-not-allowed' : ''} flex items-center justify-center`}
-                                                onClick={() => isSpeaking ? handleStopTTS() : handlePlayStory(player.story, player.voice)}
+                                                onClick={() => isSpeaking ? handleStopTTS() : handlePlayStory(player.story, player.voice, player.voiceInstructions)}
                                                 disabled={!player.story}
                                                 title={isSpeaking ? "Stop speaking" : "Play story"}
                                             >
@@ -548,6 +601,18 @@ export default function CreateNewGamePage() {
                                     placeholder="Player's Story"
                                 />
                             </div>
+                            {player.voiceInstructions && (
+                                <div className="mt-2">
+                                    <label className="block text-gray-400 text-sm mb-1">Voice Instructions:</label>
+                                    <textarea
+                                        className="w-full p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
+                                        rows={2}
+                                        value={player.voiceInstructions}
+                                        onChange={(e) => handlePlayerChange(index, 'voiceInstructions', e.target.value)}
+                                        placeholder="Voice instructions for this character..."
+                                    />
+                                </div>
+                            )}
                         </div>
                     ))}
 
@@ -557,7 +622,12 @@ export default function CreateNewGamePage() {
                             onClick={handleGeneratePreview}
                             disabled={!isFormValid || isLoading}
                         >
-                            {isLoading ? 'Processing...' : 'Generate Preview Again'}
+                            {isLoading ? (
+                                <span className="flex items-center space-x-2">
+                                    <span className="animate-spin">⏳</span>
+                                    <span>Generating Preview...</span>
+                                </span>
+                            ) : 'Generate Preview Again'}
                         </button>
                         <button
                             className={`${buttonTransparentStyle} ${isLoading ? buttonDisabledStyle : ''}`}

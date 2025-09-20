@@ -11,6 +11,8 @@ export class MistralAgent extends AbstractAgent {
     private readonly client: Mistral;
     private readonly defaultParams: Omit<Parameters<Mistral['chat']['complete']>[0], 'messages'> = {
         model: this.model,
+        maxTokens: 16384,  // Set to 16k to handle longer JSON responses
+        temperature: this.temperature,
     };
 
     // Log message templates

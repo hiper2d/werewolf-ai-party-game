@@ -13,6 +13,7 @@ export class KimiAgent extends AbstractAgent {
         model: this.model,
         temperature: this.temperature,
         stream: false,
+        max_tokens: 16384,  // Set to 16k to handle longer JSON responses
     };
 
     // Log message templates

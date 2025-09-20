@@ -93,7 +93,8 @@ export class GoogleAgent extends AbstractAgent {
             const config: any = {
                 temperature: this.temperature,
                 responseMimeType: "application/json",
-                responseSchema: googleSchema
+                responseSchema: googleSchema,
+                maxOutputTokens: 16384  // Set to 16k to handle longer JSON responses
             };
 
             // Add thinking config for Google models with thinking mode

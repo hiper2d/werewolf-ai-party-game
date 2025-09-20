@@ -1,8 +1,10 @@
 import { generateSpeech } from "@/app/api/tts-actions";
 
 export interface TTSOptions {
-  voice?: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
+  voice?: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer' | 'ash' | 'ballad' | 'coral' | 'sage';
+  instructions?: string;
   speed?: number;
+  format?: 'mp3' | 'wav' | 'opus' | 'aac' | 'flac' | 'pcm';
 }
 
 export class TTSService {
@@ -31,9 +33,11 @@ export class TTSService {
       // Call server action to generate speech
       const audioBuffer = await generateSpeech(text, options);
       
-      // Convert ArrayBuffer to Blob
+      // Convert ArrayBuffer to Blob with appropriate MIME type
+      const format = options.format || 'wav';
+      const mimeType = this.getMimeType(format);
       const audioBlob = new Blob([audioBuffer], { 
-        type: 'audio/mpeg' 
+        type: mimeType 
       });
       
       // Create audio URL and play
@@ -69,6 +73,25 @@ export class TTSService {
 
   isSpeaking(): boolean {
     return this.currentAudio !== null && !this.currentAudio.paused;
+  }
+
+  private getMimeType(format: string): string {
+    switch (format) {
+      case 'mp3':
+        return 'audio/mpeg';
+      case 'wav':
+        return 'audio/wav';
+      case 'opus':
+        return 'audio/opus';
+      case 'aac':
+        return 'audio/aac';
+      case 'flac':
+        return 'audio/flac';
+      case 'pcm':
+        return 'audio/pcm';
+      default:
+        return 'audio/wav'; // Default to WAV
+    }
   }
 }
 
