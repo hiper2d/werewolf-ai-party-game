@@ -160,8 +160,8 @@ export const PLAY_STYLES = {
 } as const;
 
 export const VOICE_OPTIONS = {
-    MALE: ['echo', 'fable', 'onyx'],
-    FEMALE: ['nova', 'shimmer'],
+    MALE: ['echo', 'fable', 'onyx'], // ash, ballad, verse
+    FEMALE: ['nova', 'shimmer'], // coral, sage
     NEUTRAL: ['alloy']
 } as const;
 
