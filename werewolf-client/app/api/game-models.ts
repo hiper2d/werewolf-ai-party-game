@@ -32,7 +32,7 @@ export interface GamePreview {
     werewolfCount: number;
     specialRoles: string[];
     gameMasterAiType: string;
-    playersAiType: string;
+    playersAiType: string | string[];
 }
 
 export interface BotPreview {

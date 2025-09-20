@@ -215,14 +215,31 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
         throw new Error('Failed to get AI response');
     }
     const bots: BotPreview[] = aiResponse.players.map((bot: { name: string; gender: string; story: string; playStyle?: string; voiceInstructions: string }) => {
-        let aiType = gamePreview.playersAiType;
+        let aiType: string;
         
-        if (aiType === LLM_CONSTANTS.RANDOM) {
-            // Support only models for which user has API keys (if needed)
-            const availableTypes = Object.values(LLM_CONSTANTS).filter(
-                type => type !== LLM_CONSTANTS.RANDOM
-            );
-            aiType = availableTypes[Math.floor(Math.random() * availableTypes.length)];
+        if (Array.isArray(gamePreview.playersAiType)) {
+            // If array is provided, pick randomly from selected models
+            const selectedModels = gamePreview.playersAiType;
+            if (selectedModels.length === 0) {
+                // Fallback to all available models if empty array
+                const availableTypes = Object.values(LLM_CONSTANTS).filter(
+                    type => type !== LLM_CONSTANTS.RANDOM
+                );
+                aiType = availableTypes[Math.floor(Math.random() * availableTypes.length)];
+            } else {
+                aiType = selectedModels[Math.floor(Math.random() * selectedModels.length)];
+            }
+        } else {
+            // Legacy support for single string value
+            aiType = gamePreview.playersAiType;
+            
+            if (aiType === LLM_CONSTANTS.RANDOM) {
+                // Support only models for which user has API keys (if needed)
+                const availableTypes = Object.values(LLM_CONSTANTS).filter(
+                    type => type !== LLM_CONSTANTS.RANDOM
+                );
+                aiType = availableTypes[Math.floor(Math.random() * availableTypes.length)];
+            }
         }
 
         // Assign gender and voice

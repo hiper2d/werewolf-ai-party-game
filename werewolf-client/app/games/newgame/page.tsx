@@ -6,6 +6,7 @@ import {buttonBlackStyle, buttonTransparentStyle} from "@/app/constants";
 import {createGame, previewGame} from '@/app/api/game-actions';
 import {GAME_ROLES, GamePreview, GamePreviewWithGeneratedBots, GENDER_OPTIONS, getVoicesForGender, getRandomVoiceForGender, PLAY_STYLES, PLAY_STYLE_CONFIGS} from "@/app/api/game-models";
 import {LLM_CONSTANTS, SupportedAiModels} from "@/app/ai/ai-models";
+import MultiSelectDropdown from '@/app/components/MultiSelectDropdown';
 import {ttsService} from "@/app/services/tts-service";
 
 export default function CreateNewGamePage() {
@@ -16,7 +17,7 @@ export default function CreateNewGamePage() {
     const [werewolfCount, setWerewolfCount] = useState(2);
     const [specialRoles, setSpecialRoles] = useState([GAME_ROLES.DOCTOR, GAME_ROLES.DETECTIVE]);
     const [gameMasterAiType, setGameMasterAiType] = useState<string>(LLM_CONSTANTS.RANDOM);
-    const [playersAiType, setPlayersAiType] = useState<string>(LLM_CONSTANTS.RANDOM);
+    const [selectedPlayerAiTypes, setSelectedPlayerAiTypes] = useState<string[]>(Object.values(LLM_CONSTANTS).filter(model => model !== LLM_CONSTANTS.RANDOM));
     const [isFormValid, setIsFormValid] = useState(false);
     const [gameData, setGameData] = useState<GamePreviewWithGeneratedBots | null>(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -24,12 +25,14 @@ export default function CreateNewGamePage() {
     const [isSpeaking, setIsSpeaking] = useState(false);
     const [showPlayStyleTooltip, setShowPlayStyleTooltip] = useState<number | null>(null);
     const [nameError, setNameError] = useState<string | null>(null);
+    const [themeError, setThemeError] = useState<string | null>(null);
+    const [playersAiError, setPlayersAiError] = useState<string | null>(null);
     const [botNameErrors, setBotNameErrors] = useState<{[key: number]: string}>({});
     const router = useRouter();
 
     const playerOptions = Array.from({ length: 7 }, (_, i) => i + 6);
     const supportedAi = Object.values(LLM_CONSTANTS); // todo: this list should be limited to ApiKeys player uploaded
-    const supportedPlayerAi = Object.values(LLM_CONSTANTS);
+    const supportedPlayerAi = Object.values(LLM_CONSTANTS).filter(model => model !== LLM_CONSTANTS.RANDOM);
 
     // Helper function to check if a model has thinking capabilities
     const hasThinkingMode = (aiType: string): boolean => {
@@ -49,6 +52,14 @@ export default function CreateNewGamePage() {
         return null;
     };
 
+    // Helper function to validate theme
+    const validateTheme = (theme: string): string | null => {
+        if (!theme.trim()) {
+            return "Theme cannot be empty";
+        }
+        return null;
+    };
+
     const availableRoles = [GAME_ROLES.DOCTOR, GAME_ROLES.DETECTIVE];
 
     useEffect(() => {
@@ -61,12 +72,20 @@ export default function CreateNewGamePage() {
         const nameValidationError = validateName(name);
         setNameError(nameValidationError);
         
+        const themeValidationError = validateTheme(theme);
+        setThemeError(themeValidationError);
+        
+        const playersAiValidationError = selectedPlayerAiTypes.length === 0 ? 'At least one AI model must be selected' : null;
+        setPlayersAiError(playersAiValidationError);
+        
         setIsFormValid(
             name.trim() !== '' &&
             theme.trim() !== '' &&
-            !nameValidationError
+            selectedPlayerAiTypes.length > 0 &&
+            !nameValidationError &&
+            !themeValidationError
         );
-    }, [name, theme]);
+    }, [name, theme, selectedPlayerAiTypes]);
 
     useEffect(() => {
         if (gameData && !gameData.gameMasterVoice) {
@@ -84,7 +103,7 @@ export default function CreateNewGamePage() {
             werewolfCount,
             specialRoles,
             gameMasterAiType,
-            playersAiType
+            playersAiType: selectedPlayerAiTypes.length > 0 ? selectedPlayerAiTypes : [LLM_CONSTANTS.RANDOM]
         };
 
         setIsLoading(true);
@@ -266,21 +285,24 @@ export default function CreateNewGamePage() {
                         <input
                             className={`w-full p-2 rounded bg-black bg-opacity-30 text-white border ${nameError ? 'border-red-500' : 'border-white border-opacity-30'} focus:outline-none focus:border-white focus:border-opacity-50`}
                             type="text"
-                            placeholder="Name"
+                            placeholder="Name *"
                             value={name}
                             onChange={(e) => setName(e.target.value)}
                             required
                         />
                         {nameError && <p className="text-red-500 text-sm mt-1">{nameError}</p>}
                     </div>
-                    <input
-                        className="w-1/2 p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
-                        type="text"
-                        placeholder="Theme"
-                        value={theme}
-                        onChange={(e) => setTheme(e.target.value)}
-                        required
-                    />
+                    <div className="w-1/2">
+                        <input
+                            className={`w-full p-2 rounded bg-black bg-opacity-30 text-white border ${themeError ? 'border-red-500' : 'border-white border-opacity-30'} focus:outline-none focus:border-white focus:border-opacity-50`}
+                            type="text"
+                            placeholder="Theme *"
+                            value={theme}
+                            onChange={(e) => setTheme(e.target.value)}
+                            required
+                        />
+                        {themeError && <p className="text-red-500 text-sm mt-1">{themeError}</p>}
+                    </div>
                 </div>
 
                 <textarea
@@ -335,17 +357,18 @@ export default function CreateNewGamePage() {
                         </select>
                     </div>
                     <div className="flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-2 sm:flex-1">
-                        <label className={labelStyle}>Players AI:</label>
-                        <select
-                            className={`${inputStyle} w-full sm:flex-1`}
-                            value={playersAiType}
-                            onChange={(e) => setPlayersAiType(e.target.value)}
-                            required
-                        >
-                            {supportedPlayerAi.map(model => (
-                                <option key={model} value={model}>{model}</option>
-                            ))}
-                        </select>
+                        <label className={labelStyle}>Players AI *:</label>
+                        <div className="w-full sm:flex-1">
+                            <MultiSelectDropdown
+                                options={supportedPlayerAi}
+                                selectedOptions={selectedPlayerAiTypes}
+                                onChange={setSelectedPlayerAiTypes}
+                                placeholder="Select AI models for bots... *"
+                                className="w-full"
+                                hasError={!!playersAiError}
+                            />
+                            {playersAiError && <p className="text-red-500 text-sm mt-1">{playersAiError}</p>}
+                        </div>
                     </div>
                 </div>
 
