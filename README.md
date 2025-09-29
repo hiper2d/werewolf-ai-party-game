@@ -1,4 +1,6 @@
-<a href="images/werewolf-ai-logo-3.png" target="_blank"><img src="images/werewolf-ai-logo-3.png" width="600"></a>
+# AI Werewolf
+
+<a href="images/werewolf-ai-logo-4.png" target="_blank"><img src="images/werewolf-ai-logo-4.png" width="800"></a>
 
 This the Werewolf game with AI bots who are instructed to pretend to be humans. 
 Who don't know about other AI in the game and try their best to win. Who has its personal goals, secret roles, enemies and alliances.
@@ -7,7 +9,7 @@ Who don't know about other AI in the game and try their best to win. Who has its
 
 The game supports all the major latest models for the game master and bots:
 - Open AI: `GPT-5`, `GPT-5-mini`
-- Anthropic: `Claude 4.1 Opus`, `Claude 4 Sonnet`
+- Anthropic: `Claude 4.1 Opus`, `Claude 4.5 Sonnet`
 - Google: `Gemini 2.5 Pro`
 - DeepSeek: `Chat (V3.1)`, `Reasoner (V3.1 with thinking)`
 - Mistral: `Mistral Large 2.1`, `Mistral Medium 3.1`, `Magistral Medium 1.1 (Thinking)`
