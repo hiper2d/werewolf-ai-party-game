@@ -59,12 +59,12 @@ export const SupportedAiModels = {
         hasThinking: true
     },
     [LLM_CONSTANTS.CLAUDE_4_SONNET]: {
-        modelApiName: 'claude-sonnet-4-0',
+        modelApiName: 'claude-sonnet-4-5',
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
         hasThinking: false
     },
     [LLM_CONSTANTS.CLAUDE_4_SONNET_THINKING]: {
-        modelApiName: 'claude-sonnet-4-0',
+        modelApiName: 'claude-sonnet-4-5',
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
         hasThinking: true
     },
