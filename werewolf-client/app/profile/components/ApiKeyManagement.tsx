@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import ApiKeyList from './ApiKeyList';
 import AddApiKeyForm from './AddApiKeyForm';
 import { ApiKeyMap } from '@/app/api/game-models';
-import { MODEL_PRICING, SupportedAiModels, API_KEY_CONSTANTS } from '@/app/ai/ai-models';
+import { MODEL_PRICING, SupportedAiModels, API_KEY_CONSTANTS, AUDIO_MODEL_CONSTANTS } from '@/app/ai/ai-models';
 import { updateUserTier } from '@/app/api/user-actions';
 import { useRouter } from 'next/navigation';
 
@@ -95,8 +95,8 @@ export default function ApiKeyManagement({ initialApiKeys, userId }: { initialAp
                     </p>
                     <div className="text-xs text-gray-400">
                         <p className="mb-2"><strong>Available with:</strong> {API_KEY_CONSTANTS.OPENAI}</p>
-                        <p className="mb-1"><strong>TTS Models:</strong> tts-1, tts-1-hd</p>
-                        <p><strong>STT Models:</strong> whisper-1</p>
+                        <p className="mb-1"><strong>TTS Model:</strong> {AUDIO_MODEL_CONSTANTS.TTS}</p>
+                        <p><strong>STT Model:</strong> {AUDIO_MODEL_CONSTANTS.STT}</p>
                     </div>
                 </div>
             </div>

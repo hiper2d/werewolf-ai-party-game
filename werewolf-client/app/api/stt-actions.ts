@@ -3,7 +3,7 @@
 import { auth } from "@/auth";
 import { getUserApiKeys } from "@/app/api/user-actions";
 import { OpenAI } from "openai";
-import { API_KEY_CONSTANTS } from "@/app/ai/ai-models";
+import { API_KEY_CONSTANTS, AUDIO_MODEL_CONSTANTS } from "@/app/ai/ai-models";
 
 export interface STTOptions {
   language?: string;
@@ -44,7 +44,7 @@ export async function transcribeAudio(
     // Transcribe audio
     const response = await client.audio.transcriptions.create({
       file: audioFile,
-      model: 'whisper-1', // Using Whisper model for transcription
+      model: AUDIO_MODEL_CONSTANTS.STT,
       language: options.language || 'en',
       prompt: options.prompt,
       temperature: options.temperature || 0,

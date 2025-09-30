@@ -46,6 +46,11 @@ export const LLM_CONSTANTS = {
     RANDOM: 'Random',
 }
 
+export const AUDIO_MODEL_CONSTANTS = {
+    TTS: 'gpt-4o-mini-tts',
+    STT: 'whisper-1',
+} as const;
+
 export interface ModelConfig {
     modelApiName: string;
     apiKeyName: string;

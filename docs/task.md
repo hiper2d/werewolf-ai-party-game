@@ -187,3 +187,4 @@ free (using my keys stored in the database and shared to all free-tier users).
 
 Now, we need to implement the game creation following the Free Tier limitations (amount of models per game)
 Let's enable tts/sst for Free Tier for now but add const tracking for each user
+Add tracking on audio tokens: https://platform.openai.com/docs/pricing

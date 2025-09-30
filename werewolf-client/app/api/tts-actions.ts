@@ -3,7 +3,7 @@
 import { auth } from "@/auth";
 import { getUserApiKeys } from "@/app/api/user-actions";
 import { OpenAI } from "openai";
-import { API_KEY_CONSTANTS } from "@/app/ai/ai-models";
+import { API_KEY_CONSTANTS, AUDIO_MODEL_CONSTANTS } from "@/app/ai/ai-models";
 
 export interface TTSOptions {
   voice?: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer' | 'ash' | 'ballad' | 'coral' | 'sage';
@@ -41,7 +41,7 @@ export async function generateSpeech(
 
     // Generate speech
     const speechOptions: any = {
-      model: 'gpt-4o-mini-tts', // Use the newer model that supports instructions
+      model: AUDIO_MODEL_CONSTANTS.TTS,
       voice: options.voice || 'alloy',
       input: text,
       speed: options.speed || 1.0,
