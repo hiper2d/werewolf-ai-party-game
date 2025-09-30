@@ -125,32 +125,60 @@ Let's implement this. The summary of the idea:
 
 - The gameStateParamQueue is always initialized when the performNightAction, humanPlayerTalkWerewolves,
   performHumanPlayerNightAction functions are being called
-- If the gameStateParamQueue is empty, this means that the current role finishes its actions, and it's time to move to the next role
+- If the gameStateParamQueue is empty, this means that the current role finishes its actions, and it's time to move to
+  the next role
 - When the active role finishes its actions, we move to the next role and reinitialize gameStateParamQueue
-- There is no parallel processing on the frontend and on the backend. We either call a server function or wait for a user to provide some data on UI
+- There is no parallel processing on the frontend and on the backend. We either call a server function or wait for a
+  user to provide some data on UI
 
 ======
 
 Rewrite play styles:
-- Aggressive provoker: boldly attack, falsely accuse, provoke to see the reaction 
-- Protective team player: seek for alliances, suspicious about other alliances, protect bullied  
+
+- Aggressive provoker: boldly attack, falsely accuse, provoke to see the reaction
+- Protective team player: seek for alliances, suspicious about other alliances, protect bullied
 - Trickster: create chaos and change sides
 
 ======
 
 I need to implement endNightWithResults function properly:
-- The evaluation of night results from the nightResults field should happen before the game master creates its night summary language
-- When we evaluate, let's decide if the werewolves target has died or not. If yes, then let's check if the victim a human player or not.
+
+- The evaluation of night results from the nightResults field should happen before the game master creates its night
+  summary language
+- When we evaluate, let's decide if the werewolves target has died or not. If yes, then let's check if the victim a
+  human player or not.
 - Then, let's decide the detective's target check outcome: it can be good (not a werewolf), or bad (werewolf)
-- 
 
 ======
 
-We need to add a check if the game has ended of not. Check should happen in the VOTE_RESULTS and NIGHT_RESULTS game stages.
+We need to add a check if the game has ended of not. Check should happen in the VOTE_RESULTS and NIGHT_RESULTS game
+stages.
 There are following end game conditions:
+
 - the human player has died: the game is over for the human player and thus stops
 - all werewolves are dead while there are alive villagers: villagers win
 - the amount of alive werewolves greater or equals to the amount of alive villagers: werewolves win
-When the game ends during the VOTE_RESULTS, UI should show the Game Over button, but it should be possible to reset to any of the day discussion message as it is now
-When the game ends during the NIGHT_RESULTS, UI should show the Game Over button as well as the Replay button as it is now
-The Game over button should move the game to the new AFTER_GAME_DISCUSSION state. We need to create the new function in game-actions with no implementation yet.
+  When the game ends during the VOTE_RESULTS, UI should show the Game Over button, but it should be possible to reset to
+  any of the day discussion message as it is now
+  When the game ends during the NIGHT_RESULTS, UI should show the Game Over button as well as the Replay button as it is
+  now
+  The Game over button should move the game to the new AFTER_GAME_DISCUSSION state. We need to create the new function
+  in game-actions with no implementation yet.
+
+======
+
+Current game assumes that a use provides API keys to all models in their profile. I want to add another way (an
+alternative option): a free tier where a user doesn't have to provide any keys, but get access to certain models for
+free (using my keys stored in the database and shared to all free-tier users).
+
+1. Let's add a filed "tier" to the User object in the database. It should support 2 values: free, api. The "free" tier
+   is the default.
+2. Based on the tier, a use see different pages when open the Profile page. The current screen is what the "api" tier
+   sees. Although, we'll need to add more information to it. We need to create a new screen for the "free" tier users.
+3. For the "api" user tier, we need to display model costs below the API keys. We should also show a dropdown with the
+   tts/sst options which is only OpenAI now
+4. For the "free" tier, we should show the free tier model limitations and the models cost. For the limitations, we need
+   to create a config that shows not many of each model usage we allow for one game. We also need to create an object in
+   the Firestore that keeps API keys for free tier users
+5. Base on the user tier, all the agents calls should be done either with user's API keys or with the global free tier
+   API keys
