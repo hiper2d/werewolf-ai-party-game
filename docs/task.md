@@ -182,3 +182,8 @@ free (using my keys stored in the database and shared to all free-tier users).
    the Firestore that keeps API keys for free tier users
 5. Base on the user tier, all the agents calls should be done either with user's API keys or with the global free tier
    API keys
+
+========
+
+Now, we need to implement the game creation following the Free Tier limitations (amount of models per game)
+Let's enable tts/sst for Free Tier for now but add const tracking for each user

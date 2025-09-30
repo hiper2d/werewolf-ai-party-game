@@ -82,7 +82,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         hasThinking: false,
         freeTier: {
             available: true,
-            maxBotsPerGame: -1 // Unlimited bots can use this model
+            maxBotsPerGame: 1
         }
     },
     [LLM_CONSTANTS.CLAUDE_4_SONNET_THINKING]: {
@@ -111,7 +111,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         hasThinking: true,
         freeTier: {
             available: true,
-            maxBotsPerGame: 1 // Only 1 bot per game - more expensive reasoning
+            maxBotsPerGame: -1
         }
     },
 
@@ -122,7 +122,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         hasThinking: true,
         freeTier: {
             available: true,
-            maxBotsPerGame: 1 // Only 1 bot per game - expensive
+            maxBotsPerGame: 1
         }
     },
     [LLM_CONSTANTS.GPT_5_MINI]: {
@@ -131,7 +131,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         hasThinking: true,
         freeTier: {
             available: true,
-            maxBotsPerGame: -1 // Unlimited - affordable mini version
+            maxBotsPerGame: -1
         }
     },
     [LLM_CONSTANTS.GEMINI_25_PRO]: {
@@ -140,7 +140,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         hasThinking: true,
         freeTier: {
             available: true,
-            maxBotsPerGame: 1 // Only 1 bot per game - expensive
+            maxBotsPerGame: 1
         }
     },
     [LLM_CONSTANTS.GROK_4]: {
@@ -149,7 +149,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         hasThinking: true,
         freeTier: {
             available: true,
-            maxBotsPerGame: 1 // Only 1 bot per game - expensive
+            maxBotsPerGame: 1
         }
     },
 
@@ -160,7 +160,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         hasThinking: false,
         freeTier: {
             available: true,
-            maxBotsPerGame: 1 // Only 1 bot per game - moderately expensive
+            maxBotsPerGame: 1
         }
     },
     [LLM_CONSTANTS.MISTRAL_3_MEDIUM]: {
@@ -169,7 +169,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         hasThinking: false,
         freeTier: {
             available: true,
-            maxBotsPerGame: -1 // Unlimited - affordable
+            maxBotsPerGame: -1
         }
     },
     [LLM_CONSTANTS.MISTRAL_MAGISTRAL]: {
@@ -178,7 +178,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         hasThinking: true,
         freeTier: {
             available: true,
-            maxBotsPerGame: 1 // Only 1 bot per game - thinking model
+            maxBotsPerGame: 1
         }
     },
 
@@ -189,7 +189,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         hasThinking: false,
         freeTier: {
             available: true,
-            maxBotsPerGame: -1 // Unlimited - affordable
+            maxBotsPerGame: -1
         }
     },
 };

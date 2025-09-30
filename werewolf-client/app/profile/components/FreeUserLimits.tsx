@@ -1,12 +1,17 @@
 'use client';
 
 import React, { useState } from 'react';
-import { getFreeTierModels, MODEL_PRICING } from '@/app/ai/ai-models';
+import { SupportedAiModels, MODEL_PRICING } from '@/app/ai/ai-models';
 import { updateUserTier } from '@/app/api/user-actions';
 import { useRouter } from 'next/navigation';
 
 export default function FreeUserLimits({ userId }: { userId: string }) {
-    const freeTierModels = getFreeTierModels();
+    // Get all models, not just free tier ones
+    const allModels = Object.entries(SupportedAiModels).map(([modelName, config]) => ({
+        modelName,
+        config
+    }));
+
     const [isLoading, setIsLoading] = useState(false);
     const router = useRouter();
 
@@ -48,14 +53,24 @@ export default function FreeUserLimits({ userId }: { userId: string }) {
                             </tr>
                         </thead>
                         <tbody>
-                            {freeTierModels.map(({ modelName, config }, index) => {
+                            {allModels.map(({ modelName, config }, index) => {
                                 const pricing = MODEL_PRICING[config.modelApiName];
+                                const isAvailable = config.freeTier?.available || false;
                                 const maxBots = config.freeTier?.maxBotsPerGame || 0;
-                                const displayLimit = maxBots === -1 ? 'Unlimited' : maxBots === 0 ? 'Not Available' : maxBots.toString();
+
+                                let displayLimit: string;
+                                if (!isAvailable) {
+                                    displayLimit = 'Not available in Free Tier';
+                                } else if (maxBots === -1) {
+                                    displayLimit = 'Unlimited';
+                                } else {
+                                    displayLimit = maxBots.toString();
+                                }
+
                                 return (
-                                    <tr key={index} className="border-b border-white border-opacity-10">
+                                    <tr key={index} className={`border-b border-white border-opacity-10 ${!isAvailable ? 'opacity-50' : ''}`}>
                                         <td className="py-2">{modelName}</td>
-                                        <td className="py-2 text-right">{displayLimit}</td>
+                                        <td className="py-2 text-right text-xs">{displayLimit}</td>
                                         <td className="py-2 text-right">${pricing?.inputPrice.toFixed(2) || '0.00'}</td>
                                         <td className="py-2 text-right">${pricing?.outputPrice.toFixed(2) || '0.00'}</td>
                                     </tr>
