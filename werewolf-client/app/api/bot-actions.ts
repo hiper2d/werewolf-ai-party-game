@@ -41,7 +41,7 @@ import {
     getGameMessages,
     getUserFromFirestore
 } from "./game-actions";
-import {getUserApiKeys} from "./user-actions";
+import {getApiKeysForUser} from "@/app/utils/tier-utils";
 import {withGameErrorHandling} from "@/app/utils/server-action-wrapper";
 import {
     generatePlayStyleDescription,
@@ -320,8 +320,7 @@ async function welcomeImpl(gameId: string): Promise<Game> {
             throw new Error(`Bot ${botName} not found in game`);
         }
 
-        const apiKeys = await getUserFromFirestore(session.user.email)
-            .then((user) => getUserApiKeys(user!.email));
+        const apiKeys = await getApiKeysForUser(session.user.email);
 
         const botPrompt = format(BOT_SYSTEM_PROMPT,
             {
@@ -495,7 +494,7 @@ async function keepBotsGoingImpl(gameId: string): Promise<Game> {
         const dayMessages = messages.filter(m => m.day === game.currentDay);
 
         // Ask GM which bots should continue the conversation (without human input)
-        const apiKeys = await getUserFromFirestore(session.user.email).then((user) => getUserApiKeys(user!.email));
+        const apiKeys = await getApiKeysForUser(session.user.email);
 
         // Ensure day activity counter is initialized for backward compatibility
         await ensureDayActivityCounter(gameId);
@@ -592,7 +591,7 @@ async function handleHumanPlayerMessage(
     const dayMessages = messages.filter(m => m.day === game.currentDay);
 
     // Ask GM which bots should respond
-    const apiKeys = await getUserFromFirestore(userEmail).then((user) => getUserApiKeys(user!.email));
+    const apiKeys = await getApiKeysForUser(userEmail);
 
     // Ensure day activity counter is initialized for backward compatibility
     await ensureDayActivityCounter(gameId);
@@ -703,8 +702,7 @@ async function processNextBotInQueue(
     const botMessages = await getBotMessages(gameId, bot.name, game.currentDay);
 
     // Get bot's response
-    const apiKeys = await getUserFromFirestore(userEmail)
-        .then((user) => getUserApiKeys(user!.email));
+    const apiKeys = await getApiKeysForUser(userEmail);
 
     const botPrompt = format(BOT_SYSTEM_PROMPT, {
         name: bot.name,
@@ -1028,8 +1026,7 @@ async function voteImpl(gameId: string): Promise<Game> {
             }
             
             // Get API keys and create bot agent
-            const apiKeys = await getUserFromFirestore(session.user!.email!)
-                .then((user) => getUserApiKeys(user!.email));
+            const apiKeys = await getApiKeysForUser(session.user!.email!);
             
             const botPrompt = format(
                 BOT_SYSTEM_PROMPT,
@@ -1491,8 +1488,7 @@ async function getSuggestionImpl(gameId: string): Promise<string> {
         const dayMessages = messages.filter(m => m.day === game.currentDay);
 
         // Get API keys for the human player
-        const apiKeys = await getUserFromFirestore(session.user.email)
-            .then((user) => getUserApiKeys(user!.email));
+        const apiKeys = await getApiKeysForUser(session.user.email);
 
         // Create prompt with game context
         const suggestionPrompt = format(HUMAN_SUGGESTION_PROMPT, {

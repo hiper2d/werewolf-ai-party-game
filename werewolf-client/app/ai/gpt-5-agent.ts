@@ -51,7 +51,7 @@ export class Gpt5Agent extends AbstractAgent {
                 model: this.model,
                 instructions: this.instruction,
                 input: input,
-                max_completion_tokens: 16384,  // Set to 16k to handle longer JSON responses
+                max_output_tokens: 16384,  // Set to 16k to handle longer JSON responses
                 text: {
                     format: zodTextFormat(zodSchema, "response_schema"),
                 }

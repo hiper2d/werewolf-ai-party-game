@@ -2,6 +2,7 @@
 
 import React, {useEffect, useState} from 'react';
 import {useRouter} from 'next/navigation';
+import {useSession} from 'next-auth/react';
 import {buttonBlackStyle, buttonTransparentStyle} from "@/app/constants";
 import {createGame, previewGame} from '@/app/api/game-actions';
 import {GAME_ROLES, GamePreview, GamePreviewWithGeneratedBots, GENDER_OPTIONS, getVoicesForGender, getRandomVoiceForGender, PLAY_STYLES, PLAY_STYLE_CONFIGS} from "@/app/api/game-models";
@@ -10,6 +11,10 @@ import MultiSelectDropdown from '@/app/components/MultiSelectDropdown';
 import {ttsService} from "@/app/services/tts-service";
 
 export default function CreateNewGamePage() {
+    const { data: session, status } = useSession();
+    const router = useRouter();
+
+    // All hooks must be called before any conditional returns
     const [name, setName] = useState('');
     const [theme, setTheme] = useState('');
     const [description, setDescription] = useState('');
@@ -28,7 +33,77 @@ export default function CreateNewGamePage() {
     const [themeError, setThemeError] = useState<string | null>(null);
     const [playersAiError, setPlayersAiError] = useState<string | null>(null);
     const [botNameErrors, setBotNameErrors] = useState<{[key: number]: string}>({});
-    const router = useRouter();
+
+    // Redirect to login if not authenticated
+    useEffect(() => {
+        if (status === 'unauthenticated') {
+            router.push('/api/auth/signin');
+        }
+    }, [status, router]);
+
+    useEffect(() => {
+        if (werewolfCount >= playerCount) {
+            setWerewolfCount(playerCount - 1);
+        }
+    }, [playerCount, werewolfCount]);
+
+    useEffect(() => {
+        // Helper function to validate names (only letters, numbers, no spaces)
+        const validateName = (name: string): string | null => {
+            if (!name.trim()) {
+                return "Name cannot be empty";
+            }
+            if (!/^[a-zA-Z0-9]+$/.test(name.trim())) {
+                return "Name can only contain letters and numbers (no spaces)";
+            }
+            return null;
+        };
+
+        // Helper function to validate theme
+        const validateTheme = (theme: string): string | null => {
+            if (!theme.trim()) {
+                return "Theme cannot be empty";
+            }
+            return null;
+        };
+
+        const nameValidationError = validateName(name);
+        setNameError(nameValidationError);
+
+        const themeValidationError = validateTheme(theme);
+        setThemeError(themeValidationError);
+
+        const playersAiValidationError = selectedPlayerAiTypes.length === 0 ? 'At least one AI model must be selected' : null;
+        setPlayersAiError(playersAiValidationError);
+
+        setIsFormValid(
+            name.trim() !== '' &&
+            theme.trim() !== '' &&
+            selectedPlayerAiTypes.length > 0 &&
+            !nameValidationError &&
+            !themeValidationError
+        );
+    }, [name, theme, selectedPlayerAiTypes]);
+
+    useEffect(() => {
+        if (gameData && !gameData.gameMasterVoice) {
+            setGameData({ ...gameData, gameMasterVoice: getRandomVoiceForGender('male') });
+        }
+    }, [gameData]);
+
+    // Show loading while checking auth
+    if (status === 'loading') {
+        return (
+            <div className="flex items-center justify-center h-full">
+                <div className="text-white text-xl">Loading...</div>
+            </div>
+        );
+    }
+
+    // Don't render if not authenticated
+    if (!session) {
+        return null;
+    }
 
     const playerOptions = Array.from({ length: 7 }, (_, i) => i + 6);
     const supportedAi = Object.values(LLM_CONSTANTS); // todo: this list should be limited to ApiKeys player uploaded
@@ -61,37 +136,6 @@ export default function CreateNewGamePage() {
     };
 
     const availableRoles = [GAME_ROLES.DOCTOR, GAME_ROLES.DETECTIVE];
-
-    useEffect(() => {
-        if (werewolfCount >= playerCount) {
-            setWerewolfCount(playerCount - 1);
-        }
-    }, [playerCount, werewolfCount]);
-
-    useEffect(() => {
-        const nameValidationError = validateName(name);
-        setNameError(nameValidationError);
-        
-        const themeValidationError = validateTheme(theme);
-        setThemeError(themeValidationError);
-        
-        const playersAiValidationError = selectedPlayerAiTypes.length === 0 ? 'At least one AI model must be selected' : null;
-        setPlayersAiError(playersAiValidationError);
-        
-        setIsFormValid(
-            name.trim() !== '' &&
-            theme.trim() !== '' &&
-            selectedPlayerAiTypes.length > 0 &&
-            !nameValidationError &&
-            !themeValidationError
-        );
-    }, [name, theme, selectedPlayerAiTypes]);
-
-    useEffect(() => {
-        if (gameData && !gameData.gameMasterVoice) {
-            setGameData({ ...gameData, gameMasterVoice: getRandomVoiceForGender('male') });
-        }
-    }, [gameData]);
 
 
     const handleGeneratePreview = async () => {

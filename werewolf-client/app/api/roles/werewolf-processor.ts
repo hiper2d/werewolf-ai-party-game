@@ -10,7 +10,7 @@ import {
 } from "@/app/api/game-models";
 import {AgentFactory} from "@/app/ai/agent-factory";
 import {addMessageToChatAndSaveToDb, getBotMessages, getUserFromFirestore} from "@/app/api/game-actions";
-import {getUserApiKeys} from "@/app/api/user-actions";
+import {getApiKeysForUser} from "@/app/utils/tier-utils";
 import {generateWerewolfTeammatesSection, generatePreviousDaySummariesSection} from "@/app/utils/bot-utils";
 import {auth} from "@/auth";
 import {convertToAIMessages, parseResponseToObj} from "@/app/utils/message-utils";
@@ -119,8 +119,7 @@ export class WerewolfProcessor extends BaseRoleProcessor {
             }
             
             // Get API keys
-            const user = await getUserFromFirestore(session.user.email);
-            const apiKeys = await getUserApiKeys(user!.email);
+            const apiKeys = await getApiKeysForUser(session.user.email);
             
             // Create werewolf prompt
             const werewolfPrompt = format(BOT_SYSTEM_PROMPT, {

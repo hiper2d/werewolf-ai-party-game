@@ -41,21 +41,21 @@ export default function ApiKeyList({ initialApiKeys, userId }: { initialApiKeys:
         <ul className="space-y-4">
             {Object.entries(apiKeys).map(([model, apiKey]) => (
                 <li key={model} className="bg-black bg-opacity-30 p-3 rounded">
-                    <div className="flex items-center justify-between">
-                        <div className="flex-grow mr-4 flex items-center">
-                            <span className="text-gray-300 mr-4 w-48">{model}:</span>
-                            <div className="flex-grow">
-                                {editingKey === model ? (
-                                    <input
-                                        type="text"
-                                        value={editValue}
-                                        onChange={(e) => setEditValue(e.target.value)}
-                                        className="bg-gray-700 text-white px-2 py-1 rounded w-full"
-                                    />
-                                ) : (
-                                    <span className="text-white">{apiKey}</span>
-                                )}
-                            </div>
+                    <div className="flex items-center gap-4">
+                        <div className="w-64 flex-shrink-0">
+                            <span className="text-gray-300">{model}</span>
+                        </div>
+                        <div className="flex-grow min-w-0">
+                            {editingKey === model ? (
+                                <input
+                                    type="text"
+                                    value={editValue}
+                                    onChange={(e) => setEditValue(e.target.value)}
+                                    className="bg-gray-700 text-white px-3 py-2 rounded w-full"
+                                />
+                            ) : (
+                                <span className="text-white break-all">{apiKey}</span>
+                            )}
                         </div>
                         <div className="flex items-center">
                             {editingKey === model ? (

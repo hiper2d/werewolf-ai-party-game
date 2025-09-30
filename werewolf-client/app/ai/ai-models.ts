@@ -31,8 +31,8 @@ export const SupportedAiKeyNames: Record<string, string> = {
 export const LLM_CONSTANTS = {
     CLAUDE_4_OPUS: 'Claude 4.1 Opus',
     CLAUDE_4_OPUS_THINKING: 'Claude 4.1 Opus (Thinking)',
-    CLAUDE_4_SONNET: 'Claude 4 Sonnet',
-    CLAUDE_4_SONNET_THINKING: 'Claude 4 Sonnet (Thinking)',
+    CLAUDE_4_SONNET: 'Claude 4.5 Sonnet',
+    CLAUDE_4_SONNET_THINKING: 'Claude 4.5 Sonnet (Thinking)',
     DEEPSEEK_CHAT: 'DeepSeek Chat',
     DEEPSEEK_REASONER: 'DeepSeek Reasoner',
     GPT_5: 'GPT-5',
@@ -46,87 +46,153 @@ export const LLM_CONSTANTS = {
     RANDOM: 'Random',
 }
 
-export const SupportedAiModels = {
+export interface ModelConfig {
+    modelApiName: string;
+    apiKeyName: string;
+    hasThinking: boolean;
+    freeTier?: {
+        available: boolean;
+        maxBotsPerGame: number; // -1 means unlimited bots, 0 means not available, 1 means only 1 bot (GM or player) can use this model
+    };
+}
+
+export const SupportedAiModels: Record<string, ModelConfig> = {
     // Claude models - separate with/without thinking versions
     [LLM_CONSTANTS.CLAUDE_4_OPUS]: {
         modelApiName: 'claude-opus-4-1',
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
-        hasThinking: false
+        hasThinking: false,
+        freeTier: {
+            available: false,
+            maxBotsPerGame: 0 // Too expensive - not available
+        }
     },
     [LLM_CONSTANTS.CLAUDE_4_OPUS_THINKING]: {
         modelApiName: 'claude-opus-4-1',
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
-        hasThinking: true
+        hasThinking: true,
+        freeTier: {
+            available: false,
+            maxBotsPerGame: 0 // Too expensive - not available
+        }
     },
     [LLM_CONSTANTS.CLAUDE_4_SONNET]: {
         modelApiName: 'claude-sonnet-4-5',
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
-        hasThinking: false
+        hasThinking: false,
+        freeTier: {
+            available: true,
+            maxBotsPerGame: -1 // Unlimited bots can use this model
+        }
     },
     [LLM_CONSTANTS.CLAUDE_4_SONNET_THINKING]: {
         modelApiName: 'claude-sonnet-4-5',
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
-        hasThinking: true
+        hasThinking: true,
+        freeTier: {
+            available: false,
+            maxBotsPerGame: 0 // Thinking version is expensive - not available
+        }
     },
-    
+
     // DeepSeek models - separate Chat and Reasoner
     [LLM_CONSTANTS.DEEPSEEK_CHAT]: {
         modelApiName: 'deepseek-chat',
         apiKeyName: API_KEY_CONSTANTS.DEEPSEEK,
-        hasThinking: false
+        hasThinking: false,
+        freeTier: {
+            available: true,
+            maxBotsPerGame: -1 // Unlimited - very affordable
+        }
     },
     [LLM_CONSTANTS.DEEPSEEK_REASONER]: {
         modelApiName: 'deepseek-reasoner',
         apiKeyName: API_KEY_CONSTANTS.DEEPSEEK,
-        hasThinking: true
+        hasThinking: true,
+        freeTier: {
+            available: true,
+            maxBotsPerGame: 1 // Only 1 bot per game - more expensive reasoning
+        }
     },
-    
+
     // Models with always-on reasoning
     [LLM_CONSTANTS.GPT_5]: {
         modelApiName: 'gpt-5',
         apiKeyName: API_KEY_CONSTANTS.OPENAI,
-        hasThinking: true
+        hasThinking: true,
+        freeTier: {
+            available: true,
+            maxBotsPerGame: 1 // Only 1 bot per game - expensive
+        }
     },
     [LLM_CONSTANTS.GPT_5_MINI]: {
         modelApiName: 'gpt-5-mini',
         apiKeyName: API_KEY_CONSTANTS.OPENAI,
-        hasThinking: true
+        hasThinking: true,
+        freeTier: {
+            available: true,
+            maxBotsPerGame: -1 // Unlimited - affordable mini version
+        }
     },
     [LLM_CONSTANTS.GEMINI_25_PRO]: {
         modelApiName: 'gemini-2.5-pro',
         apiKeyName: API_KEY_CONSTANTS.GOOGLE,
-        hasThinking: true
+        hasThinking: true,
+        freeTier: {
+            available: true,
+            maxBotsPerGame: 1 // Only 1 bot per game - expensive
+        }
     },
     [LLM_CONSTANTS.GROK_4]: {
         modelApiName: 'grok-4',
         apiKeyName: API_KEY_CONSTANTS.GROK,
-        hasThinking: true
+        hasThinking: true,
+        freeTier: {
+            available: true,
+            maxBotsPerGame: 1 // Only 1 bot per game - expensive
+        }
     },
-    
+
     // Mistral models
     [LLM_CONSTANTS.MISTRAL_2_LARGE]: {
         modelApiName: 'mistral-large-latest',
         apiKeyName: API_KEY_CONSTANTS.MISTRAL,
-        hasThinking: false
+        hasThinking: false,
+        freeTier: {
+            available: true,
+            maxBotsPerGame: 1 // Only 1 bot per game - moderately expensive
+        }
     },
     [LLM_CONSTANTS.MISTRAL_3_MEDIUM]: {
         modelApiName: 'mistral-medium-latest',
         apiKeyName: API_KEY_CONSTANTS.MISTRAL,
-        hasThinking: false
+        hasThinking: false,
+        freeTier: {
+            available: true,
+            maxBotsPerGame: -1 // Unlimited - affordable
+        }
     },
     [LLM_CONSTANTS.MISTRAL_MAGISTRAL]: {
         modelApiName: 'magistral-medium-latest',
         apiKeyName: API_KEY_CONSTANTS.MISTRAL,
-        hasThinking: true
+        hasThinking: true,
+        freeTier: {
+            available: true,
+            maxBotsPerGame: 1 // Only 1 bot per game - thinking model
+        }
     },
-    
+
     // Models without reasoning
     [LLM_CONSTANTS.KIMI_K2]: {
         modelApiName: 'kimi-k2-0905-preview',
         apiKeyName: API_KEY_CONSTANTS.MOONSHOT,
-        hasThinking: false
+        hasThinking: false,
+        freeTier: {
+            available: true,
+            maxBotsPerGame: -1 // Unlimited - affordable
+        }
     },
-} as const;
+};
 
 export type LLMModel = keyof typeof SupportedAiModels;
 
@@ -224,31 +290,60 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
  * @returns Cost in USD
  */
 export function calculateModelCost(
-    modelApiName: string, 
-    inputTokens: number, 
+    modelApiName: string,
+    inputTokens: number,
     outputTokens: number,
     cacheHitTokens: number = 0
 ): number {
     const pricing = MODEL_PRICING[modelApiName];
-    
+
     if (!pricing) {
         console.warn(`No pricing information available for model: ${modelApiName}`);
         return 0;
     }
-    
+
     // All prices are per million tokens
     const divisor = 1_000_000;
-    
+
     // Calculate cached vs uncached input tokens
     const actualCacheHits = Math.min(cacheHitTokens, inputTokens);
     const uncachedInputTokens = Math.max(0, inputTokens - actualCacheHits);
-    
+
     // Calculate costs
     const uncachedInputCost = (uncachedInputTokens * pricing.inputPrice) / divisor;
-    const cachedInputCost = pricing.cacheHitPrice 
+    const cachedInputCost = pricing.cacheHitPrice
         ? (actualCacheHits * pricing.cacheHitPrice) / divisor
         : (actualCacheHits * pricing.inputPrice) / divisor;
     const outputCost = (outputTokens * pricing.outputPrice) / divisor;
-    
+
     return uncachedInputCost + cachedInputCost + outputCost;
+}
+
+/**
+ * Returns all models available for free tier users
+ */
+export function getFreeTierModels(): Array<{modelName: string; config: ModelConfig}> {
+    return Object.entries(SupportedAiModels)
+        .filter(([_, config]) => config.freeTier?.available)
+        .map(([modelName, config]) => ({ modelName, config }));
+}
+
+/**
+ * Checks if a model is available for free tier users
+ */
+export function isModelAvailableForFreeTier(modelName: string): boolean {
+    return SupportedAiModels[modelName]?.freeTier?.available || false;
+}
+
+/**
+ * Gets the bot limit for a specific model in free tier
+ * Returns null if model is not available in free tier
+ * @returns -1 for unlimited, 0 for not available, 1 for only 1 bot per game, null if model not in free tier
+ */
+export function getFreeTierModelLimit(modelName: string): number | null {
+    const model = SupportedAiModels[modelName];
+    if (!model?.freeTier?.available) {
+        return null;
+    }
+    return model.freeTier.maxBotsPerGame;
 }

@@ -18,10 +18,13 @@ export interface GameTokenUsage {
     gameMasterUsage: TokenUsage;
 }
 
+export type UserTier = 'free' | 'api';
+
 export interface User {
     name: string;
     email: string;
     apiKeys: ApiKeyMap;
+    tier: UserTier;
 }
 
 export interface GamePreview {

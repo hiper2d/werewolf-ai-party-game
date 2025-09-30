@@ -2,7 +2,7 @@
 
 import {db} from "@/firebase/server";
 import {firestore} from "firebase-admin";
-import {ApiKeyMap, User} from "@/app/api/game-models";
+import {ApiKeyMap, User, UserTier} from "@/app/api/game-models";
 import FieldValue = firestore.FieldValue;
 
 export async function upsertUser(user: any) {
@@ -17,6 +17,7 @@ export async function upsertUser(user: any) {
         if (!doc.exists) {
             await userRef.set({
                 ...user,
+                tier: 'free', // Default tier for new users
                 created_at: FieldValue.serverTimestamp(),
                 last_login_timestamp: FieldValue.serverTimestamp()
             });
@@ -99,5 +100,60 @@ export async function deleteApiKey(userId: string, model: string): Promise<void>
     } catch (error: any) {
         console.error("Error deleting API key: ", error);
         throw new Error(`Failed to delete API key: ${error.message}`);
+    }
+}
+
+export async function getUserTier(userId: string): Promise<UserTier> {
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+    try {
+        const userDoc = await db.collection('users').doc(userId).get();
+        if (!userDoc.exists) {
+            throw new Error('User not found');
+        }
+        const user = userDoc.data() as User;
+        return user?.tier || 'free';
+    } catch (error: any) {
+        console.error("Error fetching user tier: ", error);
+        throw new Error(`Failed to fetch user tier: ${error.message}`);
+    }
+}
+
+export async function updateUserTier(userId: string, tier: UserTier): Promise<void> {
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+    try {
+        const userRef = db.collection('users').doc(userId);
+        await userRef.update({
+            tier: tier
+        });
+    } catch (error: any) {
+        console.error("Error updating user tier: ", error);
+        throw new Error(`Failed to update user tier: ${error.message}`);
+    }
+}
+
+export async function getUser(userId: string): Promise<User> {
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+    try {
+        const userDoc = await db.collection('users').doc(userId).get();
+        if (!userDoc.exists) {
+            throw new Error('User not found');
+        }
+        const userData = userDoc.data();
+        // Ensure tier field exists for backward compatibility
+        return {
+            name: userData?.name || '',
+            email: userData?.email || userId,
+            apiKeys: userData?.apiKeys || {},
+            tier: userData?.tier || 'free'
+        } as User;
+    } catch (error: any) {
+        console.error("Error fetching user: ", error);
+        throw new Error(`Failed to fetch user: ${error.message}`);
     }
 }

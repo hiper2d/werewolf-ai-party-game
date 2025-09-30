@@ -2,7 +2,7 @@ import { BaseRoleProcessor, NightActionResult } from "./base-role-processor";
 import { GAME_ROLES, GAME_MASTER, GameMessage, MessageType, BotResponseError, RECIPIENT_DOCTOR } from "@/app/api/game-models";
 import { AgentFactory } from "@/app/ai/agent-factory";
 import { addMessageToChatAndSaveToDb, getBotMessages, getUserFromFirestore } from "@/app/api/game-actions";
-import { getUserApiKeys } from "@/app/api/user-actions";
+import { getApiKeysForUser } from "@/app/utils/tier-utils";
 import { auth } from "@/auth";
 import { convertToAIMessages, parseResponseToObj } from "@/app/utils/message-utils";
 import { BOT_SYSTEM_PROMPT, BOT_DOCTOR_ACTION_PROMPT } from "@/app/ai/prompts/bot-prompts";
@@ -62,8 +62,7 @@ export class DoctorProcessor extends BaseRoleProcessor {
             }
 
             // Get API keys
-            const user = await getUserFromFirestore(session.user.email);
-            const apiKeys = await getUserApiKeys(user!.email);
+            const apiKeys = await getApiKeysForUser(session.user.email);
 
             // Create doctor prompt
             const doctorPrompt = format(BOT_SYSTEM_PROMPT, {

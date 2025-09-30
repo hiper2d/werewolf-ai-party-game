@@ -2,9 +2,9 @@ import React from 'react';
 import {redirect} from "next/navigation";
 import {buttonTransparentStyle} from "@/app/constants";
 import Image from 'next/image';
-import ApiKeyList from './components/ApiKeyList';
-import AddApiKeyForm from './components/AddApiKeyForm';
-import {getUserApiKeys} from "@/app/api/user-actions";
+import ApiKeyManagement from './components/ApiKeyManagement';
+import FreeUserLimits from './components/FreeUserLimits';
+import {getUserApiKeys, getUser} from "@/app/api/user-actions";
 import { auth } from "@/auth";
 
 export default async function UserProfilePage() {
@@ -13,7 +13,19 @@ export default async function UserProfilePage() {
         redirect('/api/auth/signin');
     }
 
-    const apiKeys = await getUserApiKeys(session.user?.email!);
+    let user = null;
+    let apiKeys = {};
+    let userTier: 'free' | 'api' = 'free';
+
+    try {
+        user = await getUser(session.user?.email!);
+        apiKeys = await getUserApiKeys(session.user?.email!);
+        userTier = user?.tier || 'free';
+    } catch (error) {
+        console.error('Error fetching user data:', error);
+        // User might not exist yet, use defaults
+        userTier = 'free';
+    }
 
     return (
         <div className="flex h-full text-white overflow-hidden">
@@ -28,6 +40,12 @@ export default async function UserProfilePage() {
                     <div className="text-sm text-gray-300 mb-2">
                         <p>Name: {session.user?.name}</p>
                         <p>Email: {session.user?.email}</p>
+                        <p className="mt-2">
+                            <span className="font-semibold">Tier: </span>
+                            <span className={userTier === 'api' ? 'text-green-400' : 'text-yellow-400'}>
+                                {userTier.toUpperCase()}
+                            </span>
+                        </p>
                     </div>
                 </div>
 
@@ -50,20 +68,14 @@ export default async function UserProfilePage() {
                 </div>
             </div>
 
-            {/* Right column - API Key Management */}
+            {/* Right column - Tier-based content */}
             <div className="w-3/4 h-full overflow-hidden">
                 <div className="h-full flex flex-col bg-black bg-opacity-30 border border-white border-opacity-30 rounded">
-                    <div className="p-4">
-                        <h2 className="text-2xl font-bold mb-4">API Keys</h2>
-                    </div>
-
-                    <div className="flex-grow overflow-auto p-4">
-                        <ApiKeyList initialApiKeys={apiKeys} userId={session.user?.email!}/>
-                    </div>
-
-                    <div className="p-4 border-t border-white border-opacity-30">
-                        <AddApiKeyForm userId={session.user?.email!}/>
-                    </div>
+                    {userTier === 'api' ? (
+                        <ApiKeyManagement initialApiKeys={apiKeys} userId={session.user?.email!} />
+                    ) : (
+                        <FreeUserLimits userId={session.user?.email!} />
+                    )}
                 </div>
             </div>
         </div>

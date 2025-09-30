@@ -21,7 +21,7 @@ import { RoleProcessorFactory } from "./roles";
 import {withGameErrorHandling} from "@/app/utils/server-action-wrapper";
 import { AgentFactory } from "@/app/ai/agent-factory";
 import { getUserFromFirestore, getBotMessages } from "@/app/api/game-actions";
-import { getUserApiKeys } from "@/app/api/user-actions";
+import { getApiKeysForUser } from "@/app/utils/tier-utils";
 import { GM_NIGHT_RESULTS_SYSTEM_PROMPT } from "@/app/ai/prompts/gm-prompts";
 import { GM_COMMAND_GENERATE_NIGHT_RESULTS } from "@/app/ai/prompts/gm-commands";
 import { NightResultsStoryZodSchema, BotAnswerZodSchema } from "@/app/ai/prompts/zod-schemas";
@@ -192,8 +192,7 @@ async function endNightWithResults(gameId: string, game: Game): Promise<Game> {
         throw new Error('Not authenticated');
     }
     
-    const user = await getUserFromFirestore(session.user.email);
-    const apiKeys = await getUserApiKeys(user!.email);
+    const apiKeys = await getApiKeysForUser(session.user.email);
     
     // Create GM system prompt with game context
     const gmSystemPrompt = format(GM_NIGHT_RESULTS_SYSTEM_PROMPT, {
@@ -1068,8 +1067,7 @@ async function summarizePastDayImpl(gameId: string): Promise<Game> {
         }
         
         // Get API keys
-        const user = await getUserFromFirestore(session.user.email);
-        const apiKeys = await getUserApiKeys(user!.email);
+        const apiKeys = await getApiKeysForUser(session.user.email);
         
         // Create bot system prompt
         const botPrompt = format(BOT_SYSTEM_PROMPT, {

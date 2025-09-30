@@ -24,7 +24,7 @@ import {
 import {auth} from "@/auth";
 import {AgentFactory} from "@/app/ai/agent-factory";
 import {STORY_SYSTEM_PROMPT, STORY_USER_PROMPT} from "@/app/ai/prompts/story-gen-prompts";
-import {getUserApiKeys} from "@/app/api/user-actions";
+import {getApiKeysForUser} from "@/app/utils/tier-utils";
 import {convertToAIMessage, parseResponseToObj} from "@/app/utils/message-utils";
 import {LLM_CONSTANTS} from "@/app/ai/ai-models";
 import {AbstractAgent} from "../ai/abstract-agent";
@@ -146,8 +146,7 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
         throw new Error('Firestore is not initialized');
     }
 
-    const apiKeys = await getUserFromFirestore(session.user.email)
-        .then((user) => getUserApiKeys(user!.email));
+    const apiKeys = await getApiKeysForUser(session.user.email);
 
     const botCount = gamePreview.playerCount - 1; // exclude human player
 
@@ -718,7 +717,8 @@ export async function getUserFromFirestore(email: string): Promise<User | null> 
         return {
             name: userData?.name,
             email: userData?.email,
-            apiKeys: userData?.ApiKeys || []
+            apiKeys: userData?.apiKeys || {},
+            tier: userData?.tier || 'free'
         };
     } else {
         return null;
