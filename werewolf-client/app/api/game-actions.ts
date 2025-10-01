@@ -25,6 +25,8 @@ import {auth} from "@/auth";
 import {AgentFactory} from "@/app/ai/agent-factory";
 import {STORY_SYSTEM_PROMPT, STORY_USER_PROMPT} from "@/app/ai/prompts/story-gen-prompts";
 import {getApiKeysForUser} from "@/app/utils/tier-utils";
+import {updateUserMonthlySpending} from "@/app/api/user-actions";
+import {normalizeSpendings} from "@/app/utils/spending-utils";
 import {convertToAIMessage, parseResponseToObj} from "@/app/utils/message-utils";
 import {LLM_CONSTANTS} from "@/app/ai/ai-models";
 import {AbstractAgent} from "../ai/abstract-agent";
@@ -212,6 +214,10 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
     const [aiResponse, thinking, tokenUsage] = await storyTellAgent.askWithZodSchema(GameSetupZodSchema, [convertToAIMessage(storyMessage)]);
     if (!aiResponse) {
         throw new Error('Failed to get AI response');
+    }
+
+    if (tokenUsage) {
+        await updateUserMonthlySpending(session.user.email, tokenUsage.costUSD);
     }
     const bots: BotPreview[] = aiResponse.players.map((bot: { name: string; gender: string; story: string; playStyle?: string; voiceInstructions: string }) => {
         let aiType: string;
@@ -718,7 +724,8 @@ export async function getUserFromFirestore(email: string): Promise<User | null> 
             name: userData?.name,
             email: userData?.email,
             apiKeys: userData?.apiKeys || {},
-            tier: userData?.tier || 'free'
+            tier: userData?.tier || 'free',
+            spendings: normalizeSpendings(userData?.spendings)
         };
     } else {
         return null;

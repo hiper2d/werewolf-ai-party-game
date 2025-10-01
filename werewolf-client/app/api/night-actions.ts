@@ -31,98 +31,7 @@ import { generateWerewolfTeammatesSection, generatePreviousDaySummariesSection }
 import { format } from "@/app/ai/prompts/utils";
 import { parseResponseToObj, convertToAIMessages } from "@/app/utils/message-utils";
 import {checkGameEndConditions} from "@/app/utils/game-utils";
-
-/**
- * Update game master's token usage in the database
- */
-async function updateGameMasterTokenUsage(gameId: string, tokenUsage: any): Promise<void> {
-    if (!db || !tokenUsage) {
-        return;
-    }
-
-    try {
-        const gameRef = db.collection('games').doc(gameId);
-        const gameDoc = await gameRef.get();
-        
-        if (!gameDoc.exists) {
-            return;
-        }
-        
-        const game = gameDoc.data() as Game;
-        const currentGMUsage = game.gameMasterTokenUsage || {
-            inputTokens: 0,
-            outputTokens: 0,
-            totalTokens: 0,
-            costUSD: 0
-        };
-        
-        const updatedGMUsage = {
-            inputTokens: currentGMUsage.inputTokens + tokenUsage.inputTokens,
-            outputTokens: currentGMUsage.outputTokens + tokenUsage.outputTokens,
-            totalTokens: currentGMUsage.totalTokens + tokenUsage.totalTokens,
-            costUSD: currentGMUsage.costUSD + tokenUsage.costUSD
-        };
-        
-        // Also update the total game cost
-        const currentTotalCost = game.totalGameCost || 0;
-        const newTotalCost = currentTotalCost + tokenUsage.costUSD;
-        
-        await gameRef.update({ 
-            gameMasterTokenUsage: updatedGMUsage,
-            totalGameCost: newTotalCost 
-        });
-    } catch (error) {
-        console.error('Failed to update game master token usage:', error);
-        // Don't throw here - cost tracking shouldn't break the game flow
-    }
-}
-
-/**
- * Update bot's token usage in the database
- */
-async function updateBotTokenUsage(gameId: string, botName: string, tokenUsage: any): Promise<void> {
-    if (!db || !tokenUsage) {
-        return;
-    }
-
-    try {
-        const gameRef = db.collection('games').doc(gameId);
-        const gameDoc = await gameRef.get();
-        
-        if (!gameDoc.exists) {
-            return;
-        }
-        
-        const game = gameDoc.data() as Game;
-        const updatedBots = game.bots.map(bot => {
-            if (bot.name === botName) {
-                const currentUsage = bot.tokenUsage || { inputTokens: 0, outputTokens: 0, totalTokens: 0, costUSD: 0 };
-                return {
-                    ...bot,
-                    tokenUsage: {
-                        inputTokens: currentUsage.inputTokens + tokenUsage.inputTokens,
-                        outputTokens: currentUsage.outputTokens + tokenUsage.outputTokens,
-                        totalTokens: currentUsage.totalTokens + tokenUsage.totalTokens,
-                        costUSD: currentUsage.costUSD + tokenUsage.costUSD
-                    }
-                };
-            }
-            return bot;
-        });
-        
-        // Also update the total game cost
-        const currentTotalCost = game.totalGameCost || 0;
-        const newTotalCost = currentTotalCost + tokenUsage.costUSD;
-        
-        await gameRef.update({ 
-            bots: updatedBots,
-            totalGameCost: newTotalCost 
-        });
-    } catch (error) {
-        console.error(`Failed to update token usage for bot ${botName}:`, error);
-        // Don't throw here - cost tracking shouldn't break the game flow
-    }
-}
+import {recordBotTokenUsage, recordGameMasterTokenUsage} from "@/app/api/cost-tracking";
 
 /**
  * Helper function to handle night end logic with results processing
@@ -253,7 +162,7 @@ async function endNightWithResults(gameId: string, game: Game): Promise<Game> {
     
     // Update game master's token usage
     if (tokenUsage) {
-        await updateGameMasterTokenUsage(gameId, tokenUsage);
+        await recordGameMasterTokenUsage(gameId, tokenUsage, session.user.email);
     }
     
     // Log thinking for debugging
@@ -1116,7 +1025,7 @@ async function summarizePastDayImpl(gameId: string): Promise<Game> {
         
         // Update bot's token usage
         if (tokenUsage) {
-            await updateBotTokenUsage(gameId, bot.name, tokenUsage);
+            await recordBotTokenUsage(gameId, bot.name, tokenUsage, session.user.email);
         }
         
         if (!summaryResponse) {

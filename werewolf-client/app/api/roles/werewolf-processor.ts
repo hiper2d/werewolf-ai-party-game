@@ -13,7 +13,7 @@ import {addMessageToChatAndSaveToDb, getBotMessages, getUserFromFirestore} from 
 import {getApiKeysForUser} from "@/app/utils/tier-utils";
 import {generateWerewolfTeammatesSection, generatePreviousDaySummariesSection} from "@/app/utils/bot-utils";
 import {auth} from "@/auth";
-import {convertToAIMessages, parseResponseToObj} from "@/app/utils/message-utils";
+import {convertToAIMessages} from "@/app/utils/message-utils";
 import {
     BOT_SYSTEM_PROMPT,
     BOT_WEREWOLF_ACTION_PROMPT,
@@ -22,6 +22,7 @@ import {
 import {format} from "@/app/ai/prompts/utils";
 import {BotAnswerZodSchema, WerewolfActionZodSchema} from "@/app/ai/prompts/zod-schemas";
 import {WerewolfAction} from "@/app/ai/prompts/ai-schemas";
+import {recordBotTokenUsage} from "@/app/api/cost-tracking";
 
 /**
  * Werewolf role processor
@@ -192,7 +193,7 @@ export class WerewolfProcessor extends BaseRoleProcessor {
             // Create conversation history
             const history = convertToAIMessages(werewolfBot.name, [...botMessages, gmMessage]);
             
-            const [werewolfResponse, thinking] = await agent.askWithZodSchema(schema, history);
+            const [werewolfResponse, thinking, tokenUsage] = await agent.askWithZodSchema(schema, history);
             
             if (!werewolfResponse) {
                 throw new Error(`Werewolf ${werewolfBot.name} failed to respond to ${isLastWerewolf ? 'action' : 'discussion'} prompt`);
@@ -249,6 +250,10 @@ export class WerewolfProcessor extends BaseRoleProcessor {
             // Save messages
             await addMessageToChatAndSaveToDb(gmMessage, this.gameId);
             await addMessageToChatAndSaveToDb(werewolfMessage, this.gameId);
+
+            if (tokenUsage) {
+                await recordBotTokenUsage(this.gameId, werewolfBot.name, tokenUsage, session.user.email);
+            }
             
             // Check if this was the last werewolf in the queue
             if (remainingQueue.length === 0) {

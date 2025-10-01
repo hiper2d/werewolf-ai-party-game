@@ -4,12 +4,13 @@ import { AgentFactory } from "@/app/ai/agent-factory";
 import { addMessageToChatAndSaveToDb, getBotMessages, getUserFromFirestore } from "@/app/api/game-actions";
 import { getApiKeysForUser } from "@/app/utils/tier-utils";
 import { auth } from "@/auth";
-import { convertToAIMessages, parseResponseToObj } from "@/app/utils/message-utils";
+import { convertToAIMessages } from "@/app/utils/message-utils";
 import { BOT_SYSTEM_PROMPT, BOT_DOCTOR_ACTION_PROMPT } from "@/app/ai/prompts/bot-prompts";
 import { format } from "@/app/ai/prompts/utils";
 import { generatePreviousDaySummariesSection } from "@/app/utils/bot-utils";
 import { DoctorActionZodSchema } from "@/app/ai/prompts/zod-schemas";
 import { DoctorAction } from "@/app/ai/prompts/ai-schemas";
+import {recordBotTokenUsage} from "@/app/api/cost-tracking";
 
 /**
  * Doctor role processor
@@ -128,7 +129,7 @@ export class DoctorProcessor extends BaseRoleProcessor {
             // Create conversation history
             const history = convertToAIMessages(doctorBot.name, [...botMessages, gmMessage]);
 
-            const [doctorResponse, thinking] = await agent.askWithZodSchema(DoctorActionZodSchema, history);
+            const [doctorResponse, thinking, tokenUsage] = await agent.askWithZodSchema(DoctorActionZodSchema, history);
 
             if (!doctorResponse) {
                 throw new Error(`Doctor ${doctorBot.name} failed to respond to protection prompt`);
@@ -193,6 +194,10 @@ export class DoctorProcessor extends BaseRoleProcessor {
             // Save messages
             await addMessageToChatAndSaveToDb(gmMessage, this.gameId);
             await addMessageToChatAndSaveToDb(doctorMessage, this.gameId);
+
+            if (tokenUsage) {
+                await recordBotTokenUsage(this.gameId, doctorBot.name, tokenUsage, session.user.email);
+            }
 
             this.logNightAction(`✅ Doctor ${doctorBot.name} protected: ${doctorResponse.target}`);
 

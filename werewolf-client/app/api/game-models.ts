@@ -25,6 +25,12 @@ export interface User {
     email: string;
     apiKeys: ApiKeyMap;
     tier: UserTier;
+    spendings?: UserMonthlySpending[];
+}
+
+export interface UserMonthlySpending {
+    period: string; // Format: YYYY-MM
+    amountUSD: number;
 }
 
 export interface GamePreview {

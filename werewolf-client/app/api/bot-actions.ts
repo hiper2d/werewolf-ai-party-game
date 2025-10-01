@@ -49,6 +49,7 @@ import {
     generateWerewolfTeammatesSection
 } from "@/app/utils/bot-utils";
 import {checkGameEndConditions} from "@/app/utils/game-utils";
+import {recordBotTokenUsage, recordGameMasterTokenUsage} from "@/app/api/cost-tracking";
 
 /**
  * Sanitize names for use in message IDs
@@ -60,98 +61,6 @@ function sanitizeForId(name: string): string {
         .replace(/[^a-z0-9-]/g, '')     // Remove non-alphanumeric chars except hyphens
         .replace(/-+/g, '-')            // Replace multiple hyphens with single hyphen
         .replace(/^-|-$/g, '');         // Remove leading/trailing hyphens
-}
-
-/**
- * Update bot's token usage in the database
- */
-async function updateBotTokenUsage(gameId: string, botName: string, tokenUsage: any): Promise<void> {
-    if (!db || !tokenUsage) {
-        return;
-    }
-
-    try {
-        const gameRef = db.collection('games').doc(gameId);
-        const gameDoc = await gameRef.get();
-        
-        if (!gameDoc.exists) {
-            return;
-        }
-        
-        const game = gameDoc.data() as Game;
-        const updatedBots = game.bots.map(bot => {
-            if (bot.name === botName) {
-                const currentUsage = bot.tokenUsage || { inputTokens: 0, outputTokens: 0, totalTokens: 0, costUSD: 0 };
-                return {
-                    ...bot,
-                    tokenUsage: {
-                        inputTokens: currentUsage.inputTokens + tokenUsage.inputTokens,
-                        outputTokens: currentUsage.outputTokens + tokenUsage.outputTokens,
-                        totalTokens: currentUsage.totalTokens + tokenUsage.totalTokens,
-                        costUSD: currentUsage.costUSD + tokenUsage.costUSD
-                    }
-                };
-            }
-            return bot;
-        });
-        
-        // Also update the total game cost
-        const currentTotalCost = game.totalGameCost || 0;
-        const newTotalCost = currentTotalCost + tokenUsage.costUSD;
-        
-        await gameRef.update({ 
-            bots: updatedBots,
-            totalGameCost: newTotalCost 
-        });
-    } catch (error) {
-        console.error(`Failed to update token usage for bot ${botName}:`, error);
-        // Don't throw here - cost tracking shouldn't break the game flow
-    }
-}
-
-/**
- * Update game master's token usage in the database
- */
-async function updateGameMasterTokenUsage(gameId: string, tokenUsage: any): Promise<void> {
-    if (!db || !tokenUsage) {
-        return;
-    }
-
-    try {
-        const gameRef = db.collection('games').doc(gameId);
-        const gameDoc = await gameRef.get();
-        
-        if (!gameDoc.exists) {
-            return;
-        }
-        
-        const game = gameDoc.data() as Game;
-        const currentGMUsage = game.gameMasterTokenUsage || {
-            inputTokens: 0,
-            outputTokens: 0,
-            totalTokens: 0,
-            costUSD: 0
-        };
-        
-        const updatedGMUsage = {
-            inputTokens: currentGMUsage.inputTokens + tokenUsage.inputTokens,
-            outputTokens: currentGMUsage.outputTokens + tokenUsage.outputTokens,
-            totalTokens: currentGMUsage.totalTokens + tokenUsage.totalTokens,
-            costUSD: currentGMUsage.costUSD + tokenUsage.costUSD
-        };
-        
-        // Also update the total game cost
-        const currentTotalCost = game.totalGameCost || 0;
-        const newTotalCost = currentTotalCost + tokenUsage.costUSD;
-        
-        await gameRef.update({ 
-            gameMasterTokenUsage: updatedGMUsage,
-            totalGameCost: newTotalCost 
-        });
-    } catch (error) {
-        console.error('Failed to update game master token usage:', error);
-        // Don't throw here - cost tracking shouldn't break the game flow
-    }
 }
 
 /**
@@ -392,7 +301,7 @@ async function welcomeImpl(gameId: string): Promise<Game> {
 
         // Update bot's token usage
         if (tokenUsage) {
-            await updateBotTokenUsage(gameId, bot.name, tokenUsage);
+            await recordBotTokenUsage(gameId, bot.name, tokenUsage, session.user.email);
         }
 
         // Increment day activity counter for the bot
@@ -538,7 +447,7 @@ async function keepBotsGoingImpl(gameId: string): Promise<Game> {
         
         // Update game master's token usage
         if (tokenUsage) {
-            await updateGameMasterTokenUsage(gameId, tokenUsage);
+            await recordGameMasterTokenUsage(gameId, tokenUsage, session.user.email);
         }
         if (!gmResponse.selected_bots || !Array.isArray(gmResponse.selected_bots)) {
             throw new BotResponseError(
@@ -635,7 +544,7 @@ async function handleHumanPlayerMessage(
     
     // Update game master's token usage
     if (tokenUsage) {
-        await updateGameMasterTokenUsage(gameId, tokenUsage);
+        await recordGameMasterTokenUsage(gameId, tokenUsage, userEmail);
     }
     if (!gmResponse.selected_bots || !Array.isArray(gmResponse.selected_bots)) {
         throw new BotResponseError(
@@ -759,7 +668,7 @@ async function processNextBotInQueue(
 
     // Update bot's token usage
     if (tokenUsage) {
-        await updateBotTokenUsage(gameId, bot.name, tokenUsage);
+        await recordBotTokenUsage(gameId, bot.name, tokenUsage, userEmail);
     }
 
     // Increment day activity counter for the bot
@@ -1145,7 +1054,7 @@ async function voteImpl(gameId: string): Promise<Game> {
             
             // Update bot's token usage
             if (tokenUsage) {
-                await updateBotTokenUsage(gameId, bot.name, tokenUsage);
+                await recordBotTokenUsage(gameId, bot.name, tokenUsage, session.user.email);
             }
             
             // Remove the bot from queue and update voting results
@@ -1518,7 +1427,7 @@ async function getSuggestionImpl(gameId: string): Promise<string> {
 
         // Update game master's token usage (since suggestion uses GM AI)
         if (tokenUsage) {
-            await updateGameMasterTokenUsage(gameId, tokenUsage);
+            await recordGameMasterTokenUsage(gameId, tokenUsage, session.user.email);
         }
 
         // Extract the reply text
