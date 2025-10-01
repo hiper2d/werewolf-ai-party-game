@@ -231,14 +231,14 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
     
     // DeepSeek models (both models have the same pricing)
     [SupportedAiModels[LLM_CONSTANTS.DEEPSEEK_CHAT].modelApiName]: {
-        inputPrice: 0.56,
-        outputPrice: 1.68,
-        cacheHitPrice: 0.07
+        inputPrice: 0.28,
+        outputPrice: 0.42,
+        cacheHitPrice: 0.028
     },
     [SupportedAiModels[LLM_CONSTANTS.DEEPSEEK_REASONER].modelApiName]: {
-        inputPrice: 0.56,
+        inputPrice: 0.28,
         outputPrice: 1.68,
-        cacheHitPrice: 0.07
+        cacheHitPrice: 0.028
     },
     
     // Kimi/Moonshot models
