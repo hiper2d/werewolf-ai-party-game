@@ -5,6 +5,7 @@ export interface TTSOptions {
   instructions?: string;
   speed?: number;
   format?: 'mp3' | 'wav' | 'opus' | 'aac' | 'flac' | 'pcm';
+  gameId?: string;
 }
 
 export class TTSService {

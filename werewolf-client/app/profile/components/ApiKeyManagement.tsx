@@ -137,12 +137,15 @@ export default function ApiKeyManagement({ initialApiKeys, userId }: { initialAp
                 <div className="bg-black bg-opacity-20 border border-white border-opacity-20 rounded p-4">
                     <h3 className="text-xl font-bold mb-4">Voice Options (TTS/STT)</h3>
                     <p className="text-sm text-gray-300 mb-3">
-                        Currently, only OpenAI provides Text-to-Speech (TTS) and Speech-to-Text (STT) capabilities.
+                        Currently, only OpenAI provides Text-to-Speech (TTS) and Speech-to-Text (STT) capabilities. Both free and API tiers can use these features when you supply an OpenAI key—this view simply makes it easier to store and reuse those keys.
                     </p>
                     <div className="text-xs text-gray-400">
                         <p className="mb-2"><strong>Available with:</strong> {API_KEY_CONSTANTS.OPENAI}</p>
                         <p className="mb-1"><strong>TTS Model:</strong> {AUDIO_MODEL_CONSTANTS.TTS}</p>
                         <p><strong>STT Model:</strong> {AUDIO_MODEL_CONSTANTS.STT}</p>
+                        <p className="mt-3">
+                            <strong>Pricing:</strong> TTS – $15 per 1M characters, STT – $0.006 per audio minute. Charges are tracked in your monthly spendings.
+                        </p>
                     </div>
                 </div>
             </div>

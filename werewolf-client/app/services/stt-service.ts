@@ -4,6 +4,7 @@ export interface STTOptions {
   language?: string;
   prompt?: string;
   temperature?: number;
+  gameId?: string;
 }
 
 export class STTService {

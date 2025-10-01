@@ -51,10 +51,27 @@ export const AUDIO_MODEL_CONSTANTS = {
     STT: 'whisper-1',
 } as const;
 
+export interface AudioModelPricing {
+    pricePerMillionCharacters?: number;
+    pricePerMinute?: number;
+}
+
+export const AUDIO_MODEL_PRICING: Record<string, AudioModelPricing> = {
+    [AUDIO_MODEL_CONSTANTS.TTS]: {
+        // OpenAI pricing as of Feb 2025: $15 per 1M characters for gpt-4o-mini-tts
+        pricePerMillionCharacters: 15,
+    },
+    [AUDIO_MODEL_CONSTANTS.STT]: {
+        // Whisper (whisper-1) pricing: $0.006 per minute of audio
+        pricePerMinute: 0.006,
+    },
+};
+
 export interface ModelConfig {
     modelApiName: string;
     apiKeyName: string;
     hasThinking: boolean;
+    maxOutputTokens?: number;
     freeTier?: {
         available: boolean;
         maxBotsPerGame: number; // -1 means unlimited bots, 0 means not available, 1 means only 1 bot (GM or player) can use this model
@@ -105,6 +122,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         modelApiName: 'deepseek-chat',
         apiKeyName: API_KEY_CONSTANTS.DEEPSEEK,
         hasThinking: false,
+        maxOutputTokens: 8192,
         freeTier: {
             available: true,
             maxBotsPerGame: -1 // Unlimited - very affordable
@@ -114,6 +132,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         modelApiName: 'deepseek-reasoner',
         apiKeyName: API_KEY_CONSTANTS.DEEPSEEK,
         hasThinking: true,
+        maxOutputTokens: 8192,
         freeTier: {
             available: true,
             maxBotsPerGame: -1
@@ -200,6 +219,10 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
 };
 
 export type LLMModel = keyof typeof SupportedAiModels;
+
+export function getModelConfigByApiName(modelApiName: string): ModelConfig | undefined {
+    return Object.values(SupportedAiModels).find(config => config.modelApiName === modelApiName);
+}
 
 /**
  * Model pricing configuration

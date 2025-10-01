@@ -3,6 +3,7 @@ import OpenAI from "openai";
 import {AIMessage, TokenUsage} from "@/app/api/game-models";
 import {cleanResponse} from "@/app/utils/message-utils";
 import {extractUsageAndCalculateCost} from "@/app/utils/pricing";
+import {getModelConfigByApiName} from "@/app/ai/ai-models";
 import { z } from 'zod';
 import { ZodSchemaConverter } from './zod-schema-converter';
 import { safeValidateResponse } from './prompts/zod-schemas';
@@ -80,11 +81,14 @@ export class DeepSeekV2Agent extends AbstractAgent {
             // For reasoning models, add schema description to prompt
             // For non-reasoning models, use JSON schema format
             let modifiedInput = [...input];
+            const modelConfig = getModelConfigByApiName(this.model);
+            const maxOutputTokens = Math.max(1, Math.min(modelConfig?.maxOutputTokens ?? 8192, 8192));
+
             let requestParams: any = {
                 model: this.model,
                 messages: this.addSystemInstruction(modifiedInput),
                 temperature: this.temperature,
-                max_tokens: 16384,  // Set to 16k to handle longer JSON responses
+                max_tokens: maxOutputTokens,
             };
 
             if (this.enableThinking) {

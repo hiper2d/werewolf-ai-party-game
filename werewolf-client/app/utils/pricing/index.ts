@@ -48,3 +48,8 @@ export {
     extractTokenUsageFromResponse as extractMistralTokenUsageFromResponse 
 } from './mistral-pricing';
 export type { MistralTokenUsage } from './mistral-pricing';
+
+export {
+    calculateOpenAITtsCost,
+    calculateOpenAISttCost,
+} from './openai-audio-pricing';

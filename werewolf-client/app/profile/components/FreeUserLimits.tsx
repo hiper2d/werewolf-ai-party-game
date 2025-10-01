@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { SupportedAiModels, MODEL_PRICING, ModelPricing } from '@/app/ai/ai-models';
+import { SupportedAiModels, MODEL_PRICING, ModelPricing, AUDIO_MODEL_CONSTANTS, API_KEY_CONSTANTS } from '@/app/ai/ai-models';
 import { updateUserTier } from '@/app/api/user-actions';
 import { useRouter } from 'next/navigation';
 
@@ -65,6 +65,9 @@ export default function FreeUserLimits({ userId }: { userId: string }) {
                     You are currently on the free tier. You can use the following models without providing API keys.
                     Each model has a limit on how many bots (including the Game Master) can use it in a single game.
                 </p>
+                <p className="text-gray-300 text-xs mt-2">
+                    TTS (text-to-speech) and STT (speech-to-text) are available on every tier when you provide your own OpenAI key—upgrading simply gives you built-in key management and higher usage limits.
+                </p>
             </div>
 
             <div className="flex-grow overflow-auto p-4 space-y-6">
@@ -121,6 +124,20 @@ export default function FreeUserLimits({ userId }: { userId: string }) {
                     <p className="text-xs text-gray-400 mt-2">* Per million tokens (extended context rates shown when available)</p>
                 </div>
 
+                {/* Voice Options */}
+                <div className="bg-black bg-opacity-20 border border-white border-opacity-20 rounded p-4">
+                    <h3 className="text-xl font-bold mb-3">Voice Options (TTS/STT)</h3>
+                    <p className="text-sm text-gray-300 mb-3">
+                        Provide an OpenAI key and you can enable both text-to-speech and speech-to-text even on the free tier.
+                    </p>
+                    <div className="text-xs text-gray-400">
+                        <p className="mb-1"><strong>Requires:</strong> {API_KEY_CONSTANTS.OPENAI}</p>
+                        <p className="mb-1"><strong>TTS:</strong> {AUDIO_MODEL_CONSTANTS.TTS} (≈ $15 per 1M characters)</p>
+                        <p className="mb-1"><strong>STT:</strong> {AUDIO_MODEL_CONSTANTS.STT} (≈ $0.006 per audio minute)</p>
+                        <p className="mt-2">Usage is recorded in your monthly spendings.</p>
+                    </div>
+                </div>
+
                 {/* Upgrade Notice */}
                 <div className="bg-black bg-opacity-20 border border-yellow-500 border-opacity-40 rounded p-4">
                     <h3 className="text-xl font-bold mb-2 text-yellow-400">Want More?</h3>
@@ -130,8 +147,7 @@ export default function FreeUserLimits({ userId }: { userId: string }) {
                     <ul className="text-sm text-gray-300 space-y-1 ml-4 list-disc">
                         <li>Access all available AI models</li>
                         <li>Remove usage limits per game</li>
-                        <li>Use your own API keys for full control</li>
-                        <li>Enable TTS (Text-to-Speech) and STT (Speech-to-Text)</li>
+                        <li>Manage your API keys directly in the app</li>
                     </ul>
                     <button
                         onClick={handleSwitchToApiTier}

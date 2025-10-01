@@ -713,7 +713,7 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
             if (!message) {
                 console.error('Message not found for voice mapping:', messageId);
                 setSpeakingMessageId(messageId);
-                await ttsService.speakText(text);
+                await ttsService.speakText(text, { gameId });
                 setSpeakingMessageId(null);
                 return;
             }
@@ -734,7 +734,7 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
             }
             
             setSpeakingMessageId(messageId);
-            await ttsService.speakText(text, { voice });
+            await ttsService.speakText(text, { voice, gameId });
             setSpeakingMessageId(null);
         } catch (error) {
             console.error('TTS Error:', error);
@@ -789,7 +789,7 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
             // Only now set recording to false after we've actually stopped
             setIsRecording(false);
             
-            const transcription = await sttService.transcribeRecording(audioBlob);
+            const transcription = await sttService.transcribeRecording(audioBlob, { gameId });
             
             // Add transcribed text to current message
             setNewMessage(prev => {

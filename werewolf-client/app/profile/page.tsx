@@ -1,6 +1,5 @@
 import React from 'react';
 import {redirect} from "next/navigation";
-import {buttonTransparentStyle} from "@/app/constants";
 import Image from 'next/image';
 import ApiKeyManagement from './components/ApiKeyManagement';
 import FreeUserLimits from './components/FreeUserLimits';
@@ -30,7 +29,7 @@ export default async function UserProfilePage() {
     return (
         <div className="flex h-full text-white overflow-hidden">
             {/* Left column */}
-            <div className="w-1/4 flex flex-col pr-4 overflow-auto">
+            <div className="w-1/4 flex flex-col pr-4 overflow-auto h-full">
                 {/* User info */}
                 <div className="bg-black bg-opacity-30 border border-white border-opacity-30 rounded p-4 mb-4">
                     <h1 className="text-2xl font-bold mb-2">User Profile</h1>
@@ -49,22 +48,17 @@ export default async function UserProfilePage() {
                     </div>
                 </div>
 
-                {/* Game Statistics */}
-                <div className="bg-black bg-opacity-30 border border-white border-opacity-30 rounded p-4 mb-4 flex-grow overflow-auto">
-                    <h2 className="text-xl font-bold mb-2">Game Statistics</h2>
+                {/* Monthly Spendings */}
+                <div className="bg-black bg-opacity-30 border border-white border-opacity-30 rounded p-4 flex-1 flex flex-col overflow-auto">
+                    <h2 className="text-xl font-bold mb-2">Monthly Spendings</h2>
                     <ul>
-                        <li className="mb-1">Games Played: 0</li>
-                        <li className="mb-1">Win Rate: 0%</li>
+                        {buildMonthlySpendings(user?.spendings ?? []).map(({ label, amount }) => (
+                            <li key={label} className="mb-2 flex justify-between text-sm">
+                                <span>{label}</span>
+                                <span className="font-semibold">{formatCurrency(amount)}</span>
+                            </li>
+                        ))}
                     </ul>
-                </div>
-
-                {/* Profile controls */}
-                <div className="bg-black bg-opacity-30 border border-white border-opacity-30 rounded p-4">
-                    <div className="flex gap-2 justify-evenly">
-                        <button className={buttonTransparentStyle}>
-                            Edit Profile
-                        </button>
-                    </div>
                 </div>
             </div>
 
@@ -80,4 +74,39 @@ export default async function UserProfilePage() {
             </div>
         </div>
     );
+}
+
+function buildMonthlySpendings(
+    spendings: Array<{ period: string; amountUSD: number }> = []
+) {
+    const now = new Date();
+    const dateFormatter = new Intl.DateTimeFormat('en-US', {
+        month: 'long',
+        year: 'numeric'
+    });
+
+    return Array.from({ length: 5 }, (_, index) => {
+        const referenceDate = new Date(Date.UTC(
+            now.getUTCFullYear(),
+            now.getUTCMonth() - index,
+            1
+        ));
+
+        const periodKey = `${referenceDate.getUTCFullYear()}-${String(referenceDate.getUTCMonth() + 1).padStart(2, '0')}`;
+        const match = spendings.find(entry => entry.period === periodKey);
+
+        return {
+            label: dateFormatter.format(referenceDate),
+            amount: match?.amountUSD ?? 0
+        };
+    });
+}
+
+function formatCurrency(amount: number): string {
+    return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    }).format(amount || 0);
 }
