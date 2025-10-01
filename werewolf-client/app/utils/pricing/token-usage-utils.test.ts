@@ -94,7 +94,7 @@ describe('Token Usage Utils', () => {
 
         it('should calculate cost with cache hits', () => {
             // DeepSeek: $0.56/M input, $1.68/M output, $0.07/M cache
-            const cost = calculateCost('deepseek-chat', 1000000, 500000, 500000);
+            const cost = calculateCost('deepseek-chat', 1000000, 500000, { cacheHitTokens: 500000 });
             
             // 500K uncached * $0.56/M + 500K cached * $0.07/M + 500K output * $1.68/M
             const expectedCost = (500000 * 0.56 / 1000000) + (500000 * 0.07 / 1000000) + (500000 * 1.68 / 1000000);

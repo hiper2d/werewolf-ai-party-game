@@ -4,6 +4,7 @@
  */
 
 import { calculateCost, extractGoogleTokenUsage } from './token-usage-utils';
+import { CostCalculationOptions } from '../../ai/ai-models';
 
 /**
  * Calculate the cost for token usage based on Google pricing
@@ -17,9 +18,9 @@ export function calculateGoogleCost(
     model: string, 
     inputTokens: number, 
     outputTokens: number,
-    cacheHitTokens: number = 0
+    options: CostCalculationOptions = {}
 ): number {
-    return calculateCost(model, inputTokens, outputTokens, cacheHitTokens);
+    return calculateCost(model, inputTokens, outputTokens, options);
 }
 
 /**

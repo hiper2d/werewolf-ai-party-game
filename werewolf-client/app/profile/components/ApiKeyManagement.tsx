@@ -4,9 +4,37 @@ import React, { useState } from 'react';
 import ApiKeyList from './ApiKeyList';
 import AddApiKeyForm from './AddApiKeyForm';
 import { ApiKeyMap } from '@/app/api/game-models';
-import { MODEL_PRICING, SupportedAiModels, API_KEY_CONSTANTS, AUDIO_MODEL_CONSTANTS } from '@/app/ai/ai-models';
+import { MODEL_PRICING, SupportedAiModels, API_KEY_CONSTANTS, AUDIO_MODEL_CONSTANTS, ModelPricing } from '@/app/ai/ai-models';
 import { updateUserTier } from '@/app/api/user-actions';
 import { useRouter } from 'next/navigation';
+
+type PriceDisplay = {
+    base: string;
+    extended?: string;
+};
+
+const getPriceDisplay = (pricing: ModelPricing | undefined, type: 'input' | 'output'): PriceDisplay => {
+    if (!pricing) {
+        return { base: '$0.00' };
+    }
+
+    const basePrice = type === 'input' ? pricing.inputPrice : pricing.outputPrice;
+    if (basePrice === undefined) {
+        return { base: '$0.00' };
+    }
+
+    const extendedPrice = type === 'input' ? pricing.extendedContextInputPrice : pricing.extendedContextOutputPrice;
+    const threshold = pricing.extendedContextThresholdTokens;
+
+    if (extendedPrice !== undefined && threshold !== undefined) {
+        return {
+            base: `$${basePrice.toFixed(2)}`,
+            extended: `Extended (>${threshold.toLocaleString()} ctx tokens): $${extendedPrice.toFixed(2)}`
+        };
+    }
+
+    return { base: `$${basePrice.toFixed(2)}` };
+};
 
 export default function ApiKeyManagement({ initialApiKeys, userId }: { initialApiKeys: ApiKeyMap; userId: string }) {
     const [isLoading, setIsLoading] = useState(false);
@@ -29,12 +57,20 @@ export default function ApiKeyManagement({ initialApiKeys, userId }: { initialAp
     // Create a flat list of all models with their pricing
     const allModels = Object.entries(SupportedAiModels).map(([modelName, config]) => {
         const pricing = MODEL_PRICING[config.modelApiName];
+        const baseInputPrice = pricing?.inputPrice || 0;
+        const baseOutputPrice = pricing?.outputPrice || 0;
+
+        const inputDisplay = getPriceDisplay(pricing, 'input');
+        const outputDisplay = getPriceDisplay(pricing, 'output');
+
         return {
             name: modelName,
-            inputPrice: pricing?.inputPrice || 0,
-            outputPrice: pricing?.outputPrice || 0,
+            baseInputPrice,
+            baseOutputPrice,
+            inputDisplay,
+            outputDisplay
         };
-    }).filter(model => model.inputPrice > 0 || model.outputPrice > 0);
+    }).filter(model => model.baseInputPrice > 0 || model.baseOutputPrice > 0);
 
     return (
         <>
@@ -78,13 +114,23 @@ export default function ApiKeyManagement({ initialApiKeys, userId }: { initialAp
                             {allModels.map((model, index) => (
                                 <tr key={index} className="border-b border-white border-opacity-10">
                                     <td className="py-2">{model.name}</td>
-                                    <td className="py-2 text-right">${model.inputPrice.toFixed(2)}</td>
-                                    <td className="py-2 text-right">${model.outputPrice.toFixed(2)}</td>
+                                    <td className="py-2 text-right">
+                                        <div>{model.inputDisplay.base}</div>
+                                        {model.inputDisplay.extended && (
+                                            <div className="text-xs text-gray-400">{model.inputDisplay.extended}</div>
+                                        )}
+                                    </td>
+                                    <td className="py-2 text-right">
+                                        <div>{model.outputDisplay.base}</div>
+                                        {model.outputDisplay.extended && (
+                                            <div className="text-xs text-gray-400">{model.outputDisplay.extended}</div>
+                                        )}
+                                    </td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
-                    <p className="text-xs text-gray-400 mt-2">* Per million tokens</p>
+                    <p className="text-xs text-gray-400 mt-2">* Per million tokens (extended context rates shown when available)</p>
                 </div>
 
                 {/* TTS/STT Options */}

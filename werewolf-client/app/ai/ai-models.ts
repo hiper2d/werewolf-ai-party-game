@@ -209,6 +209,10 @@ export interface ModelPricing {
     inputPrice: number;      // Price per million input tokens
     outputPrice: number;     // Price per million output tokens
     cacheHitPrice?: number;  // Optional: Price per million cached tokens (if applicable)
+    extendedContextInputPrice?: number; // Optional: Price per million input tokens when context exceeds threshold
+    extendedContextOutputPrice?: number; // Optional: Price per million output tokens when context exceeds threshold
+    extendedContextCacheHitPrice?: number; // Optional: Price per million cached tokens for extended contexts
+    extendedContextThresholdTokens?: number; // Optional: Threshold at which extended pricing applies
 }
 
 /**
@@ -260,8 +264,11 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
     
     // Google models (placeholder pricing)
     [SupportedAiModels[LLM_CONSTANTS.GEMINI_25_PRO].modelApiName]: {
-        inputPrice: 1.25,    // < 200k tokens; otherwise 2.5
-        outputPrice: 10.0   // < 200k tokens; otherwise 15
+        inputPrice: 1.25,
+        outputPrice: 10.0,
+        extendedContextInputPrice: 2.5,
+        extendedContextOutputPrice: 15,
+        extendedContextThresholdTokens: 200_000
     },
     
     // Mistral models (placeholder pricing)
@@ -286,19 +293,25 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
     }
 };
 
+export interface CostCalculationOptions {
+    cacheHitTokens?: number;
+    contextTokens?: number;
+    totalTokens?: number;
+}
+
 /**
  * Helper function to calculate cost based on model pricing
  * @param modelApiName - The API name of the model
  * @param inputTokens - Number of input tokens
  * @param outputTokens - Number of output tokens
- * @param cacheHitTokens - Number of cached tokens (optional)
+ * @param options - Additional calculation details (cache hits, context tokens, etc.)
  * @returns Cost in USD
  */
 export function calculateModelCost(
     modelApiName: string,
     inputTokens: number,
     outputTokens: number,
-    cacheHitTokens: number = 0
+    options: CostCalculationOptions = {}
 ): number {
     const pricing = MODEL_PRICING[modelApiName];
 
@@ -311,15 +324,31 @@ export function calculateModelCost(
     const divisor = 1_000_000;
 
     // Calculate cached vs uncached input tokens
+    const cacheHitTokens = Math.max(0, options.cacheHitTokens ?? 0);
     const actualCacheHits = Math.min(cacheHitTokens, inputTokens);
     const uncachedInputTokens = Math.max(0, inputTokens - actualCacheHits);
 
+    // Determine if extended context pricing applies
+    const contextTokens = options.contextTokens ?? options.totalTokens ?? inputTokens;
+    let activeInputPrice = pricing.inputPrice;
+    let activeOutputPrice = pricing.outputPrice;
+    let activeCachePrice = pricing.cacheHitPrice ?? pricing.inputPrice;
+
+    if (
+        pricing.extendedContextThresholdTokens !== undefined &&
+        contextTokens > pricing.extendedContextThresholdTokens
+    ) {
+        activeInputPrice = pricing.extendedContextInputPrice ?? pricing.inputPrice;
+        activeOutputPrice = pricing.extendedContextOutputPrice ?? pricing.outputPrice;
+        activeCachePrice = pricing.extendedContextCacheHitPrice ?? pricing.cacheHitPrice ?? activeInputPrice;
+    } else if (pricing.cacheHitPrice !== undefined) {
+        activeCachePrice = pricing.cacheHitPrice;
+    }
+
     // Calculate costs
-    const uncachedInputCost = (uncachedInputTokens * pricing.inputPrice) / divisor;
-    const cachedInputCost = pricing.cacheHitPrice
-        ? (actualCacheHits * pricing.cacheHitPrice) / divisor
-        : (actualCacheHits * pricing.inputPrice) / divisor;
-    const outputCost = (outputTokens * pricing.outputPrice) / divisor;
+    const uncachedInputCost = (uncachedInputTokens * activeInputPrice) / divisor;
+    const cachedInputCost = (actualCacheHits * activeCachePrice) / divisor;
+    const outputCost = (outputTokens * activeOutputPrice) / divisor;
 
     return uncachedInputCost + cachedInputCost + outputCost;
 }

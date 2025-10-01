@@ -73,8 +73,22 @@ export class GoogleAgent extends AbstractAgent {
         throw new Error(this.errorMessages.unsupportedRole(role));
     }
 
-    private calculateCost(inputTokens: number, outputTokens: number): number {
-        return calculateGoogleCost(this.model, inputTokens, outputTokens);
+    private calculateCost(inputTokens: number, outputTokens: number, totalTokens: number): number {
+        const contextTokens = this.deriveContextTokens(inputTokens, outputTokens, totalTokens);
+
+        return calculateGoogleCost(this.model, inputTokens, outputTokens, {
+            contextTokens,
+            totalTokens
+        });
+    }
+
+    private deriveContextTokens(inputTokens: number, outputTokens: number, totalTokens: number): number {
+        if (!totalTokens) {
+            return inputTokens;
+        }
+
+        const promptAndReasoningTokens = Math.max(totalTokens - outputTokens, 0);
+        return Math.max(inputTokens, promptAndReasoningTokens);
     }
 
     /**
@@ -142,7 +156,7 @@ export class GoogleAgent extends AbstractAgent {
                 const totalTokens = usageMetadata.totalTokenCount || 0;
                 
                 // Calculate cost using the pricing utility
-                const costUSD = this.calculateCost(inputTokens, outputTokens);
+                const costUSD = this.calculateCost(inputTokens, outputTokens, totalTokens);
                 
                 tokenUsage = {
                     inputTokens,

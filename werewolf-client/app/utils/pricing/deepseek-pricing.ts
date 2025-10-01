@@ -19,7 +19,7 @@ export function calculateDeepSeekCost(
     outputTokens: number,
     cacheHitTokens: number = 0
 ): number {
-    return calculateCost(model, inputTokens, outputTokens, cacheHitTokens);
+    return calculateCost(model, inputTokens, outputTokens, { cacheHitTokens });
 }
 
 /**

@@ -1,9 +1,37 @@
 'use client';
 
 import React, { useState } from 'react';
-import { SupportedAiModels, MODEL_PRICING } from '@/app/ai/ai-models';
+import { SupportedAiModels, MODEL_PRICING, ModelPricing } from '@/app/ai/ai-models';
 import { updateUserTier } from '@/app/api/user-actions';
 import { useRouter } from 'next/navigation';
+
+type PriceDisplay = {
+    base: string;
+    extended?: string;
+};
+
+const getPriceDisplay = (pricing: ModelPricing | undefined, type: 'input' | 'output'): PriceDisplay => {
+    if (!pricing) {
+        return { base: '$0.00' };
+    }
+
+    const basePrice = type === 'input' ? pricing.inputPrice : pricing.outputPrice;
+    if (basePrice === undefined) {
+        return { base: '$0.00' };
+    }
+
+    const extendedPrice = type === 'input' ? pricing.extendedContextInputPrice : pricing.extendedContextOutputPrice;
+    const threshold = pricing.extendedContextThresholdTokens;
+
+    if (extendedPrice !== undefined && threshold !== undefined) {
+        return {
+            base: `$${basePrice.toFixed(2)}`,
+            extended: `Extended (>${threshold.toLocaleString()} ctx tokens): $${extendedPrice.toFixed(2)}`
+        };
+    }
+
+    return { base: `$${basePrice.toFixed(2)}` };
+};
 
 export default function FreeUserLimits({ userId }: { userId: string }) {
     // Get all models, not just free tier ones
@@ -55,6 +83,8 @@ export default function FreeUserLimits({ userId }: { userId: string }) {
                         <tbody>
                             {allModels.map(({ modelName, config }, index) => {
                                 const pricing = MODEL_PRICING[config.modelApiName];
+                                const inputDisplay = getPriceDisplay(pricing, 'input');
+                                const outputDisplay = getPriceDisplay(pricing, 'output');
                                 const isAvailable = config.freeTier?.available || false;
                                 const maxBots = config.freeTier?.maxBotsPerGame || 0;
 
@@ -71,14 +101,24 @@ export default function FreeUserLimits({ userId }: { userId: string }) {
                                     <tr key={index} className={`border-b border-white border-opacity-10 ${!isAvailable ? 'opacity-50' : ''}`}>
                                         <td className="py-2">{modelName}</td>
                                         <td className="py-2 text-right text-xs">{displayLimit}</td>
-                                        <td className="py-2 text-right">${pricing?.inputPrice.toFixed(2) || '0.00'}</td>
-                                        <td className="py-2 text-right">${pricing?.outputPrice.toFixed(2) || '0.00'}</td>
+                                        <td className="py-2 text-right">
+                                            <div>{inputDisplay.base}</div>
+                                            {inputDisplay.extended && (
+                                                <div className="text-xs text-gray-400">{inputDisplay.extended}</div>
+                                            )}
+                                        </td>
+                                        <td className="py-2 text-right">
+                                            <div>{outputDisplay.base}</div>
+                                            {outputDisplay.extended && (
+                                                <div className="text-xs text-gray-400">{outputDisplay.extended}</div>
+                                            )}
+                                        </td>
                                     </tr>
                                 );
                             })}
                         </tbody>
                     </table>
-                    <p className="text-xs text-gray-400 mt-2">* Per million tokens</p>
+                    <p className="text-xs text-gray-400 mt-2">* Per million tokens (extended context rates shown when available)</p>
                 </div>
 
                 {/* Upgrade Notice */}

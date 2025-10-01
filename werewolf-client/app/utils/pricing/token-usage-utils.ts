@@ -4,7 +4,7 @@
  * across all supported AI providers (OpenAI, DeepSeek, Kimi, Grok, Anthropic, Google, Mistral)
  */
 
-import { calculateModelCost } from '../../ai/ai-models';
+import { calculateModelCost, CostCalculationOptions } from '../../ai/ai-models';
 
 /**
  * Generic token usage interface that covers all provider-specific fields
@@ -70,16 +70,16 @@ export function extractTokenUsage(response: any): TokenUsage | null {
  * @param modelApiName - The API name of the model (e.g., 'gpt-4', 'deepseek-chat')
  * @param inputTokens - Number of input tokens used
  * @param outputTokens - Number of output tokens used  
- * @param cacheHitTokens - Number of cached input tokens (optional)
+ * @param options - Additional calculation details (cache hits, context tokens, etc.)
  * @returns Cost in USD
  */
 export function calculateCost(
     modelApiName: string,
     inputTokens: number,
     outputTokens: number,
-    cacheHitTokens: number = 0
+    options: CostCalculationOptions = {}
 ): number {
-    return calculateModelCost(modelApiName, inputTokens, outputTokens, cacheHitTokens);
+    return calculateModelCost(modelApiName, inputTokens, outputTokens, options);
 }
 
 /**
@@ -97,12 +97,10 @@ export function extractUsageAndCalculateCost(modelApiName: string, response: any
         return null;
     }
     
-    const cost = calculateCost(
-        modelApiName,
-        usage.promptTokens,
-        usage.completionTokens,
-        usage.cacheHitTokens || 0
-    );
+    const cost = calculateCost(modelApiName, usage.promptTokens, usage.completionTokens, {
+        cacheHitTokens: usage.cacheHitTokens || 0,
+        totalTokens: usage.totalTokens
+    });
     
     return { usage, cost };
 }

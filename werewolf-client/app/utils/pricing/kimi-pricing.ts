@@ -13,7 +13,7 @@ import { calculateCost, extractKimiTokenUsage } from './token-usage-utils';
  * @returns Cost in USD
  */
 export function calculateKimiCost(model: string, inputTokens: number, outputTokens: number): number {
-    return calculateCost(model, inputTokens, outputTokens, 0);
+    return calculateCost(model, inputTokens, outputTokens);
 }
 
 /**

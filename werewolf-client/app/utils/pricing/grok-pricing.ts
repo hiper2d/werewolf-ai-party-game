@@ -16,10 +16,10 @@ import { calculateCost, extractGrokTokenUsage } from './token-usage-utils';
 export function calculateGrokCost(
     model: string, 
     inputTokens: number, 
-    outputTokens: number, 
+    outputTokens: number,
     cacheHitTokens: number = 0
 ): number {
-    return calculateCost(model, inputTokens, outputTokens, cacheHitTokens);
+    return calculateCost(model, inputTokens, outputTokens, { cacheHitTokens });
 }
 
 /**
