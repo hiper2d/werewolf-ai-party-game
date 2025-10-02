@@ -1,12 +1,13 @@
 'use client';
 
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {useRouter} from 'next/navigation';
 import {useSession} from 'next-auth/react';
 import {buttonBlackStyle, buttonTransparentStyle} from "@/app/constants";
 import {createGame, previewGame} from '@/app/api/game-actions';
-import {GAME_ROLES, GamePreview, GamePreviewWithGeneratedBots, GENDER_OPTIONS, getVoicesForGender, getRandomVoiceForGender, PLAY_STYLES, PLAY_STYLE_CONFIGS} from "@/app/api/game-models";
+import {GAME_ROLES, GamePreview, GamePreviewWithGeneratedBots, GENDER_OPTIONS, getVoicesForGender, getRandomVoiceForGender, PLAY_STYLES, PLAY_STYLE_CONFIGS, UserTier} from "@/app/api/game-models";
 import {LLM_CONSTANTS, SupportedAiModels} from "@/app/ai/ai-models";
+import {FREE_TIER_UNLIMITED, getCandidateModelsForTier, getPerGameModelLimit} from "@/app/ai/model-limit-utils";
 import MultiSelectDropdown from '@/app/components/MultiSelectDropdown';
 import {ttsService} from "@/app/services/tts-service";
 
@@ -33,6 +34,22 @@ export default function CreateNewGamePage() {
     const [themeError, setThemeError] = useState<string | null>(null);
     const [playersAiError, setPlayersAiError] = useState<string | null>(null);
     const [botNameErrors, setBotNameErrors] = useState<{[key: number]: string}>({});
+    const [userTier, setUserTier] = useState<UserTier>('free');
+    const [isTierLoaded, setIsTierLoaded] = useState(false);
+    const hasInitializedPlayerModels = useRef(false);
+    const playerOptions = useMemo(() => Array.from({ length: 7 }, (_, i) => i + 6), []);
+    const allModels = useMemo(() => Object.values(LLM_CONSTANTS), []);
+    const candidateModels = useMemo(() => getCandidateModelsForTier(userTier), [userTier]);
+    const gameMasterOptions = useMemo(() => {
+        if (userTier === 'free') {
+            return [LLM_CONSTANTS.RANDOM, ...candidateModels];
+        }
+        return allModels;
+    }, [userTier, candidateModels, allModels]);
+    const playerModelOptions = useMemo(() => {
+        const base = userTier === 'free' ? candidateModels : allModels;
+        return base.filter(model => model !== LLM_CONSTANTS.RANDOM);
+    }, [userTier, candidateModels, allModels]);
 
     // Redirect to login if not authenticated
     useEffect(() => {
@@ -40,6 +57,37 @@ export default function CreateNewGamePage() {
             router.push('/api/auth/signin');
         }
     }, [status, router]);
+
+    useEffect(() => {
+        if (status !== 'authenticated' || isTierLoaded) {
+            return;
+        }
+
+        let cancelled = false;
+
+        const loadTier = async () => {
+            try {
+                const response = await fetch('/api/user-tier');
+                if (!cancelled && response?.ok) {
+                    const data = await response.json();
+                    setUserTier(data.tier as UserTier);
+                }
+            } catch (err) {
+                console.error('Failed to load user tier for model selection', err);
+                // Fallback to existing default (free) if we cannot load the tier
+            } finally {
+                if (!cancelled) {
+                    setIsTierLoaded(true);
+                }
+            }
+        };
+
+        loadTier();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [status, isTierLoaded]);
 
     useEffect(() => {
         if (werewolfCount >= playerCount) {
@@ -73,7 +121,34 @@ export default function CreateNewGamePage() {
         const themeValidationError = validateTheme(theme);
         setThemeError(themeValidationError);
 
-        const playersAiValidationError = selectedPlayerAiTypes.length === 0 ? 'At least one AI model must be selected' : null;
+        let playersAiValidationError = selectedPlayerAiTypes.length === 0 ? 'At least one AI model must be selected' : null;
+
+        if (!playersAiValidationError && userTier === 'free') {
+            const requiredBots = Math.max(0, playerCount - 1);
+            const totalCapacity = selectedPlayerAiTypes.reduce<number>((total, model) => {
+                if (total === FREE_TIER_UNLIMITED) {
+                    return total;
+                }
+
+                try {
+                    const limit = getPerGameModelLimit(model, 'free');
+                    if (limit === FREE_TIER_UNLIMITED) {
+                        return FREE_TIER_UNLIMITED;
+                    }
+                    return total + limit;
+                } catch (err) {
+                    console.warn('Unable to evaluate free tier capacity for model', model, err);
+                    return total;
+                }
+            }, 0);
+
+            if (totalCapacity !== FREE_TIER_UNLIMITED && totalCapacity < requiredBots) {
+                const capacityLabel = totalCapacity === 1 ? '1 bot' : `${totalCapacity} bots`;
+                const requiredLabel = requiredBots === 1 ? '1 bot' : `${requiredBots} bots`;
+                playersAiValidationError = `Selected models can cover only ${capacityLabel} on the free tier. Add more models to cover ${requiredLabel}.`;
+            }
+        }
+
         setPlayersAiError(playersAiValidationError);
 
         setIsFormValid(
@@ -81,15 +156,53 @@ export default function CreateNewGamePage() {
             theme.trim() !== '' &&
             selectedPlayerAiTypes.length > 0 &&
             !nameValidationError &&
-            !themeValidationError
+            !themeValidationError &&
+            !playersAiValidationError
         );
-    }, [name, theme, selectedPlayerAiTypes]);
+    }, [name, theme, selectedPlayerAiTypes, userTier, playerCount]);
 
     useEffect(() => {
         if (gameData && !gameData.gameMasterVoice) {
             setGameData({ ...gameData, gameMasterVoice: getRandomVoiceForGender('male') });
         }
     }, [gameData]);
+
+    useEffect(() => {
+        if (!isTierLoaded) {
+            return;
+        }
+
+        setGameMasterAiType(prev => {
+            if (prev === LLM_CONSTANTS.RANDOM || gameMasterOptions.includes(prev)) {
+                return prev;
+            }
+            return gameMasterOptions[0] ?? LLM_CONSTANTS.RANDOM;
+        });
+    }, [isTierLoaded, gameMasterOptions]);
+
+    useEffect(() => {
+        if (!isTierLoaded) {
+            return;
+        }
+
+        setSelectedPlayerAiTypes(prev => {
+            const filtered = prev.filter(model => playerModelOptions.includes(model));
+
+            if (!hasInitializedPlayerModels.current) {
+                hasInitializedPlayerModels.current = true;
+                if (filtered.length > 0) {
+                    return filtered;
+                }
+                return playerModelOptions;
+            }
+
+            if (filtered.length !== prev.length) {
+                return filtered;
+            }
+
+            return prev;
+        });
+    }, [isTierLoaded, playerModelOptions]);
 
     // Show loading while checking auth
     if (status === 'loading') {
@@ -105,9 +218,6 @@ export default function CreateNewGamePage() {
         return null;
     }
 
-    const playerOptions = Array.from({ length: 7 }, (_, i) => i + 6);
-    const supportedAi = Object.values(LLM_CONSTANTS); // todo: this list should be limited to ApiKeys player uploaded
-    const supportedPlayerAi = Object.values(LLM_CONSTANTS).filter(model => model !== LLM_CONSTANTS.RANDOM);
 
     // Helper function to check if a model has thinking capabilities
     const hasThinkingMode = (aiType: string): boolean => {
@@ -394,8 +504,9 @@ export default function CreateNewGamePage() {
                             value={gameMasterAiType}
                             onChange={(e) => setGameMasterAiType(e.target.value as string)}
                             required
+                            disabled={!isTierLoaded}
                         >
-                            {supportedAi.map(model => (
+                            {gameMasterOptions.map(model => (
                                 <option key={model} value={model}>{model}</option>
                             ))}
                         </select>
@@ -404,12 +515,13 @@ export default function CreateNewGamePage() {
                         <label className={labelStyle}>Players AI *:</label>
                         <div className="w-full sm:flex-1">
                             <MultiSelectDropdown
-                                options={supportedPlayerAi}
+                                options={playerModelOptions}
                                 selectedOptions={selectedPlayerAiTypes}
                                 onChange={setSelectedPlayerAiTypes}
                                 placeholder="Select AI models for bots... *"
                                 className="w-full"
                                 hasError={!!playersAiError}
+                                disabled={!isTierLoaded}
                             />
                             {playersAiError && <p className="text-red-500 text-sm mt-1">{playersAiError}</p>}
                         </div>
@@ -497,7 +609,7 @@ export default function CreateNewGamePage() {
                                         value={gameData.gameMasterAiType}
                                         onChange={(e) => handleGameMasterAiChange(e.target.value)}
                                     >
-                                        {supportedAi.filter(model => model !== LLM_CONSTANTS.RANDOM).map(model => (
+                                        {gameMasterOptions.filter(model => model !== LLM_CONSTANTS.RANDOM).map(model => (
                                             <option key={model} value={model}>{model}</option>
                                         ))}
                                     </select>
@@ -610,7 +722,7 @@ export default function CreateNewGamePage() {
                                         value={player.playerAiType}
                                         onChange={(e) => handleBotAiChange(index, e.target.value)}
                                     >
-                                        {supportedPlayerAi.filter(model => model !== LLM_CONSTANTS.RANDOM).map(model => (
+                                        {playerModelOptions.map(model => (
                                             <option key={model} value={model}>{model}</option>
                                         ))}
                                     </select>

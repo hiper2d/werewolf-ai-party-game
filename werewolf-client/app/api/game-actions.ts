@@ -19,16 +19,24 @@ import {
     RECIPIENT_WEREWOLVES,
     ROLE_CONFIGS,
     SystemErrorMessage,
-    User
+    User,
+    UserTier
 } from "@/app/api/game-models";
 import {auth} from "@/auth";
 import {AgentFactory} from "@/app/ai/agent-factory";
 import {STORY_SYSTEM_PROMPT, STORY_USER_PROMPT} from "@/app/ai/prompts/story-gen-prompts";
-import {getApiKeysForUser} from "@/app/utils/tier-utils";
-import {updateUserMonthlySpending} from "@/app/api/user-actions";
+import {getUserTierAndApiKeys} from "@/app/utils/tier-utils";
+import {getUserTier, updateUserMonthlySpending} from "@/app/api/user-actions";
 import {normalizeSpendings} from "@/app/utils/spending-utils";
 import {convertToAIMessage, parseResponseToObj} from "@/app/utils/message-utils";
 import {LLM_CONSTANTS} from "@/app/ai/ai-models";
+import {
+    consumeModelUsage,
+    getCandidateModelsForTier,
+    getPerGameModelLimit,
+    hasCapacity,
+    validateModelUsageForTier
+} from "@/app/ai/model-limit-utils";
 import {AbstractAgent} from "../ai/abstract-agent";
 import {format} from "@/app/ai/prompts/utils";
 import {GameSetupZodSchema} from "@/app/ai/prompts/zod-schemas";
@@ -148,22 +156,26 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
         throw new Error('Firestore is not initialized');
     }
 
-    const apiKeys = await getApiKeysForUser(session.user.email);
+    const {tier, apiKeys} = await getUserTierAndApiKeys(session.user.email);
+    const usageCounts: Record<string, number> = {};
 
     const botCount = gamePreview.playerCount - 1; // exclude human player
 
-    // Resolve Game Master AI type if it's Random
+    // Resolve Game Master AI type with tier-aware restrictions
     let resolvedGmAiType = gamePreview.gameMasterAiType;
     if (resolvedGmAiType === LLM_CONSTANTS.RANDOM) {
-        const availableTypes = Object.values(LLM_CONSTANTS).filter(
-            type => type !== LLM_CONSTANTS.RANDOM
-        );
-        resolvedGmAiType = availableTypes[Math.floor(Math.random() * availableTypes.length)];
+        const candidates = getCandidateModelsForTier(tier).filter(model => hasCapacity(model, tier, usageCounts));
+        if (candidates.length === 0) {
+            throw new Error('No AI models are available for the game master on your current tier. Please adjust your selection or upgrade your plan.');
+        }
+        resolvedGmAiType = candidates[Math.floor(Math.random() * candidates.length)];
     }
+
+    consumeModelUsage(resolvedGmAiType, tier, usageCounts, 'as the game master');
 
     const storyTellAgent: AbstractAgent = AgentFactory.createAgent(
         GAME_MASTER, STORY_SYSTEM_PROMPT, resolvedGmAiType, apiKeys, false
-    )
+    );
         
     // Gather role configurations for the story generation
     const gameRoleConfigs = [];
@@ -219,33 +231,57 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
     if (tokenUsage) {
         await updateUserMonthlySpending(session.user.email, tokenUsage.costUSD);
     }
+    const defaultPlayerCandidates = getCandidateModelsForTier(tier);
+
     const bots: BotPreview[] = aiResponse.players.map((bot: { name: string; gender: string; story: string; playStyle?: string; voiceInstructions: string }) => {
         let aiType: string;
-        
+
         if (Array.isArray(gamePreview.playersAiType)) {
-            // If array is provided, pick randomly from selected models
-            const selectedModels = gamePreview.playersAiType;
-            if (selectedModels.length === 0) {
-                // Fallback to all available models if empty array
-                const availableTypes = Object.values(LLM_CONSTANTS).filter(
-                    type => type !== LLM_CONSTANTS.RANDOM
-                );
-                aiType = availableTypes[Math.floor(Math.random() * availableTypes.length)];
-            } else {
-                aiType = selectedModels[Math.floor(Math.random() * selectedModels.length)];
+            const selectedModels = gamePreview.playersAiType.length > 0
+                ? gamePreview.playersAiType
+                : [LLM_CONSTANTS.RANDOM];
+
+            if (tier === 'free') {
+                const disallowedModel = selectedModels.find(model => {
+                    if (model === LLM_CONSTANTS.RANDOM) {
+                        return false;
+                    }
+                    return getPerGameModelLimit(model, tier) === 0;
+                });
+
+                if (disallowedModel) {
+                    throw new Error(`The AI model ${disallowedModel} is not available on the free tier for bots. Please update your bot AI selection.`);
+                }
             }
+
+            const expandedCandidates = selectedModels.flatMap(model => {
+                if (model === LLM_CONSTANTS.RANDOM) {
+                    return defaultPlayerCandidates;
+                }
+                return [model];
+            });
+
+            const candidatesWithCapacity = expandedCandidates.filter(model => hasCapacity(model, tier, usageCounts));
+
+            if (candidatesWithCapacity.length === 0) {
+                throw new Error('No AI models are available for additional bots on the free tier with the current selection. Please adjust your bot AI model choices.');
+            }
+
+            aiType = candidatesWithCapacity[Math.floor(Math.random() * candidatesWithCapacity.length)];
         } else {
             // Legacy support for single string value
             aiType = gamePreview.playersAiType;
-            
+
             if (aiType === LLM_CONSTANTS.RANDOM) {
-                // Support only models for which user has API keys (if needed)
-                const availableTypes = Object.values(LLM_CONSTANTS).filter(
-                    type => type !== LLM_CONSTANTS.RANDOM
-                );
-                aiType = availableTypes[Math.floor(Math.random() * availableTypes.length)];
+                const candidates = defaultPlayerCandidates.filter(model => hasCapacity(model, tier, usageCounts));
+                if (candidates.length === 0) {
+                    throw new Error('No AI models are available for bots on your current tier. Please adjust your bot AI model selection.');
+                }
+                aiType = candidates[Math.floor(Math.random() * candidates.length)];
             }
         }
+
+        consumeModelUsage(aiType, tier, usageCounts, 'for bots');
 
         // Assign gender and voice
         const gender = bot.gender as 'male' | 'female';
@@ -270,6 +306,8 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
         };
     });
 
+    validateModelUsageForTier(tier, resolvedGmAiType, bots.map(bot => bot.playerAiType));
+
     return {
         ...gamePreview,
         gameMasterAiType: resolvedGmAiType,
@@ -290,6 +328,9 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
         throw new Error('Firestore is not initialized');
     }
     try {
+        const tier = await getUserTier(session.user.email);
+        validateModelUsageForTier(tier, gamePreview.gameMasterAiType, gamePreview.bots.map(bot => bot.playerAiType));
+
         const totalPlayers = gamePreview.playerCount;
         const werewolfCount = gamePreview.werewolfCount;
         
