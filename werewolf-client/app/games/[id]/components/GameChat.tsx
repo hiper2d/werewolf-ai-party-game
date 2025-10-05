@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { talkToAll, humanPlayerVote, getSuggestion } from "@/app/api/bot-actions";
 import { beginNight, performNightAction, humanPlayerTalkWerewolves } from "@/app/api/night-actions";
 import { buttonTransparentStyle } from "@/app/constants";
@@ -287,6 +287,17 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
     const [isRecording, setIsRecording] = useState(false);
     const [isTranscribing, setIsTranscribing] = useState(false);
     const [textareaRows, setTextareaRows] = useState(2);
+
+    const currentDayPublicMessageCount = useMemo(() => {
+        return messages.filter(message =>
+            message.day === game.currentDay && message.recipientName === RECIPIENT_ALL
+        ).length;
+    }, [messages, game.currentDay]);
+
+    const phaseLabel = game.gameState.toLowerCase().replace(/_/g, ' ');
+    const headerMessageSuffix = game.gameState === GAME_STATES.DAY_DISCUSSION
+        ? ` • ${currentDayPublicMessageCount} message${currentDayPublicMessageCount === 1 ? '' : 's'}`
+        : '';
 
     // Function to clear messages from night phase onward
     const clearMessagesFromNight = () => {
@@ -911,7 +922,7 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
     return (
         <div className="flex flex-col h-full border border-white border-opacity-30 rounded-lg p-4">
             <h2 className="text-xl font-bold mb-4 text-white">
-                Day {game.currentDay} • {game.gameState.toLowerCase().replace(/_/g, ' ')}
+                Day {game.currentDay} • {phaseLabel}{headerMessageSuffix}
             </h2>
             {game.errorState && (
                 <ErrorBanner
