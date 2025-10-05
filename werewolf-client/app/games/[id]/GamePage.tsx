@@ -21,6 +21,7 @@ interface Participant {
     isAlive: boolean;
     aiType?: string;
     enableThinking?: boolean;
+    isGameMaster?: boolean;
 }
 
 export default function GamePage({ 
@@ -317,6 +318,15 @@ export default function GamePage({
     // Combine human player and bots for participants list
     const participants: Participant[] = [
         {
+            name: 'Game Master',
+            role: 'Game Master',
+            isHuman: false,
+            isAlive: true,
+            aiType: game.gameMasterAiType,
+            enableThinking: game.gameMasterThinking,
+            isGameMaster: true,
+        },
+        {
             name: game.humanPlayerName,
             role: game.humanPlayerRole,
             isHuman: true,
@@ -451,236 +461,83 @@ export default function GamePage({
     return (
         <div className="flex h-full text-white overflow-hidden">
             {/* Left column - Game info and participants */}
-            <div className="w-1/5 flex flex-col pr-2 overflow-auto">
-                {/* Game info */}
-                <div className="bg-black bg-opacity-30 border border-white border-opacity-30 rounded p-4 mb-4">
-                    <h1 className="text-2xl font-bold mb-2">{game.theme}</h1>
-                    <p className="text-sm text-gray-300 mb-4">{game.description}</p>
-                    <div className="text-sm text-gray-400 mb-2">
-                        Day {game.currentDay} - {game.gameState}
-                    </div>
-                    <div className="text-xs text-left w-full mb-1">
-                        <button
-                            onClick={() => openModelDialog('Game Master', game.gameMasterAiType)}
-                            className="text-gray-500 hover:text-gray-300 transition-colors duration-200 text-left w-full"
-                            title="Click to change Game Master AI model"
-                        >
-                            Game Master Model: {game.gameMasterAiType}
-                        </button>
-                    </div>
-                    <div className="text-xs text-left w-full mb-1">
-                        <span className="text-gray-500">
-                            Your Role: {game.humanPlayerRole}
-                        </span>
-                    </div>
-                    {game.totalGameCost !== undefined && game.totalGameCost > 0 && (
-                        <div className="text-xs text-left w-full">
-                            <span className="text-gray-600 font-mono">
-                                Total Game Cost: ${game.totalGameCost.toFixed(4)}
-                            </span>
-                        </div>
-                    )}
-                </div>
-
-                {/* Participants list */}
-                <div className="bg-black bg-opacity-30 border border-white border-opacity-30 rounded p-4 mb-4 flex-grow overflow-auto">
-                    <h2 className="text-xl font-bold mb-2">Participants</h2>
-                    <ul>
-                        {participants.map((participant, index) => (
-                            <li
-                                key={index}
-                                className={`mb-3 flex flex-col ${!participant.isAlive ? 'opacity-60' : ''}`}
-                            >
-                                <div className="flex items-center justify-between">
-                                    <span
-                                        style={{ color: getPlayerColor(participant.name) }}
-                                        className={!participant.isAlive ? 'line-through' : ''}
-                                    >
-                                        {participant.name}
-                                        {participant.isHuman && ' (You)'}
-                                    </span>
-                                    <div className="flex items-center gap-2">
-                                        {!participant.isHuman && (() => {
-                                            const bot = game.bots.find(b => b.name === participant.name);
-                                            const cost = bot?.tokenUsage?.costUSD;
-                                            return cost && cost > 0 ? (
-                                                <span className="text-xs text-gray-600 font-mono">
-                                                    ${cost.toFixed(4)}
-                                                </span>
-                                            ) : null;
-                                        })()}
-                                        {!participant.isAlive && (
-                                            <span className="text-sm text-red-400">💀 Eliminated</span>
-                                        )}
-                                    </div>
-                                </div>
-                                {/* Show AI model for all bots */}
-                                {!participant.isHuman && participant.aiType && (
-                                    <div className="text-xs mt-1 text-left w-full">
-                                        <button
-                                            onClick={() => openModelDialog(participant.name, participant.aiType!, participant.enableThinking)}
-                                            className="text-gray-500 hover:text-gray-300 transition-colors duration-200 text-left w-full"
-                                            title="Click to change AI model"
-                                        >
-                                            Model: {participant.aiType}
-                                        </button>
-                                    </div>
-                                )}
-                                {/* Show role for eliminated players or when game is over */}
-                                {(!participant.isAlive || isGameOver) && (
-                                    <div className="text-xs text-gray-400 mt-1 ml-2">
-                                        Role: {participant.role}
-                                    </div>
-                                )}
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-
-                {/* Game controls */}
-                <div className="bg-black bg-opacity-30 border border-white border-opacity-30 rounded p-4">
-                    {isGameOver ? (
-                        <div className="text-center">
-                            <div className="mb-4">
-                                <h3 className="text-lg font-bold text-red-400 mb-2">🎭 Game Over</h3>
-                                <p className="text-sm text-gray-300">The game has ended. All roles have been revealed above.</p>
+            <div className="w-1/5 flex flex-col pr-2 h-full">
+                <div className="flex flex-col h-full overflow-hidden">
+                    {/* Game info */}
+                    <div className="bg-black bg-opacity-30 border border-white border-opacity-30 rounded p-4 mb-4 flex-shrink-0">
+                        <h1 className="text-2xl font-bold mb-2">{game.theme}</h1>
+                        <p className="text-sm text-gray-300 mb-4">{game.description}</p>
+                        {game.totalGameCost !== undefined && game.totalGameCost > 0 && (
+                            <div className="text-xs text-left w-full">
+                                <span className="text-gray-600 font-mono">
+                                    Total Game Cost: ${game.totalGameCost.toFixed(4)}
+                                </span>
                             </div>
-                            <button
-                                className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500`}
-                                onClick={handleExitGame}
-                                title="Return to the games list"
-                            >
-                                Exit Game
-                            </button>
-                        </div>
-                    ) : (
-                        <div className="flex gap-2 justify-center">
-                            {game.gameState === GAME_STATES.DAY_DISCUSSION && (
-                                <>
-                                    <button
-                                        className={buttonTransparentStyle}
-                                        onClick={async () => {
-                                            const updatedGame = await runGameAction(() => vote(game.id));
-                                            if (updatedGame) {
-                                                setGame(updatedGame);
-                                            }
-                                        }}
-                                        title="Start the voting phase to eliminate a suspected werewolf"
-                                    >
-                                        Vote
-                                    </button>
-                                    <button
-                                        className={`${buttonTransparentStyle} ${game.gameStateProcessQueue.length > 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                        disabled={game.gameStateProcessQueue.length > 0}
-                                        onClick={async () => {
-                                            const updatedGame = await runGameAction(() => keepBotsGoing(game.id));
-                                            if (updatedGame) {
-                                                setGame(updatedGame);
-                                            }
-                                        }}
-                                        title={game.gameStateProcessQueue.length > 0 ? 'Bots are already talking' : 'Let 1-3 bots continue the conversation'}
-                                    >
-                                        Keep Going
-                                    </button>
-                                </>
-                            )}
-                            {game.gameState === GAME_STATES.VOTE_RESULTS && (
-                                <div className="flex gap-2 justify-center">
-                                    <button
-                                        className={`${buttonTransparentStyle} bg-blue-600 hover:bg-blue-700 border-blue-500`}
-                                        onClick={async () => {
-                                            console.log('🌙 GAMEPAGE: START NIGHT BUTTON CLICKED:', {
-                                                gameId: game.id,
-                                                currentState: game.gameState,
-                                                timestamp: new Date().toISOString()
-                                            });
-                                            const updatedGame = await runGameAction(() => performNightAction(game.id));
-                                            console.log('✅ GAMEPAGE: Start Night button - PerformNightAction API completed');
-                                            if (updatedGame) {
-                                                setGame(updatedGame);
-                                            }
-                                        }}
-                                        title="Begin the night phase where werewolves and special roles take their actions"
-                                    >
-                                        🌙 Start Night
-                                    </button>
-                                    <button
-                                        className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500`}
-                                        onClick={async () => {
-                                            const updatedGame = await runGameAction(() => afterGameDiscussion(game.id));
-                                            if (updatedGame) {
-                                                setGame(updatedGame);
-                                            }
-                                        }}
-                                        title="End the game and move to after-game discussion"
-                                    >
-                                        🎭 Game Over
-                                    </button>
-                                </div>
-                            )}
-                            {game.gameState === GAME_STATES.NIGHT && (
-                                <div className="text-sm text-yellow-400 text-center">
-                                    🌙 Night in progress...
-                                </div>
-                            )}
-                            {game.gameState === GAME_STATES.NIGHT_RESULTS && (
-                                <div className="flex gap-2 justify-center">
-                                    <button
-                                        className={buttonTransparentStyle}
-                                        onClick={async () => {
-                                            // First trigger UI message clearing
-                                            setClearNightMessages(true);
-                                            
-                                            // Then replay night in backend
-                                            const updatedGame = await runGameAction(() => replayNight(game.id));
-                                            if (updatedGame) {
-                                                setGame(updatedGame);
-                                            }
-                                            
-                                            // Reset the clear flag after a brief delay
-                                            setTimeout(() => setClearNightMessages(false), 100);
-                                        }}
-                                        title="Clear night messages and replay the night phase actions"
-                                    >
-                                        Replay
-                                    </button>
-                                    <button
-                                        className={buttonTransparentStyle}
-                                        onClick={async () => {
-                                            const updatedGame = await runGameAction(() => startNewDay(game.id));
-                                            if (updatedGame) {
-                                                setGame(updatedGame);
-                                            }
-                                        }}
-                                        title="Continue to apply night results and start new day"
-                                    >
-                                        Next Day
-                                    </button>
-                                    <button
-                                        className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500`}
-                                        onClick={async () => {
-                                            const updatedGame = await runGameAction(() => afterGameDiscussion(game.id));
-                                            if (updatedGame) {
-                                                setGame(updatedGame);
-                                            }
-                                        }}
-                                        title="End the game and move to after-game discussion"
-                                    >
-                                        🎭 Game Over
-                                    </button>
-                                </div>
-                            )}
-                            {game.gameState === GAME_STATES.NEW_DAY_BOT_SUMMARIES && (
-                                <div className="text-sm text-blue-400 text-center">
-                                    💭 Generating day summaries... ({game.gameStateProcessQueue.length} bots remaining)
-                                </div>
-                            )}
-                        </div>
-                    )}
+                        )}
+                    </div>
+
+                    {/* Participants list */}
+                    <div className="bg-black bg-opacity-30 border border-white border-opacity-30 rounded p-4 flex-grow overflow-auto">
+                        <h2 className="text-xl font-bold mb-2">Participants</h2>
+                        <ul>
+                            {participants.map((participant, index) => (
+                                <li
+                                    key={index}
+                                    className={`mb-3 flex flex-col ${!participant.isAlive ? 'opacity-60' : ''}`}
+                                >
+                                    <div className="flex items-center justify-between">
+                                        <span
+                                            style={{ color: getPlayerColor(participant.name) }}
+                                            className={!participant.isAlive ? 'line-through' : ''}
+                                        >
+                                            {participant.name}
+                                            {participant.isHuman && ' (You)'}
+                                        </span>
+                                        <div className="flex items-center gap-2">
+                                            {!participant.isHuman && !participant.isGameMaster && (() => {
+                                                const bot = game.bots.find(b => b.name === participant.name);
+                                                const cost = bot?.tokenUsage?.costUSD;
+                                                return cost && cost > 0 ? (
+                                                    <span className="text-xs text-gray-600 font-mono">
+                                                        ${cost.toFixed(4)}
+                                                    </span>
+                                                ) : null;
+                                            })()}
+                                            {!participant.isAlive && (
+                                                <span className="text-sm text-red-400">💀 Eliminated</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    {/* Show AI model for non-human participants */}
+                                    {!participant.isHuman && participant.aiType && (
+                                        <div className="text-xs mt-1 text-left w-full">
+                                            <button
+                                                onClick={() => openModelDialog(participant.name, participant.aiType!, participant.enableThinking)}
+                                                className="text-gray-500 hover:text-gray-300 transition-colors duration-200 text-left w-full"
+                                                title="Click to change AI model"
+                                            >
+                                                Model: {participant.aiType}
+                                            </button>
+                                        </div>
+                                    )}
+                                    {/* Show human role explicitly */}
+                                    {participant.isHuman && (
+                                        <div className="text-xs text-gray-400 mt-1 ml-2">
+                                            Role: {participant.role}
+                                        </div>
+                                    )}
+                                    {/* Show role for eliminated non-human players or when game is over */}
+                                    {(!participant.isAlive || isGameOver) && !participant.isHuman && (
+                                        <div className="text-xs text-gray-400 mt-1 ml-2">
+                                            Role: {participant.role}
+                                        </div>
+                                    )}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
                 </div>
             </div>
-
-            {/* Center column - Chat */}
             <div className="flex-1 h-full overflow-hidden px-2">
                 <GameChat
                     gameId={game.id}
@@ -691,9 +548,9 @@ export default function GamePage({
                 />
             </div>
 
-            {/* Right column - Queue Info */}
-            <div className="w-1/5 flex flex-col pl-2 overflow-auto">
-                <div className="bg-black bg-opacity-30 border border-white border-opacity-30 rounded p-4">
+            {/* Right column - Queue Info and controls */}
+            <div className="w-1/5 flex flex-col pl-2 h-full">
+                <div className="bg-black bg-opacity-30 border border-white border-opacity-30 rounded p-4 flex-grow overflow-auto">
                     <h2 className="text-lg font-bold mb-2">{queueInfo.title}</h2>
                     <p className="text-sm text-gray-300 mb-3">{queueInfo.description}</p>
                     {queueInfo.subtitle && (
@@ -749,6 +606,144 @@ export default function GamePage({
                         </div>
                     )}
                 </div>
+
+                {(isGameOver || game.gameState === GAME_STATES.DAY_DISCUSSION || game.gameState === GAME_STATES.VOTE_RESULTS || game.gameState === GAME_STATES.NIGHT || game.gameState === GAME_STATES.NIGHT_RESULTS || (game.gameState === GAME_STATES.NEW_DAY_BOT_SUMMARIES && game.gameStateProcessQueue.length > 0)) && (
+                    <div className="bg-black bg-opacity-30 border border-white border-opacity-30 rounded p-4 mt-4">
+                    {isGameOver ? (
+                        <div className="text-center">
+                            <div className="mb-4">
+                                <h3 className="text-lg font-bold text-red-400 mb-2">🎭 Game Over</h3>
+                                <p className="text-sm text-gray-300">The game has ended. All roles have been revealed above.</p>
+                            </div>
+                            <button
+                                className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500`}
+                                onClick={handleExitGame}
+                                title="Return to the games list"
+                            >
+                                Exit Game
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="flex flex-col gap-3">
+                            {game.gameState === GAME_STATES.DAY_DISCUSSION && (
+                                <div className="flex gap-2 justify-center">
+                                    <button
+                                        className={buttonTransparentStyle}
+                                        onClick={async () => {
+                                            const updatedGame = await runGameAction(() => vote(game.id));
+                                            if (updatedGame) {
+                                                setGame(updatedGame);
+                                            }
+                                        }}
+                                        title="Start the voting phase to eliminate a suspected werewolf"
+                                    >
+                                        Vote
+                                    </button>
+                                    <button
+                                        className={`${buttonTransparentStyle} ${game.gameStateProcessQueue.length > 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                        disabled={game.gameStateProcessQueue.length > 0}
+                                        onClick={async () => {
+                                            const updatedGame = await runGameAction(() => keepBotsGoing(game.id));
+                                            if (updatedGame) {
+                                                setGame(updatedGame);
+                                            }
+                                        }}
+                                        title={game.gameStateProcessQueue.length > 0 ? 'Bots are already talking' : 'Let 1-3 bots continue the conversation'}
+                                    >
+                                        Keep Going
+                                    </button>
+                                </div>
+                            )}
+                            {game.gameState === GAME_STATES.VOTE_RESULTS && (
+                                <div className="flex gap-2 justify-center">
+                                    <button
+                                        className={`${buttonTransparentStyle} bg-blue-600 hover:bg-blue-700 border-blue-500`}
+                                        onClick={async () => {
+                                            console.log('🌙 GAMEPAGE: START NIGHT BUTTON CLICKED:', {
+                                                gameId: game.id,
+                                                currentState: game.gameState,
+                                                timestamp: new Date().toISOString()
+                                            });
+                                            const updatedGame = await runGameAction(() => performNightAction(game.id));
+                                            console.log('✅ GAMEPAGE: Start Night button - PerformNightAction API completed');
+                                            if (updatedGame) {
+                                                setGame(updatedGame);
+                                            }
+                                        }}
+                                        title="Begin the night phase where werewolves and special roles take their actions"
+                                    >
+                                        🌙 Start Night
+                                    </button>
+                                    <button
+                                        className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500`}
+                                        onClick={async () => {
+                                            const updatedGame = await runGameAction(() => afterGameDiscussion(game.id));
+                                            if (updatedGame) {
+                                                setGame(updatedGame);
+                                            }
+                                        }}
+                                        title="End the game and move to after-game discussion"
+                                    >
+                                        🎭 Game Over
+                                    </button>
+                                </div>
+                            )}
+                            {game.gameState === GAME_STATES.NIGHT && (
+                                <div className="text-sm text-yellow-400 text-center">
+                                    🌙 Night in progress...
+                                </div>
+                            )}
+                            {game.gameState === GAME_STATES.NIGHT_RESULTS && (
+                                <div className="flex gap-2 justify-center">
+                                    <button
+                                        className={buttonTransparentStyle}
+                                        onClick={async () => {
+                                            setClearNightMessages(true);
+                                            const updatedGame = await runGameAction(() => replayNight(game.id));
+                                            if (updatedGame) {
+                                                setGame(updatedGame);
+                                            }
+                                            setTimeout(() => setClearNightMessages(false), 100);
+                                        }}
+                                        title="Clear night messages and replay the night phase actions"
+                                    >
+                                        Replay
+                                    </button>
+                                    <button
+                                        className={buttonTransparentStyle}
+                                        onClick={async () => {
+                                            const updatedGame = await runGameAction(() => startNewDay(game.id));
+                                            if (updatedGame) {
+                                                setGame(updatedGame);
+                                            }
+                                        }}
+                                        title="Continue to apply night results and start new day"
+                                    >
+                                        Next Day
+                                    </button>
+                                    <button
+                                        className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500`}
+                                        onClick={async () => {
+                                            const updatedGame = await runGameAction(() => afterGameDiscussion(game.id));
+                                            if (updatedGame) {
+                                                setGame(updatedGame);
+                                            }
+                                        }}
+                                        title="End the game and move to after-game discussion"
+                                    >
+                                        🎭 Game Over
+                                    </button>
+                                </div>
+                            )}
+                            {game.gameState === GAME_STATES.NEW_DAY_BOT_SUMMARIES && (
+                                <div className="text-sm text-blue-400 text-center">
+                                    💭 Generating day summaries... ({game.gameStateProcessQueue.length} bots remaining)
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+                )}
             </div>
             
             {/* Model Selection Dialog */}

@@ -910,7 +910,9 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
 
     return (
         <div className="flex flex-col h-full border border-white border-opacity-30 rounded-lg p-4">
-            <h2 className="text-xl font-bold mb-4 text-white">Game Chat</h2>
+            <h2 className="text-xl font-bold mb-4 text-white">
+                Day {game.currentDay} • {game.gameState.toLowerCase().replace(/_/g, ' ')}
+            </h2>
             {game.errorState && (
                 <ErrorBanner
                     error={game.errorState}
