@@ -105,6 +105,7 @@ export interface Game {
     gameMasterTokenUsage?: TokenUsage; // Track token usage for the Game Master only
     totalGameCost?: number; // Total cost in USD for all AI calls in this game (bots + game master)
     createdAt?: number; // UTC timestamp when the game was created
+    createdWithTier: UserTier; // Store the user's tier at the time the game was created
 }
 
 export const GAME_ROLES = {

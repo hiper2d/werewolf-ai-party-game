@@ -40,6 +40,7 @@ import {
 import {AbstractAgent} from "../ai/abstract-agent";
 import {format} from "@/app/ai/prompts/utils";
 import {GameSetupZodSchema} from "@/app/ai/prompts/zod-schemas";
+import {ensureUserCanAccessGame} from "@/app/api/tier-guards";
 
 export async function getAllGames(): Promise<Game[]> {
     if (!db) {
@@ -392,6 +393,7 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
             gameStateProcessQueue: [],
             messageCounter: 0, // Initialize message counter for new games
             createdAt: timestamp, // Store creation timestamp
+            createdWithTier: tier,
             totalGameCost: previewCost, // Total cost starts with preview generation cost
             gameMasterTokenUsage: gamePreview.tokenUsage ? {
                 inputTokens: gamePreview.tokenUsage.inputTokens || 0,
@@ -484,6 +486,10 @@ function sanitizeForId(name: string): string {
 }
 
 export async function updateBotModel(gameId: string, botName: string, newAiType: string): Promise<Game> {
+    const session = await auth();
+    if (!session || !session.user?.email) {
+        throw new Error('Not authenticated');
+    }
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
@@ -497,6 +503,7 @@ export async function updateBotModel(gameId: string, botName: string, newAiType:
         }
         
         const gameData = gameSnap.data();
+        await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: (gameData?.createdWithTier ?? 'free') });
         const bots = gameData?.bots || [];
         
         // Find and update the bot
@@ -519,6 +526,10 @@ export async function updateBotModel(gameId: string, botName: string, newAiType:
 }
 
 export async function updateGameMasterModel(gameId: string, newAiType: string): Promise<Game> {
+    const session = await auth();
+    if (!session || !session.user?.email) {
+        throw new Error('Not authenticated');
+    }
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
@@ -532,6 +543,7 @@ export async function updateGameMasterModel(gameId: string, newAiType: string): 
         }
         
         const gameData = gameSnap.data();
+        await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: (gameData?.createdWithTier ?? 'free') });
         
         // Update the Game Master AI type in Firestore
         await gameRef.update({ gameMasterAiType: newAiType });
@@ -652,6 +664,10 @@ export async function getBotMessages(gameId: string, botName: string, day: numbe
  * Set error state for a game (persisted to database)
  */
 export async function setGameErrorState(gameId: string, errorState: SystemErrorMessage): Promise<Game> {
+    const session = await auth();
+    if (!session || !session.user?.email) {
+        throw new Error('Not authenticated');
+    }
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
@@ -665,6 +681,7 @@ export async function setGameErrorState(gameId: string, errorState: SystemErrorM
         }
         
         const gameData = gameSnap.data();
+        await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: (gameData?.createdWithTier ?? 'free') });
         
         // Update the error state in Firestore
         await gameRef.update({ errorState: errorState });
@@ -681,6 +698,10 @@ export async function setGameErrorState(gameId: string, errorState: SystemErrorM
  * Clear error state for a game (persisted to database)
  */
 export async function clearGameErrorState(gameId: string): Promise<Game> {
+    const session = await auth();
+    if (!session || !session.user?.email) {
+        throw new Error('Not authenticated');
+    }
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
@@ -694,6 +715,7 @@ export async function clearGameErrorState(gameId: string): Promise<Game> {
         }
         
         const gameData = gameSnap.data();
+        await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: (gameData?.createdWithTier ?? 'free') });
         
         // Clear the error state in Firestore
         await gameRef.update({ errorState: null });
@@ -711,6 +733,10 @@ export async function clearGameErrorState(gameId: string): Promise<Game> {
  * This is called when the Game Over button is clicked
  */
 export async function afterGameDiscussion(gameId: string): Promise<Game> {
+    const session = await auth();
+    if (!session || !session.user?.email) {
+        throw new Error('Not authenticated');
+    }
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
@@ -724,6 +750,7 @@ export async function afterGameDiscussion(gameId: string): Promise<Game> {
         }
         
         const gameData = gameSnap.data();
+        await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: (gameData?.createdWithTier ?? 'free') });
         
         // Update the game state to AFTER_GAME_DISCUSSION
         await gameRef.update({ 
@@ -843,6 +870,7 @@ function gameFromFirestore(id: string, data: any): Game {
         dayActivityCounter: data.dayActivityCounter || {}, // Default to empty object for existing games
         createdAt: data.createdAt || extractTimestampFromGameId(id), // Use stored timestamp or extract from ID for existing games
         totalGameCost: data.totalGameCost || 0,
-        gameMasterTokenUsage: data.gameMasterTokenUsage || data.tokenUsage?.gameMasterUsage || null
+        gameMasterTokenUsage: data.gameMasterTokenUsage || data.tokenUsage?.gameMasterUsage || null,
+        createdWithTier: data.createdWithTier || 'free'
     };
 }

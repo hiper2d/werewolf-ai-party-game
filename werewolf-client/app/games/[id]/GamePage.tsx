@@ -12,6 +12,7 @@ import type { Session } from "next-auth";
 import { welcome, vote, keepBotsGoing } from '@/app/api/bot-actions';
 import { replayNight, performNightAction } from '@/app/api/night-actions';
 import { getPlayerColor } from "@/app/utils/color-utils";
+import { isTierMismatchError } from '@/app/api/errors';
 
 interface Participant {
     name: string;
@@ -39,6 +40,29 @@ export default function GamePage({
         window.location.href = '/games';
     };
 
+    const redirectForTierMismatch = () => {
+        window.location.href = `/games?error=tier_mismatch&blocked=${encodeURIComponent(game.id)}`;
+    };
+
+    const handleGameActionError = (error: unknown) => {
+        if (isTierMismatchError(error) || (error instanceof Error && error.message === 'TIER_MISMATCH')) {
+            redirectForTierMismatch();
+            return true;
+        }
+        return false;
+    };
+
+    const runGameAction = async <T,>(action: () => Promise<T>): Promise<T | undefined> => {
+        try {
+            return await action();
+        } catch (error) {
+            if (handleGameActionError(error)) {
+                return undefined;
+            }
+            throw error;
+        }
+    };
+
     // Handle welcome state
     useEffect(() => {
         const handleWelcome = async () => {
@@ -56,9 +80,11 @@ export default function GamePage({
                         timestamp: new Date().toISOString()
                     });
                 }
-                const updatedGame = await welcome(game.id);
+                const updatedGame = await runGameAction(() => welcome(game.id));
                 console.log('✅ GAMEPAGE: Welcome API completed');
-                setGame(updatedGame);
+                if (updatedGame) {
+                    setGame(updatedGame);
+                }
             }
         };
 
@@ -97,14 +123,16 @@ export default function GamePage({
                 queueLength: game.gameStateProcessQueue.length,
                 isEmptyQueue: game.gameStateProcessQueue.length === 0
             });
-            const updatedGame = await vote(game.id);
-            console.log('✅ Vote API completed, updating game state:', {
-                oldState: game.gameState,
-                newState: updatedGame.gameState,
-                oldQueueLength: game.gameStateProcessQueue.length,
-                newQueueLength: updatedGame.gameStateProcessQueue.length
-            });
-            setGame(updatedGame);
+            const updatedGame = await runGameAction(() => vote(game.id));
+            if (updatedGame) {
+                console.log('✅ Vote API completed, updating game state:', {
+                    oldState: game.gameState,
+                    newState: updatedGame.gameState,
+                    oldQueueLength: game.gameStateProcessQueue.length,
+                    newQueueLength: updatedGame.gameStateProcessQueue.length
+                });
+                setGame(updatedGame);
+            }
         };
 
         handleVote();
@@ -120,9 +148,11 @@ export default function GamePage({
                         gameId: game.id,
                         timestamp: new Date().toISOString()
                     });
-                    const updatedGame = await performNightAction(game.id);
+                    const updatedGame = await runGameAction(() => performNightAction(game.id));
                     console.log('✅ GAMEPAGE: Night summary generation completed');
-                    setGame(updatedGame);
+                    if (updatedGame) {
+                        setGame(updatedGame);
+                    }
                     return;
                 }
                 
@@ -159,9 +189,11 @@ export default function GamePage({
                     gameId: game.id,
                     timestamp: new Date().toISOString()
                 });
-                    const updatedGame = await performNightAction(game.id);
+                    const updatedGame = await runGameAction(() => performNightAction(game.id));
                     console.log('✅ GAMEPAGE: PerformNightAction API completed');
-                    setGame(updatedGame);
+                    if (updatedGame) {
+                        setGame(updatedGame);
+                    }
                 }
             }
         };
@@ -184,10 +216,15 @@ export default function GamePage({
                 });
                 
                 try {
-                    const updatedGame = await summarizePastDay(game.id);
+                    const updatedGame = await runGameAction(() => summarizePastDay(game.id));
                     console.log('✅ GAMEPAGE: SummarizeCurrentDay API completed');
-                    setGame(updatedGame);
+                    if (updatedGame) {
+                        setGame(updatedGame);
+                    }
                 } catch (error: any) {
+                    if (handleGameActionError(error)) {
+                        return;
+                    }
                     console.error('💭 GAMEPAGE: SummarizeCurrentDay failed:', error);
                     
                     // Set error state so user can see the issue and take action
@@ -200,9 +237,14 @@ export default function GamePage({
                     };
                     
                     try {
-                        const gameWithError = await setGameErrorState(game.id, errorState);
-                        setGame(gameWithError);
+                        const gameWithError = await runGameAction(() => setGameErrorState(game.id, errorState));
+                        if (gameWithError) {
+                            setGame(gameWithError);
+                        }
                     } catch (setErrorError) {
+                        if (handleGameActionError(setErrorError)) {
+                            return;
+                        }
                         console.error('💭 GAMEPAGE: Failed to set error state:', setErrorError);
                         // Fallback: just log the error if we can't set the error state
                     }
@@ -230,9 +272,14 @@ export default function GamePage({
     // Handle error cleared callback from GameChat
     const handleErrorCleared = async () => {
         try {
-            const updatedGame = await clearGameErrorState(game.id);
-            setGame(updatedGame);
+            const updatedGame = await runGameAction(() => clearGameErrorState(game.id));
+            if (updatedGame) {
+                setGame(updatedGame);
+            }
         } catch (error) {
+            if (handleGameActionError(error)) {
+                return;
+            }
             console.error('Failed to clear error state:', error);
         }
     };
@@ -245,16 +292,20 @@ export default function GamePage({
         if (!selectedBot) return;
         
         try {
-            let updatedGame;
+            let updatedGame: Game | undefined;
             if (selectedBot.name === 'Game Master') {
-                updatedGame = await updateGameMasterModel(game.id, newModel);
+                updatedGame = await runGameAction(() => updateGameMasterModel(game.id, newModel));
             } else {
-                updatedGame = await updateBotModel(game.id, selectedBot.name, newModel);
+                updatedGame = await runGameAction(() => updateBotModel(game.id, selectedBot.name, newModel));
             }
-            setGame(updatedGame);
+            if (updatedGame) {
+                setGame(updatedGame);
+            }
         } catch (error) {
+            if (handleGameActionError(error)) {
+                return;
+            }
             console.error('Error updating model:', error);
-            throw error;
         }
     };
 
@@ -509,8 +560,10 @@ export default function GamePage({
                                     <button
                                         className={buttonTransparentStyle}
                                         onClick={async () => {
-                                            const updatedGame = await vote(game.id);
-                                            setGame(updatedGame);
+                                            const updatedGame = await runGameAction(() => vote(game.id));
+                                            if (updatedGame) {
+                                                setGame(updatedGame);
+                                            }
                                         }}
                                         title="Start the voting phase to eliminate a suspected werewolf"
                                     >
@@ -520,8 +573,10 @@ export default function GamePage({
                                         className={`${buttonTransparentStyle} ${game.gameStateProcessQueue.length > 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
                                         disabled={game.gameStateProcessQueue.length > 0}
                                         onClick={async () => {
-                                            const updatedGame = await keepBotsGoing(game.id);
-                                            setGame(updatedGame);
+                                            const updatedGame = await runGameAction(() => keepBotsGoing(game.id));
+                                            if (updatedGame) {
+                                                setGame(updatedGame);
+                                            }
                                         }}
                                         title={game.gameStateProcessQueue.length > 0 ? 'Bots are already talking' : 'Let 1-3 bots continue the conversation'}
                                     >
@@ -539,9 +594,11 @@ export default function GamePage({
                                                 currentState: game.gameState,
                                                 timestamp: new Date().toISOString()
                                             });
-                                            const updatedGame = await performNightAction(game.id);
+                                            const updatedGame = await runGameAction(() => performNightAction(game.id));
                                             console.log('✅ GAMEPAGE: Start Night button - PerformNightAction API completed');
-                                            setGame(updatedGame);
+                                            if (updatedGame) {
+                                                setGame(updatedGame);
+                                            }
                                         }}
                                         title="Begin the night phase where werewolves and special roles take their actions"
                                     >
@@ -550,8 +607,10 @@ export default function GamePage({
                                     <button
                                         className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500`}
                                         onClick={async () => {
-                                            const updatedGame = await afterGameDiscussion(game.id);
-                                            setGame(updatedGame);
+                                            const updatedGame = await runGameAction(() => afterGameDiscussion(game.id));
+                                            if (updatedGame) {
+                                                setGame(updatedGame);
+                                            }
                                         }}
                                         title="End the game and move to after-game discussion"
                                     >
@@ -573,8 +632,10 @@ export default function GamePage({
                                             setClearNightMessages(true);
                                             
                                             // Then replay night in backend
-                                            const updatedGame = await replayNight(game.id);
-                                            setGame(updatedGame);
+                                            const updatedGame = await runGameAction(() => replayNight(game.id));
+                                            if (updatedGame) {
+                                                setGame(updatedGame);
+                                            }
                                             
                                             // Reset the clear flag after a brief delay
                                             setTimeout(() => setClearNightMessages(false), 100);
@@ -586,8 +647,10 @@ export default function GamePage({
                                     <button
                                         className={buttonTransparentStyle}
                                         onClick={async () => {
-                                            const updatedGame = await startNewDay(game.id);
-                                            setGame(updatedGame);
+                                            const updatedGame = await runGameAction(() => startNewDay(game.id));
+                                            if (updatedGame) {
+                                                setGame(updatedGame);
+                                            }
                                         }}
                                         title="Continue to apply night results and start new day"
                                     >
@@ -596,8 +659,10 @@ export default function GamePage({
                                     <button
                                         className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500`}
                                         onClick={async () => {
-                                            const updatedGame = await afterGameDiscussion(game.id);
-                                            setGame(updatedGame);
+                                            const updatedGame = await runGameAction(() => afterGameDiscussion(game.id));
+                                            if (updatedGame) {
+                                                setGame(updatedGame);
+                                            }
                                         }}
                                         title="End the game and move to after-game discussion"
                                     >

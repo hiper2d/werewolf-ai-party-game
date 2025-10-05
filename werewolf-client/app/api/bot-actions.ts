@@ -50,6 +50,7 @@ import {
 } from "@/app/utils/bot-utils";
 import {checkGameEndConditions} from "@/app/utils/game-utils";
 import {recordBotTokenUsage, recordGameMasterTokenUsage} from "@/app/api/cost-tracking";
+import {ensureUserCanAccessGame} from "@/app/api/tier-guards";
 
 /**
  * Sanitize names for use in message IDs
@@ -208,6 +209,8 @@ async function welcomeImpl(gameId: string): Promise<Game> {
         throw new Error('Game not found');
     }
 
+    await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: game.createdWithTier });
+
     try {
         // If queue is empty, move to DAY_DISCUSSION state
         if (game.gameStateParamQueue.length === 0) {
@@ -348,6 +351,8 @@ async function talkToAllImpl(gameId: string, userMessage: string): Promise<Game>
         throw new Error('Game not found');
     }
 
+    await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: game.createdWithTier });
+
     // Validate game state
     if (game.gameState !== GAME_STATES.DAY_DISCUSSION) {
         throw new Error('Game is not in DAY_DISCUSSION state');
@@ -386,6 +391,8 @@ async function keepBotsGoingImpl(gameId: string): Promise<Game> {
     if (!game) {
         throw new Error('Game not found');
     }
+
+    await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: game.createdWithTier });
 
     // Validate game state
     if (game.gameState !== GAME_STATES.DAY_DISCUSSION) {
@@ -696,6 +703,8 @@ async function voteImpl(gameId: string): Promise<Game> {
     if (!game) {
         throw new Error('Game not found');
     }
+
+    await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: game.createdWithTier });
 
     console.log('🔍 VOTE FUNCTION CALLED:', {
         gameId,
@@ -1104,6 +1113,8 @@ async function humanPlayerVoteImpl(gameId: string, targetPlayer: string, reason:
         throw new Error('Game not found');
     }
 
+    await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: game.createdWithTier });
+
     // Validate game state
     if (game.gameState !== GAME_STATES.VOTE) {
         throw new Error('Game is not in voting phase');
@@ -1210,6 +1221,8 @@ async function performHumanPlayerNightActionImpl(gameId: string, targetPlayer: s
     if (!game) {
         throw new Error('Game not found');
     }
+
+    await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: game.createdWithTier });
 
     // Validate game state
     if (game.gameState !== GAME_STATES.NIGHT) {

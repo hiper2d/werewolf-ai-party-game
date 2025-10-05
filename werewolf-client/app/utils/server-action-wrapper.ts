@@ -1,5 +1,6 @@
 import { setGameErrorState } from '@/app/api/game-actions';
 import { SystemErrorMessage, BotResponseError } from '@/app/api/game-models';
+import { isTierMismatchError } from '@/app/api/errors';
 
 /**
  * Higher-order function that wraps server actions with global error handling.
@@ -17,6 +18,9 @@ export function withErrorHandling<T extends any[], R>(
     try {
       return await fn(...args);
     } catch (error) {
+      if (isTierMismatchError(error)) {
+        throw error;
+      }
       const gameId = gameIdExtractor(...args);
       
       console.error(`Error in ${fn.name}:`, error);

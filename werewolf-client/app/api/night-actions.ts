@@ -32,6 +32,7 @@ import { format } from "@/app/ai/prompts/utils";
 import { parseResponseToObj, convertToAIMessages } from "@/app/utils/message-utils";
 import {checkGameEndConditions} from "@/app/utils/game-utils";
 import {recordBotTokenUsage, recordGameMasterTokenUsage} from "@/app/api/cost-tracking";
+import {ensureUserCanAccessGame} from "@/app/api/tier-guards";
 
 /**
  * Helper function to handle night end logic with results processing
@@ -100,7 +101,8 @@ async function endNightWithResults(gameId: string, game: Game): Promise<Game> {
     if (!session || !session.user?.email) {
         throw new Error('Not authenticated');
     }
-    
+
+    await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: game.createdWithTier });
     const apiKeys = await getApiKeysForUser(session.user.email);
     
     // Create GM system prompt with game context
@@ -223,6 +225,12 @@ async function performNightActionImpl(gameId: string): Promise<Game> {
         throw new Error('Game not found');
     }
 
+    await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: game.createdWithTier });
+
+    await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: game.createdWithTier });
+
+    await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: game.createdWithTier });
+
     // Handle different game states
     if (game.gameState === GAME_STATES.VOTE_RESULTS) {
         // Transition from VOTE_RESULTS to NIGHT and set up night actions
@@ -272,6 +280,8 @@ async function beginNightImpl(gameId: string): Promise<Game> {
     if (!game) {
         throw new Error('Game not found');
     }
+
+    await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: game.createdWithTier });
 
     // Validate game state
     if (game.gameState !== GAME_STATES.VOTE_RESULTS) {
@@ -776,6 +786,10 @@ async function humanPlayerTalkWerewolvesImpl(gameId: string, message: string): P
  * Merges the functionality of newDayBegins + endNight
  */
 async function startNewDayImpl(gameId: string): Promise<Game> {
+    const session = await auth();
+    if (!session || !session.user?.email) {
+        throw new Error('Not authenticated');
+    }
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
@@ -790,6 +804,8 @@ async function startNewDayImpl(gameId: string): Promise<Game> {
         
         const gameData = gameSnap.data();
         const currentGame = { id: gameId, ...gameData } as Game;
+
+        await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: currentGame.createdWithTier });
         
         // Validate that we're in NIGHT_RESULTS state
         if (gameData?.gameState !== GAME_STATES.NIGHT_RESULTS) {
@@ -974,6 +990,7 @@ async function summarizePastDayImpl(gameId: string): Promise<Game> {
         if (!session || !session.user?.email) {
             throw new Error('Not authenticated');
         }
+        await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: currentGame.createdWithTier });
         
         // Get API keys
         const apiKeys = await getApiKeysForUser(session.user.email);
@@ -1135,7 +1152,8 @@ function gameFromFirestore(id: string, data: any): Game {
         nightResults: data.nightResults || {},
         previousNightResults: data.previousNightResults || {},
         messageCounter: data.messageCounter || 0,
-        dayActivityCounter: data.dayActivityCounter || {}
+        dayActivityCounter: data.dayActivityCounter || {},
+        createdWithTier: data.createdWithTier || 'free'
     };
 }
 
