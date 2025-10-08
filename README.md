@@ -11,7 +11,7 @@ The game supports all the major latest models for the game master and bots:
 - Open AI: `GPT-5`, `GPT-5-mini`
 - Anthropic: `Claude 4.1 Opus`, `Claude 4.5 Sonnet`
 - Google: `Gemini 2.5 Pro`
-- DeepSeek: `Chat (V3.1)`, `Reasoner (V3.1 with thinking)`
+- DeepSeek: `Chat (V3.2)`, `Reasoner (V3.2 with thinking)`
 - Mistral: `Mistral Large 2.1`, `Mistral Medium 3.1`, `Magistral Medium 1.1 (Thinking)`
 - Grok: `Grok-4`
 - Moonshot AI: `Kimi K2`

@@ -1,5 +1,6 @@
 # Bugs and improvements
 
+- Track spendings in each tier separately for a user
 - Automate votes triggering
 - Show only current day chat but let to select previous days in view mode
 - Fix game buttons enablement: some of them are shown when they should not

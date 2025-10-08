@@ -1,12 +1,11 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { talkToAll, humanPlayerVote, getSuggestion } from "@/app/api/bot-actions";
 import { beginNight, performNightAction, humanPlayerTalkWerewolves } from "@/app/api/night-actions";
 import { buttonTransparentStyle } from "@/app/constants";
 import { GAME_STATES, MessageType, RECIPIENT_ALL, GameMessage, Game, SystemErrorMessage, BotResponseError, GAME_MASTER, ROLE_CONFIGS, GAME_ROLES } from "@/app/api/game-models";
 import { getPlayerColor } from "@/app/utils/color-utils";
-import { convertMessageContent } from "@/app/utils/message-utils";
 import { clearGameErrorState } from "@/app/api/game-actions";
 import VotingModal from "./VotingModal";
 import NightActionModal from "./NightActionModal";
@@ -116,7 +115,6 @@ function renderMessage(message: GameMessage, gameId: string, onDeleteAfter: (mes
     
     let displayContent: string;
     try {
-        console.log(message)
         switch (message.messageType) {
             case MessageType.BOT_ANSWER:
             case MessageType.BOT_WELCOME: {
@@ -287,45 +285,130 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
     const [isRecording, setIsRecording] = useState(false);
     const [isTranscribing, setIsTranscribing] = useState(false);
     const [textareaRows, setTextareaRows] = useState(2);
+    const [selectedDay, setSelectedDay] = useState(game.currentDay);
+    const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+    const [showDaySelector, setShowDaySelector] = useState(false);
+    const daySelectorRef = useRef<HTMLDivElement | null>(null);
+    const isCurrentDaySelected = selectedDay === game.currentDay;
+    const availableDays = useMemo(
+        () => Array.from({ length: game.currentDay }, (_, idx) => game.currentDay - idx),
+        [game.currentDay]
+    );
 
     const currentDayPublicMessageCount = useMemo(() => {
         return messages.filter(message =>
-            message.day === game.currentDay && message.recipientName === RECIPIENT_ALL
+            message.day === selectedDay &&
+            message.recipientName === RECIPIENT_ALL &&
+            message.authorName !== GAME_MASTER
         ).length;
-    }, [messages, game.currentDay]);
+    }, [messages, selectedDay]);
 
     const phaseLabel = game.gameState.toLowerCase().replace(/_/g, ' ');
-    const headerMessageSuffix = game.gameState === GAME_STATES.DAY_DISCUSSION
-        ? ` • ${currentDayPublicMessageCount} message${currentDayPublicMessageCount === 1 ? '' : 's'}`
-        : '';
+    const headerTitle = `Day ${selectedDay}: ${isCurrentDaySelected ? phaseLabel : 'history'}`;
+    const dayMessageCount = isCurrentDaySelected ? currentDayPublicMessageCount : messages.length;
+    const shouldShowMessageCount = !isLoadingMessages;
+    const messageCountLabel = `${dayMessageCount} message${dayMessageCount === 1 ? '' : 's'}`;
 
-    // Function to clear messages from night phase onward
-    const clearMessagesFromNight = () => {
+    const handleDaySelect = (day: number) => {
+        setShowDaySelector(false);
+        setSelectedDay(day);
+    };
+
+    const clearMessagesFromNight = useCallback(() => {
         setMessages(prev => {
-            // Find the first NIGHT_BEGINS message for the current day
-            const nightBeginsIndex = prev.findIndex(msg => 
-                msg.messageType === MessageType.NIGHT_BEGINS && 
+            const nightBeginsIndex = prev.findIndex(msg =>
+                msg.messageType === MessageType.NIGHT_BEGINS &&
                 msg.day === game.currentDay
             );
-            
+
             if (nightBeginsIndex === -1) {
                 console.log('🌙 No NIGHT_BEGINS message found for current day, keeping all messages');
                 return prev;
             }
-            
+
             const messagesBeforeNight = prev.slice(0, nightBeginsIndex);
             console.log(`🌙 Cleared ${prev.length - nightBeginsIndex} messages from night phase (kept ${messagesBeforeNight.length})`);
             return messagesBeforeNight;
         });
-    };
+    }, [game.currentDay]);
 
-    // Clear night messages when prop changes
-    React.useEffect(() => {
-        if (clearNightMessages) {
+    useEffect(() => {
+        setSelectedDay(prev => {
+            if (game.currentDay > prev) {
+                setShowDaySelector(false);
+                return game.currentDay;
+            }
+            return prev;
+        });
+    }, [game.currentDay]);
+
+    useEffect(() => {
+        if (availableDays.length <= 1 && showDaySelector) {
+            setShowDaySelector(false);
+        }
+    }, [availableDays.length, showDaySelector]);
+
+    useEffect(() => {
+        if (clearNightMessages && isCurrentDaySelected) {
             clearMessagesFromNight();
         }
-    }, [clearNightMessages]);
+    }, [clearNightMessages, clearMessagesFromNight, isCurrentDaySelected]);
 
+    useEffect(() => {
+        if (selectedDay < 1) {
+            setMessages([]);
+            setIsLoadingMessages(false);
+            return;
+        }
+
+        let ignore = false;
+
+        const loadMessagesForDay = async () => {
+            setIsLoadingMessages(true);
+            setMessages([]);
+            try {
+                const response = await fetch(`/api/games/${gameId}/messages?day=${selectedDay}`, { cache: 'no-store' });
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch messages for day ${selectedDay}`);
+                }
+                const data: GameMessage[] = await response.json();
+                if (!ignore) {
+                    setMessages(data);
+                }
+            } catch (error) {
+                if (!ignore) {
+                    console.error('Failed to load messages for day', selectedDay, error);
+                }
+            } finally {
+                if (!ignore) {
+                    setIsLoadingMessages(false);
+                }
+            }
+        };
+
+        loadMessagesForDay();
+
+        return () => {
+            ignore = true;
+        };
+    }, [gameId, selectedDay]);
+
+    useEffect(() => {
+        if (!showDaySelector) {
+            return;
+        }
+
+        const handleClickOutside = (event: MouseEvent) => {
+            if (daySelectorRef.current && !daySelectorRef.current.contains(event.target as Node)) {
+                setShowDaySelector(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [showDaySelector]);
 
     // Auto-process queue when not empty
     useEffect(() => {
@@ -477,15 +560,20 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
     }, [game.gameState, game.gameStateProcessQueue, game.gameStateParamQueue, game.humanPlayerName, game.humanPlayerRole, showNightActionModal, isPerformingNightAction]);
 
     useEffect(() => {
+        if (!isCurrentDaySelected) {
+            return;
+        }
+
         const eventSource = new EventSource(`/api/games/${gameId}/messages/sse`);
-        
+
         eventSource.onmessage = (event) => {
             const message = JSON.parse(event.data) as GameMessage;
+            if (message.day !== selectedDay) {
+                return;
+            }
             setMessages(prev => {
-                // Check if message already exists to prevent duplicates
                 const messageExists = prev.some(existingMsg => existingMsg.id === message.id);
                 if (messageExists) {
-                    console.log('🔄 Duplicate message ignored:', message.id);
                     return prev;
                 }
                 return [...prev, message];
@@ -497,7 +585,7 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
         };
 
         return () => eventSource.close();
-    }, [gameId]);
+    }, [gameId, selectedDay, isCurrentDaySelected]);
 
     // Cleanup recording on component unmount
     useEffect(() => {
@@ -511,47 +599,49 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
     const sendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
         const trimmed = newMessage.trim();
-        if (!trimmed) return;
+        if (!trimmed || !isCurrentDaySelected) {
+            return;
+        }
 
         setIsProcessing(true);
-        
-        // NEW LOGIC: Check if this is werewolf coordination phase
-        if (game.gameState === GAME_STATES.NIGHT &&
-            game.gameStateProcessQueue.length > 0 &&
-            game.gameStateParamQueue.length > 1) {
-            
-            const currentRole = game.gameStateProcessQueue[0];
-            const currentPlayer = game.gameStateParamQueue[0];
-            
-            // If it's human werewolf coordination phase, use humanPlayerTalkWerewolves
-            if (currentRole === game.humanPlayerRole && 
-                currentPlayer === game.humanPlayerName &&
-                currentRole === GAME_ROLES.WEREWOLF) {
-                
-                console.log('🐺 SENDING WEREWOLF COORDINATION MESSAGE:', { message: trimmed, gameId });
-                const updatedGame = await humanPlayerTalkWerewolves(gameId, trimmed);
-                setNewMessage('');
-                
-                // Update parent game state
-                if (onGameStateChange) {
-                    console.log('🔄 UPDATING GAME STATE after werewolf coordination...');
-                    onGameStateChange(updatedGame);
+
+        try {
+            if (game.gameState === GAME_STATES.NIGHT &&
+                game.gameStateProcessQueue.length > 0 &&
+                game.gameStateParamQueue.length > 1) {
+
+                const currentRole = game.gameStateProcessQueue[0];
+                const currentPlayer = game.gameStateParamQueue[0];
+
+                if (currentRole === game.humanPlayerRole &&
+                    currentPlayer === game.humanPlayerName &&
+                    currentRole === GAME_ROLES.WEREWOLF) {
+
+                    console.log('🐺 SENDING WEREWOLF COORDINATION MESSAGE:', { message: trimmed, gameId });
+                    const updatedGame = await humanPlayerTalkWerewolves(gameId, trimmed);
+                    setNewMessage('');
+
+                    if (onGameStateChange) {
+                        console.log('🔄 UPDATING GAME STATE after werewolf coordination...');
+                        onGameStateChange(updatedGame);
+                    }
+                    return;
                 }
-                setIsProcessing(false);
-                return;
             }
+
+            const updatedGame = await talkToAll(gameId, trimmed);
+            setNewMessage('');
+
+            if (onGameStateChange) {
+                console.log('🔄 UPDATING GAME STATE after human message...');
+                onGameStateChange(updatedGame);
+            }
+        } catch (error) {
+            console.error('Error sending message:', error);
+            alert('Failed to send message. Please try again.');
+        } finally {
+            setIsProcessing(false);
         }
-        
-        // Default behavior: normal day discussion
-        const updatedGame = await talkToAll(gameId, trimmed);
-        setNewMessage('');
-        
-        // Update parent game state
-        if (onGameStateChange) {
-            console.log('🔄 UPDATING GAME STATE after human message...');
-            onGameStateChange(updatedGame);
-        }
-        setIsProcessing(false);
     };
 
     const handleDismissError = async () => {
@@ -832,6 +922,9 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
 
     // Check if chat input should be enabled
     const isInputEnabled = () => {
+        if (!isCurrentDaySelected) {
+            return false;
+        }
         // Disable input during recording or transcription
         if (isRecording || isTranscribing) {
             return false;
@@ -864,6 +957,9 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
 
     // Check if microphone should be enabled (separate from text input)
     const isMicrophoneEnabled = () => {
+        if (!isCurrentDaySelected) {
+            return false;
+        }
         // Disable during game over
         if (game.gameState === GAME_STATES.GAME_OVER) {
             return false;
@@ -879,6 +975,9 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
     };
 
     const getInputPlaceholder = () => {
+        if (!isCurrentDaySelected) {
+            return `Viewing Day ${selectedDay} history`;
+        }
         // Voice recording states take priority
         if (isRecording) {
             return "🎤 Recording in progress... Click mic to stop";
@@ -921,9 +1020,54 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
 
     return (
         <div className="flex flex-col h-full border border-white border-opacity-30 rounded-lg p-4">
-            <h2 className="text-xl font-bold mb-4 text-white">
-                Day {game.currentDay} • {phaseLabel}{headerMessageSuffix}
-            </h2>
+            <div className="flex items-center justify-between mb-4 text-white">
+                <div className="flex items-center gap-2">
+                    <span className="text-xl font-bold">
+                        {headerTitle}
+                    </span>
+                </div>
+                <div className="flex items-center gap-3">
+                    {shouldShowMessageCount && (
+                        <span className="text-xs text-gray-400">
+                            {messageCountLabel}
+                        </span>
+                    )}
+                    {availableDays.length > 1 && (
+                        <div className="flex items-center gap-2" ref={daySelectorRef}>
+                            <span className="text-sm text-gray-300">History:</span>
+                            <div className="relative">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowDaySelector(prev => !prev)}
+                                    className={`flex items-center gap-1 text-sm px-3 py-1 rounded border border-white/30 bg-black/60 hover:bg-black/80 transition-colors ${showDaySelector ? 'text-blue-300' : 'text-white'}`}
+                                >
+                                    Day {selectedDay}
+                                    <span className="text-xs">{showDaySelector ? '▲' : '▼'}</span>
+                                </button>
+                                {showDaySelector && (
+                                    <div className="absolute right-0 top-full mt-2 w-40 rounded border border-white/30 bg-black/90 shadow-lg z-20 max-h-60 overflow-y-auto">
+                                        {availableDays.map(day => (
+                                            <button
+                                                key={day}
+                                                type="button"
+                                                onClick={() => handleDaySelect(day)}
+                                                className={`block w-full px-3 py-2 text-left text-sm hover:bg-white/10 ${day === selectedDay ? 'bg-white/10' : ''}`}
+                                            >
+                                                Day {day}{day === game.currentDay ? ' (current)' : ''}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+            {!isCurrentDaySelected && (
+                <div className="mb-3 text-xs text-gray-300 italic">
+                    Viewing Day {selectedDay} history (read-only)
+                </div>
+            )}
             {game.errorState && (
                 <ErrorBanner
                     error={game.errorState}
@@ -931,12 +1075,26 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
                 />
             )}
             <div className="flex-1 overflow-y-auto mb-4 p-2 bg-black bg-opacity-30 rounded" style={{ minHeight: '200px' }}>
-                {messages.map((message, index) => (
-                    <div key={index}>
-                        {renderMessage(message, gameId, handleDeleteAfter, game, handleSpeak, speakingMessageId)}
+                {isLoadingMessages ? (
+                    <div className="text-center text-gray-400 text-sm py-4">
+                        Loading Day {selectedDay}...
                     </div>
-                ))}
-                {isDeleting && (
+                ) : messages.length === 0 ? (
+                    <div className="text-center text-gray-400 text-sm py-4">
+                        No messages for Day {selectedDay} yet.
+                    </div>
+                ) : (
+                    messages.map((message, index) => {
+                        const fallbackKey = message.timestamp ? `ts-${message.timestamp}-${index}` : `idx-${index}`;
+                        const key = message.id ?? fallbackKey;
+                        return (
+                            <div key={key}>
+                                {renderMessage(message, gameId, handleDeleteAfter, game, handleSpeak, speakingMessageId)}
+                            </div>
+                        );
+                    })
+                )}
+                {isDeleting && !isLoadingMessages && (
                     <div className="text-center text-gray-400 text-sm py-2">
                         Deleting messages...
                     </div>
