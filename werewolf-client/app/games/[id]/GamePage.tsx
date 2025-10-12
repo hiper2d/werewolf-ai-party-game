@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { getGame, updateBotModel, updateGameMasterModel, clearGameErrorState, setGameErrorState, afterGameDiscussion } from "@/app/api/game-actions";
 import { startNewDay, summarizePastDay } from "@/app/api/night-actions";
 import GameChat from "@/app/games/[id]/components/GameChat";
@@ -35,6 +35,23 @@ export default function GamePage({
     const [modelDialogOpen, setModelDialogOpen] = useState(false);
     const [selectedBot, setSelectedBot] = useState<{ name: string; aiType: string; enableThinking?: boolean } | null>(null);
     const [clearNightMessages, setClearNightMessages] = useState(false);
+
+    const modelUsageCounts = useMemo(() => {
+        const counts: Record<string, number> = {};
+        const increment = (model?: string) => {
+            if (!model) {
+                return;
+            }
+            counts[model] = (counts[model] ?? 0) + 1;
+        };
+
+        increment(game.gameMasterAiType);
+        for (const bot of game.bots) {
+            increment(bot.aiType);
+        }
+
+        return counts;
+    }, [game]);
 
     // Handle exit game
     const handleExitGame = () => {
@@ -756,6 +773,8 @@ export default function GamePage({
                 onSelect={handleModelUpdate}
                 currentModel={selectedBot?.aiType || ''}
                 botName={selectedBot?.name || ''}
+                gameTier={game.createdWithTier}
+                usageCounts={modelUsageCounts}
             />
         </div>
     );

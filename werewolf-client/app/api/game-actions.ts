@@ -503,9 +503,14 @@ export async function updateBotModel(gameId: string, botName: string, newAiType:
         }
         
         const gameData = gameSnap.data();
-        await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: (gameData?.createdWithTier ?? 'free') });
-        const bots = gameData?.bots || [];
-        
+        const {gameTier} = await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: (gameData?.createdWithTier ?? 'free') });
+        const gameMasterAiType = gameData?.gameMasterAiType;
+        if (typeof gameMasterAiType !== 'string' || !gameMasterAiType) {
+            throw new Error('Game is missing a valid Game Master AI configuration.');
+        }
+
+        const bots = (gameData?.bots || []) as Bot[];
+
         // Find and update the bot
         const updatedBots = bots.map((bot: Bot) => {
             if (bot.name === botName) {
@@ -513,6 +518,8 @@ export async function updateBotModel(gameId: string, botName: string, newAiType:
             }
             return bot;
         });
+
+        validateModelUsageForTier(gameTier, gameMasterAiType, updatedBots.map((bot: Bot) => bot.aiType));
         
         // Update the game in Firestore
         await gameRef.update({ bots: updatedBots });
@@ -543,11 +550,14 @@ export async function updateGameMasterModel(gameId: string, newAiType: string): 
         }
         
         const gameData = gameSnap.data();
-        await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: (gameData?.createdWithTier ?? 'free') });
-        
+        const {gameTier} = await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: (gameData?.createdWithTier ?? 'free') });
+
+        const bots = (gameData?.bots || []) as Bot[];
+        validateModelUsageForTier(gameTier, newAiType, bots.map((bot: Bot) => bot.aiType));
+
         // Update the Game Master AI type in Firestore
         await gameRef.update({ gameMasterAiType: newAiType });
-        
+
         // Return the updated game
         const updatedGameData = { 
             ...gameData, 

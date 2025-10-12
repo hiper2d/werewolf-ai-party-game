@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { LLM_CONSTANTS, SupportedAiModels } from '@/app/ai/ai-models';
+import { getCandidateModelsForTier, getPerGameModelLimit, FREE_TIER_UNLIMITED } from '@/app/ai/model-limit-utils';
+import type { UserTier } from '@/app/api/game-models';
 import { buttonTransparentStyle } from '@/app/constants';
 
 interface ModelSelectionDialogProps {
@@ -11,6 +13,8 @@ interface ModelSelectionDialogProps {
     currentModel: string;
     currentThinkingMode?: boolean;
     botName: string;
+    gameTier: UserTier;
+    usageCounts: Record<string, number>;
 }
 
 export default function ModelSelectionDialog({
@@ -18,11 +22,54 @@ export default function ModelSelectionDialog({
     onClose,
     onSelect,
     currentModel,
-    botName
+    botName,
+    gameTier,
+    usageCounts
 }: ModelSelectionDialogProps) {
-    const availableModels = useMemo(() => 
-        Object.values(LLM_CONSTANTS).filter(model => model !== LLM_CONSTANTS.RANDOM), 
-    []);
+    const tierFilteredModels = useMemo(() => {
+        if (gameTier === 'free') {
+            const models = new Set(getCandidateModelsForTier('free'));
+            if (currentModel && currentModel !== '' && currentModel !== LLM_CONSTANTS.RANDOM) {
+                // Ensure current assignments remain visible even if capacity is exhausted.
+                models.add(currentModel);
+            }
+            return Array.from(models);
+        }
+
+        return Object.values(LLM_CONSTANTS).filter(model => model !== LLM_CONSTANTS.RANDOM);
+    }, [gameTier, currentModel]);
+
+    const modelOptions = useMemo(() => {
+        return tierFilteredModels
+            .map(model => {
+                if (gameTier !== 'free') {
+                    return { model, disabled: false };
+                }
+
+                if (model === LLM_CONSTANTS.RANDOM) {
+                    return { model, disabled: true };
+                }
+
+                let disabled = false;
+
+                try {
+                    const limit = getPerGameModelLimit(model, 'free');
+                    if (limit !== FREE_TIER_UNLIMITED) {
+                        const used = usageCounts[model] ?? 0;
+                        const adjustedUsage = model === currentModel ? Math.max(0, used - 1) : used;
+                        disabled = adjustedUsage >= limit;
+                    }
+                } catch (err) {
+                    // If the model is not supported for free tier usage, hide it unless it's the current assignment.
+                    disabled = model !== currentModel;
+                }
+
+                return { model, disabled };
+            })
+            .filter(option => !(option.disabled && option.model !== currentModel));
+    }, [tierFilteredModels, usageCounts, gameTier, currentModel]);
+    
+    const selectableModels = useMemo(() => modelOptions.filter(option => !option.disabled).map(option => option.model), [modelOptions]);
     
     // Helper function to check if a model has thinking capabilities
     const hasThinkingMode = (aiType: string): boolean => {
@@ -36,22 +83,30 @@ export default function ModelSelectionDialog({
     // Update state when dialog opens with new bot data
     useEffect(() => {
         if (isOpen) {
-            const validModel = currentModel && availableModels.includes(currentModel) 
-                ? currentModel 
-                : availableModels[0];
-            
+            const fallbackModel = selectableModels[0] ?? modelOptions[0]?.model ?? '';
+            const validModel = currentModel && modelOptions.some(option => option.model === currentModel)
+                ? currentModel
+                : fallbackModel;
+
             console.log('ModelSelectionDialog opening:', {
                 botName,
                 currentModel,
-                validModel
+                validModel,
+                tier: gameTier,
+                selectableModels,
             });
-            
-            setSelectedModel(validModel);
+
+            setSelectedModel(validModel ?? '');
         }
-    }, [isOpen, currentModel, botName]);
+    }, [isOpen, currentModel, botName, gameTier, modelOptions, selectableModels]);
 
     const handleConfirm = async () => {
         // Only skip update if we have a valid currentModel and it matches selectedModel
+        if (!selectedModel) {
+            onClose();
+            return;
+        }
+
         if (currentModel && selectedModel === currentModel) {
             onClose();
             return;
@@ -85,9 +140,9 @@ export default function ModelSelectionDialog({
                         onChange={(e) => setSelectedModel(e.target.value)}
                         disabled={isUpdating}
                     >
-                        {availableModels.map(model => (
-                            <option key={model} value={model}>
-                                {model}
+                        {modelOptions.map(({ model, disabled }) => (
+                            <option key={model} value={model} disabled={disabled}>
+                                {disabled && model !== currentModel ? `${model} (limit reached)` : model}
                             </option>
                         ))}
                     </select>
