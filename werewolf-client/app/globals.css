@@ -26,4 +26,27 @@ body {
     rgb(var(--background-start-rgb));
 }
 
+html {
+  scrollbar-width: thin;
+  scrollbar-color: #4b5563 #0f172a;
+}
+
+*::-webkit-scrollbar {
+  width: 0.65rem;
+  height: 0.65rem;
+}
+
+*::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #4b5563 0%, #1f2937 100%);
+  border-radius: 999px;
+  border: 2px solid #0f172a;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #6b7280 0%, #374151 100%);
+}
 

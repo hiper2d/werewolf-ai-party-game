@@ -7,7 +7,7 @@ import {ensureUserCanAccessGame} from '@/app/api/tier-guards';
 import {getGame} from '@/app/api/game-actions';
 import {GameMessage, RECIPIENT_ALL} from '@/app/api/game-models';
 
-export async function GET(request: NextRequest, {params}: {params: {id: string}}) {
+export async function GET(request: NextRequest, {params}: {params: Promise<{id: string}>}) {
     const session = await auth();
     if (!session || !session.user?.email) {
         return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest, {params}: {params: {id: string}}
         return NextResponse.json({ error: 'Invalid day parameter' }, { status: 400 });
     }
 
-    const gameId = params.id;
+    const {id: gameId} = await params;
 
     await ensureUserCanAccessGame(gameId, session.user.email);
 
