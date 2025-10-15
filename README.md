@@ -25,14 +25,16 @@ Create a game in the setting you like, it can be literally anything as long as t
 A game master AI will generate a story and bots for you. Feel free to change anything:
 - bots' names and stories
 - bots' models, play styles, and voices
+- bots' voice instructions
 
-<a href="images/create_game2.png" target="_blank"><img src="images/create_game2.png" width="600"></a>
+<a href="images/create-game.png" target="_blank"><img src="images/create-game.png" width="600"></a>
+<a href="images/create-game-players.png" target="_blank"><img src="images/create-game-players.png" width="600"></a>
 
 Chat with bots or use Text-to-Sound and Sound-to-Text features.
 
 You can follow the theme and roleplay, you can tell them that they are AI, you can try to jailbreak - whatever it takes to survive the voting and the game night.
 
-<a href="images/day_chat1.png" target="_blank"><img src="images/day_chat1.png" width="600"></a>
+<a href="images/chat.png" target="_blank"><img src="images/chat.png" width="600"></a>
 
 Survival is not easy, poor Bob (me)
 

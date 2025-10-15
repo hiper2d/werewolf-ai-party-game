@@ -4,6 +4,7 @@ import "./globals.css";
 import NavBar from "@/components/navbar";
 import React from "react";
 import AuthProvider from "@/components/auth-provider";
+import { ThemeProvider } from "@/components/theme-provider";
 
 const inter = Inter({
   subsets: ['latin'],
@@ -26,18 +27,20 @@ export default function RootLayout(
     { children }: Readonly<{ children: React.ReactNode; }>
 ) {
   return (
-      <html lang="en" className={`${inter.variable} ${roboto_mono.variable} h-full`}>
+      <html suppressHydrationWarning lang="en" data-theme="midnight" className={`${inter.variable} ${roboto_mono.variable} h-full`}>
           <body className="font-inter m-0 p-0 h-full">
-              <AuthProvider>
-                <div className="flex flex-col h-screen">
-                  <NavBar />
-                  <main className="flex-1 min-h-0 flex bg-gradient-to-t from-black to-gray-800">
-                    <div className="w-full max-w-7xl mx-auto p-4 sm:p-6 flex flex-col">
-                      {children}
-                    </div>
-                  </main>
-                </div>
-              </AuthProvider>
+              <ThemeProvider>
+                <AuthProvider>
+                  <div className="flex flex-col h-screen">
+                    <NavBar />
+                    <main className="flex-1 min-h-0 flex app-shell">
+                      <div className="w-full max-w-7xl mx-auto p-4 sm:p-6 flex flex-col">
+                        {children}
+                      </div>
+                    </main>
+                  </div>
+                </AuthProvider>
+              </ThemeProvider>
           </body>
       </html>
   );

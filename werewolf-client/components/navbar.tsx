@@ -3,6 +3,7 @@
 import React from 'react';
 import Image from 'next/image';
 import AuthButtons from '@/components/auth-buttons';
+import ThemeSwitch from '@/components/theme-switch';
 import Link from "next/link";
 import {useSession} from "next-auth/react";
 
@@ -10,7 +11,7 @@ const NavBar = () => {
     const { data: session, status } = useSession();
 
     return (
-        <header className="bg-gray-900 text-white py-4 px-6 flex items-center justify-between h-16">
+        <header className="navbar-root py-4 px-6 flex items-center justify-between h-16">
             <div className="flex items-center">
                 <div className="mr-8">
                     <Image
@@ -28,14 +29,15 @@ const NavBar = () => {
                 )}
             </div>
 
-            <div className="flex items-center">
-                <nav className="mr-8">
+            <div className="flex items-center gap-4">
+                <nav className="mr-4">
                     <ul className="flex space-x-4">
-                        <li><Link href="/games" className="hover:text-gray-300">All games</Link></li>
-                        <li className="mx-2 text-gray-500">|</li>
-                        <li><Link href="/profile" className="hover:text-gray-300">User Profile</Link></li>
+                        <li><Link href="/games" className="nav-link">All games</Link></li>
+                        <li className="mx-2 nav-divider">|</li>
+                        <li><Link href="/profile" className="nav-link">User Profile</Link></li>
                     </ul>
                 </nav>
+                <ThemeSwitch />
                 <AuthButtons />
             </div>
         </header>

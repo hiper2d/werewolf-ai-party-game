@@ -3,27 +3,50 @@
 @tailwind utilities;
 
 :root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
-  --background-end-rgb: 255, 255, 255;
+  --color-text-primary: 255, 255, 255;
+  --color-text-secondary: 203, 213, 225;
+
+  --color-page-bg-start: 17, 24, 39;
+  --color-page-bg-end: 15, 15, 30;
+
+  --color-navbar-bg: 17, 24, 39;
+  --color-navbar-text: 255, 255, 255;
+  --color-navbar-link: 226, 232, 240;
+  --color-navbar-link-hover: 248, 250, 252;
+  --color-navbar-divider: 148, 163, 184;
+
+  --color-toggle-bg: rgba(255, 255, 255, 0.08);
+  --color-toggle-hover-bg: rgba(255, 255, 255, 0.16);
+  --color-toggle-border: rgba(148, 163, 184, 0.35);
+  --color-toggle-text: 248, 250, 252;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 0, 0, 0;
-    --background-end-rgb: 0, 0, 0;
-  }
+[data-theme='sunset'] {
+  --color-text-primary: 255, 255, 255;
+  --color-text-secondary: 255, 237, 213;
+
+  --color-page-bg-start: 124, 58, 237;
+  --color-page-bg-end: 251, 113, 133;
+
+  --color-navbar-bg: 91, 33, 182;
+  --color-navbar-text: 255, 255, 255;
+  --color-navbar-link: 255, 228, 230;
+  --color-navbar-link-hover: 255, 247, 237;
+  --color-navbar-divider: 254, 215, 170;
+
+  --color-toggle-bg: rgba(255, 255, 255, 0.15);
+  --color-toggle-hover-bg: rgba(255, 255, 255, 0.25);
+  --color-toggle-border: rgba(255, 255, 255, 0.45);
+  --color-toggle-text: 255, 255, 255;
 }
 
 body {
-  color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
+  color: rgb(var(--color-text-primary));
+  background: linear-gradient(160deg,
+      rgba(var(--color-page-bg-start), 0.96) 0%,
+      rgba(var(--color-page-bg-end), 0.92) 100%);
+  background-attachment: fixed;
+  min-height: 100vh;
 }
 
 html {
@@ -50,3 +73,66 @@ html {
   background: linear-gradient(180deg, #6b7280 0%, #374151 100%);
 }
 
+.navbar-root {
+  background-color: rgb(var(--color-navbar-bg));
+  color: rgb(var(--color-navbar-text));
+  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.35);
+}
+
+.navbar-root .nav-link {
+  color: rgb(var(--color-navbar-link));
+  transition: color 150ms ease;
+}
+
+.navbar-root .nav-link:hover,
+.navbar-root .nav-link:focus {
+  color: rgb(var(--color-navbar-link-hover));
+}
+
+.navbar-root .nav-divider {
+  color: rgb(var(--color-navbar-divider));
+}
+
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.9rem;
+  border-radius: 9999px;
+  border: 1px solid var(--color-toggle-border);
+  background-color: var(--color-toggle-bg);
+  color: rgb(var(--color-toggle-text));
+  font-size: 0.85rem;
+  line-height: 1.25rem;
+  font-weight: 500;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+
+.theme-toggle:hover,
+.theme-toggle:focus-visible {
+  background-color: var(--color-toggle-hover-bg);
+  outline: none;
+}
+
+.theme-toggle-label {
+  font-size: 0.625rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(var(--color-text-secondary), 0.9);
+}
+
+.theme-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.theme-name {
+  font-variant: small-caps;
+  letter-spacing: 0.08em;
+}
+
+.app-shell {
+  background: linear-gradient(160deg,
+      rgba(var(--color-page-bg-start), 0.85) 0%,
+      rgba(var(--color-page-bg-end), 0.9) 100%);
+}
