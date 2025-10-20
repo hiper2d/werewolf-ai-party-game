@@ -78,7 +78,7 @@ Output example:
 | Key Name | Provider | Required For Models |
 |----------|----------|---------------------|
 | `OPENAI_API_KEY` | OpenAI | GPT-5, GPT-5-mini |
-| `ANTHROPIC_API_KEY` | Anthropic | Claude 4 Sonnet |
+| `ANTHROPIC_API_KEY` | Anthropic | Claude 4.5 Sonnet, Claude 4.5 Haiku |
 | `GOOGLE_API_KEY` | Google | Gemini 2.5 Pro |
 | `DEEPSEEK_API_KEY` | DeepSeek | DeepSeek Chat, DeepSeek Reasoner |
 | `MISTRAL_API_KEY` | Mistral | Mistral Large, Mistral Medium, Magistral |

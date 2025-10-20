@@ -33,6 +33,8 @@ export const LLM_CONSTANTS = {
     CLAUDE_4_OPUS_THINKING: 'Claude 4.1 Opus (Thinking)',
     CLAUDE_4_SONNET: 'Claude 4.5 Sonnet',
     CLAUDE_4_SONNET_THINKING: 'Claude 4.5 Sonnet (Thinking)',
+    CLAUDE_4_HAIKU: 'Claude 4.5 Haiku',
+    CLAUDE_4_HAIKU_THINKING: 'Claude 4.5 Haiku (Thinking)',
     DEEPSEEK_CHAT: 'DeepSeek Chat',
     DEEPSEEK_REASONER: 'DeepSeek Reasoner',
     GPT_5: 'GPT-5',
@@ -116,6 +118,24 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
             maxBotsPerGame: 0 // Thinking version is expensive - not available
         }
     },
+    [LLM_CONSTANTS.CLAUDE_4_HAIKU]: {
+        modelApiName: 'claude-haiku-4-5',
+        apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
+        hasThinking: false,
+        freeTier: {
+            available: true,
+            maxBotsPerGame: 3
+        }
+    },
+    [LLM_CONSTANTS.CLAUDE_4_HAIKU_THINKING]: {
+        modelApiName: 'claude-haiku-4-5',
+        apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
+        hasThinking: true,
+        freeTier: {
+            available: true,
+            maxBotsPerGame: 1
+        }
+    },
 
     // DeepSeek models - separate Chat and Reasoner
     [LLM_CONSTANTS.DEEPSEEK_CHAT]: {
@@ -155,7 +175,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         hasThinking: true,
         freeTier: {
             available: true,
-            maxBotsPerGame: -1
+            maxBotsPerGame: 3
         }
     },
     [LLM_CONSTANTS.GEMINI_25_PRO]: {
@@ -275,7 +295,7 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
         cacheHitPrice: 0.15
     },
     
-    // Anthropic models (placeholder pricing)
+    // Anthropic models
     [SupportedAiModels[LLM_CONSTANTS.CLAUDE_4_OPUS].modelApiName]: {
         inputPrice: 15.0,
         outputPrice: 75.0
@@ -283,6 +303,11 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
     [SupportedAiModels[LLM_CONSTANTS.CLAUDE_4_SONNET].modelApiName]: {
         inputPrice: 3.0,
         outputPrice: 15.0
+    },
+    [SupportedAiModels[LLM_CONSTANTS.CLAUDE_4_HAIKU].modelApiName]: {
+        inputPrice: 1.0,
+        outputPrice: 5.0,
+        cacheHitPrice: 0.10
     },
     
     // Google models (placeholder pricing)

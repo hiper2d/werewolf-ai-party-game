@@ -32,6 +32,8 @@ export class AgentFactory {
             case LLM_CONSTANTS.CLAUDE_4_OPUS_THINKING:
             case LLM_CONSTANTS.CLAUDE_4_SONNET:
             case LLM_CONSTANTS.CLAUDE_4_SONNET_THINKING:
+            case LLM_CONSTANTS.CLAUDE_4_HAIKU:
+            case LLM_CONSTANTS.CLAUDE_4_HAIKU_THINKING:
                 return new ClaudeAgent(name, instruction, model.modelApiName, key, shouldEnableThinking);
                 
             // Always-on reasoning models

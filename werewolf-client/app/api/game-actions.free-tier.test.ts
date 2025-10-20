@@ -17,6 +17,35 @@ describe('free tier model limits', () => {
         ).toThrow('can only be used once');
     });
 
+    it('enforces the three-use limit for Claude Haiku without thinking', () => {
+        expect(() =>
+            validateModelUsageForTier('free', LLM_CONSTANTS.CLAUDE_4_HAIKU, [
+                LLM_CONSTANTS.CLAUDE_4_HAIKU,
+                LLM_CONSTANTS.CLAUDE_4_HAIKU,
+            ])
+        ).not.toThrow();
+
+        expect(() =>
+            validateModelUsageForTier('free', LLM_CONSTANTS.CLAUDE_4_HAIKU, [
+                LLM_CONSTANTS.CLAUDE_4_HAIKU,
+                LLM_CONSTANTS.CLAUDE_4_HAIKU,
+                LLM_CONSTANTS.CLAUDE_4_HAIKU,
+            ])
+        ).toThrow('can only be used 3 times');
+    });
+
+    it('enforces the single-use limit for Claude Haiku with thinking enabled', () => {
+        expect(() =>
+            validateModelUsageForTier('free', LLM_CONSTANTS.CLAUDE_4_HAIKU_THINKING, [])
+        ).not.toThrow();
+
+        expect(() =>
+            validateModelUsageForTier('free', LLM_CONSTANTS.CLAUDE_4_HAIKU_THINKING, [
+                LLM_CONSTANTS.CLAUDE_4_HAIKU_THINKING,
+            ])
+        ).toThrow('can only be used once');
+    });
+
     it('rejects models that are unavailable on the free tier', () => {
         expect(() =>
             validateModelUsageForTier('free', LLM_CONSTANTS.CLAUDE_4_OPUS, [])
@@ -32,6 +61,8 @@ describe('free tier model limits', () => {
     it('lists only free-tier-accessible models for random selection', () => {
         const candidates = getCandidateModelsForTier('free');
         expect(candidates).toContain(LLM_CONSTANTS.CLAUDE_4_SONNET);
+        expect(candidates).toContain(LLM_CONSTANTS.CLAUDE_4_HAIKU);
+        expect(candidates).toContain(LLM_CONSTANTS.CLAUDE_4_HAIKU_THINKING);
         expect(candidates).not.toContain(LLM_CONSTANTS.CLAUDE_4_OPUS);
     });
 });

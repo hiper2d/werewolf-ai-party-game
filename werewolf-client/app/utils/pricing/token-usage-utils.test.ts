@@ -85,19 +85,24 @@ describe('Token Usage Utils', () => {
 
     describe('calculateCost', () => {
         it('should calculate cost for known models', () => {
-            // Use DeepSeek as example: $0.56/M input, $1.68/M output
-            const cost = calculateCost('deepseek-chat', 1000000, 500000);
-            
-            // 1M input * $0.56 + 0.5M output * $1.68
-            expect(cost).toBeCloseTo(0.56 + 0.84, 5);
+            const pricing = MODEL_PRICING['deepseek-chat'];
+            const cost = calculateCost('deepseek-chat', 1_000_000, 500_000);
+
+            const expectedCost =
+                (1_000_000 * pricing.inputPrice) / 1_000_000 +
+                (500_000 * pricing.outputPrice) / 1_000_000;
+
+            expect(cost).toBeCloseTo(expectedCost, 5);
         });
 
         it('should calculate cost with cache hits', () => {
-            // DeepSeek: $0.56/M input, $1.68/M output, $0.07/M cache
-            const cost = calculateCost('deepseek-chat', 1000000, 500000, { cacheHitTokens: 500000 });
-            
-            // 500K uncached * $0.56/M + 500K cached * $0.07/M + 500K output * $1.68/M
-            const expectedCost = (500000 * 0.56 / 1000000) + (500000 * 0.07 / 1000000) + (500000 * 1.68 / 1000000);
+            const pricing = MODEL_PRICING['deepseek-chat'];
+            const cost = calculateCost('deepseek-chat', 1_000_000, 500_000, { cacheHitTokens: 500_000 });
+
+            const expectedCost =
+                (500_000 * pricing.inputPrice) / 1_000_000 +
+                (500_000 * (pricing.cacheHitPrice ?? pricing.inputPrice)) / 1_000_000 +
+                (500_000 * pricing.outputPrice) / 1_000_000;
             expect(cost).toBeCloseTo(expectedCost, 5);
         });
 
@@ -134,8 +139,12 @@ describe('Token Usage Utils', () => {
                 cacheHitTokens: 200000
             });
             
+            const pricing = MODEL_PRICING['deepseek-chat'];
             // Verify cost calculation: 800K uncached + 200K cached + 500K output
-            const expectedCost = (800000 * 0.56 / 1000000) + (200000 * 0.07 / 1000000) + (500000 * 1.68 / 1000000);
+            const expectedCost =
+                (800_000 * pricing.inputPrice) / 1_000_000 +
+                (200_000 * (pricing.cacheHitPrice ?? pricing.inputPrice)) / 1_000_000 +
+                (500_000 * pricing.outputPrice) / 1_000_000;
             expect(result!.cost).toBeCloseTo(expectedCost, 5);
         });
 
@@ -257,7 +266,7 @@ describe('Token Usage Utils', () => {
                 'gpt-5', 'gpt-5-mini',
                 'deepseek-chat', 'deepseek-reasoner',
                 'kimi-k2-0905-preview',
-                'claude-opus-4-1', 'claude-sonnet-4-0',
+                'claude-opus-4-1', 'claude-sonnet-4-5', 'claude-haiku-4-5',
                 'gemini-2.5-pro',
                 'mistral-large-latest', 'mistral-medium-latest', 'magistral-medium-latest',
                 'grok-4'
