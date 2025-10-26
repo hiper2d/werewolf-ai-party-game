@@ -48,18 +48,11 @@ export async function DELETE(
         }
 
         // Query all messages after the target timestamp
-        const messagesToDeleteSnapshot = await db.collection('games')
+        const messagesAfterSnapshot = await db.collection('games')
             .doc(gameId)
             .collection('messages')
             .where('timestamp', '>', targetTimestamp)
             .get();
-
-        if (messagesToDeleteSnapshot.empty) {
-            return NextResponse.json(
-                { message: 'No messages found after the specified message', deletedCount: 0 },
-                { status: 200 }
-            );
-        }
 
         // Get current game state to check current day and bot status
         const gameDoc = await db.collection('games').doc(gameId).get();
@@ -114,12 +107,11 @@ export async function DELETE(
             });
             console.log('✅ Game state update successful');
 
-            // Then delete messages individually
-            if (!messagesToDeleteSnapshot.empty) {
-                const deletePromises = messagesToDeleteSnapshot.docs.map(doc => doc.ref.delete());
-                await Promise.all(deletePromises);
-                console.log('✅ Message deletion successful');
-            }
+            // Then delete the target message and everything after it
+            const docsToDelete = [targetMessageDoc, ...messagesAfterSnapshot.docs];
+            const deletePromises = docsToDelete.map(doc => doc.ref.delete());
+            await Promise.all(deletePromises);
+            console.log(`✅ Message deletion successful (removed ${docsToDelete.length} message(s))`);
 
             // Recalculate day activity counter from remaining messages
             await recalculateDayActivity(gameId, currentDay);
@@ -135,9 +127,11 @@ export async function DELETE(
             return !originalBot.isAlive && bot.isAlive;
         }).length;
         
+        const deletedCount = messagesAfterSnapshot.size + 1; // Include the target message itself
+
         return NextResponse.json({
-            message: `Successfully deleted ${messagesToDeleteSnapshot.size} messages after message ${messageId}, reset game state${restoredBotCount > 0 ? `, and restored ${restoredBotCount} bot(s) eliminated today` : ''}`,
-            deletedCount: messagesToDeleteSnapshot.size,
+            message: `Successfully deleted ${deletedCount} message${deletedCount === 1 ? '' : 's'} at and after message ${messageId}, reset game state${restoredBotCount > 0 ? `, and restored ${restoredBotCount} bot(s) eliminated today` : ''}`,
+            deletedCount,
             restoredBots: restoredBotCount
         });
 

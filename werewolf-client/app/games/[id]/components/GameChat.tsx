@@ -112,6 +112,13 @@ function renderMessage(message: GameMessage, gameId: string, onDeleteAfter: (mes
         (message.messageType === MessageType.GM_COMMAND && 
          message.recipientName === RECIPIENT_ALL);
     const isBotMessage = message.messageType === MessageType.BOT_ANSWER && !isGameMaster && !isUserMessage;
+    const isHumanDayDiscussionMessage =
+        isUserMessage &&
+        message.messageType === MessageType.HUMAN_PLAYER_MESSAGE &&
+        message.recipientName === RECIPIENT_ALL &&
+        message.day === game.currentDay &&
+        game.gameState === GAME_STATES.DAY_DISCUSSION;
+    const canShowResetButton = isBotMessage || isHumanDayDiscussionMessage;
     
     let displayContent: string;
     try {
@@ -192,8 +199,8 @@ function renderMessage(message: GameMessage, gameId: string, onDeleteAfter: (mes
                 </div>
                 {message.id && !isVoteMessage && displayContent && displayContent.trim() && (
                     <div className="flex gap-1">
-                        {/* Reset icon - only for bot messages */}
-                        {isBotMessage && (
+                        {/* Reset icon - allow for bot + human day discussion messages */}
+                        {canShowResetButton && (
                             <button
                                 onClick={() => onDeleteAfter(message.id!)}
                                 className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 rounded hover:bg-gray-600/50"
@@ -596,8 +603,8 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
         };
     }, [isRecording]);
 
-    const sendMessage = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const sendMessage = async (e?: React.FormEvent) => {
+        e?.preventDefault();
         const trimmed = newMessage.trim();
         if (!trimmed || !isCurrentDaySelected) {
             return;
@@ -644,6 +651,13 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
         }
     };
 
+    const handleTextareaKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if (e.key === 'Enter' && e.shiftKey) {
+            e.preventDefault();
+            void sendMessage();
+        }
+    };
+
     const handleDismissError = async () => {
         // Clear the persistent error state in the database
         try {
@@ -687,7 +701,7 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
             setMessages(prev => {
                 const targetIndex = prev.findIndex(msg => msg.id === messageId);
                 if (targetIndex === -1) return prev;
-                return prev.slice(0, targetIndex + 1);
+                return prev.slice(0, targetIndex);
             });
 
             // Refresh game state immediately if callback is provided
@@ -1117,6 +1131,7 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
                 <textarea
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
+                    onKeyDown={handleTextareaKeyDown}
                     disabled={!isInputEnabled()}
                     rows={textareaRows}
                     className={`flex-grow p-3 rounded bg-black bg-opacity-30 text-white placeholder-gray-400 border

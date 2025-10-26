@@ -169,6 +169,10 @@ export const BOT_REMINDER_POSTFIX: string = `
 - Remember: Werewolves coordinate and often defend innocent targets to blend in - total agreement is suspicious
 - Focus on WHO targets WHOM and WHY, not character story consistency
 - Consider how relationships and alliances affect voting patterns\
+
+**COMPACT REPLIES:**
+- Keep output lean—2 to 4 complete sentences per response JSON field.
+- Merge related points and skip filler while staying human-sounding.
 `;
 
 export const BOT_WEREWOLF_DISCUSSION_PROMPT: string = `🌙 **Night Phase - Werewolf Discussion**

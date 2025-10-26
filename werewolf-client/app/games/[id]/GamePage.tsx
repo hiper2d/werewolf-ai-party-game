@@ -340,7 +340,6 @@ export default function GamePage({
             isHuman: false,
             isAlive: true,
             aiType: game.gameMasterAiType,
-            enableThinking: game.gameMasterThinking,
             isGameMaster: true,
         },
         {
