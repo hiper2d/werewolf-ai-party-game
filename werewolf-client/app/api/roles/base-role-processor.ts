@@ -1,4 +1,4 @@
-import { Game, Bot, GAME_MASTER, GameMessage, MessageType, RECIPIENT_ALL, ROLE_CONFIGS } from "@/app/api/game-models";
+import { Game, Bot, GAME_MASTER, GameMessage, MessageType, RECIPIENT_ALL, ROLE_CONFIGS, GAME_ROLES } from "@/app/api/game-models";
 import { addMessageToChatAndSaveToDb } from "@/app/api/game-actions";
 
 /**
@@ -186,8 +186,13 @@ export abstract class BaseRoleProcessor {
         // Create a generic announcement that doesn't reveal specific player identities
         let announcement: string;
         
-        if (this.roleName === 'werewolf' && playersInfo.allPlayers.length > 1) {
-            // Special case for multiple werewolves
+        if (this.roleName === GAME_ROLES.WEREWOLF && playersInfo.hasHumanPlayer) {
+            const werewolfRoster = playersInfo.allPlayers
+                .map(player => player.isHuman ? `${player.name} (You)` : player.name)
+                .join(', ');
+            announcement = `🌙 **Night Phase**: It's time for the ${roleConfig.name}s to act. Discuss privately with your pack (${werewolfRoster}) before locking in a target.`;
+        } else if (this.roleName === GAME_ROLES.WEREWOLF && playersInfo.allPlayers.length > 1) {
+            // Special case for multiple werewolves without human involvement
             announcement = `🌙 **Night Phase**: It's time for the ${roleConfig.name}s to act. ${roleConfig.description}.`;
         } else {
             // Single role or single werewolf

@@ -1,6 +1,10 @@
 # Bugs and improvements
 
-- Track spendings in each tier separately for a user
+- Summaries seems to be detouched from roles. Bots summarize their day activities but there should be foes and friends with respect of roles as well.
+- The previous days should include role messages in the human player can see them 
+- When night starts, the Game Master's messages should tell the human player what to do then it's their turn
+- "Keep Going" doesn't block the input while the game master is thinking. We should show the Game Master thinking in the queue probably...
+- Track spendings in each tier separately for a user (no need to change anything for a game since games stick to certain tiers)
 - Automate votes triggering
 - Show only current day chat but let to select previous days in view mode
 - Fix game buttons enablement: some of them are shown when they should not

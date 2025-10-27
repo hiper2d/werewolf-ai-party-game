@@ -12,6 +12,7 @@ import type { Session } from "next-auth";
 import { welcome, vote, keepBotsGoing } from '@/app/api/bot-actions';
 import { replayNight, performNightAction } from '@/app/api/night-actions';
 import { getPlayerColor } from "@/app/utils/color-utils";
+import { checkGameEndConditions } from "@/app/utils/game-utils";
 import { isTierMismatchError } from '@/app/api/errors';
 
 interface Participant {
@@ -35,6 +36,7 @@ export default function GamePage({
     const [modelDialogOpen, setModelDialogOpen] = useState(false);
     const [selectedBot, setSelectedBot] = useState<{ name: string; aiType: string; enableThinking?: boolean } | null>(null);
     const [clearNightMessages, setClearNightMessages] = useState(false);
+    const isGameOver = game.gameState === GAME_STATES.GAME_OVER || game.gameState === GAME_STATES.AFTER_GAME_DISCUSSION;
 
     const modelUsageCounts = useMemo(() => {
         const counts: Record<string, number> = {};
@@ -52,6 +54,11 @@ export default function GamePage({
 
         return counts;
     }, [game]);
+
+    const gameEndStatus = useMemo(() => checkGameEndConditions(game), [game]);
+    const showVoteGameOverCTA = !isGameOver && gameEndStatus.isEnded && game.gameState === GAME_STATES.VOTE_RESULTS;
+    const showNightGameOverCTA = !isGameOver && gameEndStatus.isEnded && game.gameState === GAME_STATES.NIGHT_RESULTS;
+    const pendingGameOverReason = (showVoteGameOverCTA || showNightGameOverCTA) ? gameEndStatus.reason : undefined;
 
     // Handle exit game
     const handleExitGame = () => {
@@ -302,9 +309,6 @@ export default function GamePage({
         }
     };
 
-    // Check if game is over
-    const isGameOver = game.gameState === GAME_STATES.GAME_OVER || game.gameState === GAME_STATES.AFTER_GAME_DISCUSSION;
-
     // Handle model update
     const handleModelUpdate = async (newModel: string) => {
         if (!selectedBot) return;
@@ -520,7 +524,7 @@ export default function GamePage({
                                                 ) : null;
                                             })()}
                                             {!participant.isAlive && (
-                                                <span className="text-sm text-red-400">💀 Eliminated</span>
+                                                <span className="text-sm" title="Eliminated">💀</span>
                                             )}
                                         </div>
                                     </div>
@@ -671,37 +675,48 @@ export default function GamePage({
                                 </div>
                             )}
                             {game.gameState === GAME_STATES.VOTE_RESULTS && (
-                                <div className="flex gap-2 justify-center">
-                                    <button
-                                        className={`${buttonTransparentStyle} bg-blue-600 hover:bg-blue-700 border-blue-500`}
-                                        onClick={async () => {
-                                            console.log('🌙 GAMEPAGE: START NIGHT BUTTON CLICKED:', {
-                                                gameId: game.id,
-                                                currentState: game.gameState,
-                                                timestamp: new Date().toISOString()
-                                            });
-                                            const updatedGame = await runGameAction(() => performNightAction(game.id));
-                                            console.log('✅ GAMEPAGE: Start Night button - PerformNightAction API completed');
-                                            if (updatedGame) {
-                                                setGame(updatedGame);
-                                            }
-                                        }}
-                                        title="Begin the night phase where werewolves and special roles take their actions"
-                                    >
-                                        🌙 Start Night
-                                    </button>
-                                    <button
-                                        className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500`}
-                                        onClick={async () => {
-                                            const updatedGame = await runGameAction(() => afterGameDiscussion(game.id));
-                                            if (updatedGame) {
-                                                setGame(updatedGame);
-                                            }
-                                        }}
-                                        title="End the game and move to after-game discussion"
-                                    >
-                                        🎭 Game Over
-                                    </button>
+                                <div className="flex flex-col gap-2 items-center">
+                                    {showVoteGameOverCTA && pendingGameOverReason && (
+                                        <p className="text-sm text-red-300 text-center">
+                                            {pendingGameOverReason}
+                                        </p>
+                                    )}
+                                    <div className="flex gap-2 justify-center flex-wrap">
+                                        {!showVoteGameOverCTA && (
+                                            <button
+                                                className={`${buttonTransparentStyle} bg-blue-600 hover:bg-blue-700 border-blue-500`}
+                                                onClick={async () => {
+                                                    console.log('🌙 GAMEPAGE: START NIGHT BUTTON CLICKED:', {
+                                                        gameId: game.id,
+                                                        currentState: game.gameState,
+                                                        timestamp: new Date().toISOString()
+                                                    });
+                                                    const updatedGame = await runGameAction(() => performNightAction(game.id));
+                                                    console.log('✅ GAMEPAGE: Start Night button - PerformNightAction API completed');
+                                                    if (updatedGame) {
+                                                        setGame(updatedGame);
+                                                    }
+                                                }}
+                                                title="Begin the night phase where werewolves and special roles take their actions"
+                                            >
+                                                🌙 Start Night
+                                            </button>
+                                        )}
+                                        {showVoteGameOverCTA && (
+                                            <button
+                                                className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500`}
+                                                onClick={async () => {
+                                                    const updatedGame = await runGameAction(() => afterGameDiscussion(game.id));
+                                                    if (updatedGame) {
+                                                        setGame(updatedGame);
+                                                    }
+                                                }}
+                                                title="End the game and move to after-game discussion"
+                                            >
+                                                🎭 Game Over
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
                             )}
                             {game.gameState === GAME_STATES.NIGHT && (
@@ -710,45 +725,56 @@ export default function GamePage({
                                 </div>
                             )}
                             {game.gameState === GAME_STATES.NIGHT_RESULTS && (
-                                <div className="flex gap-2 justify-center">
-                                    <button
-                                        className={buttonTransparentStyle}
-                                        onClick={async () => {
-                                            setClearNightMessages(true);
-                                            const updatedGame = await runGameAction(() => replayNight(game.id));
-                                            if (updatedGame) {
-                                                setGame(updatedGame);
-                                            }
-                                            setTimeout(() => setClearNightMessages(false), 100);
-                                        }}
-                                        title="Clear night messages and replay the night phase actions"
-                                    >
-                                        Replay
-                                    </button>
-                                    <button
-                                        className={buttonTransparentStyle}
-                                        onClick={async () => {
-                                            const updatedGame = await runGameAction(() => startNewDay(game.id));
-                                            if (updatedGame) {
-                                                setGame(updatedGame);
-                                            }
-                                        }}
-                                        title="Continue to apply night results and start new day"
-                                    >
-                                        Next Day
-                                    </button>
-                                    <button
-                                        className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500`}
-                                        onClick={async () => {
-                                            const updatedGame = await runGameAction(() => afterGameDiscussion(game.id));
-                                            if (updatedGame) {
-                                                setGame(updatedGame);
-                                            }
-                                        }}
-                                        title="End the game and move to after-game discussion"
-                                    >
-                                        🎭 Game Over
-                                    </button>
+                                <div className="flex flex-col gap-2 items-center">
+                                    {showNightGameOverCTA && pendingGameOverReason && (
+                                        <p className="text-sm text-red-300 text-center">
+                                            {pendingGameOverReason}
+                                        </p>
+                                    )}
+                                    <div className="flex gap-2 justify-center flex-wrap">
+                                        <button
+                                            className={buttonTransparentStyle}
+                                            onClick={async () => {
+                                                setClearNightMessages(true);
+                                                const updatedGame = await runGameAction(() => replayNight(game.id));
+                                                if (updatedGame) {
+                                                    setGame(updatedGame);
+                                                }
+                                                setTimeout(() => setClearNightMessages(false), 100);
+                                            }}
+                                            title="Clear night messages and replay the night phase actions"
+                                        >
+                                            Replay
+                                        </button>
+                                        {!showNightGameOverCTA && (
+                                            <button
+                                                className={buttonTransparentStyle}
+                                                onClick={async () => {
+                                                    const updatedGame = await runGameAction(() => startNewDay(game.id));
+                                                    if (updatedGame) {
+                                                        setGame(updatedGame);
+                                                    }
+                                                }}
+                                                title="Continue to apply night results and start new day"
+                                            >
+                                                Next Day
+                                            </button>
+                                        )}
+                                        {showNightGameOverCTA && (
+                                            <button
+                                                className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500`}
+                                                onClick={async () => {
+                                                    const updatedGame = await runGameAction(() => afterGameDiscussion(game.id));
+                                                    if (updatedGame) {
+                                                        setGame(updatedGame);
+                                                    }
+                                                }}
+                                                title="End the game and move to after-game discussion"
+                                            >
+                                                🎭 Game Over
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
                             )}
                             {game.gameState === GAME_STATES.NEW_DAY_BOT_SUMMARIES && (

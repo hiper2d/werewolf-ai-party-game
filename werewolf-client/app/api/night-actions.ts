@@ -207,6 +207,53 @@ async function endNightWithResults(gameId: string, game: Game): Promise<Game> {
  * If game is in VOTE_RESULTS state, transitions to NIGHT and sets up night actions
  * If game is in NIGHT state, processes the next night action in the queue
  */
+const MAX_AUTO_NIGHT_STEPS = 100;
+
+async function autoProcessNightActions(gameId: string, initialGame?: Game): Promise<Game> {
+    let currentGame = initialGame ?? await getGame(gameId);
+
+    if (!currentGame) {
+        throw new Error('Game not found');
+    }
+
+    let safetyCounter = 0;
+
+    while (currentGame.gameState === GAME_STATES.NIGHT) {
+        safetyCounter++;
+        if (safetyCounter > MAX_AUTO_NIGHT_STEPS) {
+            console.warn('⚠️ AUTO NIGHT PROCESSOR: Reached safety limit, stopping auto-processing', {
+                gameId,
+                processQueue: currentGame.gameStateProcessQueue,
+                paramQueue: currentGame.gameStateParamQueue
+            });
+            break;
+        }
+
+        // If there are no queued roles or params, attempt to progress the queue
+        if (currentGame.gameStateProcessQueue.length === 0 || currentGame.gameStateParamQueue.length === 0) {
+            currentGame = await processNightQueue(gameId, currentGame);
+            continue;
+        }
+
+        const currentRole = currentGame.gameStateProcessQueue[0];
+        const currentPlayer = currentGame.gameStateParamQueue[0];
+
+        // Stop auto-processing if the human player needs to act
+        if (currentPlayer === currentGame.humanPlayerName && currentRole === currentGame.humanPlayerRole) {
+            console.log('🌙 AUTO NIGHT PROCESSOR: Waiting for human action', {
+                gameId,
+                currentRole,
+                currentPlayer
+            });
+            break;
+        }
+
+        currentGame = await processNightQueue(gameId, currentGame);
+    }
+
+    return currentGame;
+}
+
 async function performNightActionImpl(gameId: string): Promise<Game> {
     // Authentication check
     const session = await auth();
@@ -233,11 +280,12 @@ async function performNightActionImpl(gameId: string): Promise<Game> {
 
     // Handle different game states
     if (game.gameState === GAME_STATES.VOTE_RESULTS) {
-        // Transition from VOTE_RESULTS to NIGHT and set up night actions
-        return await beginNightImpl(gameId);
+        // Transition from VOTE_RESULTS to NIGHT and immediately kick off bot processing
+        const nightGame = await beginNightImpl(gameId);
+        return await autoProcessNightActions(gameId, nightGame);
     } else if (game.gameState === GAME_STATES.NIGHT) {
-        // Process next night action or end night if queue is empty
-        return await processNightQueue(gameId, game);
+        // Process all pending bot actions (stopping if human input is required)
+        return await autoProcessNightActions(gameId, game);
     } else if (game.gameState === GAME_STATES.NIGHT_RESULTS) {
         // Night has already ended, return current game state
         console.log('🌅 Night actions already completed, returning current game state');
