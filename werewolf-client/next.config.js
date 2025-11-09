@@ -1,3 +1,5 @@
+require('./polyfills/remove-node-webstorage');
+
 /** @type {import('next').NextConfig} */
 module.exports = {
     compiler: {
