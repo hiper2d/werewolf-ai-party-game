@@ -33,7 +33,11 @@ export default async function Page(props: any) {
         return <div>Game not found</div>;
     }
 
-    const userTier = await getUserTier(session.user.email!);
+    if (!session.user?.email) {
+        redirect('/api/auth/signin');
+    }
+
+    const userTier = await getUserTier(session.user.email);
     if (game.createdWithTier !== userTier) {
         const searchParams = new URLSearchParams({
             error: 'tier_mismatch',

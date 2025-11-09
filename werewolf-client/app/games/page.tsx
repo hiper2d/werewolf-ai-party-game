@@ -20,7 +20,7 @@ function formatCreationDate(timestamp?: number): string {
     });
 }
 
-const GamePages = async ({searchParams}: {searchParams?: {error?: string; blocked?: string}}) => {
+const GamePages = async ({searchParams}: {searchParams?: Promise<{error?: string; blocked?: string}>}) => {
     const session = await auth();
     if (!session) {
         redirect('/api/auth/signin');
@@ -33,8 +33,9 @@ const GamePages = async ({searchParams}: {searchParams?: {error?: string; blocke
 
     const userTier = await getUserTier(userEmail);
     const games: Game[] = await getAllGames();
-    const errorCode = searchParams?.error;
-    const blockedGameId = searchParams?.blocked;
+    const resolvedSearchParams = await searchParams;
+    const errorCode = resolvedSearchParams?.error;
+    const blockedGameId = resolvedSearchParams?.blocked;
     return (
         <div className="flex flex-col h-full text-white overflow-hidden">
             <div className="flex justify-between items-center mb-6">
