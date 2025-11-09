@@ -12,3 +12,4 @@ venv.bak/
 **/logs
 
 **/*.code-workspace
+node_modules/
