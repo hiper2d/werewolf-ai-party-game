@@ -55,10 +55,39 @@ export default function GamePage({
         return counts;
     }, [game]);
 
+    // Helper function to simulate game state after applying night results
+    const simulateNightResults = useMemo(() => {
+        if (game.gameState !== GAME_STATES.NIGHT_RESULTS || !game.nightResults) {
+            return game;
+        }
+
+        // Simulate elimination of werewolf target if not protected
+        const nightResults = game.nightResults;
+        let simulatedBots = [...game.bots];
+
+        if (nightResults.werewolf && nightResults.werewolf.target) {
+            const targetName = nightResults.werewolf.target;
+            const doctorProtectedTarget = nightResults.doctor && nightResults.doctor.target === targetName;
+
+            if (!doctorProtectedTarget) {
+                // Eliminate the target in simulation
+                simulatedBots = simulatedBots.map(bot => {
+                    if (bot.name === targetName) {
+                        return { ...bot, isAlive: false };
+                    }
+                    return bot;
+                });
+            }
+        }
+
+        return { ...game, bots: simulatedBots };
+    }, [game]);
+
     const gameEndStatus = useMemo(() => checkGameEndConditions(game), [game]);
+    const nightResultsEndStatus = useMemo(() => checkGameEndConditions(simulateNightResults), [simulateNightResults]);
     const showVoteGameOverCTA = !isGameOver && gameEndStatus.isEnded && game.gameState === GAME_STATES.VOTE_RESULTS;
-    const showNightGameOverCTA = !isGameOver && gameEndStatus.isEnded && game.gameState === GAME_STATES.NIGHT_RESULTS;
-    const pendingGameOverReason = (showVoteGameOverCTA || showNightGameOverCTA) ? gameEndStatus.reason : undefined;
+    const showNightGameOverCTA = !isGameOver && nightResultsEndStatus.isEnded && game.gameState === GAME_STATES.NIGHT_RESULTS;
+    const pendingGameOverReason = (showVoteGameOverCTA || showNightGameOverCTA) ? (game.gameState === GAME_STATES.NIGHT_RESULTS ? nightResultsEndStatus.reason : gameEndStatus.reason) : undefined;
 
     // Handle exit game
     const handleExitGame = () => {
@@ -727,13 +756,13 @@ export default function GamePage({
                             {game.gameState === GAME_STATES.NIGHT_RESULTS && (
                                 <div className="flex flex-col gap-2 items-center">
                                     {showNightGameOverCTA && pendingGameOverReason && (
-                                        <p className="text-sm text-red-300 text-center">
+                                        <p className="text-sm text-red-300 text-center mb-2">
                                             {pendingGameOverReason}
                                         </p>
                                     )}
                                     <div className="flex gap-2 justify-center flex-wrap">
                                         <button
-                                            className={buttonTransparentStyle}
+                                            className={`${buttonTransparentStyle} min-w-[70px] max-w-[90px]`}
                                             onClick={async () => {
                                                 setClearNightMessages(true);
                                                 const updatedGame = await runGameAction(() => replayNight(game.id));
@@ -744,11 +773,24 @@ export default function GamePage({
                                             }}
                                             title="Clear night messages and replay the night phase actions"
                                         >
-                                            Replay
+                                            Replay Night
                                         </button>
-                                        {!showNightGameOverCTA && (
+                                        {showNightGameOverCTA ? (
                                             <button
-                                                className={buttonTransparentStyle}
+                                                className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500 min-w-[70px] max-w-[90px]`}
+                                                onClick={async () => {
+                                                    const updatedGame = await runGameAction(() => afterGameDiscussion(game.id));
+                                                    if (updatedGame) {
+                                                        setGame(updatedGame);
+                                                    }
+                                                }}
+                                                title="End the game and move to after-game discussion"
+                                            >
+                                                Game Over
+                                            </button>
+                                        ) : (
+                                            <button
+                                                className={`${buttonTransparentStyle} min-w-[70px] max-w-[90px]`}
                                                 onClick={async () => {
                                                     const updatedGame = await runGameAction(() => startNewDay(game.id));
                                                     if (updatedGame) {
@@ -758,20 +800,6 @@ export default function GamePage({
                                                 title="Continue to apply night results and start new day"
                                             >
                                                 Next Day
-                                            </button>
-                                        )}
-                                        {showNightGameOverCTA && (
-                                            <button
-                                                className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500`}
-                                                onClick={async () => {
-                                                    const updatedGame = await runGameAction(() => afterGameDiscussion(game.id));
-                                                    if (updatedGame) {
-                                                        setGame(updatedGame);
-                                                    }
-                                                }}
-                                                title="End the game and move to after-game discussion"
-                                            >
-                                                🎭 Game Over
                                             </button>
                                         )}
                                     </div>

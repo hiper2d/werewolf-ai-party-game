@@ -31,6 +31,7 @@ import { generateWerewolfTeammatesSection, generatePreviousDaySummariesSection }
 import { format } from "@/app/ai/prompts/utils";
 import { parseResponseToObj, convertToAIMessages } from "@/app/utils/message-utils";
 import {checkGameEndConditions} from "@/app/utils/game-utils";
+import {GameEndChecker} from "@/app/utils/game-end-checker";
 import {recordBotTokenUsage, recordGameMasterTokenUsage} from "@/app/api/cost-tracking";
 import {ensureUserCanAccessGame} from "@/app/api/tier-guards";
 
@@ -171,13 +172,37 @@ async function endNightWithResults(gameId: string, game: Game): Promise<Game> {
     if (thinking) {
         console.log(`🎭 Game Master thinking captured (${thinking.length} chars)`);
     }
-    
-    // Create Game Master message with the AI-generated night results
+
+    // Check for game end conditions after night actions
+    // We need to simulate the game state after eliminating the killed player
+    let tempBots = [...game.bots];
+    if (killedPlayer && !wasKillPrevented) {
+        tempBots = tempBots.map(bot => {
+            if (bot.name === killedPlayer) {
+                return { ...bot, isAlive: false, eliminationDay: game.currentDay };
+            }
+            return bot;
+        });
+    }
+    const tempGame = { ...game, bots: tempBots };
+
+    const gameEndChecker = new GameEndChecker();
+    const endGameCheck = gameEndChecker.check(tempGame);
+
+    // Append end game message to night results if game is ending
+    let finalNightResultsMessage = nightResultsMessage;
+    if (endGameCheck.isEnded) {
+        const endGameMessage = gameEndChecker.getEndGameMessage(tempGame);
+        finalNightResultsMessage = nightResultsMessage + endGameMessage;
+        console.log(`🎮 GAME END DETECTED: ${endGameCheck.reason}`);
+    }
+
+    // Create Game Master message with the AI-generated night results (and end game announcement if applicable)
     const gameMessage: GameMessage = {
         id: null,
         recipientName: RECIPIENT_ALL,
         authorName: GAME_MASTER,
-        msg: { story: nightResultsMessage, thinking: thinking || "" },
+        msg: { story: finalNightResultsMessage, thinking: thinking || "" },
         messageType: MessageType.NIGHT_SUMMARY,
         day: game.currentDay,
         timestamp: Date.now(),
