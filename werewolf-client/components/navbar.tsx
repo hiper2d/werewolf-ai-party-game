@@ -3,7 +3,6 @@
 import React from 'react';
 import Image from 'next/image';
 import AuthButtons from '@/components/auth-buttons';
-import ThemeSwitch from '@/components/theme-switch';
 import Link from "next/link";
 import {useSession} from "next-auth/react";
 
@@ -37,7 +36,6 @@ const NavBar = () => {
                         <li><Link href="/profile" className="nav-link">User Profile</Link></li>
                     </ul>
                 </nav>
-                <ThemeSwitch />
                 <AuthButtons />
             </div>
         </header>
