@@ -21,7 +21,7 @@ import {
     GM_COMMAND_REPLY_TO_DISCUSSION,
     GM_COMMAND_SELECT_RESPONDERS
 } from "@/app/ai/prompts/gm-commands";
-import {BOT_REMINDER_POSTFIX, BOT_SYSTEM_PROMPT, BOT_VOTE_PROMPT} from "@/app/ai/prompts/bot-prompts";
+import {BOT_REMINDER_POSTFIX, BOT_SYSTEM_PROMPT, BOT_VOTE_PROMPT, BOT_AFTER_GAME_SYSTEM_PROMPT_ADDITION} from "@/app/ai/prompts/bot-prompts";
 import {GM_ROUTER_SYSTEM_PROMPT, HUMAN_SUGGESTION_PROMPT} from "@/app/ai/prompts/gm-prompts";
 import {BotAnswerZodSchema, BotVoteZodSchema, GmBotSelectionZodSchema} from "@/app/ai/prompts/zod-schemas";
 import {AgentFactory} from "@/app/ai/agent-factory";
@@ -51,6 +51,37 @@ import {
 import {checkGameEndConditions} from "@/app/utils/game-utils";
 import {recordBotTokenUsage, recordGameMasterTokenUsage} from "@/app/api/cost-tracking";
 import {ensureUserCanAccessGame} from "@/app/api/tier-guards";
+
+/**
+ * Helper function to generate bot system prompt with after-game addition if needed
+ */
+function generateBotSystemPrompt(bot: Bot, game: Game): string {
+    const basePrompt = format(BOT_SYSTEM_PROMPT, {
+        name: bot.name,
+        personal_story: bot.story,
+        play_style: "",
+        role: bot.role,
+        werewolf_teammates_section: generateWerewolfTeammatesSection(bot, game),
+        players_names: [
+            ...game.bots
+                .filter(b => b.name !== bot.name)
+                .map(b => b.name),
+            game.humanPlayerName
+        ].join(", "),
+        dead_players_names_with_roles: game.bots
+            .filter(b => !b.isAlive)
+            .map(b => `${b.name} (${b.role})`)
+            .join(", "),
+        previous_day_summaries: generatePreviousDaySummariesSection(bot, game.currentDay)
+    });
+
+    // Add after-game discussion mode instructions if game is over
+    if (game.gameState === GAME_STATES.AFTER_GAME_DISCUSSION) {
+        return basePrompt + BOT_AFTER_GAME_SYSTEM_PROMPT_ADDITION;
+    }
+
+    return basePrompt;
+}
 
 /**
  * Sanitize names for use in message IDs
@@ -234,26 +265,7 @@ async function welcomeImpl(gameId: string): Promise<Game> {
 
         const apiKeys = await getApiKeysForUser(session.user.email);
 
-        const botPrompt = format(BOT_SYSTEM_PROMPT,
-            {
-                name: bot.name,
-                personal_story: bot.story,
-                play_style: "",
-                role: bot.role,
-                werewolf_teammates_section: generateWerewolfTeammatesSection(bot, game),
-                players_names: [
-                    ...game.bots
-                        .filter(b => b.name !== bot.name)
-                        .map(b => b.name),
-                    game.humanPlayerName
-                ].join(", "),
-                dead_players_names_with_roles: game.bots
-                    .filter(b => !b.isAlive)
-                    .map(b => `${b.name} (${b.role})`)
-                    .join(", "),
-                previous_day_summaries: generatePreviousDaySummariesSection(bot, game.currentDay)
-            }
-        );
+        const botPrompt = generateBotSystemPrompt(bot, game);
 
         const agent = AgentFactory.createAgent(bot.name, botPrompt, bot.aiType, apiKeys, false);
 
@@ -395,8 +407,9 @@ async function keepBotsGoingImpl(gameId: string): Promise<Game> {
     await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: game.createdWithTier });
 
     // Validate game state
-    if (game.gameState !== GAME_STATES.DAY_DISCUSSION) {
-        throw new Error('Game is not in DAY_DISCUSSION state');
+    const isAfterGameDiscussion = game.gameState === GAME_STATES.AFTER_GAME_DISCUSSION;
+    if (game.gameState !== GAME_STATES.DAY_DISCUSSION && !isAfterGameDiscussion) {
+        throw new Error('Game is not in DAY_DISCUSSION or AFTER_GAME_DISCUSSION state');
     }
 
     // Only allow if no bots are currently in queue (empty queue means we can start new bot conversation)
@@ -415,10 +428,14 @@ async function keepBotsGoingImpl(gameId: string): Promise<Game> {
         // Ensure day activity counter is initialized for backward compatibility
         await ensureDayActivityCounter(gameId);
 
+        // For after-game discussion, include ALL bots (dead + alive)
+        // For regular discussion, only include alive bots
+        const availableBots = isAfterGameDiscussion ? game.bots : game.bots.filter(b => b.isAlive);
+
         // Use existing activity counter - it's maintained incrementally and only recalculated after resets
         const gmPrompt = format(GM_ROUTER_SYSTEM_PROMPT, {
             players_names: [
-                ...game.bots.map(b => b.name),
+                ...availableBots.map(b => b.name),
                 game.humanPlayerName
             ].join(", "),
             dead_players_names_with_roles: game.bots
@@ -620,24 +637,7 @@ async function processNextBotInQueue(
     // Get bot's response
     const apiKeys = await getApiKeysForUser(userEmail);
 
-    const botPrompt = format(BOT_SYSTEM_PROMPT, {
-        name: bot.name,
-        personal_story: bot.story,
-        play_style: "",
-        role: bot.role,
-        werewolf_teammates_section: generateWerewolfTeammatesSection(bot, game),
-        players_names: [
-            ...game.bots
-                .filter(b => b.name !== bot.name)
-                .map(b => b.name),
-            game.humanPlayerName
-        ].join(", "),
-        dead_players_names_with_roles: game.bots
-            .filter(b => !b.isAlive)
-            .map(b => `${b.name} (${b.role})`)
-            .join(", "),
-        previous_day_summaries: generatePreviousDaySummariesSection(bot, game.currentDay)
-    });
+    const botPrompt = generateBotSystemPrompt(bot, game);
 
     const agent = AgentFactory.createAgent(bot.name, botPrompt, bot.aiType, apiKeys, false);
     // Include the GM command in history with playstyle reminder without saving it yet

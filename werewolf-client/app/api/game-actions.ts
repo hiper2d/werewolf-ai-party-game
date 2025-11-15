@@ -750,32 +750,62 @@ export async function afterGameDiscussion(gameId: string): Promise<Game> {
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
-    
+
     try {
         const gameRef = db.collection('games').doc(gameId);
         const gameSnap = await gameRef.get();
-        
+
         if (!gameSnap.exists) {
             throw new Error('Game not found');
         }
-        
+
         const gameData = gameSnap.data();
+        const game = gameFromFirestore(gameId, gameData);
+
         await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: (gameData?.createdWithTier ?? 'free') });
-        
-        // Update the game state to AFTER_GAME_DISCUSSION
-        await gameRef.update({ 
+
+        // Create Game Master message explaining the after-game discussion phase
+        const allPlayerRoles = [
+            { name: game.humanPlayerName, role: game.humanPlayerRole, isAlive: !game.bots.find(b => b.name === game.humanPlayerName && !b.isAlive) },
+            ...game.bots.map(b => ({ name: b.name, role: b.role, isAlive: b.isAlive }))
+        ];
+
+        const roleReveal = allPlayerRoles
+            .map(p => {
+                const status = p.isAlive ? '✅' : '💀';
+                const roleEmoji = p.role === 'werewolf' ? '🐺' : p.role === 'doctor' ? '🏥' : p.role === 'detective' ? '🔍' : '👤';
+                return `• ${p.name}: ${roleEmoji} **${p.role}** ${status}`;
+            })
+            .join('\n');
+
+        const gmMessage = `🎭 **GAME OVER - POST-GAME DISCUSSION**\n\n` +
+            `The game has ended! All roles are now revealed and everyone (including those who were eliminated) can participate in the discussion.\n\n` +
+            `**Final Roles:**\n${roleReveal}\n\n` +
+            `Feel free to share your experiences, reveal your strategies, discuss close calls, and ask questions about what really happened during the game. This is a time for open and honest reflection!`;
+
+        const gameMessage: GameMessage = {
+            id: null,
+            recipientName: RECIPIENT_ALL,
+            authorName: GAME_MASTER,
+            msg: { story: gmMessage },
+            messageType: MessageType.GAME_STORY,
+            day: game.currentDay,
+            timestamp: Date.now()
+        };
+
+        // Save the Game Master message
+        await addMessageToChatAndSaveToDb(gameMessage, gameId);
+
+        // Update the game state to AFTER_GAME_DISCUSSION with empty queues
+        // (bots will be added to queue when keepBotsGoing is called)
+        await gameRef.update({
             gameState: GAME_STATES.AFTER_GAME_DISCUSSION,
             gameStateProcessQueue: [],
             gameStateParamQueue: []
         });
-        
+
         // Return the updated game
-        return gameFromFirestore(gameId, { 
-            ...gameData, 
-            gameState: GAME_STATES.AFTER_GAME_DISCUSSION,
-            gameStateProcessQueue: [],
-            gameStateParamQueue: []
-        });
+        return await getGame(gameId) as Game;
     } catch (error: any) {
         console.error("Error moving to after game discussion: ", error);
         throw new Error(`Failed to move to after game discussion: ${error.message}`);

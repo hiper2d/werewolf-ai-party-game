@@ -658,7 +658,36 @@ export default function GamePage({
 
                 {(isGameOver || game.gameState === GAME_STATES.DAY_DISCUSSION || game.gameState === GAME_STATES.VOTE_RESULTS || game.gameState === GAME_STATES.NIGHT || game.gameState === GAME_STATES.NIGHT_RESULTS || (game.gameState === GAME_STATES.NEW_DAY_BOT_SUMMARIES && game.gameStateProcessQueue.length > 0)) && (
                     <div className="bg-black bg-opacity-30 border border-white border-opacity-30 rounded p-4 mt-4">
-                    {isGameOver ? (
+                    {game.gameState === GAME_STATES.AFTER_GAME_DISCUSSION ? (
+                        <div className="flex flex-col gap-3">
+                            <div className="text-center">
+                                <h3 className="text-lg font-bold text-blue-400 mb-2">💬 Post-Game Discussion</h3>
+                                <p className="text-xs text-gray-300 mb-2">All roles revealed. Everyone can participate!</p>
+                            </div>
+                            <div className="flex gap-2 justify-center">
+                                <button
+                                    className={`${buttonTransparentStyle} ${game.gameStateProcessQueue.length > 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    disabled={game.gameStateProcessQueue.length > 0}
+                                    onClick={async () => {
+                                        const updatedGame = await runGameAction(() => keepBotsGoing(game.id));
+                                        if (updatedGame) {
+                                            setGame(updatedGame);
+                                        }
+                                    }}
+                                    title={game.gameStateProcessQueue.length > 0 ? 'Bots are already talking' : 'Let 1-3 bots continue the conversation'}
+                                >
+                                    Keep Going
+                                </button>
+                                <button
+                                    className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500`}
+                                    onClick={handleExitGame}
+                                    title="Return to the games list"
+                                >
+                                    Exit Game
+                                </button>
+                            </div>
+                        </div>
+                    ) : isGameOver ? (
                         <div className="text-center">
                             <div className="mb-4">
                                 <h3 className="text-lg font-bold text-red-400 mb-2">🎭 Game Over</h3>

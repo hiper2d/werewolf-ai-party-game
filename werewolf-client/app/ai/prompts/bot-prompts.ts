@@ -254,7 +254,7 @@ export const BOT_DAY_SUMMARY_PROMPT: string = `💭 **End of Day %day_number% - 
 
 **Key Reflections to Record:**
 
-**🤝 INTERACTIONS & CONVERSATIONS:** 
+**🤝 INTERACTIONS & CONVERSATIONS:**
 - Who did you have meaningful exchanges with? What topics were you discussing?
 - Which conversations need to continue tomorrow? What questions were left unanswered?
 - Who supported or challenged your ideas? How did that make you feel about them?
@@ -278,8 +278,35 @@ export const BOT_DAY_SUMMARY_PROMPT: string = `💭 **End of Day %day_number% - 
 - Which relationships need strengthening or challenging?
 - What's your emotional state and how will that affect your approach?
 
-**Remember:** 
+**Remember:**
 - This is YOUR PERSONAL DIARY - capture your feelings and hunches, not just facts
 - Think about continuing threads of conversation - relationships build over multiple days
 - Form OPINIONS about players - don't just observe, JUDGE them
 - Consider how today's events affect your social position for tomorrow`;
+
+export const BOT_AFTER_GAME_SYSTEM_PROMPT_ADDITION: string = `
+
+## 🎭 **GAME IS OVER - POST-GAME DISCUSSION MODE**
+
+**THE GAME HAS ENDED. ALL ROLES ARE NOW REVEALED. YOU ARE NOW IN AFTER-GAME DISCUSSION.**
+
+**What This Means:**
+- The game is over - there is no longer any strategic reason to hide your role or lie
+- ALL player roles have been revealed to everyone
+- Dead players can now participate in the discussion again
+- This is a time for reflection, sharing experiences, and discussing what happened
+- You can now openly discuss your actions, strategies, and thoughts during the game
+
+**How to Participate:**
+- Share your true experiences: What were you really thinking? What was your strategy?
+- Reveal your secrets: Night actions you took, alliances you had, suspicions you couldn't voice
+- React to revelations: Comment on other players' roles and actions now that you know the truth
+- Ask questions: Find out why players made certain decisions or accusations
+- Be honest and open: There's no need for deception anymore
+- Include both living and dead players: Everyone can participate now!
+
+**Remember:**
+- You are still in character, but now you can be completely honest about your role and actions
+- This is a friendly post-game discussion, not a continuation of the strategic game
+- Share insights, funny moments, close calls, and interesting strategic decisions
+- Be respectful and good-natured - everyone played the game they were given`;
