@@ -14,7 +14,7 @@ The game supports all the major latest models for the game master and bots:
 - DeepSeek: `Chat (V3.2)`, `Reasoner (V3.2 with thinking)`
 - Mistral: `Mistral Large 2.1`, `Mistral Medium 3.1`, `Magistral Medium 1.1 (Thinking)`
 - Grok: `Grok-4`
-- Moonshot AI: `Kimi K2`
+- Moonshot AI: `Kimi K2`, `Kimi K2 Thinking`
 
 Most of the models support reasoning which is not visible on UI, but it is stored in DB with every message.
 

@@ -10,7 +10,7 @@ import {
     extractGoogleTokenUsage,
     extractMistralTokenUsage
 } from './token-usage-utils';
-import { MODEL_PRICING } from '../../ai/ai-models';
+import { LLM_CONSTANTS, MODEL_PRICING, SupportedAiModels } from '../../ai/ai-models';
 
 describe('Token Usage Utils', () => {
     describe('extractTokenUsage', () => {
@@ -263,13 +263,20 @@ describe('Token Usage Utils', () => {
     describe('MODEL_PRICING integration', () => {
         it('should have pricing for all supported models', () => {
             const expectedModels = [
-                'gpt-5', 'gpt-5-mini',
-                'deepseek-chat', 'deepseek-reasoner',
-                'kimi-k2-0905-preview',
-                'claude-opus-4-1', 'claude-sonnet-4-5', 'claude-haiku-4-5',
-                'gemini-2.5-pro',
-                'mistral-large-latest', 'mistral-medium-latest', 'magistral-medium-latest',
-                'grok-4'
+                SupportedAiModels[LLM_CONSTANTS.GPT_5].modelApiName,
+                SupportedAiModels[LLM_CONSTANTS.GPT_5_MINI].modelApiName,
+                SupportedAiModels[LLM_CONSTANTS.DEEPSEEK_CHAT].modelApiName,
+                SupportedAiModels[LLM_CONSTANTS.DEEPSEEK_REASONER].modelApiName,
+                SupportedAiModels[LLM_CONSTANTS.KIMI_K2].modelApiName,
+                SupportedAiModels[LLM_CONSTANTS.KIMI_K2_THINKING].modelApiName,
+                SupportedAiModels[LLM_CONSTANTS.CLAUDE_4_OPUS].modelApiName,
+                SupportedAiModels[LLM_CONSTANTS.CLAUDE_4_SONNET].modelApiName,
+                SupportedAiModels[LLM_CONSTANTS.CLAUDE_4_HAIKU].modelApiName,
+                SupportedAiModels[LLM_CONSTANTS.GEMINI_25_PRO].modelApiName,
+                SupportedAiModels[LLM_CONSTANTS.MISTRAL_2_LARGE].modelApiName,
+                SupportedAiModels[LLM_CONSTANTS.MISTRAL_3_MEDIUM].modelApiName,
+                SupportedAiModels[LLM_CONSTANTS.MISTRAL_MAGISTRAL].modelApiName,
+                SupportedAiModels[LLM_CONSTANTS.GROK_4].modelApiName,
             ];
 
             expectedModels.forEach(model => {

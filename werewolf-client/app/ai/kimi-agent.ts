@@ -49,17 +49,20 @@ export class KimiAgent extends AbstractAgent {
         }));
     }
 
-    private processReply(completion: OpenAI.Chat.Completions.ChatCompletion): [string, string, TokenUsage?] {
-        const reply = completion.choices[0]?.message?.content;
+    private extractThinkingAndUsage(
+        completion: OpenAI.Chat.Completions.ChatCompletion
+    ): { thinkingContent: string; tokenUsage?: TokenUsage } {
+        let thinkingContent = "";
+        const message = completion.choices[0]?.message as any;
 
-        if (!reply) {
-            throw new Error(this.errorMessages.emptyResponse);
+        if (this.enableThinking && message?.reasoning_content) {
+            thinkingContent = message.reasoning_content;
+            this.logger(`Captured reasoning_content (${thinkingContent.length} characters)`);
         }
 
-        // Extract token usage and calculate cost
-        const usageResult = extractUsageAndCalculateCost(this.model, completion);
         let tokenUsage: TokenUsage | undefined;
-        
+        const usageResult = extractUsageAndCalculateCost(this.model, completion);
+
         if (usageResult) {
             tokenUsage = {
                 inputTokens: usageResult.usage.promptTokens,
@@ -67,9 +70,17 @@ export class KimiAgent extends AbstractAgent {
                 totalTokens: usageResult.usage.totalTokens,
                 costUSD: usageResult.cost
             };
+
+            if (this.enableThinking && usageResult.usage.reasoningTokens) {
+                const reasoningTokens = usageResult.usage.reasoningTokens;
+                const finalAnswerTokens = Math.max(0, tokenUsage.outputTokens - reasoningTokens);
+                this.logger(
+                    `Output breakdown: ${reasoningTokens} reasoning tokens, ${finalAnswerTokens} final answer tokens`
+                );
+            }
         }
 
-        return [cleanResponse(reply), "", tokenUsage];
+        return { thinkingContent, tokenUsage };
     }
 
     /**
@@ -139,20 +150,9 @@ export class KimiAgent extends AbstractAgent {
 
                 this.logger(`✅ Response validated successfully with Zod schema (JSON mode)`);
 
-                // Extract token usage
-                const usageResult = extractUsageAndCalculateCost(this.model, completion);
-                let tokenUsage: TokenUsage | undefined;
-                
-                if (usageResult) {
-                    tokenUsage = {
-                        inputTokens: usageResult.usage.promptTokens,
-                        outputTokens: usageResult.usage.completionTokens,
-                        totalTokens: usageResult.usage.totalTokens,
-                        costUSD: usageResult.cost
-                    };
-                }
+                const { thinkingContent, tokenUsage } = this.extractThinkingAndUsage(completion);
 
-                return [validationResult.data, "", tokenUsage];
+                return [validationResult.data, thinkingContent, tokenUsage];
 
             } catch (jsonModeError) {
                 // If JSON mode fails, fall back to prompt-based schema
@@ -200,20 +200,9 @@ export class KimiAgent extends AbstractAgent {
 
                 this.logger(`✅ Response validated successfully with Zod schema (prompt mode)`);
 
-                // Extract token usage
-                const usageResult = extractUsageAndCalculateCost(this.model, completion);
-                let tokenUsage: TokenUsage | undefined;
-                
-                if (usageResult) {
-                    tokenUsage = {
-                        inputTokens: usageResult.usage.promptTokens,
-                        outputTokens: usageResult.usage.completionTokens,
-                        totalTokens: usageResult.usage.totalTokens,
-                        costUSD: usageResult.cost
-                    };
-                }
+                const { thinkingContent, tokenUsage } = this.extractThinkingAndUsage(completion);
 
-                return [validationResult.data, "", tokenUsage];
+                return [validationResult.data, thinkingContent, tokenUsage];
             }
 
         } catch (error) {

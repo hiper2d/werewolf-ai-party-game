@@ -83,7 +83,7 @@ Output example:
 | `DEEPSEEK_API_KEY` | DeepSeek | DeepSeek Chat, DeepSeek Reasoner |
 | `MISTRAL_API_KEY` | Mistral | Mistral Large, Mistral Medium, Magistral |
 | `GROK_API_KEY` | xAI | Grok 4 |
-| `MOONSHOT_API_KEY` | Moonshot AI | Kimi K2 |
+| `MOONSHOT_API_KEY` | Moonshot AI | Kimi K2, Kimi K2 Thinking |
 
 ## Security Best Practices
 

@@ -96,6 +96,13 @@ describe('Kimi Pricing Utils', () => {
             expect(cost).toBe(0);
         });
 
+        it('should calculate cost for kimi-k2-thinking model', () => {
+            // kimi-k2-thinking shares pricing with kimi-k2-0905-preview per Moonshot docs
+            const cost = calculateKimiCost('kimi-k2-thinking', 2500, 1000);
+            const expected = (2500 * 0.6 / 1_000_000) + (1000 * 2.50 / 1_000_000);
+            expect(cost).toBeCloseTo(expected, 5);
+        });
+
         it('should calculate fractional token costs correctly', () => {
             const cost = calculateKimiCost('kimi-k2-0905-preview', 333, 777);
             
@@ -120,6 +127,11 @@ describe('Kimi Pricing Utils', () => {
             expect(MODEL_PRICING['kimi-k2-0905-preview'].inputPrice).toBe(0.6);
             expect(MODEL_PRICING['kimi-k2-0905-preview'].outputPrice).toBe(2.50);
             expect(MODEL_PRICING['kimi-k2-0905-preview'].cacheHitPrice).toBe(0.15);
+
+            expect(MODEL_PRICING['kimi-k2-thinking']).toBeDefined();
+            expect(MODEL_PRICING['kimi-k2-thinking'].inputPrice).toBe(0.6);
+            expect(MODEL_PRICING['kimi-k2-thinking'].outputPrice).toBe(2.50);
+            expect(MODEL_PRICING['kimi-k2-thinking'].cacheHitPrice).toBe(0.15);
         });
     });
 });

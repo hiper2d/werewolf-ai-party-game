@@ -45,6 +45,7 @@ export const LLM_CONSTANTS = {
     MISTRAL_MAGISTRAL: 'Magistral Medium 1.1 (Thinking)',
     GROK_4: 'Grok 4',
     KIMI_K2: 'Kimi K2',
+    KIMI_K2_THINKING: 'Kimi K2 Thinking',
     RANDOM: 'Random',
 }
 
@@ -226,11 +227,20 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         }
     },
 
-    // Models without reasoning
+    // Kimi models
     [LLM_CONSTANTS.KIMI_K2]: {
         modelApiName: 'kimi-k2-0905-preview',
         apiKeyName: API_KEY_CONSTANTS.MOONSHOT,
         hasThinking: false,
+        freeTier: {
+            available: true,
+            maxBotsPerGame: -1
+        }
+    },
+    [LLM_CONSTANTS.KIMI_K2_THINKING]: {
+        modelApiName: 'kimi-k2-thinking',
+        apiKeyName: API_KEY_CONSTANTS.MOONSHOT,
+        hasThinking: true,
         freeTier: {
             available: true,
             maxBotsPerGame: -1
@@ -290,6 +300,11 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
     
     // Kimi/Moonshot models
     [SupportedAiModels[LLM_CONSTANTS.KIMI_K2].modelApiName]: {
+        inputPrice: 0.6,
+        outputPrice: 2.50,
+        cacheHitPrice: 0.15
+    },
+    [SupportedAiModels[LLM_CONSTANTS.KIMI_K2_THINKING].modelApiName]: {
         inputPrice: 0.6,
         outputPrice: 2.50,
         cacheHitPrice: 0.15

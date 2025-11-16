@@ -1,15 +1,17 @@
-# Use kimi-thinking-preview Model
+# Use kimi-k2-thinking Model
 
-The kimi-thinking-preview model is a multimodal reasoning model with both multimodal and general reasoning capabilities provided by Moonshot AI. It is great at diving deep into problems to help tackle more complex challenges. If you run into tough coding issues, math problems, or work-related dilemmas, the kimi-thinking-preview model can be a helpful tool to turn to.
+The kimi-k2-thinking model is a multimodal reasoning model with both multimodal and general reasoning capabilities provided by Moonshot AI. It is great at diving deep into problems to help tackle more complex challenges. If you run into tough coding issues, math problems, or work-related dilemmas, the kimi-k2-thinking model can be a helpful tool to turn to.
 
-The kimi-thinking-preview model is the newest in the k-series of thinking models. You can easily start using it by simply switching the model to this one：
+> Pricing (Moonshot AI, [Model Inference Pricing Explanation](https://platform.moonshot.ai/docs/pricing/chat), November 11, 2025 update): cache-hit input tokens cost **$0.15 per 1M**, cache-miss input tokens cost **$0.60 per 1M**, and output tokens cost **$2.50 per 1M**.
+
+The kimi-k2-thinking model is the newest in the k-series of thinking models. You can easily start using it by simply switching the model to this one：
 
 ```bash
 $ curl https://api.moonshot.ai/v1/chat/completions \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $MOONSHOT_API_KEY" \
     -d '{
-        "model": "kimi-thinking-preview",
+        "model": "kimi-k2-thinking",
         "messages": [
             {"role": "user", "content": "Hi"}
         ]
@@ -18,7 +20,7 @@ $ curl https://api.moonshot.ai/v1/chat/completions \
     "id": "chatcmpl-6810567267ee141b4630dccb",
     "object": "chat.completion",
     "created": 1745901170,
-    "model": "kimi-thinking-preview",
+    "model": "kimi-k2-thinking",
     "choices":
     [
         {
@@ -51,7 +53,7 @@ client = openai.Client(
 )
  
 stream = client.chat.completions.create(
-    model="kimi-thinking-preview",
+    model="kimi-k2-thinking",
     messages=[
         {
             "role": "system",
@@ -85,7 +87,7 @@ for chunk in stream:
             print(choice.delta.content, end="") 
 ```
 
-We've noticed that when working with the kimi-thinking-preview model, our API responses use the reasoning_content field to show the model's thinking process. Here's what you need to know about the reasoning_content field:
+We've noticed that when working with the kimi-k2-thinking model, our API responses use the reasoning_content field to show the model's thinking process. Here's what you need to know about the reasoning_content field:
 - The OpenAI SDK's ChoiceDelta and ChatCompletionMessage types don't include a reasoning_content field. So, you can't directly access it using .reasoning_content. Instead, check if the field exists with hasattr(obj, "reasoning_content"). If it does, use getattr(obj, "reasoning_content") to get its value.
 - If you're using other frameworks or directly integrating via HTTP interfaces, you can directly access the reasoning_content field. It's at the same level as the content field.
 - In streaming output scenarios (stream=True), the reasoning_content field will always come before the content field. You can tell if the thinking process (or reasoning) is done by checking if the content field has appeared in your code.
@@ -93,7 +95,7 @@ We've noticed that when working with the kimi-thinking-preview model, our API re
 
 ## Multi-turn Conversation
 
-When using kimi-thinking-preview for multi-turn conversations, the thought process doesn't need to be included in the model's request context. We'll show how to properly use kimi-thinking-preview for multi-turn conversations through the following example:：
+When using kimi-k2-thinking for multi-turn conversations, the thought process doesn't need to be included in the model's request context. We'll show how to properly use kimi-k2-thinking for multi-turn conversations through the following example:：
 
 ```bash
 import os
@@ -117,7 +119,7 @@ messages.append({
     "content": "Explain 1+1=2。"
 })
 completion = client.chat.completions.create(
-    model="kimi-thinking-preview",
+    model="kimi-k2-thinking",
     messages=messages,
     max_tokens=1024 * 32,
 )
@@ -141,7 +143,7 @@ messages.append({
     "content": "I don't understand.",
 })
 completion = client.chat.completions.create(
-    model="kimi-thinking-preview",
+    model="kimi-k2-thinking",
     messages=messages,
     max_tokens=1024 * 32,
 )
@@ -158,4 +160,3 @@ print(message.content)
 Note: If you accidentally include the reasoning_content field in the context, no need to stress. The content of reasoning_content won't count towards the Tokens usage.
 
 ## Model Limitations
-

@@ -56,6 +56,7 @@ export class AgentFactory {
             case LLM_CONSTANTS.MISTRAL_MAGISTRAL:
                 return new MistralAgent(name, instruction, model.modelApiName, key, shouldEnableThinking);
             case LLM_CONSTANTS.KIMI_K2:
+            case LLM_CONSTANTS.KIMI_K2_THINKING:
                 return new KimiAgent(name, instruction, model.modelApiName, key, 0.6, shouldEnableThinking);
             default:
                 throw new Error(`Unknown Key: ${modelName}`);
