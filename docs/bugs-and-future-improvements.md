@@ -2,6 +2,7 @@
 
 - Detective doesn't understand that they revealed a wolf. Need to inject this info more directly into some bots fields or append to summary
 - No need to keep summaries from all days - regenerating summary should be enough
+- The post game discussion needs some changes from the game: killed bots should also summarize so they know what is going on?
 - Summaries seems to be detouched from roles. Bots summarize their day activities but there should be foes and friends with respect of roles as well.
 - The previous days should include role messages in the human player can see them
 - When night starts, the Game Master's messages should tell the human player what to do then it's their turn

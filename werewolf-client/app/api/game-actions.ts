@@ -766,20 +766,20 @@ export async function afterGameDiscussion(gameId: string): Promise<Game> {
 
         // Create Game Master message explaining the after-game discussion phase
         const allPlayerRoles = [
-            { name: game.humanPlayerName, role: game.humanPlayerRole, isAlive: !game.bots.find(b => b.name === game.humanPlayerName && !b.isAlive) },
-            ...game.bots.map(b => ({ name: b.name, role: b.role, isAlive: b.isAlive }))
+            { name: game.humanPlayerName, role: game.humanPlayerRole, wasEliminated: false },
+            ...game.bots.map(b => ({ name: b.name, role: b.role, wasEliminated: !b.isAlive }))
         ];
 
         const roleReveal = allPlayerRoles
             .map(p => {
-                const status = p.isAlive ? '✅' : '💀';
+                const eliminatedNote = p.wasEliminated ? ' (was eliminated)' : '';
                 const roleEmoji = p.role === 'werewolf' ? '🐺' : p.role === 'doctor' ? '🏥' : p.role === 'detective' ? '🔍' : '👤';
-                return `• ${p.name}: ${roleEmoji} **${p.role}** ${status}`;
+                return `• ${p.name}: ${roleEmoji} **${p.role}**${eliminatedNote}`;
             })
             .join('\n');
 
         const gmMessage = `🎭 **GAME OVER - POST-GAME DISCUSSION**\n\n` +
-            `The game has ended! All roles are now revealed and everyone (including those who were eliminated) can participate in the discussion.\n\n` +
+            `The game has ended! All roles are now revealed and **everyone** (including those who were eliminated) can participate in the discussion.\n\n` +
             `**Final Roles:**\n${roleReveal}\n\n` +
             `Feel free to share your experiences, reveal your strategies, discuss close calls, and ask questions about what really happened during the game. This is a time for open and honest reflection!`;
 
@@ -796,12 +796,19 @@ export async function afterGameDiscussion(gameId: string): Promise<Game> {
         // Save the Game Master message
         await addMessageToChatAndSaveToDb(gameMessage, gameId);
 
-        // Update the game state to AFTER_GAME_DISCUSSION with empty queues
+        // Reset all bots to alive status for after-game discussion
+        const revivedBots = game.bots.map(bot => ({
+            ...bot,
+            isAlive: true
+        }));
+
+        // Update the game state to AFTER_GAME_DISCUSSION with empty queues and revived bots
         // (bots will be added to queue when keepBotsGoing is called)
         await gameRef.update({
             gameState: GAME_STATES.AFTER_GAME_DISCUSSION,
             gameStateProcessQueue: [],
-            gameStateParamQueue: []
+            gameStateParamQueue: [],
+            bots: revivedBots
         });
 
         // Return the updated game

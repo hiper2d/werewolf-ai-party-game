@@ -489,10 +489,10 @@ export default function GamePage({
             case GAME_STATES.AFTER_GAME_DISCUSSION:
                 return {
                     title: "💬 After Game Discussion",
-                    description: "Discussing the game after it has ended",
-                    items: [],
-                    currentItem: null,
-                    showProgress: false
+                    description: processQueue.length > 0 ? "Bots will talk in this order:" : "No bots thinking currently",
+                    items: processQueue,
+                    currentItem: processQueue[0] || null,
+                    showProgress: processQueue.length > 0
                 };
             default:
                 return {

@@ -431,20 +431,21 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
             timestamp: new Date().toISOString()
         });
 
-        // Auto-process DAY_DISCUSSION queue
-        if (game.gameState === GAME_STATES.DAY_DISCUSSION &&
+        // Auto-process DAY_DISCUSSION and AFTER_GAME_DISCUSSION queue
+        if ((game.gameState === GAME_STATES.DAY_DISCUSSION || game.gameState === GAME_STATES.AFTER_GAME_DISCUSSION) &&
             game.gameStateProcessQueue.length > 0 &&
             !isProcessing &&
             !game.errorState) {
-            console.log('🚨 CALLING TALK_TO_ALL API - This could be the loop source!', {
+            console.log('🚨 CALLING TALK_TO_ALL API', {
                 gameId,
+                gameState: game.gameState,
                 queue: game.gameStateProcessQueue
             });
             const processQueue = async () => {
                 setIsProcessing(true);
                 const updatedGame = await talkToAll(gameId, '');
                 console.log('✅ TalkToAll API completed');
-                
+
                 // Update parent game state to clear the queue
                 if (onGameStateChange) {
                     console.log('🔄 UPDATING PARENT GAME STATE after auto-processing...');
@@ -943,7 +944,14 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
         if (isRecording || isTranscribing) {
             return false;
         }
-        
+
+        // After game discussion - allow chat at all times
+        if (game.gameState === GAME_STATES.AFTER_GAME_DISCUSSION &&
+            !isProcessing &&
+            !isDeleting) {
+            return true;
+        }
+
         // Day discussion - normal chat when no queue processing
         if (game.gameState === GAME_STATES.DAY_DISCUSSION &&
             game.gameStateProcessQueue.length === 0 &&
@@ -951,21 +959,21 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
             !isDeleting) {
             return true;
         }
-        
+
         // Night phase - enable chat for human werewolf coordination
         if (game.gameState === GAME_STATES.NIGHT &&
             game.gameStateProcessQueue.length > 0 &&
             game.gameStateParamQueue.length > 1 && // Multiple players in queue means coordination phase
             !isProcessing &&
             !isDeleting) {
-            
+
             const currentRole = game.gameStateProcessQueue[0];
             const currentPlayer = game.gameStateParamQueue[0];
-            
+
             // Enable if it's the human player's role and they're first in param queue
             return currentRole === game.humanPlayerRole && currentPlayer === game.humanPlayerName;
         }
-        
+
         return false;
     };
 
@@ -974,17 +982,17 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
         if (!isCurrentDaySelected) {
             return false;
         }
-        // Disable during game over
+        // Disable during game over (but allow during after-game discussion)
         if (game.gameState === GAME_STATES.GAME_OVER) {
             return false;
         }
-        
+
         // Disable during any active requests (voting, processing, deleting, etc.)
         if (isProcessing || isDeleting || isVoting || isPerformingNightAction || isGettingSuggestion) {
             return false;
         }
-        
-        // Allow microphone during day discussion, voting, night phases, etc.
+
+        // Allow microphone during day discussion, after-game discussion, voting, night phases, etc.
         return true;
     };
 
@@ -999,7 +1007,14 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
         if (isTranscribing) {
             return "✨ Transcribing audio, please wait...";
         }
-        
+
+        if (game.gameState === GAME_STATES.AFTER_GAME_DISCUSSION) {
+            if (isProcessing || game.gameStateProcessQueue.length > 0) {
+                const currentBot = game.gameStateProcessQueue[0];
+                return `Waiting for ${currentBot || 'bots'} to respond...`;
+            }
+            return "Share your thoughts about the game...";
+        }
         if (game.gameState === GAME_STATES.GAME_OVER) {
             return "Game has ended - chat disabled";
         }
@@ -1007,15 +1022,15 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
             if (game.gameStateProcessQueue.length > 0) {
                 const currentRole = game.gameStateProcessQueue[0];
                 const currentPlayer = game.gameStateParamQueue.length > 0 ? game.gameStateParamQueue[0] : null;
-                
+
                 // Check if it's werewolf coordination phase for human player
-                if (currentRole === game.humanPlayerRole && 
+                if (currentRole === game.humanPlayerRole &&
                     currentPlayer === game.humanPlayerName &&
                     currentRole === GAME_ROLES.WEREWOLF &&
                     game.gameStateParamQueue.length > 1) {
                     return "Coordinate with other werewolves...";
                 }
-                
+
                 // Capitalize the role name for display
                 const displayRole = currentRole.charAt(0).toUpperCase() + currentRole.slice(1);
                 return `Night phase: ${displayRole} is taking action...`;

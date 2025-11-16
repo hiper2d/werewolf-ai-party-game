@@ -365,9 +365,10 @@ async function talkToAllImpl(gameId: string, userMessage: string): Promise<Game>
 
     await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: game.createdWithTier });
 
-    // Validate game state
-    if (game.gameState !== GAME_STATES.DAY_DISCUSSION) {
-        throw new Error('Game is not in DAY_DISCUSSION state');
+    // Validate game state - allow both DAY_DISCUSSION and AFTER_GAME_DISCUSSION
+    const isAfterGameDiscussion = game.gameState === GAME_STATES.AFTER_GAME_DISCUSSION;
+    if (game.gameState !== GAME_STATES.DAY_DISCUSSION && !isAfterGameDiscussion) {
+        throw new Error('Game is not in DAY_DISCUSSION or AFTER_GAME_DISCUSSION state');
     }
 
     try {
