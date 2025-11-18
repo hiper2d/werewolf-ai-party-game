@@ -170,13 +170,20 @@ export function extractGoogleTokenUsage(response: any): TokenUsage | null {
     if (!response?.usageMetadata) {
         return null;
     }
-    
+
     const usage = response.usageMetadata;
-    return {
+    const result: TokenUsage = {
         promptTokens: usage.promptTokenCount || 0,
         completionTokens: usage.candidatesTokenCount || 0,
         totalTokens: usage.totalTokenCount || 0
     };
+
+    // Extract cache hit tokens if available
+    if (usage.cachedContentTokenCount !== undefined) {
+        result.cacheHitTokens = usage.cachedContentTokenCount;
+    }
+
+    return result;
 }
 
 /**

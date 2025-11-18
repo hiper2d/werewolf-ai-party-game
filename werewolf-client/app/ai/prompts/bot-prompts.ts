@@ -273,6 +273,12 @@ export const BOT_DAY_SUMMARY_PROMPT: string = `💭 **End of Day %day_number% - 
 - What happened during the night and how does it change the social landscape?
 - Who might be grieving, scared, or emboldened by the night's events?
 
+**🔮 ROLE-SPECIFIC KNOWLEDGE (CRITICAL - RECORD THIS!):**
+- **IF YOU ARE A DETECTIVE:** What did you learn from your investigation? How does this change your understanding of who is trustworthy? Who should you investigate next and why?
+- **IF YOU ARE A WEREWOLF:** What did you and your werewolf teammates discuss during the night? What's your coordinated strategy moving forward? How are you dividing responsibilities (who deflects suspicion, who stays quiet, who leads discussions)?
+- **IF YOU ARE A DOCTOR:** Who did you protect and why? Who seems most at risk? What's your protection strategy for upcoming nights?
+- **IF YOU ARE A VILLAGER:** What clues or patterns have you noticed? Who should the village be watching closely?
+
 **🎯 YOUR PERSONAL AGENDA:**
 - What specific conversations or confrontations do you need to have tomorrow?
 - Which relationships need strengthening or challenging?
@@ -282,7 +288,8 @@ export const BOT_DAY_SUMMARY_PROMPT: string = `💭 **End of Day %day_number% - 
 - This is YOUR PERSONAL DIARY - capture your feelings and hunches, not just facts
 - Think about continuing threads of conversation - relationships build over multiple days
 - Form OPINIONS about players - don't just observe, JUDGE them
-- Consider how today's events affect your social position for tomorrow`;
+- Consider how today's events affect your social position for tomorrow
+- **RECORD YOUR ROLE-SPECIFIC KNOWLEDGE** - this is critical for maintaining continuity of your secret information across days`;
 
 export const BOT_AFTER_GAME_SYSTEM_PROMPT_ADDITION: string = `
 

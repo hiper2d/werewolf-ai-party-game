@@ -151,8 +151,9 @@ function renderMessage(message: GameMessage, gameId: string, onDeleteAfter: (mes
                 break;
             }
             case MessageType.DETECTIVE_ACTION: {
-                const detectiveAction = message.msg as { target: string; reasoning: string };
-                displayContent = `🔍 Investigated ${detectiveAction.target}. Reasoning: ${detectiveAction.reasoning}`;
+                const detectiveAction = message.msg as { target: string; reasoning: string; result?: string };
+                const resultText = detectiveAction.result ? ` ${detectiveAction.result}` : '';
+                displayContent = `🔍 Investigated ${detectiveAction.target}. Reasoning: ${detectiveAction.reasoning}.${resultText}`;
                 break;
             }
             case MessageType.GM_COMMAND:

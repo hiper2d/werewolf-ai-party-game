@@ -82,6 +82,16 @@ export class GoogleAgent extends AbstractAgent {
         });
     }
 
+    private calculateCostWithCacheHits(inputTokens: number, outputTokens: number, totalTokens: number, cacheHitTokens: number): number {
+        const contextTokens = this.deriveContextTokens(inputTokens, outputTokens, totalTokens);
+
+        return calculateGoogleCost(this.model, inputTokens, outputTokens, {
+            contextTokens,
+            totalTokens,
+            cacheHitTokens
+        });
+    }
+
     private deriveContextTokens(inputTokens: number, outputTokens: number, totalTokens: number): number {
         if (!totalTokens) {
             return inputTokens;
@@ -154,10 +164,11 @@ export class GoogleAgent extends AbstractAgent {
                 const inputTokens = usageMetadata.promptTokenCount || 0;
                 const outputTokens = usageMetadata.candidatesTokenCount || 0;
                 const totalTokens = usageMetadata.totalTokenCount || 0;
-                
-                // Calculate cost using the pricing utility
-                const costUSD = this.calculateCost(inputTokens, outputTokens, totalTokens);
-                
+                const cacheHitTokens = usageMetadata.cachedContentTokenCount || 0;
+
+                // Calculate cost using the pricing utility with cache hit tokens
+                const costUSD = this.calculateCostWithCacheHits(inputTokens, outputTokens, totalTokens, cacheHitTokens);
+
                 tokenUsage = {
                     inputTokens,
                     outputTokens,
