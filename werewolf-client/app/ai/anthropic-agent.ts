@@ -143,6 +143,8 @@ export class ClaudeAgent extends AbstractAgent {
                 throw new Error(this.errorMessages.invalidFormat);
             }
 
+            this.logReply(textContent);
+
             // Parse and validate the response using Zod
             let parsedContent: unknown;
             try {

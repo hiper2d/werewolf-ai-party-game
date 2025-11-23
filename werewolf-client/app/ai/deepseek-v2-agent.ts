@@ -143,6 +143,8 @@ export class DeepSeekV2Agent extends AbstractAgent {
                 throw new Error(this.errorMessages.emptyResponse);
             }
 
+            this.logReply(content);
+
             // Parse and validate the response using Zod
             let parsedContent: unknown;
             try {

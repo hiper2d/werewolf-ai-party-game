@@ -63,6 +63,10 @@ export class Gpt5Agent extends AbstractAgent {
                 throw new Error(this.errorMessages.invalidFormat);
             }
 
+            if (response.output_text) {
+                this.logReply(response.output_text);
+            }
+
             this.logger(`✅ Response validated successfully with Zod schema`);
 
             // Extract reasoning content from output if available

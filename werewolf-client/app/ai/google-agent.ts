@@ -180,6 +180,10 @@ export class GoogleAgent extends AbstractAgent {
 
             this.logger(`Zod schema response received - hasText: ${!!response.text}, textLength: ${response.text ? response.text.length : 0}`);
 
+            if (response.text) {
+                this.logReply(response.text);
+            }
+
             if (!response.text) {
                 throw new Error(this.errorMessages.emptyResponse);
             }
@@ -187,7 +191,15 @@ export class GoogleAgent extends AbstractAgent {
             // Parse and validate the response using Zod
             let parsedContent: unknown;
             try {
-                const cleanedResponse = cleanResponse(response.text);
+                let cleanedResponse = cleanResponse(response.text);
+
+                // Fix: Gemini sometimes returns the JSON string wrapped in quotes
+                if (cleanedResponse.startsWith('"') && cleanedResponse.endsWith('"')) {
+                    cleanedResponse = cleanedResponse.slice(1, -1);
+                    // Also unescape escaped quotes if necessary
+                    cleanedResponse = cleanedResponse.replace(/\\"/g, '"');
+                }
+
                 parsedContent = JSON.parse(cleanedResponse);
             } catch (parseError) {
                 throw new Error(`Failed to parse JSON response: ${parseError}`);

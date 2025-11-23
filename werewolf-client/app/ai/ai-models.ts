@@ -45,6 +45,7 @@ export const LLM_CONSTANTS = {
     MISTRAL_3_MEDIUM: 'Mistral Medium 3.1',
     MISTRAL_MAGISTRAL: 'Magistral Medium 1.1 (Thinking)',
     GROK_4: 'Grok 4',
+    GROK_4_1_FAST_REASONING: 'Grok 4.1 Fast Reasoning',
     KIMI_K2: 'Kimi K2',
     KIMI_K2_THINKING: 'Kimi K2 Thinking',
     RANDOM: 'Random',
@@ -207,6 +208,15 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
             maxBotsPerGame: 1
         }
     },
+    [LLM_CONSTANTS.GROK_4_1_FAST_REASONING]: {
+        modelApiName: 'grok-4-1-fast-reasoning',
+        apiKeyName: API_KEY_CONSTANTS.GROK,
+        hasThinking: true,
+        freeTier: {
+            available: true,
+            maxBotsPerGame: -1 // Very affordable
+        }
+    },
 
     // Mistral models
     [LLM_CONSTANTS.MISTRAL_2_LARGE]: {
@@ -295,7 +305,7 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
         outputPrice: 2.000,
         cacheHitPrice: 0.025
     },
-    
+
     // DeepSeek models (both models have the same pricing)
     [SupportedAiModels[LLM_CONSTANTS.DEEPSEEK_CHAT].modelApiName]: {
         inputPrice: 0.28,
@@ -307,7 +317,7 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
         outputPrice: 1.68,
         cacheHitPrice: 0.028
     },
-    
+
     // Kimi/Moonshot models
     [SupportedAiModels[LLM_CONSTANTS.KIMI_K2].modelApiName]: {
         inputPrice: 0.6,
@@ -319,7 +329,7 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
         outputPrice: 2.50,
         cacheHitPrice: 0.15
     },
-    
+
     // Anthropic models
     [SupportedAiModels[LLM_CONSTANTS.CLAUDE_4_OPUS].modelApiName]: {
         inputPrice: 15.0,
@@ -334,7 +344,7 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
         outputPrice: 5.0,
         cacheHitPrice: 0.10
     },
-    
+
     // Google models
     [SupportedAiModels[LLM_CONSTANTS.GEMINI_25_PRO].modelApiName]: {
         inputPrice: 1.25,
@@ -368,12 +378,16 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
         inputPrice: 2.0,
         outputPrice: 5.0
     },
-    
+
     // Grok models (placeholder pricing)
     [SupportedAiModels[LLM_CONSTANTS.GROK_4].modelApiName]: {
         inputPrice: 3.0,
         outputPrice: 15.0,
         cacheHitPrice: 0.75
+    },
+    [SupportedAiModels[LLM_CONSTANTS.GROK_4_1_FAST_REASONING].modelApiName]: {
+        inputPrice: 0.20,
+        outputPrice: 0.50
     }
 };
 
@@ -440,7 +454,7 @@ export function calculateModelCost(
 /**
  * Returns all models available for free tier users
  */
-export function getFreeTierModels(): Array<{modelName: string; config: ModelConfig}> {
+export function getFreeTierModels(): Array<{ modelName: string; config: ModelConfig }> {
     return Object.entries(SupportedAiModels)
         .filter(([_, config]) => config.freeTier?.available)
         .map(([modelName, config]) => ({ modelName, config }));

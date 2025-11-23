@@ -1,10 +1,11 @@
-import { AbstractAgent } from "@/app/ai/abstract-agent";
-import { OpenAI } from "openai";
-import { zodResponseFormat } from "openai/helpers/zod";
-import { AIMessage, TokenUsage } from "@/app/api/game-models";
-import { cleanResponse } from "@/app/utils/message-utils";
-import { calculateGrokCost } from "@/app/utils/pricing";
-import { z } from 'zod';
+import {AbstractAgent} from "@/app/ai/abstract-agent";
+import {OpenAI} from "openai";
+import {AIMessage, TokenUsage} from "@/app/api/game-models";
+import {cleanResponse} from "@/app/utils/message-utils";
+import {calculateGrokCost} from "@/app/utils/pricing";
+import {z} from 'zod';
+import {ZodSchemaConverter} from './zod-schema-converter';
+import {safeValidateResponse} from './prompts/zod-schemas';
 
 export class GrokAgent extends AbstractAgent {
     private readonly client: OpenAI;
@@ -12,6 +13,9 @@ export class GrokAgent extends AbstractAgent {
         model: this.model,
         temperature: this.temperature,
         stream: false,
+        // Request encrypted content for Grok 4 models if thinking is enabled
+        // @ts-ignore - xAI specific parameter
+        use_encrypted_content: this.enableThinking,
     };
 
     // Log message templates
@@ -47,55 +51,16 @@ export class GrokAgent extends AbstractAgent {
         }));
     }
 
-    private processReply(completion: OpenAI.Chat.Completions.ChatCompletion): [string, string, TokenUsage?] {
-        const reply = completion.choices[0]?.message?.content;
-        const message = completion.choices[0]?.message;
-
-        // Debug: Log the entire message structure
-        this.logger(`Grok Agent - Full message structure: ${JSON.stringify(message, null, 2)}`);
-
-        // Extract reasoning content if available (grok-4 is reasoning-only)
-        const reasoningContent: string = (message as any)?.reasoning_content || "";
-
-        this.logger(`Grok Agent - Found reasoning_content: ${!!reasoningContent}, length: ${reasoningContent.length}`);
-
-        if (!reply) {
-            throw new Error(this.errorMessages.emptyResponse);
-        }
-
-        // Extract token usage information
-        let tokenUsage: TokenUsage | undefined;
-        if (completion.usage) {
-            const cost = calculateGrokCost(
-                this.model,
-                completion.usage.prompt_tokens || 0,
-                completion.usage.completion_tokens || 0
-            );
-
-            tokenUsage = {
-                inputTokens: completion.usage.prompt_tokens || 0,
-                outputTokens: completion.usage.completion_tokens || 0,
-                totalTokens: completion.usage.total_tokens || 0,
-                costUSD: cost
-            };
-
-            // Log reasoning token breakdown if available and thinking is enabled
-            if (this.enableThinking && (completion.usage as any).completion_tokens_details?.reasoning_tokens) {
-                const reasoningTokens = (completion.usage as any).completion_tokens_details.reasoning_tokens;
-                const finalAnswerTokens = tokenUsage.outputTokens - reasoningTokens;
-                this.logger(`Output breakdown: ${reasoningTokens} reasoning tokens, ${finalAnswerTokens} final answer tokens`);
-            }
-        }
-
-        return [cleanResponse(reply), reasoningContent, tokenUsage];
-    }
-
     /**
      * Structured output implementation for Grok-4 using the official xAI API
-     * Uses client.chat.completions.parse() with zodResponseFormat
+     * Uses json_object mode with prompt augmentation for better compatibility
      */
     async askWithZodSchema<T>(zodSchema: z.ZodSchema<T>, messages: AIMessage[]): Promise<[T, string, TokenUsage?]> {
         try {
+            // Convert Zod schema to human-readable prompt description
+            // This is more reliable than json_schema for some OpenAI-compatible endpoints
+            const schemaDescription = ZodSchemaConverter.toPromptDescription(zodSchema);
+
             const preparedMessages = this.prepareMessages(messages);
             const openAIMessages = this.convertToOpenAIMessages(preparedMessages);
 
@@ -106,34 +71,70 @@ export class GrokAgent extends AbstractAgent {
                     content: this.instruction
                 });
             } else if (openAIMessages.length > 0 && openAIMessages[0].role === 'system') {
-                openAIMessages[0].content = `${this.instruction}\\n\\n${openAIMessages[0].content}`;
+                openAIMessages[0].content = `${this.instruction}\n\n${openAIMessages[0].content}`;
+            }
+
+            // Add schema description to the last message to ensure the model follows it
+            const lastMessage = openAIMessages[openAIMessages.length - 1];
+            if (lastMessage) {
+                lastMessage.content += `\n\nYour response must be a valid JSON object matching this schema:\n${schemaDescription}`;
             }
 
             this.logAsking();
             this.logSystemPrompt();
             this.logMessages(messages);
 
-            // Use the official structured output API for grok-4
-            // Note: Grok-4 needs high max_tokens because it consumes many tokens for reasoning
-            const completion = await this.client.chat.completions.parse({
+            // Use json_object mode
+            // Note: Grok 4.1 Fast Reasoning seems to have issues with json_object mode and use_encrypted_content
+            // producing "[object Object]" responses. We fallback to text mode for this specific model.
+            // Docs (https://docs.x.ai/docs/guides/structured-outputs) imply support for all models > grok-2-1212,
+            // but practical experience shows otherwise for the Fast Reasoning variant with the OpenAI SDK helper.
+            const isFastReasoning = this.model === 'grok-4-1-fast-reasoning';
+
+            const completion = await this.client.chat.completions.create({
                 model: this.model,
                 temperature: this.temperature,
                 messages: openAIMessages,
-                response_format: zodResponseFormat(zodSchema, "response"),
-                max_tokens: 16384  // Set to 16k to handle longer JSON responses
+                response_format: isFastReasoning ? undefined : { type: "json_object" },
+                max_tokens: 16384,  // Set to 16k to handle longer JSON responses
+                // Request encrypted content for Grok 4 models if thinking is enabled
+                // @ts-ignore - xAI specific parameter
+                use_encrypted_content: isFastReasoning ? false : this.enableThinking,
             });
 
-            // Get the parsed structured response
-            const parsedData = completion.choices[0]?.message?.parsed;
-            if (!parsedData) {
+            const reply = completion.choices[0]?.message?.content;
+            if (!reply) {
                 throw new Error(this.errorMessages.emptyResponse);
             }
 
-            // Extract reasoning content if available (grok-4 reasoning)
+            this.logReply(reply);
+
+            // Extract reasoning content if available
             const reasoningContent: string = (completion.choices[0]?.message as any)?.reasoning_content || "";
+            const encryptedContent: string = (completion.choices[0]?.message as any)?.encrypted_content || "";
 
             this.logger(`Grok Agent - Found reasoning_content: ${!!reasoningContent}, length: ${reasoningContent.length}`);
-            this.logger(`✅ Response parsed successfully with Zod schema`);
+            if (encryptedContent) {
+                this.logger(`Grok Agent - Found encrypted_content (length: ${encryptedContent.length})`);
+            }
+
+            // Parse and validate the response using Zod
+            let parsedContent: unknown;
+            try {
+                const cleanedResponse = cleanResponse(reply);
+                parsedContent = JSON.parse(cleanedResponse);
+            } catch (parseError) {
+                throw new Error(`Failed to parse JSON response: ${parseError}`);
+            }
+
+            // Validate using Zod schema
+            const validationResult = safeValidateResponse(zodSchema, parsedContent);
+            if (!validationResult.success) {
+                this.logger(`Zod validation failed: ${JSON.stringify(validationResult.error.errors)}`);
+                throw new Error(`Response validation failed: ${validationResult.error.message}`);
+            }
+
+            this.logger(`✅ Response validated successfully with Zod schema`);
 
             // Extract token usage information
             let tokenUsage: TokenUsage | undefined;
@@ -159,7 +160,7 @@ export class GrokAgent extends AbstractAgent {
                 }
             }
 
-            return [parsedData, reasoningContent, tokenUsage];
+            return [validationResult.data, reasoningContent, tokenUsage];
 
         } catch (error) {
             this.logger(this.logTemplates.error(this.name, error));

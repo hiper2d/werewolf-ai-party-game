@@ -133,6 +133,8 @@ export class KimiAgent extends AbstractAgent {
                     throw new Error(this.errorMessages.emptyResponse);
                 }
 
+                this.logReply(reply);
+
                 // Parse and validate using Zod
                 let parsedContent: unknown;
                 try {
@@ -182,6 +184,8 @@ export class KimiAgent extends AbstractAgent {
                 if (!reply) {
                     throw new Error(this.errorMessages.emptyResponse);
                 }
+
+                this.logReply(reply);
 
                 // Parse and validate using Zod
                 let parsedContent: unknown;

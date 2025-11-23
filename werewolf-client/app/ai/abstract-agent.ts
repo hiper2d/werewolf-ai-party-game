@@ -41,6 +41,12 @@ export abstract class AbstractAgent {
         });
     }
 
+    protected logReply(reply: string): void {
+        this.logger(`Reply from ${this.name}:`);
+        const preview = reply.length > 5000 ? reply.substring(0, 5000) + '...' : reply;
+        this.logger(`  [assistant]: ${preview}`);
+    }
+
 
     protected prepareMessages(messages: AIMessage[]): AIMessage[] {
         return messages;

@@ -201,6 +201,10 @@ export class MistralAgent extends AbstractAgent {
                 throw new Error(this.errorMessages.invalidFormat);
             }
 
+            // Handle both string and structured content for logging
+            const responseTextForLog = typeof content === 'string' ? content : JSON.stringify(content);
+            this.logReply(responseTextForLog);
+
             // Note: Thinking content is not available with JSON format for Mistral
             const thinkingContent = "";
 
