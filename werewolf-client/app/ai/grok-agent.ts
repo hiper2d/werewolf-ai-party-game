@@ -13,9 +13,6 @@ export class GrokAgent extends AbstractAgent {
         model: this.model,
         temperature: this.temperature,
         stream: false,
-        // Request encrypted content for Grok 4 models if thinking is enabled
-        // @ts-ignore - xAI specific parameter
-        use_encrypted_content: this.enableThinking,
     };
 
     // Log message templates
@@ -85,10 +82,10 @@ export class GrokAgent extends AbstractAgent {
             this.logMessages(messages);
 
             // Use json_object mode
-            // Note: Grok 4.1 Fast Reasoning seems to have issues with json_object mode and use_encrypted_content
-            // producing "[object Object]" responses. We fallback to text mode for this specific model.
+            // Note: Grok 4.1 Fast Reasoning may have issues with json_object mode producing "[object Object]" responses.
+            // We fallback to text mode for this specific model as a workaround.
             // Docs (https://docs.x.ai/docs/guides/structured-outputs) imply support for all models > grok-2-1212,
-            // but practical experience shows otherwise for the Fast Reasoning variant with the OpenAI SDK helper.
+            // but practical experience shows otherwise for the Fast Reasoning variant.
             const isFastReasoning = this.model === 'grok-4-1-fast-reasoning';
 
             const completion = await this.client.chat.completions.create({
@@ -97,9 +94,6 @@ export class GrokAgent extends AbstractAgent {
                 messages: openAIMessages,
                 response_format: isFastReasoning ? undefined : { type: "json_object" },
                 max_tokens: 16384,  // Set to 16k to handle longer JSON responses
-                // Request encrypted content for Grok 4 models if thinking is enabled
-                // @ts-ignore - xAI specific parameter
-                use_encrypted_content: isFastReasoning ? false : this.enableThinking,
             });
 
             const reply = completion.choices[0]?.message?.content;
@@ -111,12 +105,8 @@ export class GrokAgent extends AbstractAgent {
 
             // Extract reasoning content if available
             const reasoningContent: string = (completion.choices[0]?.message as any)?.reasoning_content || "";
-            const encryptedContent: string = (completion.choices[0]?.message as any)?.encrypted_content || "";
 
             this.logger(`Grok Agent - Found reasoning_content: ${!!reasoningContent}, length: ${reasoningContent.length}`);
-            if (encryptedContent) {
-                this.logger(`Grok Agent - Found encrypted_content (length: ${encryptedContent.length})`);
-            }
 
             // Parse and validate the response using Zod
             let parsedContent: unknown;

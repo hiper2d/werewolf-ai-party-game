@@ -69,6 +69,48 @@ const content = response.choices[0].message.content;
 const reasoning = extractInlineReasoning(content);
 ```
 
+### Returning Encrypted Thinking Content
+
+- Set `use_encrypted_content: true` when using the OpenAI-compatible SDK so Grok reasoning traces are delivered as encrypted blobs alongside the public answer.
+- When issuing raw REST/gRPC requests, add `use_encrypted_content=True` or request `include: ["reasoning.encrypted_content"]` to stream the encrypted thinking payload.
+- Persist the encrypted content in Firestore so it can be decrypted by authorized reviewers when investigating suspicious games.
+
+```typescript
+const completion = await client.chat.completions.create({
+  model: 'grok-4',
+  messages,
+  // xAI specific
+  use_encrypted_content: true,
+});
+
+const encrypted = (completion.choices[0].message as any)?.encrypted_content;
+```
+
+### xAI Responses API Highlights
+
+Refer to the [xAI Responses API guide](https://docs.x.ai/docs/guides/responses-api) whenever you need multimodal inputs, JSON mode, or tighter control over response steps. Key takeaways:
+
+- Endpoint: `POST https://api.x.ai/v1/responses` (mirrors OpenAI's schema).
+- `input` accepts mixed content blocks (`input_text`, `input_image`, etc.) so you can pass screenshots or audio to Grok.
+- `response_format`, `max_output_tokens`, `tools`, and `stream` behave like the OpenAI equivalent—use them to enforce JSON, limit token budgets, and capture incremental deltas.
+- Use `previous_response_id` (or replay prior `output` items) so the model can continue multi-step tool executions.
+
+```typescript
+const response = await client.responses.create({
+  model: 'grok-4',
+  input: [
+    { role: 'system', content: 'Follow Werewolf GM rules' },
+    { role: 'user', content: gamePrompt }
+  ],
+  response_format: { type: 'json_object' },
+  tools: [],
+  max_output_tokens: 4096,
+  stream: false
+});
+
+const answer = response.output_text?.join('') ?? '';
+```
+
 ## Task Guidelines
 
 1. **Always reference** `docs/grok/` for API specifications
