@@ -23,6 +23,16 @@ export abstract class AbstractAgent {
         logger(`[${this.name} ${this.model}]: ${message}`);
     }
 
+    protected logSystemPrompt(): void {
+        this.logger(`System Prompt: ${this.instruction}`);
+    }
+
+    protected logAsking(): void {
+        this.logger("==================================================");
+        this.logger(`Asking ${this.name} ${this.model} agent`);
+        this.logger("==================================================");
+    }
+
     protected logMessages(messages: AIMessage[]): void {
         this.logger(`History for ${this.name}:`);
         messages.forEach((msg, index) => {

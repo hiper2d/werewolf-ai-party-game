@@ -1,8 +1,8 @@
-import {AbstractAgent} from "@/app/ai/abstract-agent";
-import {OpenAI} from "openai";
-import {AIMessage, TokenUsage} from "@/app/api/game-models";
-import {cleanResponse} from "@/app/utils/message-utils";
-import {extractUsageAndCalculateCost} from "@/app/utils/pricing";
+import { AbstractAgent } from "@/app/ai/abstract-agent";
+import { OpenAI } from "openai";
+import { AIMessage, TokenUsage } from "@/app/api/game-models";
+import { cleanResponse } from "@/app/utils/message-utils";
+import { extractUsageAndCalculateCost } from "@/app/utils/pricing";
 import { z } from 'zod';
 import { ZodSchemaConverter } from './zod-schema-converter';
 import { safeValidateResponse } from './prompts/zod-schemas';
@@ -18,7 +18,6 @@ export class KimiAgent extends AbstractAgent {
 
     // Log message templates
     private readonly logTemplates = {
-        askingAgent: (name: string, model: string) => `Asking ${name} ${model} agent`,
         error: (name: string, error: unknown) => `Error in ${name} agent: ${error}`,
     };
 
@@ -94,7 +93,7 @@ export class KimiAgent extends AbstractAgent {
         try {
             const preparedMessages = this.prepareMessages(messages);
             const openAIMessages = this.convertToOpenAIMessages(preparedMessages);
-            
+
             // Add system instruction if needed
             if (openAIMessages.length > 0 && openAIMessages[0].role !== 'system') {
                 openAIMessages.unshift({
@@ -105,18 +104,20 @@ export class KimiAgent extends AbstractAgent {
                 openAIMessages[0].content = `${this.instruction}\n\n${openAIMessages[0].content}`;
             }
 
-            this.logger(this.logTemplates.askingAgent(this.name, this.model));
+            this.logAsking();
+            this.logSystemPrompt();
+            this.logMessages(messages);
 
             // First, try with JSON mode (OpenAI-compatible)
             try {
                 const kimiSchema = ZodSchemaConverter.toOpenAIJsonSchema(zodSchema, 'response_schema');
-                
+
                 let completion;
                 try {
                     completion = await this.client.chat.completions.create({
                         ...this.defaultParams,
                         messages: openAIMessages,
-                        response_format: { 
+                        response_format: {
                             type: 'json_schema',
                             json_schema: kimiSchema
                         }
@@ -157,10 +158,10 @@ export class KimiAgent extends AbstractAgent {
             } catch (jsonModeError) {
                 // If JSON mode fails, fall back to prompt-based schema
                 this.logger(`JSON mode failed, falling back to prompt-based schema: ${jsonModeError}`);
-                
+
                 const schemaDescription = ZodSchemaConverter.toPromptDescription(zodSchema);
                 const lastMessage = openAIMessages[openAIMessages.length - 1];
-                
+
                 if (lastMessage) {
                     lastMessage.content += `\n\nYour response must be a valid JSON object matching this schema:\n${schemaDescription}`;
                 }

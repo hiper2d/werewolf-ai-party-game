@@ -1,16 +1,15 @@
-import {AbstractAgent} from "@/app/ai/abstract-agent";
+import { AbstractAgent } from "@/app/ai/abstract-agent";
 import OpenAI from "openai";
-import {AIMessage, TokenUsage} from "@/app/api/game-models";
-import {calculateOpenAICost} from "@/app/utils/pricing";
-import {z} from 'zod';
-import {zodTextFormat} from 'openai/helpers/zod';
+import { AIMessage, TokenUsage } from "@/app/api/game-models";
+import { calculateOpenAICost } from "@/app/utils/pricing";
+import { z } from 'zod';
+import { zodTextFormat } from 'openai/helpers/zod';
 
 export class Gpt5Agent extends AbstractAgent {
     private readonly client: OpenAI;
 
     // Log message templates
     private readonly logTemplates = {
-        askingAgent: (name: string, model: string) => `Asking ${name} ${model} agent`,
         error: (name: string, error: unknown) => `Error in ${name} agent: ${error}`,
     };
 
@@ -39,8 +38,10 @@ export class Gpt5Agent extends AbstractAgent {
      */
     async askWithZodSchema<T>(zodSchema: z.ZodSchema<T>, messages: AIMessage[]): Promise<[T, string, TokenUsage?]> {
         try {
-            this.logger(this.logTemplates.askingAgent(this.name, this.model));
-            
+            this.logAsking();
+            this.logSystemPrompt();
+            this.logMessages(messages);
+
             // Combine system instruction with messages for the input
             const input = [
                 `System: ${this.instruction}`,

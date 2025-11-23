@@ -1,6 +1,6 @@
 'use server';
 
-import {db} from "@/firebase/server";
+import { db } from "@/firebase/server";
 import {
     Game,
     GAME_STATES,
@@ -15,10 +15,10 @@ import {
     RECIPIENT_DOCTOR,
     RECIPIENT_DETECTIVE
 } from "@/app/api/game-models";
-import {auth} from "@/auth";
-import {getGame, addMessageToChatAndSaveToDb} from "./game-actions";
-import { RoleProcessorFactory } from "./roles";
-import {withGameErrorHandling} from "@/app/utils/server-action-wrapper";
+import { auth } from "@/auth";
+import { getGame, addMessageToChatAndSaveToDb } from "./game-actions";
+import { RoleProcessorFactory, NightOutcome } from "./roles";
+import { withGameErrorHandling } from "@/app/utils/server-action-wrapper";
 import { AgentFactory } from "@/app/ai/agent-factory";
 import { getUserFromFirestore, getBotMessages } from "@/app/api/game-actions";
 import { getApiKeysForUser } from "@/app/utils/tier-utils";
@@ -30,10 +30,10 @@ import { BOT_DAY_SUMMARY_PROMPT, BOT_SYSTEM_PROMPT } from "@/app/ai/prompts/bot-
 import { generateWerewolfTeammatesSection, generatePreviousDaySummariesSection } from "@/app/utils/bot-utils";
 import { format } from "@/app/ai/prompts/utils";
 import { parseResponseToObj, convertToAIMessages } from "@/app/utils/message-utils";
-import {checkGameEndConditions} from "@/app/utils/game-utils";
-import {GameEndChecker} from "@/app/utils/game-end-checker";
-import {recordBotTokenUsage, recordGameMasterTokenUsage} from "@/app/api/cost-tracking";
-import {ensureUserCanAccessGame} from "@/app/api/tier-guards";
+import { checkGameEndConditions } from "@/app/utils/game-utils";
+import { GameEndChecker } from "@/app/utils/game-end-checker";
+import { recordBotTokenUsage, recordGameMasterTokenUsage } from "@/app/api/cost-tracking";
+import { ensureUserCanAccessGame } from "@/app/api/tier-guards";
 
 /**
  * Helper function to handle night end logic with results processing
@@ -47,56 +47,31 @@ async function endNightWithResults(gameId: string, game: Game): Promise<Game> {
 
     // Analyze night results to determine outcomes
     const nightResults = game.nightResults || {};
-    
-    // 1. Determine if werewolves succeeded in killing their target
-    let killedPlayer: string | null = null;
-    let killedPlayerRole: string | null = null;
-    let wasKillPrevented = false;
-    let noWerewolfActivity = false;
-    
-    if (nightResults.werewolf) {
-        const werewolfTarget = nightResults.werewolf.target;
-        const wasProtected = nightResults.doctor && nightResults.doctor.target === werewolfTarget;
-        
-        if (wasProtected) {
-            wasKillPrevented = true;
-        } else {
-            killedPlayer = werewolfTarget;
-            // Get the killed player's role
-            if (killedPlayer === game.humanPlayerName) {
-                killedPlayerRole = game.humanPlayerRole;
-            } else {
-                const killedBot = game.bots.find(bot => bot.name === killedPlayer);
-                killedPlayerRole = killedBot ? killedBot.role : 'unknown';
-            }
+
+    // Initialize night outcome with default values
+    let nightOutcome: NightOutcome = {
+        killedPlayer: null,
+        killedPlayerRole: null,
+        wasKillPrevented: false,
+        noWerewolfActivity: false,
+        detectiveFoundEvil: false,
+        detectiveTargetDied: false,
+        detectiveWasActive: false,
+        doctorWasActive: false
+    };
+
+    // Define resolution order (dependencies matter: Doctor -> Werewolf -> Detective)
+    const resolutionOrder = [GAME_ROLES.DOCTOR, GAME_ROLES.WEREWOLF, GAME_ROLES.DETECTIVE];
+
+    // Process results for each role in order
+    for (const roleName of resolutionOrder) {
+        const processor = RoleProcessorFactory.createProcessor(roleName, gameId, game);
+        if (processor) {
+            const roleOutcome = await processor.getNightResultsOutcome(nightResults, nightOutcome);
+            nightOutcome = { ...nightOutcome, ...roleOutcome };
         }
-    } else {
-        noWerewolfActivity = true;
     }
-    
-    // 2. Determine detective investigation outcome
-    let detectiveFoundEvil = false;
-    let detectiveTargetDied = false;
-    let detectiveWasActive = false;
-    
-    if (nightResults.detective) {
-        detectiveWasActive = true;
-        const detectiveTarget = nightResults.detective.target;
-        
-        // Check if detective target died
-        detectiveTargetDied = killedPlayer === detectiveTarget;
-        
-        // Get the investigated player's role to determine if evil was found
-        let detectiveTargetRole: string;
-        if (detectiveTarget === game.humanPlayerName) {
-            detectiveTargetRole = game.humanPlayerRole;
-        } else {
-            const targetBot = game.bots.find(bot => bot.name === detectiveTarget);
-            detectiveTargetRole = targetBot ? targetBot.role : 'unknown';
-        }
-        detectiveFoundEvil = detectiveTargetRole === GAME_ROLES.WEREWOLF;
-    }
-    
+
     // 3. Use Game Master AI to generate the night results story
     const session = await auth();
     if (!session || !session.user?.email) {
@@ -105,7 +80,7 @@ async function endNightWithResults(gameId: string, game: Game): Promise<Game> {
 
     await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: game.createdWithTier });
     const apiKeys = await getApiKeysForUser(session.user.email);
-    
+
     // Create GM system prompt with game context
     const gmSystemPrompt = format(GM_NIGHT_RESULTS_SYSTEM_PROMPT, {
         players_names: [
@@ -123,22 +98,22 @@ async function endNightWithResults(gameId: string, game: Game): Promise<Game> {
 
     // Create GM command with night events
     const nightResultsCommand = format(GM_COMMAND_GENERATE_NIGHT_RESULTS, {
-        killedPlayer: killedPlayer || 'NONE',
-        killedPlayerRole: killedPlayerRole || 'NONE',
-        wasKillPrevented: wasKillPrevented ? 'TRUE' : 'FALSE',
-        noWerewolfActivity: noWerewolfActivity ? 'TRUE' : 'FALSE',
-        detectiveFoundEvil: detectiveFoundEvil ? 'TRUE' : 'FALSE',
-        detectiveTargetDied: detectiveTargetDied ? 'TRUE' : 'FALSE',
-        detectiveWasActive: detectiveWasActive ? 'TRUE' : 'FALSE',
-        doctorWasActive: nightResults.doctor ? 'TRUE' : 'FALSE'
+        killedPlayer: nightOutcome.killedPlayer || 'NONE',
+        killedPlayerRole: nightOutcome.killedPlayerRole || 'NONE',
+        wasKillPrevented: nightOutcome.wasKillPrevented ? 'TRUE' : 'FALSE',
+        noWerewolfActivity: nightOutcome.noWerewolfActivity ? 'TRUE' : 'FALSE',
+        detectiveFoundEvil: nightOutcome.detectiveFoundEvil ? 'TRUE' : 'FALSE',
+        detectiveTargetDied: nightOutcome.detectiveTargetDied ? 'TRUE' : 'FALSE',
+        detectiveWasActive: nightOutcome.detectiveWasActive ? 'TRUE' : 'FALSE',
+        doctorWasActive: nightOutcome.doctorWasActive ? 'TRUE' : 'FALSE'
     });
-    
+
     // Create Game Master agent with system prompt
     const gmAgent = AgentFactory.createAgent(GAME_MASTER, gmSystemPrompt, game.gameMasterAiType, apiKeys, false);
-    
+
     // Get day discussion messages and night messages for context
     const dayMessages = await getBotMessages(gameId, GAME_MASTER, game.currentDay);
-    
+
     // Create GM command message
     const gmCommandMessage: GameMessage = {
         id: null,
@@ -149,7 +124,7 @@ async function endNightWithResults(gameId: string, game: Game): Promise<Game> {
         day: game.currentDay,
         timestamp: Date.now()
     };
-    
+
     // Include conversation history for the GM (day + night messages + command)
     const history = convertToAIMessages(GAME_MASTER, [...dayMessages, gmCommandMessage]);
     const [storyResponse, thinking, tokenUsage] = await gmAgent.askWithZodSchema(NightResultsStoryZodSchema, history);
@@ -162,12 +137,12 @@ async function endNightWithResults(gameId: string, game: Game): Promise<Game> {
         );
     }
     const nightResultsMessage = storyResponse.story;
-    
+
     // Update game master's token usage
     if (tokenUsage) {
         await recordGameMasterTokenUsage(gameId, tokenUsage, session.user.email);
     }
-    
+
     // Log thinking for debugging
     if (thinking) {
         console.log(`🎭 Game Master thinking captured (${thinking.length} chars)`);
@@ -176,9 +151,9 @@ async function endNightWithResults(gameId: string, game: Game): Promise<Game> {
     // Check for game end conditions after night actions
     // We need to simulate the game state after eliminating the killed player
     let tempBots = [...game.bots];
-    if (killedPlayer && !wasKillPrevented) {
+    if (nightOutcome.killedPlayer && !nightOutcome.wasKillPrevented) {
         tempBots = tempBots.map(bot => {
-            if (bot.name === killedPlayer) {
+            if (bot.name === nightOutcome.killedPlayer) {
                 return { ...bot, isAlive: false, eliminationDay: game.currentDay };
             }
             return bot;
@@ -319,10 +294,10 @@ async function performNightActionImpl(gameId: string): Promise<Game> {
         throw new BotResponseError(
             'Invalid game state for night action',
             `Game must be in VOTE_RESULTS, NIGHT, or NIGHT_RESULTS state. Current state: ${game.gameState}`,
-            { 
-                currentState: game.gameState, 
+            {
+                currentState: game.gameState,
                 expectedStates: [GAME_STATES.VOTE_RESULTS, GAME_STATES.NIGHT, GAME_STATES.NIGHT_RESULTS],
-                gameId 
+                gameId
             },
             true
         );
@@ -361,10 +336,10 @@ async function beginNightImpl(gameId: string): Promise<Game> {
         throw new BotResponseError(
             'Invalid game state for beginning night',
             `Game must be in VOTE_RESULTS state to begin night. Current state: ${game.gameState}`,
-            { 
-                currentState: game.gameState, 
+            {
+                currentState: game.gameState,
                 expectedState: GAME_STATES.VOTE_RESULTS,
-                gameId 
+                gameId
             },
             true
         );
@@ -373,7 +348,7 @@ async function beginNightImpl(gameId: string): Promise<Game> {
     try {
         // Get unique roles with night actions that have alive players, sorted by action order
         const activeNightRoles = new Set<string>();
-        
+
         // Check all bots for night actions
         game.bots
             .filter(bot => bot.isAlive && ROLE_CONFIGS[bot.role])
@@ -417,7 +392,7 @@ async function beginNightImpl(gameId: string): Promise<Game> {
         if (sortedNightRoles.length > 0) {
             const firstRole = sortedNightRoles[0];
             const firstRoleProcessor = RoleProcessorFactory.createProcessor(firstRole, gameId, game);
-            
+
             if (firstRoleProcessor) {
                 const initResult = await firstRoleProcessor.init();
                 if (initResult.success) {
@@ -446,12 +421,12 @@ async function beginNightImpl(gameId: string): Promise<Game> {
         return await getGame(gameId) as Game;
     } catch (error) {
         console.error('Error in beginNight function:', error);
-        
+
         // Re-throw BotResponseError as-is for frontend handling
         if (error instanceof BotResponseError) {
             throw error;
         }
-        
+
         // Wrap other errors in BotResponseError for consistent handling
         throw new BotResponseError(
             'System error occurred during night setup',
@@ -489,10 +464,10 @@ async function replayNightImpl(gameId: string): Promise<Game> {
         throw new BotResponseError(
             'Invalid game state for replaying night',
             `Game must be in NIGHT or NIGHT_RESULTS state to replay night. Current state: ${game.gameState}`,
-            { 
-                currentState: game.gameState, 
+            {
+                currentState: game.gameState,
                 expectedStates: [GAME_STATES.NIGHT, GAME_STATES.NIGHT_RESULTS],
-                gameId 
+                gameId
             },
             true
         );
@@ -515,7 +490,7 @@ async function replayNightImpl(gameId: string): Promise<Game> {
         } else {
             const nightBeginsDoc = nightBeginsSnapshot.docs[0];
             const nightBeginsTimestamp = nightBeginsDoc.data().timestamp;
-            
+
             console.log(`🔍 REPLAY NIGHT: Found FIRST NIGHT_BEGINS message for day ${game.currentDay} at timestamp ${nightBeginsTimestamp}`);
 
             // Use Firestore query to find all messages FROM the NIGHT_BEGINS message onward (including the night message itself)
@@ -549,12 +524,12 @@ async function replayNightImpl(gameId: string): Promise<Game> {
         return await getGame(gameId) as Game;
     } catch (error) {
         console.error('Error in replayNight function:', error);
-        
+
         // Re-throw BotResponseError as-is for frontend handling
         if (error instanceof BotResponseError) {
             throw error;
         }
-        
+
         // Wrap other errors in BotResponseError for consistent handling
         throw new BotResponseError(
             'System error occurred during night replay',
@@ -575,7 +550,7 @@ async function processNightQueue(gameId: string, game: Game): Promise<Game> {
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
-    
+
     try {
         // If process queue is empty, end the night with results
         if (game.gameStateProcessQueue.length === 0) {
@@ -586,7 +561,7 @@ async function processNightQueue(gameId: string, game: Game): Promise<Game> {
         if (game.gameStateParamQueue.length === 0) {
             // Current role finished, move to next role or end night
             const newProcessQueue = game.gameStateProcessQueue.slice(1);
-            
+
             if (newProcessQueue.length === 0) {
                 // No more roles, end the night with results
                 return await endNightWithResults(gameId, game);
@@ -594,7 +569,7 @@ async function processNightQueue(gameId: string, game: Game): Promise<Game> {
                 // Move to next role using processor's init method
                 const nextRole = newProcessQueue[0];
                 const nextRoleProcessor = RoleProcessorFactory.createProcessor(nextRole, gameId, game);
-                
+
                 if (!nextRoleProcessor) {
                     throw new BotResponseError(
                         `No processor for role: ${nextRole}`,
@@ -603,7 +578,7 @@ async function processNightQueue(gameId: string, game: Game): Promise<Game> {
                         true
                     );
                 }
-                
+
                 const initResult = await nextRoleProcessor.init();
                 if (!initResult.success) {
                     throw new BotResponseError(
@@ -613,14 +588,14 @@ async function processNightQueue(gameId: string, game: Game): Promise<Game> {
                         true
                     );
                 }
-                
+
                 await db.collection('games').doc(gameId).update({
                     gameStateProcessQueue: newProcessQueue,
                     gameStateParamQueue: initResult.paramQueue
                 });
-                
+
                 console.log(`🌙 MOVED TO NEXT ROLE: ${nextRole} with players [${initResult.paramQueue.join(', ')}]`);
-                
+
                 // Return the updated game state and continue processing
                 return await getGame(gameId) as Game;
             }
@@ -628,7 +603,7 @@ async function processNightQueue(gameId: string, game: Game): Promise<Game> {
 
         const currentRole = game.gameStateProcessQueue[0];
         const currentPlayer = game.gameStateParamQueue[0];
-        
+
         console.log(`🌙 PROCESS NIGHT QUEUE: Role=${currentRole}, Player=${currentPlayer}, ParamQueue=[${game.gameStateParamQueue.join(', ')}]`);
 
         // NEW LOGIC: Check if current player is human - if so, skip processing and let frontend handle
@@ -650,7 +625,7 @@ async function processNightQueue(gameId: string, game: Game): Promise<Game> {
 
         // Create role processor for the current role
         const roleProcessor = RoleProcessorFactory.createProcessor(currentRole, gameId, game);
-        
+
         if (!roleProcessor) {
             throw new BotResponseError(
                 `No processor for role: ${currentRole}`,
@@ -662,7 +637,7 @@ async function processNightQueue(gameId: string, game: Game): Promise<Game> {
 
         // Process the night action for this role
         const result = await roleProcessor.processNightAction();
-        
+
         if (!result.success) {
             console.error(`🌙 NIGHT ACTION ERROR: Failed to process ${currentRole} action: ${result.error}`);
             throw new BotResponseError(
@@ -687,11 +662,11 @@ async function processNightQueue(gameId: string, game: Game): Promise<Game> {
 
         // Check if we need to move to next role (param queue empty) or end night (no more roles)
         const updatedGame = await getGame(gameId) as Game;
-        
+
         if (updatedGame.gameStateParamQueue.length === 0) {
             // Current role finished, move to next role or end night
             const newProcessQueue = updatedGame.gameStateProcessQueue.slice(1);
-            
+
             if (newProcessQueue.length === 0) {
                 // No more roles, end the night with results
                 return await endNightWithResults(gameId, updatedGame);
@@ -699,7 +674,7 @@ async function processNightQueue(gameId: string, game: Game): Promise<Game> {
                 // Move to next role using processor's init method
                 const nextRole = newProcessQueue[0];
                 const nextRoleProcessor = RoleProcessorFactory.createProcessor(nextRole, gameId, updatedGame);
-                
+
                 if (!nextRoleProcessor) {
                     throw new BotResponseError(
                         `No processor for role: ${nextRole}`,
@@ -708,7 +683,7 @@ async function processNightQueue(gameId: string, game: Game): Promise<Game> {
                         true
                     );
                 }
-                
+
                 const initResult = await nextRoleProcessor.init();
                 if (!initResult.success) {
                     throw new BotResponseError(
@@ -718,12 +693,12 @@ async function processNightQueue(gameId: string, game: Game): Promise<Game> {
                         true
                     );
                 }
-                
+
                 await db.collection('games').doc(gameId).update({
                     gameStateProcessQueue: newProcessQueue,
                     gameStateParamQueue: initResult.paramQueue
                 });
-                
+
                 console.log(`🌙 MOVED TO NEXT ROLE: ${nextRole} with players [${initResult.paramQueue.join(', ')}]`);
             }
         }
@@ -732,12 +707,12 @@ async function processNightQueue(gameId: string, game: Game): Promise<Game> {
         return await getGame(gameId) as Game;
     } catch (error) {
         console.error('Error in processNightQueue function:', error);
-        
+
         // Re-throw BotResponseError as-is for frontend handling
         if (error instanceof BotResponseError) {
             throw error;
         }
-        
+
         // Wrap other errors in BotResponseError for consistent handling
         throw new BotResponseError(
             'System error occurred during night queue processing',
@@ -804,13 +779,13 @@ async function humanPlayerTalkWerewolvesImpl(gameId: string, message: string): P
             day: game.currentDay,
             timestamp: Date.now()
         };
-        
+
         // Save message to database
         await addMessageToChatAndSaveToDb(werewolfMessage, gameId);
-        
+
         // Remove the human player from param queue
         const newParamQueue = game.gameStateParamQueue.slice(1);
-        
+
         // If param queue becomes empty after removing this player, populate it for the next role
         let finalUpdates: any = {
             gameStateParamQueue: newParamQueue
@@ -825,7 +800,7 @@ async function humanPlayerTalkWerewolvesImpl(gameId: string, message: string): P
             if (newProcessQueue.length > 0) {
                 const nextRole = newProcessQueue[0];
                 const nextRoleProcessor = RoleProcessorFactory.createProcessor(nextRole, gameId, game);
-                
+
                 if (nextRoleProcessor) {
                     const initResult = await nextRoleProcessor.init();
                     if (initResult.success) {
@@ -840,12 +815,12 @@ async function humanPlayerTalkWerewolvesImpl(gameId: string, message: string): P
                 }
             }
         }
-        
+
         // Update game state
         await db.collection('games').doc(gameId).update(finalUpdates);
-        
+
         console.log(`Human player ${game.humanPlayerName} participated in werewolf discussion`);
-        
+
         // Return updated game state
         return await getGame(gameId) as Game;
     } catch (error) {
@@ -866,41 +841,41 @@ async function startNewDayImpl(gameId: string): Promise<Game> {
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
-    
+
     try {
         const gameRef = db.collection('games').doc(gameId);
         const gameSnap = await gameRef.get();
-        
+
         if (!gameSnap.exists) {
             throw new Error('Game not found');
         }
-        
+
         const gameData = gameSnap.data();
         const currentGame = { id: gameId, ...gameData } as Game;
 
         await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: currentGame.createdWithTier });
-        
+
         // Validate that we're in NIGHT_RESULTS state
         if (gameData?.gameState !== GAME_STATES.NIGHT_RESULTS) {
             throw new Error(`Cannot start new day from state: ${gameData?.gameState}. Expected: ${GAME_STATES.NIGHT_RESULTS}`);
         }
-        
+
         console.log(`🌅 Starting new day by applying night results and transitioning to NEW_DAY_BOT_SUMMARIES`);
 
         // Apply night results - eliminate werewolf targets if successful
         let updatedBots = [...currentGame.bots];
         const nightResults = currentGame.nightResults || {};
-        
+
         // Store night results for future reference before clearing
         const previousNightResults = { ...nightResults };
-        
+
         // Check if werewolves successfully killed someone
         if (nightResults.werewolf && nightResults.werewolf.target) {
             const targetName = nightResults.werewolf.target;
-            
+
             // Check if doctor protected this target
             const doctorProtectedTarget = nightResults.doctor && nightResults.doctor.target === targetName;
-            
+
             if (!doctorProtectedTarget) {
                 // Eliminate the target
                 updatedBots = updatedBots.map(bot => {
@@ -910,7 +885,7 @@ async function startNewDayImpl(gameId: string): Promise<Game> {
                     }
                     return bot;
                 });
-                
+
                 // Also check if human player was the target
                 if (targetName === currentGame.humanPlayerName) {
                     // Human player elimination would be handled by game over logic elsewhere
@@ -920,17 +895,17 @@ async function startNewDayImpl(gameId: string): Promise<Game> {
                 console.log(`🏥 ${targetName} was saved by the doctor`);
             }
         }
-        
+
         // Get all alive bot names for the processing queue
         const aliveBotNames = updatedBots.filter(bot => bot.isAlive).map(bot => bot.name);
-        
+
         // Check for game end conditions after applying night results
         const tempGame = { ...currentGame, bots: updatedBots };
         const endCheck = checkGameEndConditions(tempGame);
-        
+
         if (endCheck.isEnded) {
             console.log(`🎮 GAME END: ${endCheck.reason}`);
-            
+
             // Create game end message
             const gameEndMessage: GameMessage = {
                 id: null,
@@ -942,7 +917,7 @@ async function startNewDayImpl(gameId: string): Promise<Game> {
                 timestamp: Date.now(),
             };
             await addMessageToChatAndSaveToDb(gameEndMessage, gameId);
-            
+
             // Update game state to GAME_OVER
             await gameRef.update({
                 gameState: GAME_STATES.GAME_OVER,
@@ -952,10 +927,10 @@ async function startNewDayImpl(gameId: string): Promise<Game> {
                 previousNightResults: previousNightResults,
                 nightResults: {}
             });
-            
+
             return await getGame(gameId) as Game;
         }
-        
+
         // Transition to NEW_DAY_BOT_SUMMARIES state and populate processing queue
         // Move nightResults to previousNightResults and clear nightResults for next night
         await gameRef.update({
@@ -966,9 +941,9 @@ async function startNewDayImpl(gameId: string): Promise<Game> {
             previousNightResults: previousNightResults,
             nightResults: {} // Clear night results for the next night phase
         });
-        
+
         console.log(`💭 Transitioned to NEW_DAY_BOT_SUMMARIES with ${aliveBotNames.length} bots to summarize`);
-        
+
         // Return the updated game
         return await getGame(gameId) as Game;
     } catch (error: any) {
@@ -984,32 +959,32 @@ async function summarizePastDayImpl(gameId: string): Promise<Game> {
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
-    
+
     try {
         const gameRef = db.collection('games').doc(gameId);
         const gameSnap = await gameRef.get();
-        
+
         if (!gameSnap.exists) {
             throw new Error('Game not found');
         }
-        
+
         const gameData = gameSnap.data();
         const currentGame = gameFromFirestore(gameId, gameData);
-        
+
         // Validate that we're in NEW_DAY_BOT_SUMMARIES state
         if (gameData?.gameState !== GAME_STATES.NEW_DAY_BOT_SUMMARIES) {
             throw new Error(`Cannot summarize day from state: ${gameData?.gameState}. Expected: ${GAME_STATES.NEW_DAY_BOT_SUMMARIES}`);
         }
-        
+
         // Get the first bot from the processing queue
         const processQueue = [...(gameData.gameStateProcessQueue || [])];
         if (processQueue.length === 0) {
             // No more bots to process, transition to DAY_DISCUSSION and increment day
             const nextDay = (currentGame.currentDay || 1) + 1;
-            
+
             // Create Game Master message for new day
             const gmStory = `☀️ **Day ${nextDay} begins.**\n\nThe village awakens to a new day. The events of the night have left their mark. Now is the time to discuss what happened and decide who among you might be a threat to the village.\n\nDiscuss the night's events, share your suspicions, and prepare to vote when ready.`;
-            
+
             const gameMessage: GameMessage = {
                 id: null,
                 recipientName: RECIPIENT_ALL,
@@ -1019,10 +994,10 @@ async function summarizePastDayImpl(gameId: string): Promise<Game> {
                 day: nextDay,
                 timestamp: Date.now()
             };
-            
+
             // Save the Game Master message
             await addMessageToChatAndSaveToDb(gameMessage, gameId);
-            
+
             await gameRef.update({
                 gameState: GAME_STATES.DAY_DISCUSSION,
                 gameStateProcessQueue: [],
@@ -1033,10 +1008,10 @@ async function summarizePastDayImpl(gameId: string): Promise<Game> {
             console.log(`💭 All bot summaries completed, starting Day ${nextDay}`);
             return await getGame(gameId) as Game;
         }
-        
+
         const botName = processQueue.shift()!; // Get first bot and remove from queue
         const bot = currentGame.bots.find(b => b.name === botName);
-        
+
         if (!bot || !bot.isAlive) {
             // Bot not found or not alive, skip and continue with next
             await gameRef.update({
@@ -1045,12 +1020,12 @@ async function summarizePastDayImpl(gameId: string): Promise<Game> {
             console.log(`💭 Bot ${botName} not found or not alive, skipping`);
             return await getGame(gameId) as Game;
         }
-        
+
         console.log(`💭 Generating day ${currentGame.currentDay} summary for bot: ${botName}`);
-        
+
         // Get all messages visible to this bot for the current day
         const botMessages = await getBotMessages(gameId, botName, currentGame.currentDay);
-        
+
         if (botMessages.length === 0) {
             console.log(`💭 No messages found for bot ${botName} on day ${currentGame.currentDay}, skipping summary`);
             await gameRef.update({
@@ -1058,16 +1033,16 @@ async function summarizePastDayImpl(gameId: string): Promise<Game> {
             });
             return await getGame(gameId) as Game;
         }
-        
+
         const session = await auth();
         if (!session || !session.user?.email) {
             throw new Error('Not authenticated');
         }
         await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: currentGame.createdWithTier });
-        
+
         // Get API keys
         const apiKeys = await getApiKeysForUser(session.user.email);
-        
+
         // Create bot system prompt
         const botPrompt = format(BOT_SYSTEM_PROMPT, {
             name: bot.name,
@@ -1087,13 +1062,13 @@ async function summarizePastDayImpl(gameId: string): Promise<Game> {
                 .join(", "),
             previous_day_summaries: generatePreviousDaySummariesSection(bot, currentGame.currentDay)
         });
-        
+
         // Create summary request message
         const summaryPrompt = format(BOT_DAY_SUMMARY_PROMPT, {
             bot_name: bot.name,
             day_number: currentGame.currentDay
         });
-        
+
         const summaryMessage: GameMessage = {
             id: null,
             recipientName: bot.name,
@@ -1103,21 +1078,21 @@ async function summarizePastDayImpl(gameId: string): Promise<Game> {
             day: currentGame.currentDay,
             timestamp: Date.now()
         };
-        
+
         // Create agent
         const agent = AgentFactory.createAgent(bot.name, botPrompt, bot.aiType, apiKeys, false);
-        
+
         // Create conversation history with all day messages + summary request
         const history = convertToAIMessages(bot.name, [...botMessages, summaryMessage]);
-        
+
         // Get summary using bot answer schema (returns { reply: "summary text" })
         const [summaryResponse, thinking, tokenUsage] = await agent.askWithZodSchema(BotAnswerZodSchema, history);
-        
+
         // Update bot's token usage
         if (tokenUsage) {
             await recordBotTokenUsage(gameId, bot.name, tokenUsage, session.user.email);
         }
-        
+
         if (!summaryResponse) {
             console.warn(`💭 Bot ${bot.name} failed to generate summary for day ${currentGame.currentDay}`);
             await gameRef.update({
@@ -1125,21 +1100,21 @@ async function summarizePastDayImpl(gameId: string): Promise<Game> {
             });
             return await getGame(gameId) as Game;
         }
-        
+
         let summary: string = ""; // Initialize with empty string
         try {
             summary = summaryResponse.reply || ""; // Ensure not undefined
         } catch (parseError: any) {
             console.error(`💭 Failed to parse summary JSON for bot ${bot.name}:`, parseError);
             console.error('💭 Raw response:', summaryResponse);
-            
+
             // Try to extract summary from the response as fallback
             try {
                 // The response is now a typed object from Zod schema
                 if (summaryResponse && summaryResponse.reply) {
                     summary = summaryResponse.reply;
                     console.log(`💭 Using reply property as summary for bot ${bot.name}: ${summary.substring(0, 100)}...`);
-                    
+
                     if (summary.length > 10) { // Basic validation
                         console.log(`💭 Using cleaned response as summary for bot ${bot.name}: ${summary.substring(0, 100)}...`);
                     } else {
@@ -1150,36 +1125,36 @@ async function summarizePastDayImpl(gameId: string): Promise<Game> {
                 }
             } catch (fallbackError) {
                 console.error(`💭 Fallback summary extraction failed for bot ${bot.name}:`, fallbackError);
-                
+
                 // Skip this bot and continue with next
                 await gameRef.update({
                     gameStateProcessQueue: processQueue
                 });
-                
+
                 // Create a meaningful error that will be shown to the user
                 throw new Error(`Bot ${bot.name} response parsing failed: ${parseError.message}. Response: ${JSON.stringify(summaryResponse)?.substring(0, 200)}...`);
             }
         }
-        
+
         // Ensure summary is never undefined or null
         if (!summary || summary === "undefined" || summary === "null") {
             summary = `Summary for day ${currentGame.currentDay}`;
         }
-        
+
         // Update the bot with the new summary
         const updatedBots = currentGame.bots.map(b => {
             if (b.name === botName) {
                 // Initialize daySummaries array if needed
                 const daySummaries = [...(b.daySummaries || [])]; // Create a copy
-                
+
                 // Ensure array is large enough for this day index (day 1 -> index 0)
                 while (daySummaries.length < currentGame.currentDay) {
                     daySummaries.push(""); // Push empty string, never undefined
                 }
-                
+
                 // Store summary at correct index (day 1 -> index 0)
                 daySummaries[currentGame.currentDay - 1] = summary;
-                
+
                 return {
                     ...b,
                     daySummaries: daySummaries
@@ -1187,17 +1162,17 @@ async function summarizePastDayImpl(gameId: string): Promise<Game> {
             }
             return b;
         });
-        
+
         // Update game with new bot data and remaining queue
         await gameRef.update({
             bots: updatedBots,
             gameStateProcessQueue: processQueue
         });
-        
+
         console.log(`💭 ✅ Generated summary for bot ${botName} (${summary.length} chars). ${processQueue.length} bots remaining.`);
-        
+
         return await getGame(gameId) as Game;
-        
+
     } catch (error: any) {
         console.error("Error summarizing current day: ", error);
         throw new Error(`Failed to summarize current day: ${error.message}`);

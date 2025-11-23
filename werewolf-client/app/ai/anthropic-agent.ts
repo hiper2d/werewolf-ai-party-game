@@ -1,8 +1,8 @@
-import {AbstractAgent} from "@/app/ai/abstract-agent";
-import {AIMessage, BotResponseError, TokenUsage} from "@/app/api/game-models";
-import {Anthropic} from '@anthropic-ai/sdk';
-import {cleanResponse} from "@/app/utils/message-utils";
-import {calculateAnthropicCost} from "@/app/utils/pricing";
+import { AbstractAgent } from "@/app/ai/abstract-agent";
+import { AIMessage, BotResponseError, TokenUsage } from "@/app/api/game-models";
+import { Anthropic } from '@anthropic-ai/sdk';
+import { cleanResponse } from "@/app/utils/message-utils";
+import { calculateAnthropicCost } from "@/app/utils/pricing";
 import { z } from 'zod';
 import { ZodSchemaConverter } from './zod-schema-converter';
 import { safeValidateResponse } from './prompts/zod-schemas';
@@ -26,7 +26,6 @@ export class ClaudeAgent extends AbstractAgent {
 
     // Log message templates
     private readonly logTemplates = {
-        askingAgent: (name: string, model: string) => `Asking ${name} ${model} agent`,
         error: (name: string, error: unknown) => `Error in ${name} agent: ${error}`,
     };
 
@@ -75,18 +74,22 @@ export class ClaudeAgent extends AbstractAgent {
         // This ensures role validation errors are thrown directly
         const aiMessages = this.prepareMessages(messages);
         const anthropicMessages = this.convertToAnthropicMessages(aiMessages);
-        
+
+        this.logAsking();
+        this.logSystemPrompt();
+        this.logMessages(messages);
+
         try {
             // Generate human-readable schema description for Anthropic
             const schemaDescription = ZodSchemaConverter.toPromptDescription(zodSchema);
-            
+
             // Add schema instructions to the last message
             const lastMessage = aiMessages[aiMessages.length - 1];
             const fullPrompt = `${lastMessage.content}\n\n${schemaDescription}`;
             const updatedMessages = [...anthropicMessages];
-            updatedMessages[updatedMessages.length - 1] = { 
-                ...updatedMessages[updatedMessages.length - 1], 
-                content: fullPrompt 
+            updatedMessages[updatedMessages.length - 1] = {
+                ...updatedMessages[updatedMessages.length - 1],
+                content: fullPrompt
             };
 
             const params: Anthropic.MessageCreateParams = {
@@ -115,7 +118,7 @@ export class ClaudeAgent extends AbstractAgent {
                 this.logger(this.logTemplates.error(this.name, apiError));
                 throw new Error(this.errorMessages.apiError(apiError));
             }
-            
+
             if (!('content' in response) || !Array.isArray(response.content) || response.content.length === 0) {
                 throw new Error(this.errorMessages.emptyResponse);
             }
@@ -123,13 +126,13 @@ export class ClaudeAgent extends AbstractAgent {
             // Handle thinking content if present and find text content
             let textContent = null;
             let thinkingContent = "";
-            
+
             for (const block of response.content) {
                 // Extract thinking content
                 if (this.enableThinking && (block as any).type === 'thinking' && 'thinking' in block) {
                     thinkingContent = (block as any).thinking;
                 }
-                
+
                 // Find the text content block
                 if ('text' in block && !textContent) {
                     textContent = block.text;
@@ -166,36 +169,36 @@ export class ClaudeAgent extends AbstractAgent {
                     response.usage.input_tokens || 0,
                     response.usage.output_tokens || 0
                 );
-                
+
                 tokenUsage = {
                     inputTokens: response.usage.input_tokens || 0,
                     outputTokens: response.usage.output_tokens || 0,
                     totalTokens: (response.usage.input_tokens || 0) + (response.usage.output_tokens || 0),
                     costUSD: cost
                 };
-                
+
                 // Log thinking information if available
                 if (this.enableThinking && thinkingContent) {
                     this.logger(`Thinking enabled: ${thinkingContent.length} characters of thinking content`);
                     this.logger(`Note: Thinking tokens are included in output token count and cost`);
                 }
             }
-            
+
             return [validationResult.data, thinkingContent, tokenUsage];
-            
+
         } catch (error) {
             const errorDetails = error instanceof Error ? error.message : String(error);
-            
+
             // Check if this is an API overload error (529) which is recoverable
-            const isRecoverable = errorDetails.includes('overloaded_error') || 
-                                errorDetails.includes('529') || 
-                                errorDetails.includes('rate_limit');
-            
+            const isRecoverable = errorDetails.includes('overloaded_error') ||
+                errorDetails.includes('529') ||
+                errorDetails.includes('rate_limit');
+
             throw new BotResponseError(
                 'Failed to get response from Anthropic API with Zod schema',
                 errorDetails,
-                { 
-                    model: this.model, 
+                {
+                    model: this.model,
                     agentName: this.name,
                     apiProvider: 'Anthropic',
                     schemaType: 'zod'

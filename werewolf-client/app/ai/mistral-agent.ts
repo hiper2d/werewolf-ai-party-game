@@ -1,8 +1,8 @@
-import {AbstractAgent} from "@/app/ai/abstract-agent";
-import {Mistral} from "@mistralai/mistralai";
-import {ChatCompletionResponse} from "@mistralai/mistralai/models/components";
-import {AIMessage, MESSAGE_ROLE, TokenUsage} from "@/app/api/game-models";
-import {cleanResponse} from "@/app/utils/message-utils";
+import { AbstractAgent } from "@/app/ai/abstract-agent";
+import { Mistral } from "@mistralai/mistralai";
+import { ChatCompletionResponse } from "@mistralai/mistralai/models/components";
+import { AIMessage, MESSAGE_ROLE, TokenUsage } from "@/app/api/game-models";
+import { cleanResponse } from "@/app/utils/message-utils";
 import { z } from 'zod';
 import { ZodSchemaConverter } from './zod-schema-converter';
 import { safeValidateResponse } from './prompts/zod-schemas';
@@ -17,7 +17,6 @@ export class MistralAgent extends AbstractAgent {
 
     // Log message templates
     private readonly logTemplates = {
-        askingAgent: (name: string, model: string) => `Asking ${name} ${model} agent`,
         error: (name: string, error: unknown) => `Error in ${name} agent: ${error}`,
     };
 
@@ -32,8 +31,8 @@ export class MistralAgent extends AbstractAgent {
 
     constructor(name: string, instruction: string, model: string, apiKey: string, enableThinking: boolean = false) {
         super(name, instruction, model, 0.7, enableThinking);
-        this.client = new Mistral({apiKey: apiKey});
-        
+        this.client = new Mistral({ apiKey: apiKey });
+
         // Note: Magistral reasoning models can generate thinking content, but only when
         // responseFormat is not set to 'json_object'. Since this game requires JSON responses,
         // thinking content will be suppressed. The models still benefit from internal reasoning
@@ -52,22 +51,22 @@ export class MistralAgent extends AbstractAgent {
 
     private processReply(response: ChatCompletionResponse | undefined): [string, string, TokenUsage?] {
         const message = response?.choices?.[0]?.message;
-        
+
         if (!message || !message.content) {
             throw new Error(this.errorMessages.emptyResponse);
         }
 
         let reply = message.content;
-        
+
         // Handle structured content (thinking models)
         if (Array.isArray(reply)) {
             const { content, thinking } = this.processStructuredReply(reply);
-            
+
             // Log thinking information if available
             if (this.enableThinking && thinking) {
                 this.logger(`Thinking content: ${thinking.length} characters of reasoning`);
             }
-            
+
             return [cleanResponse(content), thinking, this.extractTokenUsage(response)];
         }
 
@@ -106,7 +105,7 @@ export class MistralAgent extends AbstractAgent {
         const inputTokens = usage.promptTokens || 0;
         const outputTokens = usage.completionTokens || 0;
         const totalTokens = usage.totalTokens || inputTokens + outputTokens;
-        
+
         // Calculate cost based on model pricing
         const costUSD = this.calculateCost(inputTokens, outputTokens);
 
@@ -124,10 +123,10 @@ export class MistralAgent extends AbstractAgent {
         // These are example prices - should be updated based on actual Mistral pricing
         const pricePerMillionInput = this.model.includes('magistral') ? 4 : 0.15;
         const pricePerMillionOutput = this.model.includes('magistral') ? 12 : 0.45;
-        
+
         const inputCost = (inputTokens / 1_000_000) * pricePerMillionInput;
         const outputCost = (outputTokens / 1_000_000) * pricePerMillionOutput;
-        
+
         return inputCost + outputCost;
     }
 
@@ -143,10 +142,10 @@ export class MistralAgent extends AbstractAgent {
         try {
             // Convert Zod schema to human-readable prompt description
             const schemaDescription = ZodSchemaConverter.toPromptDescription(zodSchema);
-            
+
             // Convert messages to Mistral format and add schema to last message
             const convertedMessages = this.convertToMistralMessages(messages);
-            
+
             // Add schema description to the last message content
             if (convertedMessages.length > 0) {
                 const lastMessage = convertedMessages[convertedMessages.length - 1];
@@ -160,13 +159,13 @@ export class MistralAgent extends AbstractAgent {
                     content: `Please respond with a valid JSON object matching this schema:\n${schemaDescription}`
                 });
             }
-            
+
             // Prepare system message
             const systemMessage = {
                 role: MESSAGE_ROLE.SYSTEM,
                 content: this.instruction
             };
-            
+
             const allMessages = [systemMessage, ...convertedMessages];
 
             // Build request parameters with JSON format (no jsonSchema parameter)
@@ -178,8 +177,10 @@ export class MistralAgent extends AbstractAgent {
                 }
             };
 
-            this.logger(this.logTemplates.askingAgent(this.name, this.model));
-            
+            this.logAsking();
+            this.logSystemPrompt();
+            this.logMessages(messages);
+
             let response;
             try {
                 response = await this.client.chat.complete(requestParams);
@@ -195,7 +196,7 @@ export class MistralAgent extends AbstractAgent {
 
             const choice = response.choices[0];
             const content = choice.message?.content;
-            
+
             if (!content) {
                 throw new Error(this.errorMessages.invalidFormat);
             }
@@ -225,9 +226,9 @@ export class MistralAgent extends AbstractAgent {
 
             // Extract token usage
             const tokenUsage = this.extractTokenUsage(response);
-            
+
             return [validationResult.data, thinkingContent, tokenUsage];
-            
+
         } catch (error) {
             this.logger(this.logTemplates.error(this.name, error));
             throw new Error(this.errorMessages.apiError(error));

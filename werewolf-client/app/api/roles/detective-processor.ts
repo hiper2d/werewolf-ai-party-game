@@ -1,15 +1,21 @@
-import { BaseRoleProcessor, NightActionResult } from "./base-role-processor";
-import { GAME_ROLES, GAME_MASTER, GameMessage, MessageType, BotResponseError, RECIPIENT_DETECTIVE } from "@/app/api/game-models";
-import { AgentFactory } from "@/app/ai/agent-factory";
-import { addMessageToChatAndSaveToDb, getBotMessages, getUserFromFirestore } from "@/app/api/game-actions";
-import { getApiKeysForUser } from "@/app/utils/tier-utils";
-import { auth } from "@/auth";
-import { convertToAIMessages } from "@/app/utils/message-utils";
-import { BOT_SYSTEM_PROMPT, BOT_DETECTIVE_ACTION_PROMPT } from "@/app/ai/prompts/bot-prompts";
-import { format } from "@/app/ai/prompts/utils";
-import { generatePreviousDaySummariesSection } from "@/app/utils/bot-utils";
-import { DetectiveActionZodSchema } from "@/app/ai/prompts/zod-schemas";
-import { DetectiveAction } from "@/app/ai/prompts/ai-schemas";
+import {BaseRoleProcessor, NightActionResult, NightOutcome} from "./base-role-processor";
+import {
+    BotResponseError,
+    GAME_MASTER,
+    GAME_ROLES,
+    GameMessage,
+    MessageType,
+    RECIPIENT_DETECTIVE
+} from "@/app/api/game-models";
+import {AgentFactory} from "@/app/ai/agent-factory";
+import {addMessageToChatAndSaveToDb, getBotMessages} from "@/app/api/game-actions";
+import {getApiKeysForUser} from "@/app/utils/tier-utils";
+import {auth} from "@/auth";
+import {convertToAIMessages} from "@/app/utils/message-utils";
+import {BOT_DETECTIVE_ACTION_PROMPT, BOT_SYSTEM_PROMPT} from "@/app/ai/prompts/bot-prompts";
+import {format} from "@/app/ai/prompts/utils";
+import {generatePreviousDaySummariesSection} from "@/app/utils/bot-utils";
+import {DetectiveActionZodSchema} from "@/app/ai/prompts/zod-schemas";
 import {recordBotTokenUsage} from "@/app/api/cost-tracking";
 
 /**
@@ -21,10 +27,34 @@ export class DetectiveProcessor extends BaseRoleProcessor {
         super(gameId, game, GAME_ROLES.DETECTIVE);
     }
 
+    async getNightResultsOutcome(nightResults: any, currentOutcome: NightOutcome): Promise<Partial<NightOutcome>> {
+        const outcome: Partial<NightOutcome> = {};
+
+        if (nightResults.detective) {
+            outcome.detectiveWasActive = true;
+            const detectiveTarget = nightResults.detective.target;
+
+            // Check if detective target died
+            outcome.detectiveTargetDied = currentOutcome.killedPlayer === detectiveTarget;
+
+            // Get the investigated player's role to determine if evil was found
+            let detectiveTargetRole: string;
+            if (detectiveTarget === this.game.humanPlayerName) {
+                detectiveTargetRole = this.game.humanPlayerRole;
+            } else {
+                const targetBot = this.game.bots.find(bot => bot.name === detectiveTarget);
+                detectiveTargetRole = targetBot ? targetBot.role : 'unknown';
+            }
+            outcome.detectiveFoundEvil = detectiveTargetRole === GAME_ROLES.WEREWOLF;
+        }
+
+        return outcome;
+    }
+
     async processNightAction(): Promise<NightActionResult> {
         try {
             const playersInfo = this.getPlayersWithRole();
-            
+
             if (playersInfo.allPlayers.length === 0) {
                 // No detectives alive, skip this action
                 this.logNightAction("No detectives alive, skipping action");
@@ -40,7 +70,7 @@ export class DetectiveProcessor extends BaseRoleProcessor {
             // Get the current detective from the param queue
             const detectiveName = this.game.gameStateParamQueue[0];
             const remainingQueue = this.game.gameStateParamQueue.slice(1);
-            
+
             this.logNightAction(`Detective (${detectiveName}) is taking their night action`);
 
             // Get the detective bot (skip if human player)
@@ -48,7 +78,7 @@ export class DetectiveProcessor extends BaseRoleProcessor {
             if (!detectiveBot) {
                 // If human detective, skip for now (would need UI implementation)
                 this.logNightAction(`HUMAN DETECTIVE DETECTED: Skipping auto-processing for human detective: ${detectiveName}`);
-                return { 
+                return {
                     success: true,
                     gameUpdates: {
                         gameStateParamQueue: remainingQueue

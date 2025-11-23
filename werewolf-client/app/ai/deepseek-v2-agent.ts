@@ -1,9 +1,9 @@
-import {AbstractAgent} from "@/app/ai/abstract-agent";
+import { AbstractAgent } from "@/app/ai/abstract-agent";
 import OpenAI from "openai";
-import {AIMessage, TokenUsage} from "@/app/api/game-models";
-import {cleanResponse} from "@/app/utils/message-utils";
-import {extractUsageAndCalculateCost} from "@/app/utils/pricing";
-import {getModelConfigByApiName} from "@/app/ai/ai-models";
+import { AIMessage, TokenUsage } from "@/app/api/game-models";
+import { cleanResponse } from "@/app/utils/message-utils";
+import { extractUsageAndCalculateCost } from "@/app/utils/pricing";
+import { getModelConfigByApiName } from "@/app/ai/ai-models";
 import { z } from 'zod';
 import { ZodSchemaConverter } from './zod-schema-converter';
 import { safeValidateResponse } from './prompts/zod-schemas';
@@ -13,7 +13,6 @@ export class DeepSeekV2Agent extends AbstractAgent {
 
     // Log message templates
     private readonly logTemplates = {
-        askingAgent: (name: string, model: string) => `Asking ${name} ${model} agent`,
         error: (name: string, error: unknown) => `Error in ${name} agent: ${error}`,
         switchingModel: (from: string, to: string) => `Switching from ${from} to ${to} for thinking mode`,
     };
@@ -37,7 +36,7 @@ export class DeepSeekV2Agent extends AbstractAgent {
 
 
 
-    private convertToOpenAIMessages(messages: AIMessage[]): Array<{role: string, content: string}> {
+    private convertToOpenAIMessages(messages: AIMessage[]): Array<{ role: string, content: string }> {
         const preparedMessages = this.prepareMessages(messages);
         return preparedMessages.map(msg => ({
             role: msg.role === 'developer' ? 'system' : msg.role === 'assistant' ? 'assistant' : 'user',
@@ -45,7 +44,7 @@ export class DeepSeekV2Agent extends AbstractAgent {
         }));
     }
 
-    private addSystemInstruction(messages: Array<{role: string, content: string}>): Array<{role: string, content: string}> {
+    private addSystemInstruction(messages: Array<{ role: string, content: string }>): Array<{ role: string, content: string }> {
         // Add system instruction if no system message exists
         if (messages.length === 0 || messages[0].role !== 'system') {
             return [
@@ -53,14 +52,14 @@ export class DeepSeekV2Agent extends AbstractAgent {
                 ...messages
             ];
         }
-        
+
         // Prepend instruction to existing system message
         const updatedMessages = [...messages];
         updatedMessages[0] = {
             ...updatedMessages[0],
             content: `${this.instruction}\n\n${updatedMessages[0].content}`
         };
-        
+
         return updatedMessages;
     }
 
@@ -75,9 +74,11 @@ export class DeepSeekV2Agent extends AbstractAgent {
     async askWithZodSchema<T>(zodSchema: z.ZodSchema<T>, messages: AIMessage[]): Promise<[T, string, TokenUsage?]> {
         try {
             const input = this.convertToOpenAIMessages(messages);
-            
-            this.logger(this.logTemplates.askingAgent(this.name, this.model));
-            
+
+            this.logAsking();
+            this.logSystemPrompt();
+            this.logMessages(messages);
+
             // For reasoning models, add schema description to prompt
             // For non-reasoning models, use JSON schema format
             let modifiedInput = [...input];
@@ -163,7 +164,7 @@ export class DeepSeekV2Agent extends AbstractAgent {
             // Extract token usage and calculate cost
             const usageResult = extractUsageAndCalculateCost(this.model, response);
             let tokenUsage: TokenUsage | undefined;
-            
+
             if (usageResult) {
                 tokenUsage = {
                     inputTokens: usageResult.usage.promptTokens,
@@ -174,7 +175,7 @@ export class DeepSeekV2Agent extends AbstractAgent {
             }
 
             return [validationResult.data, thinkingContent, tokenUsage];
-            
+
         } catch (error) {
             this.logger(this.logTemplates.error(this.name, error));
             throw new Error(this.errorMessages.apiError(error));

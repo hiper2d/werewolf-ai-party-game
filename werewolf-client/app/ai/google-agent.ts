@@ -1,8 +1,8 @@
-import {AbstractAgent} from "@/app/ai/abstract-agent";
-import {AIMessage, TokenUsage} from "@/app/api/game-models";
-import {GoogleGenAI, Type} from "@google/genai";
-import {cleanResponse} from "@/app/utils/message-utils";
-import {ModelOverloadError, ModelRateLimitError, ModelUnavailableError, ModelAuthenticationError, ModelQuotaExceededError} from "@/app/ai/errors";
+import { AbstractAgent } from "@/app/ai/abstract-agent";
+import { AIMessage, TokenUsage } from "@/app/api/game-models";
+import { GoogleGenAI, Type } from "@google/genai";
+import { cleanResponse } from "@/app/utils/message-utils";
+import { ModelOverloadError, ModelRateLimitError, ModelUnavailableError, ModelAuthenticationError, ModelQuotaExceededError } from "@/app/ai/errors";
 import { z } from 'zod';
 import { ZodSchemaConverter } from './zod-schema-converter';
 import { safeValidateResponse } from './prompts/zod-schemas';
@@ -28,7 +28,6 @@ export class GoogleAgent extends AbstractAgent {
 
     // Log message templates
     private readonly logTemplates = {
-        askingAgent: (name: string, model: string) => `Asking ${name} ${model} agent`,
         error: (name: string, error: unknown) => `Error in ${name} agent: ${error}`,
     };
 
@@ -109,11 +108,11 @@ export class GoogleAgent extends AbstractAgent {
         // Validate roles first, before entering the main try-catch block
         // This ensures role validation errors are thrown directly
         const contents = this.convertToContents(messages);
-        
+
         try {
             // Convert Zod schema to Google-compatible format using Type constants
             const googleSchema = ZodSchemaConverter.toGoogleSchema(zodSchema);
-            
+
             const config: any = {
                 temperature: this.temperature,
                 responseMimeType: "application/json",
@@ -129,8 +128,10 @@ export class GoogleAgent extends AbstractAgent {
                 };
             }
 
-            this.logger(this.logTemplates.askingAgent(this.name, this.model));
-            
+            this.logAsking();
+            this.logSystemPrompt();
+            this.logMessages(messages);
+
             let response;
             try {
                 response = await this.client.models.generateContent({
@@ -143,7 +144,7 @@ export class GoogleAgent extends AbstractAgent {
                 this.logger(this.logTemplates.error(this.name, apiError));
                 throw new Error(this.errorMessages.apiError(apiError));
             }
-            
+
             // Handle thinking content if present
             let thinkingContent = "";
             if (this.enableThinking && (response as any).candidates?.[0]?.content?.parts) {
@@ -178,7 +179,7 @@ export class GoogleAgent extends AbstractAgent {
             }
 
             this.logger(`Zod schema response received - hasText: ${!!response.text}, textLength: ${response.text ? response.text.length : 0}`);
-            
+
             if (!response.text) {
                 throw new Error(this.errorMessages.emptyResponse);
             }
@@ -200,15 +201,15 @@ export class GoogleAgent extends AbstractAgent {
             }
 
             this.logger(`✅ Response validated successfully with Zod schema`);
-            
+
             return [validationResult.data, thinkingContent, tokenUsage];
-            
+
         } catch (error) {
             this.logger(this.logTemplates.error(this.name, error));
-            
+
             // Check for specific Gemini API errors
             this.handleGeminiError(error);
-            
+
             throw error;
         }
     }
@@ -228,7 +229,7 @@ export class GoogleAgent extends AbstractAgent {
             if ('message' in error) {
                 errorMessage = String((error as any).message);
             }
-            
+
             // Try to parse if the message contains JSON (Gemini API format)
             try {
                 const parsed = JSON.parse(errorMessage);
@@ -255,8 +256,8 @@ export class GoogleAgent extends AbstractAgent {
         }
 
         // Throw specific exceptions based on error content
-        if (errorCode === 503 || errorStatus === 'UNAVAILABLE' || 
-            errorMessage.includes('model is overloaded') || 
+        if (errorCode === 503 || errorStatus === 'UNAVAILABLE' ||
+            errorMessage.includes('model is overloaded') ||
             errorMessage.includes('overloaded')) {
             throw new ModelOverloadError(
                 errorMessage || 'Model is currently overloaded. Please try again later.',

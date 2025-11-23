@@ -1,9 +1,9 @@
-import {AbstractAgent} from "@/app/ai/abstract-agent";
-import {OpenAI} from "openai";
+import { AbstractAgent } from "@/app/ai/abstract-agent";
+import { OpenAI } from "openai";
 import { zodResponseFormat } from "openai/helpers/zod";
-import {AIMessage, TokenUsage} from "@/app/api/game-models";
-import {cleanResponse} from "@/app/utils/message-utils";
-import {calculateGrokCost} from "@/app/utils/pricing";
+import { AIMessage, TokenUsage } from "@/app/api/game-models";
+import { cleanResponse } from "@/app/utils/message-utils";
+import { calculateGrokCost } from "@/app/utils/pricing";
 import { z } from 'zod';
 
 export class GrokAgent extends AbstractAgent {
@@ -16,7 +16,6 @@ export class GrokAgent extends AbstractAgent {
 
     // Log message templates
     private readonly logTemplates = {
-        askingAgent: (name: string, model: string) => `Asking ${name} ${model} agent`,
         error: (name: string, error: unknown) => `Error in ${name} agent: ${error}`,
     };
 
@@ -57,7 +56,7 @@ export class GrokAgent extends AbstractAgent {
 
         // Extract reasoning content if available (grok-4 is reasoning-only)
         const reasoningContent: string = (message as any)?.reasoning_content || "";
-        
+
         this.logger(`Grok Agent - Found reasoning_content: ${!!reasoningContent}, length: ${reasoningContent.length}`);
 
         if (!reply) {
@@ -72,7 +71,7 @@ export class GrokAgent extends AbstractAgent {
                 completion.usage.prompt_tokens || 0,
                 completion.usage.completion_tokens || 0
             );
-            
+
             tokenUsage = {
                 inputTokens: completion.usage.prompt_tokens || 0,
                 outputTokens: completion.usage.completion_tokens || 0,
@@ -99,7 +98,7 @@ export class GrokAgent extends AbstractAgent {
         try {
             const preparedMessages = this.prepareMessages(messages);
             const openAIMessages = this.convertToOpenAIMessages(preparedMessages);
-            
+
             // Add system instruction if needed
             if (openAIMessages.length > 0 && openAIMessages[0].role !== 'system') {
                 openAIMessages.unshift({
@@ -110,7 +109,9 @@ export class GrokAgent extends AbstractAgent {
                 openAIMessages[0].content = `${this.instruction}\\n\\n${openAIMessages[0].content}`;
             }
 
-            this.logger(this.logTemplates.askingAgent(this.name, this.model));
+            this.logAsking();
+            this.logSystemPrompt();
+            this.logMessages(messages);
 
             // Use the official structured output API for grok-4
             // Note: Grok-4 needs high max_tokens because it consumes many tokens for reasoning
@@ -130,7 +131,7 @@ export class GrokAgent extends AbstractAgent {
 
             // Extract reasoning content if available (grok-4 reasoning)
             const reasoningContent: string = (completion.choices[0]?.message as any)?.reasoning_content || "";
-            
+
             this.logger(`Grok Agent - Found reasoning_content: ${!!reasoningContent}, length: ${reasoningContent.length}`);
             this.logger(`✅ Response parsed successfully with Zod schema`);
 
@@ -142,7 +143,7 @@ export class GrokAgent extends AbstractAgent {
                     completion.usage.prompt_tokens || 0,
                     completion.usage.completion_tokens || 0
                 );
-                
+
                 tokenUsage = {
                     inputTokens: completion.usage.prompt_tokens || 0,
                     outputTokens: completion.usage.completion_tokens || 0,

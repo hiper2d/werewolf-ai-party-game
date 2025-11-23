@@ -42,6 +42,21 @@ export interface RolePlayersInfo {
 }
 
 /**
+ * Accumulated outcome of night actions
+ */
+export interface NightOutcome {
+    killedPlayer: string | null;
+    killedPlayerRole: string | null;
+    wasKillPrevented: boolean;
+    noWerewolfActivity: boolean;
+    detectiveFoundEvil: boolean;
+    detectiveTargetDied: boolean;
+    detectiveWasActive: boolean;
+    doctorWasActive: boolean;
+    [key: string]: any; // Allow for future extensibility
+}
+
+/**
  * Abstract base class for role processors
  * Each role that has night actions should extend this class
  */
@@ -68,7 +83,7 @@ export abstract class BaseRoleProcessor {
 
             // Get players with this role
             const playersInfo = this.getPlayersWithRole();
-            
+
             if (playersInfo.allPlayers.length === 0) {
                 // No players with this role are alive
                 this.logNightAction("No players with this role are alive, skipping");
@@ -77,9 +92,9 @@ export abstract class BaseRoleProcessor {
 
             // Create parameter queue for this role
             const paramQueue = this.createParamQueue(playersInfo);
-            
+
             this.logNightAction(`Initialized with ${paramQueue.length} players in queue: [${paramQueue.join(', ')}]`);
-            
+
             return {
                 success: true,
                 paramQueue: paramQueue
@@ -100,15 +115,15 @@ export abstract class BaseRoleProcessor {
      */
     protected createParamQueue(playersInfo: RolePlayersInfo): string[] {
         const playersWithRole: string[] = [];
-        
+
         // Add all players with this role
         playersInfo.allPlayers.forEach(player => {
             playersWithRole.push(player.name);
         });
-        
+
         // Randomize the order
         playersWithRole.sort(() => Math.random() - 0.5);
-        
+
         return playersWithRole;
     }
 
@@ -119,12 +134,23 @@ export abstract class BaseRoleProcessor {
     abstract processNightAction(): Promise<NightActionResult>;
 
     /**
+     * Calculate the outcome of this role's night action based on all night results
+     * This is called at the end of the night to generate the final summary
+     * @param nightResults The complete map of night results from all roles
+     * @param currentOutcome The accumulated outcome so far
+     */
+    async getNightResultsOutcome(nightResults: any, currentOutcome: NightOutcome): Promise<Partial<NightOutcome>> {
+        // Default implementation returns no changes
+        return {};
+    }
+
+    /**
      * Get information about all players who have this role
      */
     protected getPlayersWithRole(): RolePlayersInfo {
         // Find all alive bots with this role
         const bots = this.game.bots.filter(bot => bot.isAlive && bot.role === this.roleName);
-        
+
         // Check if human player has this role
         const hasHumanPlayer = this.game.humanPlayerRole === this.roleName;
         const humanPlayerName = hasHumanPlayer ? this.game.humanPlayerName : undefined;
@@ -185,7 +211,7 @@ export abstract class BaseRoleProcessor {
 
         // Create a generic announcement that doesn't reveal specific player identities
         let announcement: string;
-        
+
         if (this.roleName === GAME_ROLES.WEREWOLF && playersInfo.hasHumanPlayer) {
             const werewolfRoster = playersInfo.allPlayers
                 .map(player => player.isHuman ? `${player.name} (You)` : player.name)
