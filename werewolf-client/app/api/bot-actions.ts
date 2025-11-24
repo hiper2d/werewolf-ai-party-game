@@ -1410,6 +1410,10 @@ async function getSuggestionImpl(gameId: string): Promise<string> {
         const messages = await getGameMessages(gameId);
         const dayMessages = messages.filter(m => m.day === game.currentDay);
 
+        // Filter to only public messages (addressed to ALL) - exclude private messages
+        // like werewolf coordination, detective reports, doctor actions, etc.
+        const publicDayMessages = dayMessages.filter(m => m.recipientName === RECIPIENT_ALL);
+
         // Get API keys for the human player
         const apiKeys = await getApiKeysForUser(session.user.email);
 
@@ -1428,9 +1432,9 @@ async function getSuggestionImpl(gameId: string): Promise<string> {
 
         // Use the game master AI to generate suggestion
         const agent = AgentFactory.createAgent('SuggestionBot', suggestionPrompt, game.gameMasterAiType, apiKeys, false);
-        
-        // Convert day messages to AI format for context
-        const history = convertToAIMessages('SuggestionBot', dayMessages);
+
+        // Convert public day messages to AI format for context
+        const history = convertToAIMessages('SuggestionBot', publicDayMessages);
         
         // Get suggestion from AI using schema to ensure consistent format
         const [suggestionResponse, thinking, tokenUsage] = await agent.askWithZodSchema(BotAnswerZodSchema, history);

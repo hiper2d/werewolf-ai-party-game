@@ -96,7 +96,9 @@ export class GrokAgent extends AbstractAgent {
                 max_tokens: 16384,  // Set to 16k to handle longer JSON responses
             });
 
-            const reply = completion.choices[0]?.message?.content;
+            const choiceMessage = completion.choices[0]?.message;
+            const { textContent, additionalReasoning } = this.extractMessageContentParts(choiceMessage?.content);
+            const reply = textContent;
             if (!reply) {
                 throw new Error(this.errorMessages.emptyResponse);
             }
@@ -104,7 +106,15 @@ export class GrokAgent extends AbstractAgent {
             this.logReply(reply);
 
             // Extract reasoning content if available
-            const reasoningContent: string = (completion.choices[0]?.message as any)?.reasoning_content || "";
+            const reasoningContentParts: string[] = [];
+            const reasoningContentFromMessage: string = (choiceMessage as any)?.reasoning_content || "";
+            if (reasoningContentFromMessage) {
+                reasoningContentParts.push(reasoningContentFromMessage);
+            }
+            if (additionalReasoning) {
+                reasoningContentParts.push(additionalReasoning);
+            }
+            const reasoningContent = reasoningContentParts.join('\n').trim();
 
             this.logger(`Grok Agent - Found reasoning_content: ${!!reasoningContent}, length: ${reasoningContent.length}`);
 
@@ -129,24 +139,30 @@ export class GrokAgent extends AbstractAgent {
             // Extract token usage information
             let tokenUsage: TokenUsage | undefined;
             if (completion.usage) {
+                const promptTokens = completion.usage.prompt_tokens || 0;
+                const completionTokens = completion.usage.completion_tokens || 0;
+                const reasoningTokens = (completion.usage as any).completion_tokens_details?.reasoning_tokens || 0;
+
+                // For Grok reasoning models: completion_tokens = final answer only, reasoning_tokens = thinking
+                // Total output = completion_tokens + reasoning_tokens
+                const totalOutputTokens = completionTokens + reasoningTokens;
+
                 const cost = calculateGrokCost(
                     this.model,
-                    completion.usage.prompt_tokens || 0,
-                    completion.usage.completion_tokens || 0
+                    promptTokens,
+                    totalOutputTokens
                 );
 
                 tokenUsage = {
-                    inputTokens: completion.usage.prompt_tokens || 0,
-                    outputTokens: completion.usage.completion_tokens || 0,
-                    totalTokens: completion.usage.total_tokens || 0,
+                    inputTokens: promptTokens,
+                    outputTokens: totalOutputTokens,
+                    totalTokens: promptTokens + totalOutputTokens,
                     costUSD: cost
                 };
 
                 // Log reasoning token breakdown if available and thinking is enabled
-                if (this.enableThinking && (completion.usage as any).completion_tokens_details?.reasoning_tokens) {
-                    const reasoningTokens = (completion.usage as any).completion_tokens_details.reasoning_tokens;
-                    const finalAnswerTokens = tokenUsage.outputTokens - reasoningTokens;
-                    this.logger(`Output breakdown: ${reasoningTokens} reasoning tokens, ${finalAnswerTokens} final answer tokens`);
+                if (this.enableThinking && reasoningTokens > 0) {
+                    this.logger(`Output breakdown: ${reasoningTokens} reasoning tokens, ${completionTokens} final answer tokens, ${totalOutputTokens} total output tokens`);
                 }
             }
 
@@ -155,6 +171,105 @@ export class GrokAgent extends AbstractAgent {
         } catch (error) {
             this.logger(this.logTemplates.error(this.name, error));
             throw new Error(this.errorMessages.apiError(error));
+        }
+    }
+
+    private extractMessageContentParts(content: unknown): { textContent: string; additionalReasoning: string } {
+        if (!content) {
+            return { textContent: '', additionalReasoning: '' };
+        }
+
+        if (typeof content === 'string') {
+            return { textContent: content, additionalReasoning: '' };
+        }
+
+        if (!Array.isArray(content)) {
+            return { textContent: '', additionalReasoning: this.stringifyUnknown(content) };
+        }
+
+        const textParts: string[] = [];
+        const reasoningParts: string[] = [];
+
+        for (const part of content) {
+            if (part == null) {
+                continue;
+            }
+
+            if (typeof part === 'string') {
+                textParts.push(part);
+                continue;
+            }
+
+            if (typeof part !== 'object') {
+                textParts.push(String(part));
+                continue;
+            }
+
+            const normalizedReasoning = this.extractReasoningText(part as Record<string, unknown>);
+            if (normalizedReasoning) {
+                reasoningParts.push(normalizedReasoning);
+                continue;
+            }
+
+            const maybeText = (part as { text?: unknown }).text;
+            if (typeof maybeText === 'string') {
+                textParts.push(maybeText);
+            } else {
+                reasoningParts.push(this.stringifyUnknown(part));
+            }
+        }
+
+        return {
+            textContent: textParts.join('\n').trim(),
+            additionalReasoning: reasoningParts.join('\n').trim()
+        };
+    }
+
+    private extractReasoningText(part: Record<string, unknown>): string | undefined {
+        const partTypeValue = part['type'];
+        const partType = typeof partTypeValue === 'string' ? partTypeValue.toLowerCase() : '';
+
+        if (partType === 'text' && typeof part['text'] === 'string') {
+            return undefined;
+        }
+
+        if (partType.includes('thought')) {
+            if (typeof part['text'] === 'string') {
+                return part['text'] as string;
+            }
+            if (typeof (part as any).thought === 'string') {
+                return (part as any).thought;
+            }
+            if (typeof (part as any).thoughtSignature === 'string') {
+                return (part as any).thoughtSignature;
+            }
+        }
+
+        const reasoningContent = (part as any).reasoning_content || (part as any).reasoning;
+        if (reasoningContent) {
+            if (typeof reasoningContent === 'string') {
+                return reasoningContent;
+            }
+
+            if (Array.isArray(reasoningContent)) {
+                return reasoningContent.map(segment => this.stringifyUnknown(segment)).join('\n');
+            }
+
+            return this.stringifyUnknown(reasoningContent);
+        }
+
+        return undefined;
+    }
+
+    private stringifyUnknown(value: unknown): string {
+        if (typeof value === 'string') {
+            return value;
+        }
+
+        try {
+            return JSON.stringify(value);
+        } catch {
+            return String(value);
         }
     }
 }

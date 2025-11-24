@@ -105,7 +105,7 @@ function ErrorBanner({ error, onDismiss, onRetry }: ErrorBannerProps) {
     );
 }
 
-function renderMessage(message: GameMessage, gameId: string, onDeleteAfter: (messageId: string) => void, game: Game, onSpeak: (messageId: string, text: string) => void, speakingMessageId: string | null) {
+function renderMessage(message: GameMessage, gameId: string, onDeleteAfter: (messageId: string) => void, onDeleteAfterExcluding: (messageId: string) => void, game: Game, onSpeak: (messageId: string, text: string) => void, speakingMessageId: string | null) {
     const isUserMessage = message.messageType === MessageType.HUMAN_PLAYER_MESSAGE || message.authorName === game.humanPlayerName;
     const isGameMaster = message.authorName === GAME_MASTER || message.messageType === MessageType.GM_COMMAND || message.messageType === MessageType.NIGHT_BEGINS;
     const isNightMessage = message.messageType === MessageType.NIGHT_BEGINS || 
@@ -200,30 +200,57 @@ function renderMessage(message: GameMessage, gameId: string, onDeleteAfter: (mes
                 </div>
                 {message.id && !isVoteMessage && displayContent && displayContent.trim() && (
                     <div className="flex gap-1">
-                        {/* Reset icon - allow for bot + human day discussion messages */}
+                        {/* Delete buttons - allow for bot + human day discussion messages */}
                         {canShowResetButton && (
-                            <button
-                                onClick={() => onDeleteAfter(message.id!)}
-                                className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 rounded hover:bg-gray-600/50"
-                                title="Reset chat to this point (delete all messages after this one)"
-                            >
-                                <svg
-                                    width="14"
-                                    height="14"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    className="text-gray-400 hover:text-red-400"
+                            <>
+                                <button
+                                    onClick={() => onDeleteAfter(message.id!)}
+                                    className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 rounded hover:bg-gray-600/50"
+                                    title="Delete this message and all messages after it"
                                 >
-                                    <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
-                                    <path d="M21 3v5h-5"/>
-                                    <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
-                                    <path d="M3 21v-5h5"/>
-                                </svg>
-                            </button>
+                                    <svg
+                                        width="16"
+                                        height="16"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="2"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        className="text-gray-400 hover:text-red-400"
+                                    >
+                                        {/* Scissors icon - cut from here */}
+                                        <circle cx="6" cy="6" r="3"/>
+                                        <path d="M8.12 8.12 12 12"/>
+                                        <path d="M20 4 8.12 15.88"/>
+                                        <circle cx="6" cy="18" r="3"/>
+                                        <path d="M14.8 14.8 20 20"/>
+                                    </svg>
+                                </button>
+                                <button
+                                    onClick={() => onDeleteAfterExcluding(message.id!)}
+                                    className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 rounded hover:bg-gray-600/50"
+                                    title="Delete all messages after this one (keep this message)"
+                                >
+                                    <svg
+                                        width="16"
+                                        height="16"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="2"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        className="text-gray-400 hover:text-orange-400"
+                                    >
+                                        {/* Arrow with scissors - cut after this */}
+                                        <path d="M5 12h14"/>
+                                        <path d="M12 5l7 7-7 7"/>
+                                        <circle cx="9" cy="9" r="1.5"/>
+                                        <circle cx="9" cy="15" r="1.5"/>
+                                    </svg>
+                                </button>
+                            </>
                         )}
                         
                         {/* Speaker icon for TTS */}
@@ -676,9 +703,9 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
 
     const handleDeleteAfter = async (messageId: string) => {
         const confirmed = window.confirm(
-            'Are you sure you want to delete all messages after this point? This action cannot be undone.'
+            'Are you sure you want to delete this message and all messages after it? This action cannot be undone.'
         );
-        
+
         if (!confirmed) return;
 
         try {
@@ -698,12 +725,67 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
 
             const result = await response.json();
             console.log(result.message);
-            
+
             // Remove deleted messages from local state
             setMessages(prev => {
                 const targetIndex = prev.findIndex(msg => msg.id === messageId);
                 if (targetIndex === -1) return prev;
                 return prev.slice(0, targetIndex);
+            });
+
+            // Refresh game state immediately if callback is provided
+            if (onGameStateChange) {
+                try {
+                    console.log('🔄 REFRESHING GAME STATE after message deletion...');
+                    const { getGame } = await import("@/app/api/game-actions");
+                    const updatedGame = await getGame(gameId);
+                    if (updatedGame) {
+                        const aliveBots = updatedGame.bots.filter(bot => bot.isAlive).map(bot => bot.name);
+                        console.log('✅ GAME STATE REFRESHED - Alive bots:', aliveBots);
+                        onGameStateChange(updatedGame);
+                    }
+                } catch (error) {
+                    console.error('Error refreshing game state:', error);
+                }
+            }
+        } catch (error) {
+            console.error('Error deleting messages:', error);
+            alert('Failed to delete messages. Please try again.');
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
+    const handleDeleteAfterExcluding = async (messageId: string) => {
+        const confirmed = window.confirm(
+            'Are you sure you want to delete all messages after this one (keeping this message)? This action cannot be undone.'
+        );
+
+        if (!confirmed) return;
+
+        try {
+            setIsDeleting(true);
+            const response = await fetch(`/api/games/${gameId}/messages/delete-after-excluding`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ messageId }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to delete messages');
+            }
+
+            const result = await response.json();
+            console.log(result.message);
+
+            // Remove deleted messages from local state (keep the current message)
+            setMessages(prev => {
+                const targetIndex = prev.findIndex(msg => msg.id === messageId);
+                if (targetIndex === -1) return prev;
+                return prev.slice(0, targetIndex + 1);
             });
 
             // Refresh game state immediately if callback is provided
@@ -1119,7 +1201,7 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
                         const key = message.id ?? fallbackKey;
                         return (
                             <div key={key}>
-                                {renderMessage(message, gameId, handleDeleteAfter, game, handleSpeak, speakingMessageId)}
+                                {renderMessage(message, gameId, handleDeleteAfter, handleDeleteAfterExcluding, game, handleSpeak, speakingMessageId)}
                             </div>
                         );
                     })
