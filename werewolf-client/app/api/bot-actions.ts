@@ -283,8 +283,13 @@ async function welcomeImpl(gameId: string): Promise<Game> {
         // Get messages for this bot (ALL + direct messages to this bot)
         const botMessages = await getBotMessages(gameId, bot.name, game.currentDay);
 
-        // Create history from filtered messages, including the GM command that hasn't been saved yet
-        const history = convertToAIMessages(bot.name, [...botMessages, gmMessage]);
+        // Include the GM command in history with playstyle reminder without saving it yet
+        const playStyleReminder = format(BOT_REMINDER_POSTFIX, { play_style: generatePlayStyleDescription(bot) });
+        const messagesWithPlaystyle = [...botMessages, {
+            ...gmMessage,
+            msg: gmMessage.msg + playStyleReminder
+        }];
+        const history = convertToAIMessages(bot.name, messagesWithPlaystyle);
         const [answer, thinking, tokenUsage] = await agent.askWithZodSchema(BotAnswerZodSchema, history);
         
         if (!answer) {

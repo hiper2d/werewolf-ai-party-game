@@ -29,8 +29,8 @@ export const SupportedAiKeyNames: Record<string, string> = {
 };
 
 export const LLM_CONSTANTS = {
-    CLAUDE_4_OPUS: 'Claude 4.1 Opus',
-    CLAUDE_4_OPUS_THINKING: 'Claude 4.1 Opus (Thinking)',
+    CLAUDE_4_OPUS: 'Claude 4.5 Opus',
+    CLAUDE_4_OPUS_THINKING: 'Claude 4.5 Opus (Thinking)',
     CLAUDE_4_SONNET: 'Claude 4.5 Sonnet',
     CLAUDE_4_SONNET_THINKING: 'Claude 4.5 Sonnet (Thinking)',
     CLAUDE_4_HAIKU: 'Claude 4.5 Haiku',
@@ -86,7 +86,7 @@ export interface ModelConfig {
 export const SupportedAiModels: Record<string, ModelConfig> = {
     // Claude models - separate with/without thinking versions
     [LLM_CONSTANTS.CLAUDE_4_OPUS]: {
-        modelApiName: 'claude-opus-4-1',
+        modelApiName: 'claude-opus-4-5',
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
         hasThinking: false,
         freeTier: {
@@ -95,7 +95,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         }
     },
     [LLM_CONSTANTS.CLAUDE_4_OPUS_THINKING]: {
-        modelApiName: 'claude-opus-4-1',
+        modelApiName: 'claude-opus-4-5',
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
         hasThinking: true,
         freeTier: {
@@ -332,8 +332,8 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
 
     // Anthropic models
     [SupportedAiModels[LLM_CONSTANTS.CLAUDE_4_OPUS].modelApiName]: {
-        inputPrice: 15.0,
-        outputPrice: 75.0
+        inputPrice: 5.0,
+        outputPrice: 25.0
     },
     [SupportedAiModels[LLM_CONSTANTS.CLAUDE_4_SONNET].modelApiName]: {
         inputPrice: 3.0,
