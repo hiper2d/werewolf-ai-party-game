@@ -187,13 +187,13 @@ function renderMessage(message: GameMessage, gameId: string, onDeleteAfter: (mes
             <div className="flex items-center justify-between mb-1">
                 <div className="flex items-center gap-2">
                     <span className={`text-xs font-semibold ${
-                        isGameMaster ? (isNightMessage ? 'text-blue-300' : 'text-green-400') : 
-                        isUserMessage ? 'text-gray-300' : ''
+                        isGameMaster ? (isNightMessage ? 'text-blue-600 dark:text-blue-300' : 'text-green-600 dark:text-green-400') :
+                        isUserMessage ? 'theme-text-secondary' : ''
                     }`} style={!isUserMessage && !isGameMaster ? { color: getPlayerColor(message.authorName) } : undefined}>
                         {message.authorName}
                     </span>
                     {message.cost !== undefined && message.cost > 0 && (
-                        <span className="text-xs text-gray-500 bg-gray-800/30 px-1 py-0.5 rounded text-xs font-mono">
+                        <span className="text-xs theme-text-secondary bg-gray-200/60 dark:bg-gray-800/30 px-1 py-0.5 rounded text-xs font-mono">
                             ${message.cost.toFixed(4)}
                         </span>
                     )}
@@ -205,7 +205,7 @@ function renderMessage(message: GameMessage, gameId: string, onDeleteAfter: (mes
                             <>
                                 <button
                                     onClick={() => onDeleteAfter(message.id!)}
-                                    className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 rounded hover:bg-gray-600/50"
+                                    className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 rounded hover:bg-gray-300/50 dark:hover:bg-gray-600/50"
                                     title="Delete this message and all messages after it"
                                 >
                                     <svg
@@ -217,7 +217,7 @@ function renderMessage(message: GameMessage, gameId: string, onDeleteAfter: (mes
                                         strokeWidth="2"
                                         strokeLinecap="round"
                                         strokeLinejoin="round"
-                                        className="text-gray-400 hover:text-red-400"
+                                        className="theme-text-secondary hover:text-red-600 dark:hover:text-red-400"
                                     >
                                         {/* Scissors icon - cut from here */}
                                         <circle cx="6" cy="6" r="3"/>
@@ -229,7 +229,7 @@ function renderMessage(message: GameMessage, gameId: string, onDeleteAfter: (mes
                                 </button>
                                 <button
                                     onClick={() => onDeleteAfterExcluding(message.id!)}
-                                    className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 rounded hover:bg-gray-600/50"
+                                    className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 rounded hover:bg-gray-300/50 dark:hover:bg-gray-600/50"
                                     title="Delete all messages after this one (keep this message)"
                                 >
                                     <svg
@@ -241,7 +241,7 @@ function renderMessage(message: GameMessage, gameId: string, onDeleteAfter: (mes
                                         strokeWidth="2"
                                         strokeLinecap="round"
                                         strokeLinejoin="round"
-                                        className="text-gray-400 hover:text-orange-400"
+                                        className="theme-text-secondary hover:text-orange-600 dark:hover:text-orange-400"
                                     >
                                         {/* Arrow with scissors - cut after this */}
                                         <path d="M5 12h14"/>
@@ -256,7 +256,7 @@ function renderMessage(message: GameMessage, gameId: string, onDeleteAfter: (mes
                         {/* Speaker icon for TTS */}
                         <button
                             onClick={() => onSpeak(message.id!, displayContent)}
-                            className="p-1 rounded hover:bg-gray-600/50"
+                            className="p-1 rounded hover:bg-gray-300/50 dark:hover:bg-gray-600/50"
                             title={speakingMessageId === message.id ? "Stop speaking" : "Read message aloud"}
                         >
                             {speakingMessageId === message.id ? (
@@ -269,7 +269,7 @@ function renderMessage(message: GameMessage, gameId: string, onDeleteAfter: (mes
                                     strokeWidth="2"
                                     strokeLinecap="round"
                                     strokeLinejoin="round"
-                                    className="text-blue-400 hover:text-blue-300"
+                                    className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
                                 >
                                     <rect x="6" y="4" width="4" height="16"/>
                                     <rect x="14" y="4" width="4" height="16"/>
@@ -284,7 +284,7 @@ function renderMessage(message: GameMessage, gameId: string, onDeleteAfter: (mes
                                     strokeWidth="2"
                                     strokeLinecap="round"
                                     strokeLinejoin="round"
-                                    className="text-gray-400 hover:text-blue-400"
+                                    className="theme-text-secondary hover:text-blue-600 dark:hover:text-blue-400"
                                 >
                                     <polygon points="11 5,6 9,2 9,2 15,6 15,11 19"/>
                                     <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
@@ -295,10 +295,10 @@ function renderMessage(message: GameMessage, gameId: string, onDeleteAfter: (mes
                 )}
             </div>
             <span className={`inline-block p-2 ${
-                isGameMaster ? (isNightMessage ? 'rounded-lg bg-blue-950/60 border border-blue-600/20' : 'rounded-lg bg-green-900/50 border border-green-500/30') :
-                isVoteMessage ? 'rounded-lg bg-orange-900/50 border border-orange-500/30' :
-                isUserMessage ? 'rounded-lg bg-slate-700' : 'rounded-lg'
-            } text-white`} style={!isUserMessage && !isGameMaster && !isVoteMessage ? { backgroundColor: `${getPlayerColor(message.authorName)}33` } : undefined}>
+                isGameMaster ? (isNightMessage ? 'rounded-lg bg-blue-100 dark:bg-blue-950/60 border border-blue-400 dark:border-blue-600/20' : 'rounded-lg bg-green-100 dark:bg-green-900/50 border border-green-500 dark:border-green-500/30') :
+                isVoteMessage ? 'rounded-lg bg-orange-100 dark:bg-orange-900/50 border border-orange-500 dark:border-orange-500/30' :
+                isUserMessage ? 'rounded-lg bg-slate-200 dark:bg-slate-700' : 'rounded-lg'
+            } theme-text-primary`} style={!isUserMessage && !isGameMaster && !isVoteMessage ? { backgroundColor: `${getPlayerColor(message.authorName)}33` } : undefined}>
                 {displayContent}
             </span>
         </div>
@@ -1140,30 +1140,30 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
                 </div>
                 <div className="flex items-center gap-3">
                     {shouldShowMessageCount && (
-                        <span className="text-xs text-gray-400">
+                        <span className="text-xs theme-text-secondary">
                             {messageCountLabel}
                         </span>
                     )}
                     {availableDays.length > 1 && (
                         <div className="flex items-center gap-2" ref={daySelectorRef}>
-                            <span className="text-sm text-gray-300">History:</span>
+                            <span className="text-sm theme-text-secondary">History:</span>
                             <div className="relative">
                                 <button
                                     type="button"
                                     onClick={() => setShowDaySelector(prev => !prev)}
-                                    className={`flex items-center gap-1 text-sm px-3 py-1 rounded border border-white/30 bg-black/60 hover:bg-black/80 transition-colors ${showDaySelector ? 'text-blue-300' : 'text-white'}`}
+                                    className={`flex items-center gap-1 text-sm px-3 py-1 rounded theme-border border theme-bg-card hover:opacity-90 transition-colors ${showDaySelector ? 'text-blue-600 dark:text-blue-300' : 'theme-text-primary'}`}
                                 >
                                     Day {selectedDay}
                                     <span className="text-xs">{showDaySelector ? '▲' : '▼'}</span>
                                 </button>
                                 {showDaySelector && (
-                                    <div className="absolute right-0 top-full mt-2 w-40 rounded border border-white/30 bg-black/90 shadow-lg z-20 max-h-60 overflow-y-auto">
+                                    <div className="absolute right-0 top-full mt-2 w-40 rounded theme-border border theme-bg-card shadow-lg z-20 max-h-60 overflow-y-auto">
                                         {availableDays.map(day => (
                                             <button
                                                 key={day}
                                                 type="button"
                                                 onClick={() => handleDaySelect(day)}
-                                                className={`block w-full px-3 py-2 text-left text-sm hover:bg-white/10 ${day === selectedDay ? 'bg-white/10' : ''}`}
+                                                className={`block w-full px-3 py-2 text-left text-sm hover:bg-gray-200 dark:hover:bg-white/10 ${day === selectedDay ? 'bg-gray-200 dark:bg-white/10' : ''}`}
                                             >
                                                 Day {day}{day === game.currentDay ? ' (current)' : ''}
                                             </button>
@@ -1176,7 +1176,7 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
                 </div>
             </div>
             {!isCurrentDaySelected && (
-                <div className="mb-3 text-xs text-gray-300 italic">
+                <div className="mb-3 text-xs theme-text-secondary italic">
                     Viewing Day {selectedDay} history (read-only)
                 </div>
             )}
@@ -1186,13 +1186,13 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
                     onDismiss={handleDismissError}
                 />
             )}
-            <div className="flex-1 overflow-y-auto mb-4 p-2 bg-black bg-opacity-30 rounded" style={{ minHeight: '200px' }}>
+            <div className="flex-1 overflow-y-auto mb-4 p-2 theme-bg-card theme-border border rounded" style={{ minHeight: '200px' }}>
                 {isLoadingMessages ? (
-                    <div className="text-center text-gray-400 text-sm py-4">
+                    <div className="text-center theme-text-secondary text-sm py-4">
                         Loading Day {selectedDay}...
                     </div>
                 ) : messages.length === 0 ? (
-                    <div className="text-center text-gray-400 text-sm py-4">
+                    <div className="text-center theme-text-secondary text-sm py-4">
                         No messages for Day {selectedDay} yet.
                     </div>
                 ) : (
@@ -1232,8 +1232,7 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
                     onKeyDown={handleTextareaKeyDown}
                     disabled={!isInputEnabled()}
                     rows={textareaRows}
-                    className={`flex-grow p-3 rounded bg-black bg-opacity-30 text-white placeholder-gray-400 border
-                        border-gray-600 focus:outline-none focus:border-gray-500 resize-none
+                    className={`flex-grow p-3 rounded bg-input border border-input-border text-input-text placeholder-input-placeholder focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none
                         ${!isInputEnabled() ? 'opacity-50 cursor-not-allowed' : ''}`}
                     placeholder={getInputPlaceholder()}
                 />

@@ -2,7 +2,47 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
+/* Light Theme */
+[data-theme='light'] {
+  --color-text-primary: 15, 23, 42;
+  --color-text-secondary: 71, 85, 105;
+
+  --color-page-bg-start: 248, 250, 252;
+  --color-page-bg-end: 226, 232, 240;
+
+  --color-navbar-bg: 255, 255, 255;
+  --color-navbar-text: 15, 23, 42;
+  --color-navbar-link: 51, 65, 85;
+  --color-navbar-link-hover: 15, 23, 42;
+  --color-navbar-divider: 203, 213, 225;
+
+  --color-toggle-bg: rgba(0, 0, 0, 0.05);
+  --color-toggle-hover-bg: rgba(0, 0, 0, 0.1);
+  --color-toggle-border: rgba(0, 0, 0, 0.15);
+  --color-toggle-text: 30, 41, 59;
+
+  --color-card-bg: 255, 255, 255;
+  --color-card-border: 203, 213, 225;
+  --color-card-shadow: rgba(15, 23, 42, 0.12);
+
+  --color-button-bg: 15, 23, 42;
+  --color-button-text: 255, 255, 255;
+  --color-button-hover-bg: 30, 41, 59;
+  --color-button-transparent-bg: rgba(0, 0, 0, 0.05);
+  --color-button-transparent-hover-bg: rgba(0, 0, 0, 0.1);
+
+  --color-input-bg: 255, 255, 255;
+  --color-input-border: 203, 213, 225;
+  --color-input-text: 15, 23, 42;
+  --color-input-placeholder: 148, 163, 184;
+
+  --color-scrollbar-track: 241, 245, 249;
+  --color-scrollbar-thumb: 203, 213, 225;
+  --color-scrollbar-thumb-hover: 148, 163, 184;
+}
+
+/* Dark Theme */
+[data-theme='dark'] {
   --color-text-primary: 255, 255, 255;
   --color-text-secondary: 203, 213, 225;
 
@@ -19,25 +59,25 @@
   --color-toggle-hover-bg: rgba(255, 255, 255, 0.16);
   --color-toggle-border: rgba(148, 163, 184, 0.35);
   --color-toggle-text: 248, 250, 252;
-}
 
-[data-theme='sunset'] {
-  --color-text-primary: 255, 255, 255;
-  --color-text-secondary: 255, 237, 213;
+  --color-card-bg: 30, 41, 59;
+  --color-card-border: 51, 65, 85;
+  --color-card-shadow: rgba(0, 0, 0, 0.3);
 
-  --color-page-bg-start: 124, 58, 237;
-  --color-page-bg-end: 251, 113, 133;
+  --color-button-bg: 51, 65, 85;
+  --color-button-text: 255, 255, 255;
+  --color-button-hover-bg: 71, 85, 105;
+  --color-button-transparent-bg: rgba(255, 255, 255, 0.1);
+  --color-button-transparent-hover-bg: rgba(255, 255, 255, 0.15);
 
-  --color-navbar-bg: 91, 33, 182;
-  --color-navbar-text: 255, 255, 255;
-  --color-navbar-link: 255, 228, 230;
-  --color-navbar-link-hover: 255, 247, 237;
-  --color-navbar-divider: 254, 215, 170;
+  --color-input-bg: 30, 41, 59;
+  --color-input-border: 51, 65, 85;
+  --color-input-text: 255, 255, 255;
+  --color-input-placeholder: 148, 163, 184;
 
-  --color-toggle-bg: rgba(255, 255, 255, 0.15);
-  --color-toggle-hover-bg: rgba(255, 255, 255, 0.25);
-  --color-toggle-border: rgba(255, 255, 255, 0.45);
-  --color-toggle-text: 255, 255, 255;
+  --color-scrollbar-track: 15, 23, 42;
+  --color-scrollbar-thumb: 75, 85, 99;
+  --color-scrollbar-thumb-hover: 107, 114, 128;
 }
 
 body {
@@ -51,7 +91,7 @@ body {
 
 html {
   scrollbar-width: thin;
-  scrollbar-color: #4b5563 #0f172a;
+  scrollbar-color: rgb(var(--color-scrollbar-thumb)) rgb(var(--color-scrollbar-track));
 }
 
 *::-webkit-scrollbar {
@@ -60,23 +100,24 @@ html {
 }
 
 *::-webkit-scrollbar-track {
-  background: #0f172a;
+  background: rgb(var(--color-scrollbar-track));
 }
 
 *::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #4b5563 0%, #1f2937 100%);
+  background: rgb(var(--color-scrollbar-thumb));
   border-radius: 999px;
-  border: 2px solid #0f172a;
+  border: 2px solid rgb(var(--color-scrollbar-track));
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, #6b7280 0%, #374151 100%);
+  background: rgb(var(--color-scrollbar-thumb-hover));
 }
 
 .navbar-root {
   background-color: rgb(var(--color-navbar-bg));
   color: rgb(var(--color-navbar-text));
-  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.35);
+  box-shadow: 0 4px 12px var(--color-card-shadow);
+  border-bottom: 1px solid rgb(var(--color-card-border));
 }
 
 .navbar-root .nav-link {
@@ -135,4 +176,29 @@ html {
   background: linear-gradient(160deg,
       rgba(var(--color-page-bg-start), 0.85) 0%,
       rgba(var(--color-page-bg-end), 0.9) 100%);
+}
+
+/* Theme-aware utility classes */
+.theme-text-primary {
+  color: rgb(var(--color-text-primary));
+}
+
+.theme-text-secondary {
+  color: rgb(var(--color-text-secondary));
+}
+
+.theme-bg-card {
+  background-color: rgb(var(--color-card-bg));
+}
+
+.theme-border {
+  border-color: rgb(var(--color-card-border));
+}
+
+.theme-border-subtle {
+  border-color: rgba(var(--color-card-border), 0.5);
+}
+
+.theme-shadow {
+  box-shadow: 0 4px 16px var(--color-card-shadow);
 }

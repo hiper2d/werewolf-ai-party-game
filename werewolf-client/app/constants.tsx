@@ -1,3 +1,3 @@
-export const buttonTransparentStyle = `text-white 
-    bg-black bg-opacity-30 border border-white border-opacity-30 hover:bg-gray-700 px-4 py-2 rounded`;
-export const buttonBlackStyle = "text-white bg-slate-950 hover:bg-slate-900 p-3";
+export const buttonTransparentStyle = `text-btn-text
+    bg-btn-transparent border border-card-border hover:bg-btn-transparent-hover px-4 py-2 rounded`;
+export const buttonBlackStyle = "text-btn-text bg-btn hover:bg-btn-hover p-3";

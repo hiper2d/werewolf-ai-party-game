@@ -37,22 +37,22 @@ const GamePages = async ({searchParams}: {searchParams?: Promise<{error?: string
     const errorCode = resolvedSearchParams?.error;
     const blockedGameId = resolvedSearchParams?.blocked;
     return (
-        <div className="flex flex-col h-full text-white overflow-hidden">
+        <div className="flex flex-col h-full theme-text-primary overflow-hidden">
             <div className="flex justify-between items-center mb-6">
-                <h1 className="text-2xl font-bold text-white">Game List</h1>
-                <Link href="/games/newgame" className="text-white bg-slate-950 hover:bg-slate-900 p-3 text-xl rounded">
+                <h1 className="text-2xl font-bold theme-text-primary">Game List</h1>
+                <Link href="/games/newgame" className="text-btn-text bg-btn hover:bg-btn-hover p-3 text-xl rounded">
                     Create Game
                 </Link>
             </div>
 
             {errorCode === 'tier_mismatch' && (
-                <div className="mb-4 p-4 border border-yellow-500 bg-yellow-900/40 text-yellow-200 rounded flex items-start justify-between gap-4">
+                <div className="mb-4 p-4 border-2 border-yellow-600 bg-yellow-100 dark:bg-yellow-900/40 text-yellow-900 dark:text-yellow-200 rounded flex items-start justify-between gap-4">
                     <div>
                         You can only open games created on your current tier. {blockedGameId ? `Game ${blockedGameId} is locked.` : ''}
                     </div>
                     <Link
                         href="/games"
-                        className="text-yellow-100 hover:text-white text-sm underline"
+                        className="text-yellow-800 dark:text-yellow-100 hover:underline text-sm font-medium"
                         aria-label="Dismiss tier warning"
                     >
                         Dismiss
@@ -65,10 +65,10 @@ const GamePages = async ({searchParams}: {searchParams?: Promise<{error?: string
                     {games.map((game) => {
                         const isSameTier = game.createdWithTier === userTier;
                         const listClasses = [
-                            'border border-white border-opacity-30 rounded-lg p-4 transition-colors'
+                            'theme-bg-card theme-border border rounded-lg p-4 transition-colors theme-shadow'
                         ];
                         if (isSameTier) {
-                            listClasses.push('hover:bg-white/5');
+                            listClasses.push('hover:opacity-90');
                         } else {
                             listClasses.push('opacity-60');
                         }
@@ -85,7 +85,7 @@ const GamePages = async ({searchParams}: {searchParams?: Promise<{error?: string
                                 ) : (
                                     <div className="flex-grow cursor-not-allowed">
                                         <GameListEntryContent game={game} locked />
-                                        <p className="mt-2 text-xs text-yellow-200">
+                                        <p className="mt-2 text-xs text-yellow-800 dark:text-yellow-200">
                                             Switch back to the {game.createdWithTier.toUpperCase()} tier to continue this game.
                                         </p>
                                     </div>
@@ -115,10 +115,10 @@ function GameListEntryContent({
         <div className={`flex flex-col ${locked ? 'pointer-events-none' : ''}`}>
             <div className="flex justify-between items-start gap-4">
                 <div className="flex-1">
-                    <h2 className="text-lg capitalize text-white font-semibold">{game.theme}</h2>
-                    <p className="text-sm text-gray-300 mt-1">{game.description}</p>
+                    <h2 className="text-lg capitalize theme-text-primary font-semibold">{game.theme}</h2>
+                    <p className="text-sm theme-text-secondary mt-1">{game.description}</p>
                 </div>
-                <div className="text-right whitespace-nowrap text-xs text-gray-400">
+                <div className="text-right whitespace-nowrap text-xs theme-text-secondary">
                     <div>{formatCreationDate(game.createdAt)}</div>
                     <div className="mt-1">
                         Day {game.currentDay} • {stateLabel}

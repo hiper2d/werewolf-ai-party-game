@@ -48,9 +48,6 @@ export class GoogleAgent extends AbstractAgent {
         });
     }
 
-
-
-
     private convertToContents(messages: AIMessage[]): Content[] {
         try {
             return messages.map(msg => ({

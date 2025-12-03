@@ -3,6 +3,7 @@
 import React from 'react';
 import Image from 'next/image';
 import AuthButtons from '@/components/auth-buttons';
+import ThemeSwitcher from '@/app/components/ThemeSwitcher';
 import Link from "next/link";
 import {useSession} from "next-auth/react";
 
@@ -22,7 +23,7 @@ const NavBar = () => {
                     />
                 </div>
                 {status === 'authenticated' && (
-                    <span className="text-white">
+                    <span className="font-medium">
                         {session.user?.name}
                     </span>
                 )}
@@ -36,6 +37,7 @@ const NavBar = () => {
                         <li><Link href="/profile" className="nav-link">User Profile</Link></li>
                     </ul>
                 </nav>
+                <ThemeSwitcher />
                 <AuthButtons />
             </div>
         </header>

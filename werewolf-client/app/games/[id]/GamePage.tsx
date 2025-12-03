@@ -508,17 +508,17 @@ export default function GamePage({
     const queueInfo = getQueueInfo();
 
     return (
-        <div className="flex h-full text-white overflow-hidden">
+        <div className="flex h-full theme-text-primary overflow-hidden">
             {/* Left column - Game info and participants */}
             <div className="w-1/5 flex flex-col pr-2 h-full">
                 <div className="flex flex-col h-full overflow-hidden">
                     {/* Game info */}
-                    <div className="bg-black bg-opacity-30 border border-white border-opacity-30 rounded p-4 mb-4 flex-shrink-0">
+                    <div className="theme-bg-card theme-border border rounded p-4 mb-4 flex-shrink-0 theme-shadow">
                         <h1 className="text-2xl font-bold mb-2">{game.theme}</h1>
-                        <p className="text-sm text-gray-300 mb-4">{game.description}</p>
+                        <p className="text-sm theme-text-secondary mb-4">{game.description}</p>
                         {game.totalGameCost !== undefined && game.totalGameCost > 0 && (
                             <div className="text-xs text-left w-full">
-                                <span className="text-gray-600 font-mono">
+                                <span className="theme-text-secondary font-mono">
                                     Total Game Cost: ${game.totalGameCost.toFixed(4)}
                                 </span>
                             </div>
@@ -526,7 +526,7 @@ export default function GamePage({
                     </div>
 
                     {/* Participants list */}
-                    <div className="bg-black bg-opacity-30 border border-white border-opacity-30 rounded p-4 flex-grow overflow-auto">
+                    <div className="theme-bg-card theme-border border rounded p-4 flex-grow overflow-auto theme-shadow">
                         <h2 className="text-xl font-bold mb-2">Participants</h2>
                         <ul>
                             {participants.map((participant, index) => (
@@ -547,7 +547,7 @@ export default function GamePage({
                                                 const bot = game.bots.find(b => b.name === participant.name);
                                                 const cost = bot?.tokenUsage?.costUSD;
                                                 return cost && cost > 0 ? (
-                                                    <span className="text-xs text-gray-600 font-mono">
+                                                    <span className="text-xs theme-text-secondary font-mono">
                                                         ${cost.toFixed(4)}
                                                     </span>
                                                 ) : null;
@@ -562,7 +562,7 @@ export default function GamePage({
                                         <div className="text-xs mt-1 text-left w-full">
                                             <button
                                                 onClick={() => openModelDialog(participant.name, participant.aiType!, participant.enableThinking)}
-                                                className="text-gray-500 hover:text-gray-300 transition-colors duration-200 text-left w-full"
+                                                className="theme-text-secondary hover:opacity-70 transition-colors duration-200 text-left w-full"
                                                 title="Click to change AI model"
                                             >
                                                 Model: {participant.aiType}
@@ -571,13 +571,13 @@ export default function GamePage({
                                     )}
                                     {/* Show human role explicitly */}
                                     {participant.isHuman && (
-                                        <div className="text-xs text-gray-400 mt-1 ml-2">
+                                        <div className="text-xs theme-text-secondary mt-1 ml-2">
                                             Role: {participant.role}
                                         </div>
                                     )}
                                     {/* Show role for eliminated non-human players or when game is over */}
                                     {(!participant.isAlive || isGameOver) && !participant.isHuman && (
-                                        <div className="text-xs text-gray-400 mt-1 ml-2">
+                                        <div className="text-xs theme-text-secondary mt-1 ml-2">
                                             Role: {participant.role}
                                         </div>
                                     )}
@@ -599,11 +599,11 @@ export default function GamePage({
 
             {/* Right column - Queue Info and controls */}
             <div className="w-1/5 flex flex-col pl-2 h-full">
-                <div className="bg-black bg-opacity-30 border border-white border-opacity-30 rounded p-4 flex-grow overflow-auto">
+                <div className="theme-bg-card theme-border border rounded p-4 flex-grow overflow-auto theme-shadow">
                     <h2 className="text-lg font-bold mb-2">{queueInfo.title}</h2>
-                    <p className="text-sm text-gray-300 mb-3">{queueInfo.description}</p>
+                    <p className="text-sm theme-text-secondary mb-3">{queueInfo.description}</p>
                     {queueInfo.subtitle && (
-                        <p className="text-xs text-gray-400 mb-3">{queueInfo.subtitle}</p>
+                        <p className="text-xs theme-text-secondary mb-3">{queueInfo.subtitle}</p>
                     )}
                     
                     {queueInfo.items.length > 0 ? (
@@ -612,9 +612,9 @@ export default function GamePage({
                                 <li
                                     key={index}
                                     className={`text-sm p-2 rounded ${
-                                        item === queueInfo.currentItem 
-                                            ? 'bg-blue-600 bg-opacity-50 border border-blue-400' 
-                                            : 'bg-gray-700 bg-opacity-30'
+                                        item === queueInfo.currentItem
+                                            ? 'bg-blue-600 bg-opacity-50 border border-blue-400'
+                                            : 'bg-gray-200 dark:bg-gray-700 bg-opacity-50'
                                     }`}
                                 >
                                     <div className="flex items-center justify-between">
@@ -635,16 +635,16 @@ export default function GamePage({
                     ) : (
                         <div className="text-center py-8">
                             <div className="text-4xl mb-2">🤖</div>
-                            <p className="text-sm text-gray-400 italic">All bots are idle</p>
+                            <p className="text-sm theme-text-secondary italic">All bots are idle</p>
                         </div>
                     )}
-                    
+
                     {queueInfo.showProgress && queueInfo.items.length > 0 && (
-                        <div className="mt-3 pt-3 border-t border-gray-600">
-                            <div className="text-xs text-gray-400 mb-1">
+                        <div className="mt-3 pt-3 border-t theme-border-subtle">
+                            <div className="text-xs theme-text-secondary mb-1">
                                 Progress: {queueInfo.currentItem ? queueInfo.items.length - (queueInfo.items.indexOf(queueInfo.currentItem) + 1) : queueInfo.items.length} remaining
                             </div>
-                            <div className="w-full bg-gray-700 rounded-full h-2">
+                            <div className="w-full bg-gray-300 dark:bg-gray-700 rounded-full h-2">
                                 <div
                                     className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                                     style={{
@@ -657,12 +657,12 @@ export default function GamePage({
                 </div>
 
                 {(isGameOver || game.gameState === GAME_STATES.DAY_DISCUSSION || game.gameState === GAME_STATES.VOTE_RESULTS || game.gameState === GAME_STATES.NIGHT || game.gameState === GAME_STATES.NIGHT_RESULTS || (game.gameState === GAME_STATES.NEW_DAY_BOT_SUMMARIES && game.gameStateProcessQueue.length > 0)) && (
-                    <div className="bg-black bg-opacity-30 border border-white border-opacity-30 rounded p-4 mt-4">
+                    <div className="theme-bg-card theme-border border rounded p-4 mt-4 theme-shadow">
                     {game.gameState === GAME_STATES.AFTER_GAME_DISCUSSION ? (
                         <div className="flex flex-col gap-3">
                             <div className="text-center">
-                                <h3 className="text-lg font-bold text-blue-400 mb-2">💬 Post-Game Discussion</h3>
-                                <p className="text-xs text-gray-300 mb-2">All roles revealed. Everyone can participate!</p>
+                                <h3 className="text-lg font-bold text-blue-600 dark:text-blue-400 mb-2">💬 Post-Game Discussion</h3>
+                                <p className="text-xs theme-text-secondary mb-2">All roles revealed. Everyone can participate!</p>
                             </div>
                             <div className="flex gap-2 justify-center">
                                 <button
@@ -690,8 +690,8 @@ export default function GamePage({
                     ) : isGameOver ? (
                         <div className="text-center">
                             <div className="mb-4">
-                                <h3 className="text-lg font-bold text-red-400 mb-2">🎭 Game Over</h3>
-                                <p className="text-sm text-gray-300">The game has ended. All roles have been revealed above.</p>
+                                <h3 className="text-lg font-bold text-red-600 dark:text-red-400 mb-2">🎭 Game Over</h3>
+                                <p className="text-sm theme-text-secondary">The game has ended. All roles have been revealed above.</p>
                             </div>
                             <button
                                 className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500`}
@@ -735,7 +735,7 @@ export default function GamePage({
                             {game.gameState === GAME_STATES.VOTE_RESULTS && (
                                 <div className="flex flex-col gap-2 items-center">
                                     {showVoteGameOverCTA && pendingGameOverReason && (
-                                        <p className="text-sm text-red-300 text-center">
+                                        <p className="text-sm text-red-600 dark:text-red-300 text-center">
                                             {pendingGameOverReason}
                                         </p>
                                     )}
@@ -785,7 +785,7 @@ export default function GamePage({
                             {game.gameState === GAME_STATES.NIGHT_RESULTS && (
                                 <div className="flex flex-col gap-2 items-center">
                                     {showNightGameOverCTA && pendingGameOverReason && (
-                                        <p className="text-sm text-red-300 text-center mb-2">
+                                        <p className="text-sm text-red-600 dark:text-red-300 text-center mb-2">
                                             {pendingGameOverReason}
                                         </p>
                                     )}
@@ -835,7 +835,7 @@ export default function GamePage({
                                 </div>
                             )}
                             {game.gameState === GAME_STATES.NEW_DAY_BOT_SUMMARIES && (
-                                <div className="text-sm text-blue-400 text-center">
+                                <div className="text-sm text-blue-600 dark:text-blue-400 text-center">
                                     💭 Generating day summaries... ({game.gameStateProcessQueue.length} bots remaining)
                                 </div>
                             )}
