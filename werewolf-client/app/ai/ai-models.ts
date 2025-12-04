@@ -41,7 +41,7 @@ export const LLM_CONSTANTS = {
     GPT_5_MINI: 'GPT-5-mini',
     GEMINI_25_PRO: 'Gemini 2.5 Pro',
     GEMINI_3_PRO: 'Gemini 3 Pro Preview',
-    MISTRAL_2_LARGE: 'Mistral Large 2.1',
+    MISTRAL_2_LARGE: 'Mistral Large 3',
     MISTRAL_3_MEDIUM: 'Mistral Medium 3.1',
     MISTRAL_MAGISTRAL: 'Magistral Medium 1.1 (Thinking)',
     GROK_4: 'Grok 4',
@@ -225,7 +225,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         hasThinking: false,
         freeTier: {
             available: true,
-            maxBotsPerGame: 1
+            maxBotsPerGame: -1 // Unlimited - very affordable
         }
     },
     [LLM_CONSTANTS.MISTRAL_3_MEDIUM]: {
@@ -365,10 +365,10 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
         extendedContextThresholdTokens: 200_000
     },
 
-    // Mistral models (placeholder pricing)
+    // Mistral models
     [SupportedAiModels[LLM_CONSTANTS.MISTRAL_2_LARGE].modelApiName]: {
-        inputPrice: 2.0,
-        outputPrice: 6.0
+        inputPrice: 0.5,
+        outputPrice: 1.5
     },
     [SupportedAiModels[LLM_CONSTANTS.MISTRAL_3_MEDIUM].modelApiName]: {
         inputPrice: 0.4,

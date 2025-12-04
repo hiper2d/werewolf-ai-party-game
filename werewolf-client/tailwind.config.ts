@@ -20,6 +20,7 @@ const config: Config = {
         btn: {
           DEFAULT: 'rgb(var(--color-button-bg))',
           text: 'rgb(var(--color-button-text))',
+          'text-transparent': 'rgb(var(--color-button-text-transparent))',
           hover: 'rgb(var(--color-button-hover-bg))',
           transparent: 'rgb(var(--color-button-transparent-bg))',
           'transparent-hover': 'rgb(var(--color-button-transparent-hover-bg))',

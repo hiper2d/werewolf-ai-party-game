@@ -27,9 +27,10 @@
 
   --color-button-bg: 15, 23, 42;
   --color-button-text: 255, 255, 255;
+  --color-button-text-transparent: 15, 23, 42;
   --color-button-hover-bg: 30, 41, 59;
-  --color-button-transparent-bg: rgba(0, 0, 0, 0.05);
-  --color-button-transparent-hover-bg: rgba(0, 0, 0, 0.1);
+  --color-button-transparent-bg: rgba(15, 23, 42, 0.08);
+  --color-button-transparent-hover-bg: rgba(15, 23, 42, 0.12);
 
   --color-input-bg: 255, 255, 255;
   --color-input-border: 203, 213, 225;
@@ -66,6 +67,7 @@
 
   --color-button-bg: 51, 65, 85;
   --color-button-text: 255, 255, 255;
+  --color-button-text-transparent: 255, 255, 255;
   --color-button-hover-bg: 71, 85, 105;
   --color-button-transparent-bg: rgba(255, 255, 255, 0.1);
   --color-button-transparent-hover-bg: rgba(255, 255, 255, 0.15);

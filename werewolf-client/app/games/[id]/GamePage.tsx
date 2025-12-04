@@ -679,7 +679,7 @@ export default function GamePage({
                                     Keep Going
                                 </button>
                                 <button
-                                    className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500`}
+                                    className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500 !text-white`}
                                     onClick={handleExitGame}
                                     title="Return to the games list"
                                 >
@@ -694,7 +694,7 @@ export default function GamePage({
                                 <p className="text-sm theme-text-secondary">The game has ended. All roles have been revealed above.</p>
                             </div>
                             <button
-                                className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500`}
+                                className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500 !text-white`}
                                 onClick={handleExitGame}
                                 title="Return to the games list"
                             >
@@ -742,7 +742,7 @@ export default function GamePage({
                                     <div className="flex gap-2 justify-center flex-wrap">
                                         {!showVoteGameOverCTA && (
                                             <button
-                                                className={`${buttonTransparentStyle} bg-blue-600 hover:bg-blue-700 border-blue-500`}
+                                                className={`${buttonTransparentStyle} bg-blue-600 hover:bg-blue-700 border-blue-500 !text-white`}
                                                 onClick={async () => {
                                                     console.log('🌙 GAMEPAGE: START NIGHT BUTTON CLICKED:', {
                                                         gameId: game.id,
@@ -762,7 +762,7 @@ export default function GamePage({
                                         )}
                                         {showVoteGameOverCTA && (
                                             <button
-                                                className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500`}
+                                                className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500 !text-white`}
                                                 onClick={async () => {
                                                     const updatedGame = await runGameAction(() => afterGameDiscussion(game.id));
                                                     if (updatedGame) {
@@ -806,7 +806,7 @@ export default function GamePage({
                                         </button>
                                         {showNightGameOverCTA ? (
                                             <button
-                                                className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500 min-w-[70px] max-w-[90px]`}
+                                                className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500 min-w-[70px] max-w-[90px] !text-white`}
                                                 onClick={async () => {
                                                     const updatedGame = await runGameAction(() => afterGameDiscussion(game.id));
                                                     if (updatedGame) {

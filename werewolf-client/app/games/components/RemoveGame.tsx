@@ -49,13 +49,13 @@ export default function RemoveGame({gameId}: RemoveGameProps) {
                         <div className="flex justify-end space-x-3">
                             <button
                                 onClick={handleCancel}
-                                className={`${buttonTransparentStyle} bg-gray-600 hover:bg-gray-700 border-gray-500`}
+                                className={`${buttonTransparentStyle} bg-gray-600 hover:bg-gray-700 border-gray-500 !text-white`}
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={handleConfirm}
-                                className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500`}
+                                className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500 !text-white`}
                             >
                                 Remove Game
                             </button>

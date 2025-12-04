@@ -1131,10 +1131,10 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
     };
 
     return (
-        <div className="flex flex-col h-full border border-white border-opacity-30 rounded-lg p-4">
-            <div className="flex items-center justify-between mb-4 text-white">
+        <div className="flex flex-col h-full theme-border border rounded-lg p-4">
+            <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
-                    <span className="text-xl font-bold">
+                    <span className="text-xl font-bold theme-text-primary">
                         {headerTitle}
                     </span>
                 </div>
