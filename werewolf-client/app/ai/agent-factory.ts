@@ -40,7 +40,6 @@ export class AgentFactory {
             case LLM_CONSTANTS.GPT_5:
             case LLM_CONSTANTS.GPT_5_MINI:
                 return new Gpt5Agent(name, instruction, model.modelApiName, key, 1, shouldEnableThinking);
-            case LLM_CONSTANTS.GEMINI_25_PRO:
             case LLM_CONSTANTS.GEMINI_3_PRO:
                 return new GoogleAgent(name, instruction, model.modelApiName, key, shouldEnableThinking);
             case LLM_CONSTANTS.GROK_4:

@@ -10,7 +10,7 @@ Who don't know about other AI in the game and try their best to win. Who has its
 The game supports all the major latest models for the game master and bots:
 - OpenAI: `GPT-5.1`, `GPT-5-mini`
 - Anthropic: `Claude 4.1 Opus`, `Claude 4.1 Opus (Thinking)`, `Claude 4.5 Sonnet`, `Claude 4.5 Sonnet (Thinking)`, `Claude 4.5 Haiku`, `Claude 4.5 Haiku (Thinking)`
-- Google: `Gemini 2.5 Pro`, `Gemini 3 Pro Preview`
+- Google: `Gemini 3 Pro Preview`
 - DeepSeek: `DeepSeek Chat`, `DeepSeek Reasoner`
 - Mistral: `Mistral Large 2.1`, `Mistral Medium 3.1`, `Magistral Medium 1.1 (Thinking)`
 - Grok: `Grok 4`, `Grok 4.1 Fast Reasoning`

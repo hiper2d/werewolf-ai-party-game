@@ -76,11 +76,18 @@ You are an AI agent tasked with generating a game scene and character descriptio
   <Task2>
     <CharacterCreation>
       <CharacterSourcingRule>
-        **First, evaluate the <Theme> to determine how to source characters:**
-        - **If the Theme is a well-known fictional universe** (e.g., "Harry Potter", "Lord of the Rings", "Star Wars", "The Avengers"): You MUST use the established, canonical main characters from that universe.
-          - **Name Selection**: Select a number of characters equal to <NumberOfPlayers>, prioritizing the most prominent figures. Use their common single name (e.g., "Harry", "Frodo", "Vader", "Tony").
-          - **Story Adaptation**: The character's <Story> must be adapted from their known biography but rephrased to create ambiguity for the Werewolf game. For instance, a story for Snape could be: "A master of potions with a shrouded past and divided loyalties, his motives are a constant source of debate and suspicion." This could fit a Doctor, a Werewolf, or a plain Villager.
-        - **If the Theme is generic** (e.g., "Medieval Village", "Space Station", "Enchanted Forest"): You must generate completely new, original characters as described below.
+        **CRITICAL: First, evaluate the <Theme> to determine how to source characters:**
+
+        **RULE 1 - Known Fictional Universes (MANDATORY):**
+        If the Theme references ANY well-known book, movie, TV show, video game, or fictional universe (examples: "Harry Potter", "Lord of the Rings", "Star Wars", "The Avengers", "Game of Thrones", "The Witcher", "Marvel", "DC Comics", "Star Trek", "Naruto", "Pokemon", "Disney", etc.):
+        - You **MUST** use the real, canonical character names from that universe. **DO NOT invent new names.**
+        - **Name Selection**: Use famous characters like "Aragorn", "Gandalf", "Legolas", "Frodo", "Harry", "Hermione", "Vader", "Luke", "Tony", "Thor", etc.
+        - **Story Adaptation**: Adapt their known biography to create ambiguity for the Werewolf game without revealing their role.
+        - Example for Lord of the Rings: Use "Aragorn", "Gandalf", "Legolas", "Gimli", "Boromir", "Frodo", "Sam", "Merry", "Pippin", "Galadriel", "Elrond" - NOT invented names like "Thalion" or "Elendria".
+        - Example for Harry Potter: Use "Harry", "Hermione", "Ron", "Dumbledore", "Snape", "Draco", "McGonagall" - NOT invented names.
+
+        **RULE 2 - Generic/Original Themes:**
+        Only if the Theme is generic (e.g., "Medieval Village", "Space Station", "Enchanted Forest") with no connection to existing fiction, then generate completely new, original characters.
       </CharacterSourcingRule>
 
       For each player (total of <NumberOfPlayers>NumberOfPlayers</NumberOfPlayers>), generate:
@@ -169,6 +176,7 @@ You are an AI agent tasked with generating a game scene and character descriptio
   - Never use or reference the excluded name
   - Include exactly the number of players specified
   - Make sure the scene description is relevant to the theme
+  - **CRITICAL**: For known fictional universes (Lord of the Rings, Harry Potter, Star Wars, etc.), you MUST use the real canonical character names. Do NOT invent fantasy-sounding names.
 </Instructions>
 `;
 

@@ -39,7 +39,6 @@ export const LLM_CONSTANTS = {
     DEEPSEEK_REASONER: 'DeepSeek Reasoner',
     GPT_5: 'GPT-5.1',
     GPT_5_MINI: 'GPT-5-mini',
-    GEMINI_25_PRO: 'Gemini 2.5 Pro',
     GEMINI_3_PRO: 'Gemini 3 Pro Preview',
     MISTRAL_2_LARGE: 'Mistral Large 3',
     MISTRAL_3_MEDIUM: 'Mistral Medium 3.1',
@@ -179,15 +178,6 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         freeTier: {
             available: true,
             maxBotsPerGame: 3
-        }
-    },
-    [LLM_CONSTANTS.GEMINI_25_PRO]: {
-        modelApiName: 'gemini-2.5-pro',
-        apiKeyName: API_KEY_CONSTANTS.GOOGLE,
-        hasThinking: true,
-        freeTier: {
-            available: true,
-            maxBotsPerGame: 1
         }
     },
     [LLM_CONSTANTS.GEMINI_3_PRO]: {
@@ -346,15 +336,6 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
     },
 
     // Google models
-    [SupportedAiModels[LLM_CONSTANTS.GEMINI_25_PRO].modelApiName]: {
-        inputPrice: 1.25,
-        outputPrice: 10.0,
-        cacheHitPrice: 0.125,
-        extendedContextInputPrice: 2.5,
-        extendedContextOutputPrice: 15,
-        extendedContextCacheHitPrice: 0.25,
-        extendedContextThresholdTokens: 200_000
-    },
     [SupportedAiModels[LLM_CONSTANTS.GEMINI_3_PRO].modelApiName]: {
         inputPrice: 2.0,
         outputPrice: 12.0,

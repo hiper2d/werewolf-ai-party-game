@@ -272,7 +272,7 @@ describe('Token Usage Utils', () => {
                 SupportedAiModels[LLM_CONSTANTS.CLAUDE_4_OPUS].modelApiName,
                 SupportedAiModels[LLM_CONSTANTS.CLAUDE_4_SONNET].modelApiName,
                 SupportedAiModels[LLM_CONSTANTS.CLAUDE_4_HAIKU].modelApiName,
-                SupportedAiModels[LLM_CONSTANTS.GEMINI_25_PRO].modelApiName,
+                SupportedAiModels[LLM_CONSTANTS.GEMINI_3_PRO].modelApiName,
                 SupportedAiModels[LLM_CONSTANTS.MISTRAL_2_LARGE].modelApiName,
                 SupportedAiModels[LLM_CONSTANTS.MISTRAL_3_MEDIUM].modelApiName,
                 SupportedAiModels[LLM_CONSTANTS.MISTRAL_MAGISTRAL].modelApiName,

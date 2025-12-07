@@ -30,7 +30,7 @@ describe("GoogleAgent integration", () => {
     return new GoogleAgent(
       botName,
       instruction,
-      SupportedAiModels[LLM_CONSTANTS.GEMINI_25_PRO].modelApiName,
+      SupportedAiModels[LLM_CONSTANTS.GEMINI_3_PRO].modelApiName,
       apiKey
     );
   };
@@ -64,10 +64,10 @@ describe("GoogleAgent integration", () => {
     expect(tokenUsage!.outputTokens).toBeGreaterThan(0);
     expect(tokenUsage!.costUSD).toBeGreaterThan(0);
     
-    // Google reasoning models (like Gemini 2.5 Pro) include thoughtsTokenCount in totalTokenCount
+    // Google reasoning models (like Gemini 3 Pro) include thoughtsTokenCount in totalTokenCount
     // even when thinking is not explicitly enabled, so total will be greater than input + output
-    const modelName = SupportedAiModels[LLM_CONSTANTS.GEMINI_25_PRO].modelApiName;
-    const isReasoningModel = modelName.includes('2.5') || modelName.includes('thinking');
+    const modelName = SupportedAiModels[LLM_CONSTANTS.GEMINI_3_PRO].modelApiName;
+    const isReasoningModel = modelName.includes('2.5') || modelName.includes('3-pro') || modelName.includes('thinking');
     
     if (isReasoningModel) {
       expect(tokenUsage!.totalTokens).toBeGreaterThan(tokenUsage!.inputTokens + tokenUsage!.outputTokens);
@@ -110,7 +110,7 @@ describe("GoogleAgent integration", () => {
     const agent = new GoogleAgent(
       botName,
       instruction,
-      SupportedAiModels[LLM_CONSTANTS.GEMINI_25_PRO].modelApiName,
+      SupportedAiModels[LLM_CONSTANTS.GEMINI_3_PRO].modelApiName,
       process.env.GOOGLE_K!
     );
 
@@ -129,7 +129,7 @@ describe("GoogleAgent integration", () => {
     const describeOrSkip = hasApiKey ? describe : describe.skip;
     
     // Helper function to create a Google agent
-    const createAgent = (modelType: string = LLM_CONSTANTS.GEMINI_25_PRO): GoogleAgent => {
+    const createAgent = (modelType: string = LLM_CONSTANTS.GEMINI_3_PRO): GoogleAgent => {
       const testBot = {
         name: "TestBot",
         story: "A mysterious wanderer with a hidden past",
@@ -163,7 +163,7 @@ describe("GoogleAgent integration", () => {
 
     describeOrSkip("askWithZodSchema with real API", () => {
       it("should work with Zod schema for bot answers using Gemini Pro", async () => {
-        const agent = createAgent(LLM_CONSTANTS.GEMINI_25_PRO);
+        const agent = createAgent(LLM_CONSTANTS.GEMINI_3_PRO);
         const messages: AIMessage[] = [{
           role: 'user',
           content: 'What do you think about the current situation in the village?'
@@ -204,7 +204,7 @@ describe("GoogleAgent integration", () => {
         const gmAgent = new GoogleAgent(
           GAME_MASTER,
           STORY_SYSTEM_PROMPT,
-          SupportedAiModels[LLM_CONSTANTS.GEMINI_25_PRO].modelApiName,
+          SupportedAiModels[LLM_CONSTANTS.GEMINI_3_PRO].modelApiName,
           process.env.GOOGLE_K!,
           false // No thinking for story generation
         );
@@ -255,7 +255,7 @@ describe("GoogleAgent integration", () => {
         console.log("📝 Requesting game story and characters...");
         console.log("Theme:", gamePreview.theme);
         console.log("Players to generate:", botCount);
-        console.log("Model:", "gemini-2.5-pro");
+        console.log("Model:", "gemini-3-pro-preview");
         
         // Call askWithZodSchema with GameSetupZodSchema
         const [gameSetup, thinking] = await gmAgent.askWithZodSchema(
@@ -342,7 +342,7 @@ describe("GoogleAgent integration", () => {
     });
     
     it("should calculate correct USD cost for token usage", async () => {
-      const agent = createAgent(LLM_CONSTANTS.GEMINI_25_PRO);
+      const agent = createAgent(LLM_CONSTANTS.GEMINI_3_PRO);
       const messages: AIMessage[] = [{
         role: 'user',
         content: 'Hello, how are you today?'
@@ -359,7 +359,7 @@ describe("GoogleAgent integration", () => {
       expect(tokenUsage!.costUSD).toBeGreaterThan(0);
       
       console.log("\n=== Token Usage & Cost Calculation Test ===");
-      console.log(`Model: ${SupportedAiModels[LLM_CONSTANTS.GEMINI_25_PRO].modelApiName}`);
+      console.log(`Model: ${SupportedAiModels[LLM_CONSTANTS.GEMINI_3_PRO].modelApiName}`);
       console.log(`Input tokens: ${tokenUsage!.inputTokens}`);
       console.log(`Output tokens: ${tokenUsage!.outputTokens}`);
       console.log(`Total tokens: ${tokenUsage!.totalTokens}`);
