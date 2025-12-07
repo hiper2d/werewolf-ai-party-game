@@ -105,7 +105,31 @@ function ErrorBanner({ error, onDismiss, onRetry }: ErrorBannerProps) {
     );
 }
 
-function renderMessage(message: GameMessage, gameId: string, onDeleteAfter: (messageId: string) => void, onDeleteAfterExcluding: (messageId: string) => void, game: Game, onSpeak: (messageId: string, text: string) => void, speakingMessageId: string | null) {
+interface GameMessageItemProps {
+    message: GameMessage;
+    gameId: string;
+    onDeleteAfter: (messageId: string) => void;
+    onDeleteAfterExcluding: (messageId: string) => void;
+    game: Game;
+    onSpeak: (messageId: string, text: string) => void;
+    speakingMessageId: string | null;
+}
+
+function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcluding, game, onSpeak, speakingMessageId }: GameMessageItemProps) {
+    const [showDeleteMenu, setShowDeleteMenu] = useState(false);
+    const menuRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (!showDeleteMenu) return;
+        const handleClickOutside = (event: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                setShowDeleteMenu(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [showDeleteMenu]);
+
     const isUserMessage = message.messageType === MessageType.HUMAN_PLAYER_MESSAGE || message.authorName === game.humanPlayerName;
     const isGameMaster = message.authorName === GAME_MASTER || message.messageType === MessageType.GM_COMMAND || message.messageType === MessageType.NIGHT_BEGINS;
     const isNightMessage = message.messageType === MessageType.NIGHT_BEGINS || 
@@ -200,13 +224,13 @@ function renderMessage(message: GameMessage, gameId: string, onDeleteAfter: (mes
                 </div>
                 {message.id && !isVoteMessage && displayContent && displayContent.trim() && (
                     <div className="flex gap-1">
-                        {/* Delete buttons - allow for bot + human day discussion messages */}
+                        {/* Delete menu */}
                         {canShowResetButton && (
-                            <>
+                            <div className="relative" ref={menuRef}>
                                 <button
-                                    onClick={() => onDeleteAfter(message.id!)}
-                                    className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 rounded hover:bg-gray-300/50 dark:hover:bg-gray-600/50"
-                                    title="Delete this message and all messages after it"
+                                    onClick={() => setShowDeleteMenu(!showDeleteMenu)}
+                                    className={`opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 rounded hover:bg-gray-300/50 dark:hover:bg-gray-600/50 ${showDeleteMenu ? 'opacity-100' : ''}`}
+                                    title="Delete options"
                                 >
                                     <svg
                                         width="16"
@@ -219,38 +243,41 @@ function renderMessage(message: GameMessage, gameId: string, onDeleteAfter: (mes
                                         strokeLinejoin="round"
                                         className="theme-text-secondary hover:text-red-600 dark:hover:text-red-400"
                                     >
-                                        {/* Scissors icon - cut from here */}
-                                        <circle cx="6" cy="6" r="3"/>
-                                        <path d="M8.12 8.12 12 12"/>
-                                        <path d="M20 4 8.12 15.88"/>
-                                        <circle cx="6" cy="18" r="3"/>
-                                        <path d="M14.8 14.8 20 20"/>
+                                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                                        <line x1="6" y1="6" x2="18" y2="18"></line>
                                     </svg>
                                 </button>
-                                <button
-                                    onClick={() => onDeleteAfterExcluding(message.id!)}
-                                    className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 rounded hover:bg-gray-300/50 dark:hover:bg-gray-600/50"
-                                    title="Delete all messages after this one (keep this message)"
-                                >
-                                    <svg
-                                        width="16"
-                                        height="16"
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        strokeWidth="2"
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        className="theme-text-secondary hover:text-orange-600 dark:hover:text-orange-400"
-                                    >
-                                        {/* Arrow with scissors - cut after this */}
-                                        <path d="M5 12h14"/>
-                                        <path d="M12 5l7 7-7 7"/>
-                                        <circle cx="9" cy="9" r="1.5"/>
-                                        <circle cx="9" cy="15" r="1.5"/>
-                                    </svg>
-                                </button>
-                            </>
+                                {showDeleteMenu && (
+                                    <div className="absolute right-0 top-full mt-1 w-56 theme-bg-card theme-border border rounded shadow-lg z-50 flex flex-col overflow-hidden">
+                                        <button
+                                            onClick={() => { onDeleteAfter(message.id!); setShowDeleteMenu(false); }}
+                                            className="px-4 py-2 text-left text-sm hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 flex items-center gap-2"
+                                        >
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0">
+                                                <circle cx="6" cy="6" r="3"/>
+                                                <path d="M8.12 8.12 12 12"/>
+                                                <path d="M20 4 8.12 15.88"/>
+                                                <circle cx="6" cy="18" r="3"/>
+                                                <path d="M14.8 14.8 20 20"/>
+                                            </svg>
+                                            <span>Delete from here (incl.)</span>
+                                        </button>
+                                        <div className="h-px bg-gray-200 dark:bg-gray-700"></div>
+                                        <button
+                                            onClick={() => { onDeleteAfterExcluding(message.id!); setShowDeleteMenu(false); }}
+                                            className="px-4 py-2 text-left text-sm hover:bg-orange-50 dark:hover:bg-orange-900/20 text-orange-600 dark:text-orange-400 flex items-center gap-2"
+                                        >
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0">
+                                                <path d="M5 12h14"/>
+                                                <path d="M12 5l7 7-7 7"/>
+                                                <circle cx="9" cy="9" r="1.5"/>
+                                                <circle cx="9" cy="15" r="1.5"/>
+                                            </svg>
+                                            <span>Delete after here (excl.)</span>
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
                         )}
                         
                         {/* Speaker icon for TTS */}
@@ -681,7 +708,7 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
     };
 
     const handleTextareaKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-        if (e.key === 'Enter' && e.shiftKey) {
+        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
             e.preventDefault();
             void sendMessage();
         }
@@ -1200,9 +1227,16 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
                         const fallbackKey = message.timestamp ? `ts-${message.timestamp}-${index}` : `idx-${index}`;
                         const key = message.id ?? fallbackKey;
                         return (
-                            <div key={key}>
-                                {renderMessage(message, gameId, handleDeleteAfter, handleDeleteAfterExcluding, game, handleSpeak, speakingMessageId)}
-                            </div>
+                            <GameMessageItem
+                                key={key}
+                                message={message}
+                                gameId={gameId}
+                                onDeleteAfter={handleDeleteAfter}
+                                onDeleteAfterExcluding={handleDeleteAfterExcluding}
+                                game={game}
+                                onSpeak={handleSpeak}
+                                speakingMessageId={speakingMessageId}
+                            />
                         );
                     })
                 )}

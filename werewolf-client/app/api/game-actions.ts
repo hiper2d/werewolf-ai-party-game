@@ -234,53 +234,78 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
     }
     const defaultPlayerCandidates = getCandidateModelsForTier(tier);
 
+    // Initial setup for model distribution
+    let modelDeck: string[] = [];
+    let baseCandidates: string[] = [];
+
+    // Resolve base candidates
+    if (Array.isArray(gamePreview.playersAiType)) {
+        const selectedModels = gamePreview.playersAiType.length > 0
+            ? gamePreview.playersAiType
+            : [LLM_CONSTANTS.RANDOM];
+
+        // Free tier validation
+        if (tier === 'free') {
+            const disallowedModel = selectedModels.find(model => {
+                if (model === LLM_CONSTANTS.RANDOM) {
+                    return false;
+                }
+                return getPerGameModelLimit(model, tier) === 0;
+            });
+
+            if (disallowedModel) {
+                throw new Error(`The AI model ${disallowedModel} is not available on the free tier for bots. Please update your bot AI selection.`);
+            }
+        }
+
+        baseCandidates = selectedModels.flatMap(model => {
+            if (model === LLM_CONSTANTS.RANDOM) {
+                return defaultPlayerCandidates;
+            }
+            return [model];
+        });
+
+        // Remove duplicates to ensure fair distribution basis
+        baseCandidates = [...new Set(baseCandidates)];
+
+    } else {
+        // Legacy support
+        const aiType = gamePreview.playersAiType;
+        if (aiType === LLM_CONSTANTS.RANDOM) {
+            baseCandidates = defaultPlayerCandidates;
+        } else {
+            baseCandidates = [aiType];
+        }
+    }
+
     const bots: BotPreview[] = aiResponse.players.map((bot: { name: string; gender: string; story: string; playStyle?: string; voiceInstructions: string }) => {
         let aiType: string;
 
-        if (Array.isArray(gamePreview.playersAiType)) {
-            const selectedModels = gamePreview.playersAiType.length > 0
-                ? gamePreview.playersAiType
-                : [LLM_CONSTANTS.RANDOM];
+        // Filter currently available candidates based on capacity
+        const currentValidCandidates = baseCandidates.filter(model => hasCapacity(model, tier, usageCounts));
 
+        if (currentValidCandidates.length === 0) {
             if (tier === 'free') {
-                const disallowedModel = selectedModels.find(model => {
-                    if (model === LLM_CONSTANTS.RANDOM) {
-                        return false;
-                    }
-                    return getPerGameModelLimit(model, tier) === 0;
-                });
-
-                if (disallowedModel) {
-                    throw new Error(`The AI model ${disallowedModel} is not available on the free tier for bots. Please update your bot AI selection.`);
-                }
-            }
-
-            const expandedCandidates = selectedModels.flatMap(model => {
-                if (model === LLM_CONSTANTS.RANDOM) {
-                    return defaultPlayerCandidates;
-                }
-                return [model];
-            });
-
-            const candidatesWithCapacity = expandedCandidates.filter(model => hasCapacity(model, tier, usageCounts));
-
-            if (candidatesWithCapacity.length === 0) {
                 throw new Error('No AI models are available for additional bots on the free tier with the current selection. Please adjust your bot AI model choices.');
-            }
-
-            aiType = candidatesWithCapacity[Math.floor(Math.random() * candidatesWithCapacity.length)];
-        } else {
-            // Legacy support for single string value
-            aiType = gamePreview.playersAiType;
-
-            if (aiType === LLM_CONSTANTS.RANDOM) {
-                const candidates = defaultPlayerCandidates.filter(model => hasCapacity(model, tier, usageCounts));
-                if (candidates.length === 0) {
-                    throw new Error('No AI models are available for bots on your current tier. Please adjust your bot AI model selection.');
-                }
-                aiType = candidates[Math.floor(Math.random() * candidates.length)];
+            } else {
+                throw new Error('No AI models are available for additional bots.');
             }
         }
+
+        // Clean deck of invalid candidates (those that reached capacity)
+        modelDeck = modelDeck.filter(m => currentValidCandidates.includes(m));
+
+        if (modelDeck.length === 0) {
+            // Refill deck with a shuffled copy of valid candidates
+            modelDeck = [...currentValidCandidates];
+            // Fisher-Yates shuffle
+            for (let i = modelDeck.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [modelDeck[i], modelDeck[j]] = [modelDeck[j], modelDeck[i]];
+            }
+        }
+
+        aiType = modelDeck.pop()!;
 
         consumeModelUsage(aiType, tier, usageCounts, 'for bots');
 
