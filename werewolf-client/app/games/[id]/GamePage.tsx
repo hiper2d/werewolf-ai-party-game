@@ -6,7 +6,7 @@ import { startNewDay, summarizePastDay } from "@/app/api/night-actions";
 import GameChat from "@/app/games/[id]/components/GameChat";
 import ModelSelectionDialog from "@/app/games/[id]/components/ModelSelectionDialog";
 import { buttonTransparentStyle } from "@/app/constants";
-import { GAME_STATES } from "@/app/api/game-models";
+import { GAME_STATES, GAME_ROLES } from "@/app/api/game-models";
 import type { Game } from "@/app/api/game-models";
 import type { Session } from "next-auth";
 import { welcome, vote, keepBotsGoing } from '@/app/api/bot-actions';
@@ -575,8 +575,8 @@ export default function GamePage({
                                             Role: {participant.role}
                                         </div>
                                     )}
-                                    {/* Show role for eliminated non-human players or when game is over */}
-                                    {(!participant.isAlive || isGameOver) && !participant.isHuman && (
+                                    {/* Show role for eliminated non-human players, when game is over, or for other werewolves if human is werewolf */}
+                                    {(!participant.isAlive || isGameOver || (game.humanPlayerRole === GAME_ROLES.WEREWOLF && participant.role === GAME_ROLES.WEREWOLF)) && !participant.isHuman && (
                                         <div className="text-xs theme-text-secondary mt-1 ml-2">
                                             Role: {participant.role}
                                         </div>
