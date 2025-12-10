@@ -11,6 +11,7 @@ import { createBotAnswerSchema } from "@/app/ai/prompts/ai-schemas";
 import { BotAnswerZodSchema, GameSetupZodSchema, validateResponse } from "@/app/ai/prompts/zod-schemas";
 import { STORY_SYSTEM_PROMPT, STORY_USER_PROMPT } from "@/app/ai/prompts/story-gen-prompts";
 import { ROLE_CONFIGS, PLAY_STYLE_CONFIGS, GAME_MASTER } from "@/app/api/game-models";
+import { calculateCost } from "@/app/utils/pricing/token-usage-utils";
 
 // Helper function to create a MistralAgent instance
 const createAgent = (botName: string, modelType: string): MistralAgent => {
@@ -223,19 +224,21 @@ describe("MistralAgent integration", () => {
   });
   
   describe("token usage calculation", () => {
-    
+
     it("should calculate correct costs for Mistral Medium model", () => {
-      const agent = createAgent("TestBot", LLM_CONSTANTS.MISTRAL_3_MEDIUM);
-      const cost = (agent as any).calculateCost(1000000, 1000000);
-      // Based on current implementation: $0.15 per 1M input, $0.45 per 1M output  
-      expect(cost).toBeCloseTo(0.6, 2);
+      // Use centralized pricing from ai-models.ts
+      const modelApiName = SupportedAiModels[LLM_CONSTANTS.MISTRAL_3_MEDIUM].modelApiName;
+      const cost = calculateCost(modelApiName, 1000000, 1000000);
+      // Based on ai-models.ts pricing: $0.4 per 1M input, $2.0 per 1M output
+      expect(cost).toBeCloseTo(2.4, 2);
     });
-    
+
     it("should calculate correct costs for Magistral Medium model", () => {
-      const agent = createAgent("TestBot", LLM_CONSTANTS.MISTRAL_MAGISTRAL);
-      const cost = (agent as any).calculateCost(1000000, 1000000);
-      // Based on pricing: $4 per 1M input, $12 per 1M output (reasoning models are more expensive)
-      expect(cost).toBeCloseTo(16.0, 2);
+      // Use centralized pricing from ai-models.ts
+      const modelApiName = SupportedAiModels[LLM_CONSTANTS.MISTRAL_MAGISTRAL].modelApiName;
+      const cost = calculateCost(modelApiName, 1000000, 1000000);
+      // Based on ai-models.ts pricing: $2.0 per 1M input, $5.0 per 1M output
+      expect(cost).toBeCloseTo(7.0, 2);
     });
   });
   

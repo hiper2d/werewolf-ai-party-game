@@ -25,7 +25,7 @@ export default function NightActionModal({
 }: NightActionModalProps) {
     const [selectedPlayer, setSelectedPlayer] = useState<string>('');
     const [message, setMessage] = useState<string>('');
-    
+
     if (!isOpen) return null;
 
     const roleConfig = ROLE_CONFIGS[currentRole];
@@ -38,10 +38,10 @@ export default function NightActionModal({
     const getAvailableTargets = () => {
         const allPlayers = [
             { name: game.humanPlayerName, isAlive: true, isHuman: true },
-            ...game.bots.map(bot => ({ 
-                name: bot.name, 
-                isAlive: bot.isAlive, 
-                isHuman: false 
+            ...game.bots.map(bot => ({
+                name: bot.name,
+                isAlive: bot.isAlive,
+                isHuman: false
             }))
         ];
 
@@ -77,7 +77,7 @@ export default function NightActionModal({
             setMessage('');
         }
     };
-    
+
     const handleClose = () => {
         setSelectedPlayer('');
         setMessage('');
@@ -85,21 +85,21 @@ export default function NightActionModal({
     };
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-gray-900 border border-white border-opacity-30 rounded-lg p-6 max-w-md w-full mx-4">
-                <h3 className="text-xl font-bold text-white mb-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="theme-bg-card theme-border border rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+                <h3 className="text-xl font-bold theme-text-primary mb-4">
                     {roleConfig.actionTitle}
                 </h3>
-                
-                <div className="mb-2 text-sm text-gray-300">
+
+                <div className="mb-2 text-sm theme-text-secondary">
                     {roleConfig.description}
                 </div>
-                
+
                 <div className="mb-6">
                     <div className="mb-4">
-                        <label className="block text-white text-sm mb-2">{roleConfig.targetLabel}</label>
+                        <label className="block theme-text-primary text-sm mb-2">{roleConfig.targetLabel}</label>
                         <select
-                            className="w-full p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
+                            className="w-full p-2 rounded bg-[rgb(var(--color-input-bg))] text-[rgb(var(--color-input-text))] border border-[rgb(var(--color-input-border))] focus:outline-none focus:ring-1 focus:ring-blue-500"
                             value={selectedPlayer}
                             onChange={(e) => setSelectedPlayer(e.target.value)}
                             disabled={isSubmitting}
@@ -112,11 +112,11 @@ export default function NightActionModal({
                             ))}
                         </select>
                     </div>
-                    
+
                     <div className="mb-4">
-                        <label className="block text-white text-sm mb-2">{getMessageLabel()}</label>
+                        <label className="block theme-text-primary text-sm mb-2">{getMessageLabel()}</label>
                         <textarea
-                            className="w-full p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
+                            className="w-full p-2 rounded bg-[rgb(var(--color-input-bg))] text-[rgb(var(--color-input-text))] border border-[rgb(var(--color-input-border))] focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder-[rgb(var(--color-input-placeholder))]"
                             rows={3}
                             placeholder={roleConfig.messagePlaceholder}
                             value={message}
@@ -128,14 +128,14 @@ export default function NightActionModal({
 
                 <div className="flex space-x-3 justify-end">
                     <button
-                        className={`${buttonTransparentStyle} bg-gray-600 hover:bg-gray-700 border-gray-500`}
+                        className={`${buttonTransparentStyle}`}
                         onClick={handleClose}
                         disabled={isSubmitting}
                     >
                         Cancel
                     </button>
                     <button
-                        className={`${buttonTransparentStyle} ${(!selectedPlayer || !message.trim() || isSubmitting) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        className={`${buttonTransparentStyle} ${(!selectedPlayer || !message.trim() || isSubmitting) ? 'opacity-50 cursor-not-allowed' : ''} bg-blue-600/80 hover:bg-blue-700/80 text-white border-none`}
                         onClick={handleSubmit}
                         disabled={!selectedPlayer || !message.trim() || isSubmitting}
                     >

@@ -207,16 +207,17 @@ export class ZodSchemaConverter {
   static toPromptDescription(zodSchema: z.ZodSchema): string {
     const jsonSchema = this.zodToJsonSchema(zodSchema, { includeDescription: true });
     const description = this.buildSchemaDescription(jsonSchema, 0);
-    
+
     return `Your response must be a valid JSON object matching this exact structure:
 
 ${description}
 
-IMPORTANT: 
+CRITICAL REQUIREMENTS:
 - Your response must be valid JSON
 - Include all required fields
 - Follow the exact data types specified
-- Do not include any additional fields not specified in the schema`;
+- Do not include any additional fields not specified in the schema
+- IMPORTANT: Fields marked as "string" must be plain text strings, NOT nested objects or arrays. Put all your content into a single string value.`;
   }
 
   /**

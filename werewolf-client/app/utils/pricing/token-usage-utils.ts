@@ -188,9 +188,36 @@ export function extractGoogleTokenUsage(response: any): TokenUsage | null {
 
 /**
  * Mistral-specific token usage extraction
- * Mistral uses OpenAI-compatible format
+ * Mistral SDK uses camelCase (promptTokens, completionTokens, totalTokens)
+ * and reasoning tokens may be in additionalProperties for Magistral models
  */
 export function extractMistralTokenUsage(response: any): TokenUsage | null {
-    // Use the generic extractor as Mistral follows OpenAI-compatible patterns
-    return extractTokenUsage(response);
+    const usage = response?.usage;
+    if (!usage) {
+        return null;
+    }
+
+    // Mistral SDK uses camelCase field names
+    const result: TokenUsage = {
+        promptTokens: usage.promptTokens || 0,
+        completionTokens: usage.completionTokens || 0,
+        totalTokens: usage.totalTokens || 0
+    };
+
+    // Extract reasoning tokens from additionalProperties if available (Magistral models)
+    // Magistral models may include reasoning token info in the additionalProperties field
+    if (usage.additionalProperties) {
+        const additionalProps = usage.additionalProperties;
+
+        // Check common field names for reasoning tokens
+        if (additionalProps.reasoning_tokens !== undefined) {
+            result.reasoningTokens = additionalProps.reasoning_tokens;
+        } else if (additionalProps.reasoningTokens !== undefined) {
+            result.reasoningTokens = additionalProps.reasoningTokens;
+        } else if (additionalProps.thinking_tokens !== undefined) {
+            result.reasoningTokens = additionalProps.thinking_tokens;
+        }
+    }
+
+    return result;
 }

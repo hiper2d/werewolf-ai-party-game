@@ -6,6 +6,7 @@ import { cleanResponse } from "@/app/utils/message-utils";
 import { z } from 'zod';
 import { ZodSchemaConverter } from './zod-schema-converter';
 import { safeValidateResponse } from './prompts/zod-schemas';
+import { extractMistralTokenUsage, calculateCost } from '@/app/utils/pricing/token-usage-utils';
 
 export class MistralAgent extends AbstractAgent {
     private readonly client: Mistral;
@@ -99,35 +100,26 @@ export class MistralAgent extends AbstractAgent {
     }
 
     private extractTokenUsage(response: ChatCompletionResponse | undefined): TokenUsage | undefined {
-        const usage = response?.usage;
+        // Use the centralized Mistral token usage extraction
+        const usage = extractMistralTokenUsage(response);
         if (!usage) return undefined;
 
-        const inputTokens = usage.promptTokens || 0;
-        const outputTokens = usage.completionTokens || 0;
-        const totalTokens = usage.totalTokens || inputTokens + outputTokens;
+        // Log reasoning tokens if available (Magistral models)
+        if (usage.reasoningTokens && usage.reasoningTokens > 0) {
+            this.logger(`🧠 Reasoning tokens used: ${usage.reasoningTokens}`);
+        }
 
-        // Calculate cost based on model pricing
-        const costUSD = this.calculateCost(inputTokens, outputTokens);
+        // Calculate cost using centralized pricing from ai-models.ts
+        const costUSD = calculateCost(this.model, usage.promptTokens, usage.completionTokens, {
+            totalTokens: usage.totalTokens
+        });
 
         return {
-            inputTokens,
-            outputTokens,
-            totalTokens,
+            inputTokens: usage.promptTokens,
+            outputTokens: usage.completionTokens,
+            totalTokens: usage.totalTokens,
             costUSD
         };
-    }
-
-    private calculateCost(inputTokens: number, outputTokens: number): number {
-        // Mistral pricing per 1M tokens (as of documentation)
-        // Magistral models: $4 per 1M input, $12 per 1M output
-        // These are example prices - should be updated based on actual Mistral pricing
-        const pricePerMillionInput = this.model.includes('magistral') ? 4 : 0.15;
-        const pricePerMillionOutput = this.model.includes('magistral') ? 12 : 0.45;
-
-        const inputCost = (inputTokens / 1_000_000) * pricePerMillionInput;
-        const outputCost = (outputTokens / 1_000_000) * pricePerMillionOutput;
-
-        return inputCost + outputCost;
     }
 
     /**
@@ -201,20 +193,40 @@ export class MistralAgent extends AbstractAgent {
                 throw new Error(this.errorMessages.invalidFormat);
             }
 
-            // Handle both string and structured content for logging
-            const responseTextForLog = typeof content === 'string' ? content : JSON.stringify(content);
-            this.logReply(responseTextForLog);
+            // Extract text content from structured responses (thinking models return arrays)
+            let responseText: string;
+            let thinkingContent = "";
 
-            // Note: Thinking content is not available with JSON format for Mistral
-            const thinkingContent = "";
+            if (Array.isArray(content)) {
+                // Handle structured content (thinking models)
+                const { content: extractedContent, thinking } = this.processStructuredReply(content);
+                responseText = extractedContent;
+                thinkingContent = thinking;
+            } else if (typeof content === 'string') {
+                responseText = content;
+            } else {
+                // Fallback for unexpected content types
+                responseText = JSON.stringify(content);
+            }
+
+            this.logReply(responseText);
 
             // Parse and validate the response using Zod
             let parsedContent: unknown;
             try {
-                // Handle both string and structured content
-                const responseText = typeof content === 'string' ? content : JSON.stringify(content);
                 const cleanedResponse = cleanResponse(responseText);
                 parsedContent = JSON.parse(cleanedResponse);
+
+                // Fix for Mistral sometimes returning nested objects when a string is expected
+                // (e.g., { reply: { field1: "...", field2: "..." } } instead of { reply: "..." })
+                // This can happen with complex prompts that have structured sections
+                if (parsedContent && typeof parsedContent === 'object' && 'reply' in parsedContent) {
+                    const reply = (parsedContent as any).reply;
+                    if (reply && typeof reply === 'object') {
+                        this.logger(`🔧 Converting nested reply object to string`);
+                        (parsedContent as any).reply = JSON.stringify(reply, null, 2);
+                    }
+                }
             } catch (parseError) {
                 throw new Error(`Failed to parse JSON response: ${parseError}`);
             }
