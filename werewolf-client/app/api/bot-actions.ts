@@ -53,6 +53,12 @@ import {recordBotTokenUsage, recordGameMasterTokenUsage} from "@/app/api/cost-tr
 import {ensureUserCanAccessGame} from "@/app/api/tier-guards";
 
 /**
+ * Coefficient used to calculate the message threshold for automatic voting
+ * The threshold is calculated as: alivePlayersCount * AUTO_VOTE_COEFFICIENT
+ */
+const AUTO_VOTE_COEFFICIENT = 5;
+
+/**
  * Helper function to generate bot system prompt with after-game addition if needed
  */
 function generateBotSystemPrompt(bot: Bot, game: Game): string {
@@ -213,17 +219,53 @@ async function ensureDayActivityCounter(gameId: string): Promise<void> {
 function formatDayActivityData(game: Game): string {
     const activityCounter = game.dayActivityCounter || {};
     const aliveBots = game.bots.filter(bot => bot.isAlive);
-    
+
     if (aliveBots.length === 0) {
         return "No alive bots to track activity.";
     }
-    
+
     const activityData = aliveBots.map(bot => {
         const messageCount = activityCounter[bot.name] || 0;
         return `${bot.name}: ${messageCount} messages`;
     }).join(", ");
 
     return `Today's activity levels - ${activityData}`;
+}
+
+/**
+ * Calculate the message threshold for automatic voting trigger
+ * Based on number of alive players multiplied by a coefficient
+ */
+function calculateAutoVoteThreshold(game: Game): number {
+    const aliveBotsCount = game.bots.filter(bot => bot.isAlive).length;
+    const totalAlivePlayers = aliveBotsCount + 1; // +1 for human player
+    return totalAlivePlayers * AUTO_VOTE_COEFFICIENT;
+}
+
+/**
+ * Get total messages sent during current day discussion
+ * Counts all BOT_ANSWER and HUMAN_PLAYER_MESSAGE messages for the current day
+ */
+function getTotalDayMessages(game: Game): number {
+    const activityCounter = game.dayActivityCounter || {};
+    return Object.values(activityCounter).reduce((sum, count) => sum + count, 0);
+}
+
+/**
+ * Check if the message threshold has been reached and voting should be triggered
+ * Returns true if automatic voting should start
+ */
+function shouldTriggerAutoVote(game: Game): boolean {
+    if (game.gameState !== GAME_STATES.DAY_DISCUSSION) {
+        return false;
+    }
+
+    const threshold = calculateAutoVoteThreshold(game);
+    const currentMessages = getTotalDayMessages(game);
+
+    console.log(`🗳️ AUTO-VOTE CHECK: ${currentMessages}/${threshold} messages (threshold = ${game.bots.filter(b => b.isAlive).length + 1} players × ${AUTO_VOTE_COEFFICIENT})`);
+
+    return currentMessages >= threshold;
 }
 
 
@@ -386,8 +428,27 @@ async function talkToAllImpl(gameId: string, userMessage: string): Promise<Game>
             await processNextBotInQueue(gameId, game, session.user.email);
         }
 
-        // Return updated game state
-        return await getGame(gameId) as Game;
+        // Get updated game state
+        const updatedGame = await getGame(gameId) as Game;
+
+        // Check if we should auto-trigger voting (only during DAY_DISCUSSION, not AFTER_GAME_DISCUSSION)
+        if (!isAfterGameDiscussion && shouldTriggerAutoVote(updatedGame)) {
+            console.log('🗳️ AUTO-VOTE TRIGGERED: Message threshold reached, starting voting phase');
+            // Trigger voting by transitioning to VOTE state
+            const aliveBots = updatedGame.bots.filter(bot => bot.isAlive).map(bot => bot.name);
+            const allPlayers = [...aliveBots, updatedGame.humanPlayerName];
+            const shuffledPlayers = [...allPlayers].sort(() => Math.random() - 0.5);
+
+            await db.collection('games').doc(gameId).update({
+                gameState: GAME_STATES.VOTE,
+                gameStateProcessQueue: shuffledPlayers,
+                gameStateParamQueue: []
+            });
+
+            return await getGame(gameId) as Game;
+        }
+
+        return updatedGame;
     } catch (error) {
         console.error('Error in talkToAll function:', error);
         throw error;
@@ -421,6 +482,23 @@ async function keepBotsGoingImpl(gameId: string): Promise<Game> {
     // Only allow if no bots are currently in queue (empty queue means we can start new bot conversation)
     if (game.gameStateProcessQueue.length > 0) {
         throw new Error('Bots are already in conversation queue');
+    }
+
+    // Check if we should auto-trigger voting instead of continuing discussion (only during DAY_DISCUSSION)
+    if (!isAfterGameDiscussion && shouldTriggerAutoVote(game)) {
+        console.log('🗳️ AUTO-VOTE TRIGGERED in keepBotsGoing: Message threshold reached, starting voting phase');
+        // Trigger voting by transitioning to VOTE state
+        const aliveBots = game.bots.filter(bot => bot.isAlive).map(bot => bot.name);
+        const allPlayers = [...aliveBots, game.humanPlayerName];
+        const shuffledPlayers = [...allPlayers].sort(() => Math.random() - 0.5);
+
+        await db.collection('games').doc(gameId).update({
+            gameState: GAME_STATES.VOTE,
+            gameStateProcessQueue: shuffledPlayers,
+            gameStateParamQueue: []
+        });
+
+        return await getGame(gameId) as Game;
     }
 
     try {
