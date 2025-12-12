@@ -6,7 +6,7 @@ import { startNewDay, summarizePastDay } from "@/app/api/night-actions";
 import GameChat from "@/app/games/[id]/components/GameChat";
 import ModelSelectionDialog from "@/app/games/[id]/components/ModelSelectionDialog";
 import { buttonTransparentStyle } from "@/app/constants";
-import { GAME_STATES, GAME_ROLES } from "@/app/api/game-models";
+import { GAME_STATES, GAME_ROLES, AUTO_VOTE_COEFFICIENT } from "@/app/api/game-models";
 import type { Game } from "@/app/api/game-models";
 import type { Session } from "next-auth";
 import { welcome, vote, keepBotsGoing } from '@/app/api/bot-actions';
@@ -88,6 +88,23 @@ export default function GamePage({
     const showVoteGameOverCTA = !isGameOver && gameEndStatus.isEnded && game.gameState === GAME_STATES.VOTE_RESULTS;
     const showNightGameOverCTA = !isGameOver && nightResultsEndStatus.isEnded && game.gameState === GAME_STATES.NIGHT_RESULTS;
     const pendingGameOverReason = (showVoteGameOverCTA || showNightGameOverCTA) ? (game.gameState === GAME_STATES.NIGHT_RESULTS ? nightResultsEndStatus.reason : gameEndStatus.reason) : undefined;
+
+    // Calculate vote urgency based on message count vs threshold
+    const voteUrgency = useMemo(() => {
+        if (game.gameState !== GAME_STATES.DAY_DISCUSSION) {
+            return { percentage: 0, isUrgent: false, messagesLeft: 0 };
+        }
+        const alivePlayersCount = game.bots.filter(bot => bot.isAlive).length + 1; // +1 for human
+        const threshold = alivePlayersCount * AUTO_VOTE_COEFFICIENT;
+        const currentMessages = Object.values(game.dayActivityCounter || {}).reduce((sum, count) => sum + count, 0);
+        const percentage = threshold > 0 ? (currentMessages / threshold) * 100 : 0;
+        const messagesLeft = Math.max(0, threshold - currentMessages);
+        return {
+            percentage: Math.min(percentage, 100),
+            isUrgent: percentage >= 90,
+            messagesLeft
+        };
+    }, [game.gameState, game.bots, game.dayActivityCounter]);
 
     // Handle exit game
     const handleExitGame = () => {
@@ -706,16 +723,18 @@ export default function GamePage({
                             {game.gameState === GAME_STATES.DAY_DISCUSSION && (
                                 <div className="flex gap-2 justify-center">
                                     <button
-                                        className={buttonTransparentStyle}
+                                        className={`${buttonTransparentStyle} ${voteUrgency.isUrgent ? 'bg-red-600 hover:bg-red-700 border-red-500 !text-white animate-pulse' : ''}`}
                                         onClick={async () => {
                                             const updatedGame = await runGameAction(() => vote(game.id));
                                             if (updatedGame) {
                                                 setGame(updatedGame);
                                             }
                                         }}
-                                        title="Start the voting phase to eliminate a suspected werewolf"
+                                        title={voteUrgency.isUrgent
+                                            ? `Vote now! Auto-voting in ${voteUrgency.messagesLeft} messages`
+                                            : `Start the voting phase (${Math.round(voteUrgency.percentage)}% to auto-vote)`}
                                     >
-                                        Vote
+                                        Vote {voteUrgency.isUrgent && '⚠️'}
                                     </button>
                                     <button
                                         className={`${buttonTransparentStyle} ${game.gameStateProcessQueue.length > 0 ? 'opacity-50 cursor-not-allowed' : ''}`}

@@ -2,6 +2,7 @@
 
 import {db} from "@/firebase/server";
 import {
+    AUTO_VOTE_COEFFICIENT,
     Bot,
     BotAnswer,
     BotResponseError,
@@ -51,12 +52,6 @@ import {
 import {checkGameEndConditions} from "@/app/utils/game-utils";
 import {recordBotTokenUsage, recordGameMasterTokenUsage} from "@/app/api/cost-tracking";
 import {ensureUserCanAccessGame} from "@/app/api/tier-guards";
-
-/**
- * Coefficient used to calculate the message threshold for automatic voting
- * The threshold is calculated as: alivePlayersCount * AUTO_VOTE_COEFFICIENT
- */
-const AUTO_VOTE_COEFFICIENT = 5;
 
 /**
  * Helper function to generate bot system prompt with after-game addition if needed

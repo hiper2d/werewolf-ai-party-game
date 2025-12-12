@@ -37,7 +37,7 @@ export const LLM_CONSTANTS = {
     CLAUDE_4_HAIKU_THINKING: 'Claude 4.5 Haiku (Thinking)',
     DEEPSEEK_CHAT: 'DeepSeek Chat',
     DEEPSEEK_REASONER: 'DeepSeek Reasoner',
-    GPT_5: 'GPT-5.1',
+    GPT_5: 'GPT-5.2',
     GPT_5_MINI: 'GPT-5-mini',
     GEMINI_3_PRO: 'Gemini 3 Pro Preview',
     MISTRAL_2_LARGE: 'Mistral Large 3',
@@ -163,7 +163,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
 
     // Models with always-on reasoning
     [LLM_CONSTANTS.GPT_5]: {
-        modelApiName: 'gpt-5.1',
+        modelApiName: 'gpt-5.2',
         apiKeyName: API_KEY_CONSTANTS.OPENAI,
         hasThinking: true,
         freeTier: {

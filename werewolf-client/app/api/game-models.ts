@@ -115,6 +115,12 @@ export const GAME_ROLES = {
     VILLAGER: 'villager'
 } as const;
 
+/**
+ * Coefficient used to calculate the message threshold for automatic voting
+ * The threshold is calculated as: alivePlayersCount * AUTO_VOTE_COEFFICIENT
+ */
+export const AUTO_VOTE_COEFFICIENT = 5;
+
 export interface RoleConfig {
     name: string;
     nightActionOrder: number;
