@@ -16,6 +16,8 @@ import {
     PLAY_STYLES,
     PLAY_STYLE_CONFIGS,
     RECIPIENT_ALL,
+    RECIPIENT_DETECTIVE,
+    RECIPIENT_DOCTOR,
     RECIPIENT_WEREWOLVES,
     ROLE_CONFIGS,
     SystemErrorMessage,
@@ -611,10 +613,14 @@ export async function getBotMessages(gameId: string, botName: string, day: numbe
         throw new Error('Game not found');
     }
     
-    // Check if this bot is a werewolf
+    // Check if this bot has a special role
     const bot = game.bots.find(b => b.name === botName);
-    const isWerewolf = bot?.role === GAME_ROLES.WEREWOLF || 
+    const isWerewolf = bot?.role === GAME_ROLES.WEREWOLF ||
                       (botName === game.humanPlayerName && game.humanPlayerRole === GAME_ROLES.WEREWOLF);
+    const isDetective = bot?.role === GAME_ROLES.DETECTIVE ||
+                       (botName === game.humanPlayerName && game.humanPlayerRole === GAME_ROLES.DETECTIVE);
+    const isDoctor = bot?.role === GAME_ROLES.DOCTOR ||
+                    (botName === game.humanPlayerName && game.humanPlayerRole === GAME_ROLES.DOCTOR);
 
     const allMessages: GameMessage[] = [];
 
@@ -669,7 +675,31 @@ export async function getBotMessages(gameId: string, botName: string, day: numbe
                 .orderBy('timestamp', 'asc')
         );
     }
-        
+
+    // Add detective-only messages if this bot is a detective
+    if (isDetective) {
+        queries.push(
+            db.collection('games')
+                .doc(gameId)
+                .collection('messages')
+                .where('day', '==', day)
+                .where('recipientName', '==', RECIPIENT_DETECTIVE)
+                .orderBy('timestamp', 'asc')
+        );
+    }
+
+    // Add doctor-only messages if this bot is a doctor
+    if (isDoctor) {
+        queries.push(
+            db.collection('games')
+                .doc(gameId)
+                .collection('messages')
+                .where('day', '==', day)
+                .where('recipientName', '==', RECIPIENT_DOCTOR)
+                .orderBy('timestamp', 'asc')
+        );
+    }
+
     // Execute all queries
     const snapshots = await Promise.all(queries.map(query => query.get()));
     
