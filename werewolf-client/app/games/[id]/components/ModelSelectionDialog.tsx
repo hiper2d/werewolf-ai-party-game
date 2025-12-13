@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { LLM_CONSTANTS, SupportedAiModels } from '@/app/ai/ai-models';
 import { getCandidateModelsForTier, getPerGameModelLimit, FREE_TIER_UNLIMITED } from '@/app/ai/model-limit-utils';
-import type { UserTier } from '@/app/api/game-models';
+import { UserTier, USER_TIERS } from '@/app/api/game-models';
 import { buttonTransparentStyle } from '@/app/constants';
 
 interface ModelSelectionDialogProps {
@@ -27,8 +27,8 @@ export default function ModelSelectionDialog({
     usageCounts
 }: ModelSelectionDialogProps) {
     const tierFilteredModels = useMemo(() => {
-        if (gameTier === 'free') {
-            const models = new Set(getCandidateModelsForTier('free'));
+        if (gameTier === USER_TIERS.FREE) {
+            const models = new Set(getCandidateModelsForTier(USER_TIERS.FREE));
             if (currentModel && currentModel !== '' && currentModel !== LLM_CONSTANTS.RANDOM) {
                 // Ensure current assignments remain visible even if capacity is exhausted.
                 models.add(currentModel);
@@ -42,7 +42,7 @@ export default function ModelSelectionDialog({
     const modelOptions = useMemo(() => {
         return tierFilteredModels
             .map(model => {
-                if (gameTier !== 'free') {
+                if (gameTier !== USER_TIERS.FREE) {
                     return { model, disabled: false };
                 }
 
@@ -53,7 +53,7 @@ export default function ModelSelectionDialog({
                 let disabled = false;
 
                 try {
-                    const limit = getPerGameModelLimit(model, 'free');
+                    const limit = getPerGameModelLimit(model, USER_TIERS.FREE);
                     if (limit !== FREE_TIER_UNLIMITED) {
                         const used = usageCounts[model] ?? 0;
                         const adjustedUsage = model === currentModel ? Math.max(0, used - 1) : used;

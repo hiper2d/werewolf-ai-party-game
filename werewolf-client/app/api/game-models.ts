@@ -20,6 +20,11 @@ export interface GameTokenUsage {
 
 export type UserTier = 'free' | 'api';
 
+export const USER_TIERS = {
+    FREE: 'free' as const,
+    API: 'api' as const,
+};
+
 export interface User {
     name: string;
     email: string;

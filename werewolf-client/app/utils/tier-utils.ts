@@ -1,6 +1,6 @@
 'use server'
 
-import { ApiKeyMap, UserTier } from "@/app/api/game-models";
+import { ApiKeyMap, UserTier, USER_TIERS } from "@/app/api/game-models";
 import { getFreeTierApiKeys } from "@/app/api/free-tier-actions";
 import { getUserApiKeys, getUserTier } from "@/app/api/user-actions";
 
@@ -12,7 +12,7 @@ import { getUserApiKeys, getUserTier } from "@/app/api/user-actions";
 export async function getApiKeysForUser(userId: string): Promise<ApiKeyMap> {
     const tier = await getUserTier(userId);
 
-    if (tier === 'api') {
+    if (tier === USER_TIERS.API) {
         return await getUserApiKeys(userId);
     } else {
         return await getFreeTierApiKeys();
@@ -28,7 +28,7 @@ export async function getUserTierAndApiKeys(userId: string): Promise<{
     apiKeys: ApiKeyMap;
 }> {
     const tier = await getUserTier(userId);
-    const apiKeys = tier === 'api'
+    const apiKeys = tier === USER_TIERS.API
         ? await getUserApiKeys(userId)
         : await getFreeTierApiKeys();
 

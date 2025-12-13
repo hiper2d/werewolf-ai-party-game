@@ -4,6 +4,7 @@ import Image from 'next/image';
 import ApiKeyManagement from './components/ApiKeyManagement';
 import FreeUserLimits from './components/FreeUserLimits';
 import {getUserApiKeys, getUser} from "@/app/api/user-actions";
+import {UserTier, USER_TIERS} from "@/app/api/game-models";
 import { auth } from "@/auth";
 
 export default async function UserProfilePage() {
@@ -14,16 +15,16 @@ export default async function UserProfilePage() {
 
     let user = null;
     let apiKeys = {};
-    let userTier: 'free' | 'api' = 'free';
+    let userTier: UserTier = USER_TIERS.FREE;
 
     try {
         user = await getUser(session.user?.email!);
         apiKeys = await getUserApiKeys(session.user?.email!);
-        userTier = user?.tier || 'free';
+        userTier = user?.tier || USER_TIERS.FREE;
     } catch (error) {
         console.error('Error fetching user data:', error);
         // User might not exist yet, use defaults
-        userTier = 'free';
+        userTier = USER_TIERS.FREE;
     }
 
     return (
@@ -41,7 +42,7 @@ export default async function UserProfilePage() {
                         <p>Email: {session.user?.email}</p>
                         <p className="mt-2">
                             <span className="font-semibold">Tier: </span>
-                            <span className={userTier === 'api' ? 'text-green-400' : 'text-yellow-400'}>
+                            <span className={userTier === USER_TIERS.API ? 'text-green-400' : 'text-yellow-400'}>
                                 {userTier.toUpperCase()}
                             </span>
                         </p>
@@ -65,7 +66,7 @@ export default async function UserProfilePage() {
             {/* Right column - Tier-based content */}
             <div className="w-3/4 h-full overflow-hidden">
                 <div className="h-full flex flex-col bg-black bg-opacity-30 border border-white border-opacity-30 rounded">
-                    {userTier === 'api' ? (
+                    {userTier === USER_TIERS.API ? (
                         <ApiKeyManagement initialApiKeys={apiKeys} userId={session.user?.email!} />
                     ) : (
                         <FreeUserLimits userId={session.user?.email!} />

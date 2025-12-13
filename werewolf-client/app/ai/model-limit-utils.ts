@@ -1,10 +1,10 @@
 import {LLM_CONSTANTS, SupportedAiModels} from '@/app/ai/ai-models';
-import {UserTier} from '@/app/api/game-models';
+import {UserTier, USER_TIERS} from '@/app/api/game-models';
 
 export const FREE_TIER_UNLIMITED = Number.POSITIVE_INFINITY;
 
 export function getPerGameModelLimit(modelName: string, tier: UserTier): number {
-    if (tier !== 'free') {
+    if (tier !== USER_TIERS.FREE) {
         return FREE_TIER_UNLIMITED;
     }
 
@@ -27,7 +27,7 @@ export function getPerGameModelLimit(modelName: string, tier: UserTier): number 
 }
 
 export function hasCapacity(modelName: string, tier: UserTier, usageCounts: Record<string, number>): boolean {
-    if (tier !== 'free') {
+    if (tier !== USER_TIERS.FREE) {
         return true;
     }
 
@@ -54,7 +54,7 @@ export function consumeModelUsage(
     usageCounts: Record<string, number>,
     context: string
 ): void {
-    if (tier !== 'free') {
+    if (tier !== USER_TIERS.FREE) {
         return;
     }
 
@@ -77,7 +77,7 @@ export function consumeModelUsage(
 }
 
 export function getCandidateModelsForTier(tier: UserTier): string[] {
-    if (tier !== 'free') {
+    if (tier !== USER_TIERS.FREE) {
         return Object.keys(SupportedAiModels);
     }
 
@@ -87,7 +87,7 @@ export function getCandidateModelsForTier(tier: UserTier): string[] {
 }
 
 export function validateModelUsageForTier(tier: UserTier, gameMasterModel: string, botModels: string[]): void {
-    if (tier !== 'free') {
+    if (tier !== USER_TIERS.FREE) {
         return;
     }
 

@@ -5,7 +5,7 @@ import {useRouter} from 'next/navigation';
 import {useSession} from 'next-auth/react';
 import {buttonBlackStyle, buttonTransparentStyle} from "@/app/constants";
 import {createGame, previewGame} from '@/app/api/game-actions';
-import {GAME_ROLES, GamePreview, GamePreviewWithGeneratedBots, GENDER_OPTIONS, getVoicesForGender, getRandomVoiceForGender, PLAY_STYLES, PLAY_STYLE_CONFIGS, UserTier} from "@/app/api/game-models";
+import {GAME_ROLES, GamePreview, GamePreviewWithGeneratedBots, GENDER_OPTIONS, getVoicesForGender, getRandomVoiceForGender, PLAY_STYLES, PLAY_STYLE_CONFIGS, UserTier, USER_TIERS} from "@/app/api/game-models";
 import {LLM_CONSTANTS, SupportedAiModels} from "@/app/ai/ai-models";
 import {FREE_TIER_UNLIMITED, getCandidateModelsForTier, getPerGameModelLimit} from "@/app/ai/model-limit-utils";
 import MultiSelectDropdown from '@/app/components/MultiSelectDropdown';
@@ -37,17 +37,20 @@ export default function CreateNewGamePage() {
     const [userTier, setUserTier] = useState<UserTier>('free');
     const [isTierLoaded, setIsTierLoaded] = useState(false);
     const hasInitializedPlayerModels = useRef(false);
-    const playerOptions = useMemo(() => Array.from({ length: 7 }, (_, i) => i + 6), []);
+    const playerOptions = useMemo(() => {
+        const maxPlayers = userTier === USER_TIERS.API ? 16 : 12;
+        return Array.from({ length: maxPlayers - 5 }, (_, i) => i + 6);
+    }, [userTier]);
     const allModels = useMemo(() => Object.values(LLM_CONSTANTS), []);
     const candidateModels = useMemo(() => getCandidateModelsForTier(userTier), [userTier]);
     const gameMasterOptions = useMemo(() => {
-        if (userTier === 'free') {
+        if (userTier === USER_TIERS.FREE) {
             return [LLM_CONSTANTS.RANDOM, ...candidateModels];
         }
         return allModels;
     }, [userTier, candidateModels, allModels]);
     const playerModelOptions = useMemo(() => {
-        const base = userTier === 'free' ? candidateModels : allModels;
+        const base = userTier === USER_TIERS.FREE ? candidateModels : allModels;
         return base.filter(model => model !== LLM_CONSTANTS.RANDOM);
     }, [userTier, candidateModels, allModels]);
 
@@ -123,7 +126,7 @@ export default function CreateNewGamePage() {
 
         let playersAiValidationError = selectedPlayerAiTypes.length === 0 ? 'At least one AI model must be selected' : null;
 
-        if (!playersAiValidationError && userTier === 'free') {
+        if (!playersAiValidationError && userTier === USER_TIERS.FREE) {
             const requiredBots = Math.max(0, playerCount - 1);
             const totalCapacity = selectedPlayerAiTypes.reduce<number>((total, model) => {
                 if (total === FREE_TIER_UNLIMITED) {

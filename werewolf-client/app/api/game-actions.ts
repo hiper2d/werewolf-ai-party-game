@@ -20,7 +20,8 @@ import {
     ROLE_CONFIGS,
     SystemErrorMessage,
     User,
-    UserTier
+    UserTier,
+    USER_TIERS
 } from "@/app/api/game-models";
 import {auth} from "@/auth";
 import {AgentFactory} from "@/app/ai/agent-factory";
@@ -245,7 +246,7 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
             : [LLM_CONSTANTS.RANDOM];
 
         // Free tier validation
-        if (tier === 'free') {
+        if (tier === USER_TIERS.FREE) {
             const disallowedModel = selectedModels.find(model => {
                 if (model === LLM_CONSTANTS.RANDOM) {
                     return false;
@@ -285,7 +286,7 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
         const currentValidCandidates = baseCandidates.filter(model => hasCapacity(model, tier, usageCounts));
 
         if (currentValidCandidates.length === 0) {
-            if (tier === 'free') {
+            if (tier === USER_TIERS.FREE) {
                 throw new Error('No AI models are available for additional bots on the free tier with the current selection. Please adjust your bot AI model choices.');
             } else {
                 throw new Error('No AI models are available for additional bots.');
