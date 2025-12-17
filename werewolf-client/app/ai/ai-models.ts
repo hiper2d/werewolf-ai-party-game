@@ -40,7 +40,8 @@ export const LLM_CONSTANTS = {
     GPT_5: 'GPT-5.2',
     GPT_5_MINI: 'GPT-5-mini',
     GEMINI_3_PRO: 'Gemini 3 Pro Preview',
-    MISTRAL_2_LARGE: 'Mistral Large 3',
+    GEMINI_3_FLASH: 'Gemini 3 Flash Preview',
+    MISTRAL_3_LARGE: 'Mistral Large 3',
     MISTRAL_3_MEDIUM: 'Mistral Medium 3.1',
     MISTRAL_MAGISTRAL: 'Magistral Medium 1.1 (Thinking)',
     GROK_4: 'Grok 4',
@@ -189,6 +190,15 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
             maxBotsPerGame: 0 // Not available in free tier
         }
     },
+    [LLM_CONSTANTS.GEMINI_3_FLASH]: {
+        modelApiName: 'gemini-3-flash-preview',
+        apiKeyName: API_KEY_CONSTANTS.GOOGLE,
+        hasThinking: true,
+        freeTier: {
+            available: true,
+            maxBotsPerGame: -1 // Unlimited
+        }
+    },
     [LLM_CONSTANTS.GROK_4]: {
         modelApiName: 'grok-4',
         apiKeyName: API_KEY_CONSTANTS.GROK,
@@ -209,7 +219,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
     },
 
     // Mistral models
-    [LLM_CONSTANTS.MISTRAL_2_LARGE]: {
+    [LLM_CONSTANTS.MISTRAL_3_LARGE]: {
         modelApiName: 'mistral-large-latest',
         apiKeyName: API_KEY_CONSTANTS.MISTRAL,
         hasThinking: false,
@@ -345,9 +355,14 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
         extendedContextCacheHitPrice: 0.40,
         extendedContextThresholdTokens: 200_000
     },
+    [SupportedAiModels[LLM_CONSTANTS.GEMINI_3_FLASH].modelApiName]: {
+        inputPrice: 0.50,
+        outputPrice: 3.00,
+        cacheHitPrice: 0.05
+    },
 
     // Mistral models
-    [SupportedAiModels[LLM_CONSTANTS.MISTRAL_2_LARGE].modelApiName]: {
+    [SupportedAiModels[LLM_CONSTANTS.MISTRAL_3_LARGE].modelApiName]: {
         inputPrice: 0.5,
         outputPrice: 1.5
     },

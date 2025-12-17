@@ -41,6 +41,7 @@ export class AgentFactory {
             case LLM_CONSTANTS.GPT_5_MINI:
                 return new Gpt5Agent(name, instruction, model.modelApiName, key, 1, shouldEnableThinking);
             case LLM_CONSTANTS.GEMINI_3_PRO:
+            case LLM_CONSTANTS.GEMINI_3_FLASH:
                 return new GoogleAgent(name, instruction, model.modelApiName, key, shouldEnableThinking);
             case LLM_CONSTANTS.GROK_4:
             case LLM_CONSTANTS.GROK_4_1_FAST_REASONING:
@@ -53,7 +54,7 @@ export class AgentFactory {
 
             // Mistral models
             case LLM_CONSTANTS.MISTRAL_3_MEDIUM:
-            case LLM_CONSTANTS.MISTRAL_2_LARGE:
+            case LLM_CONSTANTS.MISTRAL_3_LARGE:
             case LLM_CONSTANTS.MISTRAL_MAGISTRAL:
                 return new MistralAgent(name, instruction, model.modelApiName, key, shouldEnableThinking);
             case LLM_CONSTANTS.KIMI_K2:
