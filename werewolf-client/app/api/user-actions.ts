@@ -3,6 +3,7 @@
 import {db} from "@/firebase/server";
 import {firestore} from "firebase-admin";
 import {ApiKeyMap, User, UserMonthlySpending, UserTier} from "@/app/api/game-models";
+import {VoiceProvider, getDefaultVoiceProvider} from "@/app/ai/voice-config";
 import {normalizeSpendings} from "@/app/utils/spending-utils";
 import FieldValue = firestore.FieldValue;
 
@@ -206,16 +207,49 @@ export async function getUser(userId: string): Promise<User> {
             throw new Error('User not found');
         }
         const userData = userDoc.data();
-        // Ensure tier field exists for backward compatibility
+        // Ensure tier and voiceProvider fields exist for backward compatibility
         return {
             name: userData?.name || '',
             email: userData?.email || userId,
             apiKeys: userData?.apiKeys || {},
             tier: userData?.tier || 'free',
-            spendings: normalizeSpendings(userData?.spendings)
+            spendings: normalizeSpendings(userData?.spendings),
+            voiceProvider: userData?.voiceProvider || getDefaultVoiceProvider()
         } as User;
     } catch (error: any) {
         console.error("Error fetching user: ", error);
         throw new Error(`Failed to fetch user: ${error.message}`);
+    }
+}
+
+export async function getVoiceProvider(userId: string): Promise<VoiceProvider> {
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+    try {
+        const userDoc = await db.collection('users').doc(userId).get();
+        if (!userDoc.exists) {
+            return getDefaultVoiceProvider();
+        }
+        const user = userDoc.data() as User;
+        return user?.voiceProvider || getDefaultVoiceProvider();
+    } catch (error: any) {
+        console.error("Error fetching voice provider: ", error);
+        throw new Error(`Failed to fetch voice provider: ${error.message}`);
+    }
+}
+
+export async function updateVoiceProvider(userId: string, provider: VoiceProvider): Promise<void> {
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+    try {
+        const userRef = db.collection('users').doc(userId);
+        await userRef.update({
+            voiceProvider: provider
+        });
+    } catch (error: any) {
+        console.error("Error updating voice provider: ", error);
+        throw new Error(`Failed to update voice provider: ${error.message}`);
     }
 }

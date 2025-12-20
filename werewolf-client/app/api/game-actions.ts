@@ -29,7 +29,8 @@ import {auth} from "@/auth";
 import {AgentFactory} from "@/app/ai/agent-factory";
 import {STORY_SYSTEM_PROMPT, STORY_USER_PROMPT} from "@/app/ai/prompts/story-gen-prompts";
 import {getUserTierAndApiKeys} from "@/app/utils/tier-utils";
-import {getUserTier, updateUserMonthlySpending} from "@/app/api/user-actions";
+import {getUserTier, updateUserMonthlySpending, getVoiceProvider} from "@/app/api/user-actions";
+import {getVoiceConfig, getDefaultVoiceProvider} from "@/app/ai/voice-config";
 import {normalizeSpendings} from "@/app/utils/spending-utils";
 import {convertToAIMessage, parseResponseToObj} from "@/app/utils/message-utils";
 import {LLM_CONSTANTS} from "@/app/ai/ai-models";
@@ -163,6 +164,10 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
     const {tier, apiKeys} = await getUserTierAndApiKeys(session.user.email);
     const usageCounts: Record<string, number> = {};
 
+    // Get user's voice provider preference
+    const voiceProvider = await getVoiceProvider(session.user.email);
+    const voiceConfig = getVoiceConfig(voiceProvider);
+
     const botCount = gamePreview.playerCount - 1; // exclude human player
 
     // Resolve Game Master AI type with tier-aware restrictions
@@ -203,9 +208,12 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
     ).join('\n');
 
     // Format playstyle configurations for the prompt
-    const playStylesText = Object.entries(PLAY_STYLE_CONFIGS).map(([key, config]) => 
+    const playStylesText = Object.entries(PLAY_STYLE_CONFIGS).map(([key, config]) =>
         `* ${key}: ${config.name} - ${config.uiDescription}`
     ).join('\n');
+
+    // Get available voices for the prompt
+    const availableVoicesText = voiceConfig.getPromptDescription();
 
     const userPrompt = format(STORY_USER_PROMPT, {
         theme: gamePreview.theme,
@@ -214,7 +222,8 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
         number_of_players: botCount,
         game_roles: gameRolesText,
         werewolf_count: gamePreview.werewolfCount,
-        play_styles: playStylesText
+        play_styles: playStylesText,
+        available_voices: availableVoicesText
     });
 
     const storyMessage: GameMessage = {
@@ -281,7 +290,7 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
         }
     }
 
-    const bots: BotPreview[] = aiResponse.players.map((bot: { name: string; gender: string; story: string; playStyle?: string; voiceInstructions: string }) => {
+    const bots: BotPreview[] = aiResponse.players.map((bot: { name: string; gender: string; story: string; playStyle?: string; voice?: string; voiceStyle?: string }) => {
         let aiType: string;
 
         // Filter currently available candidates based on capacity
@@ -312,9 +321,18 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
 
         consumeModelUsage(aiType, tier, usageCounts, 'for bots');
 
-        // Assign gender and voice
+        // Assign gender and voice (AI-selected or fallback)
         const gender = bot.gender as 'male' | 'female';
-        const voice = getRandomVoiceForGender(gender);
+        // Use AI-selected voice if provided and valid, otherwise fallback to random
+        let voice = bot.voice;
+        if (!voice || !voiceConfig.getVoiceById(voice)) {
+            // Fallback to random voice for the gender
+            const availableVoices = voiceConfig.getVoicesByGender(gender);
+            voice = availableVoices.length > 0
+                ? availableVoices[Math.floor(Math.random() * availableVoices.length)].id
+                : getRandomVoiceForGender(gender); // Ultimate fallback
+        }
+        const voiceStyle = bot.voiceStyle || undefined;
 
         // Use AI-selected playstyle if available, otherwise fallback to random
         let playStyle = bot.playStyle;
@@ -330,18 +348,30 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
             playerAiType: aiType,
             gender: gender,
             voice: voice,
-            voiceInstructions: bot.voiceInstructions,
+            voiceStyle: voiceStyle,
             playStyle: playStyle
         };
     });
 
     validateModelUsageForTier(tier, resolvedGmAiType, bots.map(bot => bot.playerAiType));
 
+    // Game Master voice selection (AI-selected or fallback)
+    let gameMasterVoice = aiResponse.gameMasterVoice;
+    if (!gameMasterVoice || !voiceConfig.getVoiceById(gameMasterVoice)) {
+        // Fallback to random male voice for Game Master
+        const availableMaleVoices = voiceConfig.getVoicesByGender('male');
+        gameMasterVoice = availableMaleVoices.length > 0
+            ? availableMaleVoices[Math.floor(Math.random() * availableMaleVoices.length)].id
+            : getRandomVoiceForGender('male'); // Ultimate fallback
+    }
+    const gameMasterVoiceStyle = aiResponse.gameMasterVoiceStyle || undefined;
+
     return {
         ...gamePreview,
         gameMasterAiType: resolvedGmAiType,
-        gameMasterVoice: getRandomVoiceForGender('male'),
-        gameMasterVoiceInstructions: aiResponse.gameMasterVoiceInstructions,
+        voiceProvider: voiceProvider,
+        gameMasterVoice: gameMasterVoice,
+        gameMasterVoiceStyle: gameMasterVoiceStyle,
         scene: aiResponse.scene,
         bots: bots,
         tokenUsage: tokenUsage
@@ -394,7 +424,7 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
                 aiType: bot.playerAiType,
                 gender: bot.gender,
                 voice: bot.voice,
-                voiceInstructions: bot.voiceInstructions,
+                voiceStyle: bot.voiceStyle,
                 playStyle: bot.playStyle,
             };
         });
@@ -409,8 +439,9 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
             werewolfCount: gamePreview.werewolfCount,
             specialRoles: gamePreview.specialRoles,
             gameMasterAiType: gamePreview.gameMasterAiType,
+            voiceProvider: gamePreview.voiceProvider, // TTS provider (locked at creation)
             gameMasterVoice: gamePreview.gameMasterVoice,
-            gameMasterVoiceInstructions: gamePreview.gameMasterVoiceInstructions,
+            gameMasterVoiceStyle: gamePreview.gameMasterVoiceStyle,
             story: gamePreview.scene,
             bots: bots,
             humanPlayerName: gamePreview.name,
@@ -956,8 +987,10 @@ function gameFromFirestore(id: string, data: any): Game {
         werewolfCount: data.werewolfCount,
         specialRoles: data.specialRoles,
         gameMasterAiType: data.gameMasterAiType,
+        voiceProvider: data.voiceProvider || getDefaultVoiceProvider(), // Fallback to default for existing games
         gameMasterVoice: data.gameMasterVoice || getRandomVoiceForGender('male'), // Fallback for existing games
-        gameMasterVoiceInstructions: data.gameMasterVoiceInstructions,
+        gameMasterVoiceStyle: data.gameMasterVoiceStyle,
+        gameMasterVoiceInstructions: data.gameMasterVoiceInstructions, // Legacy field
         story: data.story,
         bots: data.bots,
         humanPlayerName: data.humanPlayerName,

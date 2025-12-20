@@ -11,6 +11,7 @@ import VotingModal from "./VotingModal";
 import NightActionModal from "./NightActionModal";
 import { ttsService } from "@/app/services/tts-service";
 import { sttService } from "@/app/services/stt-service";
+import { getDefaultVoiceProvider } from "@/app/ai/voice-config";
 
 interface GameChatProps {
     gameId: string;
@@ -927,40 +928,51 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
             if (speakingMessageId) {
                 ttsService.stopSpeaking();
                 setSpeakingMessageId(null);
-                
+
                 // If clicking the same message, just stop
                 if (speakingMessageId === messageId) {
                     return;
                 }
             }
-            
+
+            // Get voice provider from game (with fallback to default)
+            const voiceProvider = game.voiceProvider || getDefaultVoiceProvider();
+
             // Find the message to get the author name
             const message = messages.find(msg => msg.id === messageId);
             if (!message) {
                 console.error('Message not found for voice mapping:', messageId);
                 setSpeakingMessageId(messageId);
-                await ttsService.speakText(text, { gameId });
+                // Use default voice when message not found
+                await ttsService.speakText(text, {
+                    voice: game.gameMasterVoice || 'alloy',
+                    voiceProvider,
+                    gameId
+                });
                 setSpeakingMessageId(null);
                 return;
             }
-            
-            // Map author to their assigned voice
-            let voice: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer' = 'alloy'; // default fallback
-            
+
+            // Map author to their assigned voice and style
+            let voice = 'alloy'; // default fallback
+            let voiceStyle: string | undefined;
+
             if (message.authorName === GAME_MASTER) {
                 // Use Game Master voice
-                voice = game.gameMasterVoice as typeof voice;
+                voice = game.gameMasterVoice || 'alloy';
+                voiceStyle = game.gameMasterVoiceStyle;
             } else {
                 // Find the bot with matching name
                 const bot = game.bots.find(b => b.name === message.authorName);
                 if (bot) {
-                    voice = bot.voice as typeof voice;
+                    voice = bot.voice || 'alloy';
+                    voiceStyle = bot.voiceStyle;
                 }
-                // If no bot found (human player), use default voice 'alloy'
+                // If no bot found (human player), use default voice
             }
-            
+
             setSpeakingMessageId(messageId);
-            await ttsService.speakText(text, { voice, gameId });
+            await ttsService.speakText(text, { voice, voiceStyle, voiceProvider, gameId });
             setSpeakingMessageId(null);
         } catch (error) {
             console.error('TTS Error:', error);

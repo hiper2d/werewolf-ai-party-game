@@ -17,13 +17,15 @@ export const BotAnswerZodSchema = z.object({
 // Game setup schema for story generation
 export const GameSetupZodSchema = z.object({
   scene: z.string().describe("The vivid scene description"),
-  gameMasterVoiceInstructions: z.string().describe("Voice instructions for the Game Master that match the theme and tone"),
+  gameMasterVoice: z.string().describe("Voice ID for the Game Master (from available voices)"),
+  gameMasterVoiceStyle: z.string().describe("Style instruction for Game Master (e.g., 'authoritatively', 'dramatically')"),
   players: z.array(z.object({
     name: z.string().describe("Single-word unique name"),
     gender: z.string().describe("male or female"),
     story: z.string().describe("1-2 sentence character background"),
     playStyle: z.string().describe("The playstyle identifier for this character (e.g., aggressive_provoker, protective_team_player, etc.)"),
-    voiceInstructions: z.string().describe("Character-specific voice instructions that match their personality, story, and role-play style")
+    voice: z.string().describe("Voice ID for this character (from available voices, matching character gender)"),
+    voiceStyle: z.string().describe("Style instruction (1-3 words, e.g., 'mysteriously', 'excitedly')")
   })).describe("Array of player characters")
 });
 

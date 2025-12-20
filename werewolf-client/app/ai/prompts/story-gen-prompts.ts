@@ -109,58 +109,67 @@ You are an AI agent tasked with generating a game scene and character descriptio
   </Task2>
 </Tasks>
 
-<VoiceInstructions>
-  For each character AND the Game Master, you must also generate voice instructions for text-to-speech synthesis. These instructions must follow the OpenAI TTS format with labeled sections:
+<VoiceSelection>
+  For each character AND the Game Master, you must select an appropriate voice from the available voices.
 
-  **Required Voice Instruction Sections:**
-  - Affect: Overall voice quality and emotional character
-  - Tone: Emotional quality and attitude
-  - Pacing: Speed, rhythm, and cadence
-  - Emotion: Emotional expression and range
-  - Pronunciation: Emphasis patterns and articulation
-  - Pauses: When and how to use pauses
+  **Available Voices:**
+  The available voices will be provided in the <AvailableVoices> parameter. Each voice has:
+  - ID: The voice identifier to use
+  - Gender: male or female
+  - Description: Personality and characteristics of the voice
+  - Celebrity Examples: Similar-sounding celebrities for reference
 
-  **Voice Instructions Must:**
-  - Match the character's personality, story, and play style
-  - Reflect the game theme (medieval = formal, sci-fi = technical, etc.)
-  - Be distinct for each character
-  - Follow professional TTS instruction format
+  **Voice Selection Rules:**
+  - **CRITICAL**: Match voice gender to character gender (male character = male voice, female character = female voice)
+  - Select a voice that matches the character's personality, story, and play style
+  - The voice's personality/description should complement the character
+  - Create variety across characters (avoid giving everyone the same voice)
+  - For the Game Master, select a voice that is authoritative and informative
 
-  **Play Style Voice Mapping:**
-  - Aggressive Provoker: Bold affect, accusatory tone, fast pacing
-  - Protective Team Player: Warm affect, reassuring tone, measured pacing  
-  - Trickster: Playful affect, alternating tone, varied pacing
-  - Rule Breaker: Rebellious affect, skeptical tone, interrupting rhythm
-  - Modest Mouse: Quiet affect, hesitant tone, slow pacing
-  - Normal: Balanced affect, collaborative tone, natural rhythm
-</VoiceInstructions>
+  **Voice Style:**
+  Also provide a short style instruction (1-3 words) that describes HOW the character speaks:
+  - Examples: "mysteriously", "excitedly", "hesitantly", "cheerfully", "gravely", "sarcastically"
+  - This should match the character's personality and play style
+
+  **Play Style Voice Style Mapping:**
+  - Aggressive Provoker: "accusingly", "boldly", "intensely"
+  - Protective Team Player: "warmly", "reassuringly", "calmly"
+  - Trickster: "playfully", "mischievously", "teasingly"
+  - Rule Breaker: "defiantly", "skeptically", "rebelliously"
+  - Modest Mouse: "hesitantly", "quietly", "nervously"
+  - Normal: "naturally", "conversationally", "thoughtfully"
+</VoiceSelection>
 
 <JSONSchema>
   Your response must exactly match this TypeScript interface:
 
   interface GameSetup {
-    scene: string;      // The vivid scene description
-    gameMasterVoiceInstructions: string; // Voice instructions for Game Master
+    scene: string;           // The vivid scene description
+    gameMasterVoice: string; // Voice ID for Game Master (from available voices)
+    gameMasterVoiceStyle: string; // Style instruction for Game Master (e.g., "authoritatively")
     players: Array<{
-      name: string;     // Single-word unique name
-      gender: string;   // male or female
-      story: string;    // 3-5 sentence character background
-      playStyle: string; // Playstyle identifier (e.g., aggressive_provoker, protective_team_player, etc.)
-      voiceInstructions: string; // Character-specific voice instructions
+      name: string;       // Single-word unique name
+      gender: string;     // male or female
+      story: string;      // 3-5 sentence character background
+      playStyle: string;  // Playstyle identifier (e.g., aggressive_provoker, protective_team_player, etc.)
+      voice: string;      // Voice ID for this character (from available voices, matching character gender)
+      voiceStyle: string; // Style instruction (1-3 words, e.g., "mysteriously", "excitedly")
     }>;
   }
 
   Example response structure:
   {
     "scene": "In the heart of a bustling space station...",
-    "gameMasterVoiceInstructions": "Affect: Authoritative and commanding, like a ship's AI computer system...",
+    "gameMasterVoice": "echo",
+    "gameMasterVoiceStyle": "authoritatively",
     "players": [
       {
-        "name": "Zenith", 
+        "name": "Zenith",
         "gender": "male",
         "story": "A veteran maintenance engineer with a mysterious past...",
         "playStyle": "modest_mouse",
-        "voiceInstructions": "Affect: Quiet and withdrawn, with technical precision..."
+        "voice": "onyx",
+        "voiceStyle": "hesitantly"
       },
       // ... more players
     ]
@@ -189,18 +198,21 @@ export const STORY_USER_PROMPT: string = `
   <GameRoles>%game_roles%</GameRoles>
   <WerewolfCount>%werewolf_count%</WerewolfCount>
   <PlayStyles>%play_styles%</PlayStyles>
+  <AvailableVoices>%available_voices%</AvailableVoices>
 </Parameters>
 
 Expected response format:
 {
   "scene": string,              // Vivid scene description
-  "gameMasterVoiceInstructions": string, // Voice instructions for Game Master
+  "gameMasterVoice": string,    // Voice ID for Game Master
+  "gameMasterVoiceStyle": string, // Style instruction for Game Master
   "players": Array<{
     "name": string,             // Single-word unique name
     "gender": string,           // male or female
     "story": string,            // 3-5 sentence character background
     "playStyle": string,        // Playstyle identifier
-    "voiceInstructions": string // Character voice instructions
+    "voice": string,            // Voice ID (matching character gender)
+    "voiceStyle": string        // Style instruction (1-3 words)
   }>
 }
 `;

@@ -7,6 +7,8 @@ import { API_KEY_CONSTANTS, AUDIO_MODEL_CONSTANTS } from "@/app/ai/ai-models";
 import { calculateOpenAITtsCost } from "@/app/utils/pricing";
 import { updateUserMonthlySpending } from "@/app/api/user-actions";
 import { recordGameCost } from "@/app/api/cost-tracking";
+import { VoiceProvider } from "@/app/ai/voice-config";
+import { generateGoogleSpeech, GoogleTTSOptions } from "@/app/api/google-tts-actions";
 
 export interface TTSOptions {
   voice?: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer' | 'ash' | 'ballad' | 'coral' | 'sage';
@@ -16,8 +18,49 @@ export interface TTSOptions {
   gameId?: string;
 }
 
+/**
+ * Unified TTS options that work with both providers
+ */
+export interface UnifiedTTSOptions {
+  voice: string;           // Voice ID from config
+  voiceStyle?: string;     // Style instruction (e.g., "mysteriously", "excitedly")
+  voiceInstructions?: string; // Legacy: detailed voice instructions for OpenAI
+  gameId?: string;
+}
+
+/**
+ * Unified speech generation function that routes to the appropriate provider.
+ * This is the preferred function for new code.
+ */
+export async function generateSpeechWithProvider(
+  text: string,
+  options: UnifiedTTSOptions,
+  voiceProvider: VoiceProvider
+): Promise<ArrayBuffer> {
+  switch (voiceProvider) {
+    case 'openai':
+      return generateSpeech(text, {
+        voice: options.voice as TTSOptions['voice'],
+        instructions: options.voiceInstructions || options.voiceStyle,
+        gameId: options.gameId,
+      });
+    case 'google':
+      return generateGoogleSpeech(text, {
+        voiceName: options.voice,
+        voiceStyle: options.voiceStyle,
+        gameId: options.gameId,
+      });
+    default:
+      throw new Error(`Unknown voice provider: ${voiceProvider}`);
+  }
+}
+
+/**
+ * Generate speech using OpenAI TTS.
+ * For backward compatibility - prefer generateSpeechWithProvider for new code.
+ */
 export async function generateSpeech(
-  text: string, 
+  text: string,
   options: TTSOptions = {}
 ): Promise<ArrayBuffer> {
   const session = await auth();

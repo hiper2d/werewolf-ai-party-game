@@ -3,8 +3,10 @@ import {redirect} from "next/navigation";
 import Image from 'next/image';
 import ApiKeyManagement from './components/ApiKeyManagement';
 import FreeUserLimits from './components/FreeUserLimits';
+import VoiceProviderSelector from './components/VoiceProviderSelector';
 import {getUserApiKeys, getUser} from "@/app/api/user-actions";
 import {UserTier, USER_TIERS} from "@/app/api/game-models";
+import {VoiceProvider, getDefaultVoiceProvider} from "@/app/ai/voice-config";
 import { auth } from "@/auth";
 
 export default async function UserProfilePage() {
@@ -16,15 +18,18 @@ export default async function UserProfilePage() {
     let user = null;
     let apiKeys = {};
     let userTier: UserTier = USER_TIERS.FREE;
+    let voiceProvider: VoiceProvider = getDefaultVoiceProvider();
 
     try {
         user = await getUser(session.user?.email!);
         apiKeys = await getUserApiKeys(session.user?.email!);
         userTier = user?.tier || USER_TIERS.FREE;
+        voiceProvider = user?.voiceProvider || getDefaultVoiceProvider();
     } catch (error) {
         console.error('Error fetching user data:', error);
         // User might not exist yet, use defaults
         userTier = USER_TIERS.FREE;
+        voiceProvider = getDefaultVoiceProvider();
     }
 
     return (
@@ -50,7 +55,7 @@ export default async function UserProfilePage() {
                 </div>
 
                 {/* Monthly Spendings */}
-                <div className="bg-black bg-opacity-30 border border-white border-opacity-30 rounded p-4 flex-1 flex flex-col overflow-auto">
+                <div className="bg-black bg-opacity-30 border border-white border-opacity-30 rounded p-4 mb-4">
                     <h2 className="text-xl font-bold mb-2">Monthly Spendings</h2>
                     <ul>
                         {buildMonthlySpendings(user?.spendings ?? []).map(({ label, amount }) => (
@@ -60,6 +65,14 @@ export default async function UserProfilePage() {
                             </li>
                         ))}
                     </ul>
+                </div>
+
+                {/* Voice Provider Selection */}
+                <div className="bg-black bg-opacity-30 border border-white border-opacity-30 rounded p-4 flex-1 overflow-auto">
+                    <VoiceProviderSelector
+                        userId={session.user?.email!}
+                        initialProvider={voiceProvider}
+                    />
                 </div>
             </div>
 

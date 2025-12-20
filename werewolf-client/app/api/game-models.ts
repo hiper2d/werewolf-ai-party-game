@@ -1,3 +1,5 @@
+import { VoiceProvider } from '@/app/ai/voice-config';
+
 export interface ApiKeyMap {
     [id: string]: string
 }
@@ -31,6 +33,7 @@ export interface User {
     apiKeys: ApiKeyMap;
     tier: UserTier;
     spendings?: UserMonthlySpending[];
+    voiceProvider?: VoiceProvider; // User's preferred TTS voice provider
 }
 
 export interface UserMonthlySpending {
@@ -55,7 +58,8 @@ export interface BotPreview {
     playerAiType: string;
     gender: 'male' | 'female';
     voice: string;
-    voiceInstructions?: string;
+    voiceStyle?: string; // Style instruction like "mysteriously", "excitedly"
+    voiceInstructions?: string; // Legacy: detailed voice instructions (OpenAI format)
     playStyle: string;
     enableThinking?: boolean;
 }
@@ -63,8 +67,10 @@ export interface BotPreview {
 export interface GamePreviewWithGeneratedBots extends GamePreview {
     scene: string;
     bots: BotPreview[];
+    voiceProvider: VoiceProvider; // TTS provider for this game
     gameMasterVoice: string;
-    gameMasterVoiceInstructions?: string;
+    gameMasterVoiceStyle?: string; // Style instruction for Game Master
+    gameMasterVoiceInstructions?: string; // Legacy: detailed voice instructions
     gameMasterThinking?: boolean;
     tokenUsage?: any; // Token usage from preview generation
 }
@@ -77,7 +83,8 @@ export interface Bot {
     aiType: string;
     gender: 'male' | 'female';
     voice: string;
-    voiceInstructions?: string;
+    voiceStyle?: string; // Style instruction like "mysteriously", "excitedly"
+    voiceInstructions?: string; // Legacy: detailed voice instructions (OpenAI format)
     playStyle: string;
     eliminationDay?: number; // Track which day this bot was eliminated (undefined if alive)
     daySummaries?: string[]; // Array of summaries for each previous day (index 0 = day 1 summary)
@@ -92,8 +99,10 @@ export interface Game {
     werewolfCount: number;
     specialRoles: string[];
     gameMasterAiType: string;
+    voiceProvider?: VoiceProvider; // TTS provider for this game (locked at creation)
     gameMasterVoice: string;
-    gameMasterVoiceInstructions?: string;
+    gameMasterVoiceStyle?: string; // Style instruction for Game Master
+    gameMasterVoiceInstructions?: string; // Legacy: detailed voice instructions
     story: string;
     bots: Bot[];
     humanPlayerName: string;
@@ -184,6 +193,10 @@ export const PLAY_STYLES = {
     NORMAL: 'normal'
 } as const;
 
+/**
+ * @deprecated Use getVoiceConfig() from '@/app/ai/voice-config' instead.
+ * This constant is kept for backward compatibility with existing games.
+ */
 export const VOICE_OPTIONS = {
     MALE: ['echo', 'fable', 'onyx', 'ash', 'ballad'], // Male voices from OpenAI
     FEMALE: ['alloy', 'nova', 'shimmer', 'coral', 'sage'], // Female voices from OpenAI (alloy is female)
@@ -191,10 +204,18 @@ export const VOICE_OPTIONS = {
 
 export const GENDER_OPTIONS = ['male', 'female'] as const;
 
+/**
+ * @deprecated Use getVoiceConfig(provider).getVoicesByGender(gender) instead.
+ * This function is kept for backward compatibility.
+ */
 export function getVoicesForGender(gender: 'male' | 'female'): string[] {
     return [...VOICE_OPTIONS[gender.toUpperCase() as 'MALE' | 'FEMALE']];
 }
 
+/**
+ * @deprecated Voices are now selected by the Game Master AI using voice config metadata.
+ * This function is kept for backward compatibility.
+ */
 export function getRandomVoiceForGender(gender: 'male' | 'female'): string {
     const voices = getVoicesForGender(gender);
     return voices[Math.floor(Math.random() * voices.length)];

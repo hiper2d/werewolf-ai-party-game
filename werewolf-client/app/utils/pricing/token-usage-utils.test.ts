@@ -250,7 +250,14 @@ describe('Token Usage Utils', () => {
             });
 
             it('should handle Mistral format', () => {
-                const result = extractMistralTokenUsage(openAIFormatResponse);
+                const mistralResponse = {
+                    usage: {
+                        promptTokens: 100,
+                        completionTokens: 50,
+                        totalTokens: 150
+                    }
+                };
+                const result = extractMistralTokenUsage(mistralResponse);
                 expect(result).toEqual({
                     promptTokens: 100,
                     completionTokens: 50,

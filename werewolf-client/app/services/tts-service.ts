@@ -1,10 +1,11 @@
-import { generateSpeech } from "@/app/api/tts-actions";
+import { generateSpeechWithProvider } from "@/app/api/tts-actions";
+import { VoiceProvider } from "@/app/ai/voice-config/voice-config";
+import { getDefaultVoiceProvider } from "@/app/ai/voice-config";
 
 export interface TTSOptions {
-  voice?: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer' | 'ash' | 'ballad' | 'coral' | 'sage';
-  instructions?: string;
-  speed?: number;
-  format?: 'mp3' | 'wav' | 'opus' | 'aac' | 'flac' | 'pcm';
+  voice: string;                  // Voice ID (e.g., "echo", "Kore")
+  voiceStyle?: string;            // Style instruction (e.g., "mysteriously", "excitedly")
+  voiceProvider?: VoiceProvider;  // TTS provider (defaults to user's preference)
   gameId?: string;
 }
 
@@ -28,7 +29,7 @@ export class TTSService {
 
   async speakText(
     text: string,
-    options: TTSOptions = {}
+    options: TTSOptions
   ): Promise<void> {
     const sanitizedText = text.trim();
     if (!sanitizedText) {
@@ -51,8 +52,8 @@ export class TTSService {
         return;
       }
 
-      const format = options.format || 'wav';
-      const mimeType = this.getMimeType(format);
+      // Both providers return WAV format
+      const mimeType = 'audio/wav';
       const audioBlob = new Blob([audioBuffer], { type: mimeType });
       const audioUrl = URL.createObjectURL(audioBlob);
       const audioElement = new Audio(audioUrl);
@@ -122,10 +123,9 @@ export class TTSService {
 
   private getCacheKey(text: string, options: TTSOptions): string {
     const normalizedOptions = {
-      voice: options.voice || 'alloy',
-      instructions: options.instructions || '',
-      speed: options.speed ?? 1,
-      format: options.format || 'wav',
+      voice: options.voice,
+      voiceStyle: options.voiceStyle || '',
+      voiceProvider: options.voiceProvider || getDefaultVoiceProvider(),
       gameId: options.gameId || ''
     };
     return JSON.stringify({ text, ...normalizedOptions });
@@ -144,7 +144,16 @@ export class TTSService {
       return this.pendingRequests.get(cacheKey)!;
     }
 
-    const requestPromise = generateSpeech(text, options)
+    const voiceProvider = options.voiceProvider || getDefaultVoiceProvider();
+    const requestPromise = generateSpeechWithProvider(
+      text,
+      {
+        voice: options.voice,
+        voiceStyle: options.voiceStyle,
+        gameId: options.gameId
+      },
+      voiceProvider
+    )
       .then(buffer => {
         this.pendingRequests.delete(cacheKey);
         this.addToCache(cacheKey, buffer);

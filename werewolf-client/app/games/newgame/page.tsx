@@ -10,6 +10,8 @@ import {LLM_CONSTANTS, SupportedAiModels} from "@/app/ai/ai-models";
 import {FREE_TIER_UNLIMITED, getCandidateModelsForTier, getPerGameModelLimit} from "@/app/ai/model-limit-utils";
 import MultiSelectDropdown from '@/app/components/MultiSelectDropdown';
 import {ttsService} from "@/app/services/tts-service";
+import {getVoiceConfig, getDefaultVoiceProvider, VOICE_PROVIDER_DISPLAY_NAMES} from "@/app/ai/voice-config";
+import {VoiceProvider} from "@/app/ai/voice-config/voice-config";
 
 export default function CreateNewGamePage() {
     const { data: session, status } = useSession();
@@ -381,12 +383,14 @@ export default function CreateNewGamePage() {
         }
     };
 
-    const handlePlayStory = async (story: string, voice: string, voiceInstructions?: string) => {
+    const handlePlayStory = async (story: string, voice: string, voiceStyle?: string) => {
         try {
             setIsSpeaking(true);
-            await ttsService.speakText(story, { 
-                voice: voice as any,
-                instructions: voiceInstructions 
+            const voiceProvider = gameData?.voiceProvider || getDefaultVoiceProvider();
+            await ttsService.speakText(story, {
+                voice: voice,
+                voiceStyle: voiceStyle,
+                voiceProvider: voiceProvider
             });
             setIsSpeaking(false);
         } catch (error) {
@@ -604,6 +608,10 @@ export default function CreateNewGamePage() {
                     <div className="mb-6">
                         <h3 className="text-xl font-bold text-white mb-4">Game Master:</h3>
                         <div className="p-4 bg-gray-900 bg-opacity-50 rounded-lg">
+                            {/* Voice Provider indicator */}
+                            <div className="mb-2 text-sm text-gray-400">
+                                Voice Provider: <span className="text-white font-medium">{VOICE_PROVIDER_DISPLAY_NAMES[gameData.voiceProvider] || gameData.voiceProvider}</span>
+                            </div>
                             <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 mb-2">
                                 <div className="flex-1">
                                     <label className="block text-gray-400 text-sm mb-1">AI Model:</label>
@@ -622,18 +630,18 @@ export default function CreateNewGamePage() {
                                         <label className="block text-gray-400 text-sm mb-1">Voice:</label>
                                         <select
                                             className="w-full h-10 p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
-                                            value={gameData.gameMasterVoice || getVoicesForGender('male')[0]}
+                                            value={gameData.gameMasterVoice || getVoiceConfig(gameData.voiceProvider).getVoicesByGender('male')[0]?.id}
                                             onChange={(e) => setGameData({ ...gameData, gameMasterVoice: e.target.value })}
                                         >
-                                            {getVoicesForGender('male').map(voice => (
-                                                <option key={voice} value={voice}>{voice}</option>
+                                            {getVoiceConfig(gameData.voiceProvider).getVoicesByGender('male').map(voice => (
+                                                <option key={voice.id} value={voice.id}>{voice.id}</option>
                                             ))}
                                         </select>
                                     </div>
                                     <div className="flex flex-col justify-end">
                                         <button
                                             className={`w-10 h-10 ${buttonTransparentStyle} ${(!gameData.scene || isSpeaking) ? 'opacity-50 cursor-not-allowed' : ''} flex items-center justify-center`}
-                                            onClick={() => isSpeaking ? handleStopTTS() : handlePlayStory(gameData.scene, gameData.gameMasterVoice || getVoicesForGender('male')[0], gameData.gameMasterVoiceInstructions)}
+                                            onClick={() => isSpeaking ? handleStopTTS() : handlePlayStory(gameData.scene, gameData.gameMasterVoice || getVoiceConfig(gameData.voiceProvider).getVoicesByGender('male')[0]?.id || '', gameData.gameMasterVoiceStyle)}
                                             disabled={!gameData.scene}
                                             title={isSpeaking ? "Stop speaking" : "Play game story"}
                                         >
@@ -644,15 +652,15 @@ export default function CreateNewGamePage() {
                                     </div>
                                 </div>
                             </div>
-                            {gameData.gameMasterVoiceInstructions && (
+                            {gameData.gameMasterVoiceStyle && (
                                 <div className="mt-2">
-                                    <label className="block text-gray-400 text-sm mb-1">Voice Instructions:</label>
-                                    <textarea
+                                    <label className="block text-gray-400 text-sm mb-1">Voice Style:</label>
+                                    <input
+                                        type="text"
                                         className="w-full p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
-                                        rows={2}
-                                        value={gameData.gameMasterVoiceInstructions}
-                                        onChange={(e) => setGameData({ ...gameData, gameMasterVoiceInstructions: e.target.value })}
-                                        placeholder="Voice instructions for the Game Master..."
+                                        value={gameData.gameMasterVoiceStyle}
+                                        onChange={(e) => setGameData({ ...gameData, gameMasterVoiceStyle: e.target.value })}
+                                        placeholder="Voice style (e.g., authoritatively, dramatically)"
                                     />
                                 </div>
                             )}
@@ -697,15 +705,15 @@ export default function CreateNewGamePage() {
                                                 value={player.voice}
                                                 onChange={(e) => handlePlayerChange(index, 'voice', e.target.value)}
                                             >
-                                                {getVoicesForGender(player.gender).map(voice => (
-                                                    <option key={voice} value={voice}>{voice}</option>
+                                                {getVoiceConfig(gameData.voiceProvider).getVoicesByGender(player.gender).map(voice => (
+                                                    <option key={voice.id} value={voice.id}>{voice.id}</option>
                                                 ))}
                                             </select>
                                         </div>
                                         <div className="flex flex-col justify-end">
                                             <button
                                                 className={`w-10 h-10 ${buttonTransparentStyle} ${(!player.story || isSpeaking) ? 'opacity-50 cursor-not-allowed' : ''} flex items-center justify-center`}
-                                                onClick={() => isSpeaking ? handleStopTTS() : handlePlayStory(player.story, player.voice, player.voiceInstructions)}
+                                                onClick={() => isSpeaking ? handleStopTTS() : handlePlayStory(player.story, player.voice, player.voiceStyle)}
                                                 disabled={!player.story}
                                                 title={isSpeaking ? "Stop speaking" : "Play story"}
                                             >
@@ -783,15 +791,15 @@ export default function CreateNewGamePage() {
                                     placeholder="Player's Story"
                                 />
                             </div>
-                            {player.voiceInstructions && (
+                            {player.voiceStyle && (
                                 <div className="mt-2">
-                                    <label className="block text-gray-400 text-sm mb-1">Voice Instructions:</label>
-                                    <textarea
+                                    <label className="block text-gray-400 text-sm mb-1">Voice Style:</label>
+                                    <input
+                                        type="text"
                                         className="w-full p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
-                                        rows={2}
-                                        value={player.voiceInstructions}
-                                        onChange={(e) => handlePlayerChange(index, 'voiceInstructions', e.target.value)}
-                                        placeholder="Voice instructions for this character..."
+                                        value={player.voiceStyle}
+                                        onChange={(e) => handlePlayerChange(index, 'voiceStyle', e.target.value)}
+                                        placeholder="Voice style (e.g., mysteriously, excitedly)"
                                     />
                                 </div>
                             )}
