@@ -690,14 +690,13 @@ export default function GamePage({
                         </div>
                     )}
 
-                    {/* Manual Bot Selection Button */}
-                    {(game.gameState === GAME_STATES.DAY_DISCUSSION || game.gameState === GAME_STATES.AFTER_GAME_DISCUSSION) && (
+                    {/* Manual Bot Selection Button - only show when queue is empty and in discussion phase */}
+                    {(game.gameState === GAME_STATES.DAY_DISCUSSION || game.gameState === GAME_STATES.AFTER_GAME_DISCUSSION) && game.gameStateProcessQueue.length === 0 && (
                         <div className="mt-3 pt-3 border-t theme-border-subtle">
                             <button
-                                className={`w-full ${buttonTransparentStyle} text-sm ${game.gameStateProcessQueue.length > 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                disabled={game.gameStateProcessQueue.length > 0}
+                                className={`w-full ${buttonTransparentStyle} text-sm`}
                                 onClick={() => setBotSelectionDialogOpen(true)}
-                                title={game.gameStateProcessQueue.length > 0 ? 'Bots are already talking' : 'Manually select which bots should respond'}
+                                title="Manually select which bots should respond"
                             >
                                 ✋ Select Bots Manually
                             </button>

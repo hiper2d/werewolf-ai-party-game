@@ -48,13 +48,21 @@ export class Gpt5Agent extends AbstractAgent {
                 ...messages.map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
             ].join('\n\n');
 
+            // Extend schema with thinking field if enabled
+            let schemaToSend: z.ZodSchema<any> = zodSchema;
+            if (this.enableThinking && zodSchema instanceof z.ZodObject) {
+                schemaToSend = zodSchema.extend({
+                    thinking: z.string().describe("Your internal chain-of-thought reasoning process used to arrive at the final answer.")
+                });
+            }
+
             const response = await this.client.responses.parse({
                 model: this.model,
                 instructions: this.instruction,
                 input: input,
                 max_output_tokens: 16384,  // Set to 16k to handle longer JSON responses
                 text: {
-                    format: zodTextFormat(zodSchema, "response_schema"),
+                    format: zodTextFormat(schemaToSend, "response_schema"),
                 }
             });
 
@@ -70,7 +78,10 @@ export class Gpt5Agent extends AbstractAgent {
             this.logger(`✅ Response validated successfully with Zod schema`);
 
             // Extract reasoning content from output if available
-            const reasoningContent = response.output_text || "";
+            let reasoningContent = "";
+            if (this.enableThinking && (response.output_parsed as any).thinking) {
+                reasoningContent = (response.output_parsed as any).thinking;
+            }
 
             // Extract token usage
             let tokenUsage: TokenUsage | undefined;
