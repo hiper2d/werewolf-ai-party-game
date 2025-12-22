@@ -6,10 +6,11 @@ import { startNewDay, summarizePastDay } from "@/app/api/night-actions";
 import GameChat from "@/app/games/[id]/components/GameChat";
 import ModelSelectionDialog from "@/app/games/[id]/components/ModelSelectionDialog";
 import { buttonTransparentStyle } from "@/app/constants";
-import { GAME_STATES, GAME_ROLES, AUTO_VOTE_COEFFICIENT } from "@/app/api/game-models";
+import { GAME_STATES, GAME_ROLES, AUTO_VOTE_COEFFICIENT, BOT_SELECTION_CONFIG } from "@/app/api/game-models";
 import type { Game } from "@/app/api/game-models";
 import type { Session } from "next-auth";
-import { welcome, vote, keepBotsGoing } from '@/app/api/bot-actions';
+import { welcome, vote, keepBotsGoing, manualSelectBots } from '@/app/api/bot-actions';
+import BotSelectionDialog from '@/app/games/[id]/components/BotSelectionDialog';
 import { replayNight, performNightAction } from '@/app/api/night-actions';
 import { getPlayerColor } from "@/app/utils/color-utils";
 import { checkGameEndConditions } from "@/app/utils/game-utils";
@@ -36,6 +37,7 @@ export default function GamePage({
     const [modelDialogOpen, setModelDialogOpen] = useState(false);
     const [selectedBot, setSelectedBot] = useState<{ name: string; aiType: string; enableThinking?: boolean } | null>(null);
     const [clearNightMessages, setClearNightMessages] = useState(false);
+    const [botSelectionDialogOpen, setBotSelectionDialogOpen] = useState(false);
     const isGameOver = game.gameState === GAME_STATES.GAME_OVER || game.gameState === GAME_STATES.AFTER_GAME_DISCUSSION;
 
     const modelUsageCounts = useMemo(() => {
@@ -92,7 +94,7 @@ export default function GamePage({
     // Calculate vote urgency based on message count vs threshold
     const voteUrgency = useMemo(() => {
         if (game.gameState !== GAME_STATES.DAY_DISCUSSION) {
-            return { percentage: 0, isUrgent: false, messagesLeft: 0 };
+            return { percentage: 0, isUrgent: false, isWarning: false, messagesLeft: 0 };
         }
         const alivePlayersCount = game.bots.filter(bot => bot.isAlive).length + 1; // +1 for human
         const threshold = alivePlayersCount * AUTO_VOTE_COEFFICIENT;
@@ -102,6 +104,7 @@ export default function GamePage({
         return {
             percentage: Math.min(percentage, 100),
             isUrgent: percentage >= 90,
+            isWarning: percentage >= 70,
             messagesLeft
         };
     }, [game.gameState, game.bots, game.dayActivityCounter]);
@@ -352,6 +355,21 @@ export default function GamePage({
                 return;
             }
             console.error('Failed to clear error state:', error);
+        }
+    };
+
+    // Handle manual bot selection
+    const handleManualBotSelection = async (selectedBots: string[]) => {
+        try {
+            const updatedGame = await runGameAction(() => manualSelectBots(game.id, selectedBots));
+            if (updatedGame) {
+                setGame(updatedGame);
+            }
+        } catch (error) {
+            if (handleGameActionError(error)) {
+                return;
+            }
+            console.error('Failed to manually select bots:', error);
         }
     };
 
@@ -671,6 +689,20 @@ export default function GamePage({
                             </div>
                         </div>
                     )}
+
+                    {/* Manual Bot Selection Button */}
+                    {(game.gameState === GAME_STATES.DAY_DISCUSSION || game.gameState === GAME_STATES.AFTER_GAME_DISCUSSION) && (
+                        <div className="mt-3 pt-3 border-t theme-border-subtle">
+                            <button
+                                className={`w-full ${buttonTransparentStyle} text-sm ${game.gameStateProcessQueue.length > 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                disabled={game.gameStateProcessQueue.length > 0}
+                                onClick={() => setBotSelectionDialogOpen(true)}
+                                title={game.gameStateProcessQueue.length > 0 ? 'Bots are already talking' : 'Manually select which bots should respond'}
+                            >
+                                ✋ Select Bots Manually
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 {(isGameOver || game.gameState === GAME_STATES.DAY_DISCUSSION || game.gameState === GAME_STATES.VOTE_RESULTS || game.gameState === GAME_STATES.NIGHT || game.gameState === GAME_STATES.NIGHT_RESULTS || (game.gameState === GAME_STATES.NEW_DAY_BOT_SUMMARIES && game.gameStateProcessQueue.length > 0)) && (
@@ -681,7 +713,7 @@ export default function GamePage({
                                 <h3 className="text-lg font-bold text-blue-600 dark:text-blue-400 mb-2">💬 Post-Game Discussion</h3>
                                 <p className="text-xs theme-text-secondary mb-2">All roles revealed. Everyone can participate!</p>
                             </div>
-                            <div className="flex gap-2 justify-center">
+                            <div className="flex gap-2 justify-center flex-wrap">
                                 <button
                                     className={`${buttonTransparentStyle} ${game.gameStateProcessQueue.length > 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
                                     disabled={game.gameStateProcessQueue.length > 0}
@@ -691,7 +723,7 @@ export default function GamePage({
                                             setGame(updatedGame);
                                         }
                                     }}
-                                    title={game.gameStateProcessQueue.length > 0 ? 'Bots are already talking' : 'Let 1-3 bots continue the conversation'}
+                                    title={game.gameStateProcessQueue.length > 0 ? 'Bots are already talking' : `Let ${BOT_SELECTION_CONFIG.MIN}-${BOT_SELECTION_CONFIG.MAX} bots continue the conversation`}
                                 >
                                     Keep Going
                                 </button>
@@ -723,7 +755,7 @@ export default function GamePage({
                             {game.gameState === GAME_STATES.DAY_DISCUSSION && (
                                 <div className="flex gap-2 justify-center">
                                     <button
-                                        className={`${buttonTransparentStyle} ${voteUrgency.isUrgent ? 'bg-red-600 hover:bg-red-700 border-red-500 !text-white animate-pulse' : ''}`}
+                                        className={`${buttonTransparentStyle} ${voteUrgency.isUrgent ? 'bg-red-600 hover:bg-red-700 border-red-500 !text-white animate-pulse' : voteUrgency.isWarning ? 'bg-yellow-500 hover:bg-yellow-600 border-yellow-400 !text-black' : ''}`}
                                         onClick={async () => {
                                             const updatedGame = await runGameAction(() => vote(game.id));
                                             if (updatedGame) {
@@ -731,10 +763,10 @@ export default function GamePage({
                                             }
                                         }}
                                         title={voteUrgency.isUrgent
-                                            ? `Vote now! Auto-voting in ${voteUrgency.messagesLeft} messages`
+                                            ? `Vote now! Auto-voting in ${Math.ceil(voteUrgency.messagesLeft)} messages`
                                             : `Start the voting phase (${Math.round(voteUrgency.percentage)}% to auto-vote)`}
                                     >
-                                        Vote {voteUrgency.isUrgent && '⚠️'}
+                                        Vote {(voteUrgency.isUrgent || voteUrgency.isWarning) && '⚠️'}
                                     </button>
                                     <button
                                         className={`${buttonTransparentStyle} ${game.gameStateProcessQueue.length > 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
@@ -745,7 +777,7 @@ export default function GamePage({
                                                 setGame(updatedGame);
                                             }
                                         }}
-                                        title={game.gameStateProcessQueue.length > 0 ? 'Bots are already talking' : 'Let 1-3 bots continue the conversation'}
+                                        title={game.gameStateProcessQueue.length > 0 ? 'Bots are already talking' : `Let ${BOT_SELECTION_CONFIG.MIN}-${BOT_SELECTION_CONFIG.MAX} bots continue the conversation`}
                                     >
                                         Keep Going
                                     </button>
@@ -876,6 +908,16 @@ export default function GamePage({
                 botName={selectedBot?.name || ''}
                 gameTier={game.createdWithTier}
                 usageCounts={modelUsageCounts}
+            />
+
+            {/* Bot Selection Dialog */}
+            <BotSelectionDialog
+                isOpen={botSelectionDialogOpen}
+                onClose={() => setBotSelectionDialogOpen(false)}
+                onConfirm={handleManualBotSelection}
+                bots={game.bots}
+                dayActivityCounter={game.dayActivityCounter || {}}
+                humanPlayerName={game.humanPlayerName}
             />
         </div>
     );

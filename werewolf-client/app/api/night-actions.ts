@@ -29,7 +29,7 @@ import { NightResultsStory } from "@/app/ai/prompts/ai-schemas";
 import { BOT_DAY_SUMMARY_PROMPT, BOT_SYSTEM_PROMPT } from "@/app/ai/prompts/bot-prompts";
 import { generateWerewolfTeammatesSection, generatePreviousDaySummariesSection } from "@/app/utils/bot-utils";
 import { format } from "@/app/ai/prompts/utils";
-import { parseResponseToObj, convertToAIMessages } from "@/app/utils/message-utils";
+import { parseResponseToObj, convertToAIMessages, convertToGMMessages } from "@/app/utils/message-utils";
 import { checkGameEndConditions } from "@/app/utils/game-utils";
 import { GameEndChecker } from "@/app/utils/game-end-checker";
 import { recordBotTokenUsage, recordGameMasterTokenUsage } from "@/app/api/cost-tracking";
@@ -126,7 +126,7 @@ async function endNightWithResults(gameId: string, game: Game): Promise<Game> {
     };
 
     // Include conversation history for the GM (day + night messages + command)
-    const history = convertToAIMessages(GAME_MASTER, [...dayMessages, gmCommandMessage]);
+    const history = convertToGMMessages([...dayMessages, gmCommandMessage]);
     const [storyResponse, thinking, tokenUsage] = await gmAgent.askWithZodSchema(NightResultsStoryZodSchema, history);
     if (!storyResponse) {
         throw new BotResponseError(

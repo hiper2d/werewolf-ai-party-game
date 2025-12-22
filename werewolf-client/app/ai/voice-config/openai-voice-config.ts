@@ -26,6 +26,7 @@ const OPENAI_VOICES: VoiceMetadata[] = [
     gender: 'male',
     description: 'Deep, authoritative, and commanding. A powerful bass voice that projects confidence and gravitas. Good for leaders, villains, or intimidating characters.',
     celebrityExamples: ['James Earl Jones', 'Idris Elba'],
+    biography: 'Onyx is a seasoned voice actor who specialized in Shakespearean theater before moving into film narration. His voice carries the weight of years on the stage.',
   },
   {
     id: 'ash',
@@ -100,6 +101,9 @@ export class OpenAIVoiceConfig implements VoiceConfig {
       if (voice.celebrityExamples.length > 0) {
         description += ` Similar to: ${voice.celebrityExamples.join(', ')}.`;
       }
+      if (voice.biography) {
+        description += ` Background: ${voice.biography}`;
+      }
       description += '\n';
     });
 
@@ -108,6 +112,9 @@ export class OpenAIVoiceConfig implements VoiceConfig {
       description += `- ${voice.id}: ${voice.description}`;
       if (voice.celebrityExamples.length > 0) {
         description += ` Similar to: ${voice.celebrityExamples.join(', ')}.`;
+      }
+      if (voice.biography) {
+        description += ` Background: ${voice.biography}`;
       }
       description += '\n';
     });

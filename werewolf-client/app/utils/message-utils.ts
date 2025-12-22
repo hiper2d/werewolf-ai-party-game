@@ -163,6 +163,56 @@ export function convertToAIMessage(message: GameMessage): AIMessage {
     };
 }
 
+/**
+ * Converts an array of GameMessages to AIMessages from the Game Master's perspective.
+ * - assistant = Game Master's own messages
+ * - user = all player messages grouped together
+ *
+ * @param messages - Array of game messages to convert
+ * @returns Array of AIMessages suitable for Game Master AI communication
+ */
+export function convertToGMMessages(messages: GameMessage[]): AIMessage[] {
+    let playerMessages: { name: string; message: string }[] = [];
+    let aiMessages: AIMessage[] = [];
+
+    function flushPlayerMessages() {
+        if (playerMessages.length > 0) {
+            let playerBlock = `## Player Messages\n\n`;
+            playerMessages.forEach((pair, index) => {
+                playerBlock += `**${index + 1}. ${pair.name}:** ${pair.message}\n\n`;
+            });
+            playerMessages = [];
+            aiMessages.push({ role: MESSAGE_ROLE.USER, content: playerBlock.trim() });
+        }
+    }
+
+    messages.forEach((message) => {
+        let content: string;
+
+        if (message.authorName === GAME_MASTER) {
+            // Flush any accumulated player messages before adding GM message
+            flushPlayerMessages();
+
+            // Game Master messages are assistant messages
+            if (message.messageType === MessageType.GAME_STORY) {
+                content = (message.msg as { story: string }).story;
+            } else {
+                content = message.msg as string;
+            }
+            aiMessages.push({ role: MESSAGE_ROLE.ASSISTANT, content: content });
+        } else {
+            // All player messages (bots + human) are grouped as user messages
+            content = convertMessageContent(message);
+            playerMessages.push({ name: message.authorName, message: content });
+        }
+    });
+
+    // Flush any remaining player messages
+    flushPlayerMessages();
+
+    return aiMessages;
+}
+
 export function cleanResponse(response: string): string {
     let cleanResponse = response.trim();
     if (cleanResponse.startsWith('```json')) {

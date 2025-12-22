@@ -22,6 +22,7 @@ const GOOGLE_VOICES: VoiceMetadata[] = [
     gender: 'male', // TODO: Verify by listening
     description: 'Upbeat and mischievous with playful energy. Quick-witted and entertaining. Good for tricksters, jesters, and characters who love chaos.',
     celebrityExamples: [],
+    biography: 'Inspired by the mythological trickster, this voice profile was designed to capture the essence of a forest sprite who enjoys leading travelers astray with a laugh.',
   },
   {
     id: 'Charon',
@@ -220,6 +221,9 @@ export class GoogleVoiceConfig implements VoiceConfig {
       if (voice.celebrityExamples.length > 0) {
         description += ` Similar to: ${voice.celebrityExamples.join(', ')}.`;
       }
+      if (voice.biography) {
+        description += ` Background: ${voice.biography}`;
+      }
       description += '\n';
     });
 
@@ -228,6 +232,9 @@ export class GoogleVoiceConfig implements VoiceConfig {
       description += `- ${voice.id}: ${voice.description}`;
       if (voice.celebrityExamples.length > 0) {
         description += ` Similar to: ${voice.celebrityExamples.join(', ')}.`;
+      }
+      if (voice.biography) {
+        description += ` Background: ${voice.biography}`;
       }
       description += '\n';
     });

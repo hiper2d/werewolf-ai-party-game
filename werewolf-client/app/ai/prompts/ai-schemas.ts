@@ -1,12 +1,14 @@
 /**
  * Legacy AI schema definitions - DEPRECATED
- * 
+ *
  * This file contains legacy schema definitions that have been replaced by Zod schemas.
  * New code should use the schemas from @/app/ai/prompts/zod-schemas.ts instead.
- * 
+ *
  * These exports are maintained for backward compatibility with existing tests
  * and will be removed in a future cleanup.
  */
+
+import { BOT_SELECTION_CONFIG } from '@/app/api/game-models';
 
 // =============================================================================
 // DEPRECATED - Use Zod schemas instead
@@ -42,9 +44,9 @@ export const createGmBotSelectionSchema = () => ({
             items: {
                 type: 'string'
             },
-            description: 'Array of 1-3 bot names who should respond next',
-            minItems: 1,
-            maxItems: 3
+            description: `Array of ${BOT_SELECTION_CONFIG.MIN}-${BOT_SELECTION_CONFIG.MAX} bot names who should respond next`,
+            minItems: BOT_SELECTION_CONFIG.MIN,
+            maxItems: BOT_SELECTION_CONFIG.MAX
         },
         reasoning: {
             type: 'string',

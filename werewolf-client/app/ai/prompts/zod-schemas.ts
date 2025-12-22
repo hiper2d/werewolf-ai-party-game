@@ -4,6 +4,7 @@
  */
 
 import { z } from 'zod';
+import { BOT_SELECTION_CONFIG } from '@/app/api/game-models';
 
 // =============================================================================
 // ZOD SCHEMAS (Primary definitions)
@@ -33,9 +34,9 @@ export const GameSetupZodSchema = z.object({
 // GM bot selection schema
 export const GmBotSelectionZodSchema = z.object({
   selected_bots: z.array(z.string())
-    .min(1, "Must select at least 1 bot")
-    .max(3, "Cannot select more than 3 bots")
-    .describe("Array of 1-3 bot names who should respond next"),
+    .min(BOT_SELECTION_CONFIG.MIN, `Must select at least ${BOT_SELECTION_CONFIG.MIN} bots`)
+    .max(BOT_SELECTION_CONFIG.MAX, `Cannot select more than ${BOT_SELECTION_CONFIG.MAX} bots`)
+    .describe(`Array of ${BOT_SELECTION_CONFIG.MIN}-${BOT_SELECTION_CONFIG.MAX} bot names who should respond next`),
   reasoning: z.string().describe("Brief explanation of why these bots were selected")
 });
 

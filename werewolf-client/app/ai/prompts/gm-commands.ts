@@ -1,12 +1,10 @@
 export const GM_COMMAND_INTRODUCE_YOURSELF: string = `Welcome to the game, %bot_name%! Please introduce yourself to the group. \
 Use your character and story to create a thematic introduction. Don't reveal you tactics and strategies. \
-Push your store a little further in your introduction, add some development to it.
+Push your store a little further in your introduction, add some development to it.`;
 
-Your response must be a valid JSON object with your introduction message.`;
+export const GM_COMMAND_SELECT_RESPONDERS: string = `Based on the recent chat messages, select 2-5 bots who should respond next from this list of candidates: %candidate_names%
 
-export const GM_COMMAND_SELECT_RESPONDERS: string = `Based on the recent chat messages, select 1-3 bots who should respond next.
-
-Your response must be a valid JSON object with the selected bot names and reasoning.`;
+REMINDER: Include at least one bot marked "⚠️NEEDS TURN" in DayActivityData to ensure fair participation.`;
 
 export const HISTORY_PREFIX = `
 Here are previous messages from other players you haven't yet seen:
@@ -14,9 +12,7 @@ Here are previous messages from other players you haven't yet seen:
 `
 
 export const GM_COMMAND_REPLY_TO_DISCUSSION: string = `%bot_name%, reply to the players in the discussion. Be thoughtful and consider what has been said so far. \
-Use your character and story to add thematic flavor to your response. Push your story a little further or keep it consistent with your background.
-
-Your response must be a valid JSON object with your discussion reply.`;
+Use your character and story to add thematic flavor to your response. Push your story a little further or keep it consistent with your background.`;
 
 export const GM_COMMAND_GENERATE_NIGHT_RESULTS: string = `Generate the night results story based on the following night events and conversation history.
 
@@ -70,4 +66,4 @@ export const GM_COMMAND_GENERATE_NIGHT_RESULTS: string = `Generate the night res
 - Always maintain game balance and fairness in information revelation
 </StorytellingRules>
 
-Your response must be a valid JSON object with the night results story.`;
+`;

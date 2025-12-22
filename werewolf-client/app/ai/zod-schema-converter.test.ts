@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ZodSchemaConverter, ProviderType, supportsNativeJsonSchema, needsPromptBasedSchema } from './zod-schema-converter';
+import { BOT_SELECTION_CONFIG } from '@/app/api/game-models';
 
 describe('ZodSchemaConverter', () => {
   // Test schemas
@@ -9,7 +10,7 @@ describe('ZodSchemaConverter', () => {
   });
 
   const complexSchema = z.object({
-    selected_bots: z.array(z.string()).min(1).max(3).describe("List of selected bot names"),
+    selected_bots: z.array(z.string()).min(BOT_SELECTION_CONFIG.MIN).max(BOT_SELECTION_CONFIG.MAX).describe("List of selected bot names"),
     reasoning: z.string().describe("Explanation for the selection"),
     priority: z.enum(["high", "medium", "low"]).describe("Priority level"),
     metadata: z.object({
@@ -55,8 +56,8 @@ describe('ZodSchemaConverter', () => {
       expect(result.schema.type).toBe('object');
       expect(result.schema.properties.selected_bots.type).toBe('array');
       expect(result.schema.properties.selected_bots.items.type).toBe('string');
-      expect(result.schema.properties.selected_bots.minItems).toBe(1);
-      expect(result.schema.properties.selected_bots.maxItems).toBe(3);
+      expect(result.schema.properties.selected_bots.minItems).toBe(BOT_SELECTION_CONFIG.MIN);
+      expect(result.schema.properties.selected_bots.maxItems).toBe(BOT_SELECTION_CONFIG.MAX);
       expect(result.schema.properties.priority.enum).toEqual(['high', 'medium', 'low']);
       expect(result.schema.properties.metadata.type).toBe('object');
       expect(result.schema.additionalProperties).toBe(false);

@@ -16,6 +16,8 @@ export interface VoiceMetadata {
   description: string;
   /** Similar-sounding celebrities (actors, singers) for reference */
   celebrityExamples: string[];
+  /** A possible story or biography of a voice owner */
+  biography?: string;
 }
 
 export interface VoiceConfig {

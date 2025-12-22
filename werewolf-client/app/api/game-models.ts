@@ -133,7 +133,16 @@ export const GAME_ROLES = {
  * Coefficient used to calculate the message threshold for automatic voting
  * The threshold is calculated as: alivePlayersCount * AUTO_VOTE_COEFFICIENT
  */
-export const AUTO_VOTE_COEFFICIENT = 5;
+export const AUTO_VOTE_COEFFICIENT = 3.5;
+
+/**
+ * Configuration for how many bots the Game Master should select to respond
+ * Used in bot selection prompts and Zod schema validation
+ */
+export const BOT_SELECTION_CONFIG = {
+    MIN: 2,
+    MAX: 5
+} as const;
 
 export interface RoleConfig {
     name: string;
