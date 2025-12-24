@@ -5,9 +5,9 @@ import { LLM_CONSTANTS, SupportedAiModels } from '@/app/ai/ai-models';
 import { getCandidateModelsForTier, getPerGameModelLimit, FREE_TIER_UNLIMITED } from '@/app/ai/model-limit-utils';
 import { UserTier, USER_TIERS } from '@/app/api/game-models';
 import { buttonTransparentStyle } from '@/app/constants';
+import { useUIControls } from '../context/UIControlsContext';
 
 interface ModelSelectionDialogProps {
-    isOpen: boolean;
     onClose: () => void;
     onSelect: (model: string, enableThinking?: boolean) => void;
     currentModel: string;
@@ -18,7 +18,6 @@ interface ModelSelectionDialogProps {
 }
 
 export default function ModelSelectionDialog({
-    isOpen,
     onClose,
     onSelect,
     currentModel,
@@ -26,6 +25,8 @@ export default function ModelSelectionDialog({
     gameTier,
     usageCounts
 }: ModelSelectionDialogProps) {
+    const { isModalOpen } = useUIControls();
+    const isOpen = isModalOpen('modelSelection');
     const tierFilteredModels = useMemo(() => {
         if (gameTier === USER_TIERS.FREE) {
             const models = new Set(getCandidateModelsForTier(USER_TIERS.FREE));

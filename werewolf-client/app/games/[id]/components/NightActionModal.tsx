@@ -3,9 +3,10 @@
 import React, { useState } from 'react';
 import { buttonTransparentStyle } from '@/app/constants';
 import { ROLE_CONFIGS, Game, GAME_ROLES } from '@/app/api/game-models';
+import DraggableDialog from './DraggableDialog';
+import { useUIControls } from '../context/UIControlsContext';
 
 interface NightActionModalProps {
-    isOpen: boolean;
     onClose: () => void;
     onAction: (targetPlayer: string, message: string) => void;
     game: Game;
@@ -15,7 +16,6 @@ interface NightActionModalProps {
 }
 
 export default function NightActionModal({
-    isOpen,
     onClose,
     onAction,
     game,
@@ -23,6 +23,8 @@ export default function NightActionModal({
     isLastInQueue,
     isSubmitting = false
 }: NightActionModalProps) {
+    const { isModalOpen } = useUIControls();
+    const isOpen = isModalOpen('nightAction');
     const [selectedPlayer, setSelectedPlayer] = useState<string>('');
     const [message, setMessage] = useState<string>('');
 
@@ -85,64 +87,62 @@ export default function NightActionModal({
     };
 
     return (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="theme-bg-card theme-border border rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
-                <h3 className="text-xl font-bold theme-text-primary mb-4">
-                    {roleConfig.actionTitle}
-                </h3>
+        <DraggableDialog
+            isOpen={isOpen}
+            title={roleConfig.actionTitle || 'Night Action'}
+            className="max-w-md w-full mx-4"
+        >
+            <div className="mb-2 text-sm theme-text-secondary">
+                {roleConfig.description}
+            </div>
 
-                <div className="mb-2 text-sm theme-text-secondary">
-                    {roleConfig.description}
-                </div>
-
-                <div className="mb-6">
-                    <div className="mb-4">
-                        <label className="block theme-text-primary text-sm mb-2">{roleConfig.targetLabel}</label>
-                        <select
-                            className="w-full p-2 rounded bg-[rgb(var(--color-input-bg))] text-[rgb(var(--color-input-text))] border border-[rgb(var(--color-input-border))] focus:outline-none focus:ring-1 focus:ring-blue-500"
-                            value={selectedPlayer}
-                            onChange={(e) => setSelectedPlayer(e.target.value)}
-                            disabled={isSubmitting}
-                        >
-                            <option value="">Select a player...</option>
-                            {availableTargets.map((target) => (
-                                <option key={target.name} value={target.name}>
-                                    {target.name}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
-                    <div className="mb-4">
-                        <label className="block theme-text-primary text-sm mb-2">{getMessageLabel()}</label>
-                        <textarea
-                            className="w-full p-2 rounded bg-[rgb(var(--color-input-bg))] text-[rgb(var(--color-input-text))] border border-[rgb(var(--color-input-border))] focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder-[rgb(var(--color-input-placeholder))]"
-                            rows={3}
-                            placeholder={roleConfig.messagePlaceholder}
-                            value={message}
-                            onChange={(e) => setMessage(e.target.value)}
-                            disabled={isSubmitting}
-                        />
-                    </div>
-                </div>
-
-                <div className="flex space-x-3 justify-end">
-                    <button
-                        className={`${buttonTransparentStyle}`}
-                        onClick={handleClose}
+            <div className="mb-6">
+                <div className="mb-4">
+                    <label className="block theme-text-primary text-sm mb-2">{roleConfig.targetLabel}</label>
+                    <select
+                        className="w-full p-2 rounded bg-[rgb(var(--color-input-bg))] text-[rgb(var(--color-input-text))] border border-[rgb(var(--color-input-border))] focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        value={selectedPlayer}
+                        onChange={(e) => setSelectedPlayer(e.target.value)}
                         disabled={isSubmitting}
                     >
-                        Cancel
-                    </button>
-                    <button
-                        className={`${buttonTransparentStyle} ${(!selectedPlayer || !message.trim() || isSubmitting) ? 'opacity-50 cursor-not-allowed' : ''} bg-blue-600/80 hover:bg-blue-700/80 text-white border-none`}
-                        onClick={handleSubmit}
-                        disabled={!selectedPlayer || !message.trim() || isSubmitting}
-                    >
-                        {isSubmitting ? 'Submitting...' : roleConfig.submitButtonText}
-                    </button>
+                        <option value="">Select a player...</option>
+                        {availableTargets.map((target) => (
+                            <option key={target.name} value={target.name}>
+                                {target.name}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+
+                <div className="mb-4">
+                    <label className="block theme-text-primary text-sm mb-2">{getMessageLabel()}</label>
+                    <textarea
+                        className="w-full p-2 rounded bg-[rgb(var(--color-input-bg))] text-[rgb(var(--color-input-text))] border border-[rgb(var(--color-input-border))] focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder-[rgb(var(--color-input-placeholder))]"
+                        rows={3}
+                        placeholder={roleConfig.messagePlaceholder}
+                        value={message}
+                        onChange={(e) => setMessage(e.target.value)}
+                        disabled={isSubmitting}
+                    />
                 </div>
             </div>
-        </div>
+
+            <div className="flex space-x-3 justify-end">
+                <button
+                    className={`${buttonTransparentStyle}`}
+                    onClick={handleClose}
+                    disabled={isSubmitting}
+                >
+                    Cancel
+                </button>
+                <button
+                    className={`${buttonTransparentStyle} ${(!selectedPlayer || !message.trim() || isSubmitting) ? 'opacity-50 cursor-not-allowed' : ''} bg-blue-600/80 hover:bg-blue-700/80 text-white border-none`}
+                    onClick={handleSubmit}
+                    disabled={!selectedPlayer || !message.trim() || isSubmitting}
+                >
+                    {isSubmitting ? 'Submitting...' : roleConfig.submitButtonText}
+                </button>
+            </div>
+        </DraggableDialog>
     );
 }

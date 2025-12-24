@@ -12,6 +12,7 @@ import NightActionModal from "./NightActionModal";
 import { ttsService } from "@/app/services/tts-service";
 import { sttService } from "@/app/services/stt-service";
 import { getDefaultVoiceProvider } from "@/app/ai/voice-config";
+import { useUIControls } from '../context/UIControlsContext';
 
 interface GameChatProps {
     gameId: string;
@@ -338,11 +339,12 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
     const [newMessage, setNewMessage] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
-    const [showVotingModal, setShowVotingModal] = useState(false);
     const [isVoting, setIsVoting] = useState(false);
     const [isStartingNight, setIsStartingNight] = useState(false);
-    const [showNightActionModal, setShowNightActionModal] = useState(false);
     const [isPerformingNightAction, setIsPerformingNightAction] = useState(false);
+    const { openModal, closeModal, isModalOpen, areControlsEnabled } = useUIControls();
+    const showVotingModal = isModalOpen('voting');
+    const showNightActionModal = isModalOpen('nightAction');
     const [isGettingSuggestion, setIsGettingSuggestion] = useState(false);
     const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
     const [isRecording, setIsRecording] = useState(false);
@@ -583,7 +585,7 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
             !showVotingModal &&
             !isVoting) {
             console.log('🚨 OPENING VOTING MODAL - This could be the loop source!');
-            setShowVotingModal(true);
+            openModal('voting');
         }
     }, [game.gameState, game.gameStateProcessQueue, game.humanPlayerName, showVotingModal, isVoting]);
 
@@ -615,7 +617,7 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
                 // Check if this is the last player in the param queue (target selection needed)
                 if (game.gameStateParamQueue.length === 1) {
                     console.log('🚨 OPENING NIGHT ACTION MODAL - Last in queue, target selection needed');
-                    setShowNightActionModal(true);
+                    openModal('nightAction');
                 }
                 // If multiple players in param queue, enable chat for werewolf coordination
                 // This will be handled by enabling the input field below
@@ -853,7 +855,7 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
         console.log('🚨 CALLING HUMAN_PLAYER_VOTE API - This could trigger the loop!');
         const updatedGame = await humanPlayerVote(gameId, targetPlayer, reason);
         console.log('✅ Human vote API completed, closing modal and updating state');
-        setShowVotingModal(false);
+        closeModal('voting');
         
         // Update game state if callback is provided
         if (onGameStateChange) {
@@ -865,7 +867,7 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
 
     const handleCloseVotingModal = () => {
         if (!isVoting) {
-            setShowVotingModal(false);
+            closeModal('voting');
         }
     };
 
@@ -906,7 +908,7 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
         const { performHumanPlayerNightAction } = await import("@/app/api/bot-actions");
         const updatedGame = await performHumanPlayerNightAction(gameId, targetPlayer, message);
         console.log('✅ Human night action API completed, closing modal and updating state');
-        setShowNightActionModal(false);
+        closeModal('nightAction');
         
         // Update game state if callback is provided
         if (onGameStateChange) {
@@ -918,7 +920,7 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
 
     const handleCloseNightActionModal = () => {
         if (!isPerformingNightAction) {
-            setShowNightActionModal(false);
+            closeModal('nightAction');
         }
     };
 
@@ -1059,6 +1061,10 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
 
     // Check if chat input should be enabled
     const isInputEnabled = () => {
+        // Disable when any modal is open
+        if (!areControlsEnabled) {
+            return false;
+        }
         if (!isCurrentDaySelected) {
             return false;
         }
@@ -1101,6 +1107,10 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
 
     // Check if microphone should be enabled (separate from text input)
     const isMicrophoneEnabled = () => {
+        // Disable when any modal is open
+        if (!areControlsEnabled) {
+            return false;
+        }
         if (!isCurrentDaySelected) {
             return false;
         }
@@ -1365,26 +1375,20 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
                     </div>
                 </div>
             </form>
-            {showVotingModal && (
-                <VotingModal
-                    isOpen={showVotingModal}
-                    game={game}
-                    onVote={handleVote}
-                    onClose={handleCloseVotingModal}
-                    isSubmitting={isVoting}
-                />
-            )}
-            {showNightActionModal && (
-                <NightActionModal
-                    isOpen={showNightActionModal}
-                    game={game}
-                    currentRole={game.humanPlayerRole}
-                    isLastInQueue={game.gameStateParamQueue.length === 1}
-                    onAction={handleNightAction}
-                    onClose={handleCloseNightActionModal}
-                    isSubmitting={isPerformingNightAction}
-                />
-            )}
+            <VotingModal
+                game={game}
+                onVote={handleVote}
+                onClose={handleCloseVotingModal}
+                isSubmitting={isVoting}
+            />
+            <NightActionModal
+                game={game}
+                currentRole={game.humanPlayerRole}
+                isLastInQueue={game.gameStateParamQueue.length === 1}
+                onAction={handleNightAction}
+                onClose={handleCloseNightActionModal}
+                isSubmitting={isPerformingNightAction}
+            />
         </div>
     );
 }

@@ -2,8 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Default dark background to prevent flash before theme loads */
+html {
+  background-color: #111827; /* matches dark theme --color-page-bg-start */
+}
+
 /* Light Theme */
 [data-theme='light'] {
+  background-color: #f8fafc; /* override default dark background */
+
   --color-text-primary: 15, 23, 42;
   --color-text-secondary: 71, 85, 105;
 

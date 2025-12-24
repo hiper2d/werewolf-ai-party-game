@@ -23,11 +23,27 @@ export const metadata: Metadata = {
   description: "Werewolf AI Game Client",
 };
 
+// Inline script to prevent flash of wrong theme
+const themeScript = `
+  (function() {
+    try {
+      var theme = localStorage.getItem('theme');
+      if (!theme) {
+        theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+      document.documentElement.setAttribute('data-theme', theme);
+    } catch (e) {}
+  })();
+`;
+
 export default function RootLayout(
     { children }: Readonly<{ children: React.ReactNode; }>
 ) {
   return (
       <html suppressHydrationWarning lang="en" className={`${inter.variable} ${roboto_mono.variable} h-full`}>
+          <head>
+            <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+          </head>
           <body className="font-inter m-0 p-0 h-full">
             <ThemeProvider>
               <AuthProvider>

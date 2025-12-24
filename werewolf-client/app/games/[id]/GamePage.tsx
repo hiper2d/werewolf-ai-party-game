@@ -15,6 +15,7 @@ import { replayNight, performNightAction } from '@/app/api/night-actions';
 import { getPlayerColor } from "@/app/utils/color-utils";
 import { checkGameEndConditions } from "@/app/utils/game-utils";
 import { isTierMismatchError } from '@/app/api/errors';
+import { UIControlsProvider, useUIControls } from './context/UIControlsContext';
 
 interface Participant {
     name: string;
@@ -26,18 +27,31 @@ interface Participant {
     isGameMaster?: boolean;
 }
 
-export default function GamePage({ 
-    initialGame, 
-    session 
-}: { 
-    initialGame: Game, 
-    session: Session | null 
+export default function GamePage({
+    initialGame,
+    session
+}: {
+    initialGame: Game,
+    session: Session | null
+}) {
+    return (
+        <UIControlsProvider>
+            <GamePageContent initialGame={initialGame} session={session} />
+        </UIControlsProvider>
+    );
+}
+
+function GamePageContent({
+    initialGame,
+    session
+}: {
+    initialGame: Game,
+    session: Session | null
 }) {
     const [game, setGame] = useState(initialGame);
-    const [modelDialogOpen, setModelDialogOpen] = useState(false);
     const [selectedBot, setSelectedBot] = useState<{ name: string; aiType: string; enableThinking?: boolean } | null>(null);
     const [clearNightMessages, setClearNightMessages] = useState(false);
-    const [botSelectionDialogOpen, setBotSelectionDialogOpen] = useState(false);
+    const { openModal, closeModal, areControlsEnabled } = useUIControls();
     const isGameOver = game.gameState === GAME_STATES.GAME_OVER || game.gameState === GAME_STATES.AFTER_GAME_DISCUSSION;
 
     const modelUsageCounts = useMemo(() => {
@@ -397,7 +411,7 @@ export default function GamePage({
 
     const openModelDialog = (botName: string, currentModel: string, enableThinking?: boolean) => {
         setSelectedBot({ name: botName, aiType: currentModel, enableThinking });
-        setModelDialogOpen(true);
+        openModal('modelSelection');
     };
 
     // Combine human player and bots for participants list
@@ -597,8 +611,9 @@ export default function GamePage({
                                         <div className="text-xs mt-1 text-left w-full">
                                             <button
                                                 onClick={() => openModelDialog(participant.name, participant.aiType!, participant.enableThinking)}
-                                                className="theme-text-secondary hover:opacity-70 transition-colors duration-200 text-left w-full"
+                                                className={`theme-text-secondary hover:opacity-70 transition-colors duration-200 text-left w-full ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                                                 title="Click to change AI model"
+                                                disabled={!areControlsEnabled}
                                             >
                                                 Model: {participant.aiType}
                                             </button>
@@ -694,8 +709,9 @@ export default function GamePage({
                     {(game.gameState === GAME_STATES.DAY_DISCUSSION || game.gameState === GAME_STATES.AFTER_GAME_DISCUSSION) && game.gameStateProcessQueue.length === 0 && (
                         <div className="mt-3 pt-3 border-t theme-border-subtle">
                             <button
-                                className={`w-full ${buttonTransparentStyle} text-sm`}
-                                onClick={() => setBotSelectionDialogOpen(true)}
+                                className={`w-full ${buttonTransparentStyle} text-sm ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                onClick={() => openModal('botSelection')}
+                                disabled={!areControlsEnabled}
                                 title="Manually select which bots should respond"
                             >
                                 ✋ Select Bots Manually
@@ -714,8 +730,8 @@ export default function GamePage({
                             </div>
                             <div className="flex gap-2 justify-center flex-wrap">
                                 <button
-                                    className={`${buttonTransparentStyle} ${game.gameStateProcessQueue.length > 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                    disabled={game.gameStateProcessQueue.length > 0}
+                                    className={`${buttonTransparentStyle} ${!areControlsEnabled || game.gameStateProcessQueue.length > 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    disabled={!areControlsEnabled || game.gameStateProcessQueue.length > 0}
                                     onClick={async () => {
                                         const updatedGame = await runGameAction(() => keepBotsGoing(game.id));
                                         if (updatedGame) {
@@ -727,8 +743,9 @@ export default function GamePage({
                                     Keep Going
                                 </button>
                                 <button
-                                    className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500 !text-white`}
+                                    className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500 !text-white ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                                     onClick={handleExitGame}
+                                    disabled={!areControlsEnabled}
                                     title="Return to the games list"
                                 >
                                     Exit Game
@@ -742,8 +759,9 @@ export default function GamePage({
                                 <p className="text-sm theme-text-secondary">The game has ended. All roles have been revealed above.</p>
                             </div>
                             <button
-                                className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500 !text-white`}
+                                className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500 !text-white ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 onClick={handleExitGame}
+                                disabled={!areControlsEnabled}
                                 title="Return to the games list"
                             >
                                 Exit Game
@@ -754,7 +772,8 @@ export default function GamePage({
                             {game.gameState === GAME_STATES.DAY_DISCUSSION && (
                                 <div className="flex gap-2 justify-center">
                                     <button
-                                        className={`${buttonTransparentStyle} ${voteUrgency.isUrgent ? 'bg-red-600 hover:bg-red-700 border-red-500 !text-white animate-pulse' : voteUrgency.isWarning ? 'bg-yellow-500 hover:bg-yellow-600 border-yellow-400 !text-black' : ''}`}
+                                        className={`${buttonTransparentStyle} ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''} ${voteUrgency.isUrgent ? 'bg-red-600 hover:bg-red-700 border-red-500 !text-white animate-pulse' : voteUrgency.isWarning ? 'bg-yellow-500 hover:bg-yellow-600 border-yellow-400 !text-black' : ''}`}
+                                        disabled={!areControlsEnabled}
                                         onClick={async () => {
                                             const updatedGame = await runGameAction(() => vote(game.id));
                                             if (updatedGame) {
@@ -768,8 +787,8 @@ export default function GamePage({
                                         Vote {(voteUrgency.isUrgent || voteUrgency.isWarning) && '⚠️'}
                                     </button>
                                     <button
-                                        className={`${buttonTransparentStyle} ${game.gameStateProcessQueue.length > 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                        disabled={game.gameStateProcessQueue.length > 0}
+                                        className={`${buttonTransparentStyle} ${!areControlsEnabled || game.gameStateProcessQueue.length > 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                        disabled={!areControlsEnabled || game.gameStateProcessQueue.length > 0}
                                         onClick={async () => {
                                             const updatedGame = await runGameAction(() => keepBotsGoing(game.id));
                                             if (updatedGame) {
@@ -792,7 +811,8 @@ export default function GamePage({
                                     <div className="flex gap-2 justify-center flex-wrap">
                                         {!showVoteGameOverCTA && (
                                             <button
-                                                className={`${buttonTransparentStyle} bg-blue-600 hover:bg-blue-700 border-blue-500 !text-white`}
+                                                className={`${buttonTransparentStyle} bg-blue-600 hover:bg-blue-700 border-blue-500 !text-white ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                disabled={!areControlsEnabled}
                                                 onClick={async () => {
                                                     console.log('🌙 GAMEPAGE: START NIGHT BUTTON CLICKED:', {
                                                         gameId: game.id,
@@ -812,7 +832,8 @@ export default function GamePage({
                                         )}
                                         {showVoteGameOverCTA && (
                                             <button
-                                                className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500 !text-white`}
+                                                className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500 !text-white ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                disabled={!areControlsEnabled}
                                                 onClick={async () => {
                                                     const updatedGame = await runGameAction(() => afterGameDiscussion(game.id));
                                                     if (updatedGame) {
@@ -841,7 +862,8 @@ export default function GamePage({
                                     )}
                                     <div className="flex gap-2 justify-center flex-wrap">
                                         <button
-                                            className={`${buttonTransparentStyle} min-w-[70px] max-w-[90px]`}
+                                            className={`${buttonTransparentStyle} min-w-[70px] max-w-[90px] ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                            disabled={!areControlsEnabled}
                                             onClick={async () => {
                                                 setClearNightMessages(true);
                                                 const updatedGame = await runGameAction(() => replayNight(game.id));
@@ -856,7 +878,8 @@ export default function GamePage({
                                         </button>
                                         {showNightGameOverCTA ? (
                                             <button
-                                                className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500 min-w-[70px] max-w-[90px] !text-white`}
+                                                className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500 min-w-[70px] max-w-[90px] !text-white ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                disabled={!areControlsEnabled}
                                                 onClick={async () => {
                                                     const updatedGame = await runGameAction(() => afterGameDiscussion(game.id));
                                                     if (updatedGame) {
@@ -869,7 +892,8 @@ export default function GamePage({
                                             </button>
                                         ) : (
                                             <button
-                                                className={`${buttonTransparentStyle} min-w-[70px] max-w-[90px]`}
+                                                className={`${buttonTransparentStyle} min-w-[70px] max-w-[90px] ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                disabled={!areControlsEnabled}
                                                 onClick={async () => {
                                                     const updatedGame = await runGameAction(() => startNewDay(game.id));
                                                     if (updatedGame) {
@@ -897,9 +921,8 @@ export default function GamePage({
             
             {/* Model Selection Dialog */}
             <ModelSelectionDialog
-                isOpen={modelDialogOpen}
                 onClose={() => {
-                    setModelDialogOpen(false);
+                    closeModal('modelSelection');
                     setSelectedBot(null);
                 }}
                 onSelect={handleModelUpdate}
@@ -911,8 +934,7 @@ export default function GamePage({
 
             {/* Bot Selection Dialog */}
             <BotSelectionDialog
-                isOpen={botSelectionDialogOpen}
-                onClose={() => setBotSelectionDialogOpen(false)}
+                onClose={() => closeModal('botSelection')}
                 onConfirm={handleManualBotSelection}
                 bots={game.bots}
                 dayActivityCounter={game.dayActivityCounter || {}}
