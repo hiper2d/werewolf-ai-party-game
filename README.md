@@ -27,6 +27,8 @@ A game master AI will generate a story and bots for you. Feel free to change any
 - bots' models, play styles, and voices
 - bots' voice instructions
 
+I don't use any frameworks for AI, I created s simple agent for each vendor based on their native SDK. I have my own router to coordinate bots. And a simple voice framework (with OpenAI and Gemini voices support) to make sure bots cat talk with voices matching their characters. Pretty cool stuff.
+
 <a href="images/create-game.png" target="_blank"><img src="images/create-game.png" width="600"></a>
 <a href="images/create-game-players.png" target="_blank"><img src="images/create-game-players.png" width="600"></a>
 
@@ -36,11 +38,21 @@ You can follow the theme and roleplay, you can tell them that they are AI, you c
 
 <a href="images/chat.png" target="_blank"><img src="images/chat.png" width="600"></a>
 
+Game Master chooses who should reply to you, or you can choose yourself.
+
+<a href="images/manual-bots-selection.png" target="_blank"><img src="images/manual-bots-selection.png" width="600"></a>
+
 Survival is not easy, poor Bob (me)
 
 <a href="images/game_vote_all_for_bob.png" target="_blank"><img src="images/game_vote_all_for_bob.png" width="600"></a>
 
-I don't use any frameworks for AI, I created s simple agent for each vendor based on their native SDK.
+Werewolves coordinate their actions at night:
+
+<a href="images/wolfs-talking.png" target="_blank"><img src="images/wolfs-talking.png" width="600"></a>
+
+Reasoning AI-werewolf reasons though their night actions
+
+<a href="images/wolf-reasoning.png" target="_blank"><img src="images/wolf-reasoning.png" width="600"></a>
 
 ### Stack
 
