@@ -1,6 +1,5 @@
 # Bugs and improvements
 
-- The names selection mechanic requires changes. Weak models keep selecting the same players. I should add an option to select players myself
 - Detective doesn't understand that they revealed a wolf. Need to inject this info more directly into some bots fields
   or append to summary
 - Prepare the framework to easily add more roles
