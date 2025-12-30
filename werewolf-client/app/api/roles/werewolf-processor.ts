@@ -154,6 +154,7 @@ export class WerewolfProcessor extends BaseRoleProcessor {
                 personal_story: werewolfBot.story,
                 play_style: "",
                 role: werewolfBot.role,
+                human_player_name: this.game.humanPlayerName,
                 werewolf_teammates_section: generateWerewolfTeammatesSection(werewolfBot, this.game),
                 players_names: [
                     ...this.game.bots

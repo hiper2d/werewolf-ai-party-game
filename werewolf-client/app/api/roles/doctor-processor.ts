@@ -77,6 +77,7 @@ export class DoctorProcessor extends BaseRoleProcessor {
                 personal_story: doctorBot.story,
                 play_style: "",
                 role: doctorBot.role,
+                human_player_name: this.game.humanPlayerName,
                 werewolf_teammates_section: '',
                 players_names: [
                     ...this.game.bots

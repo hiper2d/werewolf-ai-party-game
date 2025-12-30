@@ -1049,6 +1049,7 @@ async function summarizePastDayImpl(gameId: string): Promise<Game> {
             personal_story: bot.story,
             play_style: "",
             role: bot.role,
+            human_player_name: currentGame.humanPlayerName,
             werewolf_teammates_section: generateWerewolfTeammatesSection(bot, currentGame),
             players_names: [
                 ...currentGame.bots
@@ -1066,7 +1067,8 @@ async function summarizePastDayImpl(gameId: string): Promise<Game> {
         // Create summary request message
         const summaryPrompt = format(BOT_DAY_SUMMARY_PROMPT, {
             bot_name: bot.name,
-            day_number: currentGame.currentDay
+            day_number: currentGame.currentDay,
+            human_player_name: currentGame.humanPlayerName
         });
 
         const summaryMessage: GameMessage = {
