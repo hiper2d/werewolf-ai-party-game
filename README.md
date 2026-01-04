@@ -71,13 +71,47 @@ To run the project locally, you need:
 ### Firebase Setup
 
 This project uses Firestore and Authentication from Firebase. You'll need to:
-1. Create a new Firebase project in the Firebase Console
+1. Create a new Firebase project in the [Firebase Console](https://console.firebase.google.com/)
 2. Enable Firestore Database
-3. Enable Authentication
+3. Enable Authentication (with GitHub and/or Google providers)
 4. Deploy Firestore indexes using Firebase CLI:
    ```bash
    firebase deploy --only firestore:indexes
    ```
+
+### Environment Variables
+
+1. Copy the template file:
+   ```bash
+   cd werewolf-client
+   cp .env.template .env
+   ```
+
+2. **Firebase Service Account** (required):
+   - Go to [Firebase Console](https://console.firebase.google.com/) > Your Project > Project Settings > Service Accounts
+   - Click "Generate new private key" to download `serviceAccount.json`
+   - Extract the required values:
+     ```bash
+     echo "" >> .env
+     echo "# Firebase Service Account" >> .env
+     echo "FIREBASE_PROJECT_ID=$(jq -r '.project_id' firebase/serviceAccount.json)" >> .env
+     echo "FIREBASE_CLIENT_EMAIL=$(jq -r '.client_email' firebase/serviceAccount.json)" >> .env
+     echo "FIREBASE_PRIVATE_KEY=\"$(jq -r '.private_key' firebase/serviceAccount.json)\"" >> .env
+     ```
+   - Add these to your `.env` file
+
+3. **NextAuth Secret** (required):
+   ```bash
+   # Generate a random secret
+   openssl rand -base64 32
+   ```
+   Set both `AUTH_SECRET` and `NEXTAUTH_SECRET` to this value.
+
+4. **OAuth Providers** (optional):
+   - **GitHub**: Create an OAuth app at [GitHub Developer Settings](https://github.com/settings/developers)
+   - **Google**: Create OAuth credentials at [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
+
+5. **AI API Keys**: Users provide their own API keys via the profile page after logging in.
 
 ### Frontend Setup
 
