@@ -58,7 +58,7 @@ firebase deploy --only firestore:indexes    # Deploy Firestore indexes
 Required environment variables:
 - `GITHUB_ID`, `GITHUB_SECRET` (GitHub OAuth)
 - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (Google OAuth)
-- Firebase configuration in `firebase/firebase-keys.js`
+- `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY` (Firebase Admin SDK)
 - Users provide their own AI API keys via the profile page
 
 ## Testing
