@@ -9,6 +9,7 @@ import { getPlayerColor } from "@/app/utils/color-utils";
 import { clearGameErrorState } from "@/app/api/game-actions";
 import VotingModal from "./VotingModal";
 import NightActionModal from "./NightActionModal";
+import MentionDropdown from "./MentionDropdown";
 import { ttsService } from "@/app/services/tts-service";
 import { sttService } from "@/app/services/stt-service";
 import { getDefaultVoiceProvider } from "@/app/ai/voice-config";
@@ -354,6 +355,21 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
     const [isLoadingMessages, setIsLoadingMessages] = useState(false);
     const [showDaySelector, setShowDaySelector] = useState(false);
     const daySelectorRef = useRef<HTMLDivElement | null>(null);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+    
+    // Mention state
+    const [mentionState, setMentionState] = useState<{
+        isOpen: boolean;
+        query: string;
+        matchIndex: number;
+        selectedIndex: number;
+    }>({
+        isOpen: false,
+        query: '',
+        matchIndex: -1,
+        selectedIndex: 0
+    });
+
     const isCurrentDaySelected = selectedDay === game.currentDay;
     const availableDays = useMemo(
         () => Array.from({ length: game.currentDay }, (_, idx) => game.currentDay - idx),
@@ -367,6 +383,69 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
             message.authorName !== GAME_MASTER
         ).length;
     }, [messages, selectedDay]);
+
+    // Get mention candidates
+    const mentionCandidates = useMemo(() => {
+        if (!mentionState.isOpen) return [];
+        
+        const queryLower = mentionState.query.toLowerCase();
+        
+        // Combine bots and exclude current user
+        const candidates = game.bots
+            .filter(bot => bot.name !== game.humanPlayerName)
+            .map(bot => ({ name: bot.name, isAlive: bot.isAlive }));
+            
+        // Filter by query
+        return candidates.filter(c => c.name.toLowerCase().includes(queryLower));
+    }, [game.bots, game.humanPlayerName, mentionState.isOpen, mentionState.query]);
+
+    const handleMentionSelect = (name: string) => {
+        const prefix = newMessage.slice(0, mentionState.matchIndex);
+        const suffix = newMessage.slice(textareaRef.current?.selectionStart || newMessage.length);
+        const insertedName = `${name} `;
+        
+        const updatedMessage = `${prefix}@${insertedName}${suffix}`;
+        setNewMessage(updatedMessage);
+        setMentionState(prev => ({ ...prev, isOpen: false }));
+        
+        // Focus back on textarea
+        if (textareaRef.current) {
+            textareaRef.current.focus();
+            // Note: Setting cursor position accurately requires useEffect or layout effect after render,
+            // skipping for simplicity as adding at end of insertion is default behavior often sufficient.
+        }
+    };
+
+    const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        const newValue = e.target.value;
+        const newCursorPos = e.target.selectionStart;
+        setNewMessage(newValue);
+
+        // Find the active mention
+        const textBeforeCursor = newValue.slice(0, newCursorPos);
+        const lastAtIndex = textBeforeCursor.lastIndexOf('@');
+        
+        if (lastAtIndex !== -1) {
+             const isStartOfLine = lastAtIndex === 0;
+             const isPrecededBySpace = lastAtIndex > 0 && /[\s\n]/.test(newValue[lastAtIndex - 1]);
+             
+             if (isStartOfLine || isPrecededBySpace) {
+                 const query = textBeforeCursor.slice(lastAtIndex + 1);
+                 // Heuristic: if query is too long or contains newlines, probably not a mention
+                 if (query.length < 30 && !query.includes('\n')) {
+                     setMentionState({
+                         isOpen: true,
+                         query: query,
+                         matchIndex: lastAtIndex,
+                         selectedIndex: 0
+                     });
+                     return;
+                 }
+             }
+        }
+        
+        setMentionState(prev => ({ ...prev, isOpen: false }));
+    };
 
     const phaseLabel = game.gameState.toLowerCase().replace(/_/g, ' ');
     const headerTitle = `Day ${selectedDay}: ${isCurrentDaySelected ? phaseLabel : 'history'}`;
@@ -711,6 +790,35 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
     };
 
     const handleTextareaKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if (mentionState.isOpen && mentionCandidates.length > 0) {
+            if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                setMentionState(prev => ({
+                    ...prev,
+                    selectedIndex: (prev.selectedIndex - 1 + mentionCandidates.length) % mentionCandidates.length
+                }));
+                return;
+            }
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                setMentionState(prev => ({
+                    ...prev,
+                    selectedIndex: (prev.selectedIndex + 1) % mentionCandidates.length
+                }));
+                return;
+            }
+            if (e.key === 'Enter' || e.key === 'Tab') {
+                e.preventDefault();
+                handleMentionSelect(mentionCandidates[mentionState.selectedIndex].name);
+                return;
+            }
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                setMentionState(prev => ({ ...prev, isOpen: false }));
+                return;
+            }
+        }
+
         if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
             e.preventDefault();
             void sendMessage();
@@ -1280,18 +1388,27 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
                     </button>
                 </div>
             )}
-            <form onSubmit={sendMessage} className="flex gap-2">
+            <form onSubmit={sendMessage} className="flex gap-2 items-end">
                 {/* Textarea on the left - expandable from 2 to 5 rows */}
-                <textarea
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    onKeyDown={handleTextareaKeyDown}
-                    disabled={!isInputEnabled()}
-                    rows={textareaRows}
-                    className={`flex-grow p-3 rounded bg-input border border-input-border text-input-text placeholder-input-placeholder focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none
-                        ${!isInputEnabled() ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    placeholder={getInputPlaceholder()}
-                />
+                <div className="relative flex-grow">
+                    <MentionDropdown
+                        candidates={mentionCandidates}
+                        selectedIndex={mentionState.selectedIndex}
+                        onSelect={handleMentionSelect}
+                        onClose={() => setMentionState(prev => ({ ...prev, isOpen: false }))}
+                    />
+                    <textarea
+                        ref={textareaRef}
+                        value={newMessage}
+                        onChange={handleTextareaChange}
+                        onKeyDown={handleTextareaKeyDown}
+                        disabled={!isInputEnabled()}
+                        rows={textareaRows}
+                        className={`w-full p-3 rounded bg-input border border-input-border text-input-text placeholder-input-placeholder focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none
+                            ${!isInputEnabled() ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        placeholder={getInputPlaceholder()}
+                    />
+                </div>
                 
                 {/* Button grid on the right - 2 rows x 2 columns */}
                 <div className="flex flex-col gap-1 min-w-[120px]">

@@ -3,6 +3,7 @@
 - Detective doesn't understand that they revealed a wolf. Need to inject this info more directly into some bots fields
   or append to summary
 - Prepare the framework to easily add more roles
+- Make button click interactive and prevent somehow double clicks 
 - No need to keep summaries from all days - regenerating summary should be enough. But we need to save the voting and
   night results in the game object and load to each bot's system prompt.
 - Summaries seems to be detouched from roles. Bots summarize their day activities but there should be foes and friends

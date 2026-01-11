@@ -601,6 +601,9 @@ function GamePageContent({
                                                     </span>
                                                 ) : null;
                                             })()}
+                                            {game.humanPlayerRole === GAME_ROLES.WEREWOLF && participant.role === GAME_ROLES.WEREWOLF && (
+                                                <span className="text-sm" title="Werewolf teammate">🐺</span>
+                                            )}
                                             {!participant.isAlive && (
                                                 <span className="text-sm" title="Eliminated">💀</span>
                                             )}
