@@ -87,9 +87,22 @@ export interface Bot {
     voiceInstructions?: string; // Legacy: detailed voice instructions (OpenAI format)
     playStyle: string;
     eliminationDay?: number; // Track which day this bot was eliminated (undefined if alive)
-    daySummaries?: string[]; // Array of summaries for each previous day (index 0 = day 1 summary)
+    summary?: string; // Single consolidated summary that bot rewrites each day
+    daySummaries?: string[]; // @deprecated Legacy: array of summaries for backward compatibility
     enableThinking?: boolean;
     tokenUsage?: TokenUsage; // Track token usage for this bot
+}
+
+export interface VotingDayResult {
+    day: number;
+    voteCounts: Record<string, number>; // e.g., { "Alice": 3, "Bob": 2 }
+    eliminatedPlayer: string | null;
+    eliminatedPlayerRole: string | null;
+}
+
+export interface NightNarrativeResult {
+    day: number;
+    narrative: string; // The atmospheric GM story from night results
 }
 
 export interface Game {
@@ -120,6 +133,8 @@ export interface Game {
     totalGameCost?: number; // Total cost in USD for all AI calls in this game (bots + game master)
     createdAt?: number; // UTC timestamp when the game was created
     createdWithTier: UserTier; // Store the user's tier at the time the game was created
+    votingHistory?: VotingDayResult[]; // History of voting results for each day
+    nightNarratives?: NightNarrativeResult[]; // GM night result narratives for each night
 }
 
 export const GAME_ROLES = {

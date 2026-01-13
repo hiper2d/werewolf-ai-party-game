@@ -34,7 +34,7 @@ const createAgent = (botName: string, modelType: string): MistralAgent => {
     werewolf_teammates_section: "",
     players_names: "Alice, Bob, Charlie",
     dead_players_names_with_roles: "David (Werewolf)",
-    previous_day_summaries: "" // Add missing parameter
+    bot_context: "" // Add missing parameter
   });
   
   // Enable thinking for Magistral model

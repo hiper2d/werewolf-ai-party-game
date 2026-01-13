@@ -10,6 +10,7 @@ import {
     GAME_MASTER,
     GameMessage,
     MessageType,
+    NightNarrativeResult,
     RECIPIENT_ALL,
     RECIPIENT_WEREWOLVES,
     RECIPIENT_DOCTOR,
@@ -27,7 +28,7 @@ import { GM_COMMAND_GENERATE_NIGHT_RESULTS } from "@/app/ai/prompts/gm-commands"
 import { NightResultsStoryZodSchema, BotAnswerZodSchema } from "@/app/ai/prompts/zod-schemas";
 import { NightResultsStory } from "@/app/ai/prompts/ai-schemas";
 import { BOT_DAY_SUMMARY_PROMPT, BOT_SYSTEM_PROMPT } from "@/app/ai/prompts/bot-prompts";
-import { generateWerewolfTeammatesSection, generatePreviousDaySummariesSection } from "@/app/utils/bot-utils";
+import { generateBotContextSection, generateWerewolfTeammatesSection } from "@/app/utils/bot-utils";
 import { format } from "@/app/ai/prompts/utils";
 import { parseResponseToObj, convertToAIMessages, convertToGMMessages } from "@/app/utils/message-utils";
 import { checkGameEndConditions } from "@/app/utils/game-utils";
@@ -187,11 +188,20 @@ async function endNightWithResults(gameId: string, game: Game): Promise<Game> {
     // Save the Game Master message
     await addMessageToChatAndSaveToDb(gameMessage, gameId);
 
+    // Store night narrative for bot context
+    const nightNarrativeResult: NightNarrativeResult = {
+        day: game.currentDay,
+        narrative: finalNightResultsMessage
+    };
+    const existingNightNarratives = game.nightNarratives || [];
+    const updatedNightNarratives = [...existingNightNarratives, nightNarrativeResult];
+
     // 4. Update game state to NIGHT_RESULTS (don't eliminate players yet - that happens when starting next day)
     const gameUpdates: any = {
         gameState: GAME_STATES.NIGHT_RESULTS,
         gameStateProcessQueue: [],
-        gameStateParamQueue: []
+        gameStateParamQueue: [],
+        nightNarratives: updatedNightNarratives
     };
 
     // Update game state
@@ -1061,14 +1071,16 @@ async function summarizePastDayImpl(gameId: string): Promise<Game> {
                 .filter(b => !b.isAlive)
                 .map(b => `${b.name} (${b.role})`)
                 .join(", "),
-            previous_day_summaries: generatePreviousDaySummariesSection(bot, currentGame.currentDay)
+            bot_context: generateBotContextSection(bot, currentGame)
         });
 
-        // Create summary request message
+        // Create summary request message with previous summary context
+        const previousSummary = bot.summary || '(This is your first summary - no previous summary exists)';
         const summaryPrompt = format(BOT_DAY_SUMMARY_PROMPT, {
             bot_name: bot.name,
             day_number: currentGame.currentDay,
-            human_player_name: currentGame.humanPlayerName
+            human_player_name: currentGame.humanPlayerName,
+            previous_summary: previousSummary
         });
 
         const summaryMessage: GameMessage = {
@@ -1143,23 +1155,12 @@ async function summarizePastDayImpl(gameId: string): Promise<Game> {
             summary = `Summary for day ${currentGame.currentDay}`;
         }
 
-        // Update the bot with the new summary
+        // Update the bot with the new consolidated summary (replaces previous summary)
         const updatedBots = currentGame.bots.map(b => {
             if (b.name === botName) {
-                // Initialize daySummaries array if needed
-                const daySummaries = [...(b.daySummaries || [])]; // Create a copy
-
-                // Ensure array is large enough for this day index (day 1 -> index 0)
-                while (daySummaries.length < currentGame.currentDay) {
-                    daySummaries.push(""); // Push empty string, never undefined
-                }
-
-                // Store summary at correct index (day 1 -> index 0)
-                daySummaries[currentGame.currentDay - 1] = summary;
-
                 return {
                     ...b,
-                    daySummaries: daySummaries
+                    summary: summary // Single consolidated summary that gets rewritten each day
                 };
             }
             return b;
@@ -1203,7 +1204,9 @@ function gameFromFirestore(id: string, data: any): Game {
         previousNightResults: data.previousNightResults || {},
         messageCounter: data.messageCounter || 0,
         dayActivityCounter: data.dayActivityCounter || {},
-        createdWithTier: data.createdWithTier || 'free'
+        createdWithTier: data.createdWithTier || 'free',
+        votingHistory: data.votingHistory || [],
+        nightNarratives: data.nightNarratives || []
     };
 }
 

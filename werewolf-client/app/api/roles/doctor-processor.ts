@@ -7,7 +7,7 @@ import { auth } from "@/auth";
 import { convertToAIMessages } from "@/app/utils/message-utils";
 import { BOT_SYSTEM_PROMPT, BOT_DOCTOR_ACTION_PROMPT } from "@/app/ai/prompts/bot-prompts";
 import { format } from "@/app/ai/prompts/utils";
-import { generatePreviousDaySummariesSection } from "@/app/utils/bot-utils";
+import { generateBotContextSection } from "@/app/utils/bot-utils";
 import { DoctorActionZodSchema } from "@/app/ai/prompts/zod-schemas";
 import { DoctorAction } from "@/app/ai/prompts/ai-schemas";
 import { recordBotTokenUsage } from "@/app/api/cost-tracking";
@@ -89,7 +89,7 @@ export class DoctorProcessor extends BaseRoleProcessor {
                     .filter(b => !b.isAlive)
                     .map(b => `${b.name} (${b.role})`)
                     .join(", "),
-                previous_day_summaries: generatePreviousDaySummariesSection(doctorBot, this.game.currentDay)
+                bot_context: generateBotContextSection(doctorBot, this.game)
             });
 
             // Create agent

@@ -14,7 +14,7 @@ import {auth} from "@/auth";
 import {convertToAIMessages} from "@/app/utils/message-utils";
 import {BOT_DETECTIVE_ACTION_PROMPT, BOT_SYSTEM_PROMPT} from "@/app/ai/prompts/bot-prompts";
 import {format} from "@/app/ai/prompts/utils";
-import {generatePreviousDaySummariesSection} from "@/app/utils/bot-utils";
+import {generateBotContextSection} from "@/app/utils/bot-utils";
 import {DetectiveActionZodSchema} from "@/app/ai/prompts/zod-schemas";
 import {recordBotTokenUsage} from "@/app/api/cost-tracking";
 
@@ -113,7 +113,7 @@ export class DetectiveProcessor extends BaseRoleProcessor {
                     .filter(b => !b.isAlive)
                     .map(b => `${b.name} (${b.role})`)
                     .join(", "),
-                previous_day_summaries: generatePreviousDaySummariesSection(detectiveBot, this.game.currentDay)
+                bot_context: generateBotContextSection(detectiveBot, this.game)
             });
 
             // Create agent

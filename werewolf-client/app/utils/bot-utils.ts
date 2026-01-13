@@ -48,6 +48,63 @@ export function generateWerewolfTeammatesSection(bot: Bot, game: Game): string {
 }
 
 /**
+ * Generates the complete context section for the bot prompt including:
+ * - Bot's personal summary
+ * - Voting history statistics
+ * - Night narrative summaries
+ *
+ * @param bot The current bot
+ * @param game The game state
+ * @returns Formatted context section or empty string
+ */
+export function generateBotContextSection(bot: Bot, game: Game): string {
+    const sections: string[] = [];
+
+    // 1. Bot's Personal Summary (with legacy daySummaries fallback)
+    let summary = bot.summary;
+    if (!summary && bot.daySummaries && bot.daySummaries.length > 0) {
+        // Legacy fallback: concatenate old daySummaries format
+        summary = bot.daySummaries
+            .filter((s: string) => s && s.trim())
+            .map((s: string, i: number) => `**Day ${i + 1}:** ${s}`)
+            .join('\n\n');
+    }
+
+    if (summary && summary.trim()) {
+        sections.push(`## Your Personal Summary\n\n${summary}`);
+    }
+
+    // 2. Voting History
+    if (game.votingHistory && game.votingHistory.length > 0) {
+        const votingLines = game.votingHistory.map(v => {
+            const voteStr = Object.entries(v.voteCounts)
+                .map(([name, count]) => `${name}: ${count} vote(s)`)
+                .join(', ');
+            const eliminated = v.eliminatedPlayer
+                ? `${v.eliminatedPlayer} eliminated (was ${v.eliminatedPlayerRole})`
+                : 'No elimination';
+            return `**Day ${v.day}:** ${voteStr}. ${eliminated}.`;
+        }).join('\n');
+        sections.push(`## Voting History\n\n${votingLines}`);
+    }
+
+    // 3. Night Narratives
+    if (game.nightNarratives && game.nightNarratives.length > 0) {
+        const nightLines = game.nightNarratives.map(n =>
+            `**Night ${n.day}:**\n${n.narrative}`
+        ).join('\n\n');
+        sections.push(`## Night Events\n\n${nightLines}`);
+    }
+
+    if (sections.length === 0) {
+        return '';
+    }
+
+    return '\n\n' + sections.join('\n\n');
+}
+
+/**
+ * @deprecated Use generateBotContextSection instead
  * Generates the previous day summaries section for the bot prompt
  * @param bot The current bot
  * @param currentDay The current day number
@@ -58,14 +115,14 @@ export function generatePreviousDaySummariesSection(bot: Bot, currentDay: number
     if (currentDay <= 1) {
         return '';
     }
-    
+
     // No summaries if bot doesn't have them or has empty array
     if (!bot.daySummaries || bot.daySummaries.length === 0) {
         return '';
     }
-    
+
     const summaries: string[] = [];
-    
+
     // Add summaries for all previous days (day 1 = index 0, day 2 = index 1, etc.)
     for (let day = 1; day < currentDay; day++) {
         const summaryIndex = day - 1; // Convert day number to array index
@@ -73,10 +130,10 @@ export function generatePreviousDaySummariesSection(bot: Bot, currentDay: number
             summaries.push(`**Day ${day}:** ${bot.daySummaries[summaryIndex]}`);
         }
     }
-    
+
     if (summaries.length === 0) {
         return '';
     }
-    
+
     return `\n\n## Previous Day Summaries\n\nHere are your memories from previous days to help you remember important events and maintain consistency:\n\n${summaries.join('\n\n')}`;
 }

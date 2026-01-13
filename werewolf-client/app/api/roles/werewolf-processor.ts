@@ -11,7 +11,7 @@ import {
 import { AgentFactory } from "@/app/ai/agent-factory";
 import { addMessageToChatAndSaveToDb, getBotMessages, getUserFromFirestore } from "@/app/api/game-actions";
 import { getApiKeysForUser } from "@/app/utils/tier-utils";
-import { generateWerewolfTeammatesSection, generatePreviousDaySummariesSection } from "@/app/utils/bot-utils";
+import { generateBotContextSection, generateWerewolfTeammatesSection } from "@/app/utils/bot-utils";
 import { auth } from "@/auth";
 import { convertToAIMessages } from "@/app/utils/message-utils";
 import {
@@ -166,7 +166,7 @@ export class WerewolfProcessor extends BaseRoleProcessor {
                     .filter(b => !b.isAlive)
                     .map(b => `${b.name} (${b.role})`)
                     .join(", "),
-                previous_day_summaries: generatePreviousDaySummariesSection(werewolfBot, this.game.currentDay)
+                bot_context: generateBotContextSection(werewolfBot, this.game)
             });
 
             // Create agent

@@ -112,7 +112,7 @@ Before acting, ask: "Is this based on game mechanics and player behavior, or am 
 ## Game State
 **Alive Players:** %players_names%
 **Dead Players:** %dead_players_names_with_roles%
-%previous_day_summaries%
+%bot_context%
 
 ## Special Role-Play Engagement
 **Key Player of Interest:** %human_player_name%
@@ -255,55 +255,35 @@ Consider:
 
 Your response must be a valid JSON object with your target choice and reasoning.`;
 
-export const BOT_DAY_SUMMARY_PROMPT: string = `💭 **End of Day %day_number% - Personal Reflection & Relationship Summary**
+export const BOT_DAY_SUMMARY_PROMPT: string = `**End of Day %day_number% - Update Your Personal Summary**
 
-%bot_name%, the day has ended. Create a personal reflection on Day %day_number% that captures your evolving understanding of other players and ongoing conversations.
+%bot_name%, the day has ended. You must now UPDATE your personal summary to incorporate Day %day_number%'s events.
 
-**IMPORTANT: Focus on RELATIONSHIPS and INTERACTIONS, not just facts. Aim for 2-3 sentences per section.**
+**YOUR PREVIOUS SUMMARY:**
+%previous_summary%
 
-**Key Reflections to Record:**
+**INSTRUCTIONS:**
+- Read your previous summary above carefully
+- ADD new insights, relationships, and events from Day %day_number%
+- KEEP important information from previous days that remains relevant
+- CONSOLIDATE and update any information that has changed
+- REMOVE outdated information that is no longer relevant
+- Create ONE comprehensive summary that captures everything you need to remember
 
-**🤝 INTERACTIONS & CONVERSATIONS:**
-- Who did you have meaningful exchanges with? What topics were you discussing?
-- Which conversations need to continue tomorrow? What questions were left unanswered?
-- Who supported or challenged your ideas? How did that make you feel about them?
+**Focus Areas:**
+- Key player relationships and how they've evolved
+- Your suspicions and trust levels for each player (who do you trust? who seems suspicious?)
+- Important conversations and unfinished discussions that need follow-up
+- Your role-specific knowledge:
+  - **DETECTIVE:** Investigation results and who you've cleared or suspect
+  - **WEREWOLF:** Coordination with teammates, strategy, who knows what
+  - **DOCTOR:** Protection history and strategy
+  - **VILLAGER:** Patterns and clues you've noticed
+- Night events and their implications for the game
+- Your strategic plans for upcoming days
+- Key interactions with %human_player_name% (the human player)
 
-**💭 YOUR EVOLVING OPINIONS:**
-- How has your opinion of specific players changed based on today's interactions?
-- Who surprised you with their behavior or reasoning? Who confirmed your suspicions?
-- What's your gut feeling about each active player now? Trust them more or less?
-
-**🌟 NARRATIVE ENGAGEMENT WITH %human_player_name%:**
-- Did you have any role-play or story-related exchanges with %human_player_name% today?
-- If they suggested a side-story or small talk, how did you respond?
-- What can you do tomorrow to continue or deepen this narrative thread?
-
-**🎭 SOCIAL DYNAMICS:**
-- What alliances or tensions did you notice forming between players?
-- Who seems to be working together? Who are natural opponents?
-- Where do you fit in these social dynamics? Who might be your allies?
-
-**🌙 NIGHT EVENTS & THEIR MEANING:**
-- What happened during the night and how does it change the social landscape?
-- Who might be grieving, scared, or emboldened by the night's events?
-
-**🔮 ROLE-SPECIFIC KNOWLEDGE (CRITICAL - RECORD THIS!):**
-- **IF YOU ARE A DETECTIVE:** What did you learn from your investigation? How does this change your understanding of who is trustworthy? Who should you investigate next and why?
-- **IF YOU ARE A WEREWOLF:** What did you and your werewolf teammates discuss during the night? What's your coordinated strategy moving forward? How are you dividing responsibilities (who deflects suspicion, who stays quiet, who leads discussions)?
-- **IF YOU ARE A DOCTOR:** Who did you protect and why? Who seems most at risk? What's your protection strategy for upcoming nights?
-- **IF YOU ARE A VILLAGER:** What clues or patterns have you noticed? Who should the village be watching closely?
-
-**🎯 YOUR PERSONAL AGENDA:**
-- What specific conversations or confrontations do you need to have tomorrow?
-- Which relationships need strengthening or challenging?
-- What's your emotional state and how will that affect your approach?
-
-**Remember:**
-- This is YOUR PERSONAL DIARY - capture your feelings and hunches, not just facts
-- Think about continuing threads of conversation - relationships build over multiple days
-- Form OPINIONS about players - don't just observe, JUDGE them
-- Consider how today's events affect your social position for tomorrow
-- **RECORD YOUR ROLE-SPECIFIC KNOWLEDGE** - this is critical for maintaining continuity of your secret information across days`;
+**Format:** Write a concise but comprehensive personal diary entry that captures your complete understanding of the game so far. This should be 3-5 paragraphs that you can reference in future days to remember everything important.`;
 
 export const BOT_AFTER_GAME_SYSTEM_PROMPT_ADDITION: string = `
 

@@ -32,7 +32,7 @@ describe("KimiAgent integration", () => {
       werewolf_teammates_section: "",
       players_names: "Alice, Bob, Charlie",
       dead_players_names_with_roles: "David (Werewolf)",
-      previous_day_summaries: ""
+      bot_context: ""
     });
 
     return new KimiAgent(
@@ -122,7 +122,7 @@ describe("KimiAgent integration", () => {
         werewolf_teammates_section: "",
         players_names: "Alice, Bob, Charlie",
         dead_players_names_with_roles: "David (Werewolf)",
-        previous_day_summaries: ""
+        bot_context: ""
       });
       
       return new KimiAgent(

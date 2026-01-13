@@ -16,7 +16,8 @@ import {
     RECIPIENT_ALL,
     RECIPIENT_DETECTIVE,
     RECIPIENT_DOCTOR,
-    RECIPIENT_WEREWOLVES
+    RECIPIENT_WEREWOLVES,
+    VotingDayResult
 } from "@/app/api/game-models";
 import {
     GM_COMMAND_INTRODUCE_YOURSELF,
@@ -47,8 +48,8 @@ import {
 import {getApiKeysForUser} from "@/app/utils/tier-utils";
 import {withGameErrorHandling} from "@/app/utils/server-action-wrapper";
 import {
+    generateBotContextSection,
     generatePlayStyleDescription,
-    generatePreviousDaySummariesSection,
     generateWerewolfTeammatesSection
 } from "@/app/utils/bot-utils";
 import {checkGameEndConditions} from "@/app/utils/game-utils";
@@ -76,7 +77,7 @@ function generateBotSystemPrompt(bot: Bot, game: Game): string {
             .filter(b => !b.isAlive)
             .map(b => `${b.name} (${b.role})`)
             .join(", "),
-        previous_day_summaries: generatePreviousDaySummariesSection(bot, game.currentDay)
+        bot_context: generateBotContextSection(bot, game)
     });
 
     // Add after-game discussion mode instructions if game is over
@@ -1040,7 +1041,17 @@ async function voteImpl(gameId: string): Promise<Game> {
                     
                     // Generate elimination message
                     const eliminationMessage = generateEliminationMessage(eliminatedPlayer, eliminatedRole);
-                    
+
+                    // Create voting history entry
+                    const votingDayResult: VotingDayResult = {
+                        day: updatedGame.currentDay,
+                        voteCounts: votingResults,
+                        eliminatedPlayer: eliminatedPlayer || null,
+                        eliminatedPlayerRole: eliminatedRole || null
+                    };
+                    const existingVotingHistory = updatedGame.votingHistory || [];
+                    const updatedVotingHistory = [...existingVotingHistory, votingDayResult];
+
                     // Create and save elimination message
                     const eliminationGmMessage: GameMessage = {
                         id: null,
@@ -1052,12 +1063,13 @@ async function voteImpl(gameId: string): Promise<Game> {
                         timestamp: Date.now(),
                     };
                     await addMessageToChatAndSaveToDb(eliminationGmMessage, gameId);
-                    
+
                     // Update game state based on elimination
                     if (isHumanEliminated) {
                         // Human eliminated: set game state to GAME_OVER
                         await db.collection('games').doc(gameId).update({
-                            gameState: GAME_STATES.GAME_OVER
+                            gameState: GAME_STATES.GAME_OVER,
+                            votingHistory: updatedVotingHistory
                         });
                         console.log('🎮 ELIMINATION: Human player eliminated, game over');
                     } else {
@@ -1069,17 +1081,18 @@ async function voteImpl(gameId: string): Promise<Game> {
                         );
                         
                         await db.collection('games').doc(gameId).update({
-                            bots: updatedBots
+                            bots: updatedBots,
+                            votingHistory: updatedVotingHistory
                         });
                         console.log(`🤖 ELIMINATION: Bot ${eliminatedPlayer} eliminated`);
-                        
+
                         // Check for game end conditions after updating bots
-                        const tempGame = { ...updatedGame, bots: updatedBots };
+                        const tempGame = { ...updatedGame, bots: updatedBots, votingHistory: updatedVotingHistory };
                         const endCheck = checkGameEndConditions(tempGame);
-                        
+
                         if (endCheck.isEnded) {
                             console.log(`🎮 GAME END: ${endCheck.reason}`);
-                            
+
                             // Create game end message
                             const gameEndMessage: GameMessage = {
                                 id: null,
@@ -1091,7 +1104,7 @@ async function voteImpl(gameId: string): Promise<Game> {
                                 timestamp: Date.now(),
                             };
                             await addMessageToChatAndSaveToDb(gameEndMessage, gameId);
-                            
+
                             // Update game state to GAME_OVER
                             await db.collection('games').doc(gameId).update({
                                 gameState: GAME_STATES.GAME_OVER
@@ -1171,7 +1184,7 @@ async function voteImpl(gameId: string): Promise<Game> {
                         .filter(b => !b.isAlive)
                         .map(b => `${b.name} (${b.role})`)
                         .join(", "),
-                    previous_day_summaries: generatePreviousDaySummariesSection(bot, currentGame.currentDay)
+                    bot_context: generateBotContextSection(bot, currentGame)
                 }
             );
             
