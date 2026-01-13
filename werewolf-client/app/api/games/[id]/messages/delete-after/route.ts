@@ -97,15 +97,20 @@ export async function DELETE(
             restoredBots: restoredBots.map(bot => ({ name: bot.name, isAlive: bot.isAlive }))
         });
 
+        // Determine target game state: stay in AFTER_GAME_DISCUSSION if already there, otherwise DAY_DISCUSSION
+        const targetGameState = gameData.gameState === GAME_STATES.AFTER_GAME_DISCUSSION 
+            ? GAME_STATES.AFTER_GAME_DISCUSSION 
+            : GAME_STATES.DAY_DISCUSSION;
+
         try {
             // Update game state first
             await gameRef.update({
-                gameState: GAME_STATES.DAY_DISCUSSION,
+                gameState: targetGameState,
                 gameStateProcessQueue: [],
                 gameStateParamQueue: [],
                 bots: restoredBots
             });
-            console.log('✅ Game state update successful');
+            console.log(`✅ Game state update successful (set to ${targetGameState})`);
 
             // Then delete the target message and everything after it
             const docsToDelete = [targetMessageDoc, ...messagesAfterSnapshot.docs];

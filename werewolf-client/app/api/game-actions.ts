@@ -870,13 +870,15 @@ export async function afterGameDiscussion(gameId: string): Promise<Game> {
             `**Final Roles:**\n${roleReveal}\n\n` +
             `Feel free to share your experiences, reveal your strategies, discuss close calls, and ask questions about what really happened during the game. This is a time for open and honest reflection!`;
 
+        const nextDay = game.currentDay + 1;
+
         const gameMessage: GameMessage = {
             id: null,
             recipientName: RECIPIENT_ALL,
             authorName: GAME_MASTER,
             msg: { story: gmMessage },
             messageType: MessageType.GAME_STORY,
-            day: game.currentDay,
+            day: nextDay,
             timestamp: Date.now()
         };
 
@@ -895,7 +897,9 @@ export async function afterGameDiscussion(gameId: string): Promise<Game> {
             gameState: GAME_STATES.AFTER_GAME_DISCUSSION,
             gameStateProcessQueue: [],
             gameStateParamQueue: [],
-            bots: revivedBots
+            bots: revivedBots,
+            currentDay: nextDay,
+            dayActivityCounter: {} // Reset activity counter for the post-game discussion
         });
 
         // Return the updated game

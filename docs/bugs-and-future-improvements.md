@@ -31,3 +31,4 @@
     Ginny, voting for the 'least suspicious' deliberately inverts our only tool for catching wolves — I'd rather refine 
     our methods than abandon them entirely.
     ```
+- Change bots prompting to explain that random voting is not something suspicious. People do this. Maybe add it to personalities.

@@ -195,7 +195,8 @@ export class DoctorProcessor extends BaseRoleProcessor {
                 msg: doctorResponse,
                 messageType: MessageType.DOCTOR_ACTION,
                 day: this.game.currentDay,
-                timestamp: Date.now()
+                timestamp: Date.now(),
+                cost: tokenUsage?.costUSD
             };
 
             // Save messages

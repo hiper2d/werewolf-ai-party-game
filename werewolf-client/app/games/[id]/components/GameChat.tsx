@@ -144,7 +144,7 @@ function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcludin
         message.messageType === MessageType.HUMAN_PLAYER_MESSAGE &&
         message.recipientName === RECIPIENT_ALL &&
         message.day === game.currentDay &&
-        game.gameState === GAME_STATES.DAY_DISCUSSION;
+        (game.gameState === GAME_STATES.DAY_DISCUSSION || game.gameState === GAME_STATES.AFTER_GAME_DISCUSSION);
     const canShowResetButton = isBotMessage || isHumanDayDiscussionMessage;
     
     let displayContent: string;
@@ -404,7 +404,7 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
         const suffix = newMessage.slice(textareaRef.current?.selectionStart || newMessage.length);
         const insertedName = `${name} `;
         
-        const updatedMessage = `${prefix}@${insertedName}${suffix}`;
+        const updatedMessage = `${prefix}${insertedName}${suffix}`;
         setNewMessage(updatedMessage);
         setMentionState(prev => ({ ...prev, isOpen: false }));
         

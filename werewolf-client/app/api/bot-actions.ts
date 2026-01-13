@@ -460,6 +460,13 @@ async function talkToAllImpl(gameId: string, userMessage: string): Promise<Game>
             });
 
             return await getGame(gameId) as Game;
+        } else if (isAfterGameDiscussion && shouldTriggerAutoVote(updatedGame)) {
+            console.log('🛑 DISCUSSION LIMIT REACHED (After Game): Stopping auto-responses');
+            // Stop further discussion by clearing the queue
+            await db.collection('games').doc(gameId).update({
+                gameStateProcessQueue: []
+            });
+            return await getGame(gameId) as Game;
         }
 
         return updatedGame;

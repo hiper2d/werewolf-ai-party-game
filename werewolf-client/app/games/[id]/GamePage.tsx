@@ -428,7 +428,7 @@ function GamePageContent({
             name: game.humanPlayerName,
             role: game.humanPlayerRole,
             isHuman: true,
-            isAlive: !isGameOver // Human player is alive unless game is over
+            isAlive: !isGameOver || game.gameState === GAME_STATES.AFTER_GAME_DISCUSSION
         },
         ...game.bots.map(bot => ({
             name: bot.name,

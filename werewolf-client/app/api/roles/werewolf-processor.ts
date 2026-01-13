@@ -271,7 +271,8 @@ export class WerewolfProcessor extends BaseRoleProcessor {
                 msg: msgWithThinking,
                 messageType: isLastWerewolf ? MessageType.WEREWOLF_ACTION : MessageType.BOT_ANSWER,
                 day: this.game.currentDay,
-                timestamp: Date.now()
+                timestamp: Date.now(),
+                cost: tokenUsage?.costUSD
             };
 
             // Save messages

@@ -148,81 +148,6 @@ class VillagersWinChecker implements WinConditionChecker {
 }
 
 /**
- * Check for tie condition (equal numbers of werewolves and villagers)
- */
-class TieChecker implements WinConditionChecker {
-    check(game: Game): WinConditionResult | null {
-        const alivePlayers = [
-            { name: game.humanPlayerName, role: game.humanPlayerRole, isAlive: true },
-            ...game.bots.filter(bot => bot.isAlive)
-        ];
-
-        const aliveWerewolves = alivePlayers.filter(player =>
-            player.role === GAME_ROLES.WEREWOLF
-        ).length;
-
-        const aliveVillagers = alivePlayers.filter(player =>
-            player.role !== GAME_ROLES.WEREWOLF
-        ).length;
-
-        // Tie: equal numbers of werewolves and villagers (minimum 1 each)
-        if (aliveWerewolves === aliveVillagers && aliveWerewolves > 0) {
-            return {
-                isEnded: true,
-                winner: 'tie',
-                reason: 'Equal numbers of werewolves and villagers remain! It\'s a tie!'
-            };
-        }
-        return null;
-    }
-
-    getEndGameMessage(game: Game): string {
-        const roleList = this.generateRoleRevealList(game);
-        const alivePlayers = [
-            { name: game.humanPlayerName, role: game.humanPlayerRole, isAlive: true },
-            ...game.bots.filter(bot => bot.isAlive)
-        ];
-
-        const aliveWerewolves = alivePlayers.filter(p => p.role === GAME_ROLES.WEREWOLF).length;
-        const aliveVillagers = alivePlayers.filter(p => p.role !== GAME_ROLES.WEREWOLF).length;
-
-        return `\n\n🎭 **GAME OVER - IT'S A TIE!** 🤝\n\n` +
-               `The game ends in a stalemate with ${aliveWerewolves} werewolf(s) and ${aliveVillagers} villager(s) remaining.\n` +
-               `Neither side can achieve victory.\n\n` +
-               `**Final Role Reveals:**\n${roleList}`;
-    }
-
-    private generateRoleRevealList(game: Game): string {
-        const allPlayers = [
-            { name: game.humanPlayerName, role: game.humanPlayerRole, isAlive: true },
-            ...game.bots.map(bot => ({
-                name: bot.name,
-                role: bot.role,
-                isAlive: bot.isAlive
-            }))
-        ];
-
-        return allPlayers
-            .map(player => {
-                const status = player.isAlive ? '✅ Alive' : '💀 Dead';
-                const roleEmoji = this.getRoleEmoji(player.role);
-                return `• ${player.name}: ${roleEmoji} **${player.role}** (${status})`;
-            })
-            .join('\n');
-    }
-
-    private getRoleEmoji(role: string): string {
-        switch (role) {
-            case GAME_ROLES.WEREWOLF: return '🐺';
-            case GAME_ROLES.DOCTOR: return '🏥';
-            case GAME_ROLES.DETECTIVE: return '🔍';
-            case GAME_ROLES.VILLAGER: return '👤';
-            default: return '❓';
-        }
-    }
-}
-
-/**
  * Check if werewolves outnumber villagers (werewolves win)
  */
 class WerewolvesWinChecker implements WinConditionChecker {
@@ -240,11 +165,11 @@ class WerewolvesWinChecker implements WinConditionChecker {
             player.role !== GAME_ROLES.WEREWOLF
         ).length;
 
-        if (aliveWerewolves > aliveVillagers) {
+        if (aliveWerewolves >= aliveVillagers && aliveWerewolves > 0) {
             return {
                 isEnded: true,
                 winner: 'werewolves',
-                reason: 'Werewolves outnumber villagers! Werewolves win!'
+                reason: 'Werewolves equal or outnumber villagers! Werewolves win!'
             };
         }
         return null;
@@ -253,7 +178,7 @@ class WerewolvesWinChecker implements WinConditionChecker {
     getEndGameMessage(game: Game): string {
         const roleList = this.generateRoleRevealList(game);
         return `\n\n🎭 **GAME OVER - WEREWOLVES WIN!** 🐺\n\n` +
-               `The werewolves have achieved dominance! They outnumber the remaining villagers.\n\n` +
+               `The werewolves have achieved dominance! They equal or outnumber the remaining villagers.\n\n` +
                `**Final Role Reveals:**\n${roleList}`;
     }
 
@@ -298,12 +223,10 @@ export class GameEndChecker {
         // Order matters! Check in priority:
         // 1. Human eliminated (special case)
         // 2. All werewolves dead (villagers win)
-        // 3. Tie (equal numbers)
-        // 4. Werewolves outnumber villagers (werewolves win)
+        // 3. Werewolves equal or outnumber villagers (werewolves win)
         this.checkers = [
             new HumanEliminatedChecker(),
             new VillagersWinChecker(),
-            new TieChecker(),
             new WerewolvesWinChecker()
         ];
     }

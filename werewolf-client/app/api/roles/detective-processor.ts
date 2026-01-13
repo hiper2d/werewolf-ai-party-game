@@ -190,7 +190,8 @@ export class DetectiveProcessor extends BaseRoleProcessor {
                 msg: investigationResult,
                 messageType: MessageType.DETECTIVE_ACTION,
                 day: this.game.currentDay,
-                timestamp: Date.now()
+                timestamp: Date.now(),
+                cost: tokenUsage?.costUSD
             };
 
             // Save messages

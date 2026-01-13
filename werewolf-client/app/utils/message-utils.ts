@@ -196,8 +196,10 @@ export function convertToGMMessages(messages: GameMessage[]): AIMessage[] {
             // Game Master messages are assistant messages
             if (message.messageType === MessageType.GAME_STORY) {
                 content = (message.msg as { story: string }).story;
+            } else if (message.messageType === MessageType.NIGHT_SUMMARY) {
+                content = (message.msg as { story: string }).story;
             } else {
-                content = message.msg as string;
+                content = typeof message.msg === 'string' ? message.msg : JSON.stringify(message.msg);
             }
             aiMessages.push({ role: MESSAGE_ROLE.ASSISTANT, content: content });
         } else {

@@ -56,7 +56,13 @@ Reasoning AI-werewolf reasons though their night actions
 
 <a href="images/wolf-reasoning.png" target="_blank"><img src="images/wolf-reasoning.png" width="600"></a>
 
-### Stack
+And the funnies part - the post-game discussion with everybody staying in roles
+
+<a href="images/post-game-discussion.png" target="_blank"><img src="images/post-game-discussion.png" width="600"></a>
+
+<a href="images/post-game-discussion-2.png" target="_blank"><img src="images/post-game-discussion-2.png" width="600"></a>
+
+## Stack
 
 - Next.js 15 and React 19
 - Firebase: auth, firestore

@@ -140,7 +140,7 @@ export const AUTO_VOTE_COEFFICIENT = 3.5;
  * Used in bot selection prompts and Zod schema validation
  */
 export const BOT_SELECTION_CONFIG = {
-    MIN: 2,
+    MIN: 1,
     MAX: 5
 } as const;
 
