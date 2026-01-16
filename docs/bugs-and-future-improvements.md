@@ -1,19 +1,15 @@
 # Bugs and improvements
 
+- Summaries seems to be detouched from roles. Bots summarize their day activities but there should be foes and friends
 - Detective doesn't understand that they revealed a wolf. Need to inject this info more directly into some bots fields
   or append to summary
+- Track spendings in each tier separately for a user (no need to change anything for a game since games stick to certain
 - Prepare the framework to easily add more roles
 - Make button click interactive and prevent somehow double clicks 
-- No need to keep summaries from all days - regenerating summary should be enough. But we need to save the voting and
-  night results in the game object and load to each bot's system prompt.
-- Summaries seems to be detouched from roles. Bots summarize their day activities but there should be foes and friends
   with respect of roles as well.
 - "Keep Going" doesn't block the input while the game master is thinking. We should show the Game Master thinking in the
   queue probably...
-- Track spendings in each tier separately for a user (no need to change anything for a game since games stick to certain
   tiers)
-- The post game discussion needs some changes from the game: killed bots should also summarize so they know what is
-  going on? Update: having vote and night results should be enough
 - Fix game buttons enablement: some of them are shown when they should not
 - Need to refactor agent answer type determination in parseResponseToObj function. It doesn't use types from
 - When bot votes or speaks, the scroll is not moving on UI
