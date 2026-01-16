@@ -6,7 +6,7 @@ import { OpenAI } from "openai";
 import { API_KEY_CONSTANTS, AUDIO_MODEL_CONSTANTS } from "@/app/ai/ai-models";
 import { calculateOpenAITtsCost } from "@/app/utils/pricing";
 import { updateUserMonthlySpending } from "@/app/api/user-actions";
-import { recordGameCost } from "@/app/api/cost-tracking";
+import { recordGameCost, getGameTier } from "@/app/api/cost-tracking";
 import { VoiceProvider } from "@/app/ai/voice-config";
 import { generateGoogleSpeech, GoogleTTSOptions } from "@/app/api/google-tts-actions";
 
@@ -104,7 +104,8 @@ export async function generateSpeech(
 
     const cost = calculateOpenAITtsCost(text.length);
     if (cost > 0) {
-      await updateUserMonthlySpending(session.user.email, cost);
+      const tier = await getGameTier(options.gameId);
+      await updateUserMonthlySpending(session.user.email, cost, tier);
       if (options.gameId) {
         await recordGameCost(options.gameId, cost);
       }

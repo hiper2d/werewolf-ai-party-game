@@ -242,7 +242,7 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
     }
 
     if (tokenUsage) {
-        await updateUserMonthlySpending(session.user.email, tokenUsage.costUSD);
+        await updateUserMonthlySpending(session.user.email, tokenUsage.costUSD, tier);
     }
     const defaultPlayerCandidates = getCandidateModelsForTier(tier);
 

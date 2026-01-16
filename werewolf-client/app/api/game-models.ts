@@ -38,7 +38,9 @@ export interface User {
 
 export interface UserMonthlySpending {
     period: string; // Format: YYYY-MM
-    amountUSD: number;
+    amountUSD: number; // Total spending (sum of free + api, for backward compatibility)
+    freeAmountUSD?: number; // Spending while on free tier
+    apiAmountUSD?: number; // Spending while on API tier (user's own keys)
 }
 
 export interface GamePreview {
@@ -75,6 +77,34 @@ export interface GamePreviewWithGeneratedBots extends GamePreview {
     tokenUsage?: any; // Token usage from preview generation
 }
 
+/**
+ * Role-specific knowledge stored by bots with special roles.
+ * Each role processor populates its own section after night actions.
+ * This provides structured data that bots can reference in their summaries.
+ */
+export interface DetectiveInvestigation {
+    day: number;
+    target: string;
+    isWerewolf: boolean;
+    success?: boolean; // False if investigation was blocked/failed (default: true)
+}
+
+export interface DoctorProtection {
+    day: number;
+    target: string;
+    success?: boolean; // False if protection was blocked/failed (default: true)
+    savedTarget?: boolean; // True if protected player was actually targeted by werewolves
+}
+
+export interface RoleKnowledge {
+    // Detective-specific: history of investigations
+    investigations?: DetectiveInvestigation[];
+    // Doctor-specific: history of protections
+    protections?: DoctorProtection[];
+    // Extensible: future roles can add their own fields here
+    [key: string]: any;
+}
+
 export interface Bot {
     name: string;
     story: string;
@@ -91,6 +121,7 @@ export interface Bot {
     daySummaries?: string[]; // @deprecated Legacy: array of summaries for backward compatibility
     enableThinking?: boolean;
     tokenUsage?: TokenUsage; // Track token usage for this bot
+    roleKnowledge?: RoleKnowledge; // Structured role-specific knowledge (investigations, protections, etc.)
 }
 
 export interface VotingDayResult {

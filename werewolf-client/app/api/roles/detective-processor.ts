@@ -5,7 +5,8 @@ import {
     GAME_ROLES,
     GameMessage,
     MessageType,
-    RECIPIENT_DETECTIVE
+    RECIPIENT_DETECTIVE,
+    DetectiveInvestigation
 } from "@/app/api/game-models";
 import {AgentFactory} from "@/app/ai/agent-factory";
 import {addMessageToChatAndSaveToDb, getBotMessages} from "@/app/api/game-actions";
@@ -177,6 +178,29 @@ export class DetectiveProcessor extends BaseRoleProcessor {
             const currentNightResults = this.game.nightResults || {};
             currentNightResults[GAME_ROLES.DETECTIVE] = { target: detectiveResponse.target };
 
+            // Store investigation result in detective bot's roleKnowledge
+            // Detective only learns if target is a werewolf, not their actual role
+            const investigation: DetectiveInvestigation = {
+                day: this.game.currentDay,
+                target: detectiveResponse.target,
+                isWerewolf: targetRole === GAME_ROLES.WEREWOLF
+            };
+
+            // Update the detective bot's roleKnowledge
+            const updatedBots = this.game.bots.map(bot => {
+                if (bot.name === detectiveBot.name) {
+                    const existingInvestigations = bot.roleKnowledge?.investigations || [];
+                    return {
+                        ...bot,
+                        roleKnowledge: {
+                            ...bot.roleKnowledge,
+                            investigations: [...existingInvestigations, investigation]
+                        }
+                    };
+                }
+                return bot;
+            });
+
             // Create detective response message with investigation result (sent only to the detective)
             const investigationResult = {
                 ...detectiveResponse,
@@ -208,7 +232,8 @@ export class DetectiveProcessor extends BaseRoleProcessor {
                 success: true,
                 gameUpdates: {
                     nightResults: currentNightResults,
-                    gameStateParamQueue: remainingQueue
+                    gameStateParamQueue: remainingQueue,
+                    bots: updatedBots
                 }
             };
 

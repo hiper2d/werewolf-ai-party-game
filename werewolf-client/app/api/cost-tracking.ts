@@ -1,5 +1,5 @@
 import {db} from "@/firebase/server";
-import {Game, TokenUsage} from "@/app/api/game-models";
+import {Game, TokenUsage, UserTier} from "@/app/api/game-models";
 import {updateUserMonthlySpending} from "@/app/api/user-actions";
 
 type TokenUsageInput = Partial<TokenUsage> | null | undefined;
@@ -20,7 +20,11 @@ function normalizeTokenUsage(usage: TokenUsageInput): TokenUsage {
     };
 }
 
-async function applyUserSpending(userEmail: string | undefined, amountUSD: number): Promise<void> {
+async function applyUserSpending(
+    userEmail: string | undefined,
+    amountUSD: number,
+    tier?: UserTier
+): Promise<void> {
     if (!userEmail) {
         return;
     }
@@ -28,7 +32,7 @@ async function applyUserSpending(userEmail: string | undefined, amountUSD: numbe
         return;
     }
 
-    await updateUserMonthlySpending(userEmail, amountUSD);
+    await updateUserMonthlySpending(userEmail, amountUSD, tier);
 }
 
 export async function recordGameMasterTokenUsage(
@@ -43,6 +47,7 @@ export async function recordGameMasterTokenUsage(
     const usage = normalizeTokenUsage(tokenUsage);
     const gameRef = db.collection('games').doc(gameId);
     let usageApplied = false;
+    let gameTier: UserTier | undefined;
 
     await db.runTransaction(async (transaction) => {
         const gameSnap = await transaction.get(gameRef);
@@ -51,6 +56,7 @@ export async function recordGameMasterTokenUsage(
         }
 
         const game = gameSnap.data() as Game;
+        gameTier = game.createdWithTier;
         const currentUsage = game.gameMasterTokenUsage || {
             inputTokens: 0,
             outputTokens: 0,
@@ -76,7 +82,7 @@ export async function recordGameMasterTokenUsage(
     });
 
     if (usageApplied) {
-        await applyUserSpending(userEmail, usage.costUSD);
+        await applyUserSpending(userEmail, usage.costUSD, gameTier);
     }
 }
 
@@ -94,6 +100,8 @@ export async function recordBotTokenUsage(
     const gameRef = db.collection('games').doc(gameId);
 
     let usageApplied = false;
+    let gameTier: UserTier | undefined;
+
     await db.runTransaction(async (transaction) => {
         const gameSnap = await transaction.get(gameRef);
         if (!gameSnap.exists) {
@@ -101,6 +109,7 @@ export async function recordBotTokenUsage(
         }
 
         const game = gameSnap.data() as Game;
+        gameTier = game.createdWithTier;
         const bots = Array.isArray(game.bots) ? game.bots : [];
         let botFound = false;
 
@@ -143,7 +152,29 @@ export async function recordBotTokenUsage(
     });
 
     if (usageApplied) {
-        await applyUserSpending(userEmail, usage.costUSD);
+        await applyUserSpending(userEmail, usage.costUSD, gameTier);
+    }
+}
+
+/**
+ * Get the tier a game was created with.
+ * Useful for tracking spending by tier when gameId is known.
+ */
+export async function getGameTier(gameId: string | undefined): Promise<UserTier | undefined> {
+    if (!db || !gameId) {
+        return undefined;
+    }
+
+    try {
+        const gameSnap = await db.collection('games').doc(gameId).get();
+        if (!gameSnap.exists) {
+            return undefined;
+        }
+        const game = gameSnap.data() as Game;
+        return game.createdWithTier;
+    } catch (error) {
+        console.error('Error getting game tier:', error);
+        return undefined;
     }
 }
 

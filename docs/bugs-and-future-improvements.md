@@ -1,21 +1,14 @@
 # Bugs and improvements
 
-- Summaries seems to be detouched from roles. Bots summarize their day activities but there should be foes and friends
-- Detective doesn't understand that they revealed a wolf. Need to inject this info more directly into some bots fields
-  or append to summary
-- Track spendings in each tier separately for a user (no need to change anything for a game since games stick to certain
 - Prepare the framework to easily add more roles
-- Make button click interactive and prevent somehow double clicks 
-  with respect of roles as well.
+- Make button click interactive and prevent somehow double clicks with respect of roles as well.
 - "Keep Going" doesn't block the input while the game master is thinking. We should show the Game Master thinking in the
-  queue probably...
-  tiers)
+  queue probably... tiers)
 - Fix game buttons enablement: some of them are shown when they should not
 - Need to refactor agent answer type determination in parseResponseToObj function. It doesn't use types from
 - When bot votes or speaks, the scroll is not moving on UI
 - Resolve vote tie by asking Detective to choose
 - Optimize indexes in DB
-- Automatically end up day discussion when each bot replied X times min
 - Let bots and the human player to like and dislike day discussion messages
 - When night starts, the Game Master's messages should tell the human player what to do then it's their turn
 - When bots are voting, they don't know that at this stage discussions are over. This has to be clarified in the game
@@ -27,4 +20,5 @@
     Ginny, voting for the 'least suspicious' deliberately inverts our only tool for catching wolves — I'd rather refine 
     our methods than abandon them entirely.
     ```
-- Change bots prompting to explain that random voting is not something suspicious. People do this. Maybe add it to personalities.
+- Change bots prompting to explain that random voting is not something suspicious. People do this. Maybe add it to
+  personalities.

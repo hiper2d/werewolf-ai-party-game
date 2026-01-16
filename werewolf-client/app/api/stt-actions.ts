@@ -6,7 +6,7 @@ import { OpenAI } from "openai";
 import { API_KEY_CONSTANTS, AUDIO_MODEL_CONSTANTS } from "@/app/ai/ai-models";
 import { calculateOpenAISttCost } from "@/app/utils/pricing";
 import { updateUserMonthlySpending } from "@/app/api/user-actions";
-import { recordGameCost } from "@/app/api/cost-tracking";
+import { recordGameCost, getGameTier } from "@/app/api/cost-tracking";
 
 export interface STTOptions {
   language?: string;
@@ -65,7 +65,8 @@ export async function transcribeAudio(
 
     const cost = calculateOpenAISttCost(durationSeconds);
     if (cost > 0) {
-      await updateUserMonthlySpending(session.user.email, cost);
+      const tier = await getGameTier(options.gameId);
+      await updateUserMonthlySpending(session.user.email, cost, tier);
       if (options.gameId) {
         await recordGameCost(options.gameId, cost);
       }

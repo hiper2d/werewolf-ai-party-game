@@ -5,7 +5,7 @@ import { getUserApiKeys } from "@/app/api/user-actions";
 import { GoogleGenAI } from "@google/genai";
 import { API_KEY_CONSTANTS } from "@/app/ai/ai-models";
 import { updateUserMonthlySpending } from "@/app/api/user-actions";
-import { recordGameCost } from "@/app/api/cost-tracking";
+import { recordGameCost, getGameTier } from "@/app/api/cost-tracking";
 
 export interface GoogleTTSOptions {
   voiceName: string;       // e.g., "Kore", "Puck"
@@ -156,7 +156,8 @@ export async function generateGoogleSpeech(
     // Track costs
     const cost = calculateGoogleTtsCost(text.length);
     if (cost > 0) {
-      await updateUserMonthlySpending(session.user.email, cost);
+      const tier = await getGameTier(options.gameId);
+      await updateUserMonthlySpending(session.user.email, cost, tier);
       if (options.gameId) {
         await recordGameCost(options.gameId, cost);
       }

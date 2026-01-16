@@ -1,4 +1,4 @@
-import { Bot, Game, GAME_ROLES, PLAY_STYLES, PLAY_STYLE_CONFIGS } from "@/app/api/game-models";
+import { Bot, Game, GAME_ROLES, PLAY_STYLES, PLAY_STYLE_CONFIGS, RoleKnowledge } from "@/app/api/game-models";
 
 /**
  * Generates a random play style description for a bot
@@ -48,7 +48,78 @@ export function generateWerewolfTeammatesSection(bot: Bot, game: Game): string {
 }
 
 /**
+ * Generates role-specific knowledge section based on the bot's role
+ * This provides clear, structured information about night action results
+ *
+ * @param bot The current bot
+ * @returns Formatted role knowledge section or empty string
+ */
+export function generateRoleKnowledgeSection(bot: Bot): string {
+    if (!bot.roleKnowledge) {
+        return '';
+    }
+
+    const sections: string[] = [];
+
+    // Detective investigations
+    if (bot.role === GAME_ROLES.DETECTIVE && bot.roleKnowledge.investigations && bot.roleKnowledge.investigations.length > 0) {
+        const investigationLines = bot.roleKnowledge.investigations.map(inv => {
+            // Handle unsuccessful investigations (blocked by some future role)
+            if (inv.success === false) {
+                return `- **Night ${inv.day}:** Investigated **${inv.target}** → ❌ Investigation failed/blocked`;
+            }
+            const status = inv.isWerewolf ? '🐺 **WEREWOLF**' : '✓ Not a Werewolf';
+            return `- **Night ${inv.day}:** Investigated **${inv.target}** → ${status}`;
+        }).join('\n');
+
+        // Only count successful investigations
+        const confirmedWerewolves = bot.roleKnowledge.investigations
+            .filter(inv => inv.success !== false && inv.isWerewolf)
+            .map(inv => inv.target);
+
+        const clearedPlayers = bot.roleKnowledge.investigations
+            .filter(inv => inv.success !== false && !inv.isWerewolf)
+            .map(inv => inv.target);
+
+        let summary = `## 🔍 Your Detective Investigation Results\n\n${investigationLines}`;
+
+        if (confirmedWerewolves.length > 0) {
+            summary += `\n\n**CONFIRMED WEREWOLVES:** ${confirmedWerewolves.join(', ')}`;
+        }
+        if (clearedPlayers.length > 0) {
+            summary += `\n**CLEARED PLAYERS:** ${clearedPlayers.join(', ')}`;
+        }
+
+        sections.push(summary);
+    }
+
+    // Doctor protections
+    if (bot.role === GAME_ROLES.DOCTOR && bot.roleKnowledge.protections && bot.roleKnowledge.protections.length > 0) {
+        const protectionLines = bot.roleKnowledge.protections.map(prot => {
+            // Handle unsuccessful protections (blocked by some future role)
+            if (prot.success === false) {
+                return `- **Night ${prot.day}:** Tried to protect **${prot.target}** → ❌ Protection failed/blocked`;
+            }
+            const savedNote = prot.savedTarget === true ? ' 🛡️ (SAVED THEM from werewolves!)' : '';
+            return `- **Night ${prot.day}:** Protected **${prot.target}**${savedNote}`;
+        }).join('\n');
+
+        const lastProtection = bot.roleKnowledge.protections[bot.roleKnowledge.protections.length - 1];
+
+        let summary = `## 🏥 Your Doctor Protection History\n\n${protectionLines}`;
+        if (lastProtection.success !== false) {
+            summary += `\n\n**REMINDER:** You protected **${lastProtection.target}** last night, so you CANNOT protect them again tonight.`;
+        }
+
+        sections.push(summary);
+    }
+
+    return sections.length > 0 ? sections.join('\n\n') : '';
+}
+
+/**
  * Generates the complete context section for the bot prompt including:
+ * - Role-specific knowledge (investigations, protections, etc.)
  * - Bot's personal summary
  * - Voting history statistics
  * - Night narrative summaries
@@ -60,7 +131,13 @@ export function generateWerewolfTeammatesSection(bot: Bot, game: Game): string {
 export function generateBotContextSection(bot: Bot, game: Game): string {
     const sections: string[] = [];
 
-    // 1. Bot's Personal Summary (with legacy daySummaries fallback)
+    // 1. Role-Specific Knowledge (FIRST - most important for special roles)
+    const roleKnowledge = generateRoleKnowledgeSection(bot);
+    if (roleKnowledge) {
+        sections.push(roleKnowledge);
+    }
+
+    // 2. Bot's Personal Summary (with legacy daySummaries fallback)
     let summary = bot.summary;
     if (!summary && bot.daySummaries && bot.daySummaries.length > 0) {
         // Legacy fallback: concatenate old daySummaries format
@@ -74,7 +151,7 @@ export function generateBotContextSection(bot: Bot, game: Game): string {
         sections.push(`## Your Personal Summary\n\n${summary}`);
     }
 
-    // 2. Voting History
+    // 3. Voting History
     if (game.votingHistory && game.votingHistory.length > 0) {
         const votingLines = game.votingHistory.map(v => {
             const voteStr = Object.entries(v.voteCounts)
@@ -88,7 +165,7 @@ export function generateBotContextSection(bot: Bot, game: Game): string {
         sections.push(`## Voting History\n\n${votingLines}`);
     }
 
-    // 3. Night Narratives
+    // 4. Night Narratives
     if (game.nightNarratives && game.nightNarratives.length > 0) {
         const nightLines = game.nightNarratives.map(n =>
             `**Night ${n.day}:**\n${n.narrative}`

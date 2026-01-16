@@ -116,7 +116,12 @@ export async function deleteApiKey(userId: string, model: string): Promise<void>
     }
 }
 
-export async function updateUserMonthlySpending(userId: string, amountUSD: number, timestamp: number = Date.now()): Promise<void> {
+export async function updateUserMonthlySpending(
+    userId: string,
+    amountUSD: number,
+    tier?: UserTier,
+    timestamp: number = Date.now()
+): Promise<void> {
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
@@ -143,16 +148,38 @@ export async function updateUserMonthlySpending(userId: string, amountUSD: numbe
         const updatedSpendings = currentSpendings.map(record => {
             if (record.period === period) {
                 periodUpdated = true;
+
+                // Update total amount
+                const newTotal = parseFloat((record.amountUSD + normalizedAmount).toFixed(6));
+
+                // Update tier-specific amount if tier is provided
+                let freeAmount = record.freeAmountUSD || 0;
+                let apiAmount = record.apiAmountUSD || 0;
+
+                if (tier === 'free') {
+                    freeAmount = parseFloat((freeAmount + normalizedAmount).toFixed(6));
+                } else if (tier === 'api') {
+                    apiAmount = parseFloat((apiAmount + normalizedAmount).toFixed(6));
+                }
+
                 return {
                     period: record.period,
-                    amountUSD: parseFloat((record.amountUSD + normalizedAmount).toFixed(6))
+                    amountUSD: newTotal,
+                    freeAmountUSD: freeAmount,
+                    apiAmountUSD: apiAmount
                 } as UserMonthlySpending;
             }
             return record;
         });
 
         if (!periodUpdated) {
-            updatedSpendings.push({ period, amountUSD: normalizedAmount });
+            const newRecord: UserMonthlySpending = {
+                period,
+                amountUSD: normalizedAmount,
+                freeAmountUSD: tier === 'free' ? normalizedAmount : 0,
+                apiAmountUSD: tier === 'api' ? normalizedAmount : 0
+            };
+            updatedSpendings.push(newRecord);
         }
 
         updatedSpendings.sort((a, b) => b.period.localeCompare(a.period));

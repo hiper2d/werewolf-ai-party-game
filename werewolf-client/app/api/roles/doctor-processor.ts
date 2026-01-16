@@ -1,5 +1,5 @@
 import { BaseRoleProcessor, NightActionResult, NightOutcome } from "./base-role-processor";
-import { GAME_ROLES, GAME_MASTER, GameMessage, MessageType, BotResponseError, RECIPIENT_DOCTOR } from "@/app/api/game-models";
+import { GAME_ROLES, GAME_MASTER, GameMessage, MessageType, BotResponseError, RECIPIENT_DOCTOR, DoctorProtection } from "@/app/api/game-models";
 import { AgentFactory } from "@/app/ai/agent-factory";
 import { addMessageToChatAndSaveToDb, getBotMessages, getUserFromFirestore } from "@/app/api/game-actions";
 import { getApiKeysForUser } from "@/app/utils/tier-utils";
@@ -187,6 +187,28 @@ export class DoctorProcessor extends BaseRoleProcessor {
             const currentNightResults = this.game.nightResults || {};
             currentNightResults[GAME_ROLES.DOCTOR] = { target: doctorResponse.target };
 
+            // Store protection in doctor bot's roleKnowledge
+            const protection: DoctorProtection = {
+                day: this.game.currentDay,
+                target: doctorResponse.target
+                // wasSuccessful will be updated later when we know if werewolves targeted this player
+            };
+
+            // Update the doctor bot's roleKnowledge
+            const updatedBots = this.game.bots.map(bot => {
+                if (bot.name === doctorBot.name) {
+                    const existingProtections = bot.roleKnowledge?.protections || [];
+                    return {
+                        ...bot,
+                        roleKnowledge: {
+                            ...bot.roleKnowledge,
+                            protections: [...existingProtections, protection]
+                        }
+                    };
+                }
+                return bot;
+            });
+
             // Create doctor response message (sent only to the doctor role)
             const doctorMessage: GameMessage = {
                 id: null,
@@ -213,7 +235,8 @@ export class DoctorProcessor extends BaseRoleProcessor {
                 success: true,
                 gameUpdates: {
                     nightResults: currentNightResults,
-                    gameStateParamQueue: remainingQueue
+                    gameStateParamQueue: remainingQueue,
+                    bots: updatedBots
                 }
             };
 

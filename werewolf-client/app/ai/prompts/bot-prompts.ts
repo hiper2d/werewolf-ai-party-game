@@ -308,20 +308,39 @@ export const BOT_DAY_SUMMARY_PROMPT: string = `**End of Day %day_number% - Updat
 - REMOVE outdated information that is no longer relevant
 - Create ONE comprehensive summary that captures everything you need to remember
 
-**Focus Areas:**
-- Key player relationships and how they've evolved
-- Your suspicions and trust levels for each player (who do you trust? who seems suspicious?)
-- Important conversations and unfinished discussions that need follow-up
-- Your role-specific knowledge:
-  - **DETECTIVE:** Investigation results and who you've cleared or suspect
-  - **WEREWOLF:** Coordination with teammates, strategy, who knows what
-  - **DOCTOR:** Protection history and strategy
-  - **VILLAGER:** Patterns and clues you've noticed
-- Night events and their implications for the game
-- Your strategic plans for upcoming days
-- Key interactions with %human_player_name% (the human player)
+**REQUIRED SECTIONS in your summary:**
 
-**Format:** Write a concise but comprehensive personal diary entry that captures your complete understanding of the game so far. This should be 3-5 paragraphs that you can reference in future days to remember everything important.`;
+**1. FRIENDS & ALLIES** - Who do you trust and why?
+- Players who have defended you or supported your positions
+- Players whose behavior consistently aligns with village goals (if you're a villager)
+- Your werewolf teammates and coordination (if you're a werewolf)
+- Rate each ally: Strong ally / Tentative ally / Uncertain
+
+**2. SUSPECTS & ENEMIES** - Who do you suspect and why?
+- Players showing suspicious voting patterns
+- Players who have targeted you or your allies unfairly
+- Players with contradictory statements about game mechanics
+- Rate each suspect: Highly suspicious / Somewhat suspicious / Worth watching
+
+**3. ROLE-SPECIFIC KNOWLEDGE** (CRITICAL - review the data provided above your previous summary)
+- **DETECTIVE:** Your investigation results are tracked for you. Summarize: CONFIRMED WEREWOLVES to eliminate, CLEARED PLAYERS to trust/protect, and WHO TO INVESTIGATE NEXT
+- **WEREWOLF:** Coordination with teammates, which innocents are threats, who suspects you
+- **DOCTOR:** Your protection history is tracked. Note: who seems most at risk, protection priorities
+- **VILLAGER:** Patterns noticed, deductions from night events and votes
+
+**4. ROLE-PLAY & SOCIAL CONNECTIONS**
+- Memorable character moments and conversations
+- Ongoing stories or interactions you want to continue
+- How your character relates to others in the game world
+- Interesting narrative hooks from %human_player_name% to respond to
+
+**5. STRATEGIC PLANS**
+- Your goals for the next day
+- Who you plan to push suspicion on (and why)
+- Who you plan to defend or ally with
+- Unfinished discussions that need follow-up
+
+**Format:** Write a comprehensive personal diary entry (4-6 paragraphs) covering ALL five sections above. This is your memory for future days - make it complete and actionable.`;
 
 export const BOT_AFTER_GAME_SYSTEM_PROMPT_ADDITION: string = `
 
