@@ -182,10 +182,17 @@ All responses must be valid JSON. The specific schema will be provided by the AP
 export const BOT_VOTE_PROMPT: string = `%bot_name%, it's time to vote for someone to eliminate from the game. \
 You must choose one player who you believe should be voted out.
 
+**IMPORTANT: VOTING PHASE RULES**
+- Discussion time is OVER. This is the voting phase only.
+- You cannot ask questions or demand explanations from other players now.
+- Other players' vote comments are just brief justifications - NOT invitations to debate.
+- Do NOT treat vote comments as suspicious or analyze them for contradictions.
+- Simply cast your vote based on everything discussed BEFORE voting began.
+
 Consider:
-- Who seems most suspicious based on the discussions
+- Who seems most suspicious based on the discussions that happened BEFORE voting
 - Who might be a threat to your team's victory
-- The evidence and arguments presented so far
+- The evidence and arguments presented during the discussion phase
 - Your role's objectives and win conditions
 
 **CRITICAL TEAM STRATEGY REMINDER:**

@@ -11,14 +11,5 @@
 - Optimize indexes in DB
 - Let bots and the human player to like and dislike day discussion messages
 - When night starts, the Game Master's messages should tell the human player what to do then it's their turn
-- When bots are voting, they don't know that at this stage discussions are over. This has to be clarified in the game
-  rules. Right now, they find my comments to votes suspicious:
-    ```txt
-    I appreciate your frustration—I share it, and I acknowledged my own part in yesterday's mistake.
-    But you're still dodging the core question: if you believed Draco innocent, why did your vote land on Hermione instead of 
-    abstaining or fighting to shift the consensus? That's not about blame, it's about understanding your logic. 
-    Ginny, voting for the 'least suspicious' deliberately inverts our only tool for catching wolves — I'd rather refine 
-    our methods than abandon them entirely.
-    ```
 - Change bots prompting to explain that random voting is not something suspicious. People do this. Maybe add it to
   personalities.
