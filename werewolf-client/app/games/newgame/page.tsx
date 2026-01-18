@@ -21,7 +21,7 @@ export default function CreateNewGamePage() {
     const [name, setName] = useState('');
     const [theme, setTheme] = useState('');
     const [description, setDescription] = useState('');
-    const [playerCount, setPlayerCount] = useState(10);
+    const [playerCount, setPlayerCount] = useState(12);
     const [werewolfCount, setWerewolfCount] = useState(3);
     const [specialRoles, setSpecialRoles] = useState([GAME_ROLES.DOCTOR, GAME_ROLES.DETECTIVE]);
     const [gameMasterAiType, setGameMasterAiType] = useState<string>(LLM_CONSTANTS.RANDOM);

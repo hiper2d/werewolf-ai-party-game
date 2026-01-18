@@ -117,8 +117,28 @@ export class TTSService {
     this.currentAudioKey = null;
   }
 
+  pauseSpeaking(): void {
+    if (this.currentAudio && !this.currentAudio.paused) {
+      this.currentAudio.pause();
+    }
+  }
+
+  resumeSpeaking(): void {
+    if (this.currentAudio && this.currentAudio.paused && this.currentAudio.currentTime > 0) {
+      this.currentAudio.play();
+    }
+  }
+
   isSpeaking(): boolean {
     return this.currentAudio !== null && !this.currentAudio.paused;
+  }
+
+  isPaused(): boolean {
+    return this.currentAudio !== null && this.currentAudio.paused && this.currentAudio.currentTime > 0;
+  }
+
+  hasActiveAudio(): boolean {
+    return this.currentAudio !== null;
   }
 
   private getCacheKey(text: string, options: TTSOptions): string {

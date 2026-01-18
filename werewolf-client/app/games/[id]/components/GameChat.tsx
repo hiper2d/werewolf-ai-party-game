@@ -116,9 +116,11 @@ interface GameMessageItemProps {
     game: Game;
     onSpeak: (messageId: string, text: string) => void;
     speakingMessageId: string | null;
+    loadingMessageId: string | null;
+    pausedMessageId: string | null;
 }
 
-function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcluding, game, onSpeak, speakingMessageId }: GameMessageItemProps) {
+function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcluding, game, onSpeak, speakingMessageId, loadingMessageId, pausedMessageId }: GameMessageItemProps) {
     const [showDeleteMenu, setShowDeleteMenu] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
 
@@ -287,9 +289,30 @@ function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcludin
                         <button
                             onClick={() => onSpeak(message.id!, displayContent)}
                             className="p-1 rounded hover:bg-gray-300/50 dark:hover:bg-gray-600/50"
-                            title={speakingMessageId === message.id ? "Stop speaking" : "Read message aloud"}
+                            disabled={loadingMessageId === message.id}
+                            title={
+                                loadingMessageId === message.id ? "Loading audio..." :
+                                speakingMessageId === message.id ? "Pause" :
+                                pausedMessageId === message.id ? "Resume" :
+                                "Read message aloud"
+                            }
                         >
-                            {speakingMessageId === message.id ? (
+                            {loadingMessageId === message.id ? (
+                                // Loading spinner
+                                <svg
+                                    width="14"
+                                    height="14"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    className="text-blue-600 dark:text-blue-400 animate-spin"
+                                >
+                                    <circle cx="12" cy="12" r="10" strokeOpacity="0.25"/>
+                                    <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round"/>
+                                </svg>
+                            ) : speakingMessageId === message.id ? (
+                                // Pause icon (two vertical bars)
                                 <svg
                                     width="14"
                                     height="14"
@@ -304,7 +327,23 @@ function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcludin
                                     <rect x="6" y="4" width="4" height="16"/>
                                     <rect x="14" y="4" width="4" height="16"/>
                                 </svg>
+                            ) : pausedMessageId === message.id ? (
+                                // Play icon (triangle) for paused state
+                                <svg
+                                    width="14"
+                                    height="14"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+                                >
+                                    <polygon points="5 3,19 12,5 21,5 3"/>
+                                </svg>
                             ) : (
+                                // Speaker icon (default state)
                                 <svg
                                     width="14"
                                     height="14"
@@ -348,6 +387,8 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
     const showNightActionModal = isModalOpen('nightAction');
     const [isGettingSuggestion, setIsGettingSuggestion] = useState(false);
     const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
+    const [loadingMessageId, setLoadingMessageId] = useState<string | null>(null);
+    const [pausedMessageId, setPausedMessageId] = useState<string | null>(null);
     const [isRecording, setIsRecording] = useState(false);
     const [isTranscribing, setIsTranscribing] = useState(false);
     const [textareaRows, setTextareaRows] = useState(2);
@@ -1034,15 +1075,27 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
 
     const handleSpeak = async (messageId: string, text: string) => {
         try {
-            // Stop any currently playing audio
-            if (speakingMessageId) {
+            // If clicking on currently playing message, pause it
+            if (speakingMessageId === messageId) {
+                ttsService.pauseSpeaking();
+                setSpeakingMessageId(null);
+                setPausedMessageId(messageId);
+                return;
+            }
+
+            // If clicking on paused message, resume it
+            if (pausedMessageId === messageId) {
+                ttsService.resumeSpeaking();
+                setPausedMessageId(null);
+                setSpeakingMessageId(messageId);
+                return;
+            }
+
+            // Stop any currently playing or paused audio before starting new one
+            if (speakingMessageId || pausedMessageId) {
                 ttsService.stopSpeaking();
                 setSpeakingMessageId(null);
-
-                // If clicking the same message, just stop
-                if (speakingMessageId === messageId) {
-                    return;
-                }
+                setPausedMessageId(null);
             }
 
             // Get voice provider from game (with fallback to default)
@@ -1050,24 +1103,15 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
 
             // Find the message to get the author name
             const message = messages.find(msg => msg.id === messageId);
-            if (!message) {
-                console.error('Message not found for voice mapping:', messageId);
-                setSpeakingMessageId(messageId);
-                // Use default voice when message not found
-                await ttsService.speakText(text, {
-                    voice: game.gameMasterVoice || 'alloy',
-                    voiceProvider,
-                    gameId
-                });
-                setSpeakingMessageId(null);
-                return;
-            }
 
             // Map author to their assigned voice and style
             let voice = 'alloy'; // default fallback
             let voiceStyle: string | undefined;
 
-            if (message.authorName === GAME_MASTER) {
+            if (!message) {
+                console.error('Message not found for voice mapping:', messageId);
+                voice = game.gameMasterVoice || 'alloy';
+            } else if (message.authorName === GAME_MASTER) {
                 // Use Game Master voice
                 voice = game.gameMasterVoice || 'alloy';
                 voiceStyle = game.gameMasterVoiceStyle;
@@ -1081,13 +1125,30 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
                 // If no bot found (human player), use default voice
             }
 
-            setSpeakingMessageId(messageId);
+            // Show loading state
+            setLoadingMessageId(messageId);
+
             await ttsService.speakText(text, { voice, voiceStyle, voiceProvider, gameId });
-            setSpeakingMessageId(null);
+
+            // Audio started playing
+            setLoadingMessageId(null);
+            setSpeakingMessageId(messageId);
+
+            // Listen for when audio ends
+            const checkAudioEnd = setInterval(() => {
+                if (!ttsService.hasActiveAudio()) {
+                    clearInterval(checkAudioEnd);
+                    setSpeakingMessageId(prev => prev === messageId ? null : prev);
+                    setPausedMessageId(prev => prev === messageId ? null : prev);
+                }
+            }, 100);
+
         } catch (error) {
             console.error('TTS Error:', error);
             alert(`Failed to play audio: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            setLoadingMessageId(null);
             setSpeakingMessageId(null);
+            setPausedMessageId(null);
         }
     };
 
@@ -1366,6 +1427,8 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
                                 game={game}
                                 onSpeak={handleSpeak}
                                 speakingMessageId={speakingMessageId}
+                                loadingMessageId={loadingMessageId}
+                                pausedMessageId={pausedMessageId}
                             />
                         );
                     })
