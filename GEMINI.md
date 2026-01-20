@@ -57,6 +57,11 @@ The game follows a state machine pattern managed in Firestore:
 3.  **Real-time UI:** React components listen to Firestore updates.
 4.  **AI Response:** AI agents process game state and append messages to `games/{gameId}/messages`.
 
+## Development Guidelines
+
+### Test Files
+*   **Do NOT delete test files:** When creating new tests to verify functionality (e.g., `*-thinking.test.ts`), leave them in the codebase. They serve as valuable regression tests and documentation for future development.
+
 ## Directory Structure
 
 *   `werewolf-client/`: Main application source.
