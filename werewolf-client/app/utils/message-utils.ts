@@ -128,21 +128,37 @@ export function convertToAIMessages(currentBotName: string, messages: GameMessag
             flushGmMessages(currentBotName, gmMessages, otherPlayerMessages, aiMessages);
 
             // Prepare own message (assistant type)
+            let thinking: string | undefined;
+            let anthropicThinkingSignature: string | undefined;
+            let googleThoughtSignature: string | undefined;
             if (message.messageType === MessageType.BOT_ANSWER || message.messageType === MessageType.BOT_WELCOME) {
-                content = (message.msg as { reply: string }).reply;
+                const botMsg = message.msg as { reply: string; thinking?: string; anthropicThinkingSignature?: string; googleThoughtSignature?: string };
+                content = botMsg.reply;
+                thinking = botMsg.thinking;
+                anthropicThinkingSignature = botMsg.anthropicThinkingSignature;
+                googleThoughtSignature = botMsg.googleThoughtSignature;
             } else if (message.messageType === MessageType.WEREWOLF_ACTION) {
-                const werewolfMsg = message.msg as { target: string; reasoning: string };
+                const werewolfMsg = message.msg as { target: string; reasoning: string; thinking?: string; anthropicThinkingSignature?: string; googleThoughtSignature?: string };
                 content = `Selected ${werewolfMsg.target} for elimination. Reasoning: ${werewolfMsg.reasoning}`;
+                thinking = werewolfMsg.thinking;
+                anthropicThinkingSignature = werewolfMsg.anthropicThinkingSignature;
+                googleThoughtSignature = werewolfMsg.googleThoughtSignature;
             } else if (message.messageType === MessageType.DOCTOR_ACTION) {
-                const doctorMsg = message.msg as { target: string; reasoning: string };
+                const doctorMsg = message.msg as { target: string; reasoning: string; thinking?: string; anthropicThinkingSignature?: string; googleThoughtSignature?: string };
                 content = `Protected ${doctorMsg.target} from werewolf attacks. Reasoning: ${doctorMsg.reasoning}`;
+                thinking = doctorMsg.thinking;
+                anthropicThinkingSignature = doctorMsg.anthropicThinkingSignature;
+                googleThoughtSignature = doctorMsg.googleThoughtSignature;
             } else if (message.messageType === MessageType.VOTE_MESSAGE) {
-                const voteMsg = message.msg as { who: string; why: string };
+                const voteMsg = message.msg as { who: string; why: string; thinking?: string; anthropicThinkingSignature?: string; googleThoughtSignature?: string };
                 content = `🗳️ Votes for ${voteMsg.who}: "${voteMsg.why}"`;
+                thinking = voteMsg.thinking;
+                anthropicThinkingSignature = voteMsg.anthropicThinkingSignature;
+                googleThoughtSignature = voteMsg.googleThoughtSignature;
             } else {
                 content = message.msg as string;
             }
-            const aiMessage = { role: MESSAGE_ROLE.ASSISTANT, content: content };
+            const aiMessage: AIMessage = { role: MESSAGE_ROLE.ASSISTANT, content: content, thinking, anthropicThinkingSignature, googleThoughtSignature };
             aiMessages.push(aiMessage);
         } else {
             // Use convertMessageContent to properly handle all message types
@@ -188,6 +204,9 @@ export function convertToGMMessages(messages: GameMessage[]): AIMessage[] {
 
     messages.forEach((message) => {
         let content: string;
+        let thinking: string | undefined;
+        let anthropicThinkingSignature: string | undefined;
+        let googleThoughtSignature: string | undefined;
 
         if (message.authorName === GAME_MASTER) {
             // Flush any accumulated player messages before adding GM message
@@ -195,13 +214,21 @@ export function convertToGMMessages(messages: GameMessage[]): AIMessage[] {
 
             // Game Master messages are assistant messages
             if (message.messageType === MessageType.GAME_STORY) {
-                content = (message.msg as { story: string }).story;
+                const storyMsg = message.msg as { story: string; thinking?: string; anthropicThinkingSignature?: string; googleThoughtSignature?: string };
+                content = storyMsg.story;
+                thinking = storyMsg.thinking;
+                anthropicThinkingSignature = storyMsg.anthropicThinkingSignature;
+                googleThoughtSignature = storyMsg.googleThoughtSignature;
             } else if (message.messageType === MessageType.NIGHT_SUMMARY) {
-                content = (message.msg as { story: string }).story;
+                const summaryMsg = message.msg as { story: string; thinking?: string; anthropicThinkingSignature?: string; googleThoughtSignature?: string };
+                content = summaryMsg.story;
+                thinking = summaryMsg.thinking;
+                anthropicThinkingSignature = summaryMsg.anthropicThinkingSignature;
+                googleThoughtSignature = summaryMsg.googleThoughtSignature;
             } else {
                 content = typeof message.msg === 'string' ? message.msg : JSON.stringify(message.msg);
             }
-            aiMessages.push({ role: MESSAGE_ROLE.ASSISTANT, content: content });
+            aiMessages.push({ role: MESSAGE_ROLE.ASSISTANT, content: content, thinking, anthropicThinkingSignature, googleThoughtSignature });
         } else {
             // All player messages (bots + human) are grouped as user messages
             content = convertMessageContent(message);

@@ -53,6 +53,7 @@ import {
     generateWerewolfTeammatesSection
 } from "@/app/utils/bot-utils";
 import {checkGameEndConditions} from "@/app/utils/game-utils";
+import {getProviderSignatureFields} from "@/app/ai/ai-models";
 import {recordBotTokenUsage, recordGameMasterTokenUsage} from "@/app/api/cost-tracking";
 import {ensureUserCanAccessGame} from "@/app/api/tier-guards";
 
@@ -347,8 +348,8 @@ async function welcomeImpl(gameId: string): Promise<Game> {
             msg: gmMessage.msg + playStyleReminder
         }];
         const history = convertToAIMessages(bot.name, messagesWithPlaystyle);
-        const [answer, thinking, tokenUsage] = await agent.askWithZodSchema(BotAnswerZodSchema, history);
-        
+        const [answer, thinking, tokenUsage, thinkingSignature] = await agent.askWithZodSchema(BotAnswerZodSchema, history);
+
         if (!answer) {
             throw new BotResponseError(
                 'Bot failed to provide introduction',
@@ -362,7 +363,7 @@ async function welcomeImpl(gameId: string): Promise<Game> {
             id: null,
             recipientName: RECIPIENT_ALL,
             authorName: bot.name,
-            msg: { reply: answer.reply, thinking: thinking || "" },
+            msg: { reply: answer.reply, thinking: thinking || "", ...getProviderSignatureFields(bot.aiType, thinkingSignature) },
             messageType: MessageType.BOT_WELCOME,
             day: game.currentDay,
             timestamp: Date.now(),
@@ -571,7 +572,7 @@ async function keepBotsGoingImpl(gameId: string): Promise<Game> {
 
         // Include recent conversation in the GM's history for bot selection
         const history = convertToGMMessages([...dayMessages, gmMessage]);
-        const [gmResponse, thinking, tokenUsage] = await gmAgent.askWithZodSchema(GmBotSelectionZodSchema, history);
+        const [gmResponse, , tokenUsage] = await gmAgent.askWithZodSchema(GmBotSelectionZodSchema, history);
         if (!gmResponse) {
             throw new BotResponseError(
                 'Game Master failed to select responding bots',
@@ -746,7 +747,7 @@ async function handleHumanPlayerMessage(
 
     // Include the user's message in the GM's history for bot selection
     const history = convertToGMMessages([...dayMessages, userChatMessage, gmMessage]);
-    const [gmResponse, thinking, tokenUsage] = await gmAgent.askWithZodSchema(GmBotSelectionZodSchema, history);
+    const [gmResponse, , tokenUsage] = await gmAgent.askWithZodSchema(GmBotSelectionZodSchema, history);
     if (!gmResponse) {
         throw new BotResponseError(
             'Game Master failed to select responding bots',
@@ -854,7 +855,7 @@ async function processNextBotInQueue(
         msg: gmMessage.msg + playStyleReminder
     }];
     const history = convertToAIMessages(bot.name, messagesWithPlaystyle);
-    const [botReply, thinking, tokenUsage] = await agent.askWithZodSchema(BotAnswerZodSchema, history);
+    const [botReply, thinking, tokenUsage, thinkingSignature] = await agent.askWithZodSchema(BotAnswerZodSchema, history);
     if (!botReply) {
         throw new BotResponseError(
             'Bot failed to respond to discussion',
@@ -867,7 +868,7 @@ async function processNextBotInQueue(
         id: null,
         recipientName: RECIPIENT_ALL,
         authorName: bot.name,
-        msg: { reply: botReply.reply, thinking: thinking || "" },
+        msg: { reply: botReply.reply, thinking: thinking || "", ...getProviderSignatureFields(bot.aiType, thinkingSignature) },
         messageType: MessageType.BOT_ANSWER,
         day: game.currentDay,
         timestamp: Date.now(),
@@ -1215,8 +1216,9 @@ async function voteImpl(gameId: string): Promise<Game> {
             let voteResponse: any;
             let thinking: string;
             let tokenUsage: any;
+            let thinkingSignature: string | undefined;
             try {
-                [voteResponse, thinking, tokenUsage] = await agent.askWithZodSchema(BotVoteZodSchema, history);
+                [voteResponse, thinking, tokenUsage, thinkingSignature] = await agent.askWithZodSchema(BotVoteZodSchema, history);
             } catch (error) {
                 // Handle specific model errors by using their message
                 if (error instanceof ModelError) {
@@ -1270,7 +1272,9 @@ async function voteImpl(gameId: string): Promise<Game> {
                 authorName: bot.name,
                 msg: {
                     who: voteResponse.who,
-                    why: voteResponse.why
+                    why: voteResponse.why,
+                    thinking: thinking || "",
+                    ...getProviderSignatureFields(bot.aiType, thinkingSignature)
                 },
                 messageType: MessageType.VOTE_MESSAGE,
                 day: currentGame.currentDay,
@@ -1656,7 +1660,7 @@ async function getSuggestionImpl(gameId: string): Promise<string> {
         const history = convertToAIMessages('SuggestionBot', publicDayMessages);
         
         // Get suggestion from AI using schema to ensure consistent format
-        const [suggestionResponse, thinking, tokenUsage] = await agent.askWithZodSchema(BotAnswerZodSchema, history);
+        const [suggestionResponse, , tokenUsage] = await agent.askWithZodSchema(BotAnswerZodSchema, history);
         
         if (!suggestionResponse) {
             throw new Error('Failed to generate suggestion');

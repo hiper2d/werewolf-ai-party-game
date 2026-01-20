@@ -130,7 +130,7 @@ export class MistralAgent extends AbstractAgent {
      * 1. Set responseFormat to { type: 'json_object' }
      * 2. Add the schema description to the last message content
      */
-    async askWithZodSchema<T>(zodSchema: z.ZodSchema<T>, messages: AIMessage[]): Promise<[T, string, TokenUsage?]> {
+    async askWithZodSchema<T>(zodSchema: z.ZodSchema<T>, messages: AIMessage[]): Promise<[T, string, TokenUsage?, string?]> {
         try {
             // Convert Zod schema to human-readable prompt description
             const schemaDescription = ZodSchemaConverter.toPromptDescription(zodSchema);

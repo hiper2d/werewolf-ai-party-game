@@ -23,6 +23,7 @@ import { format } from "@/app/ai/prompts/utils";
 import { BotAnswerZodSchema, WerewolfActionZodSchema } from "@/app/ai/prompts/zod-schemas";
 import { WerewolfAction } from "@/app/ai/prompts/ai-schemas";
 import { recordBotTokenUsage } from "@/app/api/cost-tracking";
+import { getProviderSignatureFields } from "@/app/ai/ai-models";
 
 /**
  * Werewolf role processor
@@ -220,7 +221,7 @@ export class WerewolfProcessor extends BaseRoleProcessor {
             // Create conversation history
             const history = convertToAIMessages(werewolfBot.name, [...botMessages, gmMessage]);
 
-            const [werewolfResponse, thinking, tokenUsage] = await agent.askWithZodSchema(schema, history);
+            const [werewolfResponse, thinking, tokenUsage, thinkingSignature] = await agent.askWithZodSchema(schema, history);
 
             if (!werewolfResponse) {
                 throw new Error(`Werewolf ${werewolfBot.name} failed to respond to ${isLastWerewolf ? 'action' : 'discussion'} prompt`);
@@ -259,10 +260,10 @@ export class WerewolfProcessor extends BaseRoleProcessor {
             }
 
             // Create werewolf response message with WEREWOLVES recipient
-            // Add thinking content to the response object
+            // Add thinking content and signature to the response object
             const msgWithThinking = isLastWerewolf
-                ? { ...(werewolfResponse as WerewolfAction), thinking: thinking || "" }
-                : { ...(werewolfResponse as any), thinking: thinking || "" };
+                ? { ...(werewolfResponse as WerewolfAction), thinking: thinking || "", ...getProviderSignatureFields(werewolfBot.aiType, thinkingSignature) }
+                : { ...(werewolfResponse as any), thinking: thinking || "", ...getProviderSignatureFields(werewolfBot.aiType, thinkingSignature) };
 
             const werewolfMessage: GameMessage = {
                 id: null,

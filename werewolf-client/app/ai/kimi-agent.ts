@@ -89,7 +89,7 @@ export class KimiAgent extends AbstractAgent {
      * Kimi/Moonshot AI API is OpenAI-compatible, so we try JSON mode first,
      * and fall back to prompt-based schema if not supported
      */
-    async askWithZodSchema<T>(zodSchema: z.ZodSchema<T>, messages: AIMessage[]): Promise<[T, string, TokenUsage?]> {
+    async askWithZodSchema<T>(zodSchema: z.ZodSchema<T>, messages: AIMessage[]): Promise<[T, string, TokenUsage?, string?]> {
         try {
             const preparedMessages = this.prepareMessages(messages);
             const openAIMessages = this.convertToOpenAIMessages(preparedMessages);

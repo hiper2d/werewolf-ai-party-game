@@ -17,7 +17,7 @@ export abstract class AbstractAgent {
         this.enableThinking = enableThinking;
     }
 
-    abstract askWithZodSchema<T>(zodSchema: z.ZodSchema<T>, messages: AIMessage[]): Promise<[T, string, TokenUsage?]>;
+    abstract askWithZodSchema<T>(zodSchema: z.ZodSchema<T>, messages: AIMessage[]): Promise<[T, string, TokenUsage?, string?]>;
 
     protected logger(message: string): void {
         logger(`[${this.name} ${this.model}]: ${message}`);

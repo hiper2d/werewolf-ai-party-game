@@ -11,6 +11,7 @@ import { generateBotContextSection } from "@/app/utils/bot-utils";
 import { DoctorActionZodSchema } from "@/app/ai/prompts/zod-schemas";
 import { DoctorAction } from "@/app/ai/prompts/ai-schemas";
 import { recordBotTokenUsage } from "@/app/api/cost-tracking";
+import { getProviderSignatureFields } from "@/app/ai/ai-models";
 
 /**
  * Doctor role processor
@@ -136,7 +137,7 @@ export class DoctorProcessor extends BaseRoleProcessor {
             // Create conversation history
             const history = convertToAIMessages(doctorBot.name, [...botMessages, gmMessage]);
 
-            const [doctorResponse, thinking, tokenUsage] = await agent.askWithZodSchema(DoctorActionZodSchema, history);
+            const [doctorResponse, thinking, tokenUsage, thinkingSignature] = await agent.askWithZodSchema(DoctorActionZodSchema, history);
 
             if (!doctorResponse) {
                 throw new Error(`Doctor ${doctorBot.name} failed to respond to protection prompt`);
@@ -214,7 +215,7 @@ export class DoctorProcessor extends BaseRoleProcessor {
                 id: null,
                 recipientName: RECIPIENT_DOCTOR,
                 authorName: doctorBot.name,
-                msg: doctorResponse,
+                msg: { ...doctorResponse, thinking: thinking || "", ...getProviderSignatureFields(doctorBot.aiType, thinkingSignature) },
                 messageType: MessageType.DOCTOR_ACTION,
                 day: this.game.currentDay,
                 timestamp: Date.now(),

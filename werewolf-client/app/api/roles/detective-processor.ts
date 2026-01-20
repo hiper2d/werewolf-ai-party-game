@@ -18,6 +18,7 @@ import {format} from "@/app/ai/prompts/utils";
 import {generateBotContextSection} from "@/app/utils/bot-utils";
 import {DetectiveActionZodSchema} from "@/app/ai/prompts/zod-schemas";
 import {recordBotTokenUsage} from "@/app/api/cost-tracking";
+import {getProviderSignatureFields} from "@/app/ai/ai-models";
 
 /**
  * Detective role processor
@@ -145,7 +146,7 @@ export class DetectiveProcessor extends BaseRoleProcessor {
             // Create conversation history
             const history = convertToAIMessages(detectiveBot.name, [...botMessages, gmMessage]);
 
-            const [detectiveResponse, thinking, tokenUsage] = await agent.askWithZodSchema(DetectiveActionZodSchema, history);
+            const [detectiveResponse, thinking, tokenUsage, thinkingSignature] = await agent.askWithZodSchema(DetectiveActionZodSchema, history);
 
             if (!detectiveResponse) {
                 throw new Error(`Detective ${detectiveBot.name} failed to respond to investigation prompt`);
@@ -204,7 +205,9 @@ export class DetectiveProcessor extends BaseRoleProcessor {
             // Create detective response message with investigation result (sent only to the detective)
             const investigationResult = {
                 ...detectiveResponse,
-                result: `Investigation reveals: ${detectiveResponse.target} is a ${targetRole.charAt(0).toUpperCase() + targetRole.slice(1)}`
+                result: `Investigation reveals: ${detectiveResponse.target} is a ${targetRole.charAt(0).toUpperCase() + targetRole.slice(1)}`,
+                thinking: thinking || "",
+                ...getProviderSignatureFields(detectiveBot.aiType, thinkingSignature)
             };
 
             const detectiveMessage: GameMessage = {

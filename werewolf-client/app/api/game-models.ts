@@ -470,18 +470,31 @@ export enum MessageType {
 }
 
 export class BotAnswer {
-    constructor(public reply: string, public thinking?: string) {
-    }
+    constructor(
+        public reply: string,
+        public thinking?: string,
+        public anthropicThinkingSignature?: string,
+        public googleThoughtSignature?: string
+    ) {}
 }
 
 export class GameStory {
-    constructor(public story: string, public thinking?: string) {
-    }
+    constructor(
+        public story: string,
+        public thinking?: string,
+        public anthropicThinkingSignature?: string,
+        public googleThoughtSignature?: string
+    ) {}
 }
 
 export class WerewolfAction {
-    constructor(public target: string, public reasoning: string, public thinking?: string) {
-    }
+    constructor(
+        public target: string,
+        public reasoning: string,
+        public thinking?: string,
+        public anthropicThinkingSignature?: string,
+        public googleThoughtSignature?: string
+    ) {}
 }
 
 export interface SystemErrorMessage {
@@ -537,4 +550,7 @@ export interface GameMessage {
 export interface AIMessage {
     role: 'system' | 'user' | 'assistant' | 'developer';
     content: string;
+    thinking?: string;  // Optional thinking content for models that support extended thinking
+    anthropicThinkingSignature?: string;  // Signature for Anthropic/Claude thinking (required for multi-turn)
+    googleThoughtSignature?: string;  // Signature for Google/Gemini thinking (required for multi-turn)
 }

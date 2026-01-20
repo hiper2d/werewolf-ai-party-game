@@ -36,7 +36,7 @@ export class Gpt5Agent extends AbstractAgent {
      * 
      * Uses responses.parse for models that support structured outputs
      */
-    async askWithZodSchema<T>(zodSchema: z.ZodSchema<T>, messages: AIMessage[]): Promise<[T, string, TokenUsage?]> {
+    async askWithZodSchema<T>(zodSchema: z.ZodSchema<T>, messages: AIMessage[]): Promise<[T, string, TokenUsage?, string?]> {
         try {
             this.logAsking();
             this.logSystemPrompt();

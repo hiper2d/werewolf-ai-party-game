@@ -52,7 +52,7 @@ export class GrokAgent extends AbstractAgent {
      * Structured output implementation for Grok-4 using the official xAI API
      * Uses json_object mode with prompt augmentation for better compatibility
      */
-    async askWithZodSchema<T>(zodSchema: z.ZodSchema<T>, messages: AIMessage[]): Promise<[T, string, TokenUsage?]> {
+    async askWithZodSchema<T>(zodSchema: z.ZodSchema<T>, messages: AIMessage[]): Promise<[T, string, TokenUsage?, string?]> {
         try {
             // Convert Zod schema to human-readable prompt description
             // This is more reliable than json_schema for some OpenAI-compatible endpoints

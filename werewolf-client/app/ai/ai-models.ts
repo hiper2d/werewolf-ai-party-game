@@ -475,3 +475,32 @@ export function getFreeTierModelLimit(modelName: string): number | null {
     }
     return model.freeTier.maxBotsPerGame;
 }
+
+/**
+ * Returns provider-specific signature fields based on the AI type.
+ * Used when storing messages with thinking signatures from different providers.
+ * @param aiType - The LLM type string (e.g., "Claude 4.5 Haiku (Thinking)", "Gemini 3 Flash Preview")
+ * @param signature - The thinking signature from the API response (may be undefined)
+ * @returns Object with appropriate signature fields for the message
+ */
+export function getProviderSignatureFields(aiType: string, signature?: string): {
+    anthropicThinkingSignature?: string;
+    googleThoughtSignature?: string;
+} {
+    if (!signature) {
+        return {};
+    }
+
+    // Check if it's an Anthropic (Claude) model
+    if (aiType.startsWith('Claude ')) {
+        return { anthropicThinkingSignature: signature };
+    }
+
+    // Check if it's a Google (Gemini) model
+    if (aiType.startsWith('Gemini ')) {
+        return { googleThoughtSignature: signature };
+    }
+
+    // Other providers don't support signatures, return empty
+    return {};
+}

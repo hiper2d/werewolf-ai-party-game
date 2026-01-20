@@ -236,7 +236,7 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
         timestamp: null
     };
 
-    const [aiResponse, thinking, tokenUsage] = await storyTellAgent.askWithZodSchema(GameSetupZodSchema, [convertToAIMessage(storyMessage)]);
+    const [aiResponse, , tokenUsage] = await storyTellAgent.askWithZodSchema(GameSetupZodSchema, [convertToAIMessage(storyMessage)]);
     if (!aiResponse) {
         throw new Error('Failed to get AI response');
     }

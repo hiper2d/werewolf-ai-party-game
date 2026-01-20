@@ -9,9 +9,23 @@ import { safeValidateResponse } from './prompts/zod-schemas';
 
 type AnthropicRole = 'user' | 'assistant';
 
+// Content block types for thinking-enabled messages
+interface ThinkingBlock {
+    type: 'thinking';
+    thinking: string;
+    signature?: string;  // Required for Claude 4+ multi-turn conversations
+}
+
+interface TextBlock {
+    type: 'text';
+    text: string;
+}
+
+type ContentBlock = ThinkingBlock | TextBlock;
+
 interface AnthropicMessage {
     role: AnthropicRole;
-    content: string;
+    content: string | ContentBlock[];
 }
 
 export class ClaudeAgent extends AbstractAgent {
@@ -55,6 +69,41 @@ export class ClaudeAgent extends AbstractAgent {
         }));
     }
 
+    /**
+     * Converts messages for thinking-enabled requests.
+     * Assistant messages include thinking blocks ONLY if they have valid signatures.
+     * If a signature is missing, the thinking block is dropped to ensure API validity.
+     */
+    private convertToAnthropicMessagesWithThinking(messages: AIMessage[]): AnthropicMessage[] {
+        return messages.map(msg => {
+            const role = this.convertRole(msg.role);
+
+            if (role === 'assistant') {
+                // Assistant messages need thinking blocks with signatures when thinking is enabled.
+                // SAFEGUARD: If we have thinking but NO SIGNATURE, we must drop the thinking block
+                // to prevent an API error, sending only the text content.
+                if (msg.thinking && msg.anthropicThinkingSignature) {
+                    const thinkingBlock: ThinkingBlock = {
+                        type: 'thinking',
+                        thinking: msg.thinking,
+                        signature: msg.anthropicThinkingSignature
+                    };
+                    const contentBlocks: ContentBlock[] = [
+                        thinkingBlock,
+                        { type: 'text', text: msg.content }
+                    ];
+                    return { role, content: contentBlocks };
+                }
+                
+                // Fallback for text-only messages or messages with missing signatures
+                return { role, content: msg.content };
+            }
+
+            // User messages remain as simple strings
+            return { role, content: msg.content };
+        });
+    }
+
     private convertRole(role: string): AnthropicRole {
         if (role === 'system' || role === 'user') {
             return 'user';
@@ -69,11 +118,9 @@ export class ClaudeAgent extends AbstractAgent {
      * New method using Zod with Anthropic's Claude API
      * Since Anthropic doesn't support native JSON schemas, we generate prompt descriptions
      */
-    async askWithZodSchema<T>(zodSchema: z.ZodSchema<T>, messages: AIMessage[]): Promise<[T, string, TokenUsage?]> {
+    async askWithZodSchema<T>(zodSchema: z.ZodSchema<T>, messages: AIMessage[]): Promise<[T, string, TokenUsage?, string?]> {
         // Validate roles first, before entering the main try-catch block
-        // This ensures role validation errors are thrown directly
         const aiMessages = this.prepareMessages(messages);
-        const anthropicMessages = this.convertToAnthropicMessages(aiMessages);
 
         this.logAsking();
         this.logSystemPrompt();
@@ -86,19 +133,29 @@ export class ClaudeAgent extends AbstractAgent {
             // Add schema instructions to the last message
             const lastMessage = aiMessages[aiMessages.length - 1];
             const fullPrompt = `${lastMessage.content}\n\n${schemaDescription}`;
-            const updatedMessages = [...anthropicMessages];
-            updatedMessages[updatedMessages.length - 1] = {
-                ...updatedMessages[updatedMessages.length - 1],
+
+            // Update the last AI message with schema instructions before conversion
+            const messagesWithSchema = [...aiMessages];
+            messagesWithSchema[messagesWithSchema.length - 1] = {
+                ...lastMessage,
                 content: fullPrompt
             };
 
+            // Use thinking if enabled for this agent
+            const canUseThinking = this.enableThinking;
+
+            // Convert messages - use thinking-aware conversion when thinking can be used
+            const anthropicMessages = canUseThinking
+                ? this.convertToAnthropicMessagesWithThinking(messagesWithSchema)
+                : this.convertToAnthropicMessages(messagesWithSchema);
+
             const params: Anthropic.MessageCreateParams = {
                 ...this.defaultParams,
-                messages: updatedMessages,
+                messages: anthropicMessages as Anthropic.MessageParam[],
             };
 
             // Add thinking config for Anthropic models with thinking mode
-            if (this.enableThinking) {
+            if (canUseThinking) {
                 (params as any).thinking = {
                     type: "enabled",
                     budget_tokens: 1024
@@ -106,8 +163,7 @@ export class ClaudeAgent extends AbstractAgent {
                 // Anthropic requires temperature to be 1 when thinking is enabled
                 params.temperature = 1;
                 // Increase max_tokens to be greater than budget_tokens
-                // Use a larger value for complex responses like game generation
-                params.max_tokens = 16384; // Set to 16k
+                params.max_tokens = 16384; 
             }
 
             let response;
@@ -126,11 +182,16 @@ export class ClaudeAgent extends AbstractAgent {
             // Handle thinking content if present and find text content
             let textContent = null;
             let thinkingContent = "";
+            let anthropicThinkingSignature = "";
 
             for (const block of response.content) {
-                // Extract thinking content
+                // Extract thinking content and signature
                 if (this.enableThinking && (block as any).type === 'thinking' && 'thinking' in block) {
                     thinkingContent = (block as any).thinking;
+                    // Extract signature if present (required for Claude 4+ multi-turn)
+                    if ('signature' in block) {
+                        anthropicThinkingSignature = (block as any).signature;
+                    }
                 }
 
                 // Find the text content block
@@ -186,7 +247,7 @@ export class ClaudeAgent extends AbstractAgent {
                 }
             }
 
-            return [validationResult.data, thinkingContent, tokenUsage];
+            return [validationResult.data, thinkingContent, tokenUsage, anthropicThinkingSignature || undefined];
 
         } catch (error) {
             const errorDetails = error instanceof Error ? error.message : String(error);

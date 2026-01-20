@@ -71,7 +71,7 @@ export class DeepSeekV2Agent extends AbstractAgent {
      * 1. Set response_format to { type: 'json_object' } for non-reasoning models
      * 2. For reasoning models (deepseek-reasoner), schema guidance via prompts
      */
-    async askWithZodSchema<T>(zodSchema: z.ZodSchema<T>, messages: AIMessage[]): Promise<[T, string, TokenUsage?]> {
+    async askWithZodSchema<T>(zodSchema: z.ZodSchema<T>, messages: AIMessage[]): Promise<[T, string, TokenUsage?, string?]> {
         try {
             const input = this.convertToOpenAIMessages(messages);
 

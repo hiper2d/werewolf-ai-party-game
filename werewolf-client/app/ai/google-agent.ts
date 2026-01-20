@@ -13,6 +13,8 @@ type GoogleRole = 'model' | 'user';
 // Define types for the new Google GenAI SDK
 interface Part {
     text: string;
+    thought?: boolean;  // Indicates this is a thinking part
+    thoughtSignature?: string;  // Encrypted signature for multi-turn thinking
 }
 
 interface Content {
@@ -50,10 +52,38 @@ export class GoogleAgent extends AbstractAgent {
 
     private convertToContents(messages: AIMessage[]): Content[] {
         try {
-            return messages.map(msg => ({
-                role: this.convertRole(msg.role),
-                parts: [{ text: msg.content }]
-            }));
+            return messages.map(msg => {
+                const role = this.convertRole(msg.role);
+                const parts: Part[] = [];
+
+                if (role === 'model') {
+                    // Include thinking part only if text exists
+                    if (msg.thinking) {
+                        parts.push({
+                            text: msg.thinking,
+                            thought: true
+                        });
+                    }
+                    
+                    // Always include the response part
+                    const responsePart: Part = { text: msg.content };
+                    
+                    // Attach signature if we have one (even if thinking was empty)
+                    if (msg.googleThoughtSignature) {
+                        responsePart.thoughtSignature = msg.googleThoughtSignature;
+                    }
+                    
+                    parts.push(responsePart);
+                } else {
+                    // Regular turn or user turn
+                    parts.push({ text: msg.content });
+                }
+
+                return {
+                    role: role,
+                    parts: parts
+                };
+            });
         } catch (error) {
             throw error;
         }
@@ -101,9 +131,12 @@ export class GoogleAgent extends AbstractAgent {
      * New method using Zod with Google's Gemini API
      * This provides better schema handling and runtime validation
      */
-    async askWithZodSchema<T>(zodSchema: z.ZodSchema<T>, messages: AIMessage[]): Promise<[T, string, TokenUsage?]> {
-        // Validate roles first, before entering the main try-catch block
-        // This ensures role validation errors are thrown directly
+    async askWithZodSchema<T>(zodSchema: z.ZodSchema<T>, messages: AIMessage[]): Promise<[T, string, TokenUsage?, string?]> {
+        // Google's thinking API doesn't require signature validation like Anthropic
+        // Google models decide internally whether to use thinking
+        // We simply enable the thinking config if the agent has thinking enabled
+
+        // Convert messages using simple conversion (Google handles thinking internally)
         const contents = this.convertToContents(messages);
 
         try {
@@ -114,7 +147,8 @@ export class GoogleAgent extends AbstractAgent {
                 temperature: this.temperature,
                 responseMimeType: "application/json",
                 responseSchema: googleSchema,
-                maxOutputTokens: 16384  // Set to 16k to handle longer JSON responses
+                maxOutputTokens: 16384,  // Set to 16k to handle longer JSON responses
+                systemInstruction: this.instruction
             };
 
             // Add thinking config for Google models with thinking mode
@@ -142,17 +176,41 @@ export class GoogleAgent extends AbstractAgent {
                 throw new Error(this.errorMessages.apiError(apiError));
             }
 
-            // Handle thinking content if present
+            // Handle thinking content and signature if present
             let thinkingContent = "";
+            let googleThoughtSignature = "";
             if (this.enableThinking && (response as any).candidates?.[0]?.content?.parts) {
                 const parts = (response as any).candidates[0].content.parts;
                 const thinkingParts: string[] = [];
+
+                // Debug: Log the structure of each part to identify signature field name
+                this.logger(`🔍 DEBUG: Response parts structure: ${JSON.stringify(parts.map((p: any) => Object.keys(p)))}`);
+
                 for (const part of parts) {
+                    // Handle thinking content
                     if (part.thought && part.text) {
                         thinkingParts.push(part.text);
+                        // Debug: Log the thinking part to see all available fields
+                        this.logger(`🔍 DEBUG: Thinking part keys: ${JSON.stringify(Object.keys(part))}`);
+                    }
+
+                    // Check for thoughtSignature in ANY part (it often comes with the final response, not the thought part)
+                    if (part.thoughtSignature) {
+                        googleThoughtSignature = part.thoughtSignature;
+                        this.logger(`🔍 DEBUG: Found thoughtSignature`);
+                    } else if (part.thought_signature) {
+                        googleThoughtSignature = part.thought_signature;
+                        this.logger(`🔍 DEBUG: Found thought_signature (snake_case)`);
+                    } else if (part.signature) {
+                        googleThoughtSignature = part.signature;
+                        this.logger(`🔍 DEBUG: Found signature`);
                     }
                 }
                 thinkingContent = thinkingParts.join('\n');
+
+                if (thinkingContent && !googleThoughtSignature) {
+                    this.logger(`⚠️ WARNING: Thinking content found but no signature. First thinking part: ${JSON.stringify(parts.find((p: any) => p.thought))}`);
+                }
             }
 
             // Extract token usage from response metadata
@@ -211,7 +269,7 @@ export class GoogleAgent extends AbstractAgent {
 
             this.logger(`✅ Response validated successfully with Zod schema`);
 
-            return [validationResult.data, thinkingContent, tokenUsage];
+            return [validationResult.data, thinkingContent, tokenUsage, googleThoughtSignature || undefined];
 
         } catch (error) {
             this.logger(this.logTemplates.error(this.name, error));

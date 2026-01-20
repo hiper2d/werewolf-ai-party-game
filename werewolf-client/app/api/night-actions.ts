@@ -32,6 +32,7 @@ import { generateBotContextSection, generateWerewolfTeammatesSection } from "@/a
 import { format } from "@/app/ai/prompts/utils";
 import { parseResponseToObj, convertToAIMessages, convertToGMMessages } from "@/app/utils/message-utils";
 import { checkGameEndConditions } from "@/app/utils/game-utils";
+import { getProviderSignatureFields } from "@/app/ai/ai-models";
 import { GameEndChecker } from "@/app/utils/game-end-checker";
 import { recordBotTokenUsage, recordGameMasterTokenUsage } from "@/app/api/cost-tracking";
 import { ensureUserCanAccessGame } from "@/app/api/tier-guards";
@@ -128,7 +129,7 @@ async function endNightWithResults(gameId: string, game: Game): Promise<Game> {
 
     // Include conversation history for the GM (day + night messages + command)
     const history = convertToGMMessages([...dayMessages, gmCommandMessage]);
-    const [storyResponse, thinking, tokenUsage] = await gmAgent.askWithZodSchema(NightResultsStoryZodSchema, history);
+    const [storyResponse, thinking, tokenUsage, thinkingSignature] = await gmAgent.askWithZodSchema(NightResultsStoryZodSchema, history);
     if (!storyResponse) {
         throw new BotResponseError(
             'Game Master failed to generate night results story',
@@ -178,7 +179,7 @@ async function endNightWithResults(gameId: string, game: Game): Promise<Game> {
         id: null,
         recipientName: RECIPIENT_ALL,
         authorName: GAME_MASTER,
-        msg: { story: finalNightResultsMessage, thinking: thinking || "" },
+        msg: { story: finalNightResultsMessage, thinking: thinking || "", ...getProviderSignatureFields(game.gameMasterAiType, thinkingSignature) },
         messageType: MessageType.NIGHT_SUMMARY,
         day: game.currentDay,
         timestamp: Date.now(),
@@ -1100,7 +1101,7 @@ async function summarizePastDayImpl(gameId: string): Promise<Game> {
         const history = convertToAIMessages(bot.name, [...botMessages, summaryMessage]);
 
         // Get summary using bot answer schema (returns { reply: "summary text" })
-        const [summaryResponse, thinking, tokenUsage] = await agent.askWithZodSchema(BotAnswerZodSchema, history);
+        const [summaryResponse, , tokenUsage] = await agent.askWithZodSchema(BotAnswerZodSchema, history);
 
         // Update bot's token usage
         if (tokenUsage) {

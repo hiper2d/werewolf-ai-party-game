@@ -1468,7 +1468,8 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
                         disabled={!isInputEnabled()}
                         rows={textareaRows}
                         className={`w-full p-3 rounded bg-input border border-input-border text-input-text placeholder-input-placeholder focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none
-                            ${!isInputEnabled() ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            ${!isInputEnabled() ? 'opacity-50 cursor-not-allowed' : ''}
+                            min-h-[6.25rem]`}
                         placeholder={getInputPlaceholder()}
                     />
                 </div>
