@@ -1451,7 +1451,7 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
                     </button>
                 </div>
             )}
-            <form onSubmit={sendMessage} className="flex gap-2 items-end">
+            <form onSubmit={sendMessage} className="flex gap-2 items-stretch">
                 {/* Textarea on the left - expandable from 2 to 5 rows */}
                 <div className="relative flex-grow">
                     <MentionDropdown
@@ -1467,15 +1467,15 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
                         onKeyDown={handleTextareaKeyDown}
                         disabled={!isInputEnabled()}
                         rows={textareaRows}
-                        className={`w-full p-3 rounded bg-input border border-input-border text-input-text placeholder-input-placeholder focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none
+                        className={`w-full h-full p-3 rounded bg-input border border-input-border text-input-text placeholder-input-placeholder focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none
                             ${!isInputEnabled() ? 'opacity-50 cursor-not-allowed' : ''}
                             min-h-[6.25rem]`}
                         placeholder={getInputPlaceholder()}
                     />
                 </div>
-                
+
                 {/* Button grid on the right - 2 rows x 2 columns */}
-                <div className="flex flex-col gap-1 min-w-[120px]">
+                <div className="flex flex-col justify-between min-w-[120px]">
                     {/* First row - Send button (stretched across both columns) */}
                     <button
                         type="submit"
