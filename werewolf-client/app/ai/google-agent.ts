@@ -52,28 +52,48 @@ export class GoogleAgent extends AbstractAgent {
 
     private convertToContents(messages: AIMessage[]): Content[] {
         try {
-            return messages.map(msg => {
+            // Track thinking stats for aggregated logging
+            let assistantMsgCount = 0;
+            let withThinking = 0;
+            let withValidGoogleSig = 0;
+            let droppedAnthropicSig = 0;
+            let droppedNoSig = 0;
+
+            const contents = messages.map(msg => {
                 const role = this.convertRole(msg.role);
                 const parts: Part[] = [];
 
                 if (role === 'model') {
-                    // Include thinking part only if text exists
-                    if (msg.thinking) {
+                    assistantMsgCount++;
+
+                    // Only include thinking if we have a valid Google signature
+                    // (don't use thinking from other providers like Anthropic)
+                    if (msg.thinking && msg.googleThoughtSignature) {
+                        withThinking++;
+                        withValidGoogleSig++;
                         parts.push({
                             text: msg.thinking,
                             thought: true
                         });
-                    }
-                    
-                    // Always include the response part
-                    const responsePart: Part = { text: msg.content };
-                    
-                    // Attach signature if we have one (even if thinking was empty)
-                    if (msg.googleThoughtSignature) {
+
+                        // Attach signature to the response part
+                        const responsePart: Part = { text: msg.content };
                         responsePart.thoughtSignature = msg.googleThoughtSignature;
+                        parts.push(responsePart);
+                    } else {
+                        // Track dropped thinking
+                        if (msg.thinking) {
+                            withThinking++;
+                            if (msg.anthropicThinkingSignature) {
+                                droppedAnthropicSig++;
+                            } else {
+                                droppedNoSig++;
+                            }
+                        }
+
+                        // Just include the text content
+                        parts.push({ text: msg.content });
                     }
-                    
-                    parts.push(responsePart);
                 } else {
                     // Regular turn or user turn
                     parts.push({ text: msg.content });
@@ -84,6 +104,19 @@ export class GoogleAgent extends AbstractAgent {
                     parts: parts
                 };
             });
+
+            // Log aggregated thinking stats once
+            if (withThinking > 0) {
+                const dropped = droppedAnthropicSig + droppedNoSig;
+                let dropReason = '';
+                if (droppedAnthropicSig > 0) dropReason += `${droppedAnthropicSig} with Anthropic signature`;
+                if (droppedNoSig > 0) dropReason += `${droppedNoSig > 0 && droppedAnthropicSig > 0 ? ', ' : ''}${droppedNoSig} without signature`;
+
+                this.logger(`📊 Thinking history: ${assistantMsgCount} assistant msgs, ${withThinking} with thinking, ` +
+                    `${withValidGoogleSig} included, ${dropped} dropped${dropped > 0 ? ` (${dropReason})` : ''}`);
+            }
+
+            return contents;
         } catch (error) {
             throw error;
         }
@@ -183,33 +216,25 @@ export class GoogleAgent extends AbstractAgent {
                 const parts = (response as any).candidates[0].content.parts;
                 const thinkingParts: string[] = [];
 
-                // Debug: Log the structure of each part to identify signature field name
-                this.logger(`🔍 DEBUG: Response parts structure: ${JSON.stringify(parts.map((p: any) => Object.keys(p)))}`);
-
                 for (const part of parts) {
                     // Handle thinking content
                     if (part.thought && part.text) {
                         thinkingParts.push(part.text);
-                        // Debug: Log the thinking part to see all available fields
-                        this.logger(`🔍 DEBUG: Thinking part keys: ${JSON.stringify(Object.keys(part))}`);
                     }
 
                     // Check for thoughtSignature in ANY part (it often comes with the final response, not the thought part)
                     if (part.thoughtSignature) {
                         googleThoughtSignature = part.thoughtSignature;
-                        this.logger(`🔍 DEBUG: Found thoughtSignature`);
                     } else if (part.thought_signature) {
                         googleThoughtSignature = part.thought_signature;
-                        this.logger(`🔍 DEBUG: Found thought_signature (snake_case)`);
                     } else if (part.signature) {
                         googleThoughtSignature = part.signature;
-                        this.logger(`🔍 DEBUG: Found signature`);
                     }
                 }
                 thinkingContent = thinkingParts.join('\n');
 
                 if (thinkingContent && !googleThoughtSignature) {
-                    this.logger(`⚠️ WARNING: Thinking content found but no signature. First thinking part: ${JSON.stringify(parts.find((p: any) => p.thought))}`);
+                    this.logger(`⚠️ Thinking content received but no signature found in response`);
                 }
             }
 
@@ -236,7 +261,7 @@ export class GoogleAgent extends AbstractAgent {
             this.logger(`Zod schema response received - hasText: ${!!response.text}, textLength: ${response.text ? response.text.length : 0}`);
 
             if (response.text) {
-                this.logReply(response.text);
+                this.logReply(response.text, thinkingContent || undefined);
             }
 
             if (!response.text) {

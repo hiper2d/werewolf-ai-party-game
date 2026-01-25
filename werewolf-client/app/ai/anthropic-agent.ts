@@ -75,14 +75,25 @@ export class ClaudeAgent extends AbstractAgent {
      * If a signature is missing, the thinking block is dropped to ensure API validity.
      */
     private convertToAnthropicMessagesWithThinking(messages: AIMessage[]): AnthropicMessage[] {
-        return messages.map(msg => {
+        // Track thinking stats for aggregated logging
+        let assistantMsgCount = 0;
+        let withThinking = 0;
+        let withValidAnthropicSig = 0;
+        let droppedGoogleSig = 0;
+        let droppedNoSig = 0;
+
+        const result = messages.map(msg => {
             const role = this.convertRole(msg.role);
 
             if (role === 'assistant') {
+                assistantMsgCount++;
+
                 // Assistant messages need thinking blocks with signatures when thinking is enabled.
                 // SAFEGUARD: If we have thinking but NO SIGNATURE, we must drop the thinking block
                 // to prevent an API error, sending only the text content.
                 if (msg.thinking && msg.anthropicThinkingSignature) {
+                    withThinking++;
+                    withValidAnthropicSig++;
                     const thinkingBlock: ThinkingBlock = {
                         type: 'thinking',
                         thinking: msg.thinking,
@@ -94,7 +105,17 @@ export class ClaudeAgent extends AbstractAgent {
                     ];
                     return { role, content: contentBlocks };
                 }
-                
+
+                // Track dropped thinking
+                if (msg.thinking) {
+                    withThinking++;
+                    if (msg.googleThoughtSignature) {
+                        droppedGoogleSig++;
+                    } else {
+                        droppedNoSig++;
+                    }
+                }
+
                 // Fallback for text-only messages or messages with missing signatures
                 return { role, content: msg.content };
             }
@@ -102,6 +123,19 @@ export class ClaudeAgent extends AbstractAgent {
             // User messages remain as simple strings
             return { role, content: msg.content };
         });
+
+        // Log aggregated thinking stats once
+        if (withThinking > 0) {
+            const dropped = droppedGoogleSig + droppedNoSig;
+            let dropReason = '';
+            if (droppedGoogleSig > 0) dropReason += `${droppedGoogleSig} with Google signature`;
+            if (droppedNoSig > 0) dropReason += `${droppedNoSig > 0 && droppedGoogleSig > 0 ? ', ' : ''}${droppedNoSig} without signature`;
+
+            this.logger(`📊 Thinking history: ${assistantMsgCount} assistant msgs, ${withThinking} with thinking, ` +
+                `${withValidAnthropicSig} included, ${dropped} dropped${dropped > 0 ? ` (${dropReason})` : ''}`);
+        }
+
+        return result;
     }
 
     private convertRole(role: string): AnthropicRole {
@@ -204,7 +238,7 @@ export class ClaudeAgent extends AbstractAgent {
                 throw new Error(this.errorMessages.invalidFormat);
             }
 
-            this.logReply(textContent);
+            this.logReply(textContent, thinkingContent || undefined);
 
             // Parse and validate the response using Zod
             let parsedContent: unknown;
