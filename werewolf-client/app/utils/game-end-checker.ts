@@ -76,6 +76,7 @@ class HumanEliminatedChecker implements WinConditionChecker {
             case GAME_ROLES.WEREWOLF: return '🐺';
             case GAME_ROLES.DOCTOR: return '🏥';
             case GAME_ROLES.DETECTIVE: return '🔍';
+            case GAME_ROLES.MANIAC: return '🔪';
             case GAME_ROLES.VILLAGER: return '👤';
             default: return '❓';
         }
@@ -141,6 +142,7 @@ class VillagersWinChecker implements WinConditionChecker {
             case GAME_ROLES.WEREWOLF: return '🐺';
             case GAME_ROLES.DOCTOR: return '🏥';
             case GAME_ROLES.DETECTIVE: return '🔍';
+            case GAME_ROLES.MANIAC: return '🔪';
             case GAME_ROLES.VILLAGER: return '👤';
             default: return '❓';
         }
@@ -206,6 +208,7 @@ class WerewolvesWinChecker implements WinConditionChecker {
             case GAME_ROLES.WEREWOLF: return '🐺';
             case GAME_ROLES.DOCTOR: return '🏥';
             case GAME_ROLES.DETECTIVE: return '🔍';
+            case GAME_ROLES.MANIAC: return '🔪';
             case GAME_ROLES.VILLAGER: return '👤';
             default: return '❓';
         }

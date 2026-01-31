@@ -48,6 +48,7 @@ export const LLM_CONSTANTS = {
     GROK_4_1_FAST_REASONING: 'Grok 4.1 Fast Reasoning',
     KIMI_K2: 'Kimi K2',
     KIMI_K2_THINKING: 'Kimi K2 Thinking',
+    KIMI_K2_5: 'Kimi K2.5',
     RANDOM: 'Random',
 }
 
@@ -266,6 +267,15 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
             maxBotsPerGame: -1
         }
     },
+    [LLM_CONSTANTS.KIMI_K2_5]: {
+        modelApiName: 'kimi-k2.5',
+        apiKeyName: API_KEY_CONSTANTS.MOONSHOT,
+        hasThinking: false,
+        freeTier: {
+            available: false,
+            maxBotsPerGame: 0
+        }
+    },
 };
 
 export type LLMModel = keyof typeof SupportedAiModels;
@@ -328,6 +338,11 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
         inputPrice: 0.6,
         outputPrice: 2.50,
         cacheHitPrice: 0.15
+    },
+    [SupportedAiModels[LLM_CONSTANTS.KIMI_K2_5].modelApiName]: {
+        inputPrice: 0.60,
+        outputPrice: 3.00,
+        cacheHitPrice: 0.10
     },
 
     // Anthropic models

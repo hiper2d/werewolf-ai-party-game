@@ -18,6 +18,7 @@ import {
     RECIPIENT_ALL,
     RECIPIENT_DETECTIVE,
     RECIPIENT_DOCTOR,
+    RECIPIENT_MANIAC,
     RECIPIENT_WEREWOLVES,
     ROLE_CONFIGS,
     SystemErrorMessage,
@@ -200,6 +201,9 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
     }
     if (gamePreview.specialRoles.includes(GAME_ROLES.DETECTIVE)) {
         gameRoleConfigs.push(ROLE_CONFIGS[GAME_ROLES.DETECTIVE]);
+    }
+    if (gamePreview.specialRoles.includes(GAME_ROLES.MANIAC)) {
+        gameRoleConfigs.push(ROLE_CONFIGS[GAME_ROLES.MANIAC]);
     }
     
     // Format role configurations for the prompt
@@ -400,6 +404,9 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
         }
         if (gamePreview.specialRoles.includes(GAME_ROLES.DETECTIVE)) {
             roleDistribution.push(GAME_ROLES.DETECTIVE);
+        }
+        if (gamePreview.specialRoles.includes(GAME_ROLES.MANIAC)) {
+            roleDistribution.push(GAME_ROLES.MANIAC);
         }
         roleDistribution.push(...Array(werewolfCount).fill(GAME_ROLES.WEREWOLF));    
         const villagersNeeded = totalPlayers - roleDistribution.length;
@@ -652,6 +659,8 @@ export async function getBotMessages(gameId: string, botName: string, day: numbe
                        (botName === game.humanPlayerName && game.humanPlayerRole === GAME_ROLES.DETECTIVE);
     const isDoctor = bot?.role === GAME_ROLES.DOCTOR ||
                     (botName === game.humanPlayerName && game.humanPlayerRole === GAME_ROLES.DOCTOR);
+    const isManiac = bot?.role === GAME_ROLES.MANIAC ||
+                    (botName === game.humanPlayerName && game.humanPlayerRole === GAME_ROLES.MANIAC);
 
     const allMessages: GameMessage[] = [];
 
@@ -727,6 +736,18 @@ export async function getBotMessages(gameId: string, botName: string, day: numbe
                 .collection('messages')
                 .where('day', '==', day)
                 .where('recipientName', '==', RECIPIENT_DOCTOR)
+                .orderBy('timestamp', 'asc')
+        );
+    }
+
+    // Add maniac-only messages if this bot is a maniac
+    if (isManiac) {
+        queries.push(
+            db.collection('games')
+                .doc(gameId)
+                .collection('messages')
+                .where('day', '==', day)
+                .where('recipientName', '==', RECIPIENT_MANIAC)
                 .orderBy('timestamp', 'asc')
         );
     }
@@ -860,7 +881,7 @@ export async function afterGameDiscussion(gameId: string): Promise<Game> {
         const roleReveal = allPlayerRoles
             .map(p => {
                 const eliminatedNote = p.wasEliminated ? ' (was eliminated)' : '';
-                const roleEmoji = p.role === 'werewolf' ? '🐺' : p.role === 'doctor' ? '🏥' : p.role === 'detective' ? '🔍' : '👤';
+                const roleEmoji = p.role === 'werewolf' ? '🐺' : p.role === 'doctor' ? '🏥' : p.role === 'detective' ? '🔍' : p.role === 'maniac' ? '🔪' : '👤';
                 return `• ${p.name}: ${roleEmoji} **${p.role}**${eliminatedNote}`;
             })
             .join('\n');
@@ -951,6 +972,7 @@ function serializeMessageForFirestore(gameMessage: GameMessage) {
              gameMessage.messageType === MessageType.VOTE_MESSAGE ||
              gameMessage.messageType === MessageType.WEREWOLF_ACTION ||
              gameMessage.messageType === MessageType.DOCTOR_ACTION ||
+             gameMessage.messageType === MessageType.MANIAC_ACTION ||
              gameMessage.messageType === MessageType.NIGHT_SUMMARY
             ? gameMessage.msg  // keep as object
             : gameMessage.msg as string,  // it's a string for most other message types
@@ -1011,6 +1033,10 @@ function gameFromFirestore(id: string, data: any): Game {
         createdAt: data.createdAt || extractTimestampFromGameId(id), // Use stored timestamp or extract from ID for existing games
         totalGameCost: data.totalGameCost || 0,
         gameMasterTokenUsage: data.gameMasterTokenUsage || data.tokenUsage?.gameMasterUsage || null,
-        createdWithTier: data.createdWithTier || 'free'
+        createdWithTier: data.createdWithTier || 'free',
+        votingHistory: data.votingHistory || [],
+        nightNarratives: data.nightNarratives || [],
+        oneTimeAbilitiesUsed: data.oneTimeAbilitiesUsed || {},
+        resolvedNightState: data.resolvedNightState || null
     };
 }

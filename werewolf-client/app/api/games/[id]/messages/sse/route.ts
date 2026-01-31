@@ -1,6 +1,6 @@
 import {NextRequest} from 'next/server';
 import {db} from "@/firebase/server";
-import {RECIPIENT_ALL, RECIPIENT_WEREWOLVES, RECIPIENT_DOCTOR, RECIPIENT_DETECTIVE, GameMessage, MessageType, GAME_ROLES} from "@/app/api/game-models";
+import {RECIPIENT_ALL, RECIPIENT_WEREWOLVES, RECIPIENT_DOCTOR, RECIPIENT_DETECTIVE, RECIPIENT_MANIAC, GameMessage, MessageType, GAME_ROLES} from "@/app/api/game-models";
 import {auth} from "@/auth";
 import {getGame, getUserFromFirestore} from "@/app/api/game-actions";
 
@@ -49,6 +49,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
                 allowedRecipients.push(RECIPIENT_DOCTOR);
             } else if (humanPlayerRole === GAME_ROLES.DETECTIVE) {
                 allowedRecipients.push(RECIPIENT_DETECTIVE);
+            } else if (humanPlayerRole === GAME_ROLES.MANIAC) {
+                allowedRecipients.push(RECIPIENT_MANIAC);
             }
 
             // Create single query with proper chronological ordering

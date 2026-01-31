@@ -32,14 +32,17 @@ Your paramount objective is to blend in seamlessly as another player while pursu
 **Teams:**
 - **Werewolves:** Secret team that knows each other's identities from the start, must deceive others, win by elimination/outnumbering
 - **Villagers:** Majority team, must deduce Werewolves through discussion, win by eliminating all Werewolves
-- **Doctor:** Village-aligned, saves one player per night
-- **Detective:** Village-aligned, investigates one player's role per night
+
+**Special Roles (Village-aligned):**
+- **Doctor:** Each night, protects one player from werewolf attacks. Cannot protect the same player two nights in a row. Has a ONE-TIME "Doctor's Mistake" ability to kill a player instead of protecting.
+- **Detective:** Each night, investigates one player to learn their true role. Use this information strategically without revealing your role.
+- **Maniac:** Each night, abducts one player for the entire night. The abducted player's night action fails, and any actions targeting them also fail. Cannot abduct the same player twice in a row. If the Maniac dies at night, the abducted victim dies too. Abductions are secret and not announced.
 
 **Game Flow:**
 
 *Day Phase:* Players discuss recent events, share information, make accusations, and defend themselves. Discussion concludes with a voting phase where all players vote to eliminate one suspected player. **CRITICAL: Role-play stories are just flavor - suspicious behavior means tactical inconsistencies, voting patterns, contradictory claims, and strategic motivations. Do NOT obsess over story details or demand "proof" of personal narratives.*
 
-*Night Phase:* All players "sleep." Werewolves wake up together and can chat privately to coordinate their target choice and discuss strategy. Doctor saves someone, Detective investigates. Actions resolve before the next day phase.
+*Night Phase:* All players "sleep." Special roles act in order: Maniac abducts first (blocking all actions involving that player), then Werewolves choose a target, Doctor protects someone, and Detective investigates. Actions resolve before the next day phase.
 
 **Victory Conditions:**
 - Werewolves win when they equal/outnumber Villagers
@@ -279,6 +282,30 @@ Consider:
 
 Your response must be a valid JSON object with your target choice and reasoning.`;
 
+export const BOT_MANIAC_ACTION_PROMPT: string = `🎭 **Night Phase - Maniac Abduction**
+
+%bot_name%, the night has fallen and it's time for you to act. As the Maniac, you have a unique ability to ABDUCT one player for the entire night.
+
+**IMPORTANT RULES:**
+- You can abduct any living player except yourself
+- The abducted player's night action will FAIL (if they have one)
+- Any role trying to target the abducted player will FAIL (werewolf kill, doctor protect, detective investigate)
+- You CANNOT abduct the same player two nights in a row
+- If YOU die tonight (from werewolf attack), your abducted victim ALSO DIES with you
+- Your abduction is SECRET - it will NOT be announced in the morning narrative
+- You WIN with the villagers - help them by strategically blocking werewolves or protecting key players
+
+**Strategic Considerations:**
+- Abducting the werewolf target saves that player (werewolf attack fails)
+- Abducting a werewolf prevents them from participating in the kill (but if there are multiple werewolves, they can still act)
+- Abducting the doctor or detective prevents their night action
+- If you suspect someone is a werewolf, abducting them could disrupt their plans
+- Consider who the werewolves might target and abduct that person to save them
+
+**Your Goal:** Use your abduction strategically to help the village team win while staying alive.
+
+Your response must be a valid JSON object with your target choice and reasoning.`;
+
 export const BOT_DETECTIVE_ACTION_PROMPT: string = `🔍 **Night Phase - Detective Investigation**
 
 %bot_name%, the night has fallen and it's time for you to investigate a player. As the Detective, you must choose one player to investigate and learn their true role.
@@ -332,7 +359,8 @@ export const BOT_DAY_SUMMARY_PROMPT: string = `**End of Day %day_number% - Updat
 **3. ROLE-SPECIFIC KNOWLEDGE** (CRITICAL - review the data provided above your previous summary)
 - **DETECTIVE:** Your investigation results are tracked for you. Summarize: CONFIRMED WEREWOLVES to eliminate, CLEARED PLAYERS to trust/protect, and WHO TO INVESTIGATE NEXT
 - **WEREWOLF:** Coordination with teammates, which innocents are threats, who suspects you
-- **DOCTOR:** Your protection history is tracked. Note: who seems most at risk, protection priorities
+- **DOCTOR:** Your protection history is tracked. Note: who seems most at risk, protection priorities. Remember your one-time kill ability if not yet used.
+- **MANIAC:** Your abduction history is tracked. Note: who you've blocked, patterns in werewolf targets, strategic opportunities to disrupt werewolves or protect key players
 - **VILLAGER:** Patterns noticed, deductions from night events and votes
 
 **4. ROLE-PLAY & SOCIAL CONNECTIONS**

@@ -1,4 +1,5 @@
-import {BaseRoleProcessor, NightActionResult, NightOutcome} from "./base-role-processor";
+import {BaseRoleProcessor, NightActionResult, NightState} from "./base-role-processor";
+import {registerRoleProcessor, RoleProcessorFactory} from "./role-processor-factory";
 import {
     BotResponseError,
     GAME_MASTER,
@@ -29,28 +30,59 @@ export class DetectiveProcessor extends BaseRoleProcessor {
         super(gameId, game, GAME_ROLES.DETECTIVE);
     }
 
-    async getNightResultsOutcome(nightResults: any, currentOutcome: NightOutcome): Promise<Partial<NightOutcome>> {
-        const outcome: Partial<NightOutcome> = {};
+    /**
+     * Determines whether a role reads as "evil" to the detective.
+     * Werewolves are evil. Maniac also reads as evil to add ambiguity
+     * to detective results — the detective can't be 100% sure an "evil"
+     * result means werewolf.
+     */
+    private readsAsEvil(role: string): boolean {
+        return role === GAME_ROLES.WEREWOLF || role === GAME_ROLES.MANIAC;
+    }
 
-        if (nightResults.detective) {
-            outcome.detectiveWasActive = true;
-            const detectiveTarget = nightResults.detective.target;
+    /**
+     * Find the detective player name (bot or human).
+     */
+    private findDetectiveName(): string | null {
+        const detectiveBot = this.game.bots.find(b => b.isAlive && b.role === GAME_ROLES.DETECTIVE);
+        if (detectiveBot) return detectiveBot.name;
+        if (this.game.humanPlayerRole === GAME_ROLES.DETECTIVE) return this.game.humanPlayerName;
+        return null;
+    }
 
-            // Check if detective target died
-            outcome.detectiveTargetDied = currentOutcome.killedPlayer === detectiveTarget;
+    resolveNightAction(nightResults: any, state: NightState): void {
+        if (!nightResults.detective) return;
 
-            // Get the investigated player's role to determine if evil was found
-            let detectiveTargetRole: string;
-            if (detectiveTarget === this.game.humanPlayerName) {
-                detectiveTargetRole = this.game.humanPlayerRole;
-            } else {
-                const targetBot = this.game.bots.find(bot => bot.name === detectiveTarget);
-                detectiveTargetRole = targetBot ? targetBot.role : 'unknown';
-            }
-            outcome.detectiveFoundEvil = detectiveTargetRole === GAME_ROLES.WEREWOLF;
+        const detectiveName = this.findDetectiveName();
+        const detectiveTarget = nightResults.detective.target;
+
+        // If the detective was abducted, investigation fails
+        if (detectiveName && state.abductedPlayer === detectiveName) {
+            this.logNightAction(`Detective ${detectiveName} was abducted by Maniac — investigation fails`);
+            state.detectiveResult = { target: detectiveTarget, isEvil: false, success: false };
+            return;
         }
 
-        return outcome;
+        // If the detective died during the night (e.g. werewolf attack), investigation fails
+        if (detectiveName && state.deaths.some(d => d.player === detectiveName)) {
+            this.logNightAction(`Detective ${detectiveName} died during the night — investigation fails`);
+            state.detectiveResult = { target: detectiveTarget, isEvil: false, success: false };
+            return;
+        }
+
+        // If detective's target was abducted, investigation fails
+        if (state.abductedPlayer === detectiveTarget) {
+            this.logNightAction(`Detective investigation of ${detectiveTarget} failed - target was abducted by Maniac`);
+            state.detectiveResult = { target: detectiveTarget, isEvil: false, success: false };
+            return;
+        }
+
+        const targetRole = this.resolvePlayerRole(detectiveTarget);
+        state.detectiveResult = {
+            target: detectiveTarget,
+            isEvil: this.readsAsEvil(targetRole),
+            success: true
+        };
     }
 
     async processNightAction(): Promise<NightActionResult> {
@@ -72,6 +104,26 @@ export class DetectiveProcessor extends BaseRoleProcessor {
             // Get the current detective from the param queue
             const detectiveName = this.game.gameStateParamQueue[0];
             const remainingQueue = this.game.gameStateParamQueue.slice(1);
+
+            // Pre-check: resolve night state up to (but not including) detective
+            // to see if the detective is dead or abducted — skip entirely if so
+            const preState = RoleProcessorFactory.resolveNightState(
+                this.gameId, this.game, GAME_ROLES.DETECTIVE
+            );
+            if (preState.abductedPlayer === detectiveName) {
+                this.logNightAction(`Detective ${detectiveName} was abducted by Maniac — skipping their action`);
+                return {
+                    success: true,
+                    gameUpdates: { gameStateParamQueue: remainingQueue }
+                };
+            }
+            if (preState.deaths.some(d => d.player === detectiveName)) {
+                this.logNightAction(`Detective ${detectiveName} will die tonight — skipping their action`);
+                return {
+                    success: true,
+                    gameUpdates: { gameStateParamQueue: remainingQueue }
+                };
+            }
 
             this.logNightAction(`Detective (${detectiveName}) is taking their night action`);
 
@@ -166,6 +218,9 @@ export class DetectiveProcessor extends BaseRoleProcessor {
                 );
             }
 
+            // Check if target was abducted by maniac (investigation fails)
+            const targetAbducted = preState.abductedPlayer === detectiveResponse.target;
+
             // Get the target's role for investigation result
             let targetRole: string;
             if (detectiveResponse.target === this.game.humanPlayerName) {
@@ -180,11 +235,12 @@ export class DetectiveProcessor extends BaseRoleProcessor {
             currentNightResults[GAME_ROLES.DETECTIVE] = { target: detectiveResponse.target };
 
             // Store investigation result in detective bot's roleKnowledge
-            // Detective only learns if target is a werewolf, not their actual role
+            // If target was abducted, investigation fails (success: false)
             const investigation: DetectiveInvestigation = {
                 day: this.game.currentDay,
                 target: detectiveResponse.target,
-                isWerewolf: targetRole === GAME_ROLES.WEREWOLF
+                isEvil: targetAbducted ? false : this.readsAsEvil(targetRole),
+                success: !targetAbducted  // Investigation fails if target was abducted
             };
 
             // Update the detective bot's roleKnowledge
@@ -203,9 +259,15 @@ export class DetectiveProcessor extends BaseRoleProcessor {
             });
 
             // Create detective response message with investigation result (sent only to the detective)
+            // Result shows "evil" or "innocent" — not the actual role — to preserve ambiguity
+            const isEvil = this.readsAsEvil(targetRole);
+            const investigationResultMessage = targetAbducted
+                ? `Investigation FAILED: ${detectiveResponse.target} could not be found tonight (they were abducted by the Maniac)`
+                : `Investigation reveals: ${detectiveResponse.target} appears to be ${isEvil ? '**evil**' : '**innocent**'}`;
+
             const investigationResult = {
                 ...detectiveResponse,
-                result: `Investigation reveals: ${detectiveResponse.target} is a ${targetRole.charAt(0).toUpperCase() + targetRole.slice(1)}`,
+                result: investigationResultMessage,
                 thinking: thinking || "",
                 ...getProviderSignatureFields(detectiveBot.aiType, thinkingSignature)
             };
@@ -249,3 +311,6 @@ export class DetectiveProcessor extends BaseRoleProcessor {
         }
     }
 }
+
+// Register this processor
+registerRoleProcessor(GAME_ROLES.DETECTIVE, DetectiveProcessor);

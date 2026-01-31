@@ -42,18 +42,33 @@ export interface RolePlayersInfo {
 }
 
 /**
- * Accumulated outcome of night actions
+ * A single death that occurred during the night
  */
-export interface NightOutcome {
-    killedPlayer: string | null;
-    killedPlayerRole: string | null;
-    wasKillPrevented: boolean;
-    noWerewolfActivity: boolean;
-    detectiveFoundEvil: boolean;
-    detectiveTargetDied: boolean;
-    detectiveWasActive: boolean;
-    doctorWasActive: boolean;
-    [key: string]: any; // Allow for future extensibility
+export interface NightDeath {
+    player: string;
+    role: string;
+    cause: 'werewolf_attack' | 'doctor_kill' | 'maniac_collateral';
+}
+
+/**
+ * Result of the detective's investigation
+ */
+export interface DetectiveResult {
+    target: string;
+    isEvil: boolean; // true for werewolf AND maniac — detective can't distinguish them
+    success: boolean; // false if blocked by abduction
+}
+
+/**
+ * Shared mutable state that role processors populate in order during night resolution.
+ * After all processors run, `deaths` contains the definitive list of who dies.
+ */
+export interface NightState {
+    deaths: NightDeath[];
+    abductedPlayer: string | null;
+    detectiveResult: DetectiveResult | null;
+    werewolfKillPrevented: boolean;  // for narrative flavor
+    noWerewolfActivity: boolean;     // sole wolf abducted or no wolves alive
 }
 
 /**
@@ -75,8 +90,14 @@ export abstract class BaseRoleProcessor {
      * Initialize the role processor when it's activated for the first time
      * Announces the role turn and sets up the parameter queue
      * This is called once per role per night, before any processNightAction() calls
+     *
+     * @param preState Optional NightState resolved up to (but not including) this role.
+     *                 When provided, players who can't act are filtered out of the queue:
+     *                 - Abducted players are always removed
+     *                 - Dead players are removed UNLESS this is the doctor role
+     *                   (doctor can save themselves even if targeted by werewolves)
      */
-    async init(): Promise<RoleInitResult> {
+    async init(preState?: NightState): Promise<RoleInitResult> {
         try {
             // Announce that it's this role's turn
             await this.announceRoleTurn();
@@ -91,7 +112,23 @@ export abstract class BaseRoleProcessor {
             }
 
             // Create parameter queue for this role
-            const paramQueue = this.createParamQueue(playersInfo);
+            let paramQueue = this.createParamQueue(playersInfo);
+
+            // Filter out players who can't act this night
+            if (preState) {
+                paramQueue = paramQueue.filter(playerName => {
+                    if (preState.abductedPlayer === playerName) {
+                        this.logNightAction(`${playerName} is abducted — removed from queue`);
+                        return false;
+                    }
+                    // Doctor is NOT filtered on death — they can save themselves
+                    if (this.roleName !== GAME_ROLES.DOCTOR && preState.deaths.some(d => d.player === playerName)) {
+                        this.logNightAction(`${playerName} is dead — removed from queue`);
+                        return false;
+                    }
+                    return true;
+                });
+            }
 
             this.logNightAction(`Initialized with ${paramQueue.length} players in queue: [${paramQueue.join(', ')}]`);
 
@@ -134,14 +171,25 @@ export abstract class BaseRoleProcessor {
     abstract processNightAction(): Promise<NightActionResult>;
 
     /**
-     * Calculate the outcome of this role's night action based on all night results
-     * This is called at the end of the night to generate the final summary
+     * Mutate the shared NightState based on this role's night results.
+     * Called in nightActionOrder after all processNightAction() calls are done.
+     * Default implementation is a no-op.
      * @param nightResults The complete map of night results from all roles
-     * @param currentOutcome The accumulated outcome so far
+     * @param state The shared NightState to mutate
      */
-    async getNightResultsOutcome(nightResults: any, currentOutcome: NightOutcome): Promise<Partial<NightOutcome>> {
-        // Default implementation returns no changes
-        return {};
+    resolveNightAction(nightResults: any, state: NightState): void {
+        // Default: no-op
+    }
+
+    /**
+     * Resolve a player name to their role string.
+     */
+    protected resolvePlayerRole(name: string): string {
+        if (name === this.game.humanPlayerName) {
+            return this.game.humanPlayerRole;
+        }
+        const bot = this.game.bots.find(b => b.name === name);
+        return bot ? bot.role : 'unknown';
     }
 
     /**

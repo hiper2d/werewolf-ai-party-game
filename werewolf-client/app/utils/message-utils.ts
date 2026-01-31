@@ -24,9 +24,20 @@ export function convertMessageContent(message: GameMessage): string {
             return `Selected ${werewolfMsg.target} for elimination. Reasoning: ${werewolfMsg.reasoning}`;
         
         case MessageType.DOCTOR_ACTION:
-            const doctorMsg = message.msg as { target: string; reasoning: string };
+            const doctorMsg = message.msg as { target: string; reasoning: string; action_type?: string };
+            if (doctorMsg.action_type === 'kill') {
+                return `Used Doctor's Mistake to kill ${doctorMsg.target}. Reasoning: ${doctorMsg.reasoning}`;
+            }
             return `Protected ${doctorMsg.target} from werewolf attacks. Reasoning: ${doctorMsg.reasoning}`;
-        
+
+        case MessageType.MANIAC_ACTION:
+            const maniacMsg = message.msg as { target: string; reasoning: string };
+            return `Abducted ${maniacMsg.target} for the night. Reasoning: ${maniacMsg.reasoning}`;
+
+        case MessageType.DETECTIVE_ACTION:
+            const detectiveMsg = message.msg as { target: string; reasoning: string };
+            return `Investigated ${detectiveMsg.target}. Reasoning: ${detectiveMsg.reasoning}`;
+
         case MessageType.GAME_STORY:
             const storyMsg = message.msg as { story: string };
             return storyMsg.story;
@@ -144,11 +155,27 @@ export function convertToAIMessages(currentBotName: string, messages: GameMessag
                 anthropicThinkingSignature = werewolfMsg.anthropicThinkingSignature;
                 googleThoughtSignature = werewolfMsg.googleThoughtSignature;
             } else if (message.messageType === MessageType.DOCTOR_ACTION) {
-                const doctorMsg = message.msg as { target: string; reasoning: string; thinking?: string; anthropicThinkingSignature?: string; googleThoughtSignature?: string };
-                content = `Protected ${doctorMsg.target} from werewolf attacks. Reasoning: ${doctorMsg.reasoning}`;
+                const doctorMsg = message.msg as { target: string; reasoning: string; action_type?: string; thinking?: string; anthropicThinkingSignature?: string; googleThoughtSignature?: string };
+                if (doctorMsg.action_type === 'kill') {
+                    content = `Used Doctor's Mistake to kill ${doctorMsg.target}. Reasoning: ${doctorMsg.reasoning}`;
+                } else {
+                    content = `Protected ${doctorMsg.target} from werewolf attacks. Reasoning: ${doctorMsg.reasoning}`;
+                }
                 thinking = doctorMsg.thinking;
                 anthropicThinkingSignature = doctorMsg.anthropicThinkingSignature;
                 googleThoughtSignature = doctorMsg.googleThoughtSignature;
+            } else if (message.messageType === MessageType.MANIAC_ACTION) {
+                const maniacMsg = message.msg as { target: string; reasoning: string; thinking?: string; anthropicThinkingSignature?: string; googleThoughtSignature?: string };
+                content = `Abducted ${maniacMsg.target} for the night. Reasoning: ${maniacMsg.reasoning}`;
+                thinking = maniacMsg.thinking;
+                anthropicThinkingSignature = maniacMsg.anthropicThinkingSignature;
+                googleThoughtSignature = maniacMsg.googleThoughtSignature;
+            } else if (message.messageType === MessageType.DETECTIVE_ACTION) {
+                const detectiveMsg = message.msg as { target: string; reasoning: string; thinking?: string; anthropicThinkingSignature?: string; googleThoughtSignature?: string };
+                content = `Investigated ${detectiveMsg.target}. Reasoning: ${detectiveMsg.reasoning}`;
+                thinking = detectiveMsg.thinking;
+                anthropicThinkingSignature = detectiveMsg.anthropicThinkingSignature;
+                googleThoughtSignature = detectiveMsg.googleThoughtSignature;
             } else if (message.messageType === MessageType.VOTE_MESSAGE) {
                 const voteMsg = message.msg as { who: string; why: string; thinking?: string; anthropicThinkingSignature?: string; googleThoughtSignature?: string };
                 content = `🗳️ Votes for ${voteMsg.who}: "${voteMsg.why}"`;
@@ -187,59 +214,46 @@ export function convertToAIMessage(message: GameMessage): AIMessage {
  * @param messages - Array of game messages to convert
  * @returns Array of AIMessages suitable for Game Master AI communication
  */
-export function convertToGMMessages(messages: GameMessage[]): AIMessage[] {
-    let playerMessages: { name: string; message: string }[] = [];
-    let aiMessages: AIMessage[] = [];
+/**
+ * Formats player discussion messages for GM bot selection.
+ * GM sees the conversation and picks which bots should respond next.
+ * Returns a single user message with player discussion + selection task.
+ */
+export function formatMessagesForBotSelection(messages: GameMessage[], selectionCommand: string): AIMessage[] {
+    const playerMessages: { name: string; message: string }[] = [];
 
-    function flushPlayerMessages() {
-        if (playerMessages.length > 0) {
-            let playerBlock = `## Player Messages\n\n`;
-            playerMessages.forEach((pair, index) => {
-                playerBlock += `**${index + 1}. ${pair.name}:** ${pair.message}\n\n`;
-            });
-            playerMessages = [];
-            aiMessages.push({ role: MESSAGE_ROLE.USER, content: playerBlock.trim() });
-        }
-    }
-
+    // Collect only player messages (not GM messages)
     messages.forEach((message) => {
-        let content: string;
-        let thinking: string | undefined;
-        let anthropicThinkingSignature: string | undefined;
-        let googleThoughtSignature: string | undefined;
-
-        if (message.authorName === GAME_MASTER) {
-            // Flush any accumulated player messages before adding GM message
-            flushPlayerMessages();
-
-            // Game Master messages are assistant messages
-            if (message.messageType === MessageType.GAME_STORY) {
-                const storyMsg = message.msg as { story: string; thinking?: string; anthropicThinkingSignature?: string; googleThoughtSignature?: string };
-                content = storyMsg.story;
-                thinking = storyMsg.thinking;
-                anthropicThinkingSignature = storyMsg.anthropicThinkingSignature;
-                googleThoughtSignature = storyMsg.googleThoughtSignature;
-            } else if (message.messageType === MessageType.NIGHT_SUMMARY) {
-                const summaryMsg = message.msg as { story: string; thinking?: string; anthropicThinkingSignature?: string; googleThoughtSignature?: string };
-                content = summaryMsg.story;
-                thinking = summaryMsg.thinking;
-                anthropicThinkingSignature = summaryMsg.anthropicThinkingSignature;
-                googleThoughtSignature = summaryMsg.googleThoughtSignature;
-            } else {
-                content = typeof message.msg === 'string' ? message.msg : JSON.stringify(message.msg);
-            }
-            aiMessages.push({ role: MESSAGE_ROLE.ASSISTANT, content: content, thinking, anthropicThinkingSignature, googleThoughtSignature });
-        } else {
-            // All player messages (bots + human) are grouped as user messages
-            content = convertMessageContent(message);
+        if (message.authorName !== GAME_MASTER) {
+            const content = convertMessageContent(message);
             playerMessages.push({ name: message.authorName, message: content });
         }
     });
 
-    // Flush any remaining player messages
-    flushPlayerMessages();
+    // Build the content
+    let content = '';
 
-    return aiMessages;
+    if (playerMessages.length > 0) {
+        content += `## Recent Discussion\n\n`;
+        playerMessages.forEach((pair, index) => {
+            content += `**${index + 1}. ${pair.name}:** ${pair.message}\n\n`;
+        });
+    }
+
+    content += `## Your Task\n\n${selectionCommand}`;
+
+    return [{ role: MESSAGE_ROLE.USER, content: content.trim() }];
+}
+
+/**
+ * Formats night results data for GM story generation.
+ * GM receives voting results and night action outcomes to create a narrative.
+ * Returns a single user message with the results + story generation task.
+ */
+export function formatMessagesForNightSummary(nightResultsCommand: string): AIMessage[] {
+    // The night results command already contains all the necessary info
+    // (voting results, night actions, who died, etc.)
+    return [{ role: MESSAGE_ROLE.USER, content: nightResultsCommand }];
 }
 
 export function cleanResponse(response: string): string {

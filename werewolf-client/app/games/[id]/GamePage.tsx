@@ -73,27 +73,25 @@ function GamePageContent({
 
     // Helper function to simulate game state after applying night results
     const simulateNightResults = useMemo(() => {
-        if (game.gameState !== GAME_STATES.NIGHT_RESULTS || !game.nightResults) {
+        if (game.gameState !== GAME_STATES.NIGHT_RESULTS || !game.resolvedNightState) {
             return game;
         }
 
-        // Simulate elimination of werewolf target if not protected
-        const nightResults = game.nightResults;
-        let simulatedBots = [...game.bots];
+        const deaths = game.resolvedNightState.deaths || [];
+        const deadNames = new Set(deaths.map(d => d.player));
 
-        if (nightResults.werewolf && nightResults.werewolf.target) {
-            const targetName = nightResults.werewolf.target;
-            const doctorProtectedTarget = nightResults.doctor && nightResults.doctor.target === targetName;
+        // Mark killed bots as dead
+        let simulatedBots = game.bots.map(bot =>
+            deadNames.has(bot.name) ? { ...bot, isAlive: false } : bot
+        );
 
-            if (!doctorProtectedTarget) {
-                // Eliminate the target in simulation
-                simulatedBots = simulatedBots.map(bot => {
-                    if (bot.name === targetName) {
-                        return { ...bot, isAlive: false };
-                    }
-                    return bot;
-                });
-            }
+        // If the human player died, add them as a pseudo-bot entry
+        // so HumanEliminatedChecker (which searches game.bots by name) can detect it
+        if (deadNames.has(game.humanPlayerName)) {
+            simulatedBots = [
+                ...simulatedBots,
+                { name: game.humanPlayerName, role: game.humanPlayerRole, isAlive: false } as any
+            ];
         }
 
         return { ...game, bots: simulatedBots };

@@ -16,6 +16,7 @@ import {
     RECIPIENT_ALL,
     RECIPIENT_DETECTIVE,
     RECIPIENT_DOCTOR,
+    RECIPIENT_MANIAC,
     RECIPIENT_WEREWOLVES,
     VotingDayResult
 } from "@/app/api/game-models";
@@ -32,7 +33,7 @@ import {format} from "@/app/ai/prompts/utils";
 import {auth} from "@/auth";
 import {
     convertToAIMessages,
-    convertToGMMessages,
+    formatMessagesForBotSelection,
     generateEliminationMessage,
     generateVotingResultsMessage,
     parseResponseToObj
@@ -560,18 +561,10 @@ async function keepBotsGoingImpl(gameId: string): Promise<Game> {
             .join(", ");
 
         const gmAgent = AgentFactory.createAgent(GAME_MASTER, gmPrompt, game.gameMasterAiType, apiKeys, false);
-        const gmMessage: GameMessage = {
-            id: null,
-            recipientName: GAME_MASTER,
-            authorName: GAME_MASTER,
-            msg: format(GM_COMMAND_SELECT_RESPONDERS, { candidate_names: candidateNames }),
-            messageType: MessageType.GM_COMMAND,
-            day: game.currentDay,
-            timestamp: Date.now()
-        };
+        const selectionCommand = format(GM_COMMAND_SELECT_RESPONDERS, { candidate_names: candidateNames });
 
         // Include recent conversation in the GM's history for bot selection
-        const history = convertToGMMessages([...dayMessages, gmMessage]);
+        const history = formatMessagesForBotSelection(dayMessages, selectionCommand);
         const [gmResponse, , tokenUsage] = await gmAgent.askWithZodSchema(GmBotSelectionZodSchema, history);
         if (!gmResponse) {
             throw new BotResponseError(
@@ -735,18 +728,10 @@ async function handleHumanPlayerMessage(
         .join(", ");
 
     const gmAgent = AgentFactory.createAgent(GAME_MASTER, gmPrompt, game.gameMasterAiType, apiKeys, false);
-    const gmMessage: GameMessage = {
-        id: null,
-        recipientName: GAME_MASTER,
-        authorName: GAME_MASTER,
-        msg: format(GM_COMMAND_SELECT_RESPONDERS, { candidate_names: candidateNames }),
-        messageType: MessageType.GM_COMMAND,
-        day: game.currentDay,
-        timestamp: Date.now()
-    };
+    const selectionCommand = format(GM_COMMAND_SELECT_RESPONDERS, { candidate_names: candidateNames });
 
     // Include the user's message in the GM's history for bot selection
-    const history = convertToGMMessages([...dayMessages, userChatMessage, gmMessage]);
+    const history = formatMessagesForBotSelection([...dayMessages, userChatMessage], selectionCommand);
     const [gmResponse, , tokenUsage] = await gmAgent.askWithZodSchema(GmBotSelectionZodSchema, history);
     if (!gmResponse) {
         throw new BotResponseError(
@@ -1524,6 +1509,9 @@ async function performHumanPlayerNightActionImpl(gameId: string, targetPlayer: s
         } else if (currentRole === GAME_ROLES.DETECTIVE) {
             recipient = RECIPIENT_DETECTIVE;
             messageType = MessageType.DETECTIVE_ACTION;
+        } else if (currentRole === GAME_ROLES.MANIAC) {
+            recipient = RECIPIENT_MANIAC;
+            messageType = MessageType.MANIAC_ACTION;
         } else {
             // Fallback for other roles
             recipient = RECIPIENT_ALL;

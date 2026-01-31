@@ -1,4 +1,5 @@
-import { BaseRoleProcessor, NightActionResult, RolePlayersInfo, NightOutcome } from "./base-role-processor";
+import { BaseRoleProcessor, NightActionResult, RolePlayersInfo, NightState } from "./base-role-processor";
+import { registerRoleProcessor } from "./role-processor-factory";
 import {
     BotAnswer,
     BotResponseError,
@@ -34,30 +35,45 @@ export class WerewolfProcessor extends BaseRoleProcessor {
         super(gameId, game, GAME_ROLES.WEREWOLF);
     }
 
-    async getNightResultsOutcome(nightResults: any, currentOutcome: NightOutcome): Promise<Partial<NightOutcome>> {
-        const outcome: Partial<NightOutcome> = {};
-
-        if (nightResults.werewolf) {
-            const werewolfTarget = nightResults.werewolf.target;
-            const wasProtected = nightResults.doctor && nightResults.doctor.target === werewolfTarget;
-
-            if (wasProtected) {
-                outcome.wasKillPrevented = true;
-            } else {
-                outcome.killedPlayer = werewolfTarget;
-                // Get the killed player's role
-                if (outcome.killedPlayer === this.game.humanPlayerName) {
-                    outcome.killedPlayerRole = this.game.humanPlayerRole;
-                } else {
-                    const killedBot = this.game.bots.find(bot => bot.name === outcome.killedPlayer);
-                    outcome.killedPlayerRole = killedBot ? killedBot.role : 'unknown';
-                }
-            }
-        } else {
-            outcome.noWerewolfActivity = true;
+    resolveNightAction(nightResults: any, state: NightState): void {
+        // 1. Check if sole remaining wolf was abducted → no werewolf activity
+        const aliveWolfNames = this.game.bots
+            .filter(b => b.isAlive && b.role === GAME_ROLES.WEREWOLF)
+            .map(b => b.name);
+        if (this.game.humanPlayerRole === GAME_ROLES.WEREWOLF) {
+            aliveWolfNames.push(this.game.humanPlayerName);
+        }
+        if (aliveWolfNames.length === 1 && state.abductedPlayer === aliveWolfNames[0]) {
+            state.noWerewolfActivity = true;
+            this.logNightAction(`Sole werewolf ${aliveWolfNames[0]} was abducted — no werewolf activity`);
+            return;
         }
 
-        return outcome;
+        // 2. No werewolf target was chosen (all wolves dead or no result)
+        if (!nightResults.werewolf || !nightResults.werewolf.target) {
+            state.noWerewolfActivity = true;
+            return;
+        }
+
+        const werewolfTarget = nightResults.werewolf.target;
+
+        // 3. Target was abducted — werewolf attack fails
+        if (state.abductedPlayer === werewolfTarget) {
+            state.werewolfKillPrevented = true;
+            this.logNightAction(`Werewolf attack on ${werewolfTarget} failed - target was abducted by Maniac`);
+            return;
+        }
+
+        // 4. Add werewolf kill to deaths (doctor may remove it later)
+        const victimRole = this.resolvePlayerRole(werewolfTarget);
+        state.deaths.push({ player: werewolfTarget, role: victimRole, cause: 'werewolf_attack' });
+
+        // 5. If victim is the maniac, their abducted victim also dies
+        if (victimRole === GAME_ROLES.MANIAC && state.abductedPlayer) {
+            const collateralRole = this.resolvePlayerRole(state.abductedPlayer);
+            state.deaths.push({ player: state.abductedPlayer, role: collateralRole, cause: 'maniac_collateral' });
+            this.logNightAction(`Maniac killed by werewolves - abducted victim ${state.abductedPlayer} also dies`);
+        }
     }
 
     /**
@@ -121,6 +137,29 @@ export class WerewolfProcessor extends BaseRoleProcessor {
             const remainingQueue = this.game.gameStateParamQueue.slice(1);
 
             this.logNightAction(`Processing action for werewolf: ${currentWerewolfName}`);
+
+            // Check if current werewolf is abducted by maniac
+            const abductedPlayer = this.game.nightResults?.maniac?.target;
+            if (abductedPlayer === currentWerewolfName) {
+                this.logNightAction(`Werewolf ${currentWerewolfName} was abducted by Maniac - skipping their action`);
+
+                // Check if this is the ONLY werewolf (or last werewolf in a sole-werewolf game)
+                // If so, and they're the decision maker, no kill happens
+                const aliveWerewolves = playersInfo.allPlayers.length;
+                const isLastInQueue = remainingQueue.length === 0;
+
+                if (aliveWerewolves === 1 && isLastInQueue) {
+                    this.logNightAction(`Sole werewolf was abducted - werewolf kill fails entirely`);
+                    // No target will be set - werewolf kill fails
+                }
+
+                return {
+                    success: true,
+                    gameUpdates: {
+                        gameStateParamQueue: remainingQueue
+                    }
+                };
+            }
 
             // Get the werewolf bot (skip if human player)
             const werewolfBot = playersInfo.bots.find(bot => bot.name === currentWerewolfName);
@@ -310,3 +349,6 @@ export class WerewolfProcessor extends BaseRoleProcessor {
     }
 
 }
+
+// Register this processor
+registerRoleProcessor(GAME_ROLES.WEREWOLF, WerewolfProcessor);

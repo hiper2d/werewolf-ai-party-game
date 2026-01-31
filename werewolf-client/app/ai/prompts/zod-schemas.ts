@@ -54,14 +54,21 @@ export const WerewolfActionZodSchema = z.object({
 
 // Doctor action schema
 export const DoctorActionZodSchema = z.object({
-  target: z.string().describe("The name of the player to protect from werewolf attacks"),
-  reasoning: z.string().describe("Reasoning for the protection choice")
+  target: z.string().describe("The name of the player to protect from werewolf attacks (or kill if using Doctor's Mistake)"),
+  reasoning: z.string().describe("Reasoning for the protection or kill choice"),
+  action_type: z.enum(['protect', 'kill']).optional().describe("The type of action: 'protect' (default) or 'kill' (one-time ability)")
 });
 
 // Detective action schema
 export const DetectiveActionZodSchema = z.object({
   target: z.string().describe("The name of the player to investigate and learn their role"),
   reasoning: z.string().describe("Reasoning for the investigation choice")
+});
+
+// Maniac action schema
+export const ManiacActionZodSchema = z.object({
+  target: z.string().describe("The name of the player to abduct for the night"),
+  reasoning: z.string().describe("Reasoning for the abduction choice")
 });
 
 // Night results story schema
@@ -80,6 +87,7 @@ export type BotVoteZod = z.infer<typeof BotVoteZodSchema>;
 export type WerewolfActionZod = z.infer<typeof WerewolfActionZodSchema>;
 export type DoctorActionZod = z.infer<typeof DoctorActionZodSchema>;
 export type DetectiveActionZod = z.infer<typeof DetectiveActionZodSchema>;
+export type ManiacActionZod = z.infer<typeof ManiacActionZodSchema>;
 export type NightResultsStoryZod = z.infer<typeof NightResultsStoryZodSchema>;
 
 // =============================================================================
@@ -127,6 +135,7 @@ export const ZodSchemaRegistry = {
   werewolf_action: WerewolfActionZodSchema,
   doctor_action: DoctorActionZodSchema,
   detective_action: DetectiveActionZodSchema,
+  maniac_action: ManiacActionZodSchema,
   night_results_story: NightResultsStoryZodSchema
 } as const;
 

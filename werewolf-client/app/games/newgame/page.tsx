@@ -23,7 +23,7 @@ export default function CreateNewGamePage() {
     const [description, setDescription] = useState('');
     const [playerCount, setPlayerCount] = useState(12);
     const [werewolfCount, setWerewolfCount] = useState(3);
-    const [specialRoles, setSpecialRoles] = useState([GAME_ROLES.DOCTOR, GAME_ROLES.DETECTIVE]);
+    const [specialRoles, setSpecialRoles] = useState([GAME_ROLES.DOCTOR, GAME_ROLES.DETECTIVE, GAME_ROLES.MANIAC]);
     const [gameMasterAiType, setGameMasterAiType] = useState<string>(LLM_CONSTANTS.RANDOM);
     const [selectedPlayerAiTypes, setSelectedPlayerAiTypes] = useState<string[]>(Object.values(LLM_CONSTANTS).filter(model => model !== LLM_CONSTANTS.RANDOM));
     const [isFormValid, setIsFormValid] = useState(false);
@@ -250,7 +250,7 @@ export default function CreateNewGamePage() {
         return null;
     };
 
-    const availableRoles = [GAME_ROLES.DOCTOR, GAME_ROLES.DETECTIVE];
+    const availableRoles = [GAME_ROLES.DOCTOR, GAME_ROLES.DETECTIVE, GAME_ROLES.MANIAC];
 
 
     const handleGeneratePreview = async () => {

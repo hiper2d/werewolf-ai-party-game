@@ -85,7 +85,7 @@ export interface GamePreviewWithGeneratedBots extends GamePreview {
 export interface DetectiveInvestigation {
     day: number;
     target: string;
-    isWerewolf: boolean;
+    isEvil: boolean; // True for werewolf AND maniac — detective can't distinguish them
     success?: boolean; // False if investigation was blocked/failed (default: true)
 }
 
@@ -94,6 +94,14 @@ export interface DoctorProtection {
     target: string;
     success?: boolean; // False if protection was blocked/failed (default: true)
     savedTarget?: boolean; // True if protected player was actually targeted by werewolves
+    actionType?: 'protect' | 'kill';  // Whether this was a protection or kill action
+}
+
+export interface ManiacAbduction {
+    day: number;
+    target: string;
+    success: boolean;
+    maniacDied?: boolean;  // If true, victim died with maniac
 }
 
 export interface RoleKnowledge {
@@ -101,6 +109,8 @@ export interface RoleKnowledge {
     investigations?: DetectiveInvestigation[];
     // Doctor-specific: history of protections
     protections?: DoctorProtection[];
+    // Maniac-specific: history of abductions
+    abductions?: ManiacAbduction[];
     // Extensible: future roles can add their own fields here
     [key: string]: any;
 }
@@ -156,8 +166,8 @@ export interface Game {
     gameStateParamQueue: Array<string>; // some states require a queue of params, usually bot names
     gameStateProcessQueue: Array<string>; // some states need to keep intermediate results
     errorState?: SystemErrorMessage | null; // Persistent error state stored in the game object
-    nightResults?: Record<string, { target: string }>; // Dynamic night results for each role that has night actions
-    previousNightResults?: Record<string, { target: string }>; // Previous night's results for reference
+    nightResults?: Record<string, { target: string; actionType?: string }>; // Dynamic night results for each role that has night actions
+    previousNightResults?: Record<string, { target: string; actionType?: string }>; // Previous night's results for reference
     messageCounter?: number; // Counter for generating incremental message IDs
     dayActivityCounter?: Record<string, number>; // Track number of messages each bot has sent during current day
     gameMasterTokenUsage?: TokenUsage; // Track token usage for the Game Master only
@@ -166,13 +176,24 @@ export interface Game {
     createdWithTier: UserTier; // Store the user's tier at the time the game was created
     votingHistory?: VotingDayResult[]; // History of voting results for each day
     nightNarratives?: NightNarrativeResult[]; // GM night result narratives for each night
+    oneTimeAbilitiesUsed?: {
+        doctorKill?: boolean;  // True if doctor has used their one-time kill ability
+    };
+    resolvedNightState?: {
+        deaths: Array<{ player: string; role: string; cause: 'werewolf_attack' | 'doctor_kill' | 'maniac_collateral' }>;
+        abductedPlayer: string | null;
+        detectiveResult: { target: string; isEvil: boolean; success: boolean } | null;
+        werewolfKillPrevented: boolean;
+        noWerewolfActivity: boolean;
+    } | null;
 }
 
 export const GAME_ROLES = {
     DOCTOR: 'doctor',
     DETECTIVE: 'detective',
     WEREWOLF: 'werewolf',
-    VILLAGER: 'villager'
+    VILLAGER: 'villager',
+    MANIAC: 'maniac'
 } as const;
 
 /**
@@ -192,23 +213,46 @@ export const BOT_SELECTION_CONFIG = {
 
 export interface RoleConfig {
     name: string;
-    nightActionOrder: number;
+    nightActionOrder: number | null;  // null = no night action
     description: string;
     alignment: 'good' | 'evil'; // 'good' = villager team, 'evil' = werewolf team
+    hasNightAction: boolean;  // Explicit flag for night action
+
     // UI text for night action modal
     actionTitle?: string;
     targetLabel?: string;
     messageLabel?: string;
     messagePlaceholder?: string;
     submitButtonText?: string;
+
+    // One-time abilities config
+    oneTimeAbilities?: {
+        [abilityName: string]: {
+            description: string;
+            promptAddition: string;
+        }
+    };
 }
 
 export const ROLE_CONFIGS: Record<string, RoleConfig> = {
+    [GAME_ROLES.MANIAC]: {
+        name: 'Maniac',
+        nightActionOrder: 0,  // Acts FIRST (before werewolves)
+        description: 'Abducts one player for the night, blocking their actions and any actions targeting them',
+        alignment: 'good',  // Wins with villagers
+        hasNightAction: true,
+        actionTitle: 'Choose who to abduct',
+        targetLabel: 'Who do you want to abduct tonight?',
+        messageLabel: 'Private thoughts:',
+        messagePlaceholder: 'Your reasoning for this abduction...',
+        submitButtonText: 'Abduct Target'
+    },
     [GAME_ROLES.WEREWOLF]: {
         name: 'Werewolf',
         nightActionOrder: 1,
         description: 'Can eliminate other players during the night',
         alignment: 'evil',
+        hasNightAction: true,
         actionTitle: 'Choose the werewolves target',
         targetLabel: 'Who should be eliminated tonight?',
         messageLabel: 'Message to other werewolves:',
@@ -220,22 +264,44 @@ export const ROLE_CONFIGS: Record<string, RoleConfig> = {
         nightActionOrder: 2,
         description: 'Can protect a player from elimination during the night',
         alignment: 'good',
+        hasNightAction: true,
         actionTitle: 'Choose who to protect',
         targetLabel: 'Who do you want to protect tonight?',
         messageLabel: 'Message to other doctors:',
         messagePlaceholder: 'Share your thoughts...',
-        submitButtonText: 'Protect Target'
+        submitButtonText: 'Protect Target',
+        oneTimeAbilities: {
+            kill: {
+                description: "Doctor's Mistake - kill one player instead of protecting",
+                promptAddition: `
+
+**ONE-TIME SPECIAL ABILITY - DOCTOR'S MISTAKE:**
+You have discovered a ONE-TIME ability: You can choose to KILL a player instead of protecting them tonight.
+- This ability can only be used ONCE per game
+- If you choose to kill, your target will die (unless they are abducted by the Maniac)
+- You must decide: PROTECT someone OR KILL someone - you cannot do both
+- After using this kill ability, you will only have the regular protection ability for the rest of the game`
+            }
+        }
     },
     [GAME_ROLES.DETECTIVE]: {
         name: 'Detective',
         nightActionOrder: 3,
         description: 'Can investigate a player to learn their role during the night',
         alignment: 'good',
+        hasNightAction: true,
         actionTitle: 'Choose who to investigate',
         targetLabel: 'Who do you want to investigate tonight?',
         messageLabel: 'Message to other detectives:',
         messagePlaceholder: 'Share your thoughts...',
         submitButtonText: 'Investigate Target'
+    },
+    [GAME_ROLES.VILLAGER]: {
+        name: 'Villager',
+        nightActionOrder: null,
+        description: 'A regular villager with no special abilities',
+        alignment: 'good',
+        hasNightAction: false
     }
 };
 
@@ -460,6 +526,7 @@ export enum MessageType {
     WEREWOLF_ACTION = 'WEREWOLF_ACTION', // Werewolf night action response
     DOCTOR_ACTION = 'DOCTOR_ACTION', // Doctor night action response
     DETECTIVE_ACTION = 'DETECTIVE_ACTION', // Detective night action response
+    MANIAC_ACTION = 'MANIAC_ACTION', // Maniac night action response
     NIGHT_SUMMARY = 'NIGHT_SUMMARY', // GM night results summary message
     GAME_STORY = 'GAME_STORY', // Initial message to generate the game, never used after
     HUMAN_PLAYER_MESSAGE = 'HUMAN_PLAYER_MESSAGE',
@@ -535,6 +602,7 @@ export const RECIPIENT_ALL = 'ALL';
 export const RECIPIENT_WEREWOLVES = 'WEREWOLVES';
 export const RECIPIENT_DOCTOR = 'DOCTOR';
 export const RECIPIENT_DETECTIVE = 'DETECTIVE';
+export const RECIPIENT_MANIAC = 'MANIAC';
 
 export interface GameMessage {
     id: string | null;           // Will be null for new messages, set by Firestore

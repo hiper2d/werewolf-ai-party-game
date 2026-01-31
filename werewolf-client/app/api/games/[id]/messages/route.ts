@@ -5,7 +5,7 @@ import {db} from '@/firebase/server';
 import {auth} from '@/auth';
 import {ensureUserCanAccessGame} from '@/app/api/tier-guards';
 import {getGame} from '@/app/api/game-actions';
-import {GameMessage, RECIPIENT_ALL, RECIPIENT_WEREWOLVES, RECIPIENT_DOCTOR, RECIPIENT_DETECTIVE, GAME_ROLES} from '@/app/api/game-models';
+import {GameMessage, RECIPIENT_ALL, RECIPIENT_WEREWOLVES, RECIPIENT_DOCTOR, RECIPIENT_DETECTIVE, RECIPIENT_MANIAC, GAME_ROLES} from '@/app/api/game-models';
 
 export async function GET(request: NextRequest, {params}: {params: Promise<{id: string}>}) {
     const session = await auth();
@@ -48,6 +48,8 @@ export async function GET(request: NextRequest, {params}: {params: Promise<{id: 
         allowedRecipients.push(RECIPIENT_DOCTOR);
     } else if (humanPlayerRole === GAME_ROLES.DETECTIVE) {
         allowedRecipients.push(RECIPIENT_DETECTIVE);
+    } else if (humanPlayerRole === GAME_ROLES.MANIAC) {
+        allowedRecipients.push(RECIPIENT_MANIAC);
     }
 
     try {

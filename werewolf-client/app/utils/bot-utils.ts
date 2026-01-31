@@ -68,23 +68,23 @@ export function generateRoleKnowledgeSection(bot: Bot): string {
             if (inv.success === false) {
                 return `- **Night ${inv.day}:** Investigated **${inv.target}** → ❌ Investigation failed/blocked`;
             }
-            const status = inv.isWerewolf ? '🐺 **WEREWOLF**' : '✓ Not a Werewolf';
+            const status = inv.isEvil ? '🔴 **EVIL**' : '✓ Innocent';
             return `- **Night ${inv.day}:** Investigated **${inv.target}** → ${status}`;
         }).join('\n');
 
         // Only count successful investigations
-        const confirmedWerewolves = bot.roleKnowledge.investigations
-            .filter(inv => inv.success !== false && inv.isWerewolf)
+        const evilPlayers = bot.roleKnowledge.investigations
+            .filter(inv => inv.success !== false && inv.isEvil)
             .map(inv => inv.target);
 
         const clearedPlayers = bot.roleKnowledge.investigations
-            .filter(inv => inv.success !== false && !inv.isWerewolf)
+            .filter(inv => inv.success !== false && !inv.isEvil)
             .map(inv => inv.target);
 
         let summary = `## 🔍 Your Detective Investigation Results\n\n${investigationLines}`;
 
-        if (confirmedWerewolves.length > 0) {
-            summary += `\n\n**CONFIRMED WEREWOLVES:** ${confirmedWerewolves.join(', ')}`;
+        if (evilPlayers.length > 0) {
+            summary += `\n\n**DETECTED AS EVIL (werewolf or maniac):** ${evilPlayers.join(', ')}`;
         }
         if (clearedPlayers.length > 0) {
             summary += `\n**CLEARED PLAYERS:** ${clearedPlayers.join(', ')}`;
@@ -98,7 +98,11 @@ export function generateRoleKnowledgeSection(bot: Bot): string {
         const protectionLines = bot.roleKnowledge.protections.map(prot => {
             // Handle unsuccessful protections (blocked by some future role)
             if (prot.success === false) {
-                return `- **Night ${prot.day}:** Tried to protect **${prot.target}** → ❌ Protection failed/blocked`;
+                return `- **Night ${prot.day}:** Tried to protect **${prot.target}** → ❌ Protection failed/blocked (target was abducted)`;
+            }
+            // Handle kill actions
+            if (prot.actionType === 'kill') {
+                return `- **Night ${prot.day}:** Used DOCTOR'S MISTAKE to kill **${prot.target}** 💀`;
             }
             const savedNote = prot.savedTarget === true ? ' 🛡️ (SAVED THEM from werewolves!)' : '';
             return `- **Night ${prot.day}:** Protected **${prot.target}**${savedNote}`;
@@ -107,8 +111,30 @@ export function generateRoleKnowledgeSection(bot: Bot): string {
         const lastProtection = bot.roleKnowledge.protections[bot.roleKnowledge.protections.length - 1];
 
         let summary = `## 🏥 Your Doctor Protection History\n\n${protectionLines}`;
-        if (lastProtection.success !== false) {
+        if (lastProtection.success !== false && lastProtection.actionType !== 'kill') {
             summary += `\n\n**REMINDER:** You protected **${lastProtection.target}** last night, so you CANNOT protect them again tonight.`;
+        }
+
+        sections.push(summary);
+    }
+
+    // Maniac abductions
+    if (bot.role === GAME_ROLES.MANIAC && bot.roleKnowledge.abductions && bot.roleKnowledge.abductions.length > 0) {
+        const abductionLines = bot.roleKnowledge.abductions.map(abd => {
+            if (abd.maniacDied) {
+                return `- **Night ${abd.day}:** Abducted **${abd.target}** → 💀 You died, and ${abd.target} died with you!`;
+            }
+            if (!abd.success) {
+                return `- **Night ${abd.day}:** Tried to abduct **${abd.target}** → ❌ Abduction failed`;
+            }
+            return `- **Night ${abd.day}:** Abducted **${abd.target}** 🎭 (blocked any actions involving them)`;
+        }).join('\n');
+
+        const lastAbduction = bot.roleKnowledge.abductions[bot.roleKnowledge.abductions.length - 1];
+
+        let summary = `## 🎭 Your Maniac Abduction History\n\n${abductionLines}`;
+        if (lastAbduction.success) {
+            summary += `\n\n**REMINDER:** You abducted **${lastAbduction.target}** last night, so you CANNOT abduct them again tonight.`;
         }
 
         sections.push(summary);
