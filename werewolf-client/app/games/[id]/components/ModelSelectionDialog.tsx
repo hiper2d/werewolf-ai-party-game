@@ -128,15 +128,15 @@ export default function ModelSelectionDialog({
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-gray-900 border border-white border-opacity-30 rounded-lg p-6 max-w-md w-full mx-4">
-                <h3 className="text-xl font-bold text-white mb-4">
+            <div className="bg-white dark:bg-neutral-900 border theme-border rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+                <h3 className="text-xl font-bold theme-text-primary mb-4">
                     Change AI Model for {botName}
                 </h3>
-                
+
                 <div className="mb-6">
-                    <label className="block text-white text-sm mb-2">Select AI Model:</label>
+                    <label className="block theme-text-primary text-sm mb-2">Select AI Model:</label>
                     <select
-                        className="w-full p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
+                        className="w-full p-2 rounded bg-[rgb(var(--color-input-bg))] text-[rgb(var(--color-input-text))] border border-[rgb(var(--color-input-border))] focus:outline-none focus:ring-1 focus:ring-blue-500"
                         value={selectedModel}
                         onChange={(e) => setSelectedModel(e.target.value)}
                         disabled={isUpdating}
@@ -152,7 +152,7 @@ export default function ModelSelectionDialog({
 
                 <div className="flex space-x-3 justify-end">
                     <button
-                        className={`${buttonTransparentStyle} bg-gray-600 hover:bg-gray-700 border-gray-500`}
+                        className={`${buttonTransparentStyle} bg-neutral-200 dark:bg-neutral-600 hover:bg-neutral-300 dark:hover:bg-neutral-700 border-neutral-300 dark:border-neutral-500`}
                         onClick={onClose}
                         disabled={isUpdating}
                     >

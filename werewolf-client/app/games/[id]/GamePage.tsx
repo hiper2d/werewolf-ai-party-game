@@ -665,7 +665,7 @@ function GamePageContent({
                                     className={`text-sm p-2 rounded ${
                                         item === queueInfo.currentItem
                                             ? 'bg-blue-600 bg-opacity-50 border border-blue-400'
-                                            : 'bg-gray-200 dark:bg-gray-700 bg-opacity-50'
+                                            : 'bg-gray-200 dark:bg-neutral-700 bg-opacity-50'
                                     }`}
                                 >
                                     <div className="flex items-center justify-between">
@@ -695,7 +695,7 @@ function GamePageContent({
                             <div className="text-xs theme-text-secondary mb-1">
                                 Progress: {queueInfo.currentItem ? queueInfo.items.length - (queueInfo.items.indexOf(queueInfo.currentItem) + 1) : queueInfo.items.length} remaining
                             </div>
-                            <div className="w-full bg-gray-300 dark:bg-gray-700 rounded-full h-2">
+                            <div className="w-full bg-gray-300 dark:bg-neutral-700 rounded-full h-2">
                                 <div
                                     className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                                     style={{

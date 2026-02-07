@@ -45,10 +45,14 @@ export class DetectiveProcessor extends BaseRoleProcessor {
 
         const detectiveTarget = nightResults.detective.target;
 
-        // If detective's target was abducted, investigation fails
+        // If detective's target was abducted, investigation fails — no result
         if (state.abductedPlayer === detectiveTarget) {
             this.logNightAction(`Detective investigation of ${detectiveTarget} failed - target was abducted by Maniac`);
-            state.detectiveResult = { target: detectiveTarget, isEvil: false, success: false };
+            state.actionsPrevented.push({
+                role: GAME_ROLES.DETECTIVE,
+                reason: 'abduction',
+                player: null // Detective's target was abducted so investigation failed
+            });
             return state;
         }
 

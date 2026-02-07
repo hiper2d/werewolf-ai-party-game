@@ -97,7 +97,7 @@ export default function VotingModal({
                     Cancel
                 </button>
                 <button
-                    className={`${buttonTransparentStyle} ${(!selectedPlayer || !reason.trim() || isSubmitting) ? 'opacity-50 cursor-not-allowed' : ''} bg-red-600/80 hover:bg-red-700/80 text-white border-none`}
+                    className={`${buttonTransparentStyle} ${(!selectedPlayer || !reason.trim() || isSubmitting) ? 'opacity-50 cursor-not-allowed' : ''} bg-red-600/80 hover:bg-red-700/80 text-white border-red-500`}
                     onClick={handleSubmit}
                     disabled={!selectedPlayer || !reason.trim() || isSubmitting}
                 >

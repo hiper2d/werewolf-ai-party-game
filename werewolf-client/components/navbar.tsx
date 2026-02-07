@@ -13,7 +13,7 @@ const NavBar = () => {
     return (
         <header className="navbar-root py-4 px-6 flex items-center justify-between h-16">
             <div className="flex items-center">
-                <div className="mr-8">
+                <div className="mr-8 rounded-full bg-neutral-600 p-1 dark:bg-transparent dark:p-0">
                     <Image
                         src="/werewolf-ai-logo-2.png"
                         alt="Werewolf AI Logo"

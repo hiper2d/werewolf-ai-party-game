@@ -90,7 +90,7 @@ export default function DraggableDialog({
     return (
         <div
             ref={dialogRef}
-            className={`z-50 bg-white dark:bg-gray-900 border theme-border rounded-lg shadow-xl ${className}`}
+            className={`z-50 bg-white dark:bg-neutral-900 border theme-border rounded-lg shadow-xl ${className}`}
             style={dialogStyle}
         >
             {/* Draggable header */}

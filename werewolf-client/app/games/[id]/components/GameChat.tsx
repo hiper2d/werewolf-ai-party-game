@@ -222,7 +222,7 @@ function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcludin
                         {message.authorName}
                     </span>
                     {message.cost !== undefined && message.cost > 0 && (
-                        <span className="text-xs theme-text-secondary bg-gray-200/60 dark:bg-gray-800/30 px-1 py-0.5 rounded text-xs font-mono">
+                        <span className="text-xs theme-text-secondary bg-gray-200/60 dark:bg-neutral-800/30 px-1 py-0.5 rounded text-xs font-mono">
                             ${message.cost.toFixed(4)}
                         </span>
                     )}
@@ -267,7 +267,7 @@ function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcludin
                                             </svg>
                                             <span>Delete from here (incl.)</span>
                                         </button>
-                                        <div className="h-px bg-gray-200 dark:bg-gray-700"></div>
+                                        <div className="h-px bg-gray-200 dark:bg-neutral-700"></div>
                                         <button
                                             onClick={() => { onDeleteAfterExcluding(message.id!); setShowDeleteMenu(false); }}
                                             className="px-4 py-2 text-left text-sm hover:bg-orange-50 dark:hover:bg-orange-900/20 text-orange-600 dark:text-orange-400 flex items-center gap-2"

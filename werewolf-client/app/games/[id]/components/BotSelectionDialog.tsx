@@ -108,8 +108,8 @@ export default function BotSelectionDialog({
                                     isSelected
                                         ? 'bg-blue-100 dark:bg-blue-600/30 border-blue-400 dark:border-blue-400'
                                         : isDisabled
-                                        ? 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-700 opacity-50 cursor-not-allowed'
-                                        : 'bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-400'
+                                        ? 'bg-neutral-100 dark:bg-neutral-800 border-neutral-300 dark:border-neutral-700 opacity-50 cursor-not-allowed'
+                                        : 'bg-neutral-50 dark:bg-neutral-800 border-neutral-300 dark:border-neutral-600 hover:border-neutral-400 dark:hover:border-neutral-400'
                                 }`}
                             >
                                 <div className="flex items-center gap-3">
@@ -117,7 +117,7 @@ export default function BotSelectionDialog({
                                         className={`w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs font-bold ${
                                             isSelected
                                                 ? 'bg-blue-500 border-blue-400 text-white'
-                                                : 'border-gray-400 dark:border-gray-500 text-gray-400 dark:text-gray-500'
+                                                : 'border-neutral-400 dark:border-neutral-500 text-neutral-400 dark:text-neutral-500'
                                         }`}
                                     >
                                         {isSelected ? selectionIndex + 1 : ''}
@@ -133,7 +133,7 @@ export default function BotSelectionDialog({
                                     <span className={`text-sm px-2 py-1 rounded ${
                                         messageCount === 0
                                             ? 'bg-yellow-100 dark:bg-yellow-600/30 text-yellow-700 dark:text-yellow-400'
-                                            : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+                                            : 'bg-neutral-200 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-400'
                                     }`}>
                                         {messageCount} msg{messageCount !== 1 ? 's' : ''}
                                     </span>
@@ -144,9 +144,9 @@ export default function BotSelectionDialog({
                 </div>
             </div>
 
-            <div className="flex space-x-3 justify-end pt-3 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex space-x-3 justify-end pt-3 border-t border-neutral-200 dark:border-neutral-700">
                 <button
-                    className={`${buttonTransparentStyle} bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-700 border-gray-300 dark:border-gray-500`}
+                    className={`${buttonTransparentStyle} bg-neutral-200 dark:bg-neutral-600 hover:bg-neutral-300 dark:hover:bg-neutral-700 border-neutral-300 dark:border-neutral-500`}
                     onClick={onClose}
                     disabled={isSubmitting}
                 >

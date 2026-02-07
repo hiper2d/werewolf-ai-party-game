@@ -65,7 +65,7 @@ export interface DetectiveResult {
 export interface NightActionPrevented {
     role: string;
     reason: 'abduction' | 'death' | 'doctor_save';
-    player?: string; // The specific player who was prevented (if applicable)
+    player: string | null; // The specific player who was prevented (if applicable)
 }
 
 /**

@@ -206,7 +206,7 @@ export default function NightActionModal({
                     Cancel
                 </button>
                 <button
-                    className={`${buttonTransparentStyle} ${(!selectedPlayer || isSubmitting) ? 'opacity-50 cursor-not-allowed' : ''} ${actionType === 'kill' ? 'bg-red-600/80 hover:bg-red-700/80' : 'bg-blue-600/80 hover:bg-blue-700/80'} text-white border-none`}
+                    className={`${buttonTransparentStyle} ${(!selectedPlayer || isSubmitting) ? 'opacity-50 cursor-not-allowed' : ''} ${actionType === 'kill' ? 'bg-red-600/80 hover:bg-red-700/80 border-red-500' : 'bg-blue-600/80 hover:bg-blue-700/80 border-blue-500'} text-white`}
                     onClick={handleSubmit}
                     disabled={!selectedPlayer || isSubmitting}
                 >

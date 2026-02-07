@@ -47,7 +47,7 @@ export class WerewolfProcessor extends BaseRoleProcessor {
             state.actionsPrevented.push({
                 role: GAME_ROLES.WEREWOLF,
                 reason: 'abduction',
-                player: undefined // Pack action blocked because target was abducted
+                player: null // Pack action blocked because target was abducted
             });
             this.logNightAction(`Werewolf attack on ${werewolfTarget} failed - target was abducted by Maniac`);
             return state;

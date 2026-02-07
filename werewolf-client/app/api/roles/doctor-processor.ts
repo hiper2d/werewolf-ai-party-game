@@ -30,9 +30,14 @@ export class DoctorProcessor extends BaseRoleProcessor {
         const doctorTarget = nightResults.doctor.target;
         const actionType = nightResults.doctor.actionType || 'protect';
 
-        // If doctor's target was abducted, action fails silently
+        // If doctor's target was abducted, action fails
         if (state.abductedPlayer === doctorTarget) {
             this.logNightAction(`Doctor's ${actionType} on ${doctorTarget} failed - target was abducted by Maniac`);
+            state.actionsPrevented.push({
+                role: GAME_ROLES.DOCTOR,
+                reason: 'abduction',
+                player: null // Doctor's target was abducted so action had no effect
+            });
             return state;
         }
 
@@ -46,7 +51,7 @@ export class DoctorProcessor extends BaseRoleProcessor {
                 state.actionsPrevented.push({
                     role: GAME_ROLES.WEREWOLF,
                     reason: 'doctor_save',
-                    player: undefined // Pack action blocked by doctor
+                    player: null // Pack action blocked by doctor
                 });
                 this.logNightAction(`Doctor saved ${doctorTarget} from werewolf attack`);
             }
