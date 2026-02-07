@@ -4,7 +4,7 @@
 
 /* Default dark background to prevent flash before theme loads */
 html {
-  background-color: #111827; /* matches dark theme --color-page-bg-start */
+  background-color: #121216; /* matches dark theme --color-page-bg-start */
 }
 
 /* Light Theme */
@@ -51,70 +51,70 @@ html {
 
 /* Dark Theme */
 [data-theme='dark'] {
-  --color-text-primary: 255, 255, 255;
-  --color-text-secondary: 203, 213, 225;
+  --color-text-primary: 240, 240, 245;
+  --color-text-secondary: 160, 160, 170;
 
-  --color-page-bg-start: 17, 24, 39;
-  --color-page-bg-end: 15, 15, 30;
+  --color-page-bg-start: 18, 18, 22;
+  --color-page-bg-end: 12, 12, 16;
 
-  --color-navbar-bg: 17, 24, 39;
-  --color-navbar-text: 255, 255, 255;
-  --color-navbar-link: 226, 232, 240;
-  --color-navbar-link-hover: 248, 250, 252;
-  --color-navbar-divider: 148, 163, 184;
+  --color-navbar-bg: 18, 18, 22;
+  --color-navbar-text: 240, 240, 245;
+  --color-navbar-link: 200, 200, 210;
+  --color-navbar-link-hover: 240, 240, 245;
+  --color-navbar-divider: 120, 120, 130;
 
   --color-toggle-bg: rgba(255, 255, 255, 0.08);
   --color-toggle-hover-bg: rgba(255, 255, 255, 0.16);
-  --color-toggle-border: rgba(148, 163, 184, 0.35);
-  --color-toggle-text: 248, 250, 252;
+  --color-toggle-border: rgba(160, 160, 170, 0.35);
+  --color-toggle-text: 240, 240, 245;
 
-  --color-card-bg: 30, 41, 59;
-  --color-card-border: 51, 65, 85;
+  --color-card-bg: 32, 32, 38;
+  --color-card-border: 55, 55, 62;
   --color-card-shadow: rgba(0, 0, 0, 0.3);
 
-  --color-button-bg: 51, 65, 85;
-  --color-button-text: 255, 255, 255;
-  --color-button-text-transparent: 255, 255, 255;
-  --color-button-hover-bg: 71, 85, 105;
+  --color-button-bg: 55, 55, 62;
+  --color-button-text: 240, 240, 245;
+  --color-button-text-transparent: 240, 240, 245;
+  --color-button-hover-bg: 72, 72, 80;
   --color-button-transparent-bg: rgba(255, 255, 255, 0.1);
   --color-button-transparent-hover-bg: rgba(255, 255, 255, 0.15);
 
-  --color-input-bg: 30, 41, 59;
-  --color-input-border: 51, 65, 85;
-  --color-input-text: 255, 255, 255;
-  --color-input-placeholder: 148, 163, 184;
+  --color-input-bg: 32, 32, 38;
+  --color-input-border: 55, 55, 62;
+  --color-input-text: 240, 240, 245;
+  --color-input-placeholder: 120, 120, 130;
 
-  --color-scrollbar-track: 15, 23, 42;
-  --color-scrollbar-thumb: 75, 85, 99;
-  --color-scrollbar-thumb-hover: 107, 114, 128;
+  --color-scrollbar-track: 18, 18, 22;
+  --color-scrollbar-thumb: 75, 75, 82;
+  --color-scrollbar-thumb-hover: 100, 100, 108;
 }
 
 /* Dark theme glassmorphism */
 [data-theme='dark'] .theme-bg-card {
-  background-color: rgba(30, 41, 59, 0.15);
+  background-color: rgba(32, 32, 38, 0.15);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
 }
 
 [data-theme='dark'] .theme-border {
-  border-color: rgba(148, 163, 184, 0.15);
+  border-color: rgba(160, 160, 170, 0.4);
 }
 
 [data-theme='dark'] .theme-border-subtle {
-  border-color: rgba(148, 163, 184, 0.08);
+  border-color: rgba(160, 160, 170, 0.2);
 }
 
 [data-theme='dark'] .theme-shadow {
   box-shadow:
     0 4px 24px rgba(0, 0, 0, 0.15),
-    inset 0 0.5px 0 0 rgba(148, 163, 184, 0.12);
+    inset 0 0.5px 0 0 rgba(160, 160, 170, 0.12);
 }
 
 [data-theme='dark'] .navbar-root {
-  background-color: rgba(17, 24, 39, 0.7);
+  background-color: rgba(18, 18, 22, 0.7);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
-  border-bottom-color: rgba(148, 163, 184, 0.1);
+  border-bottom-color: rgba(160, 160, 170, 0.35);
 }
 
 body {
