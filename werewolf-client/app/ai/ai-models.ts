@@ -29,8 +29,8 @@ export const SupportedAiKeyNames: Record<string, string> = {
 };
 
 export const LLM_CONSTANTS = {
-    CLAUDE_4_OPUS: 'Claude 4.5 Opus',
-    CLAUDE_4_OPUS_THINKING: 'Claude 4.5 Opus (Thinking)',
+    CLAUDE_4_OPUS: 'Claude 4.6 Opus',
+    CLAUDE_4_OPUS_THINKING: 'Claude 4.6 Opus (Thinking)',
     CLAUDE_4_SONNET: 'Claude 4.5 Sonnet',
     CLAUDE_4_SONNET_THINKING: 'Claude 4.5 Sonnet (Thinking)',
     CLAUDE_4_HAIKU: 'Claude 4.5 Haiku',
@@ -47,8 +47,9 @@ export const LLM_CONSTANTS = {
     GROK_4: 'Grok 4',
     GROK_4_1_FAST_REASONING: 'Grok 4.1 Fast Reasoning',
     KIMI_K2: 'Kimi K2',
-    KIMI_K2_THINKING: 'Kimi K2 Thinking',
+    KIMI_K2_THINKING: 'Kimi K2 (Thinking)',
     KIMI_K2_5: 'Kimi K2.5',
+    KIMI_K2_5_THINKING: 'Kimi K2.5 (Thinking)',
     RANDOM: 'Random',
 }
 
@@ -87,7 +88,7 @@ export interface ModelConfig {
 export const SupportedAiModels: Record<string, ModelConfig> = {
     // Claude models - separate with/without thinking versions
     [LLM_CONSTANTS.CLAUDE_4_OPUS]: {
-        modelApiName: 'claude-opus-4-5',
+        modelApiName: 'claude-opus-4-6',
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
         hasThinking: false,
         freeTier: {
@@ -96,7 +97,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         }
     },
     [LLM_CONSTANTS.CLAUDE_4_OPUS_THINKING]: {
-        modelApiName: 'claude-opus-4-5',
+        modelApiName: 'claude-opus-4-6',
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
         hasThinking: true,
         freeTier: {
@@ -271,6 +272,15 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         modelApiName: 'kimi-k2.5',
         apiKeyName: API_KEY_CONSTANTS.MOONSHOT,
         hasThinking: false,
+        freeTier: {
+            available: false,
+            maxBotsPerGame: 0
+        }
+    },
+    [LLM_CONSTANTS.KIMI_K2_5_THINKING]: {
+        modelApiName: 'kimi-k2.5',
+        apiKeyName: API_KEY_CONSTANTS.MOONSHOT,
+        hasThinking: true,
         freeTier: {
             available: false,
             maxBotsPerGame: 0

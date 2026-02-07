@@ -24,7 +24,7 @@ export abstract class AbstractAgent {
     }
 
     protected logSystemPrompt(): void {
-        this.logger(`System Prompt: ${this.instruction}`);
+        // this.logger(`System Prompt: ${this.instruction}`);
     }
 
     protected logAsking(): void {

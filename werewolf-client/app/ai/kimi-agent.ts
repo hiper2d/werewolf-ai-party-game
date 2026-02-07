@@ -114,14 +114,25 @@ export class KimiAgent extends AbstractAgent {
 
                 let completion;
                 try {
-                    completion = await this.client.chat.completions.create({
+                    const params: any = {
                         ...this.defaultParams,
                         messages: openAIMessages,
                         response_format: {
                             type: 'json_schema',
                             json_schema: kimiSchema
                         }
-                    }) as OpenAI.Chat.Completions.ChatCompletion;
+                    };
+
+                    // Special handling for Kimi K2.5 thinking parameter
+                    if (this.model === 'kimi-k2.5') {
+                        params.thinking = { type: this.enableThinking ? 'enabled' : 'disabled' };
+                        // Search results recommend temperature 1.0 for thinking
+                        if (this.enableThinking) {
+                            params.temperature = 1.0;
+                        }
+                    }
+
+                    completion = await this.client.chat.completions.create(params) as OpenAI.Chat.Completions.ChatCompletion;
                 } catch (apiError) {
                     // Re-throw API errors immediately without wrapping them in schema validation errors
                     this.logger(this.logTemplates.error(this.name, apiError));
@@ -170,10 +181,21 @@ export class KimiAgent extends AbstractAgent {
 
                 let completion;
                 try {
-                    completion = await this.client.chat.completions.create({
+                    const params: any = {
                         ...this.defaultParams,
                         messages: openAIMessages
-                    }) as OpenAI.Chat.Completions.ChatCompletion;
+                    };
+
+                    // Special handling for Kimi K2.5 thinking parameter
+                    if (this.model === 'kimi-k2.5') {
+                        params.thinking = { type: this.enableThinking ? 'enabled' : 'disabled' };
+                        // Search results recommend temperature 1.0 for thinking
+                        if (this.enableThinking) {
+                            params.temperature = 1.0;
+                        }
+                    }
+
+                    completion = await this.client.chat.completions.create(params) as OpenAI.Chat.Completions.ChatCompletion;
                 } catch (apiError) {
                     // Re-throw API errors immediately without wrapping them in schema validation errors
                     this.logger(this.logTemplates.error(this.name, apiError));
