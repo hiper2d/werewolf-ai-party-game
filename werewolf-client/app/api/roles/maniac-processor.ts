@@ -6,8 +6,7 @@ import {
     GAME_ROLES,
     GameMessage,
     MessageType,
-    RECIPIENT_MANIAC,
-    ManiacAbduction
+    RECIPIENT_MANIAC
 } from "@/app/api/game-models";
 import { AgentFactory } from "@/app/ai/agent-factory";
 import { addMessageToChatAndSaveToDb, getBotMessages } from "@/app/api/game-actions";
@@ -38,10 +37,11 @@ export class ManiacProcessor extends BaseRoleProcessor {
         super(gameId, game, GAME_ROLES.MANIAC);
     }
 
-    resolveNightAction(nightResults: any, state: NightState): void {
+    computeIntermediateNightState(nightResults: Record<string, any>, state: NightState): NightState {
         if (nightResults.maniac && nightResults.maniac.target) {
             state.abductedPlayer = nightResults.maniac.target;
         }
+        return state;
     }
 
     async processNightAction(): Promise<NightActionResult> {
@@ -203,28 +203,6 @@ export class ManiacProcessor extends BaseRoleProcessor {
             const currentNightResults = this.game.nightResults || {};
             currentNightResults[GAME_ROLES.MANIAC] = { target: maniacResponse.target };
 
-            // Store abduction in maniac bot's roleKnowledge
-            const abduction: ManiacAbduction = {
-                day: this.game.currentDay,
-                target: maniacResponse.target,
-                success: true  // Will be updated later if needed
-            };
-
-            // Update the maniac bot's roleKnowledge
-            const updatedBots = this.game.bots.map(bot => {
-                if (bot.name === maniacBot.name) {
-                    const existingAbductions = bot.roleKnowledge?.abductions || [];
-                    return {
-                        ...bot,
-                        roleKnowledge: {
-                            ...bot.roleKnowledge,
-                            abductions: [...existingAbductions, abduction]
-                        }
-                    };
-                }
-                return bot;
-            });
-
             // Create maniac response message (sent only to the maniac role)
             const maniacMessage: GameMessage = {
                 id: null,
@@ -247,12 +225,15 @@ export class ManiacProcessor extends BaseRoleProcessor {
 
             this.logNightAction(`Maniac ${maniacBot.name} abducted: ${maniacResponse.target}`);
 
+            // Calculate intermediate resolvedNightState and save it
+            const intermediateNightState = this.computeIntermediateNightState(currentNightResults, this.getBaseNightState());
+
             return {
                 success: true,
                 gameUpdates: {
                     nightResults: currentNightResults,
                     gameStateParamQueue: remainingQueue,
-                    bots: updatedBots
+                    resolvedNightState: intermediateNightState
                 }
             };
 

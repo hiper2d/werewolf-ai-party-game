@@ -14,7 +14,10 @@ import {
     RECIPIENT_ALL,
     RECIPIENT_WEREWOLVES,
     RECIPIENT_DOCTOR,
-    RECIPIENT_DETECTIVE
+    RECIPIENT_DETECTIVE,
+    DetectiveInvestigation,
+    DoctorProtection,
+    ManiacAbduction
 } from "@/app/api/game-models";
 import { auth } from "@/auth";
 import { getGame, addMessageToChatAndSaveToDb } from "./game-actions";
@@ -85,15 +88,22 @@ async function endNightWithResults(gameId: string, game: Game): Promise<Game> {
             : 'BLOCKED')
         : 'INACTIVE';
 
-    const quietNight = nightState.deaths.length === 0 && !nightState.werewolfKillPrevented;
+    const actionsPreventedSummary = nightState.actionsPrevented && nightState.actionsPrevented.length > 0
+        ? nightState.actionsPrevented.map(ap => `${ap.role} (${ap.player}) blocked by ${ap.reason}`).join('; ')
+        : 'NONE';
+
+    const werewolfKillPrevented = nightState.actionsPrevented.some(ap => ap.role === GAME_ROLES.WEREWOLF && ap.reason === 'doctor_save');
+
+    const quietNight = nightState.deaths.length === 0 && !werewolfKillPrevented;
 
     // Create GM command with simplified night events
+    // We append actionsPreventedSummary to the command context
     const nightResultsCommand = format(GM_COMMAND_GENERATE_NIGHT_RESULTS, {
         deathsSummary,
-        werewolfKillPrevented: nightState.werewolfKillPrevented ? 'TRUE' : 'FALSE',
+        werewolfKillPrevented: werewolfKillPrevented ? 'TRUE' : 'FALSE',
         quietNight: quietNight ? 'TRUE' : 'FALSE',
         detectiveResultSummary
-    });
+    }) + `\n\n**Blocked Actions:** ${actionsPreventedSummary}`;
 
     // Create Game Master agent with system prompt
     const gmAgent = AgentFactory.createAgent(GAME_MASTER, gmSystemPrompt, game.gameMasterAiType, apiKeys, false);
@@ -255,10 +265,6 @@ async function performNightActionImpl(gameId: string): Promise<Game> {
     if (!game) {
         throw new Error('Game not found');
     }
-
-    await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: game.createdWithTier });
-
-    await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: game.createdWithTier });
 
     await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: game.createdWithTier });
 
@@ -892,30 +898,95 @@ async function startNewDayImpl(gameId: string): Promise<Game> {
                     return bot;
                 });
 
-                // If maniac died with a collateral victim, update roleKnowledge
-                if (death.cause === 'maniac_collateral') {
-                    const maniacBot = currentGame.bots.find(bot => bot.role === GAME_ROLES.MANIAC);
-                    if (maniacBot) {
-                        updatedBots = updatedBots.map(bot => {
-                            if (bot.name === maniacBot.name && bot.roleKnowledge?.abductions) {
-                                const updatedAbductions = bot.roleKnowledge.abductions.map(abd => {
-                                    if (abd.day === currentGame.currentDay && abd.target === death.player) {
-                                        return { ...abd, maniacDied: true };
-                                    }
-                                    return abd;
-                                });
-                                return {
-                                    ...bot,
-                                    roleKnowledge: {
-                                        ...bot.roleKnowledge,
-                                        abductions: updatedAbductions
-                                    }
-                                };
+            }
+        }
+
+        // Build roleKnowledge from nightResults + resolvedNightState
+        // This is done here (not in role processors) so that night replay
+        // naturally works: nightResults/resolvedNightState are cleared on replay,
+        // and roleKnowledge is only built when the day actually starts.
+
+        // Detective knowledge
+        if (nightState?.detectiveResult) {
+            const detectiveBot = updatedBots.find(bot => bot.role === GAME_ROLES.DETECTIVE);
+            if (detectiveBot) {
+                const investigation: DetectiveInvestigation = {
+                    day: currentGame.currentDay,
+                    target: nightState.detectiveResult.target,
+                    isEvil: nightState.detectiveResult.isEvil,
+                    success: nightState.detectiveResult.success
+                };
+                const existingInvestigations = detectiveBot.roleKnowledge?.investigations || [];
+                updatedBots = updatedBots.map(bot => {
+                    if (bot.name === detectiveBot.name) {
+                        return {
+                            ...bot,
+                            roleKnowledge: {
+                                ...bot.roleKnowledge,
+                                investigations: [...existingInvestigations, investigation]
                             }
-                            return bot;
-                        });
+                        };
                     }
-                }
+                    return bot;
+                });
+            }
+        }
+
+        // Doctor knowledge
+        if (nightResults.doctor) {
+            const doctorBot = updatedBots.find(bot => bot.role === GAME_ROLES.DOCTOR);
+            if (doctorBot) {
+                const doctorWasAbducted = nightState?.abductedPlayer === doctorBot.name;
+                const savedTarget = nightState?.actionsPrevented?.some(
+                    ap => ap.role === GAME_ROLES.WEREWOLF && ap.reason === 'doctor_save'
+                ) || false;
+                const protection: DoctorProtection = {
+                    day: currentGame.currentDay,
+                    target: nightResults.doctor.target,
+                    success: !doctorWasAbducted && nightState?.abductedPlayer !== nightResults.doctor.target,
+                    actionType: (nightResults.doctor.actionType as 'protect' | 'kill') || 'protect',
+                    ...(nightResults.doctor.actionType !== 'kill' ? { savedTarget } : {})
+                };
+                const existingProtections = doctorBot.roleKnowledge?.protections || [];
+                updatedBots = updatedBots.map(bot => {
+                    if (bot.name === doctorBot.name) {
+                        return {
+                            ...bot,
+                            roleKnowledge: {
+                                ...bot.roleKnowledge,
+                                protections: [...existingProtections, protection]
+                            }
+                        };
+                    }
+                    return bot;
+                });
+            }
+        }
+
+        // Maniac knowledge
+        if (nightResults.maniac) {
+            const maniacBot = updatedBots.find(bot => bot.role === GAME_ROLES.MANIAC);
+            if (maniacBot) {
+                const maniacDied = nightState?.deaths?.some(d => d.player === maniacBot.name) || false;
+                const abduction: ManiacAbduction = {
+                    day: currentGame.currentDay,
+                    target: nightResults.maniac.target,
+                    success: true,
+                    maniacDied
+                };
+                const existingAbductions = maniacBot.roleKnowledge?.abductions || [];
+                updatedBots = updatedBots.map(bot => {
+                    if (bot.name === maniacBot.name) {
+                        return {
+                            ...bot,
+                            roleKnowledge: {
+                                ...bot.roleKnowledge,
+                                abductions: [...existingAbductions, abduction]
+                            }
+                        };
+                    }
+                    return bot;
+                });
             }
         }
 

@@ -1,5 +1,5 @@
-import { BaseRoleProcessor, NightActionResult, RolePlayersInfo, NightState } from "./base-role-processor";
-import { registerRoleProcessor } from "./role-processor-factory";
+import {BaseRoleProcessor, NightActionResult, NightState, RolePlayersInfo} from "./base-role-processor";
+import {registerRoleProcessor} from "./role-processor-factory";
 import {
     BotAnswer,
     BotResponseError,
@@ -9,22 +9,21 @@ import {
     MessageType,
     RECIPIENT_WEREWOLVES
 } from "@/app/api/game-models";
-import { AgentFactory } from "@/app/ai/agent-factory";
-import { addMessageToChatAndSaveToDb, getBotMessages, getUserFromFirestore } from "@/app/api/game-actions";
-import { getApiKeysForUser } from "@/app/utils/tier-utils";
-import { generateBotContextSection, generateWerewolfTeammatesSection } from "@/app/utils/bot-utils";
-import { auth } from "@/auth";
-import { convertToAIMessages } from "@/app/utils/message-utils";
+import {AgentFactory} from "@/app/ai/agent-factory";
+import {addMessageToChatAndSaveToDb, getBotMessages} from "@/app/api/game-actions";
+import {getApiKeysForUser} from "@/app/utils/tier-utils";
+import {generateBotContextSection, generateWerewolfTeammatesSection} from "@/app/utils/bot-utils";
+import {auth} from "@/auth";
+import {convertToAIMessages} from "@/app/utils/message-utils";
 import {
     BOT_SYSTEM_PROMPT,
     BOT_WEREWOLF_ACTION_PROMPT,
     BOT_WEREWOLF_DISCUSSION_PROMPT
 } from "@/app/ai/prompts/bot-prompts";
-import { format } from "@/app/ai/prompts/utils";
-import { BotAnswerZodSchema, WerewolfActionZodSchema } from "@/app/ai/prompts/zod-schemas";
-import { WerewolfAction } from "@/app/ai/prompts/ai-schemas";
-import { recordBotTokenUsage } from "@/app/api/cost-tracking";
-import { getProviderSignatureFields } from "@/app/ai/ai-models";
+import {format} from "@/app/ai/prompts/utils";
+import {BotAnswerZodSchema, WerewolfActionZod, WerewolfActionZodSchema} from "@/app/ai/prompts/zod-schemas";
+import {recordBotTokenUsage} from "@/app/api/cost-tracking";
+import {getProviderSignatureFields} from "@/app/ai/ai-models";
 
 /**
  * Werewolf role processor
@@ -35,45 +34,36 @@ export class WerewolfProcessor extends BaseRoleProcessor {
         super(gameId, game, GAME_ROLES.WEREWOLF);
     }
 
-    resolveNightAction(nightResults: any, state: NightState): void {
-        // 1. Check if sole remaining wolf was abducted → no werewolf activity
-        const aliveWolfNames = this.game.bots
-            .filter(b => b.isAlive && b.role === GAME_ROLES.WEREWOLF)
-            .map(b => b.name);
-        if (this.game.humanPlayerRole === GAME_ROLES.WEREWOLF) {
-            aliveWolfNames.push(this.game.humanPlayerName);
-        }
-        if (aliveWolfNames.length === 1 && state.abductedPlayer === aliveWolfNames[0]) {
-            state.noWerewolfActivity = true;
-            this.logNightAction(`Sole werewolf ${aliveWolfNames[0]} was abducted — no werewolf activity`);
-            return;
-        }
-
-        // 2. No werewolf target was chosen (all wolves dead or no result)
+    computeIntermediateNightState(nightResults: Record<string, any>, state: NightState): NightState {
+        // No target was chosen (sole wolf abducted — handled in processNightAction)
         if (!nightResults.werewolf || !nightResults.werewolf.target) {
-            state.noWerewolfActivity = true;
-            return;
+            return state;
         }
 
         const werewolfTarget = nightResults.werewolf.target;
 
-        // 3. Target was abducted — werewolf attack fails
+        // Target was abducted — werewolf attack fails
         if (state.abductedPlayer === werewolfTarget) {
-            state.werewolfKillPrevented = true;
+            state.actionsPrevented.push({
+                role: GAME_ROLES.WEREWOLF,
+                reason: 'abduction',
+                player: undefined // Pack action blocked because target was abducted
+            });
             this.logNightAction(`Werewolf attack on ${werewolfTarget} failed - target was abducted by Maniac`);
-            return;
+            return state;
         }
 
-        // 4. Add werewolf kill to deaths (doctor may remove it later)
+        // Add werewolf kill to deaths (doctor may remove it later)
         const victimRole = this.resolvePlayerRole(werewolfTarget);
         state.deaths.push({ player: werewolfTarget, role: victimRole, cause: 'werewolf_attack' });
 
-        // 5. If victim is the maniac, their abducted victim also dies
+        // If victim is the maniac, their abducted victim also dies
         if (victimRole === GAME_ROLES.MANIAC && state.abductedPlayer) {
             const collateralRole = this.resolvePlayerRole(state.abductedPlayer);
             state.deaths.push({ player: state.abductedPlayer, role: collateralRole, cause: 'maniac_collateral' });
             this.logNightAction(`Maniac killed by werewolves - abducted victim ${state.abductedPlayer} also dies`);
         }
+        return state;
     }
 
     /**
@@ -112,6 +102,25 @@ export class WerewolfProcessor extends BaseRoleProcessor {
                 return { success: true };
             }
 
+            // If the sole remaining werewolf is abducted, skip the entire werewolf turn
+            const baseNightState = this.getBaseNightState();
+            if (playersInfo.allPlayers.length === 1 && baseNightState.abductedPlayer === playersInfo.allPlayers[0].name) {
+                const soleName = playersInfo.allPlayers[0].name;
+                this.logNightAction(`Sole werewolf ${soleName} was abducted by Maniac — skipping entire werewolf turn`);
+                baseNightState.actionsPrevented.push({
+                    role: GAME_ROLES.WEREWOLF,
+                    reason: 'abduction',
+                    player: soleName
+                });
+                return {
+                    success: true,
+                    gameUpdates: {
+                        gameStateParamQueue: [],
+                        resolvedNightState: baseNightState
+                    }
+                };
+            }
+
             // Log the werewolves taking action
             const werewolfNames = playersInfo.allPlayers.map(p => p.name).join(', ');
             this.logNightAction(`Werewolves (${werewolfNames}) are taking their night action`);
@@ -137,29 +146,6 @@ export class WerewolfProcessor extends BaseRoleProcessor {
             const remainingQueue = this.game.gameStateParamQueue.slice(1);
 
             this.logNightAction(`Processing action for werewolf: ${currentWerewolfName}`);
-
-            // Check if current werewolf is abducted by maniac
-            const abductedPlayer = this.game.nightResults?.maniac?.target;
-            if (abductedPlayer === currentWerewolfName) {
-                this.logNightAction(`Werewolf ${currentWerewolfName} was abducted by Maniac - skipping their action`);
-
-                // Check if this is the ONLY werewolf (or last werewolf in a sole-werewolf game)
-                // If so, and they're the decision maker, no kill happens
-                const aliveWerewolves = playersInfo.allPlayers.length;
-                const isLastInQueue = remainingQueue.length === 0;
-
-                if (aliveWerewolves === 1 && isLastInQueue) {
-                    this.logNightAction(`Sole werewolf was abducted - werewolf kill fails entirely`);
-                    // No target will be set - werewolf kill fails
-                }
-
-                return {
-                    success: true,
-                    gameUpdates: {
-                        gameStateParamQueue: remainingQueue
-                    }
-                };
-            }
 
             // Get the werewolf bot (skip if human player)
             const werewolfBot = playersInfo.bots.find(bot => bot.name === currentWerewolfName);
@@ -272,7 +258,7 @@ export class WerewolfProcessor extends BaseRoleProcessor {
             };
 
             if (isLastWerewolf) {
-                const targetName = (werewolfResponse as WerewolfAction).target;
+                const targetName = (werewolfResponse as WerewolfActionZod).target;
                 const targetablePlayers = this.getTargetablePlayers(true); // Exclude werewolves
                 const targetableNames = targetablePlayers.map(p => p.name);
 
@@ -295,13 +281,16 @@ export class WerewolfProcessor extends BaseRoleProcessor {
 
                 gameUpdates.nightResults = currentNightResults;
 
+                // Calculate intermediate resolvedNightState and save it
+                gameUpdates.resolvedNightState = this.computeIntermediateNightState(currentNightResults, baseNightState);
+
                 this.logNightAction(`✅ Werewolf target validated and saved: ${targetName}`);
             }
 
             // Create werewolf response message with WEREWOLVES recipient
             // Add thinking content and signature to the response object
             const msgWithThinking = isLastWerewolf
-                ? { ...(werewolfResponse as WerewolfAction), thinking: thinking || "", ...getProviderSignatureFields(werewolfBot.aiType, thinkingSignature) }
+                ? { ...(werewolfResponse as WerewolfActionZod), thinking: thinking || "", ...getProviderSignatureFields(werewolfBot.aiType, thinkingSignature) }
                 : { ...(werewolfResponse as any), thinking: thinking || "", ...getProviderSignatureFields(werewolfBot.aiType, thinkingSignature) };
 
             const werewolfMessage: GameMessage = {
@@ -329,7 +318,7 @@ export class WerewolfProcessor extends BaseRoleProcessor {
             }
 
             if (isLastWerewolf) {
-                this.logNightAction(`Werewolf ${werewolfBot.name} selected target: ${(werewolfResponse as WerewolfAction).target}`);
+                this.logNightAction(`Werewolf ${werewolfBot.name} selected target: ${(werewolfResponse as WerewolfActionZod).target}`);
             } else {
                 this.logNightAction(`Werewolf ${werewolfBot.name} contributed to discussion`);
             }

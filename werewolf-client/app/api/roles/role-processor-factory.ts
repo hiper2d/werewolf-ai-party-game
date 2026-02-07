@@ -78,9 +78,9 @@ export class RoleProcessorFactory {
     }
 
     /**
-     * Run resolveNightAction for all roles (in nightActionOrder) and return
-     * the resulting NightState. Optionally stop BEFORE a given role so callers
-     * can see what the state would be at that point in the pipeline.
+     * Run computeIntermediateNightState for all roles (in nightActionOrder) and
+     * return the resulting NightState. Optionally stop BEFORE a given role so
+     * callers can see what the state would be at that point in the pipeline.
      *
      * @param gameId  - The game ID
      * @param game    - Current game state (with nightResults populated)
@@ -95,8 +95,7 @@ export class RoleProcessorFactory {
             deaths: [],
             abductedPlayer: null,
             detectiveResult: null,
-            werewolfKillPrevented: false,
-            noWerewolfActivity: false
+            actionsPrevented: []
         };
         const nightResults = game.nightResults || {};
         const roles = RoleProcessorFactory.getRolesWithNightActions();
@@ -105,7 +104,7 @@ export class RoleProcessorFactory {
             if (stopBeforeRole && roleName === stopBeforeRole) break;
             const processor = RoleProcessorFactory.createProcessor(roleName, gameId, game);
             if (processor) {
-                processor.resolveNightAction(nightResults, state);
+                processor.computeIntermediateNightState(nightResults, state);
             }
         }
         return state;

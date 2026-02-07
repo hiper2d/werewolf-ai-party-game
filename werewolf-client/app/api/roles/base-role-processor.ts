@@ -60,6 +60,15 @@ export interface DetectiveResult {
 }
 
 /**
+ * Record of a role's action being prevented
+ */
+export interface NightActionPrevented {
+    role: string;
+    reason: 'abduction' | 'death' | 'doctor_save';
+    player?: string; // The specific player who was prevented (if applicable)
+}
+
+/**
  * Shared mutable state that role processors populate in order during night resolution.
  * After all processors run, `deaths` contains the definitive list of who dies.
  */
@@ -67,8 +76,7 @@ export interface NightState {
     deaths: NightDeath[];
     abductedPlayer: string | null;
     detectiveResult: DetectiveResult | null;
-    werewolfKillPrevented: boolean;  // for narrative flavor
-    noWerewolfActivity: boolean;     // sole wolf abducted or no wolves alive
+    actionsPrevented: NightActionPrevented[];
 }
 
 /**
@@ -117,7 +125,9 @@ export abstract class BaseRoleProcessor {
             // Filter out players who can't act this night
             if (preState) {
                 paramQueue = paramQueue.filter(playerName => {
-                    if (preState.abductedPlayer === playerName) {
+                    // Werewolves are NOT filtered on abduction — they can still participate
+                    // in pack discussion. Sole-wolf abduction is handled in processNightAction.
+                    if (this.roleName !== GAME_ROLES.WEREWOLF && preState.abductedPlayer === playerName) {
                         this.logNightAction(`${playerName} is abducted — removed from queue`);
                         return false;
                     }
@@ -171,14 +181,30 @@ export abstract class BaseRoleProcessor {
     abstract processNightAction(): Promise<NightActionResult>;
 
     /**
-     * Mutate the shared NightState based on this role's night results.
-     * Called in nightActionOrder after all processNightAction() calls are done.
-     * Default implementation is a no-op.
-     * @param nightResults The complete map of night results from all roles
-     * @param state The shared NightState to mutate
+     * Apply this role's night resolution to the given state and return it.
+     * Called by the factory pipeline (passing accumulated state) and by
+     * each processor at the end of processNightAction (passing game's persisted state).
+     *
+     * @param nightResults - The accumulated night results map from all roles
+     * @param state - The NightState to build on (mutated in place and returned)
      */
-    resolveNightAction(nightResults: any, state: NightState): void {
-        // Default: no-op
+    abstract computeIntermediateNightState(nightResults: Record<string, any>, state: NightState): NightState;
+
+    /**
+     * Clone the game's persisted resolvedNightState or create a fresh one.
+     * Used by processors when calling computeIntermediateNightState from processNightAction.
+     */
+    protected getBaseNightState(): NightState {
+        const existing = this.game.resolvedNightState;
+        if (existing) {
+            return {
+                deaths: [...existing.deaths],
+                abductedPlayer: existing.abductedPlayer,
+                detectiveResult: existing.detectiveResult,
+                actionsPrevented: [...existing.actionsPrevented]
+            };
+        }
+        return { deaths: [], abductedPlayer: null, detectiveResult: null, actionsPrevented: [] };
     }
 
     /**

@@ -183,8 +183,7 @@ export interface Game {
         deaths: Array<{ player: string; role: string; cause: 'werewolf_attack' | 'doctor_kill' | 'maniac_collateral' }>;
         abductedPlayer: string | null;
         detectiveResult: { target: string; isEvil: boolean; success: boolean } | null;
-        werewolfKillPrevented: boolean;
-        noWerewolfActivity: boolean;
+        actionsPrevented: Array<{ role: string; reason: 'abduction' | 'death' | 'doctor_save'; player?: string; }>;
     } | null;
 }
 

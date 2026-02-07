@@ -1,6 +1,6 @@
 import { BaseRoleProcessor, NightActionResult, NightState } from "./base-role-processor";
 import { registerRoleProcessor } from "./role-processor-factory";
-import { GAME_ROLES, GAME_MASTER, GameMessage, MessageType, BotResponseError, RECIPIENT_DOCTOR, DoctorProtection, ROLE_CONFIGS } from "@/app/api/game-models";
+import { GAME_ROLES, GAME_MASTER, GameMessage, MessageType, BotResponseError, RECIPIENT_DOCTOR, ROLE_CONFIGS } from "@/app/api/game-models";
 import { AgentFactory } from "@/app/ai/agent-factory";
 import { addMessageToChatAndSaveToDb, getBotMessages, getUserFromFirestore } from "@/app/api/game-actions";
 import { getApiKeysForUser } from "@/app/utils/tier-utils";
@@ -23,25 +23,9 @@ export class DoctorProcessor extends BaseRoleProcessor {
         super(gameId, game, GAME_ROLES.DOCTOR);
     }
 
-    /**
-     * Find the doctor player name (bot or human).
-     */
-    private findDoctorName(): string | null {
-        const doctorBot = this.game.bots.find(b => b.isAlive && b.role === GAME_ROLES.DOCTOR);
-        if (doctorBot) return doctorBot.name;
-        if (this.game.humanPlayerRole === GAME_ROLES.DOCTOR) return this.game.humanPlayerName;
-        return null;
-    }
-
-    resolveNightAction(nightResults: any, state: NightState): void {
-        if (!nightResults.doctor) return;
-
-        // If the doctor themselves was abducted, all their actions fail
-        const doctorName = this.findDoctorName();
-        if (doctorName && state.abductedPlayer === doctorName) {
-            this.logNightAction(`Doctor ${doctorName} was abducted by Maniac — action fails entirely`);
-            return;
-        }
+    computeIntermediateNightState(nightResults: Record<string, any>, state: NightState): NightState {
+        // No doctor action was recorded (doctor didn't act or was abducted — handled in processNightAction)
+        if (!nightResults.doctor) return state;
 
         const doctorTarget = nightResults.doctor.target;
         const actionType = nightResults.doctor.actionType || 'protect';
@@ -49,7 +33,7 @@ export class DoctorProcessor extends BaseRoleProcessor {
         // If doctor's target was abducted, action fails silently
         if (state.abductedPlayer === doctorTarget) {
             this.logNightAction(`Doctor's ${actionType} on ${doctorTarget} failed - target was abducted by Maniac`);
-            return;
+            return state;
         }
 
         if (actionType === 'protect') {
@@ -59,7 +43,11 @@ export class DoctorProcessor extends BaseRoleProcessor {
             );
             if (deathIndex !== -1) {
                 state.deaths.splice(deathIndex, 1);
-                state.werewolfKillPrevented = true;
+                state.actionsPrevented.push({
+                    role: GAME_ROLES.WEREWOLF,
+                    reason: 'doctor_save',
+                    player: undefined // Pack action blocked by doctor
+                });
                 this.logNightAction(`Doctor saved ${doctorTarget} from werewolf attack`);
             }
         } else if (actionType === 'kill') {
@@ -75,6 +63,7 @@ export class DoctorProcessor extends BaseRoleProcessor {
                 this.logNightAction(`Maniac killed by doctor - abducted victim ${state.abductedPlayer} also dies`);
             }
         }
+        return state;
     }
 
     async processNightAction(): Promise<NightActionResult> {
@@ -97,14 +86,22 @@ export class DoctorProcessor extends BaseRoleProcessor {
             const doctorName = this.game.gameStateParamQueue[0];
             const remainingQueue = this.game.gameStateParamQueue.slice(1);
 
+            // Get base night state once and reuse
+            const baseNightState = this.getBaseNightState();
+
             // Check if doctor is abducted by maniac — skip entirely (no AI call)
-            const abductedPlayer = this.game.nightResults?.maniac?.target;
-            if (abductedPlayer === doctorName) {
+            if (baseNightState.abductedPlayer === doctorName) {
                 this.logNightAction(`Doctor ${doctorName} was abducted by Maniac — skipping their action`);
+                baseNightState.actionsPrevented.push({
+                    role: GAME_ROLES.DOCTOR,
+                    reason: 'abduction',
+                    player: doctorName
+                });
                 return {
                     success: true,
                     gameUpdates: {
-                        gameStateParamQueue: remainingQueue
+                        gameStateParamQueue: remainingQueue,
+                        resolvedNightState: baseNightState
                     }
                 };
             }
@@ -254,9 +251,6 @@ export class DoctorProcessor extends BaseRoleProcessor {
                 }
             }
 
-            // Check if target was abducted by maniac (protection/kill fails)
-            const targetAbducted = abductedPlayer === doctorResponse.target;
-
             // Determine action type (default to protect)
             const actionType = doctorResponse.action_type || 'protect';
 
@@ -279,37 +273,6 @@ export class DoctorProcessor extends BaseRoleProcessor {
                 target: doctorResponse.target,
                 actionType: actionType
             };
-
-            // Store protection/kill in doctor bot's roleKnowledge
-            // If target was abducted, action fails (success: false)
-            const protection: DoctorProtection = {
-                day: this.game.currentDay,
-                target: doctorResponse.target,
-                success: !targetAbducted,  // Action fails if target was abducted
-                actionType: actionType
-                // savedTarget will be updated later when we know if werewolves targeted this player
-            };
-
-            if (targetAbducted) {
-                this.logNightAction(`Doctor's ${actionType} of ${doctorResponse.target} failed - target was abducted by Maniac`);
-            } else if (actionType === 'kill') {
-                this.logNightAction(`Doctor used DOCTOR'S MISTAKE to kill ${doctorResponse.target}`);
-            }
-
-            // Update the doctor bot's roleKnowledge
-            const updatedBots = this.game.bots.map(bot => {
-                if (bot.name === doctorBot.name) {
-                    const existingProtections = bot.roleKnowledge?.protections || [];
-                    return {
-                        ...bot,
-                        roleKnowledge: {
-                            ...bot.roleKnowledge,
-                            protections: [...existingProtections, protection]
-                        }
-                    };
-                }
-                return bot;
-            });
 
             // Create doctor response message (sent only to the doctor role)
             const doctorMessage: GameMessage = {
@@ -340,8 +303,7 @@ export class DoctorProcessor extends BaseRoleProcessor {
             // Build game updates
             const gameUpdates: any = {
                 nightResults: currentNightResults,
-                gameStateParamQueue: remainingQueue,
-                bots: updatedBots
+                gameStateParamQueue: remainingQueue
             };
 
             // If kill ability was used, mark it as used
@@ -351,6 +313,9 @@ export class DoctorProcessor extends BaseRoleProcessor {
                     doctorKill: true
                 };
             }
+
+            // Calculate intermediate resolvedNightState and save it
+            gameUpdates.resolvedNightState = this.computeIntermediateNightState(currentNightResults, baseNightState);
 
             return {
                 success: true,

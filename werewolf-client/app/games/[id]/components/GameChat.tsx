@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { talkToAll, humanPlayerVote, getSuggestion } from "@/app/api/bot-actions";
-import { beginNight, performNightAction, humanPlayerTalkWerewolves } from "@/app/api/night-actions";
+import { performNightAction, humanPlayerTalkWerewolves } from "@/app/api/night-actions";
 import { buttonTransparentStyle } from "@/app/constants";
 import { GAME_STATES, MessageType, RECIPIENT_ALL, GameMessage, Game, SystemErrorMessage, BotResponseError, GAME_MASTER, ROLE_CONFIGS, GAME_ROLES } from "@/app/api/game-models";
 import { getPlayerColor } from "@/app/utils/color-utils";
@@ -380,7 +380,6 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
     const [isProcessing, setIsProcessing] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [isVoting, setIsVoting] = useState(false);
-    const [isStartingNight, setIsStartingNight] = useState(false);
     const [isPerformingNightAction, setIsPerformingNightAction] = useState(false);
     const { openModal, closeModal, isModalOpen, areControlsEnabled } = useUIControls();
     const showVotingModal = isModalOpen('voting');
@@ -1020,26 +1019,6 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
         }
     };
 
-    const handleStartNight = async () => {
-        console.log('🌙 START NIGHT BUTTON CLICKED:', {
-            gameId,
-            currentState: game.gameState,
-            timestamp: new Date().toISOString()
-        });
-        
-        setIsStartingNight(true);
-        console.log('🚨 CALLING BEGIN_NIGHT API');
-        const updatedGame = await beginNight(gameId);
-        console.log('✅ Begin night API completed, updating state');
-        
-        // Update game state if callback is provided
-        if (onGameStateChange) {
-            console.log('📊 Updating parent game state after starting night');
-            onGameStateChange(updatedGame);
-        }
-        setIsStartingNight(false);
-    };
-
     const handleNightAction = async (targetPlayer: string, message: string) => {
         console.log('🌙 HUMAN NIGHT ACTION SUBMISSION:', {
             targetPlayer,
@@ -1439,18 +1418,6 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
                     </div>
                 )}
             </div>
-            {game.gameState === GAME_STATES.VOTE_RESULTS && (
-                <div className="mb-4 flex justify-center">
-                    <button
-                        onClick={handleStartNight}
-                        disabled={isStartingNight}
-                        className={`${buttonTransparentStyle} ${isStartingNight ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        title={isStartingNight ? "Starting night phase..." : "Begin the night phase where werewolves and special roles take their actions"}
-                    >
-                        {isStartingNight ? 'Starting Night...' : 'Start Night'}
-                    </button>
-                </div>
-            )}
             <form onSubmit={sendMessage} className="flex gap-2 items-stretch">
                 {/* Textarea on the left - expandable from 2 to 5 rows */}
                 <div className="relative flex-grow">

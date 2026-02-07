@@ -57,6 +57,7 @@ import {checkGameEndConditions} from "@/app/utils/game-utils";
 import {getProviderSignatureFields} from "@/app/ai/ai-models";
 import {recordBotTokenUsage, recordGameMasterTokenUsage} from "@/app/api/cost-tracking";
 import {ensureUserCanAccessGame} from "@/app/api/tier-guards";
+import { RoleProcessorFactory } from "./roles";
 
 /**
  * Helper function to generate bot system prompt with after-game addition if needed
@@ -1584,6 +1585,15 @@ async function performHumanPlayerNightActionImpl(gameId: string, targetPlayer: s
             }
         }
         
+        // NEW LOGIC: Calculate intermediate resolvedNightState and save it
+        // This ensures we have a running state after the human turn
+        const tempGame = { ...game, ...finalUpdates };
+        // Ensure nightResults are correctly set in tempGame
+        tempGame.nightResults = updatedNightResults;
+        
+        const intermediateNightState = RoleProcessorFactory.resolveNightState(gameId, tempGame);
+        finalUpdates.resolvedNightState = intermediateNightState;
+
         // Update game state
         await db.collection('games').doc(gameId).update(finalUpdates);
         
