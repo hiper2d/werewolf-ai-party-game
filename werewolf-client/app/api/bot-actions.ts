@@ -1444,7 +1444,7 @@ async function humanPlayerVoteImpl(gameId: string, targetPlayer: string, reason:
  * NEW LOGIC: This function is only called when human player is the last in gameStateParamQueue
  * and needs to make the final target decision for their role
  */
-async function performHumanPlayerNightActionImpl(gameId: string, targetPlayer: string, message: string): Promise<Game> {
+async function performHumanPlayerNightActionImpl(gameId: string, targetPlayer: string, message: string, actionType?: 'protect' | 'kill'): Promise<Game> {
     const session = await auth();
     if (!session || !session.user?.email) {
         throw new Error('Not authenticated');
@@ -1550,7 +1550,7 @@ async function performHumanPlayerNightActionImpl(gameId: string, targetPlayer: s
             id: null,
             recipientName: recipient,
             authorName: game.humanPlayerName,
-            msg: { target: targetPlayer, reasoning: message },
+            msg: { target: targetPlayer, reasoning: message, ...(currentRole === GAME_ROLES.DOCTOR && actionType ? { action_type: actionType } : {}) },
             messageType: messageType,
             day: game.currentDay,
             timestamp: Date.now()
@@ -1559,20 +1559,37 @@ async function performHumanPlayerNightActionImpl(gameId: string, targetPlayer: s
         // Save night action message to database
         await addMessageToChatAndSaveToDb(nightActionMessage, gameId);
         
-        // Update night results with the target
+        // Update night results with the target (include actionType for doctor's kill ability)
+        const nightResultEntry: Record<string, any> = { target: targetPlayer };
+        if (currentRole === GAME_ROLES.DOCTOR && actionType) {
+            nightResultEntry.actionType = actionType;
+        }
         const updatedNightResults = {
             ...(game.nightResults || {}),
-            [currentRole]: { target: targetPlayer }
+            [currentRole]: nightResultEntry
         };
-        
+
+        // If doctor used kill ability, mark it as used
+        let oneTimeAbilitiesUpdate: Record<string, any> | undefined;
+        if (currentRole === GAME_ROLES.DOCTOR && actionType === 'kill') {
+            oneTimeAbilitiesUpdate = {
+                ...(game.oneTimeAbilitiesUsed || {}),
+                doctorKill: true
+            };
+        }
+
         // Remove current player from param queue (should make it empty)
         const newParamQueue = game.gameStateParamQueue.slice(1);
-        
+
         // Since this was the last player, move to next role or end night
         let finalUpdates: any = {
             gameStateParamQueue: newParamQueue,
             nightResults: updatedNightResults
         };
+
+        if (oneTimeAbilitiesUpdate) {
+            finalUpdates.oneTimeAbilitiesUsed = oneTimeAbilitiesUpdate;
+        }
 
         if (newParamQueue.length === 0) {
             // Current role finished, move to next role or end night

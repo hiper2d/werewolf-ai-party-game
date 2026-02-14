@@ -16,7 +16,7 @@
     "@mistralai/mistralai": "^1.10.0",
     "firebase": "^12.5.0",
     "firebase-admin": "^13.6.0",
-    "next": "16.0.1",
+    "next": "16.1.6",
     "next-auth": "^5.0.0-beta.30",
     "openai": "5.20.3",
     "react": "19.2.0",

@@ -1026,22 +1026,23 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
         }
     };
 
-    const handleNightAction = async (targetPlayer: string, message: string) => {
+    const handleNightAction = async (targetPlayer: string, message: string, actionType?: 'protect' | 'kill') => {
         console.log('🌙 HUMAN NIGHT ACTION SUBMISSION:', {
             targetPlayer,
             message,
+            actionType,
             gameId,
             currentState: game.gameState,
             role: game.humanPlayerRole,
             timestamp: new Date().toISOString()
         });
-        
+
         setIsPerformingNightAction(true);
         console.log('🚨 CALLING PERFORM_HUMAN_PLAYER_NIGHT_ACTION API');
-        
+
         // We'll need to import this function
         const { performHumanPlayerNightAction } = await import("@/app/api/bot-actions");
-        const updatedGame = await performHumanPlayerNightAction(gameId, targetPlayer, message);
+        const updatedGame = await performHumanPlayerNightAction(gameId, targetPlayer, message, actionType);
         console.log('✅ Human night action API completed, closing modal and updating state');
         closeModal('nightAction');
         
