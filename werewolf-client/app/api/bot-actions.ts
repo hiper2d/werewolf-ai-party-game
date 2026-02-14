@@ -17,6 +17,7 @@ import {
     RECIPIENT_DETECTIVE,
     RECIPIENT_DOCTOR,
     RECIPIENT_MANIAC,
+    RECIPIENT_NONE,
     RECIPIENT_WEREWOLVES,
     VotingDayResult
 } from "@/app/api/game-models";
@@ -543,9 +544,9 @@ async function keepBotsGoingImpl(gameId: string): Promise<Game> {
 
         // Use existing activity counter - it's maintained incrementally and only recalculated after resets
         const gmPrompt = format(GM_ROUTER_SYSTEM_PROMPT, {
-            players_names: [
-                ...availableBots.map(b => b.name),
-                game.humanPlayerName
+            alive_players_with_roles: [
+                ...availableBots.map(b => `${b.name} (${b.role})`),
+                `${game.humanPlayerName} (${game.humanPlayerRole})`
             ].join(", "),
             dead_players_names_with_roles: game.bots
                 .filter(b => !b.isAlive)
@@ -606,7 +607,19 @@ async function keepBotsGoingImpl(gameId: string): Promise<Game> {
 
         // Update game state with selected bots queue (limit to configured max)
         const selectedBots = gmResponse.selected_bots.slice(0, BOT_SELECTION_CONFIG.MAX);
-        
+
+        // Save GM bot selection as a hidden debug message
+        const selectionMessage: GameMessage = {
+            id: null,
+            recipientName: RECIPIENT_NONE,
+            authorName: GAME_MASTER,
+            msg: `Selected: [${selectedBots.join(', ')}]. Reasoning: ${gmResponse.reasoning || 'none'}`,
+            messageType: MessageType.GM_BOT_SELECTION,
+            day: game.currentDay,
+            timestamp: null
+        };
+        await addMessageToChatAndSaveToDb(selectionMessage, gameId);
+
         await db.collection('games').doc(gameId).update({
             gameStateProcessQueue: selectedBots
         });
@@ -710,9 +723,9 @@ async function handleHumanPlayerMessage(
 
     // Use existing activity counter - it's maintained incrementally and only recalculated after resets
     const gmPrompt = format(GM_ROUTER_SYSTEM_PROMPT, {
-        players_names: [
-            ...game.bots.map(b => b.name),
-            game.humanPlayerName
+        alive_players_with_roles: [
+            ...game.bots.filter(b => b.isAlive).map(b => `${b.name} (${b.role})`),
+            `${game.humanPlayerName} (${game.humanPlayerRole})`
         ].join(", "),
         dead_players_names_with_roles: game.bots
             .filter(b => !b.isAlive)
@@ -776,12 +789,25 @@ async function handleHumanPlayerMessage(
     // Save the user's message to the database after successful GM response
     await addMessageToChatAndSaveToDb(userChatMessage, gameId);
 
+    // Save GM bot selection as a hidden debug message
+    const selectedBots = gmResponse.selected_bots.slice(0, BOT_SELECTION_CONFIG.MAX);
+    const selectionMessage: GameMessage = {
+        id: null,
+        recipientName: RECIPIENT_NONE,
+        authorName: GAME_MASTER,
+        msg: `Selected: [${selectedBots.join(', ')}]. Reasoning: ${gmResponse.reasoning || 'none'}`,
+        messageType: MessageType.GM_BOT_SELECTION,
+        day: game.currentDay,
+        timestamp: null
+    };
+    await addMessageToChatAndSaveToDb(selectionMessage, gameId);
+
     // Update game state with selected bots queue
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
     await db.collection('games').doc(gameId).update({
-        gameStateProcessQueue: gmResponse.selected_bots
+        gameStateProcessQueue: selectedBots
     });
 }
 

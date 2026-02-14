@@ -34,6 +34,8 @@ const NavBar = () => {
                     <ul className="flex space-x-4">
                         <li><Link href="/games" className="nav-link">All games</Link></li>
                         <li className="mx-2 nav-divider">|</li>
+                        <li><Link href="/rules" className="nav-link">Rules</Link></li>
+                        <li className="mx-2 nav-divider">|</li>
                         <li><Link href="/profile" className="nav-link">User Profile</Link></li>
                     </ul>
                 </nav>

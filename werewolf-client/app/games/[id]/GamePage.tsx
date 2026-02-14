@@ -51,6 +51,7 @@ function GamePageContent({
     const [game, setGame] = useState(initialGame);
     const [selectedBot, setSelectedBot] = useState<{ name: string; aiType: string; enableThinking?: boolean } | null>(null);
     const [clearNightMessages, setClearNightMessages] = useState(false);
+    const [isKeepGoingLoading, setIsKeepGoingLoading] = useState(false);
     const { openModal, closeModal, areControlsEnabled } = useUIControls();
     const isGameOver = game.gameState === GAME_STATES.GAME_OVER || game.gameState === GAME_STATES.AFTER_GAME_DISCUSSION;
 
@@ -645,6 +646,7 @@ function GamePageContent({
                     onGameStateChange={setGame}
                     clearNightMessages={clearNightMessages}
                     onErrorHandled={handleErrorCleared}
+                    isExternalLoading={isKeepGoingLoading}
                 />
             </div>
 
@@ -731,17 +733,29 @@ function GamePageContent({
                             </div>
                             <div className="flex gap-2 justify-center flex-wrap">
                                 <button
-                                    className={`${buttonTransparentStyle} ${!areControlsEnabled || game.gameStateProcessQueue.length > 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                    disabled={!areControlsEnabled || game.gameStateProcessQueue.length > 0}
+                                    className={`${buttonTransparentStyle} ${!areControlsEnabled || game.gameStateProcessQueue.length > 0 || isKeepGoingLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    disabled={!areControlsEnabled || game.gameStateProcessQueue.length > 0 || isKeepGoingLoading}
                                     onClick={async () => {
-                                        const updatedGame = await runGameAction(() => keepBotsGoing(game.id));
-                                        if (updatedGame) {
-                                            setGame(updatedGame);
+                                        setIsKeepGoingLoading(true);
+                                        try {
+                                            const updatedGame = await runGameAction(() => keepBotsGoing(game.id));
+                                            if (updatedGame) {
+                                                setGame(updatedGame);
+                                            }
+                                        } finally {
+                                            setIsKeepGoingLoading(false);
                                         }
                                     }}
                                     title={game.gameStateProcessQueue.length > 0 ? 'Bots are already talking' : `Let ${BOT_SELECTION_CONFIG.MIN}-${BOT_SELECTION_CONFIG.MAX} bots continue the conversation`}
                                 >
-                                    Keep Going
+                                    {isKeepGoingLoading ? (
+                                        <span className="flex items-center gap-2">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin">
+                                                <path d="M21 12a9 9 0 11-6.219-8.56"/>
+                                            </svg>
+                                            Starting...
+                                        </span>
+                                    ) : 'Keep Going'}
                                 </button>
                                 <button
                                     className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500 !text-white ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
@@ -788,17 +802,29 @@ function GamePageContent({
                                         Vote {(voteUrgency.isUrgent || voteUrgency.isWarning) && '⚠️'}
                                     </button>
                                     <button
-                                        className={`${buttonTransparentStyle} ${!areControlsEnabled || game.gameStateProcessQueue.length > 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                        disabled={!areControlsEnabled || game.gameStateProcessQueue.length > 0}
+                                        className={`${buttonTransparentStyle} ${!areControlsEnabled || game.gameStateProcessQueue.length > 0 || isKeepGoingLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                        disabled={!areControlsEnabled || game.gameStateProcessQueue.length > 0 || isKeepGoingLoading}
                                         onClick={async () => {
-                                            const updatedGame = await runGameAction(() => keepBotsGoing(game.id));
-                                            if (updatedGame) {
-                                                setGame(updatedGame);
+                                            setIsKeepGoingLoading(true);
+                                            try {
+                                                const updatedGame = await runGameAction(() => keepBotsGoing(game.id));
+                                                if (updatedGame) {
+                                                    setGame(updatedGame);
+                                                }
+                                            } finally {
+                                                setIsKeepGoingLoading(false);
                                             }
                                         }}
                                         title={game.gameStateProcessQueue.length > 0 ? 'Bots are already talking' : `Let ${BOT_SELECTION_CONFIG.MIN}-${BOT_SELECTION_CONFIG.MAX} bots continue the conversation`}
                                     >
-                                        Keep Going
+                                        {isKeepGoingLoading ? (
+                                            <span className="flex items-center gap-2">
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin">
+                                                    <path d="M21 12a9 9 0 11-6.219-8.56"/>
+                                                </svg>
+                                                Starting...
+                                            </span>
+                                        ) : 'Keep Going'}
                                     </button>
                                 </div>
                             )}

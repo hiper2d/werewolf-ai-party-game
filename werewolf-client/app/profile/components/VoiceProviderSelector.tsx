@@ -45,32 +45,42 @@ export default function VoiceProviderSelector({
                 Select the text-to-speech provider for new games. This setting is locked once a game is created.
             </p>
             <div className="space-y-2">
-                {SUPPORTED_VOICE_PROVIDERS.map((provider) => (
-                    <button
-                        key={provider}
-                        onClick={() => handleProviderChange(provider)}
-                        disabled={isUpdating}
-                        className={`w-full p-4 rounded border text-left transition-all ${
-                            selectedProvider === provider
-                                ? 'border-green-500 bg-green-500 bg-opacity-20'
-                                : 'border-white border-opacity-30 hover:border-opacity-60'
-                        } ${isUpdating ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-                    >
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <span className="font-semibold text-lg">
-                                    {VOICE_PROVIDER_DISPLAY_NAMES[provider]}
-                                </span>
-                                <p className="text-sm text-gray-400 mt-1">
-                                    {VOICE_PROVIDER_DESCRIPTIONS[provider]}
-                                </p>
+                {SUPPORTED_VOICE_PROVIDERS.map((provider) => {
+                    const isUnsupported = provider === 'google';
+                    return (
+                        <button
+                            key={provider}
+                            onClick={() => !isUnsupported && handleProviderChange(provider)}
+                            disabled={isUpdating || isUnsupported}
+                            className={`w-full p-4 rounded border text-left transition-all ${
+                                selectedProvider === provider
+                                    ? 'border-green-500 bg-green-500 bg-opacity-20'
+                                    : isUnsupported
+                                        ? 'border-gray-700 bg-gray-800 opacity-60'
+                                        : 'border-white border-opacity-30 hover:border-opacity-60'
+                            } ${isUpdating || isUnsupported ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                        >
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <span className="font-semibold text-lg">
+                                        {VOICE_PROVIDER_DISPLAY_NAMES[provider]}
+                                        {isUnsupported && (
+                                            <span className="ml-2 text-xs font-normal text-yellow-500 bg-yellow-500 bg-opacity-10 px-2 py-0.5 rounded border border-yellow-500 border-opacity-30">
+                                                Coming Soon
+                                            </span>
+                                        )}
+                                    </span>
+                                    <p className="text-sm text-gray-400 mt-1">
+                                        {VOICE_PROVIDER_DESCRIPTIONS[provider]}
+                                    </p>
+                                </div>
+                                {selectedProvider === provider && (
+                                    <span className="text-green-400 text-xl">&#10003;</span>
+                                )}
                             </div>
-                            {selectedProvider === provider && (
-                                <span className="text-green-400 text-xl">&#10003;</span>
-                            )}
-                        </div>
-                    </button>
-                ))}
+                        </button>
+                    );
+                })}
             </div>
             {isUpdating && (
                 <p className="text-sm text-gray-400 mt-2">Updating...</p>

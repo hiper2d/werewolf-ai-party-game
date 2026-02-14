@@ -533,6 +533,7 @@ export enum MessageType {
     NIGHT_BEGINS = 'NIGHT_BEGINS', // Special message type for when night phase starts
     SYSTEM_ERROR = 'SYSTEM_ERROR',
     SYSTEM_WARNING = 'SYSTEM_WARNING',
+    GM_BOT_SELECTION = 'GM_BOT_SELECTION', // Debug-only: GM's reasoning for which bots to select next
 }
 
 export class BotAnswer {
@@ -602,6 +603,7 @@ export const RECIPIENT_WEREWOLVES = 'WEREWOLVES';
 export const RECIPIENT_DOCTOR = 'DOCTOR';
 export const RECIPIENT_DETECTIVE = 'DETECTIVE';
 export const RECIPIENT_MANIAC = 'MANIAC';
+export const RECIPIENT_NONE = 'NONE'; // Hidden message, not visible to any player (debug only)
 
 export interface GameMessage {
     id: string | null;           // Will be null for new messages, set by Firestore

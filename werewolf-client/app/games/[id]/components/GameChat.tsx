@@ -21,6 +21,7 @@ interface GameChatProps {
     onGameStateChange?: (updatedGame: Game) => void;
     clearNightMessages?: boolean;
     onErrorHandled?: () => void;
+    isExternalLoading?: boolean;
 }
 
 interface BotAnswer {
@@ -253,7 +254,7 @@ function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcludin
                                     </svg>
                                 </button>
                                 {showDeleteMenu && (
-                                    <div className="absolute right-0 top-full mt-1 w-56 theme-bg-card theme-border border rounded shadow-lg z-50 flex flex-col overflow-hidden">
+                                    <div className="absolute right-0 top-full mt-1 w-56 bg-white dark:bg-neutral-800 theme-border border rounded shadow-lg z-50 flex flex-col overflow-hidden">
                                         <button
                                             onClick={() => { onDeleteAfter(message.id!); setShowDeleteMenu(false); }}
                                             className="px-4 py-2 text-left text-sm hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 flex items-center gap-2"
@@ -374,7 +375,7 @@ function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcludin
     );
 }
 
-export default function GameChat({ gameId, game, onGameStateChange, clearNightMessages, onErrorHandled }: GameChatProps) {
+export default function GameChat({ gameId, game, onGameStateChange, clearNightMessages, onErrorHandled, isExternalLoading }: GameChatProps) {
     const [messages, setMessages] = useState<GameMessage[]>([]);
     const [newMessage, setNewMessage] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
@@ -396,6 +397,7 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
     const [showDaySelector, setShowDaySelector] = useState(false);
     const daySelectorRef = useRef<HTMLDivElement | null>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const messagesEndRef = useRef<HTMLDivElement>(null);
     
     // Mention state
     const [mentionState, setMentionState] = useState<{
@@ -771,6 +773,11 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
 
         return () => eventSource.close();
     }, [gameId, selectedDay, isCurrentDaySelected]);
+
+    // Auto-scroll to bottom when new messages arrive or processing starts
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [messages, isProcessing]);
 
     // Cleanup recording on component unmount
     useEffect(() => {
@@ -1220,6 +1227,10 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
         if (isRecording || isTranscribing) {
             return false;
         }
+        // Disable when an external action (e.g. Keep Going) is loading
+        if (isExternalLoading) {
+            return false;
+        }
 
         // After game discussion - allow chat at all times
         if (game.gameState === GAME_STATES.AFTER_GAME_DISCUSSION &&
@@ -1417,6 +1428,21 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
                         Deleting messages...
                     </div>
                 )}
+                {isProcessing && !isLoadingMessages && (
+                    <div className="flex items-center gap-2 py-2 px-3">
+                        <div className="flex gap-1">
+                            <span className="w-2 h-2 rounded-full bg-blue-400 animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                            <span className="w-2 h-2 rounded-full bg-blue-400 animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                            <span className="w-2 h-2 rounded-full bg-blue-400 animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                        </div>
+                        <span className="text-xs theme-text-secondary">
+                            {game.gameStateProcessQueue.length > 0
+                                ? `${game.gameStateProcessQueue[0]} is thinking...`
+                                : 'Processing...'}
+                        </span>
+                    </div>
+                )}
+                <div ref={messagesEndRef} />
             </div>
             <form onSubmit={sendMessage} className="flex gap-2 items-stretch">
                 {/* Textarea on the left - expandable from 2 to 5 rows */}
@@ -1446,11 +1472,18 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
                     {/* First row - Send button (stretched across both columns) */}
                     <button
                         type="submit"
-                        disabled={!isInputEnabled()}
-                        className={`w-full h-12 ${buttonTransparentStyle} ${!isInputEnabled() ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        title={!isInputEnabled() ? "Game is not ready for input" : "Send your message to all players"}
+                        disabled={!isInputEnabled() || isProcessing}
+                        className={`w-full h-12 ${buttonTransparentStyle} ${!isInputEnabled() || isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        title={isProcessing ? "Waiting for response..." : !isInputEnabled() ? "Game is not ready for input" : "Send your message to all players"}
                     >
-                        Send
+                        {isProcessing ? (
+                            <div className="flex items-center justify-center gap-2">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin">
+                                    <path d="M21 12a9 9 0 11-6.219-8.56"/>
+                                </svg>
+                                <span>Sending...</span>
+                            </div>
+                        ) : 'Send'}
                     </button>
                     
                     {/* Second row - Three icon buttons */}

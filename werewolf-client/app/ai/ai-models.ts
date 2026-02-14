@@ -316,9 +316,9 @@ export interface ModelPricing {
 export const MODEL_PRICING: Record<string, ModelPricing> = {
     // OpenAI models
     [SupportedAiModels[LLM_CONSTANTS.GPT_5].modelApiName]: {
-        inputPrice: 1.250,
-        outputPrice: 10.000,
-        cacheHitPrice: 0.125
+        inputPrice: 1.750,
+        outputPrice: 14.000,
+        cacheHitPrice: 0.175
     },
     [SupportedAiModels[LLM_CONSTANTS.GPT_5_MINI].modelApiName]: {
         inputPrice: 0.250,
