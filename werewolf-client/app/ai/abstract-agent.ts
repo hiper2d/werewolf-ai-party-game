@@ -1,5 +1,4 @@
 import { AIMessage, TokenUsage } from "@/app/api/game-models";
-import logger from "@/app/utils/logger-utils";
 import { z } from 'zod';
 
 export abstract class AbstractAgent {
@@ -20,7 +19,7 @@ export abstract class AbstractAgent {
     abstract askWithZodSchema<T>(zodSchema: z.ZodSchema<T>, messages: AIMessage[]): Promise<[T, string, TokenUsage?, string?]>;
 
     protected logger(message: string): void {
-        logger(`[${this.name} ${this.model}]: ${message}`);
+        console.log(`[${this.name} ${this.model}]: ${message}`);
     }
 
     protected logSystemPrompt(): void {
