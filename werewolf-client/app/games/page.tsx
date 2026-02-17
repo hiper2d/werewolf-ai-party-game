@@ -32,7 +32,7 @@ const GamePages = async ({searchParams}: {searchParams?: Promise<{error?: string
     }
 
     const userTier = await getUserTier(userEmail);
-    const games: Game[] = await getAllGames();
+    const games: Game[] = await getAllGames(userEmail);
     const resolvedSearchParams = await searchParams;
     const errorCode = resolvedSearchParams?.error;
     const blockedGameId = resolvedSearchParams?.blocked;
@@ -90,7 +90,7 @@ const GamePages = async ({searchParams}: {searchParams?: Promise<{error?: string
                                         </p>
                                     </div>
                                 )}
-                                <RemoveGame gameId={game.id} />
+                                <RemoveGame gameId={game.id} ownerEmail={userEmail} />
                             </div>
                         </li>
                         );

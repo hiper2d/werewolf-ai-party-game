@@ -42,10 +42,9 @@ interface VoteMessage {
 interface ErrorBannerProps {
     error: SystemErrorMessage;
     onDismiss: () => void;
-    onRetry?: () => void;
 }
 
-function ErrorBanner({ error, onDismiss, onRetry }: ErrorBannerProps) {
+function ErrorBanner({ error, onDismiss }: ErrorBannerProps) {
     const isWarning = error.error.toLowerCase().includes('warning');
     const bgColor = isWarning ? 'bg-yellow-900/50 border-yellow-500/30' : 'bg-red-900/50 border-red-500/30';
     const textColor = isWarning ? 'text-yellow-200' : 'text-red-200';
@@ -83,27 +82,16 @@ function ErrorBanner({ error, onDismiss, onRetry }: ErrorBannerProps) {
                         )}
                     </div>
                 </div>
-                <div className="flex items-center space-x-2 ml-4 flex-shrink-0">
-                    {error.recoverable && onRetry && (
-                        <button
-                            onClick={onRetry}
-                            className="px-2 py-1 text-xs rounded bg-blue-600 hover:bg-blue-700 text-white transition-colors"
-                            title="Retry the failed action"
-                        >
-                            Retry
-                        </button>
-                    )}
-                    <button
-                        onClick={onDismiss}
-                        className="p-1 rounded hover:bg-gray-600/50 transition-colors"
-                        title="Dismiss"
-                    >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <line x1="18" y1="6" x2="6" y2="18"/>
-                            <line x1="6" y1="6" x2="18" y2="18"/>
-                        </svg>
-                    </button>
-                </div>
+                <button
+                    onClick={onDismiss}
+                    className="ml-4 flex-shrink-0 p-1.5 rounded bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+                    title="Dismiss error and retry"
+                >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="23 4 23 10 17 10"/>
+                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                    </svg>
+                </button>
             </div>
         </div>
     );
@@ -1366,7 +1354,7 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
                                     <span className="text-xs">{showDaySelector ? '▲' : '▼'}</span>
                                 </button>
                                 {showDaySelector && (
-                                    <div className="absolute right-0 top-full mt-2 w-40 rounded theme-border border theme-bg-card shadow-lg z-20 max-h-60 overflow-y-auto">
+                                    <div className="absolute right-0 top-full mt-2 w-40 rounded theme-border border bg-white dark:bg-neutral-800 shadow-lg z-20 max-h-60 overflow-y-auto">
                                         {availableDays.map(day => (
                                             <button
                                                 key={day}
@@ -1489,12 +1477,11 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
                     
                     {/* Second row - Three icon buttons */}
                     <div className="flex gap-1">
-                        {/* Expand/Shrink button */}
+                        {/* Expand/Shrink button - always enabled */}
                         <button
                             type="button"
                             onClick={() => setTextareaRows(prev => prev === 2 ? 10 : 2)}
-                            disabled={!isInputEnabled()}
-                            className={`flex-1 h-12 ${buttonTransparentStyle} ${!isInputEnabled() ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            className={`flex-1 h-12 ${buttonTransparentStyle}`}
                             title="Expand/shrink text area"
                         >
                             <span className="text-lg">

@@ -41,7 +41,7 @@ export default function MentionDropdown({ candidates, selectedIndex, onSelect, o
     if (candidates.length === 0) return null;
 
     return (
-        <div className="absolute bottom-full left-0 mb-1 w-64 max-h-48 overflow-y-auto theme-bg-card theme-border border rounded-lg shadow-lg z-50">
+        <div className="absolute bottom-full left-0 mb-1 w-64 max-h-48 overflow-y-auto bg-white dark:bg-neutral-800 theme-border border rounded-lg shadow-lg z-50">
             <ul ref={listRef} className="py-1">
                 {candidates.map((candidate, index) => (
                     <li

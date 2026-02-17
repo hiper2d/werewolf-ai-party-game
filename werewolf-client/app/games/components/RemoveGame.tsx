@@ -6,15 +6,16 @@ import {useState} from "react";
 import { buttonTransparentStyle } from '@/app/constants';
 
 interface RemoveGameProps {
-    gameId: string
+    gameId: string;
+    ownerEmail: string;
 }
 
-export default function RemoveGame({gameId}: RemoveGameProps) {
+export default function RemoveGame({gameId, ownerEmail}: RemoveGameProps) {
     const router = useRouter();
     const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
     async function removeGame() {
-        await removeGameById(gameId);
+        await removeGameById(gameId, ownerEmail);
         router.refresh();
     }
 

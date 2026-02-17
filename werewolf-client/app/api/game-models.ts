@@ -173,6 +173,7 @@ export interface Game {
     gameMasterTokenUsage?: TokenUsage; // Track token usage for the Game Master only
     totalGameCost?: number; // Total cost in USD for all AI calls in this game (bots + game master)
     createdAt?: number; // UTC timestamp when the game was created
+    ownerEmail: string; // Email of the user who created this game
     createdWithTier: UserTier; // Store the user's tier at the time the game was created
     votingHistory?: VotingDayResult[]; // History of voting results for each day
     nightNarratives?: NightNarrativeResult[]; // GM night result narratives for each night

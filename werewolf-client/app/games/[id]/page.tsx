@@ -37,6 +37,11 @@ export default async function Page(props: any) {
         redirect('/api/auth/signin');
     }
 
+    // Check ownership — redirect if this game belongs to another user
+    if (game.ownerEmail && game.ownerEmail !== session.user.email) {
+        redirect('/games');
+    }
+
     const userTier = await getUserTier(session.user.email);
     if (game.createdWithTier !== userTier) {
         const searchParams = new URLSearchParams({

@@ -1290,6 +1290,7 @@ function gameFromFirestore(id: string, data: any): Game {
         previousNightResults: data.previousNightResults || {},
         messageCounter: data.messageCounter || 0,
         dayActivityCounter: data.dayActivityCounter || {},
+        ownerEmail: data.ownerEmail || '',
         createdWithTier: data.createdWithTier || 'free',
         votingHistory: data.votingHistory || [],
         nightNarratives: data.nightNarratives || [],

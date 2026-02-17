@@ -8,6 +8,7 @@ import type {UserTier} from '@/app/api/game-models';
 interface EnsureOptions {
     gameTier?: UserTier;
     userTier?: UserTier;
+    ownerEmail?: string;
 }
 
 export async function ensureUserCanAccessGame(
@@ -22,12 +23,20 @@ export async function ensureUserCanAccessGame(
     const currentUserTier = options.userTier ?? await getUserTier(userEmail);
 
     let storedTier: UserTier | undefined = options.gameTier;
-    if (!storedTier) {
+    let gameOwnerEmail: string | undefined = options.ownerEmail;
+    if (!storedTier || !gameOwnerEmail) {
         const gameDoc = await db.collection('games').doc(gameId).get();
         if (!gameDoc.exists) {
             throw new Error('Game not found');
         }
-        storedTier = (gameDoc.data()?.createdWithTier as UserTier | undefined) ?? 'free';
+        const gameData = gameDoc.data();
+        storedTier = storedTier ?? (gameData?.createdWithTier as UserTier | undefined) ?? 'free';
+        gameOwnerEmail = gameOwnerEmail ?? gameData?.ownerEmail;
+    }
+
+    // Verify ownership if the game has an owner
+    if (gameOwnerEmail && gameOwnerEmail !== userEmail) {
+        throw new Error('You do not have access to this game');
     }
 
     if (storedTier !== currentUserTier) {

@@ -47,33 +47,43 @@ import {format} from "@/app/ai/prompts/utils";
 import {GameSetupZodSchema} from "@/app/ai/prompts/zod-schemas";
 import {ensureUserCanAccessGame} from "@/app/api/tier-guards";
 
-export async function getAllGames(): Promise<Game[]> {
+export async function getAllGames(ownerEmail: string): Promise<Game[]> {
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
-    const collectionRef = db.collection('games');
+    const collectionRef = db.collection('games').where('ownerEmail', '==', ownerEmail);
     const snapshot = await collectionRef.get();
 
     return snapshot.docs.map((doc) => gameFromFirestore(doc.id, doc.data()));
 }
 
-export async function removeGameById(id: string) {
+export async function removeGameById(id: string, ownerEmail: string) {
     if (!db) {
         throw new Error('Firestore is not initialized');
+    }
+
+    // Verify ownership before deleting
+    const gameRef = db.collection('games').doc(id);
+    const gameSnap = await gameRef.get();
+    if (!gameSnap.exists) {
+        throw new Error('Game not found');
+    }
+    const gameData = gameSnap.data();
+    if (gameData?.ownerEmail && gameData.ownerEmail !== ownerEmail) {
+        throw new Error('You do not own this game');
     }
 
     // Delete all messages for this game
     const messagesSnapshot = await db.collection('games').doc(id).collection('messages')
         .get();
-    
+
     // Delete messages individually
     const messageDeletePromises = messagesSnapshot.docs.map(doc => doc.ref.delete());
     await Promise.all(messageDeletePromises);
-    
+
     // Delete the game
-    const gameRef = db.collection('games').doc(id);
     await gameRef.delete();
-    
+
     return "ok";
 }
 
@@ -458,6 +468,7 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
             gameStateParamQueue: bots.map(bot => bot.name),
             gameStateProcessQueue: [],
             messageCounter: 0, // Initialize message counter for new games
+            ownerEmail: session.user.email, // Store the owner's email for per-user isolation
             createdAt: timestamp, // Store creation timestamp
             createdWithTier: tier,
             totalGameCost: previewCost, // Total cost starts with preview generation cost
@@ -1030,6 +1041,7 @@ function gameFromFirestore(id: string, data: any): Game {
         previousNightResults: data.previousNightResults || {},
         messageCounter: data.messageCounter || 0, // Default to 0 for existing games
         dayActivityCounter: data.dayActivityCounter || {}, // Default to empty object for existing games
+        ownerEmail: data.ownerEmail || '', // Empty string for legacy games without owner
         createdAt: data.createdAt || extractTimestampFromGameId(id), // Use stored timestamp or extract from ID for existing games
         totalGameCost: data.totalGameCost || 0,
         gameMasterTokenUsage: data.gameMasterTokenUsage || data.tokenUsage?.gameMasterUsage || null,

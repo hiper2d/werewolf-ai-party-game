@@ -1,7 +1,6 @@
 # Bugs and improvements
 
-- We erase resolvedNightState too fast. I noticed that abducted detective is not in the skipped roles. The GM's summary
-  doesn't reflect the detective at all in this case. It is also too long.
+- Implement Axiom logging in vercel
 - Add game rules page. Add hints to roles on the game prev
 - Add Google voices
 - "Keep Going" doesn't block the input while the game master is thinking. We should show the Game Master thinking in the

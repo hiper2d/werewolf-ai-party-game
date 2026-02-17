@@ -2,12 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/firebase/server';
 import {GAME_STATES, Bot, Game} from "@/app/api/game-models";
 import {recalculateDayActivity} from "@/app/api/bot-actions";
+import {auth} from "@/auth";
 
 export async function DELETE(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const session = await auth();
+        if (!session || !session.user?.email) {
+            return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+        }
+
         const { id: gameId } = await params;
         const { messageId } = await request.json();
 
@@ -64,8 +70,14 @@ export async function DELETE(
         }
         
         const gameData = gameDoc.data() as Game;
+
+        // Verify ownership
+        if ((gameData as any).ownerEmail && (gameData as any).ownerEmail !== session.user!.email) {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        }
+
         const currentDay = gameData.currentDay;
-        
+
         // Reset bots that were eliminated on the current day
         // Preserve token usage costs even when resetting bots
         const restoredBots = gameData.bots.map((bot: Bot) => {

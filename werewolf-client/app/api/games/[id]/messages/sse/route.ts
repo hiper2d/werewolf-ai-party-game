@@ -21,6 +21,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         return new Response('Game not found', { status: 404 });
     }
 
+    // Verify ownership
+    if (game.ownerEmail && game.ownerEmail !== session.user.email) {
+        return new Response('Forbidden', { status: 403 });
+    }
+
     // Get user data to match with game
     const user = await getUserFromFirestore(session.user.email);
     if (!user) {
