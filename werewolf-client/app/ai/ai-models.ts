@@ -31,8 +31,8 @@ export const SupportedAiKeyNames: Record<string, string> = {
 export const LLM_CONSTANTS = {
     CLAUDE_4_OPUS: 'Claude 4.6 Opus',
     CLAUDE_4_OPUS_THINKING: 'Claude 4.6 Opus (Thinking)',
-    CLAUDE_4_SONNET: 'Claude 4.5 Sonnet',
-    CLAUDE_4_SONNET_THINKING: 'Claude 4.5 Sonnet (Thinking)',
+    CLAUDE_4_SONNET: 'Claude 4.6 Sonnet',
+    CLAUDE_4_SONNET_THINKING: 'Claude 4.6 Sonnet (Thinking)',
     CLAUDE_4_HAIKU: 'Claude 4.5 Haiku',
     CLAUDE_4_HAIKU_THINKING: 'Claude 4.5 Haiku (Thinking)',
     DEEPSEEK_CHAT: 'DeepSeek Chat',
@@ -106,7 +106,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         }
     },
     [LLM_CONSTANTS.CLAUDE_4_SONNET]: {
-        modelApiName: 'claude-sonnet-4-5',
+        modelApiName: 'claude-sonnet-4-6',
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
         hasThinking: false,
         freeTier: {
@@ -115,7 +115,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         }
     },
     [LLM_CONSTANTS.CLAUDE_4_SONNET_THINKING]: {
-        modelApiName: 'claude-sonnet-4-5',
+        modelApiName: 'claude-sonnet-4-6',
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
         hasThinking: true,
         freeTier: {
