@@ -22,6 +22,7 @@ interface GameChatProps {
     clearNightMessages?: boolean;
     onErrorHandled?: () => void;
     isExternalLoading?: boolean;
+    gameControls?: React.ReactNode;
 }
 
 interface BotAnswer {
@@ -363,7 +364,7 @@ function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcludin
     );
 }
 
-export default function GameChat({ gameId, game, onGameStateChange, clearNightMessages, onErrorHandled, isExternalLoading }: GameChatProps) {
+export default function GameChat({ gameId, game, onGameStateChange, clearNightMessages, onErrorHandled, isExternalLoading, gameControls }: GameChatProps) {
     const [messages, setMessages] = useState<GameMessage[]>([]);
     const [newMessage, setNewMessage] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
@@ -380,6 +381,7 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
     const [isRecording, setIsRecording] = useState(false);
     const [isTranscribing, setIsTranscribing] = useState(false);
     const [textareaRows, setTextareaRows] = useState(2);
+    const [isInputFocused, setIsInputFocused] = useState(false);
     const [selectedDay, setSelectedDay] = useState(game.currentDay);
     const [isLoadingMessages, setIsLoadingMessages] = useState(false);
     const [showDaySelector, setShowDaySelector] = useState(false);
@@ -1328,7 +1330,7 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
     };
 
     return (
-        <div className="flex flex-col h-full theme-border border rounded-lg p-4">
+        <div className="flex flex-col">
             <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                     <span className="text-xl font-bold theme-text-primary">
@@ -1343,7 +1345,7 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
                     )}
                     {availableDays.length > 1 && (
                         <div className="flex items-center gap-2" ref={daySelectorRef}>
-                            <span className="text-sm theme-text-secondary">History:</span>
+                            <span className="text-sm theme-text-secondary hidden sm:inline">History:</span>
                             <div className="relative">
                                 <button
                                     type="button"
@@ -1383,7 +1385,8 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
                     onDismiss={handleDismissError}
                 />
             )}
-            <div className="flex-1 overflow-y-auto mb-4 p-2 theme-bg-card theme-border border rounded" style={{ minHeight: '200px' }}>
+            {/* Messages area - natural flow, no internal scroll */}
+            <div className="mb-4 p-2 theme-bg-card theme-border border rounded">
                 {isLoadingMessages ? (
                     <div className="text-center theme-text-secondary text-sm py-4">
                         Loading Day {selectedDay}...
@@ -1433,9 +1436,10 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
                 )}
                 <div ref={messagesEndRef} />
             </div>
-            <form onSubmit={sendMessage} className="flex gap-2 items-stretch">
-                {/* Textarea on the left - expandable from 2 to 5 rows */}
-                <div className="relative flex-grow">
+
+            {/* Input area */}
+            <form onSubmit={sendMessage} className="sticky bottom-0 z-10 bg-[rgb(var(--color-page-bg-start))] pt-1">
+                <div className="relative">
                     <MentionDropdown
                         candidates={mentionCandidates}
                         selectedIndex={mentionState.selectedIndex}
@@ -1447,99 +1451,112 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
                         value={newMessage}
                         onChange={handleTextareaChange}
                         onKeyDown={handleTextareaKeyDown}
+                        onFocus={() => setIsInputFocused(true)}
+                        onBlur={() => {
+                            // Delay to allow button clicks to register before hiding toolbar
+                            setTimeout(() => setIsInputFocused(false), 150);
+                        }}
                         disabled={!isInputEnabled()}
                         rows={textareaRows}
-                        className={`w-full h-full p-3 rounded bg-input border border-input-border text-input-text placeholder-input-placeholder focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none
-                            ${!isInputEnabled() ? 'opacity-50 cursor-not-allowed' : ''}
-                            min-h-[6.25rem]`}
+                        className={`w-full p-3 rounded bg-input border border-input-border text-input-text placeholder-input-placeholder focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none
+                            ${!isInputEnabled() ? 'opacity-50 cursor-not-allowed' : ''}`}
                         placeholder={getInputPlaceholder()}
                     />
                 </div>
 
-                {/* Button grid on the right - 2 rows x 2 columns */}
-                <div className="flex flex-col justify-between min-w-[120px]">
-                    {/* First row - Send button (stretched across both columns) */}
-                    <button
-                        type="submit"
-                        disabled={!isInputEnabled() || isProcessing}
-                        className={`w-full h-12 ${buttonTransparentStyle} ${!isInputEnabled() || isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        title={isProcessing ? "Waiting for response..." : !isInputEnabled() ? "Game is not ready for input" : "Send your message to all players"}
-                    >
-                        {isProcessing ? (
-                            <div className="flex items-center justify-center gap-2">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin">
-                                    <path d="M21 12a9 9 0 11-6.219-8.56"/>
-                                </svg>
-                                <span>Sending...</span>
-                            </div>
-                        ) : 'Send'}
-                    </button>
-                    
-                    {/* Second row - Three icon buttons */}
-                    <div className="flex gap-1">
-                        {/* Expand/Shrink button - always enabled */}
+                {/* Toolbar row below textarea: text buttons left, icon buttons right */}
+                <div className={`flex items-center justify-between mt-1 ${isInputFocused ? 'flex' : 'hidden lg:flex'}`}>
+                    {/* Left group: text buttons (Send + game controls) */}
+                    <div className="flex items-center gap-1 flex-wrap">
+                        {/* Send button */}
                         <button
-                            type="button"
-                            onClick={() => setTextareaRows(prev => prev === 2 ? 10 : 2)}
-                            className={`flex-1 h-12 ${buttonTransparentStyle}`}
-                            title="Expand/shrink text area"
+                            type="submit"
+                            disabled={!isInputEnabled() || isProcessing}
+                            className={`h-10 px-4 ${buttonTransparentStyle} ${!isInputEnabled() || isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            title={isProcessing ? "Waiting for response..." : !isInputEnabled() ? "Game is not ready for input" : "Send your message to all players"}
                         >
-                            <span className="text-lg">
-                                {textareaRows === 2 ? '⬆️' : '⬇️'}
-                            </span>
-                        </button>
-                        
-                        {/* AI Suggestion button - only show during day discussion */}
-                        {game.gameState === GAME_STATES.DAY_DISCUSSION ? (
-                            <button
-                                type="button"
-                                onClick={handleGetSuggestion}
-                                disabled={!isInputEnabled() || isGettingSuggestion}
-                                className={`flex-1 h-12 ${buttonTransparentStyle} ${!isInputEnabled() || isGettingSuggestion ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                title={isGettingSuggestion ? "Getting suggestion..." : "Get AI suggestion for your response"}
-                            >
-                                {isGettingSuggestion ? (
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin mx-auto">
+                            {isProcessing ? (
+                                <div className="flex items-center gap-2">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin">
                                         <path d="M21 12a9 9 0 11-6.219-8.56"/>
                                     </svg>
-                                ) : (
-                                    <span className="text-lg">💡</span>
-                                )}
-                            </button>
-                        ) : (
-                            <div className="flex-1"></div>
+                                    <span className="text-sm">Sending...</span>
+                                </div>
+                            ) : <span className="text-sm">Send</span>}
+                        </button>
+
+                        {/* Game controls (Vote, Keep Going, etc.) */}
+                        {gameControls && (
+                            <>
+                                <div className="w-px h-8 bg-gray-300 dark:bg-neutral-600 mx-1" />
+                                {gameControls}
+                            </>
                         )}
-                        
-                        {/* Microphone button for voice input */}
+                    </div>
+
+                    {/* Right group: icon buttons (Mic, Suggestion, Expand) */}
+                    <div className="flex items-center gap-1">
+                        {/* Microphone button */}
                         <button
                             type="button"
                             onClick={handleToggleRecording}
                             disabled={!isMicrophoneEnabled() || isTranscribing}
-                            className={`flex-1 h-12 transition-colors ${
-                                isRecording 
-                                    ? `${buttonTransparentStyle} animate-pulse` 
+                            className={`h-10 w-10 transition-colors ${
+                                isRecording
+                                    ? `${buttonTransparentStyle} animate-pulse`
                                     : buttonTransparentStyle
                             } ${!isMicrophoneEnabled() || isTranscribing ? 'opacity-50 cursor-not-allowed' : ''}`}
                             title={
-                                isTranscribing 
-                                    ? "Transcribing audio..." 
-                                    : isRecording 
-                                        ? "Stop recording and transcribe" 
+                                isTranscribing
+                                    ? "Transcribing audio..."
+                                    : isRecording
+                                        ? "Stop recording and transcribe"
                                         : "Start voice recording"
                             }
                         >
                             {isTranscribing ? (
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin mx-auto">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin mx-auto">
                                     <path d="M21 12a9 9 0 11-6.219-8.56"/>
                                 </svg>
                             ) : (
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mx-auto">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mx-auto">
                                     <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
                                     <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
                                     <line x1="12" y1="19" x2="12" y2="23"/>
                                     <line x1="8" y1="23" x2="16" y2="23"/>
                                 </svg>
                             )}
+                        </button>
+
+                        {/* AI Suggestion button */}
+                        {game.gameState === GAME_STATES.DAY_DISCUSSION && (
+                            <button
+                                type="button"
+                                onClick={handleGetSuggestion}
+                                disabled={!isInputEnabled() || isGettingSuggestion}
+                                className={`h-10 w-10 ${buttonTransparentStyle} ${!isInputEnabled() || isGettingSuggestion ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                title={isGettingSuggestion ? "Getting suggestion..." : "Get AI suggestion for your response"}
+                            >
+                                {isGettingSuggestion ? (
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin mx-auto">
+                                        <path d="M21 12a9 9 0 11-6.219-8.56"/>
+                                    </svg>
+                                ) : (
+                                    <span className="text-sm">💡</span>
+                                )}
+                            </button>
+                        )}
+
+                        {/* Expand/Shrink button */}
+                        <button
+                            type="button"
+                            onClick={() => setTextareaRows(prev => prev === 2 ? 10 : 2)}
+                            className={`h-10 w-10 ${buttonTransparentStyle}`}
+                            title="Expand/shrink text area"
+                        >
+                            <span className="text-sm">
+                                {textareaRows === 2 ? '⬆️' : '⬇️'}
+                            </span>
                         </button>
                     </div>
                 </div>

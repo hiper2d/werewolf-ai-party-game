@@ -111,9 +111,7 @@ html {
 }
 
 [data-theme='dark'] .navbar-root {
-  background-color: rgba(18, 18, 22, 0.7);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  background-color: rgb(18, 18, 22);
   border-bottom-color: rgba(160, 160, 170, 0.35);
 }
 
@@ -239,4 +237,12 @@ html {
 
 .theme-shadow {
   box-shadow: 0 4px 16px var(--color-card-shadow);
+}
+
+.hide-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
 }

@@ -40,17 +40,17 @@ export default function RootLayout(
     { children }: Readonly<{ children: React.ReactNode; }>
 ) {
   return (
-      <html suppressHydrationWarning lang="en" className={`${inter.variable} ${roboto_mono.variable} h-full`}>
+      <html suppressHydrationWarning lang="en" className={`${inter.variable} ${roboto_mono.variable} min-h-full`}>
           <head>
             <script dangerouslySetInnerHTML={{ __html: themeScript }} />
           </head>
-          <body className="font-inter m-0 p-0 h-full">
+          <body className="font-inter m-0 p-0 min-h-full">
             <ThemeProvider>
               <AuthProvider>
-                <div className="flex flex-col h-screen">
+                <div className="flex flex-col min-h-screen">
                   <NavBar />
-                  <main className="flex-1 min-h-0 flex app-shell">
-                    <div className="w-full max-w-7xl mx-auto p-4 sm:p-6 flex flex-col">
+                  <main className="flex-1 flex app-shell">
+                    <div className="w-full max-w-7xl mx-auto p-2 sm:p-4 lg:p-6">
                       {children}
                     </div>
                   </main>

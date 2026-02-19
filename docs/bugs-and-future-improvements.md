@@ -1,6 +1,7 @@
 # Bugs and improvements
 
 - Implement Axiom logging in vercel
+- Reference models by some ids rather than by names. This will make the update easier
 - Redesign UI to look good on mobiles
 - Add game rules page. Add hints to roles on the game prev
 - Add Google voices

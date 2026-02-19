@@ -41,7 +41,7 @@ export default function VoiceProviderSelector({
     return (
         <div className="space-y-3">
             <h3 className="text-lg font-semibold">Voice Provider</h3>
-            <p className="text-sm text-gray-400 mb-4">
+            <p className="text-sm theme-text-secondary mb-4">
                 Select the text-to-speech provider for new games. This setting is locked once a game is created.
             </p>
             <div className="space-y-2">
@@ -54,10 +54,10 @@ export default function VoiceProviderSelector({
                             disabled={isUpdating || isUnsupported}
                             className={`w-full p-4 rounded border text-left transition-all ${
                                 selectedProvider === provider
-                                    ? 'border-green-500 bg-green-500 bg-opacity-20'
+                                    ? 'border-green-500 bg-green-500/20'
                                     : isUnsupported
-                                        ? 'border-gray-700 bg-gray-800 opacity-60'
-                                        : 'border-white border-opacity-30 hover:border-opacity-60'
+                                        ? 'theme-border opacity-60 bg-gray-100 dark:bg-neutral-800'
+                                        : 'theme-border hover:border-blue-400 dark:hover:border-blue-500'
                             } ${isUpdating || isUnsupported ? 'cursor-not-allowed' : 'cursor-pointer'}`}
                         >
                             <div className="flex items-center justify-between">
@@ -65,17 +65,17 @@ export default function VoiceProviderSelector({
                                     <span className="font-semibold text-lg">
                                         {VOICE_PROVIDER_DISPLAY_NAMES[provider]}
                                         {isUnsupported && (
-                                            <span className="ml-2 text-xs font-normal text-yellow-500 bg-yellow-500 bg-opacity-10 px-2 py-0.5 rounded border border-yellow-500 border-opacity-30">
+                                            <span className="ml-2 text-xs font-normal text-yellow-600 dark:text-yellow-500 bg-yellow-500/10 px-2 py-0.5 rounded border border-yellow-500/30">
                                                 Coming Soon
                                             </span>
                                         )}
                                     </span>
-                                    <p className="text-sm text-gray-400 mt-1">
+                                    <p className="text-sm theme-text-secondary mt-1">
                                         {VOICE_PROVIDER_DESCRIPTIONS[provider]}
                                     </p>
                                 </div>
                                 {selectedProvider === provider && (
-                                    <span className="text-green-400 text-xl">&#10003;</span>
+                                    <span className="text-green-600 dark:text-green-400 text-xl">&#10003;</span>
                                 )}
                             </div>
                         </button>
@@ -83,7 +83,7 @@ export default function VoiceProviderSelector({
                 })}
             </div>
             {isUpdating && (
-                <p className="text-sm text-gray-400 mt-2">Updating...</p>
+                <p className="text-sm theme-text-secondary mt-2">Updating...</p>
             )}
         </div>
     );

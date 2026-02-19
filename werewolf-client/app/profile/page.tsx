@@ -27,63 +27,62 @@ export default async function UserProfilePage() {
         voiceProvider = user?.voiceProvider || getDefaultVoiceProvider();
     } catch (error) {
         console.error('Error fetching user data:', error);
-        // User might not exist yet, use defaults
         userTier = USER_TIERS.FREE;
         voiceProvider = getDefaultVoiceProvider();
     }
 
     return (
-        <div className="flex h-full text-white overflow-hidden">
-            {/* Left column */}
-            <div className="w-1/4 flex flex-col pr-4 overflow-auto h-full">
+        <div className="flex flex-col lg:flex-row theme-text-primary">
+            {/* Left column - User info & spendings */}
+            <div className="lg:w-1/4 lg:sticky lg:top-20 lg:h-[calc(100vh-5rem)] lg:overflow-auto hide-scrollbar lg:pr-4 mb-6 lg:mb-0">
                 {/* User info */}
-                <div className="bg-black bg-opacity-30 border border-white border-opacity-30 rounded p-4 mb-4">
+                <div className="mb-4">
                     <h1 className="text-2xl font-bold mb-2">User Profile</h1>
-                    <div className="text-sm text-gray-300 mb-2">
-                        <Image src={session.user?.image ?? '/mememan.webp'} width="100" height="100" alt="User profile" className="rounded-full" />
-                    </div>
-                    <div className="text-sm text-gray-300 mb-2">
-                        <p>Name: {session.user?.name}</p>
-                        <p>Email: {session.user?.email}</p>
-                        <p className="mt-2">
-                            <span className="font-semibold">Tier: </span>
-                            <span className={userTier === USER_TIERS.API ? 'text-green-400' : 'text-yellow-400'}>
-                                {userTier.toUpperCase()}
-                            </span>
-                        </p>
+                    <div className="flex items-center gap-4 mb-3">
+                        <Image src={session.user?.image ?? '/mememan.webp'} width="64" height="64" alt="User profile" className="rounded-full" />
+                        <div className="text-sm theme-text-secondary">
+                            <p>{session.user?.name}</p>
+                            <p>{session.user?.email}</p>
+                            <p className="mt-1">
+                                <span className="font-semibold">Tier: </span>
+                                <span className={userTier === USER_TIERS.API ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}>
+                                    {userTier.toUpperCase()}
+                                </span>
+                            </p>
+                        </div>
                     </div>
                 </div>
 
                 {/* Monthly Spendings */}
-                <div className="bg-black bg-opacity-30 border border-white border-opacity-30 rounded p-4 mb-4">
-                    <h2 className="text-xl font-bold mb-2">Monthly Spendings</h2>
+                <div className="border-t theme-border-subtle pt-3">
+                    <h2 className="text-lg font-bold mb-2">Monthly Spendings</h2>
                     <ul>
                         {buildMonthlySpendings(user?.spendings ?? []).map(({ label, amount }) => (
-                            <li key={label} className="mb-2 flex justify-between text-sm">
+                            <li key={label} className="mb-2 flex justify-between text-sm theme-text-secondary">
                                 <span>{label}</span>
                                 <span className="font-semibold">{formatCurrency(amount)}</span>
                             </li>
                         ))}
                     </ul>
                 </div>
-
-                {/* Voice Provider Selection */}
-                <div className="bg-black bg-opacity-30 border border-white border-opacity-30 rounded p-4 flex-1 overflow-auto">
-                    <VoiceProviderSelector
-                        userId={session.user?.email!}
-                        initialProvider={voiceProvider}
-                    />
-                </div>
             </div>
 
-            {/* Right column - Tier-based content */}
-            <div className="w-3/4 h-full overflow-hidden">
-                <div className="h-full flex flex-col bg-black bg-opacity-30 border border-white border-opacity-30 rounded">
+            {/* Right column - Main content */}
+            <div className="flex-1 min-w-0 lg:pl-4">
+                <div className="flex flex-col">
                     {userTier === USER_TIERS.API ? (
                         <ApiKeyManagement initialApiKeys={apiKeys} userId={session.user?.email!} />
                     ) : (
                         <FreeUserLimits userId={session.user?.email!} />
                     )}
+
+                    {/* Voice Provider - in main panel */}
+                    <div className="mt-6 border-t theme-border-subtle pt-6">
+                        <VoiceProviderSelector
+                            userId={session.user?.email!}
+                            initialProvider={voiceProvider}
+                        />
+                    </div>
                 </div>
             </div>
         </div>

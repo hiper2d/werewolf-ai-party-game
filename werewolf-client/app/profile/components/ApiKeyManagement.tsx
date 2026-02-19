@@ -45,7 +45,7 @@ export default function ApiKeyManagement({ initialApiKeys, userId }: { initialAp
         setIsLoading(true);
         try {
             await updateUserTier(userId, 'free');
-            router.refresh(); // Refresh the page to show Free tier UI
+            router.refresh();
         } catch (error) {
             console.error('Failed to switch tier:', error);
             alert('Failed to switch tier. Please try again.');
@@ -54,7 +54,6 @@ export default function ApiKeyManagement({ initialApiKeys, userId }: { initialAp
         }
     };
 
-    // Create a flat list of all models with their pricing
     const allModels = Object.entries(SupportedAiModels).map(([modelName, config]) => {
         const pricing = MODEL_PRICING[config.modelApiName];
         const baseInputPrice = pricing?.inputPrice || 0;
@@ -74,72 +73,79 @@ export default function ApiKeyManagement({ initialApiKeys, userId }: { initialAp
 
     return (
         <>
-            <div className="p-4 border-b border-white border-opacity-20">
+            <div className="mb-4">
                 <div className="flex justify-between items-start gap-4">
                     <div className="flex-1">
                         <h2 className="text-2xl font-bold mb-2">API Key Management</h2>
-                        <p className="text-gray-300 text-sm">
+                        <p className="theme-text-secondary text-sm">
                             Add your API keys to access all available AI models with no usage limits.
                         </p>
                     </div>
                     <button
                         onClick={handleSwitchToFreeTier}
                         disabled={isLoading}
-                        className="px-3 py-1.5 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-800 disabled:cursor-not-allowed text-white text-sm rounded transition whitespace-nowrap flex-shrink-0"
+                        className="px-3 py-1.5 bg-gray-500 hover:bg-gray-600 dark:bg-gray-600 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm rounded transition whitespace-nowrap flex-shrink-0"
                     >
                         {isLoading ? 'Switching...' : 'Switch to Free Tier'}
                     </button>
                 </div>
             </div>
 
-            <div className="flex-grow overflow-auto p-4 space-y-6">
+            <div className="space-y-6">
                 {/* Current API Keys */}
-                <div className="bg-black bg-opacity-20 border border-white border-opacity-20 rounded p-4">
+                <div>
                     <h3 className="text-xl font-bold mb-4">Your API Keys</h3>
                     <ApiKeyList initialApiKeys={initialApiKeys} userId={userId} />
                 </div>
 
-                {/* Model Pricing Information - Single Table */}
-                <div className="bg-black bg-opacity-20 border border-white border-opacity-20 rounded p-4">
+                {/* Add API Key Form */}
+                <div className="border-t theme-border-subtle pt-4">
+                    <AddApiKeyForm userId={userId} />
+                </div>
+
+                {/* Model Pricing Information */}
+                <div className="border-t theme-border-subtle pt-4">
                     <h3 className="text-xl font-bold mb-4">Available Models</h3>
-                    <table className="w-full text-sm">
-                        <thead>
-                            <tr className="border-b border-white border-opacity-30">
-                                <th className="text-left py-2">Model</th>
-                                <th className="text-right py-2">Input Cost*</th>
-                                <th className="text-right py-2">Output Cost*</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {allModels.map((model, index) => (
-                                <tr key={index} className="border-b border-white border-opacity-10">
-                                    <td className="py-2">{model.name}</td>
-                                    <td className="py-2 text-right">
-                                        <div>{model.inputDisplay.base}</div>
-                                        {model.inputDisplay.extended && (
-                                            <div className="text-xs text-gray-400">{model.inputDisplay.extended}</div>
-                                        )}
-                                    </td>
-                                    <td className="py-2 text-right">
-                                        <div>{model.outputDisplay.base}</div>
-                                        {model.outputDisplay.extended && (
-                                            <div className="text-xs text-gray-400">{model.outputDisplay.extended}</div>
-                                        )}
-                                    </td>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="border-b theme-border">
+                                    <th className="text-left py-2">Model</th>
+                                    <th className="text-right py-2">Input Cost*</th>
+                                    <th className="text-right py-2">Output Cost*</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                    <p className="text-xs text-gray-400 mt-2">* Per million tokens (extended context rates shown when available)</p>
+                            </thead>
+                            <tbody>
+                                {allModels.map((model, index) => (
+                                    <tr key={index} className="border-b theme-border-subtle">
+                                        <td className="py-2">{model.name}</td>
+                                        <td className="py-2 text-right">
+                                            <div>{model.inputDisplay.base}</div>
+                                            {model.inputDisplay.extended && (
+                                                <div className="text-xs theme-text-secondary">{model.inputDisplay.extended}</div>
+                                            )}
+                                        </td>
+                                        <td className="py-2 text-right">
+                                            <div>{model.outputDisplay.base}</div>
+                                            {model.outputDisplay.extended && (
+                                                <div className="text-xs theme-text-secondary">{model.outputDisplay.extended}</div>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                    <p className="text-xs theme-text-secondary mt-2">* Per million tokens (extended context rates shown when available)</p>
                 </div>
 
                 {/* TTS/STT Options */}
-                <div className="bg-black bg-opacity-20 border border-white border-opacity-20 rounded p-4">
+                <div className="border-t theme-border-subtle pt-4">
                     <h3 className="text-xl font-bold mb-4">Voice Options (TTS/STT)</h3>
-                    <p className="text-sm text-gray-300 mb-3">
-                        Currently, only OpenAI provides Text-to-Speech (TTS) and Speech-to-Text (STT) capabilities. Both free and API tiers can use these features when you supply an OpenAI key—this view simply makes it easier to store and reuse those keys.
+                    <p className="text-sm theme-text-secondary mb-3">
+                        Currently, only OpenAI provides Text-to-Speech (TTS) and Speech-to-Text (STT) capabilities. Both free and API tiers can use these features when you supply an OpenAI key.
                     </p>
-                    <div className="text-xs text-gray-400">
+                    <div className="text-xs theme-text-secondary">
                         <p className="mb-2"><strong>Available with:</strong> {API_KEY_CONSTANTS.OPENAI}</p>
                         <p className="mb-1"><strong>TTS Model:</strong> {AUDIO_MODEL_CONSTANTS.TTS}</p>
                         <p><strong>STT Model:</strong> {AUDIO_MODEL_CONSTANTS.STT}</p>
@@ -148,10 +154,6 @@ export default function ApiKeyManagement({ initialApiKeys, userId }: { initialAp
                         </p>
                     </div>
                 </div>
-            </div>
-
-            <div className="p-4 border-t border-white border-opacity-30">
-                <AddApiKeyForm userId={userId} />
             </div>
         </>
     );
