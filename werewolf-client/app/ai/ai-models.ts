@@ -39,11 +39,11 @@ export const LLM_CONSTANTS = {
     DEEPSEEK_REASONER: 'DeepSeek Reasoner',
     GPT_5: 'GPT-5.2',
     GPT_5_MINI: 'GPT-5-mini',
-    GEMINI_3_PRO: 'Gemini 3 Pro Preview',
+    GEMINI_3_PRO: 'Gemini 3.1 Pro Preview',
     GEMINI_3_FLASH: 'Gemini 3 Flash Preview',
     MISTRAL_3_LARGE: 'Mistral Large 3',
     MISTRAL_3_MEDIUM: 'Mistral Medium 3.1',
-    MISTRAL_MAGISTRAL: 'Magistral Medium 1.1 (Thinking)',
+    MISTRAL_MAGISTRAL: 'Magistral Medium 1.2 (Thinking)',
     GROK_4: 'Grok 4',
     GROK_4_1_FAST_REASONING: 'Grok 4.1 Fast Reasoning',
     KIMI_K2: 'Kimi K2',
@@ -184,7 +184,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         }
     },
     [LLM_CONSTANTS.GEMINI_3_PRO]: {
-        modelApiName: 'gemini-3-pro-preview',
+        modelApiName: 'gemini-3.1-pro-preview',
         apiKeyName: API_KEY_CONSTANTS.GOOGLE,
         hasThinking: true,
         freeTier: {
