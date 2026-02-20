@@ -24,14 +24,17 @@
 *   Firebase project (Auth & Firestore enabled).
 *   `.env.local` configured with API keys (see `werewolf-client/README.md` or existing environment configs).
 
-### Commands (Run from `werewolf-client/` directory)
+### Commands
 
+#### From root directory:
+*   **Deploy Firestore Indexes:** `firebase deploy --only firestore:indexes` (Requires Firebase CLI)
+
+#### From `werewolf-client/` directory:
 *   **Install Dependencies:** `npm install`
 *   **Development Server:** `npm run dev` (Runs on `http://localhost:3000`)
 *   **Build:** `npm run build`
 *   **Test:** `npm test`
 *   **Lint:** `npm run lint`
-*   **Deploy Firestore Indexes:** `firebase deploy --only firestore:indexes` (Requires Firebase CLI)
 
 ## Architecture & Logic
 

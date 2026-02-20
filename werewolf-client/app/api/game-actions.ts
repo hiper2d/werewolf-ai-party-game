@@ -13,8 +13,8 @@ import {
     GamePreviewWithGeneratedBots,
     getRandomVoiceForGender,
     MessageType,
-    PLAY_STYLES,
     PLAY_STYLE_CONFIGS,
+    PLAY_STYLES,
     RECIPIENT_ALL,
     RECIPIENT_DETECTIVE,
     RECIPIENT_DOCTOR,
@@ -23,17 +23,16 @@ import {
     ROLE_CONFIGS,
     SystemErrorMessage,
     User,
-    UserTier,
     USER_TIERS
 } from "@/app/api/game-models";
 import {auth} from "@/auth";
 import {AgentFactory} from "@/app/ai/agent-factory";
 import {STORY_SYSTEM_PROMPT, STORY_USER_PROMPT} from "@/app/ai/prompts/story-gen-prompts";
 import {getUserTierAndApiKeys} from "@/app/utils/tier-utils";
-import {getUserTier, updateUserMonthlySpending, getVoiceProvider} from "@/app/api/user-actions";
-import {getVoiceConfig, getDefaultVoiceProvider} from "@/app/ai/voice-config";
+import {getUserTier, getVoiceProvider, updateUserMonthlySpending} from "@/app/api/user-actions";
+import {getDefaultVoiceProvider, getVoiceConfig} from "@/app/ai/voice-config";
 import {normalizeSpendings} from "@/app/utils/spending-utils";
-import {convertToAIMessage, parseResponseToObj} from "@/app/utils/message-utils";
+import {convertToAIMessage} from "@/app/utils/message-utils";
 import {LLM_CONSTANTS} from "@/app/ai/ai-models";
 import {
     consumeModelUsage,
@@ -47,14 +46,19 @@ import {format} from "@/app/ai/prompts/utils";
 import {GameSetupZodSchema} from "@/app/ai/prompts/zod-schemas";
 import {ensureUserCanAccessGame} from "@/app/api/tier-guards";
 
-export async function getAllGames(ownerEmail: string): Promise<Game[]> {
+export async function getAllGames(ownerEmail?: string): Promise<Game[]> {
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
-    const collectionRef = db.collection('games').where('ownerEmail', '==', ownerEmail);
+    let collectionRef: FirebaseFirestore.Query<FirebaseFirestore.DocumentData> = db.collection('games');
+    
+    if (ownerEmail) {
+        collectionRef = collectionRef.where('ownerEmail', '==', ownerEmail);
+    }
+    
     const snapshot = await collectionRef.get();
 
-    return snapshot.docs.map((doc) => gameFromFirestore(doc.id, doc.data()));
+    return snapshot.docs.map((doc: any) => gameFromFirestore(doc.id, doc.data()));
 }
 
 export async function removeGameById(id: string, ownerEmail: string) {
@@ -78,7 +82,7 @@ export async function removeGameById(id: string, ownerEmail: string) {
         .get();
 
     // Delete messages individually
-    const messageDeletePromises = messagesSnapshot.docs.map(doc => doc.ref.delete());
+    const messageDeletePromises = messagesSnapshot.docs.map((doc: any) => doc.ref.delete());
     await Promise.all(messageDeletePromises);
 
     // Delete the game
@@ -113,7 +117,7 @@ export async function getGameMessages(gameId: string): Promise<GameMessage[]> {
         .orderBy('timestamp', 'asc')
         .get();
 
-    return messagesSnapshot.docs.map(doc => ({
+    return messagesSnapshot.docs.map((doc: any) => ({
         id: doc.id,
         recipientName: doc.data().recipientName,
         authorName: doc.data().authorName,
@@ -122,44 +126,6 @@ export async function getGameMessages(gameId: string): Promise<GameMessage[]> {
         day: doc.data().day,
         timestamp: doc.data().timestamp
     }));
-}
-
-export async function copyGame(sourceGameId: string): Promise<string> {
-    if (!db) {
-        throw new Error('Firestore is not initialized');
-    }
-
-    // Get the source game
-    const gameRef = db.collection('games').doc(sourceGameId);
-    const gameSnap = await gameRef.get();
-
-    if (!gameSnap.exists) {
-        throw new Error('Source game not found');
-    }
-
-    // Get all messages for the source game
-    const messagesSnapshot = await gameRef.collection('messages')
-        .orderBy('timestamp', 'asc')
-        .get();
-
-    // Create the new game
-    const newGameRef = db.collection('games').doc();
-    const gameData = gameSnap.data();
-    if (!gameData) {
-        throw new Error('Source game data is empty');
-    }
-    await newGameRef.set(gameData);
-
-    // Create a messages subcollection in the new game
-    const messagesPromises = messagesSnapshot.docs.map(async (messageDoc) => {
-        const newMessageRef = newGameRef.collection('messages').doc();
-        return newMessageRef.set(messageDoc.data());
-    });
-
-    // Wait for all message promises to resolve
-    await Promise.all(messagesPromises);
-
-    return newGameRef.id;
 }
 
 export async function previewGame(gamePreview: GamePreview): Promise<GamePreviewWithGeneratedBots> {
@@ -764,11 +730,11 @@ export async function getBotMessages(gameId: string, botName: string, day: numbe
     }
 
     // Execute all queries
-    const snapshots = await Promise.all(queries.map(query => query.get()));
+    const snapshots = await Promise.all(queries.map((query: any) => query.get()));
     
     // Combine all current day messages
-    snapshots.forEach(snapshot => {
-        snapshot.docs.forEach(doc => {
+    snapshots.forEach((snapshot: any) => {
+        snapshot.docs.forEach((doc: any) => {
             allMessages.push({
                 id: doc.id,
                 recipientName: doc.data().recipientName,

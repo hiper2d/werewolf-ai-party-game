@@ -76,14 +76,28 @@ To run the project locally, you need:
 
 ### Firebase Setup
 
-This project uses Firestore and Authentication from Firebase. You'll need to:
-1. Create a new Firebase project in the [Firebase Console](https://console.firebase.google.com/)
-2. Enable Firestore Database
-3. Enable Authentication (with GitHub and/or Google providers)
-4. Deploy Firestore indexes using Firebase CLI:
-   ```bash
-   firebase deploy --only firestore:indexes
-   ```
+This project uses Firestore and Authentication from Firebase.
+
+1.  Create a new Firebase project in the [Firebase Console](https://console.firebase.google.com/)
+2.  Enable Firestore Database
+3.  Enable Authentication (with GitHub and/or Google providers)
+4.  **Deploy Firestore indexes** from the **root directory**:
+    ```bash
+    # Login first if you haven't
+    npx firebase-tools login
+    
+    # Deploy indexes
+    npx firebase-tools deploy --only firestore:indexes
+    ```
+
+#### Troubleshooting Firebase CLI
+If you encounter `401 Unauthorized` or authentication errors:
+-   **Re-authenticate:** Run `npx firebase-tools login --reauth`.
+-   **Check Node Version:** The CLI might have issues with experimental Node versions (like v23+). Try using an LTS version (Node 20 or 22).
+-   **Manual Creation:** If the CLI still fails, create the index manually in the [Firebase Console](https://console.firebase.google.com/):
+    -   **Collection**: `games`
+    -   **Fields**: `ownerEmail` (Ascending), `createdAt` (Descending)
+    -   **Scope**: `Collection`
 
 ### Environment Variables
 

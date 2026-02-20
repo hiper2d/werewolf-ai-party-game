@@ -65,7 +65,7 @@ const GamePages = async ({searchParams}: {searchParams?: Promise<{error?: string
                     {games.map((game) => {
                         const isSameTier = game.createdWithTier === userTier;
                         const listClasses = [
-                            'theme-bg-card theme-border border rounded-lg p-4 transition-colors theme-shadow'
+                            'theme-bg-card theme-border border rounded-lg px-2 py-4 sm:px-4 transition-colors theme-shadow'
                         ];
                         if (isSameTier) {
                             listClasses.push('hover:opacity-90');
@@ -77,7 +77,7 @@ const GamePages = async ({searchParams}: {searchParams?: Promise<{error?: string
                             key={game.id}
                             className={listClasses.join(' ')}
                         >
-                            <div className="flex justify-between items-start gap-4">
+                            <div className="flex justify-between items-start gap-2">
                                 {isSameTier ? (
                                     <Link href={`/games/${game.id}`} className="flex-grow">
                                         <GameListEntryContent game={game} />
@@ -112,19 +112,25 @@ function GameListEntryContent({
 }) {
     const stateLabel = game.gameState.toLowerCase().replace(/_/g, ' ');
     return (
-        <div className={`flex flex-col ${locked ? 'pointer-events-none' : ''}`}>
-            <div className="flex justify-between items-start gap-4">
-                <div className="flex-1">
-                    <h2 className="text-lg capitalize theme-text-primary font-semibold">{game.theme}</h2>
-                    <p className="text-sm theme-text-secondary mt-1">{game.description}</p>
-                </div>
-                <div className="text-right whitespace-nowrap text-xs theme-text-secondary">
-                    <div>{formatCreationDate(game.createdAt)}</div>
-                    <div className="mt-1">
+        <div className={`flex flex-col gap-1.5 ${locked ? 'pointer-events-none' : ''}`}>
+            {/* Top row: Theme and Date/Status */}
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-4">
+                <h2 className="text-lg capitalize theme-text-primary font-semibold truncate">{game.theme}</h2>
+                <div className="flex flex-wrap items-center gap-x-2 text-xs theme-text-secondary">
+                    <span>{formatCreationDate(game.createdAt)}</span>
+                    <span className="hidden sm:inline opacity-40">•</span>
+                    <span className="font-medium theme-text-primary uppercase tracking-tight bg-opacity-10 bg-gray-500 px-1.5 py-0.5 rounded sm:bg-transparent sm:p-0">
                         Day {game.currentDay} • {stateLabel}
-                    </div>
-                    <div className="mt-1">Tier: {game.createdWithTier.toUpperCase()}</div>
+                    </span>
                 </div>
+            </div>
+            
+            {/* Description row: Full width */}
+            <p className="text-sm theme-text-secondary line-clamp-2 leading-relaxed">{game.description}</p>
+            
+            {/* Bottom row: Tier */}
+            <div className="text-[10px] uppercase tracking-wider theme-text-secondary opacity-60">
+                Tier: {game.createdWithTier}
             </div>
         </div>
     );
