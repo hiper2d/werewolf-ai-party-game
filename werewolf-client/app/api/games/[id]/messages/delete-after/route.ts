@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/firebase/server';
-import {GAME_STATES, Bot, Game} from "@/app/api/game-models";
+import {GAME_STATES, Bot, Game, FREE_TIER_LIMITS} from "@/app/api/game-models";
 import {recalculateDayActivity} from "@/app/api/bot-actions";
 import {auth} from "@/auth";
 
@@ -78,6 +78,17 @@ export async function DELETE(
 
         const currentDay = gameData.currentDay;
 
+        // Enforce chat reset limit for free-tier games
+        if (gameData.createdWithTier === 'free') {
+            const currentResets = gameData.chatResetCounts?.[currentDay] ?? 0;
+            if (currentResets >= FREE_TIER_LIMITS.CHAT_RESETS_PER_GAME_DAY) {
+                return NextResponse.json(
+                    { error: `Free tier limit reached: you can reset chat up to ${FREE_TIER_LIMITS.CHAT_RESETS_PER_GAME_DAY} times per game day. Switch to API tier for unlimited resets.` },
+                    { status: 429 }
+                );
+            }
+        }
+
         // Reset bots that were eliminated on the current day
         // Preserve token usage costs even when resetting bots
         const restoredBots = gameData.bots.map((bot: Bot) => {
@@ -116,12 +127,17 @@ export async function DELETE(
 
         try {
             // Update game state first
-            await gameRef.update({
+            const updateData: Record<string, any> = {
                 gameState: targetGameState,
                 gameStateProcessQueue: [],
                 gameStateParamQueue: [],
-                bots: restoredBots
-            });
+                bots: restoredBots,
+            };
+            // Increment chat reset counter for free-tier games
+            if (gameData.createdWithTier === 'free') {
+                updateData[`chatResetCounts.${currentDay}`] = (gameData.chatResetCounts?.[currentDay] ?? 0) + 1;
+            }
+            await gameRef.update(updateData);
             console.log(`✅ Game state update successful (set to ${targetGameState})`);
 
             // Then delete the target message and everything after it

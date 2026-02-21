@@ -177,6 +177,7 @@ export interface Game {
     createdWithTier: UserTier; // Store the user's tier at the time the game was created
     votingHistory?: VotingDayResult[]; // History of voting results for each day
     nightNarratives?: NightNarrativeResult[]; // GM night result narratives for each night
+    chatResetCounts?: Record<number, number>; // game day number → reset count (free tier only)
     oneTimeAbilitiesUsed?: {
         doctorKill?: boolean;  // True if doctor has used their one-time kill ability
     };
@@ -209,6 +210,14 @@ export const AUTO_VOTE_COEFFICIENT = 3.5;
 export const BOT_SELECTION_CONFIG = {
     MIN: 1,
     MAX: 5
+} as const;
+
+/**
+ * Rate limits for free-tier users
+ */
+export const FREE_TIER_LIMITS = {
+    CHAT_RESETS_PER_GAME_DAY: 5,
+    GAMES_PER_CALENDAR_DAY: 5,
 } as const;
 
 export interface RoleConfig {

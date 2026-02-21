@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { talkToAll, humanPlayerVote, getSuggestion } from "@/app/api/bot-actions";
 import { performNightAction, humanPlayerTalkWerewolves } from "@/app/api/night-actions";
 import { buttonTransparentStyle } from "@/app/constants";
-import { GAME_STATES, MessageType, RECIPIENT_ALL, GameMessage, Game, SystemErrorMessage, BotResponseError, GAME_MASTER, ROLE_CONFIGS, GAME_ROLES } from "@/app/api/game-models";
+import { GAME_STATES, MessageType, RECIPIENT_ALL, GameMessage, Game, SystemErrorMessage, BotResponseError, GAME_MASTER, ROLE_CONFIGS, GAME_ROLES, FREE_TIER_LIMITS } from "@/app/api/game-models";
 import { getPlayerColor } from "@/app/utils/color-utils";
 import { clearGameErrorState } from "@/app/api/game-actions";
 import VotingModal from "./VotingModal";
@@ -108,9 +108,10 @@ interface GameMessageItemProps {
     speakingMessageId: string | null;
     loadingMessageId: string | null;
     pausedMessageId: string | null;
+    resetsRemaining: number | null; // null = unlimited (api tier)
 }
 
-function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcluding, game, onSpeak, speakingMessageId, loadingMessageId, pausedMessageId }: GameMessageItemProps) {
+function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcluding, game, onSpeak, speakingMessageId, loadingMessageId, pausedMessageId, resetsRemaining }: GameMessageItemProps) {
     const [showDeleteMenu, setShowDeleteMenu] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
 
@@ -224,8 +225,9 @@ function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcludin
                             <div className="relative" ref={menuRef}>
                                 <button
                                     onClick={() => setShowDeleteMenu(!showDeleteMenu)}
-                                    className={`opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 rounded hover:bg-gray-300/50 dark:hover:bg-gray-600/50 ${showDeleteMenu ? 'opacity-100' : ''}`}
-                                    title="Delete options"
+                                    className={`opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 rounded hover:bg-gray-300/50 dark:hover:bg-gray-600/50 ${showDeleteMenu ? 'opacity-100' : ''} ${resetsRemaining === 0 ? 'opacity-30 cursor-not-allowed' : ''}`}
+                                    title={resetsRemaining === 0 ? 'Reset limit reached for today' : 'Delete options'}
+                                    disabled={resetsRemaining === 0}
                                 >
                                     <svg
                                         width="16"
@@ -243,7 +245,14 @@ function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcludin
                                     </svg>
                                 </button>
                                 {showDeleteMenu && (
-                                    <div className="absolute right-0 top-full mt-1 w-56 bg-white dark:bg-neutral-800 theme-border border rounded shadow-lg z-50 flex flex-col overflow-hidden">
+                                    <div className="absolute right-0 top-full mt-1 w-64 bg-white dark:bg-neutral-800 theme-border border rounded shadow-lg z-50 flex flex-col overflow-hidden">
+                                        {resetsRemaining !== null && (
+                                            <div className="px-4 py-1.5 text-xs theme-text-secondary border-b border-gray-200 dark:border-neutral-700">
+                                                {resetsRemaining > 0
+                                                    ? `${resetsRemaining} reset${resetsRemaining === 1 ? '' : 's'} left today`
+                                                    : 'Reset limit reached for today'}
+                                            </div>
+                                        )}
                                         <button
                                             onClick={() => { onDeleteAfter(message.id!); setShowDeleteMenu(false); }}
                                             className="px-4 py-2 text-left text-sm hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 flex items-center gap-2"
@@ -407,6 +416,12 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
         () => Array.from({ length: game.currentDay }, (_, idx) => game.currentDay - idx),
         [game.currentDay]
     );
+
+    const resetsRemaining = useMemo(() => {
+        if (game.createdWithTier !== 'free') return null; // unlimited for api tier
+        const used = game.chatResetCounts?.[game.currentDay] ?? 0;
+        return Math.max(0, FREE_TIER_LIMITS.CHAT_RESETS_PER_GAME_DAY - used);
+    }, [game.createdWithTier, game.chatResetCounts, game.currentDay]);
 
     const currentDayPublicMessageCount = useMemo(() => {
         return messages.filter(message =>
@@ -895,6 +910,10 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
 
             if (!response.ok) {
                 const errorData = await response.json();
+                if (response.status === 429) {
+                    alert(errorData.error || 'Reset limit reached for today.');
+                    return;
+                }
                 throw new Error(errorData.error || 'Failed to delete messages');
             }
 
@@ -950,6 +969,10 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
 
             if (!response.ok) {
                 const errorData = await response.json();
+                if (response.status === 429) {
+                    alert(errorData.error || 'Reset limit reached for today.');
+                    return;
+                }
                 throw new Error(errorData.error || 'Failed to delete messages');
             }
 
@@ -1411,6 +1434,7 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
                                 speakingMessageId={speakingMessageId}
                                 loadingMessageId={loadingMessageId}
                                 pausedMessageId={pausedMessageId}
+                                resetsRemaining={resetsRemaining}
                             />
                         );
                     })

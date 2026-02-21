@@ -1,5 +1,9 @@
 # Bugs and improvements
 
+- Fix indexes
+- Make free tiers models restricted on game creation
+- Make sure errors are shown on UI
+- When a game is opened, it shows input section not at the bottom. We need to move it there even when there are no messages yet leaded.
 - Implement Axiom logging in vercel
 - Redesign UI to look good on mobiles
 - Add game rules page. Add hints to roles on the game prev

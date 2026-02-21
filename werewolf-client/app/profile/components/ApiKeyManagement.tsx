@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react';
 import ApiKeyList from './ApiKeyList';
-import AddApiKeyForm from './AddApiKeyForm';
 import { ApiKeyMap } from '@/app/api/game-models';
 import { MODEL_PRICING, SupportedAiModels, API_KEY_CONSTANTS, AUDIO_MODEL_CONSTANTS, ModelPricing } from '@/app/ai/ai-models';
 import { updateUserTier } from '@/app/api/user-actions';
@@ -96,11 +95,6 @@ export default function ApiKeyManagement({ initialApiKeys, userId }: { initialAp
                 <div>
                     <h3 className="text-xl font-bold mb-4">Your API Keys</h3>
                     <ApiKeyList initialApiKeys={initialApiKeys} userId={userId} />
-                </div>
-
-                {/* Add API Key Form */}
-                <div className="border-t theme-border-subtle pt-4">
-                    <AddApiKeyForm userId={userId} />
                 </div>
 
                 {/* Model Pricing Information */}

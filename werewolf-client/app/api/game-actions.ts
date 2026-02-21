@@ -4,6 +4,7 @@ import {db} from "@/firebase/server";
 import {
     Bot,
     BotPreview,
+    FREE_TIER_LIMITS,
     Game,
     GAME_MASTER,
     GAME_ROLES,
@@ -139,6 +140,25 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
     }
 
     const {tier, apiKeys} = await getUserTierAndApiKeys(session.user.email);
+
+    // Enforce daily game creation limit for free-tier users
+    if (tier === USER_TIERS.FREE) {
+        const startOfTodayUTC = new Date();
+        startOfTodayUTC.setUTCHours(0, 0, 0, 0);
+        const todayTimestamp = startOfTodayUTC.getTime();
+
+        const todaysGamesSnapshot = await db.collection('games')
+            .where('ownerEmail', '==', session.user.email)
+            .where('createdAt', '>=', todayTimestamp)
+            .get();
+
+        if (todaysGamesSnapshot.size >= FREE_TIER_LIMITS.GAMES_PER_CALENDAR_DAY) {
+            throw new Error(
+                `Free tier limit reached: you can create up to ${FREE_TIER_LIMITS.GAMES_PER_CALENDAR_DAY} games per day. Please try again tomorrow or switch to API tier.`
+            );
+        }
+    }
+
     const usageCounts: Record<string, number> = {};
 
     // Get user's voice provider preference
@@ -1014,6 +1034,7 @@ function gameFromFirestore(id: string, data: any): Game {
         createdWithTier: data.createdWithTier || 'free',
         votingHistory: data.votingHistory || [],
         nightNarratives: data.nightNarratives || [],
+        chatResetCounts: data.chatResetCounts || {},
         oneTimeAbilitiesUsed: data.oneTimeAbilitiesUsed || {},
         resolvedNightState: data.resolvedNightState || null
     };
