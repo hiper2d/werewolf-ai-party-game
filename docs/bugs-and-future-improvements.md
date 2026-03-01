@@ -1,12 +1,8 @@
 # Bugs and improvements
 
-+ Fix indexes
 - Rework login page
-+ Make free tiers models restricted on game creation
 - Make sure errors are shown on UI
 - When a game is opened, it shows input section not at the bottom. We need to move it there even when there are no messages yet leaded.
-+ Implement BetterStack logging in vercel
-- Redesign UI to look good on mobiles
 - Add game rules page. Add hints to roles on the game prev
 - Add Google voices
 - "Keep Going" doesn't block the input while the game master is thinking. We should show the Game Master thinking in the

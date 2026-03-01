@@ -1491,7 +1491,7 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
                 {/* Toolbar row below textarea: text buttons left, icon buttons right */}
                 <div className={`flex items-center justify-between mt-1 ${isInputFocused ? 'flex' : 'hidden lg:flex'}`}>
                     {/* Left group: text buttons (Send + game controls) */}
-                    <div className="flex items-center gap-1 flex-wrap">
+                    <div className="flex items-center gap-1">
                         {/* Send button */}
                         <button
                             type="submit"
@@ -1510,12 +1510,7 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
                         </button>
 
                         {/* Game controls (Vote, Keep Going, etc.) */}
-                        {gameControls && (
-                            <>
-                                <div className="w-px h-8 bg-gray-300 dark:bg-neutral-600 mx-1" />
-                                {gameControls}
-                            </>
-                        )}
+                        {gameControls}
                     </div>
 
                     {/* Right group: icon buttons (Mic, Suggestion, Expand) */}
