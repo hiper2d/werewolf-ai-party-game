@@ -205,8 +205,8 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         }
     },
     [LLM_CONSTANTS.GEMINI_3_FLASH]: {
-        displayName: 'Gemini 3 Flash Preview',
-        modelApiName: 'gemini-3-flash-preview',
+        displayName: 'Gemini 3.1 Flash Preview',
+        modelApiName: 'gemini-3.1-flash-preview',
         apiKeyName: API_KEY_CONSTANTS.GOOGLE,
         hasThinking: true,
         freeTier: {
