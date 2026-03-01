@@ -12,7 +12,7 @@ import { auth } from "@/auth";
 export default async function UserProfilePage() {
     const session = await auth();
     if (!session) {
-        redirect('/api/auth/signin');
+        redirect('/?login=true&callbackUrl=%2Fprofile');
     }
 
     let user = null;

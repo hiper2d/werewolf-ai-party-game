@@ -8,9 +8,9 @@ export async function generateMetadata(props: any) {
     const params = await props.params;
     const session = await auth();
     if (!session) {
-        redirect('/api/auth/signin');
+        redirect(`/?login=true&callbackUrl=${encodeURIComponent(`/games/${params.id}`)}`);
     }
-    
+
     const game = await getGame(params.id);
     if (!game) {
         return { title: 'Game not found' };
@@ -25,16 +25,16 @@ export default async function Page(props: any) {
     const params = await props.params;
     const session = await auth();
     if (!session) {
-        redirect('/api/auth/signin');
+        redirect(`/?login=true&callbackUrl=${encodeURIComponent(`/games/${params.id}`)}`);
     }
-    
+
     const game = await getGame(params.id);
     if (!game) {
         return <div>Game not found</div>;
     }
 
     if (!session.user?.email) {
-        redirect('/api/auth/signin');
+        redirect(`/?login=true&callbackUrl=${encodeURIComponent(`/games/${params.id}`)}`);
     }
 
     // Check ownership — redirect if this game belongs to another user

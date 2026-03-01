@@ -5,7 +5,7 @@ import {ROLE_CONFIGS, PLAY_STYLE_CONFIGS} from "@/app/api/game-models";
 export default async function RulesPage() {
     const session = await auth();
     if (!session) {
-        redirect('/api/auth/signin');
+        redirect('/?login=true&callbackUrl=%2Frules');
     }
 
     return (

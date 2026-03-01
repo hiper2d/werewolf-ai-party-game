@@ -2,14 +2,16 @@
 
 import React from 'react';
 import {buttonTransparentStyle} from "@/app/constants";
-import {signIn, signOut, useSession} from "next-auth/react";
+import {signOut, useSession} from "next-auth/react";
+import {useLoginDialog} from "@/app/providers/LoginDialogProvider";
 
 const AuthButtons = () => {
     const { data: session, status } = useSession();
+    const { openLoginDialog } = useLoginDialog();
 
     if (status === 'unauthenticated') {
         return (
-            <button onClick={() => signIn()} className={buttonTransparentStyle}>
+            <button onClick={() => openLoginDialog()} className={buttonTransparentStyle}>
                 Login
             </button>
         );

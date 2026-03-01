@@ -23,12 +23,12 @@ function formatCreationDate(timestamp?: number): string {
 const GamePages = async ({searchParams}: {searchParams?: Promise<{error?: string; blocked?: string}>}) => {
     const session = await auth();
     if (!session) {
-        redirect('/api/auth/signin');
+        redirect('/?login=true&callbackUrl=%2Fgames');
     }
 
     const userEmail = session.user?.email;
     if (!userEmail) {
-        redirect('/api/auth/signin');
+        redirect('/?login=true&callbackUrl=%2Fgames');
     }
 
     const userTier = await getUserTier(userEmail);

@@ -5,6 +5,8 @@ import NavBar from "@/components/navbar";
 import React from "react";
 import AuthProvider from "@/components/auth-provider";
 import { ThemeProvider } from "@/app/providers/ThemeProvider";
+import { LoginDialogProvider } from "@/app/providers/LoginDialogProvider";
+import LoginDialog from "@/components/login-dialog";
 
 const inter = Inter({
   subsets: ['latin'],
@@ -47,14 +49,17 @@ export default function RootLayout(
           <body className="font-inter m-0 p-0 min-h-full">
             <ThemeProvider>
               <AuthProvider>
-                <div className="flex flex-col min-h-screen">
-                  <NavBar />
-                  <main className="flex-1 flex app-shell">
-                    <div className="w-full max-w-7xl mx-auto p-2 sm:p-4 lg:p-6">
-                      {children}
-                    </div>
-                  </main>
-                </div>
+                <LoginDialogProvider>
+                  <div className="flex flex-col min-h-screen">
+                    <NavBar />
+                    <LoginDialog />
+                    <main className="flex-1 flex app-shell">
+                      <div className="w-full max-w-7xl mx-auto p-2 sm:p-4 lg:p-6">
+                        {children}
+                      </div>
+                    </main>
+                  </div>
+                </LoginDialogProvider>
               </AuthProvider>
             </ThemeProvider>
           </body>
