@@ -1,5 +1,5 @@
 import { AbstractAgent } from "@/app/ai/abstract-agent";
-import { AIMessage, TokenUsage } from "@/app/api/game-models";
+import { AIMessage, TokenUsage, AgentLoggingConfig, DEFAULT_LOGGING_CONFIG } from "@/app/api/game-models";
 import { GoogleGenAI, Type } from "@google/genai";
 import { cleanResponse } from "@/app/utils/message-utils";
 import { ModelOverloadError, ModelRateLimitError, ModelUnavailableError, ModelAuthenticationError, ModelQuotaExceededError } from "@/app/ai/errors";
@@ -43,8 +43,15 @@ export class GoogleAgent extends AbstractAgent {
     };
 
 
-    constructor(name: string, instruction: string, model: string, apiKey: string, enableThinking: boolean = false) {
-        super(name, instruction, model, 0.2, enableThinking);
+    constructor(
+        name: string, 
+        instruction: string, 
+        model: string, 
+        apiKey: string, 
+        enableThinking: boolean = false,
+        agentLoggingConfig: AgentLoggingConfig = DEFAULT_LOGGING_CONFIG.agents
+    ) {
+        super(name, instruction, model, 0.2, enableThinking, agentLoggingConfig);
         this.client = new GoogleGenAI({
             apiKey: apiKey
         });
@@ -192,8 +199,7 @@ export class GoogleAgent extends AbstractAgent {
                 };
             }
 
-            this.logAsking();
-            this.logSystemPrompt();
+            this.logAsking(messages);
             this.logMessages(messages);
 
             let response;
@@ -260,10 +266,6 @@ export class GoogleAgent extends AbstractAgent {
 
             this.logger(`Zod schema response received - hasText: ${!!response.text}, textLength: ${response.text ? response.text.length : 0}`);
 
-            if (response.text) {
-                this.logReply(response.text, thinkingContent || undefined);
-            }
-
             if (!response.text) {
                 throw new Error(this.errorMessages.emptyResponse);
             }
@@ -290,6 +292,10 @@ export class GoogleAgent extends AbstractAgent {
             if (!validationResult.success) {
                 this.logger(`Zod validation failed: ${JSON.stringify(validationResult.error.errors)}`);
                 throw new Error(`Response validation failed: ${validationResult.error.message}`);
+            }
+
+            if (validationResult.data) {
+                this.logReply(validationResult.data, thinkingContent || undefined, tokenUsage);
             }
 
             this.logger(`✅ Response validated successfully with Zod schema`);

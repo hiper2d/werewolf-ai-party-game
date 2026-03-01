@@ -1,6 +1,6 @@
 import { AbstractAgent } from "@/app/ai/abstract-agent";
 import OpenAI from "openai";
-import { AIMessage, TokenUsage } from "@/app/api/game-models";
+import { AIMessage, TokenUsage, AgentLoggingConfig, DEFAULT_LOGGING_CONFIG } from "@/app/api/game-models";
 import { calculateOpenAICost } from "@/app/utils/pricing";
 import { z } from 'zod';
 import { zodTextFormat } from 'openai/helpers/zod';
@@ -22,8 +22,16 @@ export class Gpt5Agent extends AbstractAgent {
     };
 
 
-    constructor(name: string, instruction: string, model: string, apiKey: string, temperature: number, enableThinking: boolean = false) {
-        super(name, instruction, model, temperature, enableThinking);
+    constructor(
+        name: string, 
+        instruction: string, 
+        model: string, 
+        apiKey: string, 
+        temperature: number, 
+        enableThinking: boolean = false,
+        agentLoggingConfig: AgentLoggingConfig = DEFAULT_LOGGING_CONFIG.agents
+    ) {
+        super(name, instruction, model, temperature, enableThinking, agentLoggingConfig);
         this.client = new OpenAI({
             apiKey: apiKey,
         });
@@ -38,8 +46,7 @@ export class Gpt5Agent extends AbstractAgent {
      */
     async askWithZodSchema<T>(zodSchema: z.ZodSchema<T>, messages: AIMessage[]): Promise<[T, string, TokenUsage?, string?]> {
         try {
-            this.logAsking();
-            this.logSystemPrompt();
+            this.logAsking(messages);
             this.logMessages(messages);
 
             // Combine system instruction with messages for the input
@@ -71,12 +78,6 @@ export class Gpt5Agent extends AbstractAgent {
                 throw new Error(this.errorMessages.invalidFormat);
             }
 
-            if (response.output_text) {
-                this.logReply(response.output_text);
-            }
-
-            this.logger(`✅ Response validated successfully with Zod schema`);
-
             // Extract reasoning content from output if available
             let reasoningContent = "";
             if (this.enableThinking && (response.output_parsed as any).thinking) {
@@ -106,6 +107,12 @@ export class Gpt5Agent extends AbstractAgent {
                     this.logger(`Output breakdown: ${reasoningTokens} reasoning tokens, ${finalAnswerTokens} final answer tokens`);
                 }
             }
+
+            if (response.output_parsed) {
+                this.logReply(response.output_parsed, reasoningContent, tokenUsage);
+            }
+
+            this.logger(`✅ Response validated successfully with Zod schema`);
 
             return [response.output_parsed, reasoningContent, tokenUsage];
         } catch (error) {

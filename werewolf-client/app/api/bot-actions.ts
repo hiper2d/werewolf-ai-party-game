@@ -59,6 +59,7 @@ import {getProviderSignatureFields} from "@/app/ai/ai-models";
 import {recordBotTokenUsage, recordGameMasterTokenUsage} from "@/app/api/cost-tracking";
 import {ensureUserCanAccessGame} from "@/app/api/tier-guards";
 import { RoleProcessorFactory } from "./roles";
+import {logger} from "@/app/utils/logger";
 
 /**
  * Helper function to generate bot system prompt with after-game addition if needed
@@ -134,7 +135,7 @@ async function incrementDayActivity(gameId: string, botName: string, currentDay:
             dayActivityCounter: updatedCounter
         });
     } catch (error) {
-        console.error(`Failed to increment day activity for ${botName}:`, error);
+        logger.error(`Failed to increment day activity for ${botName}:`, { error, gameId, botName });
         // Don't throw here - activity tracking shouldn't break the game flow
     }
 }
@@ -169,7 +170,7 @@ export async function recalculateDayActivity(gameId: string, currentDay: number)
             }
         });
 
-        console.log(`Recalculated day ${currentDay} activity:`, activityCounter);
+        logger.info(`Recalculated day ${currentDay} activity for game ${gameId}`, { gameId, day: currentDay, activity: activityCounter });
 
         // Update the game with recalculated counter
         const gameRef = db.collection('games').doc(gameId);
@@ -178,7 +179,7 @@ export async function recalculateDayActivity(gameId: string, currentDay: number)
         });
 
     } catch (error) {
-        console.error(`Failed to recalculate day activity for game ${gameId}, day ${currentDay}:`, error);
+        logger.error(`Failed to recalculate day activity for game ${gameId}, day ${currentDay}:`, { error, gameId, currentDay });
         // Don't throw here - activity tracking shouldn't break the game flow
     }
 }
@@ -204,13 +205,13 @@ async function ensureDayActivityCounter(gameId: string): Promise<void> {
         
         // If the game doesn't have a dayActivityCounter, initialize it
         if (!game.dayActivityCounter) {
-            console.log(`🆕 Initializing day activity counter for game ${gameId}`);
+            logger.info(`🆕 Initializing day activity counter for game ${gameId}`);
             await gameRef.update({
                 dayActivityCounter: {}
             });
         }
     } catch (error) {
-        console.error(`Failed to ensure day activity counter for game ${gameId}:`, error);
+        logger.error(`Failed to ensure day activity counter for game ${gameId}:`, { error, gameId });
         // Don't throw - this is a best-effort initialization
     }
 }
@@ -279,205 +280,206 @@ function shouldTriggerAutoVote(game: Game): boolean {
         return false;
     }
 
-    const threshold = calculateAutoVoteThreshold(game);
-    const currentMessages = getTotalDayMessages(game);
-
-    console.log(`🗳️ AUTO-VOTE CHECK: ${currentMessages}/${threshold} messages (threshold = ${game.bots.filter(b => b.isAlive).length + 1} players × ${AUTO_VOTE_COEFFICIENT})`);
-
-    return currentMessages >= threshold;
-}
-
-
-async function welcomeImpl(gameId: string): Promise<Game> {
-    const session = await auth();
-    if (!session || !session.user?.email) {
-        throw new Error('Not authenticated');
+        const threshold = calculateAutoVoteThreshold(game);
+        const currentMessages = getTotalDayMessages(game);
+    
+        logger.debug(`🗳️ AUTO-VOTE CHECK: ${currentMessages}/${threshold} messages (threshold = ${game.bots.filter(b => b.isAlive).length + 1} players × ${AUTO_VOTE_COEFFICIENT})`, { gameId: game.id, currentMessages, threshold });
+    
+        return currentMessages >= threshold;
     }
-    if (!db) {
-        throw new Error('Firestore is not initialized');
-    }
-    const game = await getGame(gameId);
-    if (!game) {
-        throw new Error('Game not found');
-    }
+    
+    
+    async function welcomeImpl(gameId: string): Promise<Game> {
+        const session = await auth();
+        if (!session || !session.user?.email) {
+            throw new Error('Not authenticated');
+        }
+        if (!db) {
+            throw new Error('Firestore is not initialized');
+        }
+        const game = await getGame(gameId);
+        if (!game) {
+            throw new Error('Game not found');
+        }
+    
+        await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: game.createdWithTier });
+    
+        try {
+            // If queue is empty, move to DAY_DISCUSSION state
+            if (game.gameStateParamQueue.length === 0) {
+                logger.info(`🎭 WELCOME: Queue is empty, transitioning to DAY_DISCUSSION for game ${gameId}`);
+                await db.collection('games').doc(gameId).update({
+                    gameState: GAME_STATES.DAY_DISCUSSION,
+                    gameStateProcessQueue: [] // Ensure the process queue is empty for DAY_DISCUSSION
+                });
+                return await getGame(gameId) as Game;
+            }
+    
+            // Get the first bot name and remove it from queue
+            const botName = game.gameStateParamQueue[0];
+            const newQueue = game.gameStateParamQueue.slice(1);
+    
+            // Find the bot in the game's bots array
+            const bot: Bot | undefined = game.bots.find(b => b.name === botName);
+            if (!bot) {
+                throw new Error(`Bot ${botName} not found in game`);
+            }
+    
+            const apiKeys = await getApiKeysForUser(session.user.email);
+    
+            const botPrompt = generateBotSystemPrompt(bot, game);
+    
+            const agent = AgentFactory.createAgent(bot.name, botPrompt, bot.aiType, apiKeys, false);
+            agent.gameId = gameId;
+            agent.userId = session.user.email;
 
-    await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: game.createdWithTier });
-
-    try {
-        // If queue is empty, move to DAY_DISCUSSION state
-        if (game.gameStateParamQueue.length === 0) {
-            console.log(`🎭 WELCOME: Queue is empty, transitioning to DAY_DISCUSSION for game ${gameId}`);
-            await db.collection('games').doc(gameId).update({
-                gameState: GAME_STATES.DAY_DISCUSSION,
-                gameStateProcessQueue: [] // Ensure the process queue is empty for DAY_DISCUSSION
-            });
+            // Create the game master command message
+            const gmMessage: GameMessage = {
+                id: null,
+                recipientName: bot.name,
+                authorName: GAME_MASTER,
+                msg: format(GM_COMMAND_INTRODUCE_YOURSELF, { bot_name: bot.name }),
+                messageType: MessageType.GM_COMMAND,
+                day: game.currentDay,
+                timestamp: Date.now()
+            };
+    
+            // Get messages for this bot (ALL + direct messages to this bot)
+            const botMessages = await getBotMessages(gameId, bot.name, game.currentDay);
+    
+            // Include the GM command in history with playstyle reminder without saving it yet
+            const playStyleReminder = format(BOT_REMINDER_POSTFIX, { play_style: generatePlayStyleDescription(bot), human_player_name: game.humanPlayerName });
+            const messagesWithPlaystyle = [...botMessages, {
+                ...gmMessage,
+                msg: gmMessage.msg + playStyleReminder
+            }];
+            const history = convertToAIMessages(bot.name, messagesWithPlaystyle);
+            const [answer, thinking, tokenUsage, thinkingSignature] = await agent.askWithZodSchema(BotAnswerZodSchema, history);
+    
+            if (!answer) {
+                throw new BotResponseError(
+                    'Bot failed to provide introduction',
+                    `Bot ${bot.name} did not respond to introduction request`,
+                    { botName: bot.name, aiType: bot.aiType },
+                    true
+                );
+            }
+    
+            const botMessage: GameMessage = {
+                id: null,
+                recipientName: RECIPIENT_ALL,
+                authorName: bot.name,
+                msg: { reply: answer.reply, thinking: thinking || "", ...getProviderSignatureFields(bot.aiType, thinkingSignature) },
+                messageType: MessageType.BOT_WELCOME,
+                day: game.currentDay,
+                timestamp: Date.now(),
+                cost: tokenUsage?.costUSD
+            };
+            
+    
+            // Save the game master command to the database first
+            await addMessageToChatAndSaveToDb(gmMessage, gameId);
+    
+            // Then save the bot's response
+            await addMessageToChatAndSaveToDb(botMessage, gameId);
+    
+            // Update bot's token usage
+            if (tokenUsage) {
+                await recordBotTokenUsage(gameId, bot.name, tokenUsage, session.user.email);
+            }
+    
+            // Increment day activity counter for the bot
+            await incrementDayActivity(gameId, bot.name, game.currentDay);
+    
+            // Check if this was the last bot in the queue
+            if (newQueue.length === 0) {
+                // Transition to DAY_DISCUSSION state
+                logger.info(`🎭 WELCOME: Last bot introduced, transitioning to DAY_DISCUSSION for game ${gameId}`);
+                await db.collection('games').doc(gameId).update({
+                    gameStateParamQueue: newQueue,
+                    gameState: GAME_STATES.DAY_DISCUSSION,
+                    gameStateProcessQueue: [] // Ensure the process queue is empty for DAY_DISCUSSION
+                });
+            } else {
+                // Update game with the modified queue but stay in WELCOME state
+                logger.debug(`🎭 WELCOME: ${newQueue.length} bots remaining in introduction queue for game ${gameId}`);
+                await db.collection('games').doc(gameId).update({
+                    gameStateParamQueue: newQueue
+                });
+            }
+    
+            // Return the updated game state
             return await getGame(gameId) as Game;
+        } catch (error) {
+            logger.error('Error in welcome function:', { error, gameId });
+            throw error;
         }
-
-        // Get the first bot name and remove it from queue
-        const botName = game.gameStateParamQueue[0];
-        const newQueue = game.gameStateParamQueue.slice(1);
-
-        // Find the bot in the game's bots array
-        const bot: Bot | undefined = game.bots.find(b => b.name === botName);
-        if (!bot) {
-            throw new Error(`Bot ${botName} not found in game`);
-        }
-
-        const apiKeys = await getApiKeysForUser(session.user.email);
-
-        const botPrompt = generateBotSystemPrompt(bot, game);
-
-        const agent = AgentFactory.createAgent(bot.name, botPrompt, bot.aiType, apiKeys, false);
-
-        // Create the game master command message
-        const gmMessage: GameMessage = {
-            id: null,
-            recipientName: bot.name,
-            authorName: GAME_MASTER,
-            msg: format(GM_COMMAND_INTRODUCE_YOURSELF, { bot_name: bot.name }),
-            messageType: MessageType.GM_COMMAND,
-            day: game.currentDay,
-            timestamp: Date.now()
-        };
-
-        // Get messages for this bot (ALL + direct messages to this bot)
-        const botMessages = await getBotMessages(gameId, bot.name, game.currentDay);
-
-        // Include the GM command in history with playstyle reminder without saving it yet
-        const playStyleReminder = format(BOT_REMINDER_POSTFIX, { play_style: generatePlayStyleDescription(bot), human_player_name: game.humanPlayerName });
-        const messagesWithPlaystyle = [...botMessages, {
-            ...gmMessage,
-            msg: gmMessage.msg + playStyleReminder
-        }];
-        const history = convertToAIMessages(bot.name, messagesWithPlaystyle);
-        const [answer, thinking, tokenUsage, thinkingSignature] = await agent.askWithZodSchema(BotAnswerZodSchema, history);
-
-        if (!answer) {
-            throw new BotResponseError(
-                'Bot failed to provide introduction',
-                `Bot ${bot.name} did not respond to introduction request`,
-                { botName: bot.name, aiType: bot.aiType },
-                true
-            );
-        }
-
-        const botMessage: GameMessage = {
-            id: null,
-            recipientName: RECIPIENT_ALL,
-            authorName: bot.name,
-            msg: { reply: answer.reply, thinking: thinking || "", ...getProviderSignatureFields(bot.aiType, thinkingSignature) },
-            messageType: MessageType.BOT_WELCOME,
-            day: game.currentDay,
-            timestamp: Date.now(),
-            cost: tokenUsage?.costUSD
-        };
-        
-
-        // Save the game master command to the database first
-        await addMessageToChatAndSaveToDb(gmMessage, gameId);
-        
-        // Then save the bot's response
-        await addMessageToChatAndSaveToDb(botMessage, gameId);
-
-        // Update bot's token usage
-        if (tokenUsage) {
-            await recordBotTokenUsage(gameId, bot.name, tokenUsage, session.user.email);
-        }
-
-        // Increment day activity counter for the bot
-        await incrementDayActivity(gameId, bot.name, game.currentDay);
-
-        // Check if this was the last bot in the queue
-        if (newQueue.length === 0) {
-            // Transition to DAY_DISCUSSION state
-            console.log(`🎭 WELCOME: Last bot introduced, transitioning to DAY_DISCUSSION for game ${gameId}`);
-            await db.collection('games').doc(gameId).update({
-                gameStateParamQueue: newQueue,
-                gameState: GAME_STATES.DAY_DISCUSSION,
-                gameStateProcessQueue: [] // Ensure the process queue is empty for DAY_DISCUSSION
-            });
-        } else {
-            // Update game with the modified queue but stay in WELCOME state
-            console.log(`🎭 WELCOME: ${newQueue.length} bots remaining in introduction queue for game ${gameId}`);
-            await db.collection('games').doc(gameId).update({
-                gameStateParamQueue: newQueue
-            });
-        }
-
-        // Return the updated game state
-        return await getGame(gameId) as Game;
-    } catch (error) {
-        console.error('Error in welcome function:', error);
-        throw error;
     }
-}
-
-async function talkToAllImpl(gameId: string, userMessage: string): Promise<Game> {
-    // Common authentication and validation
-    const session = await auth();
-    if (!session || !session.user?.email) {
-        throw new Error('Not authenticated');
-    }
-    if (!db) {
-        throw new Error('Firestore is not initialized');
-    }
-
-    // Fetch the current game
-    const game = await getGame(gameId);
-    if (!game) {
-        throw new Error('Game not found');
-    }
-
-    await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: game.createdWithTier });
-
-    // Validate game state - allow both DAY_DISCUSSION and AFTER_GAME_DISCUSSION
-    const isAfterGameDiscussion = game.gameState === GAME_STATES.AFTER_GAME_DISCUSSION;
-    if (game.gameState !== GAME_STATES.DAY_DISCUSSION && !isAfterGameDiscussion) {
-        throw new Error('Game is not in DAY_DISCUSSION or AFTER_GAME_DISCUSSION state');
-    }
-
-    try {
-        // Case 1: Human player initiates discussion
-        if (userMessage && game.gameStateProcessQueue.length === 0) {
-            await handleHumanPlayerMessage(gameId, game, userMessage, session.user.email);
+    
+    async function talkToAllImpl(gameId: string, userMessage: string): Promise<Game> {
+        // Common authentication and validation
+        const session = await auth();
+        if (!session || !session.user?.email) {
+            throw new Error('Not authenticated');
         }
-        // Case 2: Process next bot in queue
-        else if (game.gameStateProcessQueue.length > 0) {
-            await processNextBotInQueue(gameId, game, session.user.email);
+        if (!db) {
+            throw new Error('Firestore is not initialized');
         }
-
-        // Get updated game state
-        const updatedGame = await getGame(gameId) as Game;
-
-        // Check if we should auto-trigger voting (only during DAY_DISCUSSION, not AFTER_GAME_DISCUSSION)
-        if (!isAfterGameDiscussion && shouldTriggerAutoVote(updatedGame)) {
-            console.log('🗳️ AUTO-VOTE TRIGGERED: Message threshold reached, starting voting phase');
-            // Trigger voting by transitioning to VOTE state
-            const aliveBots = updatedGame.bots.filter(bot => bot.isAlive).map(bot => bot.name);
-            const allPlayers = [...aliveBots, updatedGame.humanPlayerName];
-            const shuffledPlayers = [...allPlayers].sort(() => Math.random() - 0.5);
-
-            await db.collection('games').doc(gameId).update({
-                gameState: GAME_STATES.VOTE,
-                gameStateProcessQueue: shuffledPlayers,
-                gameStateParamQueue: []
-            });
-
-            return await getGame(gameId) as Game;
-        } else if (isAfterGameDiscussion && shouldTriggerAutoVote(updatedGame)) {
-            console.log('🛑 DISCUSSION LIMIT REACHED (After Game): Stopping auto-responses');
-            // Stop further discussion by clearing the queue
-            await db.collection('games').doc(gameId).update({
-                gameStateProcessQueue: []
-            });
-            return await getGame(gameId) as Game;
+    
+        // Fetch the current game
+        const game = await getGame(gameId);
+        if (!game) {
+            throw new Error('Game not found');
         }
-
-        return updatedGame;
-    } catch (error) {
-        console.error('Error in talkToAll function:', error);
-        throw error;
+    
+        await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: game.createdWithTier });
+    
+        // Validate game state - allow both DAY_DISCUSSION and AFTER_GAME_DISCUSSION
+        const isAfterGameDiscussion = game.gameState === GAME_STATES.AFTER_GAME_DISCUSSION;
+        if (game.gameState !== GAME_STATES.DAY_DISCUSSION && !isAfterGameDiscussion) {
+            throw new Error('Game is not in DAY_DISCUSSION or AFTER_GAME_DISCUSSION state');
+        }
+    
+        try {
+            // Case 1: Human player initiates discussion
+            if (userMessage && game.gameStateProcessQueue.length === 0) {
+                await handleHumanPlayerMessage(gameId, game, userMessage, session.user.email);
+            }
+            // Case 2: Process next bot in queue
+            else if (game.gameStateProcessQueue.length > 0) {
+                await processNextBotInQueue(gameId, game, session.user.email);
+            }
+    
+            // Get updated game state
+            const updatedGame = await getGame(gameId) as Game;
+    
+            // Check if we should auto-trigger voting (only during DAY_DISCUSSION, not AFTER_GAME_DISCUSSION)
+            if (!isAfterGameDiscussion && shouldTriggerAutoVote(updatedGame)) {
+                logger.info('🗳️ AUTO-VOTE TRIGGERED: Message threshold reached, starting voting phase', { gameId });
+                // Trigger voting by transitioning to VOTE state
+                const aliveBots = updatedGame.bots.filter(bot => bot.isAlive).map(bot => bot.name);
+                const allPlayers = [...aliveBots, updatedGame.humanPlayerName];
+                const shuffledPlayers = [...allPlayers].sort(() => Math.random() - 0.5);
+    
+                await db.collection('games').doc(gameId).update({
+                    gameState: GAME_STATES.VOTE,
+                    gameStateProcessQueue: shuffledPlayers,
+                    gameStateParamQueue: []
+                });
+    
+                return await getGame(gameId) as Game;
+            } else if (isAfterGameDiscussion && shouldTriggerAutoVote(updatedGame)) {
+                logger.info('🛑 DISCUSSION LIMIT REACHED (After Game): Stopping auto-responses', { gameId });
+                // Stop further discussion by clearing the queue
+                await db.collection('games').doc(gameId).update({
+                    gameStateProcessQueue: []
+                });
+                return await getGame(gameId) as Game;
+            }
+    
+            return updatedGame;
+        } catch (error) {
+            logger.error('Error in talkToAll function:', { error, gameId });        throw error;
     }
 }
 
@@ -563,6 +565,8 @@ async function keepBotsGoingImpl(gameId: string): Promise<Game> {
             .join(", ");
 
         const gmAgent = AgentFactory.createAgent(GAME_MASTER, gmPrompt, game.gameMasterAiType, apiKeys, false);
+        gmAgent.gameId = gameId;
+        gmAgent.userId = session.user.email;
         const selectionCommand = format(GM_COMMAND_SELECT_RESPONDERS, { candidate_names: candidateNames });
 
         // Include recent conversation in the GM's history for bot selection
@@ -742,6 +746,8 @@ async function handleHumanPlayerMessage(
         .join(", ");
 
     const gmAgent = AgentFactory.createAgent(GAME_MASTER, gmPrompt, game.gameMasterAiType, apiKeys, false);
+    gmAgent.gameId = gameId;
+    gmAgent.userId = userEmail;
     const selectionCommand = format(GM_COMMAND_SELECT_RESPONDERS, { candidate_names: candidateNames });
 
     // Include the user's message in the GM's history for bot selection
@@ -860,6 +866,8 @@ async function processNextBotInQueue(
     const botPrompt = generateBotSystemPrompt(bot, game);
 
     const agent = AgentFactory.createAgent(bot.name, botPrompt, bot.aiType, apiKeys, false);
+    agent.gameId = gameId;
+    agent.userId = userEmail;
     // Include the GM command in history with playstyle reminder without saving it yet
     const playStyleReminder = format(BOT_REMINDER_POSTFIX, { play_style: generatePlayStyleDescription(bot), human_player_name: game.humanPlayerName });
     const messagesWithPlaystyle = [...botMessages, {
@@ -1202,7 +1210,9 @@ async function voteImpl(gameId: string): Promise<Game> {
             );
             
             const agent = AgentFactory.createAgent(bot.name, botPrompt, bot.aiType, apiKeys, false);
-            
+            agent.gameId = gameId;
+            agent.userId = session.user!.email!;
+
             // Create the voting command message
             const gmMessage: GameMessage = {
                 id: null,
@@ -1310,27 +1320,25 @@ async function voteImpl(gameId: string): Promise<Game> {
                 gameStateParamQueue: [JSON.stringify(votingResults)]
             });
             
-            console.log(`Successfully processed vote for bot ${bot.name}, removed from queue`);
+            logger.info(`Successfully processed vote for bot ${bot.name}, removed from queue`, { gameId, botName: bot.name });
             
             // Return updated game state
             return await getGame(gameId) as Game;
         }
         
         else {
-            console.error('🚨 INVALID GAME STATE FOR VOTING:', {
+            logger.error('🚨 INVALID GAME STATE FOR VOTING:', {
                 gameId,
                 currentGameState: game.gameState,
                 validStates: [GAME_STATES.DAY_DISCUSSION, GAME_STATES.VOTE],
                 queueLength: game.gameStateProcessQueue.length,
                 queue: game.gameStateProcessQueue,
-                timestamp: new Date().toISOString(),
-                userEmail: session.user.email,
-                stackTrace: new Error().stack
+                userEmail: session.user.email
             });
             throw new Error(`Invalid game state for voting: ${game.gameState}`);
         }
     } catch (error) {
-        console.error('Error in vote function:', error);
+        logger.error('Error in vote function:', { error, gameId });
         throw error;
     }
 }
@@ -1368,7 +1376,7 @@ async function humanPlayerVoteImpl(gameId: string, targetPlayer: string, reason:
     }
 
     try {
-        console.log(`Processing vote for human player ${game.humanPlayerName}`);
+        logger.info(`Processing vote for human player ${game.humanPlayerName}`, { gameId, player: game.humanPlayerName, target: targetPlayer });
         
         // Re-read current game state to ensure consistency
         const currentGame = await getGame(gameId);
@@ -1425,7 +1433,7 @@ async function humanPlayerVoteImpl(gameId: string, targetPlayer: string, reason:
             gameStateParamQueue: [JSON.stringify(votingResults)]
         });
         
-        console.log(`Successfully processed vote for human player ${currentGame.humanPlayerName}, removed from queue`);
+        logger.info(`Successfully processed vote for human player ${currentGame.humanPlayerName}, removed from queue`, { gameId });
         
         // Return updated game state
         return {
@@ -1434,7 +1442,7 @@ async function humanPlayerVoteImpl(gameId: string, targetPlayer: string, reason:
             gameStateParamQueue: [JSON.stringify(votingResults)]
         };
     } catch (error) {
-        console.error('Error in humanPlayerVote function:', error);
+        logger.error('Error in humanPlayerVote function:', { error, gameId });
         throw error;
     }
 }
@@ -1640,12 +1648,12 @@ async function performHumanPlayerNightActionImpl(gameId: string, targetPlayer: s
         // Update game state
         await db.collection('games').doc(gameId).update(finalUpdates);
         
-        console.log(`Successfully processed final night action for human player ${game.humanPlayerName} targeting ${targetPlayer}`);
+        logger.info(`Successfully processed final night action for human player ${game.humanPlayerName} targeting ${targetPlayer}`, { gameId, role: currentRole, target: targetPlayer });
         
         // Return updated game state
         return await getGame(gameId) as Game;
     } catch (error) {
-        console.error('Error in performHumanPlayerNightAction function:', error);
+        logger.error('Error in performHumanPlayerNightAction function:', { error, gameId });
         throw error;
     }
 }
@@ -1696,6 +1704,8 @@ async function getSuggestionImpl(gameId: string): Promise<string> {
 
         // Use the game master AI to generate suggestion
         const agent = AgentFactory.createAgent('SuggestionBot', suggestionPrompt, game.gameMasterAiType, apiKeys, false);
+        agent.gameId = gameId;
+        agent.userId = session.user.email;
 
         // Convert public day messages to AI format for context
         const history = convertToAIMessages('SuggestionBot', publicDayMessages);
@@ -1715,7 +1725,7 @@ async function getSuggestionImpl(gameId: string): Promise<string> {
         // Extract the reply text
         return suggestionResponse.reply.trim();
     } catch (error) {
-        console.error('Error in getSuggestion function:', error);
+        logger.error('Error in getSuggestion function:', { error, gameId });
         throw error;
     }
 }

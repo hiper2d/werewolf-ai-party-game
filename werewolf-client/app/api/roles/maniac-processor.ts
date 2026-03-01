@@ -111,6 +111,8 @@ export class ManiacProcessor extends BaseRoleProcessor {
 
             // Create agent
             const agent = AgentFactory.createAgent(maniacBot.name, maniacPrompt, maniacBot.aiType, apiKeys, maniacBot.enableThinking || false);
+            agent.gameId = this.gameId;
+            agent.userId = session.user.email;
 
             // Get all living players except the maniac for abduction
             const allLivePlayers = [

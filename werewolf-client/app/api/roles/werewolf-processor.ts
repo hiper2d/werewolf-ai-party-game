@@ -197,6 +197,8 @@ export class WerewolfProcessor extends BaseRoleProcessor {
 
             // Create agent
             const agent = AgentFactory.createAgent(werewolfBot.name, werewolfPrompt, werewolfBot.aiType, apiKeys, werewolfBot.enableThinking || false);
+            agent.gameId = this.gameId;
+            agent.userId = session.user.email;
 
             // Determine if this is the last werewolf in queue (decision maker)
             const isLastWerewolf = remainingQueue.length === 0;

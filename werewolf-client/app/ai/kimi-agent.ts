@@ -1,6 +1,6 @@
 import { AbstractAgent } from "@/app/ai/abstract-agent";
 import { OpenAI } from "openai";
-import { AIMessage, TokenUsage } from "@/app/api/game-models";
+import { AIMessage, TokenUsage, AgentLoggingConfig, DEFAULT_LOGGING_CONFIG } from "@/app/api/game-models";
 import { cleanResponse } from "@/app/utils/message-utils";
 import { extractUsageAndCalculateCost } from "@/app/utils/pricing";
 import { z } from 'zod';
@@ -30,8 +30,16 @@ export class KimiAgent extends AbstractAgent {
     };
 
 
-    constructor(name: string, instruction: string, model: string, apiKey: string, temperature: number, enableThinking: boolean = false) {
-        super(name, instruction, model, temperature, enableThinking);
+    constructor(
+        name: string, 
+        instruction: string, 
+        model: string, 
+        apiKey: string, 
+        temperature: number, 
+        enableThinking: boolean = false,
+        agentLoggingConfig: AgentLoggingConfig = DEFAULT_LOGGING_CONFIG.agents
+    ) {
+        super(name, instruction, model, temperature, enableThinking, agentLoggingConfig);
         this.client = new OpenAI({
             apiKey: apiKey,
             baseURL: 'https://api.moonshot.ai/v1',
@@ -104,8 +112,7 @@ export class KimiAgent extends AbstractAgent {
                 openAIMessages[0].content = `${this.instruction}\n\n${openAIMessages[0].content}`;
             }
 
-            this.logAsking();
-            this.logSystemPrompt();
+            this.logAsking(messages);
             this.logMessages(messages);
 
             // First, try with JSON mode (OpenAI-compatible)
@@ -144,8 +151,6 @@ export class KimiAgent extends AbstractAgent {
                     throw new Error(this.errorMessages.emptyResponse);
                 }
 
-                this.logReply(reply);
-
                 // Parse and validate using Zod
                 let parsedContent: unknown;
                 try {
@@ -165,6 +170,10 @@ export class KimiAgent extends AbstractAgent {
                 this.logger(`✅ Response validated successfully with Zod schema (JSON mode)`);
 
                 const { thinkingContent, tokenUsage } = this.extractThinkingAndUsage(completion);
+
+                if (validationResult.data) {
+                    this.logReply(validationResult.data, thinkingContent, tokenUsage);
+                }
 
                 return [validationResult.data, thinkingContent, tokenUsage];
 
@@ -207,8 +216,6 @@ export class KimiAgent extends AbstractAgent {
                     throw new Error(this.errorMessages.emptyResponse);
                 }
 
-                this.logReply(reply);
-
                 // Parse and validate using Zod
                 let parsedContent: unknown;
                 try {
@@ -228,6 +235,10 @@ export class KimiAgent extends AbstractAgent {
                 this.logger(`✅ Response validated successfully with Zod schema (prompt mode)`);
 
                 const { thinkingContent, tokenUsage } = this.extractThinkingAndUsage(completion);
+
+                if (validationResult.data) {
+                    this.logReply(validationResult.data, thinkingContent, tokenUsage);
+                }
 
                 return [validationResult.data, thinkingContent, tokenUsage];
             }

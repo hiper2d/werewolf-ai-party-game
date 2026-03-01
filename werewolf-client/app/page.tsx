@@ -40,7 +40,7 @@ export default async function Home() {
             </Link>
           ) : (
             <Link
-              href="/api/auth/signin"
+              href="/api/auth/signin?callbackUrl=%2Fgames"
               className="px-8 py-4 bg-btn text-btn-text rounded-lg font-bold text-xl hover:bg-btn-hover transition-all transform hover:scale-105 shadow-lg"
             >
               Play Now (Sign In)

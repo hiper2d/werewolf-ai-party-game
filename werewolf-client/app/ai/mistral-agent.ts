@@ -1,7 +1,7 @@
 import { AbstractAgent } from "@/app/ai/abstract-agent";
 import { Mistral } from "@mistralai/mistralai";
 import { ChatCompletionResponse } from "@mistralai/mistralai/models/components";
-import { AIMessage, MESSAGE_ROLE, TokenUsage } from "@/app/api/game-models";
+import { AIMessage, MESSAGE_ROLE, TokenUsage, AgentLoggingConfig, DEFAULT_LOGGING_CONFIG } from "@/app/api/game-models";
 import { cleanResponse } from "@/app/utils/message-utils";
 import { z } from 'zod';
 import { ZodSchemaConverter } from './zod-schema-converter';
@@ -30,8 +30,15 @@ export class MistralAgent extends AbstractAgent {
     };
 
 
-    constructor(name: string, instruction: string, model: string, apiKey: string, enableThinking: boolean = false) {
-        super(name, instruction, model, 0.7, enableThinking);
+    constructor(
+        name: string, 
+        instruction: string, 
+        model: string, 
+        apiKey: string, 
+        enableThinking: boolean = false,
+        agentLoggingConfig: AgentLoggingConfig = DEFAULT_LOGGING_CONFIG.agents
+    ) {
+        super(name, instruction, model, 0.7, enableThinking, agentLoggingConfig);
         this.client = new Mistral({ apiKey: apiKey });
 
         // Note: Magistral reasoning models can generate thinking content, but only when
@@ -169,8 +176,7 @@ export class MistralAgent extends AbstractAgent {
                 }
             };
 
-            this.logAsking();
-            this.logSystemPrompt();
+            this.logAsking(messages);
             this.logMessages(messages);
 
             let response;
@@ -209,8 +215,6 @@ export class MistralAgent extends AbstractAgent {
                 responseText = JSON.stringify(content);
             }
 
-            this.logReply(responseText);
-
             // Parse and validate the response using Zod
             let parsedContent: unknown;
             try {
@@ -242,6 +246,10 @@ export class MistralAgent extends AbstractAgent {
 
             // Extract token usage
             const tokenUsage = this.extractTokenUsage(response);
+
+            if (validationResult.data) {
+                this.logReply(validationResult.data, thinkingContent || undefined, tokenUsage);
+            }
 
             return [validationResult.data, thinkingContent, tokenUsage];
 

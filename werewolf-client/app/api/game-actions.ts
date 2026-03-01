@@ -46,6 +46,7 @@ import {AbstractAgent} from "../ai/abstract-agent";
 import {format} from "@/app/ai/prompts/utils";
 import {GameSetupZodSchema} from "@/app/ai/prompts/zod-schemas";
 import {ensureUserCanAccessGame} from "@/app/api/tier-guards";
+import {logger} from "@/app/utils/logger";
 
 export async function getAllGames(ownerEmail?: string): Promise<Game[]> {
     if (!db) {
@@ -182,7 +183,8 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
     const storyTellAgent: AbstractAgent = AgentFactory.createAgent(
         GAME_MASTER, STORY_SYSTEM_PROMPT, resolvedGmAiType, apiKeys, false
     );
-        
+    storyTellAgent.userId = session.user.email;
+
     // Gather role configurations for the story generation
     const gameRoleConfigs = [];
     
@@ -489,9 +491,10 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
         };
 
         await addMessageToChatAndSaveToDb(gameStoryMessage, customGameId);
+        logger.info(`Game created: ${customGameId}`, { theme: gamePreview.theme, owner: session.user.email });
         return customGameId;
     } catch (error: any) {
-        console.error("Error adding document: ", error);
+        logger.error("Error adding document: ", { error: error.message, stack: error.stack });
         throw new Error(`Failed to create game: ${error.message}`);
     }
 }
@@ -531,7 +534,7 @@ export async function addMessageToChatAndSaveToDb(gameMessage: GameMessage, game
         
         return customId;
     } catch (error: any) {
-        console.error("Error adding message: ", error);
+        logger.error("Error adding message to chat: ", { error: error.message, gameId, author: gameMessage.authorName });
         throw new Error(`Failed to add message: ${error.message}`);
     }
 }
@@ -628,7 +631,7 @@ export async function updateGameMasterModel(gameId: string, newAiType: string): 
         };
         return gameFromFirestore(gameId, updatedGameData);
     } catch (error: any) {
-        console.error("Error updating Game Master model: ", error);
+        logger.error("Error updating Game Master model: ", { error: error.message, gameId, newAiType });
         throw new Error(`Failed to update Game Master model: ${error.message}`);
     }
 }
@@ -804,7 +807,7 @@ export async function setGameErrorState(gameId: string, errorState: SystemErrorM
         // Return the updated game
         return gameFromFirestore(gameId, { ...gameData, errorState: errorState });
     } catch (error: any) {
-        console.error("Error setting game error state: ", error);
+        logger.error("Error setting game error state: ", { error: error.message, gameId, errorState });
         throw new Error(`Failed to set game error state: ${error.message}`);
     }
 }
@@ -838,7 +841,7 @@ export async function clearGameErrorState(gameId: string): Promise<Game> {
         // Return the updated game
         return gameFromFirestore(gameId, { ...gameData, errorState: null });
     } catch (error: any) {
-        console.error("Error clearing game error state: ", error);
+        logger.error("Error clearing game error state: ", { error: error.message, gameId });
         throw new Error(`Failed to clear game error state: ${error.message}`);
     }
 }
@@ -920,10 +923,12 @@ export async function afterGameDiscussion(gameId: string): Promise<Game> {
             dayActivityCounter: {} // Reset activity counter for the post-game discussion
         });
 
+        logger.info(`Game moved to after-game discussion: ${gameId}`);
+
         // Return the updated game
         return await getGame(gameId) as Game;
     } catch (error: any) {
-        console.error("Error moving to after game discussion: ", error);
+        logger.error("Error moving to after game discussion: ", { error: error.message, gameId });
         throw new Error(`Failed to move to after game discussion: ${error.message}`);
     }
 }

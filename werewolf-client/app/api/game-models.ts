@@ -1,5 +1,47 @@
 import { VoiceProvider } from '@/app/ai/voice-config';
 
+export interface AgentLoggingConfig {
+    enabled: boolean;
+    logSystemPrompt: boolean;
+    history: {
+        enabled: boolean;
+        maxCharactersPerMessage: number;
+    };
+    logCommand: boolean;
+    reply: {
+        mode: 'raw' | 'body-only';
+        maxReplyChars: number;
+        maxThinkingChars: number;
+        includeReasoning: boolean;
+        includeUsage: boolean;
+    };
+}
+
+export interface LoggingConfig {
+    axiomEnabled: boolean;
+    agents: AgentLoggingConfig;
+}
+
+export const DEFAULT_LOGGING_CONFIG: LoggingConfig = {
+    axiomEnabled: process.env.NODE_ENV === 'production' || !!process.env.NEXT_PUBLIC_AXIOM_TOKEN,
+    agents: {
+        enabled: true,
+        logSystemPrompt: process.env.LOG_SYSTEM_PROMPT !== 'false',
+        history: {
+            enabled: process.env.LOG_HISTORY !== 'false',
+            maxCharactersPerMessage: parseInt(process.env.LOG_MAX_HISTORY_CHARS || '1000', 10),
+        },
+        logCommand: true,
+        reply: {
+            mode: (process.env.LOG_REPLY_MODE === 'raw' ? 'raw' : 'body-only') as 'raw' | 'body-only',
+            maxReplyChars: parseInt(process.env.LOG_MAX_REPLY_CHARS || '5000', 10),
+            maxThinkingChars: parseInt(process.env.LOG_MAX_THINKING_CHARS || '2000', 10),
+            includeReasoning: process.env.LOG_INCLUDE_REASONING !== 'false',
+            includeUsage: process.env.LOG_INCLUDE_USAGE !== 'false',
+        },
+    },
+};
+
 export interface ApiKeyMap {
     [id: string]: string
 }

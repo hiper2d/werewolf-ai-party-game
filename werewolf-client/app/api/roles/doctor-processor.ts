@@ -158,6 +158,8 @@ export class DoctorProcessor extends BaseRoleProcessor {
 
             // Create agent
             const agent = AgentFactory.createAgent(doctorBot.name, doctorPrompt, doctorBot.aiType, apiKeys, doctorBot.enableThinking || false);
+            agent.gameId = this.gameId;
+            agent.userId = session.user.email;
 
             // Get all living players for protection
             const allLivePlayers = [

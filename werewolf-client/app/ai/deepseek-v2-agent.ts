@@ -1,6 +1,6 @@
 import { AbstractAgent } from "@/app/ai/abstract-agent";
 import OpenAI from "openai";
-import { AIMessage, TokenUsage } from "@/app/api/game-models";
+import { AIMessage, TokenUsage, AgentLoggingConfig, DEFAULT_LOGGING_CONFIG } from "@/app/api/game-models";
 import { cleanResponse } from "@/app/utils/message-utils";
 import { extractUsageAndCalculateCost } from "@/app/utils/pricing";
 import { getModelConfigByApiName } from "@/app/ai/ai-models";
@@ -26,8 +26,16 @@ export class DeepSeekV2Agent extends AbstractAgent {
     };
 
 
-    constructor(name: string, instruction: string, model: string, apiKey: string, temperature: number, enableThinking: boolean = false) {
-        super(name, instruction, model, temperature, enableThinking);
+    constructor(
+        name: string, 
+        instruction: string, 
+        model: string, 
+        apiKey: string, 
+        temperature: number, 
+        enableThinking: boolean = false,
+        agentLoggingConfig: AgentLoggingConfig = DEFAULT_LOGGING_CONFIG.agents
+    ) {
+        super(name, instruction, model, temperature, enableThinking, agentLoggingConfig);
         this.client = new OpenAI({
             baseURL: 'https://api.deepseek.com',
             apiKey: apiKey,
@@ -75,8 +83,7 @@ export class DeepSeekV2Agent extends AbstractAgent {
         try {
             const input = this.convertToOpenAIMessages(messages);
 
-            this.logAsking();
-            this.logSystemPrompt();
+            this.logAsking(messages);
             this.logMessages(messages);
 
             // For reasoning models, add schema description to prompt
@@ -143,8 +150,6 @@ export class DeepSeekV2Agent extends AbstractAgent {
                 throw new Error(this.errorMessages.emptyResponse);
             }
 
-            this.logReply(content);
-
             // Parse and validate the response using Zod
             let parsedContent: unknown;
             try {
@@ -174,6 +179,10 @@ export class DeepSeekV2Agent extends AbstractAgent {
                     totalTokens: usageResult.usage.totalTokens,
                     costUSD: usageResult.cost
                 };
+            }
+
+            if (validationResult.data) {
+                this.logReply(validationResult.data, thinkingContent || undefined, tokenUsage);
             }
 
             return [validationResult.data, thinkingContent, tokenUsage];

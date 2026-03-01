@@ -1,6 +1,6 @@
 import {AbstractAgent} from "@/app/ai/abstract-agent";
 import {OpenAI} from "openai";
-import {AIMessage, TokenUsage} from "@/app/api/game-models";
+import {AIMessage, TokenUsage, AgentLoggingConfig, DEFAULT_LOGGING_CONFIG} from "@/app/api/game-models";
 import {cleanResponse} from "@/app/utils/message-utils";
 import {calculateGrokCost} from "@/app/utils/pricing";
 import {z} from 'zod';
@@ -29,8 +29,16 @@ export class GrokAgent extends AbstractAgent {
     };
 
 
-    constructor(name: string, instruction: string, model: string, apiKey: string, temperature: number, enableThinking: boolean = false) {
-        super(name, instruction, model, temperature, enableThinking);
+    constructor(
+        name: string, 
+        instruction: string, 
+        model: string, 
+        apiKey: string, 
+        temperature: number, 
+        enableThinking: boolean = false,
+        agentLoggingConfig: AgentLoggingConfig = DEFAULT_LOGGING_CONFIG.agents
+    ) {
+        super(name, instruction, model, temperature, enableThinking, agentLoggingConfig);
         this.client = new OpenAI({
             apiKey: apiKey,
             baseURL: 'https://api.x.ai/v1',
@@ -77,15 +85,12 @@ export class GrokAgent extends AbstractAgent {
                 lastMessage.content += `\n\nYour response must be a valid JSON object matching this schema:\n${schemaDescription}`;
             }
 
-            this.logAsking();
-            this.logSystemPrompt();
+            this.logAsking(messages);
             this.logMessages(messages);
 
             // Use json_object mode
             // Note: Grok 4.1 Fast Reasoning may have issues with json_object mode producing "[object Object]" responses.
             // We fallback to text mode for this specific model as a workaround.
-            // Docs (https://docs.x.ai/docs/guides/structured-outputs) imply support for all models > grok-2-1212,
-            // but practical experience shows otherwise for the Fast Reasoning variant.
             const isFastReasoning = this.model === 'grok-4-1-fast-reasoning';
 
             const completion = await this.client.chat.completions.create({
@@ -102,8 +107,6 @@ export class GrokAgent extends AbstractAgent {
             if (!reply) {
                 throw new Error(this.errorMessages.emptyResponse);
             }
-
-            this.logReply(reply);
 
             // Extract reasoning content if available
             const reasoningContentParts: string[] = [];
@@ -144,7 +147,6 @@ export class GrokAgent extends AbstractAgent {
                 const reasoningTokens = (completion.usage as any).completion_tokens_details?.reasoning_tokens || 0;
 
                 // For Grok reasoning models: completion_tokens = final answer only, reasoning_tokens = thinking
-                // Total output = completion_tokens + reasoning_tokens
                 const totalOutputTokens = completionTokens + reasoningTokens;
 
                 const cost = calculateGrokCost(
@@ -160,10 +162,13 @@ export class GrokAgent extends AbstractAgent {
                     costUSD: cost
                 };
 
-                // Log reasoning token breakdown if available and thinking is enabled
                 if (this.enableThinking && reasoningTokens > 0) {
                     this.logger(`Output breakdown: ${reasoningTokens} reasoning tokens, ${completionTokens} final answer tokens, ${totalOutputTokens} total output tokens`);
                 }
+            }
+
+            if (validationResult.data) {
+                this.logReply(validationResult.data, reasoningContent, tokenUsage);
             }
 
             return [validationResult.data, reasoningContent, tokenUsage];

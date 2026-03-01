@@ -1,5 +1,5 @@
 import { AbstractAgent } from "@/app/ai/abstract-agent";
-import { AIMessage, BotResponseError, TokenUsage } from "@/app/api/game-models";
+import { AIMessage, BotResponseError, TokenUsage, AgentLoggingConfig, DEFAULT_LOGGING_CONFIG } from "@/app/api/game-models";
 import { Anthropic } from '@anthropic-ai/sdk';
 import { cleanResponse } from "@/app/utils/message-utils";
 import { calculateAnthropicCost } from "@/app/utils/pricing";
@@ -53,8 +53,15 @@ export class ClaudeAgent extends AbstractAgent {
     };
 
 
-    constructor(name: string, instruction: string, model: string, apiKey: string, enableThinking: boolean = false) {
-        super(name, instruction, model, 0.2, enableThinking);
+    constructor(
+        name: string, 
+        instruction: string, 
+        model: string, 
+        apiKey: string, 
+        enableThinking: boolean = false,
+        agentLoggingConfig: AgentLoggingConfig = DEFAULT_LOGGING_CONFIG.agents
+    ) {
+        super(name, instruction, model, 0.2, enableThinking, agentLoggingConfig);
         this.client = new Anthropic({
             apiKey: apiKey,
         });
@@ -88,9 +95,6 @@ export class ClaudeAgent extends AbstractAgent {
             if (role === 'assistant') {
                 assistantMsgCount++;
 
-                // Assistant messages need thinking blocks with signatures when thinking is enabled.
-                // SAFEGUARD: If we have thinking but NO SIGNATURE, we must drop the thinking block
-                // to prevent an API error, sending only the text content.
                 if (msg.thinking && msg.anthropicThinkingSignature) {
                     withThinking++;
                     withValidAnthropicSig++;
@@ -156,8 +160,7 @@ export class ClaudeAgent extends AbstractAgent {
         // Validate roles first, before entering the main try-catch block
         const aiMessages = this.prepareMessages(messages);
 
-        this.logAsking();
-        this.logSystemPrompt();
+        this.logAsking(messages);
         this.logMessages(messages);
 
         try {
@@ -238,8 +241,6 @@ export class ClaudeAgent extends AbstractAgent {
                 throw new Error(this.errorMessages.invalidFormat);
             }
 
-            this.logReply(textContent, thinkingContent || undefined);
-
             // Parse and validate the response using Zod
             let parsedContent: unknown;
             try {
@@ -279,6 +280,10 @@ export class ClaudeAgent extends AbstractAgent {
                     this.logger(`Thinking enabled: ${thinkingContent.length} characters of thinking content`);
                     this.logger(`Note: Thinking tokens are included in output token count and cost`);
                 }
+            }
+
+            if (validationResult.data) {
+                this.logReply(validationResult.data, thinkingContent || undefined, tokenUsage);
             }
 
             return [validationResult.data, thinkingContent, tokenUsage, anthropicThinkingSignature || undefined];
