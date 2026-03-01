@@ -1353,7 +1353,7 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
     };
 
     return (
-        <div className="flex flex-col">
+        <div className="flex flex-col min-h-[calc(100vh-10rem)]">
             <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                     <span className="text-xl font-bold theme-text-primary">
@@ -1408,8 +1408,8 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
                     onDismiss={handleDismissError}
                 />
             )}
-            {/* Messages area - natural flow, no internal scroll */}
-            <div className="mb-4 p-2 theme-bg-card theme-border border rounded">
+            {/* Messages area - grows to fill space, pushing input to bottom */}
+            <div className="flex-1 mb-4 p-2 theme-bg-card theme-border border rounded">
                 {isLoadingMessages ? (
                     <div className="text-center theme-text-secondary text-sm py-4">
                         Loading Day {selectedDay}...
@@ -1462,7 +1462,7 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
             </div>
 
             {/* Input area */}
-            <form onSubmit={sendMessage} className="sticky bottom-0 z-10 bg-[rgb(var(--color-page-bg-start))] pt-1">
+            <form onSubmit={sendMessage} className="sticky bottom-0 z-10 mt-auto bg-[rgb(var(--color-page-bg-start))] pt-1">
                 <div className="relative">
                     <MentionDropdown
                         candidates={mentionCandidates}

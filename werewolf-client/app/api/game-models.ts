@@ -18,12 +18,10 @@ export interface AgentLoggingConfig {
 }
 
 export interface LoggingConfig {
-    axiomEnabled: boolean;
     agents: AgentLoggingConfig;
 }
 
 export const DEFAULT_LOGGING_CONFIG: LoggingConfig = {
-    axiomEnabled: process.env.NODE_ENV === 'production' || !!process.env.NEXT_PUBLIC_AXIOM_TOKEN,
     agents: {
         enabled: true,
         logSystemPrompt: process.env.LOG_SYSTEM_PROMPT !== 'false',
