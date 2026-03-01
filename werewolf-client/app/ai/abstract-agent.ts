@@ -49,7 +49,7 @@ export abstract class AbstractAgent {
     }
 
     protected logSystemPrompt(): void {
-        // No longer needed as it's included in logAsking's Axiom log
+        // No longer needed as it's included in logAsking's structured log
         // Keeping it for backward compatibility with subclasses that might call it
     }
 

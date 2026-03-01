@@ -64,8 +64,9 @@ And the funnies part - the post-game discussion with everybody staying in roles
 
 ## Stack
 
-- Next.js 15 and React 19
+- Next.js 16 and React 19
 - Firebase: auth, firestore
+- BetterStack: logging and uptime monitoring
 - All AI providers SDKs
 
 ## Setup

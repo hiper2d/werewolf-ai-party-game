@@ -615,8 +615,8 @@ function GamePageContent({
                 {game.gameState === GAME_STATES.DAY_DISCUSSION && (
                     <>
                         <button
-                            className={`${buttonTransparentStyle} ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''} ${voteUrgency.isUrgent ? 'bg-red-600 hover:bg-red-700 border-red-500 !text-white animate-pulse' : voteUrgency.isWarning ? 'bg-yellow-500 hover:bg-yellow-600 border-yellow-400 !text-black' : ''}`}
-                            disabled={!areControlsEnabled}
+                            className={`${buttonTransparentStyle} ${!areControlsEnabled || game.gameStateProcessQueue.length > 0 || isKeepGoingLoading ? 'opacity-50 cursor-not-allowed' : ''} ${voteUrgency.isUrgent && !isKeepGoingLoading && game.gameStateProcessQueue.length === 0 ? 'bg-red-600 hover:bg-red-700 border-red-500 !text-white animate-pulse' : voteUrgency.isWarning && !isKeepGoingLoading && game.gameStateProcessQueue.length === 0 ? 'bg-yellow-500 hover:bg-yellow-600 border-yellow-400 !text-black' : ''}`}
+                            disabled={!areControlsEnabled || game.gameStateProcessQueue.length > 0 || isKeepGoingLoading}
                             onClick={async () => {
                                 const updatedGame = await runGameAction(() => vote(game.id));
                                 if (updatedGame) {
