@@ -29,28 +29,28 @@ export const SupportedAiKeyNames: Record<string, string> = {
 };
 
 export const LLM_CONSTANTS = {
-    CLAUDE_4_OPUS: 'Claude 4.6 Opus',
-    CLAUDE_4_OPUS_THINKING: 'Claude 4.6 Opus (Thinking)',
-    CLAUDE_4_SONNET: 'Claude 4.6 Sonnet',
-    CLAUDE_4_SONNET_THINKING: 'Claude 4.6 Sonnet (Thinking)',
-    CLAUDE_4_HAIKU: 'Claude 4.5 Haiku',
-    CLAUDE_4_HAIKU_THINKING: 'Claude 4.5 Haiku (Thinking)',
-    DEEPSEEK_CHAT: 'DeepSeek Chat',
-    DEEPSEEK_REASONER: 'DeepSeek Reasoner',
-    GPT_5: 'GPT-5.2',
-    GPT_5_MINI: 'GPT-5-mini',
-    GEMINI_3_PRO: 'Gemini 3.1 Pro Preview',
-    GEMINI_3_FLASH: 'Gemini 3 Flash Preview',
-    MISTRAL_3_LARGE: 'Mistral Large 3',
-    MISTRAL_3_MEDIUM: 'Mistral Medium 3.1',
-    MISTRAL_MAGISTRAL: 'Magistral Medium 1.2 (Thinking)',
-    GROK_4: 'Grok 4',
-    GROK_4_1_FAST_REASONING: 'Grok 4.1 Fast Reasoning',
-    KIMI_K2: 'Kimi K2',
-    KIMI_K2_THINKING: 'Kimi K2 (Thinking)',
-    KIMI_K2_5: 'Kimi K2.5',
-    KIMI_K2_5_THINKING: 'Kimi K2.5 (Thinking)',
-    RANDOM: 'Random',
+    CLAUDE_4_OPUS: 'claude-opus',
+    CLAUDE_4_OPUS_THINKING: 'claude-opus-thinking',
+    CLAUDE_4_SONNET: 'claude-sonnet',
+    CLAUDE_4_SONNET_THINKING: 'claude-sonnet-thinking',
+    CLAUDE_4_HAIKU: 'claude-haiku',
+    CLAUDE_4_HAIKU_THINKING: 'claude-haiku-thinking',
+    DEEPSEEK_CHAT: 'deepseek-chat',
+    DEEPSEEK_REASONER: 'deepseek-reasoner',
+    GPT_5: 'gpt',
+    GPT_5_MINI: 'gpt-mini',
+    GEMINI_3_PRO: 'gemini-pro',
+    GEMINI_3_FLASH: 'gemini-flash',
+    MISTRAL_3_LARGE: 'mistral-large',
+    MISTRAL_3_MEDIUM: 'mistral-medium',
+    MISTRAL_MAGISTRAL: 'mistral-magistral',
+    GROK_4: 'grok',
+    GROK_4_1_FAST_REASONING: 'grok-fast',
+    KIMI_K2: 'kimi',
+    KIMI_K2_THINKING: 'kimi-thinking',
+    KIMI_K2_5: 'kimi-k2.5',
+    KIMI_K2_5_THINKING: 'kimi-k2.5-thinking',
+    RANDOM: 'random',
 }
 
 export const AUDIO_MODEL_CONSTANTS = {
@@ -75,6 +75,7 @@ export const AUDIO_MODEL_PRICING: Record<string, AudioModelPricing> = {
 };
 
 export interface ModelConfig {
+    displayName: string;
     modelApiName: string;
     apiKeyName: string;
     hasThinking: boolean;
@@ -88,6 +89,7 @@ export interface ModelConfig {
 export const SupportedAiModels: Record<string, ModelConfig> = {
     // Claude models - separate with/without thinking versions
     [LLM_CONSTANTS.CLAUDE_4_OPUS]: {
+        displayName: 'Claude 4.6 Opus',
         modelApiName: 'claude-opus-4-6',
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
         hasThinking: false,
@@ -97,6 +99,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         }
     },
     [LLM_CONSTANTS.CLAUDE_4_OPUS_THINKING]: {
+        displayName: 'Claude 4.6 Opus (Thinking)',
         modelApiName: 'claude-opus-4-6',
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
         hasThinking: true,
@@ -106,6 +109,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         }
     },
     [LLM_CONSTANTS.CLAUDE_4_SONNET]: {
+        displayName: 'Claude 4.6 Sonnet',
         modelApiName: 'claude-sonnet-4-6',
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
         hasThinking: false,
@@ -115,6 +119,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         }
     },
     [LLM_CONSTANTS.CLAUDE_4_SONNET_THINKING]: {
+        displayName: 'Claude 4.6 Sonnet (Thinking)',
         modelApiName: 'claude-sonnet-4-6',
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
         hasThinking: true,
@@ -124,6 +129,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         }
     },
     [LLM_CONSTANTS.CLAUDE_4_HAIKU]: {
+        displayName: 'Claude 4.5 Haiku',
         modelApiName: 'claude-haiku-4-5',
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
         hasThinking: false,
@@ -133,6 +139,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         }
     },
     [LLM_CONSTANTS.CLAUDE_4_HAIKU_THINKING]: {
+        displayName: 'Claude 4.5 Haiku (Thinking)',
         modelApiName: 'claude-haiku-4-5',
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
         hasThinking: true,
@@ -144,6 +151,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
 
     // DeepSeek models - separate Chat and Reasoner
     [LLM_CONSTANTS.DEEPSEEK_CHAT]: {
+        displayName: 'DeepSeek Chat',
         modelApiName: 'deepseek-chat',
         apiKeyName: API_KEY_CONSTANTS.DEEPSEEK,
         hasThinking: false,
@@ -154,6 +162,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         }
     },
     [LLM_CONSTANTS.DEEPSEEK_REASONER]: {
+        displayName: 'DeepSeek Reasoner',
         modelApiName: 'deepseek-reasoner',
         apiKeyName: API_KEY_CONSTANTS.DEEPSEEK,
         hasThinking: true,
@@ -166,6 +175,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
 
     // Models with always-on reasoning
     [LLM_CONSTANTS.GPT_5]: {
+        displayName: 'GPT-5.2',
         modelApiName: 'gpt-5.2',
         apiKeyName: API_KEY_CONSTANTS.OPENAI,
         hasThinking: true,
@@ -175,6 +185,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         }
     },
     [LLM_CONSTANTS.GPT_5_MINI]: {
+        displayName: 'GPT-5-mini',
         modelApiName: 'gpt-5-mini',
         apiKeyName: API_KEY_CONSTANTS.OPENAI,
         hasThinking: true,
@@ -184,6 +195,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         }
     },
     [LLM_CONSTANTS.GEMINI_3_PRO]: {
+        displayName: 'Gemini 3.1 Pro Preview',
         modelApiName: 'gemini-3.1-pro-preview',
         apiKeyName: API_KEY_CONSTANTS.GOOGLE,
         hasThinking: true,
@@ -193,6 +205,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         }
     },
     [LLM_CONSTANTS.GEMINI_3_FLASH]: {
+        displayName: 'Gemini 3 Flash Preview',
         modelApiName: 'gemini-3-flash-preview',
         apiKeyName: API_KEY_CONSTANTS.GOOGLE,
         hasThinking: true,
@@ -202,6 +215,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         }
     },
     [LLM_CONSTANTS.GROK_4]: {
+        displayName: 'Grok 4',
         modelApiName: 'grok-4',
         apiKeyName: API_KEY_CONSTANTS.GROK,
         hasThinking: true,
@@ -211,6 +225,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         }
     },
     [LLM_CONSTANTS.GROK_4_1_FAST_REASONING]: {
+        displayName: 'Grok 4.1 Fast Reasoning',
         modelApiName: 'grok-4-1-fast-reasoning',
         apiKeyName: API_KEY_CONSTANTS.GROK,
         hasThinking: true,
@@ -222,6 +237,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
 
     // Mistral models
     [LLM_CONSTANTS.MISTRAL_3_LARGE]: {
+        displayName: 'Mistral Large 3',
         modelApiName: 'mistral-large-latest',
         apiKeyName: API_KEY_CONSTANTS.MISTRAL,
         hasThinking: false,
@@ -231,6 +247,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         }
     },
     [LLM_CONSTANTS.MISTRAL_3_MEDIUM]: {
+        displayName: 'Mistral Medium 3.1',
         modelApiName: 'mistral-medium-latest',
         apiKeyName: API_KEY_CONSTANTS.MISTRAL,
         hasThinking: false,
@@ -240,6 +257,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         }
     },
     [LLM_CONSTANTS.MISTRAL_MAGISTRAL]: {
+        displayName: 'Magistral Medium 1.2 (Thinking)',
         modelApiName: 'magistral-medium-latest',
         apiKeyName: API_KEY_CONSTANTS.MISTRAL,
         hasThinking: true,
@@ -251,6 +269,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
 
     // Kimi models
     [LLM_CONSTANTS.KIMI_K2]: {
+        displayName: 'Kimi K2',
         modelApiName: 'kimi-k2-0905-preview',
         apiKeyName: API_KEY_CONSTANTS.MOONSHOT,
         hasThinking: false,
@@ -260,6 +279,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         }
     },
     [LLM_CONSTANTS.KIMI_K2_THINKING]: {
+        displayName: 'Kimi K2 (Thinking)',
         modelApiName: 'kimi-k2-thinking',
         apiKeyName: API_KEY_CONSTANTS.MOONSHOT,
         hasThinking: true,
@@ -269,6 +289,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         }
     },
     [LLM_CONSTANTS.KIMI_K2_5]: {
+        displayName: 'Kimi K2.5',
         modelApiName: 'kimi-k2.5',
         apiKeyName: API_KEY_CONSTANTS.MOONSHOT,
         hasThinking: false,
@@ -278,6 +299,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         }
     },
     [LLM_CONSTANTS.KIMI_K2_5_THINKING]: {
+        displayName: 'Kimi K2.5 (Thinking)',
         modelApiName: 'kimi-k2.5',
         apiKeyName: API_KEY_CONSTANTS.MOONSHOT,
         hasThinking: true,
@@ -289,6 +311,10 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
 };
 
 export type LLMModel = keyof typeof SupportedAiModels;
+
+export function getModelDisplayName(modelId: string): string {
+    return SupportedAiModels[modelId]?.displayName ?? modelId;
+}
 
 export function getModelConfigByApiName(modelApiName: string): ModelConfig | undefined {
     return Object.values(SupportedAiModels).find(config => config.modelApiName === modelApiName);
@@ -517,12 +543,12 @@ export function getProviderSignatureFields(aiType: string, signature?: string): 
     }
 
     // Check if it's an Anthropic (Claude) model
-    if (aiType.startsWith('Claude ')) {
+    if (aiType.startsWith('claude-')) {
         return { anthropicThinkingSignature: signature };
     }
 
     // Check if it's a Google (Gemini) model
-    if (aiType.startsWith('Gemini ')) {
+    if (aiType.startsWith('gemini-')) {
         return { googleThoughtSignature: signature };
     }
 

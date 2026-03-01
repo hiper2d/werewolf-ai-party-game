@@ -10,6 +10,7 @@ interface MultiSelectDropdownProps {
     className?: string;
     disabled?: boolean;
     hasError?: boolean;
+    labelFn?: (option: string) => string;
 }
 
 export default function MultiSelectDropdown({
@@ -19,7 +20,8 @@ export default function MultiSelectDropdown({
     placeholder = 'Select options...',
     className = '',
     disabled = false,
-    hasError = false
+    hasError = false,
+    labelFn = (o: string) => o
 }: MultiSelectDropdownProps) {
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
@@ -59,7 +61,7 @@ export default function MultiSelectDropdown({
         } else if (selectedOptions.length === options.length) {
             return 'All Models Selected';
         } else if (selectedOptions.length === 1) {
-            return selectedOptions[0];
+            return labelFn(selectedOptions[0]);
         } else {
             return `${selectedOptions.length} Models Selected`;
         }
@@ -107,7 +109,7 @@ export default function MultiSelectDropdown({
                                 onChange={() => handleToggleOption(option)}
                                 className="mr-2 text-blue-500"
                             />
-                            <span className="text-white">{option}</span>
+                            <span className="text-white">{labelFn(option)}</span>
                         </label>
                     ))}
                 </div>

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { LLM_CONSTANTS, SupportedAiModels } from '@/app/ai/ai-models';
+import { LLM_CONSTANTS, SupportedAiModels, getModelDisplayName } from '@/app/ai/ai-models';
 import { getCandidateModelsForTier, getPerGameModelLimit, FREE_TIER_UNLIMITED } from '@/app/ai/model-limit-utils';
 import { UserTier, USER_TIERS } from '@/app/api/game-models';
 import { buttonTransparentStyle } from '@/app/constants';
@@ -143,7 +143,7 @@ export default function ModelSelectionDialog({
                     >
                         {modelOptions.map(({ model, disabled }) => (
                             <option key={model} value={model} disabled={disabled}>
-                                {disabled && model !== currentModel ? `${model} (limit reached)` : model}
+                                {disabled && model !== currentModel ? `${getModelDisplayName(model)} (limit reached)` : getModelDisplayName(model)}
                             </option>
                         ))}
                     </select>

@@ -6,6 +6,7 @@ import { startNewDay, summarizePastDay } from "@/app/api/night-actions";
 import GameChat from "@/app/games/[id]/components/GameChat";
 import ModelSelectionDialog from "@/app/games/[id]/components/ModelSelectionDialog";
 import { buttonTransparentStyle } from "@/app/constants";
+import { getModelDisplayName } from "@/app/ai/ai-models";
 import { GAME_STATES, GAME_ROLES, AUTO_VOTE_COEFFICIENT, BOT_SELECTION_CONFIG } from "@/app/api/game-models";
 import type { Game } from "@/app/api/game-models";
 import type { Session } from "next-auth";
@@ -819,7 +820,7 @@ function GamePageContent({
                                         title="Click to change AI model"
                                         disabled={!areControlsEnabled}
                                     >
-                                        Model: {participant.aiType}
+                                        Model: {getModelDisplayName(participant.aiType!)}
                                     </button>
                                 </div>
                             )}

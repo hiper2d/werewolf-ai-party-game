@@ -6,7 +6,7 @@ import {useSession} from 'next-auth/react';
 import {buttonBlackStyle, buttonTransparentStyle} from "@/app/constants";
 import {createGame, previewGame} from '@/app/api/game-actions';
 import {GAME_ROLES, GamePreview, GamePreviewWithGeneratedBots, GENDER_OPTIONS, getVoicesForGender, getRandomVoiceForGender, PLAY_STYLES, PLAY_STYLE_CONFIGS, UserTier, USER_TIERS} from "@/app/api/game-models";
-import {LLM_CONSTANTS, SupportedAiModels} from "@/app/ai/ai-models";
+import {LLM_CONSTANTS, SupportedAiModels, getModelDisplayName} from "@/app/ai/ai-models";
 import {FREE_TIER_UNLIMITED, getCandidateModelsForTier, getPerGameModelLimit} from "@/app/ai/model-limit-utils";
 import MultiSelectDropdown from '@/app/components/MultiSelectDropdown';
 import {ttsService} from "@/app/services/tts-service";
@@ -514,7 +514,7 @@ export default function CreateNewGamePage() {
                             disabled={!isTierLoaded}
                         >
                             {gameMasterOptions.map(model => (
-                                <option key={model} value={model}>{model}</option>
+                                <option key={model} value={model}>{getModelDisplayName(model)}</option>
                             ))}
                         </select>
                     </div>
@@ -529,6 +529,7 @@ export default function CreateNewGamePage() {
                                 className="w-full"
                                 hasError={!!playersAiError}
                                 disabled={!isTierLoaded}
+                                labelFn={getModelDisplayName}
                             />
                             {playersAiError && <p className="text-red-500 text-sm mt-1">{playersAiError}</p>}
                         </div>
@@ -621,7 +622,7 @@ export default function CreateNewGamePage() {
                                         onChange={(e) => handleGameMasterAiChange(e.target.value)}
                                     >
                                         {gameMasterOptions.filter(model => model !== LLM_CONSTANTS.RANDOM).map(model => (
-                                            <option key={model} value={model}>{model}</option>
+                                            <option key={model} value={model}>{getModelDisplayName(model)}</option>
                                         ))}
                                     </select>
                                 </div>
@@ -734,7 +735,7 @@ export default function CreateNewGamePage() {
                                         onChange={(e) => handleBotAiChange(index, e.target.value)}
                                     >
                                         {playerModelOptions.map(model => (
-                                            <option key={model} value={model}>{model}</option>
+                                            <option key={model} value={model}>{getModelDisplayName(model)}</option>
                                         ))}
                                     </select>
                                 </div>
