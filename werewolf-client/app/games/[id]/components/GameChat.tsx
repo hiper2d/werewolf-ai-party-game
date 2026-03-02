@@ -397,6 +397,7 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
     const daySelectorRef = useRef<HTMLDivElement | null>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const [showScrollToTop, setShowScrollToTop] = useState(false);
     
     // Mention state
     const [mentionState, setMentionState] = useState<{
@@ -783,6 +784,15 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages, isProcessing]);
+
+    // Show/hide scroll-to-top button based on window scroll position
+    useEffect(() => {
+        const handleScroll = () => {
+            setShowScrollToTop(window.scrollY > 300);
+        };
+        window.addEventListener('scroll', handleScroll);
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
 
     // Cleanup recording on component unmount
     useEffect(() => {
@@ -1458,8 +1468,32 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
                         </span>
                     </div>
                 )}
+                {!isProcessing && game.errorState && game.gameStateProcessQueue.length > 0 && !isLoadingMessages && (
+                    <div className="flex items-center gap-2 py-2 px-3 text-red-400">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0">
+                            <circle cx="12" cy="12" r="10"/>
+                            <line x1="15" y1="9" x2="9" y2="15"/>
+                            <line x1="9" y1="9" x2="15" y2="15"/>
+                        </svg>
+                        <span className="text-xs">
+                            {game.gameStateProcessQueue[0]} failed to respond. Dismiss the error above to retry.
+                        </span>
+                    </div>
+                )}
                 <div ref={messagesEndRef} />
             </div>
+            {showScrollToTop && (
+                <button
+                    type="button"
+                    onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                    className="fixed bottom-20 right-6 w-7 h-7 flex items-center justify-center rounded-full theme-bg-card theme-border border theme-text-secondary hover:opacity-80 shadow transition-colors z-20"
+                    title="Scroll to top"
+                >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="18 15 12 9 6 15"/>
+                    </svg>
+                </button>
+            )}
 
             {/* Input area */}
             <form onSubmit={sendMessage} className="sticky bottom-0 z-10 mt-auto bg-[rgb(var(--color-page-bg-start))] pt-1">

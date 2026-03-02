@@ -50,6 +50,8 @@ export const LLM_CONSTANTS = {
     KIMI_K2_THINKING: 'kimi-thinking',
     KIMI_K2_5: 'kimi-k2.5',
     KIMI_K2_5_THINKING: 'kimi-k2.5-thinking',
+    KIMI_K2_TURBO: 'kimi-turbo',
+    KIMI_K2_TURBO_THINKING: 'kimi-turbo-thinking',
     RANDOM: 'random',
 }
 
@@ -205,8 +207,8 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         }
     },
     [LLM_CONSTANTS.GEMINI_3_FLASH]: {
-        displayName: 'Gemini 3.1 Flash Preview',
-        modelApiName: 'gemini-3.1-flash-preview',
+        displayName: 'Gemini 3 Flash Preview',
+        modelApiName: 'gemini-3-flash-preview',
         apiKeyName: API_KEY_CONSTANTS.GOOGLE,
         hasThinking: true,
         freeTier: {
@@ -308,6 +310,26 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
             maxBotsPerGame: 0
         }
     },
+    [LLM_CONSTANTS.KIMI_K2_TURBO]: {
+        displayName: 'Kimi K2 Turbo',
+        modelApiName: 'kimi-k2-turbo-preview',
+        apiKeyName: API_KEY_CONSTANTS.MOONSHOT,
+        hasThinking: false,
+        freeTier: {
+            available: false,
+            maxBotsPerGame: 0
+        }
+    },
+    [LLM_CONSTANTS.KIMI_K2_TURBO_THINKING]: {
+        displayName: 'Kimi K2 Turbo (Thinking)',
+        modelApiName: 'kimi-k2-thinking-turbo',
+        apiKeyName: API_KEY_CONSTANTS.MOONSHOT,
+        hasThinking: true,
+        freeTier: {
+            available: false,
+            maxBotsPerGame: 0
+        }
+    },
 };
 
 export type LLMModel = keyof typeof SupportedAiModels;
@@ -379,6 +401,16 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
         inputPrice: 0.60,
         outputPrice: 3.00,
         cacheHitPrice: 0.10
+    },
+    [SupportedAiModels[LLM_CONSTANTS.KIMI_K2_TURBO].modelApiName]: {
+        inputPrice: 1.15,
+        outputPrice: 8.00,
+        cacheHitPrice: 0.15
+    },
+    [SupportedAiModels[LLM_CONSTANTS.KIMI_K2_TURBO_THINKING].modelApiName]: {
+        inputPrice: 1.15,
+        outputPrice: 8.00,
+        cacheHitPrice: 0.15
     },
 
     // Anthropic models

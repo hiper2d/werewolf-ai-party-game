@@ -62,6 +62,8 @@ export class AgentFactory {
                 return new KimiAgent(name, instruction, model.modelApiName, key, 1, shouldEnableThinking);
             case LLM_CONSTANTS.KIMI_K2:
             case LLM_CONSTANTS.KIMI_K2_THINKING:
+            case LLM_CONSTANTS.KIMI_K2_TURBO:
+            case LLM_CONSTANTS.KIMI_K2_TURBO_THINKING:
                 return new KimiAgent(name, instruction, model.modelApiName, key, 0.6, shouldEnableThinking);
             default:
                 throw new Error(`Unknown Key: ${modelName}`);

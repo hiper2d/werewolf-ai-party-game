@@ -22,7 +22,12 @@ const roboto_mono = Roboto_Mono({
 
 export const metadata: Metadata = {
   title: "Werewolf AI",
-  description: "Werewolf AI Game Client",
+  description: "Play the classic Werewolf party game with top AI models from OpenAI, Anthropic, Google, Mistral, and more. Each bot has its own personality, goals, and alliances.",
+  openGraph: {
+    title: "Werewolf AI",
+    description: "Play the classic Werewolf party game with top AI models from OpenAI, Anthropic, Google, Mistral, and more.",
+    siteName: "Werewolf AI",
+  },
 };
 
 // Inline script to prevent flash of wrong theme
