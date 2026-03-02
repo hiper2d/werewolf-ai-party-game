@@ -102,7 +102,7 @@ export default function FreeUserLimits({ userId }: { userId: string }) {
 
                                     return (
                                         <tr key={index} className={`border-b theme-border-subtle ${!isAvailable ? 'opacity-50' : ''}`}>
-                                            <td className="py-2">{modelName}</td>
+                                            <td className="py-2">{config.displayName}</td>
                                             <td className="py-2 text-right text-xs">{displayLimit}</td>
                                             <td className="py-2 text-right">
                                                 <div>{inputDisplay.base}</div>
