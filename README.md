@@ -1,8 +1,10 @@
 # AI Werewolf
 
+The game is live at **[aiwerewolf.net](https://aiwerewolf.net)**
+
 <a href="images/werewolf-ai-logo-4.png" target="_blank"><img src="images/werewolf-ai-logo-4.png" width="800"></a>
 
-This the Werewolf game with AI bots who are instructed to pretend to be humans. 
+This the Werewolf game with AI bots who are instructed to pretend to be humans.
 Who don't know about other AI in the game and try their best to win. Who has its personal goals, secret roles, enemies and alliances.
 
 ## Chose from the following models
@@ -14,7 +16,7 @@ The game supports all the major latest models for the game master and bots:
 - DeepSeek: DeepSeek Chat, DeepSeek Reasoner
 - Mistral: Mistral Large 3, Mistral Medium 3.1, Magistral Medium 1.2 (Thinking)
 - Grok: Grok 4, Grok 4.1 Fast Reasoning
-- Moonshot AI: Kimi K2.5, Kimi K2.5 (Thinking), Kimi K2 Turbo, Kimi K2 Turbo (Thinking), Kimi K2, Kimi K2 (Thinking)
+- Moonshot AI: Kimi K2.5, Kimi K2 Turbo, Kimi K2 (all with or without Thinking)
 
 Most of the models support reasoning which is not visible on UI, but it is stored in DB with every message.
 
