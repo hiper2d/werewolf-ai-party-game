@@ -38,6 +38,7 @@ export const LLM_CONSTANTS = {
     DEEPSEEK_CHAT: 'deepseek-chat',
     DEEPSEEK_REASONER: 'deepseek-reasoner',
     GPT_5: 'gpt',
+    GPT_5_4: 'gpt-5.4',
     GPT_5_MINI: 'gpt-mini',
     GEMINI_3_PRO: 'gemini-pro',
     GEMINI_3_FLASH: 'gemini-flash',
@@ -177,13 +178,23 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
 
     // Models with always-on reasoning
     [LLM_CONSTANTS.GPT_5]: {
-        displayName: 'GPT-5.2',
-        modelApiName: 'gpt-5.2',
+        displayName: 'GPT-5.3',
+        modelApiName: 'gpt-5.3-chat-latest',
         apiKeyName: API_KEY_CONSTANTS.OPENAI,
         hasThinking: true,
         freeTier: {
             available: true,
             maxBotsPerGame: 1
+        }
+    },
+    [LLM_CONSTANTS.GPT_5_4]: {
+        displayName: 'GPT-5.4',
+        modelApiName: 'gpt-5.4',
+        apiKeyName: API_KEY_CONSTANTS.OPENAI,
+        hasThinking: true,
+        freeTier: {
+            available: false,
+            maxBotsPerGame: 0
         }
     },
     [LLM_CONSTANTS.GPT_5_MINI]: {
@@ -367,6 +378,11 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
         inputPrice: 1.750,
         outputPrice: 14.000,
         cacheHitPrice: 0.175
+    },
+    [SupportedAiModels[LLM_CONSTANTS.GPT_5_4].modelApiName]: {
+        inputPrice: 2.500,
+        outputPrice: 15.000,
+        cacheHitPrice: 0.250
     },
     [SupportedAiModels[LLM_CONSTANTS.GPT_5_MINI].modelApiName]: {
         inputPrice: 0.250,

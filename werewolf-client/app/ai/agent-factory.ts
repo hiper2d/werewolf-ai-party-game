@@ -38,6 +38,7 @@ export class AgentFactory {
 
             // Always-on reasoning models
             case LLM_CONSTANTS.GPT_5:
+            case LLM_CONSTANTS.GPT_5_4:
             case LLM_CONSTANTS.GPT_5_MINI:
                 return new Gpt5Agent(name, instruction, model.modelApiName, key, 1, shouldEnableThinking);
             case LLM_CONSTANTS.GEMINI_3_PRO:

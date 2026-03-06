@@ -250,8 +250,8 @@ export class DetectiveProcessor extends BaseRoleProcessor {
             };
 
             // Save messages
-            await addMessageToChatAndSaveToDb(gmMessage, this.gameId);
-            await addMessageToChatAndSaveToDb(detectiveMessage, this.gameId);
+            const savedGmMessage = await addMessageToChatAndSaveToDb(gmMessage, this.gameId);
+            const savedDetectiveMessage = await addMessageToChatAndSaveToDb(detectiveMessage, this.gameId);
 
             if (tokenUsage) {
                 await recordBotTokenUsage(this.gameId, detectiveBot.name, tokenUsage, session.user.email);
@@ -266,7 +266,8 @@ export class DetectiveProcessor extends BaseRoleProcessor {
                     nightResults: currentNightResults,
                     gameStateParamQueue: remainingQueue,
                     resolvedNightState: intermediateNightState
-                }
+                },
+                messages: [savedGmMessage, savedDetectiveMessage]
             };
 
         } catch (error) {

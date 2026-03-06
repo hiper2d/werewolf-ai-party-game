@@ -218,8 +218,8 @@ export class ManiacProcessor extends BaseRoleProcessor {
             };
 
             // Save messages
-            await addMessageToChatAndSaveToDb(gmMessage, this.gameId);
-            await addMessageToChatAndSaveToDb(maniacMessage, this.gameId);
+            const savedGmMessage = await addMessageToChatAndSaveToDb(gmMessage, this.gameId);
+            const savedManiacMessage = await addMessageToChatAndSaveToDb(maniacMessage, this.gameId);
 
             if (tokenUsage) {
                 await recordBotTokenUsage(this.gameId, maniacBot.name, tokenUsage, session.user.email);
@@ -236,7 +236,8 @@ export class ManiacProcessor extends BaseRoleProcessor {
                     nightResults: currentNightResults,
                     gameStateParamQueue: remainingQueue,
                     resolvedNightState: intermediateNightState
-                }
+                },
+                messages: [savedGmMessage, savedManiacMessage]
             };
 
         } catch (error) {

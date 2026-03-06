@@ -2,9 +2,9 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { talkToAll, humanPlayerVote, getSuggestion } from "@/app/api/bot-actions";
-import { performNightAction, humanPlayerTalkWerewolves } from "@/app/api/night-actions";
+import { humanPlayerTalkWerewolves } from "@/app/api/night-actions";
 import { buttonTransparentStyle } from "@/app/constants";
-import { GAME_STATES, MessageType, RECIPIENT_ALL, GameMessage, Game, SystemErrorMessage, BotResponseError, GAME_MASTER, ROLE_CONFIGS, GAME_ROLES, FREE_TIER_LIMITS } from "@/app/api/game-models";
+import { GAME_STATES, MessageType, RECIPIENT_ALL, RECIPIENT_WEREWOLVES, RECIPIENT_DOCTOR, RECIPIENT_DETECTIVE, RECIPIENT_MANIAC, GameMessage, Game, GameActionResponse, SystemErrorMessage, BotResponseError, GAME_MASTER, ROLE_CONFIGS, GAME_ROLES, FREE_TIER_LIMITS } from "@/app/api/game-models";
 import { getPlayerColor } from "@/app/utils/color-utils";
 import { clearGameErrorState } from "@/app/api/game-actions";
 import VotingModal from "./VotingModal";
@@ -18,7 +18,9 @@ import { useUIControls } from '../context/UIControlsContext';
 interface GameChatProps {
     gameId: string;
     game: Game;
-    onGameStateChange?: (updatedGame: Game) => void;
+    onGameStateChange?: (response: GameActionResponse) => void;
+    pendingMessages?: GameMessage[];
+    onPendingMessagesConsumed?: () => void;
     clearNightMessages?: boolean;
     onErrorHandled?: () => void;
     isExternalLoading?: boolean;
@@ -176,6 +178,11 @@ function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcludin
                 displayContent = `🔍 Investigated ${detectiveAction.target}. Reasoning: ${detectiveAction.reasoning}.${resultText}`;
                 break;
             }
+            case MessageType.MANIAC_ACTION: {
+                const maniacAction = message.msg as { target: string; reasoning: string };
+                displayContent = `🔪 Abducted ${maniacAction.target}. Reasoning: ${maniacAction.reasoning}`;
+                break;
+            }
             case MessageType.GM_COMMAND:
                 displayContent = typeof message.msg === 'string' ? `🎭 ${message.msg}` : '🎭 Invalid message format';
                 break;
@@ -225,7 +232,7 @@ function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcludin
                             <div className="relative" ref={menuRef}>
                                 <button
                                     onClick={() => setShowDeleteMenu(!showDeleteMenu)}
-                                    className={`opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 rounded hover:bg-gray-300/50 dark:hover:bg-gray-600/50 ${showDeleteMenu ? 'opacity-100' : ''} ${resetsRemaining === 0 ? 'opacity-30 cursor-not-allowed' : ''}`}
+                                    className={`opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-200 p-1 rounded hover:bg-gray-300/50 dark:hover:bg-gray-600/50 ${showDeleteMenu ? '!opacity-100' : ''} ${resetsRemaining === 0 ? '!opacity-30 cursor-not-allowed' : ''}`}
                                     title={resetsRemaining === 0 ? 'Reset limit reached for today' : 'Delete options'}
                                     disabled={resetsRemaining === 0}
                                 >
@@ -373,7 +380,7 @@ function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcludin
     );
 }
 
-export default function GameChat({ gameId, game, onGameStateChange, clearNightMessages, onErrorHandled, isExternalLoading, gameControls }: GameChatProps) {
+export default function GameChat({ gameId, game, onGameStateChange, pendingMessages, onPendingMessagesConsumed, clearNightMessages, onErrorHandled, isExternalLoading, gameControls }: GameChatProps) {
     const [messages, setMessages] = useState<GameMessage[]>([]);
     const [newMessage, setNewMessage] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
@@ -524,6 +531,35 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
         });
     }, [game.currentDay]);
 
+    const allowedRecipients = useMemo(() => {
+        const recipients = new Set([RECIPIENT_ALL, game.humanPlayerName]);
+        if (game.humanPlayerRole === GAME_ROLES.WEREWOLF) recipients.add(RECIPIENT_WEREWOLVES);
+        else if (game.humanPlayerRole === GAME_ROLES.DOCTOR) recipients.add(RECIPIENT_DOCTOR);
+        else if (game.humanPlayerRole === GAME_ROLES.DETECTIVE) recipients.add(RECIPIENT_DETECTIVE);
+        else if (game.humanPlayerRole === GAME_ROLES.MANIAC) recipients.add(RECIPIENT_MANIAC);
+        return recipients;
+    }, [game.humanPlayerName, game.humanPlayerRole]);
+
+    const addMessages = useCallback((newMsgs: GameMessage[]) => {
+        if (newMsgs.length === 0) return;
+        setMessages(prev => {
+            const existingIds = new Set(prev.map(m => m.id));
+            const uniqueNew = newMsgs.filter(m =>
+                m.id && !existingIds.has(m.id) && allowedRecipients.has(m.recipientName)
+            );
+            if (uniqueNew.length === 0) return prev;
+            return [...prev, ...uniqueNew];
+        });
+    }, [allowedRecipients]);
+
+    // Consume pending messages from parent (GamePage)
+    useEffect(() => {
+        if (pendingMessages && pendingMessages.length > 0) {
+            addMessages(pendingMessages);
+            onPendingMessagesConsumed?.();
+        }
+    }, [pendingMessages, addMessages, onPendingMessagesConsumed]);
+
     useEffect(() => {
         setSelectedDay(prev => {
             if (game.currentDay > prev) {
@@ -628,71 +664,23 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
             });
             const processQueue = async () => {
                 setIsProcessing(true);
-                const updatedGame = await talkToAll(gameId, '');
+                const { game: updatedGame, messages: newMessages } = await talkToAll(gameId, '');
                 console.log('✅ TalkToAll API completed');
+                addMessages(newMessages);
 
                 // Update parent game state to clear the queue
                 if (onGameStateChange) {
                     console.log('🔄 UPDATING PARENT GAME STATE after auto-processing...');
-                    onGameStateChange(updatedGame);
+                    onGameStateChange({ game: updatedGame, messages: [] });
                 }
                 setIsProcessing(false);
             };
             processQueue();
         }
-        
-        // Auto-process NIGHT queue (but skip if human player is involved or night has ended)
-        if (game.gameState === GAME_STATES.NIGHT &&
-            game.gameStateProcessQueue.length > 0 &&
-            game.gameStateParamQueue.length > 0 &&
-            !isProcessing &&
-            !game.errorState) {
-            
-            const currentRole = game.gameStateProcessQueue[0];
-            const currentPlayer = game.gameStateParamQueue[0];
-            
-            console.log('🔍 GAMECHAT: AUTO-PROCESS NIGHT CHECK:', {
-                currentRole,
-                currentPlayer,
-                humanPlayerRole: game.humanPlayerRole,
-                humanPlayerName: game.humanPlayerName,
-                isHumanPlayerTurn: currentRole === game.humanPlayerRole && currentPlayer === game.humanPlayerName,
-                gameId,
-                timestamp: new Date().toISOString()
-            });
-            
-            // Skip auto-processing if it's the human player's turn for this role
-            if (currentRole === game.humanPlayerRole && currentPlayer === game.humanPlayerName) {
-                console.log('🌙 GAMECHAT: SKIPPING AUTO-PROCESS - Human player turn for night action', {
-                    currentRole,
-                    currentPlayer,
-                    humanPlayerRole: game.humanPlayerRole,
-                    humanPlayerName: game.humanPlayerName
-                });
-                return;
-            }
-            
-            console.log('🌙 GAMECHAT: CALLING PERFORM_NIGHT_ACTION API', {
-                gameId,
-                queue: game.gameStateProcessQueue,
-                processQueueLength: game.gameStateProcessQueue.length,
-                paramQueueLength: game.gameStateParamQueue.length
-            });
-            const processNightQueue = async () => {
-                setIsProcessing(true);
-                const updatedGame = await performNightAction(gameId);
-                console.log('✅ GAMECHAT: PerformNightAction API completed');
-                
-                // Update parent game state
-                if (onGameStateChange) {
-                    console.log('🔄 GAMECHAT: UPDATING PARENT GAME STATE after night processing...');
-                    onGameStateChange(updatedGame);
-                }
-                setIsProcessing(false);
-            };
-            processNightQueue();
-        }
-    }, [game.gameState, game.gameStateProcessQueue, game.gameStateParamQueue, game.humanPlayerRole, game.humanPlayerName, gameId, isProcessing, game.errorState, onGameStateChange]);
+
+        // Night processing is handled exclusively by GamePage's useEffect to avoid
+        // duplicate calls. GameChat only handles human player modals for night actions.
+    }, [game.gameState, game.gameStateProcessQueue, game.gameStateParamQueue, game.humanPlayerRole, game.humanPlayerName, gameId, isProcessing, game.errorState, onGameStateChange, addMessages]);
 
     // Check if it's human player's turn to vote
     useEffect(() => {
@@ -752,34 +740,6 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
         }
     }, [game.gameState, game.gameStateProcessQueue, game.gameStateParamQueue, game.humanPlayerName, game.humanPlayerRole, showNightActionModal, isPerformingNightAction]);
 
-    useEffect(() => {
-        if (!isCurrentDaySelected) {
-            return;
-        }
-
-        const eventSource = new EventSource(`/api/games/${gameId}/messages/sse`);
-
-        eventSource.onmessage = (event) => {
-            const message = JSON.parse(event.data) as GameMessage;
-            if (message.day !== selectedDay) {
-                return;
-            }
-            setMessages(prev => {
-                const messageExists = prev.some(existingMsg => existingMsg.id === message.id);
-                if (messageExists) {
-                    return prev;
-                }
-                return [...prev, message];
-            });
-        };
-
-        eventSource.onerror = (event) => {
-            console.error('SSE connection error:', event);
-        };
-
-        return () => eventSource.close();
-    }, [gameId, selectedDay, isCurrentDaySelected]);
-
     // Auto-scroll to bottom when new messages arrive or processing starts
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -825,23 +785,32 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
                     currentRole === GAME_ROLES.WEREWOLF) {
 
                     console.log('🐺 SENDING WEREWOLF COORDINATION MESSAGE:', { message: trimmed, gameId });
-                    const updatedGame = await humanPlayerTalkWerewolves(gameId, trimmed);
-                    setNewMessage('');
+                    const { game: updatedGame, messages: newMessages } = await humanPlayerTalkWerewolves(gameId, trimmed);
+                    addMessages(newMessages);
 
                     if (onGameStateChange) {
                         console.log('🔄 UPDATING GAME STATE after werewolf coordination...');
-                        onGameStateChange(updatedGame);
+                        onGameStateChange({ game: updatedGame, messages: [] });
+                    }
+
+                    if (!updatedGame.errorState) {
+                        setNewMessage('');
                     }
                     return;
                 }
             }
 
-            const updatedGame = await talkToAll(gameId, trimmed);
-            setNewMessage('');
+            const { game: updatedGame, messages: newMessages } = await talkToAll(gameId, trimmed);
+            addMessages(newMessages);
 
             if (onGameStateChange) {
                 console.log('🔄 UPDATING GAME STATE after human message...');
-                onGameStateChange(updatedGame);
+                onGameStateChange({ game: updatedGame, messages: [] });
+            }
+
+            // Only clear the input if the message was successfully processed (no error state)
+            if (!updatedGame.errorState) {
+                setNewMessage('');
             }
         } catch (error) {
             console.error('Error sending message:', error);
@@ -893,7 +862,7 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
             console.log('🔄 CLEARING GAME ERROR STATE and refreshing...');
             const updatedGame = await clearGameErrorState(gameId);
             if (onGameStateChange) {
-                onGameStateChange(updatedGame);
+                onGameStateChange({ game: updatedGame, messages: [] });
             }
             console.log('✅ GAME ERROR STATE CLEARED and game state refreshed');
         } catch (error) {
@@ -946,7 +915,7 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
                     if (updatedGame) {
                         const aliveBots = updatedGame.bots.filter(bot => bot.isAlive).map(bot => bot.name);
                         console.log('✅ GAME STATE REFRESHED - Alive bots:', aliveBots);
-                        onGameStateChange(updatedGame);
+                        onGameStateChange({ game: updatedGame, messages: [] });
                     }
                 } catch (error) {
                     console.error('Error refreshing game state:', error);
@@ -1005,7 +974,7 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
                     if (updatedGame) {
                         const aliveBots = updatedGame.bots.filter(bot => bot.isAlive).map(bot => bot.name);
                         console.log('✅ GAME STATE REFRESHED - Alive bots:', aliveBots);
-                        onGameStateChange(updatedGame);
+                        onGameStateChange({ game: updatedGame, messages: [] });
                     }
                 } catch (error) {
                     console.error('Error refreshing game state:', error);
@@ -1031,14 +1000,15 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
         
         setIsVoting(true);
         console.log('🚨 CALLING HUMAN_PLAYER_VOTE API - This could trigger the loop!');
-        const updatedGame = await humanPlayerVote(gameId, targetPlayer, reason);
+        const { game: updatedGame, messages: newMessages } = await humanPlayerVote(gameId, targetPlayer, reason);
         console.log('✅ Human vote API completed, closing modal and updating state');
+        addMessages(newMessages);
         closeModal('voting');
-        
+
         // Update game state if callback is provided
         if (onGameStateChange) {
             console.log('📊 Updating parent game state after vote');
-            onGameStateChange(updatedGame);
+            onGameStateChange({ game: updatedGame, messages: [] });
         }
         setIsVoting(false);
     };
@@ -1065,14 +1035,15 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
 
         // We'll need to import this function
         const { performHumanPlayerNightAction } = await import("@/app/api/bot-actions");
-        const updatedGame = await performHumanPlayerNightAction(gameId, targetPlayer, message, actionType);
+        const { game: updatedGame, messages: newMessages } = await performHumanPlayerNightAction(gameId, targetPlayer, message, actionType);
         console.log('✅ Human night action API completed, closing modal and updating state');
+        addMessages(newMessages);
         closeModal('nightAction');
-        
+
         // Update game state if callback is provided
         if (onGameStateChange) {
             console.log('📊 Updating parent game state after night action');
-            onGameStateChange(updatedGame);
+            onGameStateChange({ game: updatedGame, messages: [] });
         }
         setIsPerformingNightAction(false);
     };
@@ -1454,7 +1425,7 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
                         Deleting messages...
                     </div>
                 )}
-                {isProcessing && !isLoadingMessages && (
+                {(isProcessing || isExternalLoading || (game.gameState === GAME_STATES.VOTE && game.gameStateProcessQueue.length > 0 && !game.errorState)) && !isLoadingMessages && (
                     <div className="flex items-center gap-2 py-2 px-3">
                         <div className="flex gap-1">
                             <span className="w-2 h-2 rounded-full bg-blue-400 animate-bounce" style={{ animationDelay: '0ms' }}></span>
@@ -1462,9 +1433,11 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
                             <span className="w-2 h-2 rounded-full bg-blue-400 animate-bounce" style={{ animationDelay: '300ms' }}></span>
                         </div>
                         <span className="text-xs theme-text-secondary">
-                            {game.gameStateProcessQueue.length > 0
-                                ? `${game.gameStateProcessQueue[0]} is thinking...`
-                                : 'Processing...'}
+                            {game.gameState === GAME_STATES.VOTE && game.gameStateProcessQueue.length > 0
+                                ? `${game.gameStateProcessQueue[0]} is voting...`
+                                : game.gameStateProcessQueue.length > 0
+                                    ? `${game.gameStateProcessQueue[0]} is thinking...`
+                                    : 'Processing...'}
                         </span>
                     </div>
                 )}
@@ -1497,121 +1470,125 @@ export default function GameChat({ gameId, game, onGameStateChange, clearNightMe
 
             {/* Input area */}
             <form onSubmit={sendMessage} className="sticky bottom-0 z-10 mt-auto bg-[rgb(var(--color-page-bg-start))] pt-1">
-                <div className="relative">
-                    <MentionDropdown
-                        candidates={mentionCandidates}
-                        selectedIndex={mentionState.selectedIndex}
-                        onSelect={handleMentionSelect}
-                        onClose={() => setMentionState(prev => ({ ...prev, isOpen: false }))}
-                    />
-                    <textarea
-                        ref={textareaRef}
-                        value={newMessage}
-                        onChange={handleTextareaChange}
-                        onKeyDown={handleTextareaKeyDown}
-                        onFocus={() => setIsInputFocused(true)}
-                        onBlur={() => {
-                            // Delay to allow button clicks to register before hiding toolbar
-                            setTimeout(() => setIsInputFocused(false), 150);
-                        }}
-                        disabled={!isInputEnabled()}
-                        rows={textareaRows}
-                        className={`w-full p-3 rounded bg-input border border-input-border text-input-text placeholder-input-placeholder focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none
-                            ${!isInputEnabled() ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        placeholder={getInputPlaceholder()}
-                    />
-                </div>
+                {isInputEnabled() && (
+                    <div className="relative">
+                        <MentionDropdown
+                            candidates={mentionCandidates}
+                            selectedIndex={mentionState.selectedIndex}
+                            onSelect={handleMentionSelect}
+                            onClose={() => setMentionState(prev => ({ ...prev, isOpen: false }))}
+                        />
+                        <textarea
+                            ref={textareaRef}
+                            value={newMessage}
+                            onChange={handleTextareaChange}
+                            onKeyDown={handleTextareaKeyDown}
+                            onFocus={() => setIsInputFocused(true)}
+                            onBlur={() => {
+                                // Delay to allow button clicks to register before hiding toolbar
+                                setTimeout(() => setIsInputFocused(false), 150);
+                            }}
+                            rows={textareaRows}
+                            className="w-full p-3 rounded bg-input border border-input-border text-input-text placeholder-input-placeholder focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                            placeholder={getInputPlaceholder()}
+                        />
+                    </div>
+                )}
 
-                {/* Toolbar row below textarea: text buttons left, icon buttons right */}
-                <div className={`flex items-center justify-between mt-1 ${isInputFocused ? 'flex' : 'hidden lg:flex'}`}>
+                {/* Toolbar row: text buttons left, icon buttons right */}
+                <div className={`flex items-center justify-between mt-1 ${isInputEnabled() ? (isInputFocused ? 'flex' : 'hidden lg:flex') : 'flex'}`}>
                     {/* Left group: text buttons (Send + game controls) */}
                     <div className="flex items-center gap-1">
-                        {/* Send button */}
-                        <button
-                            type="submit"
-                            disabled={!isInputEnabled() || isProcessing}
-                            className={`h-10 px-4 ${buttonTransparentStyle} ${!isInputEnabled() || isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            title={isProcessing ? "Waiting for response..." : !isInputEnabled() ? "Game is not ready for input" : "Send your message to all players"}
-                        >
-                            {isProcessing ? (
-                                <div className="flex items-center gap-2">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin">
-                                        <path d="M21 12a9 9 0 11-6.219-8.56"/>
-                                    </svg>
-                                    <span className="text-sm">Sending...</span>
-                                </div>
-                            ) : <span className="text-sm">Send</span>}
-                        </button>
+                        {/* Send button - only when input is enabled */}
+                        {isInputEnabled() && (
+                            <button
+                                type="submit"
+                                disabled={isProcessing}
+                                className={`h-10 px-4 ${buttonTransparentStyle} ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                title={isProcessing ? "Waiting for response..." : "Send your message to all players"}
+                            >
+                                {isProcessing ? (
+                                    <div className="flex items-center gap-2">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin">
+                                            <path d="M21 12a9 9 0 11-6.219-8.56"/>
+                                        </svg>
+                                        <span className="text-sm">Sending...</span>
+                                    </div>
+                                ) : <span className="text-sm">Send</span>}
+                            </button>
+                        )}
 
                         {/* Game controls (Vote, Keep Going, etc.) */}
                         {gameControls}
                     </div>
 
-                    {/* Right group: icon buttons (Mic, Suggestion, Expand) */}
-                    <div className="flex items-center gap-1">
-                        {/* Microphone button */}
-                        <button
-                            type="button"
-                            onClick={handleToggleRecording}
-                            disabled={!isMicrophoneEnabled() || isTranscribing}
-                            className={`h-10 w-10 transition-colors ${
-                                isRecording
-                                    ? `${buttonTransparentStyle} animate-pulse`
-                                    : buttonTransparentStyle
-                            } ${!isMicrophoneEnabled() || isTranscribing ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            title={
-                                isTranscribing
-                                    ? "Transcribing audio..."
-                                    : isRecording
-                                        ? "Stop recording and transcribe"
-                                        : "Start voice recording"
-                            }
-                        >
-                            {isTranscribing ? (
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin mx-auto">
-                                    <path d="M21 12a9 9 0 11-6.219-8.56"/>
-                                </svg>
-                            ) : (
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mx-auto">
-                                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-                                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-                                    <line x1="12" y1="19" x2="12" y2="23"/>
-                                    <line x1="8" y1="23" x2="16" y2="23"/>
-                                </svg>
-                            )}
-                        </button>
-
-                        {/* AI Suggestion button */}
-                        {game.gameState === GAME_STATES.DAY_DISCUSSION && (
+                    {/* Right group: icon buttons (Mic, Suggestion, Expand) - only when input is enabled */}
+                    {isInputEnabled() && (
+                        <div className="flex items-center gap-1">
+                            {/* Microphone button */}
                             <button
                                 type="button"
-                                onClick={handleGetSuggestion}
-                                disabled={!isInputEnabled() || isGettingSuggestion}
-                                className={`h-10 w-10 ${buttonTransparentStyle} ${!isInputEnabled() || isGettingSuggestion ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                title={isGettingSuggestion ? "Getting suggestion..." : "Get AI suggestion for your response"}
+                                onClick={handleToggleRecording}
+                                disabled={!isMicrophoneEnabled() || isTranscribing}
+                                className={`h-10 w-10 transition-colors ${
+                                    isRecording
+                                        ? `${buttonTransparentStyle} animate-pulse`
+                                        : buttonTransparentStyle
+                                } ${!isMicrophoneEnabled() || isTranscribing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                title={
+                                    isTranscribing
+                                        ? "Transcribing audio..."
+                                        : isRecording
+                                            ? "Stop recording and transcribe"
+                                            : "Start voice recording"
+                                }
                             >
-                                {isGettingSuggestion ? (
+                                {isTranscribing ? (
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin mx-auto">
                                         <path d="M21 12a9 9 0 11-6.219-8.56"/>
                                     </svg>
                                 ) : (
-                                    <span className="text-sm">💡</span>
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mx-auto">
+                                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                                        <line x1="12" y1="19" x2="12" y2="23"/>
+                                        <line x1="8" y1="23" x2="16" y2="23"/>
+                                    </svg>
                                 )}
                             </button>
-                        )}
 
-                        {/* Expand/Shrink button */}
-                        <button
-                            type="button"
-                            onClick={() => setTextareaRows(prev => prev === 2 ? 10 : 2)}
-                            className={`h-10 w-10 ${buttonTransparentStyle}`}
-                            title="Expand/shrink text area"
-                        >
-                            <span className="text-sm">
-                                {textareaRows === 2 ? '⬆️' : '⬇️'}
-                            </span>
-                        </button>
-                    </div>
+                            {/* AI Suggestion button */}
+                            {game.gameState === GAME_STATES.DAY_DISCUSSION && (
+                                <button
+                                    type="button"
+                                    onClick={handleGetSuggestion}
+                                    disabled={isGettingSuggestion}
+                                    className={`h-10 w-10 ${buttonTransparentStyle} ${isGettingSuggestion ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    title={isGettingSuggestion ? "Getting suggestion..." : "Get AI suggestion for your response"}
+                                >
+                                    {isGettingSuggestion ? (
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin mx-auto">
+                                            <path d="M21 12a9 9 0 11-6.219-8.56"/>
+                                        </svg>
+                                    ) : (
+                                        <span className="text-sm">💡</span>
+                                    )}
+                                </button>
+                            )}
+
+                            {/* Expand/Shrink button */}
+                            <button
+                                type="button"
+                                onClick={() => setTextareaRows(prev => prev === 2 ? 10 : 2)}
+                                className={`h-10 w-10 ${buttonTransparentStyle}`}
+                                title="Expand/shrink text area"
+                            >
+                                <span className="text-sm">
+                                    {textareaRows === 2 ? '⬆️' : '⬇️'}
+                                </span>
+                            </button>
+                        </div>
+                    )}
                 </div>
             </form>
             <VotingModal

@@ -294,8 +294,8 @@ export class DoctorProcessor extends BaseRoleProcessor {
             };
 
             // Save messages
-            await addMessageToChatAndSaveToDb(gmMessage, this.gameId);
-            await addMessageToChatAndSaveToDb(doctorMessage, this.gameId);
+            const savedGmMessage = await addMessageToChatAndSaveToDb(gmMessage, this.gameId);
+            const savedDoctorMessage = await addMessageToChatAndSaveToDb(doctorMessage, this.gameId);
 
             if (tokenUsage) {
                 await recordBotTokenUsage(this.gameId, doctorBot.name, tokenUsage, session.user.email);
@@ -326,7 +326,8 @@ export class DoctorProcessor extends BaseRoleProcessor {
 
             return {
                 success: true,
-                gameUpdates
+                gameUpdates,
+                messages: [savedGmMessage, savedDoctorMessage]
             };
 
         } catch (error) {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getGame, updateBotModel, updateGameMasterModel, clearGameErrorState, setGameErrorState, afterGameDiscussion } from "@/app/api/game-actions";
 import { startNewDay, summarizePastDay } from "@/app/api/night-actions";
 import GameChat from "@/app/games/[id]/components/GameChat";
@@ -8,7 +8,7 @@ import ModelSelectionDialog from "@/app/games/[id]/components/ModelSelectionDial
 import { buttonTransparentStyle } from "@/app/constants";
 import { getModelDisplayName } from "@/app/ai/ai-models";
 import { GAME_STATES, GAME_ROLES, AUTO_VOTE_COEFFICIENT, BOT_SELECTION_CONFIG } from "@/app/api/game-models";
-import type { Game } from "@/app/api/game-models";
+import type { Game, GameActionResponse, GameMessage } from "@/app/api/game-models";
 import type { Session } from "next-auth";
 import { welcome, vote, keepBotsGoing, manualSelectBots } from '@/app/api/bot-actions';
 import BotSelectionDialog from '@/app/games/[id]/components/BotSelectionDialog';
@@ -51,9 +51,17 @@ function GamePageContent({
     session: Session | null
 }) {
     const [game, setGame] = useState(initialGame);
+    const [pendingMessages, setPendingMessages] = useState<GameMessage[]>([]);
     const [selectedBot, setSelectedBot] = useState<{ name: string; aiType: string; enableThinking?: boolean } | null>(null);
     const [clearNightMessages, setClearNightMessages] = useState(false);
     const [isKeepGoingLoading, setIsKeepGoingLoading] = useState(false);
+
+    const applyActionResult = useCallback((result: GameActionResponse) => {
+        setGame(result.game);
+        if (result.messages.length > 0) {
+            setPendingMessages(prev => [...prev, ...result.messages]);
+        }
+    }, []);
     const { openModal, closeModal, areControlsEnabled } = useUIControls();
     const isGameOver = game.gameState === GAME_STATES.GAME_OVER || game.gameState === GAME_STATES.AFTER_GAME_DISCUSSION;
 
@@ -170,10 +178,10 @@ function GamePageContent({
                         timestamp: new Date().toISOString()
                     });
                 }
-                const updatedGame = await runGameAction(() => welcome(game.id));
+                const result = await runGameAction(() => welcome(game.id));
                 console.log('✅ GAMEPAGE: Welcome API completed');
-                if (updatedGame) {
-                    setGame(updatedGame);
+                if (result) {
+                    applyActionResult(result);
                 }
             }
         };
@@ -211,15 +219,15 @@ function GamePageContent({
                 queueLength: game.gameStateProcessQueue.length,
                 isEmptyQueue: game.gameStateProcessQueue.length === 0
             });
-            const updatedGame = await runGameAction(() => vote(game.id));
-            if (updatedGame) {
+            const result = await runGameAction(() => vote(game.id));
+            if (result) {
                 console.log('✅ Vote API completed, updating game state:', {
                     oldState: game.gameState,
-                    newState: updatedGame.gameState,
+                    newState: result.game.gameState,
                     oldQueueLength: game.gameStateProcessQueue.length,
-                    newQueueLength: updatedGame.gameStateProcessQueue.length
+                    newQueueLength: result.game.gameStateProcessQueue.length
                 });
-                setGame(updatedGame);
+                applyActionResult(result);
             }
         };
 
@@ -235,10 +243,10 @@ function GamePageContent({
                         gameId: game.id,
                         timestamp: new Date().toISOString()
                     });
-                    const updatedGame = await runGameAction(() => performNightAction(game.id));
+                    const result = await runGameAction(() => performNightAction(game.id));
                     console.log('✅ GAMEPAGE: Night summary generation completed');
-                    if (updatedGame) {
-                        setGame(updatedGame);
+                    if (result) {
+                        applyActionResult(result);
                     }
                     return;
                 }
@@ -274,10 +282,10 @@ function GamePageContent({
                         gameId: game.id,
                         timestamp: new Date().toISOString()
                     });
-                    const updatedGame = await runGameAction(() => performNightAction(game.id));
+                    const result = await runGameAction(() => performNightAction(game.id));
                     console.log('✅ GAMEPAGE: PerformNightAction API completed');
-                    if (updatedGame) {
-                        setGame(updatedGame);
+                    if (result) {
+                        applyActionResult(result);
                     }
                 }
             }
@@ -301,10 +309,10 @@ function GamePageContent({
                 });
 
                 try {
-                    const updatedGame = await runGameAction(() => summarizePastDay(game.id));
+                    const result = await runGameAction(() => summarizePastDay(game.id));
                     console.log('✅ GAMEPAGE: SummarizeCurrentDay API completed');
-                    if (updatedGame) {
-                        setGame(updatedGame);
+                    if (result) {
+                        applyActionResult(result);
                     }
                 } catch (error: any) {
                     if (handleGameActionError(error)) {
@@ -370,9 +378,9 @@ function GamePageContent({
     // Handle manual bot selection
     const handleManualBotSelection = async (selectedBots: string[]) => {
         try {
-            const updatedGame = await runGameAction(() => manualSelectBots(game.id, selectedBots));
-            if (updatedGame) {
-                setGame(updatedGame);
+            const result = await runGameAction(() => manualSelectBots(game.id, selectedBots));
+            if (result) {
+                applyActionResult(result);
             }
         } catch (error) {
             if (handleGameActionError(error)) {
@@ -564,9 +572,9 @@ function GamePageContent({
                         onClick={async () => {
                             setIsKeepGoingLoading(true);
                             try {
-                                const updatedGame = await runGameAction(() => keepBotsGoing(game.id));
-                                if (updatedGame) {
-                                    setGame(updatedGame);
+                                const result = await runGameAction(() => keepBotsGoing(game.id));
+                                if (result) {
+                                    applyActionResult(result);
                                 }
                             } finally {
                                 setIsKeepGoingLoading(false);
@@ -581,7 +589,7 @@ function GamePageContent({
                                 </svg>
                                 Starting...
                             </span>
-                        ) : 'Keep Going'}
+                        ) : 'Go on'}
                     </button>
                     <button
                         className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500 !text-white ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
@@ -619,9 +627,9 @@ function GamePageContent({
                             className={`${buttonTransparentStyle} ${!areControlsEnabled || game.gameStateProcessQueue.length > 0 || isKeepGoingLoading ? 'opacity-50 cursor-not-allowed' : ''} ${voteUrgency.isUrgent && !isKeepGoingLoading && game.gameStateProcessQueue.length === 0 ? 'bg-red-600 hover:bg-red-700 border-red-500 !text-white animate-pulse' : voteUrgency.isWarning && !isKeepGoingLoading && game.gameStateProcessQueue.length === 0 ? 'bg-yellow-500 hover:bg-yellow-600 border-yellow-400 !text-black' : ''}`}
                             disabled={!areControlsEnabled || game.gameStateProcessQueue.length > 0 || isKeepGoingLoading}
                             onClick={async () => {
-                                const updatedGame = await runGameAction(() => vote(game.id));
-                                if (updatedGame) {
-                                    setGame(updatedGame);
+                                const result = await runGameAction(() => vote(game.id));
+                                if (result) {
+                                    applyActionResult(result);
                                 }
                             }}
                             title={voteUrgency.isUrgent
@@ -636,9 +644,9 @@ function GamePageContent({
                             onClick={async () => {
                                 setIsKeepGoingLoading(true);
                                 try {
-                                    const updatedGame = await runGameAction(() => keepBotsGoing(game.id));
-                                    if (updatedGame) {
-                                        setGame(updatedGame);
+                                    const result = await runGameAction(() => keepBotsGoing(game.id));
+                                    if (result) {
+                                        applyActionResult(result);
                                     }
                                 } finally {
                                     setIsKeepGoingLoading(false);
@@ -653,7 +661,7 @@ function GamePageContent({
                                     </svg>
                                     Starting...
                                 </span>
-                            ) : 'Keep Going'}
+                            ) : 'Go on'}
                         </button>
                     </>
                 )}
@@ -669,9 +677,9 @@ function GamePageContent({
                                 className={`${buttonTransparentStyle} bg-blue-600 hover:bg-blue-700 border-blue-500 !text-white ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 disabled={!areControlsEnabled}
                                 onClick={async () => {
-                                    const updatedGame = await runGameAction(() => performNightAction(game.id));
-                                    if (updatedGame) {
-                                        setGame(updatedGame);
+                                    const result = await runGameAction(() => performNightAction(game.id));
+                                    if (result) {
+                                        applyActionResult(result);
                                     }
                                 }}
                                 title="Begin the night phase where werewolves and special roles take their actions"
@@ -684,9 +692,9 @@ function GamePageContent({
                                 className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500 !text-white ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 disabled={!areControlsEnabled}
                                 onClick={async () => {
-                                    const updatedGame = await runGameAction(() => afterGameDiscussion(game.id));
-                                    if (updatedGame) {
-                                        setGame(updatedGame);
+                                    const result = await runGameAction(() => afterGameDiscussion(game.id));
+                                    if (result) {
+                                        applyActionResult(result);
                                     }
                                 }}
                                 title="End the game and move to after-game discussion"
@@ -711,9 +719,9 @@ function GamePageContent({
                             disabled={!areControlsEnabled}
                             onClick={async () => {
                                 setClearNightMessages(true);
-                                const updatedGame = await runGameAction(() => replayNight(game.id));
-                                if (updatedGame) {
-                                    setGame(updatedGame);
+                                const result = await runGameAction(() => replayNight(game.id));
+                                if (result) {
+                                    applyActionResult(result);
                                 }
                                 setTimeout(() => setClearNightMessages(false), 100);
                             }}
@@ -726,9 +734,9 @@ function GamePageContent({
                                 className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500 !text-white ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 disabled={!areControlsEnabled}
                                 onClick={async () => {
-                                    const updatedGame = await runGameAction(() => afterGameDiscussion(game.id));
-                                    if (updatedGame) {
-                                        setGame(updatedGame);
+                                    const result = await runGameAction(() => afterGameDiscussion(game.id));
+                                    if (result) {
+                                        applyActionResult(result);
                                     }
                                 }}
                                 title="End the game and move to after-game discussion"
@@ -740,9 +748,9 @@ function GamePageContent({
                                 className={`${buttonTransparentStyle} ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 disabled={!areControlsEnabled}
                                 onClick={async () => {
-                                    const updatedGame = await runGameAction(() => startNewDay(game.id));
-                                    if (updatedGame) {
-                                        setGame(updatedGame);
+                                    const result = await runGameAction(() => startNewDay(game.id));
+                                    if (result) {
+                                        applyActionResult(result);
                                     }
                                 }}
                                 title="Continue to apply night results and start new day"
@@ -754,7 +762,7 @@ function GamePageContent({
                 )}
                 {game.gameState === GAME_STATES.NEW_DAY_BOT_SUMMARIES && (
                     <span className="text-sm text-blue-600 dark:text-blue-400">
-                        💭 Generating summaries... ({game.gameStateProcessQueue.length} remaining)
+                        💭 {game.gameStateProcessQueue[0]} is generating summary... ({game.gameStateProcessQueue.length} remaining)
                     </span>
                 )}
             </div>
@@ -955,7 +963,9 @@ function GamePageContent({
                 <GameChat
                     gameId={game.id}
                     game={game}
-                    onGameStateChange={setGame}
+                    onGameStateChange={(response: GameActionResponse) => setGame(response.game)}
+                    pendingMessages={pendingMessages}
+                    onPendingMessagesConsumed={() => setPendingMessages([])}
                     clearNightMessages={clearNightMessages}
                     onErrorHandled={handleErrorCleared}
                     isExternalLoading={isKeepGoingLoading}

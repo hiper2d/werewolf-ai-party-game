@@ -261,9 +261,9 @@ export abstract class BaseRoleProcessor {
     /**
      * Send a message to all players
      */
-    protected async sendMessage(content: string, messageType: MessageType = MessageType.GM_COMMAND): Promise<void> {
+    protected async sendMessage(content: string, messageType: MessageType = MessageType.GM_COMMAND): Promise<GameMessage> {
         const message = this.createGameMessage(content, messageType);
-        await addMessageToChatAndSaveToDb(message, this.gameId);
+        return await addMessageToChatAndSaveToDb(message, this.gameId);
     }
 
     /**

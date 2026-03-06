@@ -307,8 +307,8 @@ export class WerewolfProcessor extends BaseRoleProcessor {
             };
 
             // Save messages
-            await addMessageToChatAndSaveToDb(gmMessage, this.gameId);
-            await addMessageToChatAndSaveToDb(werewolfMessage, this.gameId);
+            const savedGmMessage = await addMessageToChatAndSaveToDb(gmMessage, this.gameId);
+            const savedWerewolfMessage = await addMessageToChatAndSaveToDb(werewolfMessage, this.gameId);
 
             if (tokenUsage) {
                 await recordBotTokenUsage(this.gameId, werewolfBot.name, tokenUsage, session.user.email);
@@ -327,7 +327,8 @@ export class WerewolfProcessor extends BaseRoleProcessor {
 
             return {
                 success: true,
-                gameUpdates: gameUpdates
+                gameUpdates: gameUpdates,
+                messages: [savedGmMessage, savedWerewolfMessage]
             };
 
         } catch (error) {

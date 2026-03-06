@@ -19,7 +19,8 @@ import {
     RECIPIENT_MANIAC,
     RECIPIENT_NONE,
     RECIPIENT_WEREWOLVES,
-    VotingDayResult
+    VotingDayResult,
+    GameActionResponse
 } from "@/app/api/game-models";
 import {
     GM_COMMAND_INTRODUCE_YOURSELF,
@@ -289,7 +290,7 @@ function shouldTriggerAutoVote(game: Game): boolean {
     }
     
     
-    async function welcomeImpl(gameId: string): Promise<Game> {
+    async function welcomeImpl(gameId: string): Promise<GameActionResponse> {
         const session = await auth();
         if (!session || !session.user?.email) {
             throw new Error('Not authenticated');
@@ -312,7 +313,7 @@ function shouldTriggerAutoVote(game: Game): boolean {
                     gameState: GAME_STATES.DAY_DISCUSSION,
                     gameStateProcessQueue: [] // Ensure the process queue is empty for DAY_DISCUSSION
                 });
-                return await getGame(gameId) as Game;
+                return { game: await getGame(gameId) as Game, messages: [] };
             }
     
             // Get the first bot name and remove it from queue
@@ -378,10 +379,10 @@ function shouldTriggerAutoVote(game: Game): boolean {
             
     
             // Save the game master command to the database first
-            await addMessageToChatAndSaveToDb(gmMessage, gameId);
-    
+            const savedGmMessage = await addMessageToChatAndSaveToDb(gmMessage, gameId);
+
             // Then save the bot's response
-            await addMessageToChatAndSaveToDb(botMessage, gameId);
+            const savedBotMessage = await addMessageToChatAndSaveToDb(botMessage, gameId);
     
             // Update bot's token usage
             if (tokenUsage) {
@@ -408,15 +409,16 @@ function shouldTriggerAutoVote(game: Game): boolean {
                 });
             }
     
-            // Return the updated game state
-            return await getGame(gameId) as Game;
+            // Return the updated game state with messages
+            const updatedGame = await getGame(gameId) as Game;
+            return { game: updatedGame, messages: [savedGmMessage, savedBotMessage] };
         } catch (error) {
             logger.error('Error in welcome function:', { error, gameId });
             throw error;
         }
     }
-    
-    async function talkToAllImpl(gameId: string, userMessage: string): Promise<Game> {
+
+    async function talkToAllImpl(gameId: string, userMessage: string): Promise<GameActionResponse> {
         // Common authentication and validation
         const session = await auth();
         if (!session || !session.user?.email) {
@@ -441,18 +443,20 @@ function shouldTriggerAutoVote(game: Game): boolean {
         }
     
         try {
+            let newMessages: GameMessage[] = [];
+
             // Case 1: Human player initiates discussion
             if (userMessage && game.gameStateProcessQueue.length === 0) {
-                await handleHumanPlayerMessage(gameId, game, userMessage, session.user.email);
+                newMessages = await handleHumanPlayerMessage(gameId, game, userMessage, session.user.email);
             }
             // Case 2: Process next bot in queue
             else if (game.gameStateProcessQueue.length > 0) {
-                await processNextBotInQueue(gameId, game, session.user.email);
+                newMessages = await processNextBotInQueue(gameId, game, session.user.email);
             }
-    
+
             // Get updated game state
             const updatedGame = await getGame(gameId) as Game;
-    
+
             // Check if we should auto-trigger voting (only during DAY_DISCUSSION, not AFTER_GAME_DISCUSSION)
             if (!isAfterGameDiscussion && shouldTriggerAutoVote(updatedGame)) {
                 logger.info('🗳️ AUTO-VOTE TRIGGERED: Message threshold reached, starting voting phase', { gameId });
@@ -460,30 +464,31 @@ function shouldTriggerAutoVote(game: Game): boolean {
                 const aliveBots = updatedGame.bots.filter(bot => bot.isAlive).map(bot => bot.name);
                 const allPlayers = [...aliveBots, updatedGame.humanPlayerName];
                 const shuffledPlayers = [...allPlayers].sort(() => Math.random() - 0.5);
-    
+
                 await db.collection('games').doc(gameId).update({
                     gameState: GAME_STATES.VOTE,
                     gameStateProcessQueue: shuffledPlayers,
                     gameStateParamQueue: []
                 });
-    
-                return await getGame(gameId) as Game;
+
+                return { game: await getGame(gameId) as Game, messages: newMessages };
             } else if (isAfterGameDiscussion && shouldTriggerAutoVote(updatedGame)) {
                 logger.info('🛑 DISCUSSION LIMIT REACHED (After Game): Stopping auto-responses', { gameId });
                 // Stop further discussion by clearing the queue
                 await db.collection('games').doc(gameId).update({
                     gameStateProcessQueue: []
                 });
-                return await getGame(gameId) as Game;
+                return { game: await getGame(gameId) as Game, messages: newMessages };
             }
-    
-            return updatedGame;
-        } catch (error) {
-            logger.error('Error in talkToAll function:', { error, gameId });        throw error;
-    }
-}
 
-async function keepBotsGoingImpl(gameId: string): Promise<Game> {
+            return { game: updatedGame, messages: newMessages };
+        } catch (error) {
+            logger.error('Error in talkToAll function:', { error, gameId });
+            throw error;
+        }
+    }
+
+async function keepBotsGoingImpl(gameId: string): Promise<GameActionResponse> {
     // Common authentication and validation
     const session = await auth();
     if (!session || !session.user?.email) {
@@ -526,7 +531,7 @@ async function keepBotsGoingImpl(gameId: string): Promise<Game> {
             gameStateParamQueue: []
         });
 
-        return await getGame(gameId) as Game;
+        return { game: await getGame(gameId) as Game, messages: [] };
     }
 
     try {
@@ -628,8 +633,8 @@ async function keepBotsGoingImpl(gameId: string): Promise<Game> {
             gameStateProcessQueue: selectedBots
         });
 
-        // Return updated game state
-        return await getGame(gameId) as Game;
+        // Return updated game state (no visible messages — selection is hidden debug message)
+        return { game: await getGame(gameId) as Game, messages: [] };
     } catch (error) {
         console.error('Error in keepBotsGoing function:', error);
         throw error;
@@ -640,7 +645,7 @@ async function keepBotsGoingImpl(gameId: string): Promise<Game> {
  * Manually select bots to respond in the discussion.
  * This bypasses the Game Master AI selection and directly sets the queue.
  */
-async function manualSelectBotsImpl(gameId: string, selectedBots: string[]): Promise<Game> {
+async function manualSelectBotsImpl(gameId: string, selectedBots: string[]): Promise<GameActionResponse> {
     const session = await auth();
     if (!session?.user?.email) {
         throw new Error('Unauthorized: No session found');
@@ -688,7 +693,7 @@ async function manualSelectBotsImpl(gameId: string, selectedBots: string[]): Pro
         gameStateProcessQueue: selectedBots
     });
 
-    return await getGame(gameId) as Game;
+    return { game: await getGame(gameId) as Game, messages: [] };
 }
 
 export const manualSelectBots = withGameErrorHandling(manualSelectBotsImpl);
@@ -703,7 +708,7 @@ async function handleHumanPlayerMessage(
     game: Game,
     userMessage: string,
     userEmail: string
-): Promise<void> {
+): Promise<GameMessage[]> {
     // Save the user's message to chat
     const userChatMessage: GameMessage = {
         id: null,
@@ -793,7 +798,7 @@ async function handleHumanPlayerMessage(
     }
 
     // Save the user's message to the database after successful GM response
-    await addMessageToChatAndSaveToDb(userChatMessage, gameId);
+    const savedUserMessage = await addMessageToChatAndSaveToDb(userChatMessage, gameId);
 
     // Save GM bot selection as a hidden debug message
     const selectedBots = gmResponse.selected_bots.slice(0, BOT_SELECTION_CONFIG.MAX);
@@ -815,6 +820,9 @@ async function handleHumanPlayerMessage(
     await db.collection('games').doc(gameId).update({
         gameStateProcessQueue: selectedBots
     });
+
+    // Return the human player message (selection message is hidden/debug, not shown in chat)
+    return [savedUserMessage];
 }
 
 /**
@@ -825,7 +833,7 @@ async function processNextBotInQueue(
     gameId: string,
     game: Game,
     userEmail: string
-): Promise<void> {
+): Promise<GameMessage[]> {
     // Get the first bot from queue
     const botName = game.gameStateProcessQueue[0];
     const newQueue = game.gameStateProcessQueue.slice(1);
@@ -837,7 +845,7 @@ async function processNextBotInQueue(
         await db.collection('games').doc(gameId).update({
             gameStateProcessQueue: newQueue
         });
-        return;
+        return [];
     }
 
     // Find the bot
@@ -896,10 +904,10 @@ async function processNextBotInQueue(
     };
 
     // Save the game master command to the database first
-    await addMessageToChatAndSaveToDb(gmMessage, gameId);
-    
+    const savedGmMessage = await addMessageToChatAndSaveToDb(gmMessage, gameId);
+
     // Then save the bot's response
-    await addMessageToChatAndSaveToDb(botMessage, gameId);
+    const savedBotMessage = await addMessageToChatAndSaveToDb(botMessage, gameId);
 
     // Update bot's token usage
     if (tokenUsage) {
@@ -916,9 +924,11 @@ async function processNextBotInQueue(
     await db.collection('games').doc(gameId).update({
         gameStateProcessQueue: newQueue
     });
+
+    return [savedGmMessage, savedBotMessage];
 }
 
-async function voteImpl(gameId: string): Promise<Game> {
+async function voteImpl(gameId: string): Promise<GameActionResponse> {
     const session = await auth();
     if (!session || !session.user?.email) {
         throw new Error('Not authenticated');
@@ -965,8 +975,8 @@ async function voteImpl(gameId: string): Promise<Game> {
                 gameStateProcessQueue: shuffledPlayers,
                 gameStateParamQueue: gameStateParamQueue
             });
-            
-            return await getGame(gameId) as Game;
+
+            return { game: await getGame(gameId) as Game, messages: [] };
         }
         
         // Mode 2: VOTE state - Process voting
@@ -1006,6 +1016,7 @@ async function voteImpl(gameId: string): Promise<Game> {
                 console.log('📝 VOTE FUNCTION: Generated results message:', resultsMessage);
                 
                 // Create and save GM message
+                const voteResultMessages: GameMessage[] = [];
                 const gmMessage: GameMessage = {
                     id: null, // Will be generated by Firestore
                     recipientName: RECIPIENT_ALL,
@@ -1015,7 +1026,7 @@ async function voteImpl(gameId: string): Promise<Game> {
                     day: updatedGame.currentDay,
                     timestamp: Date.now(),
                 };
-                await addMessageToChatAndSaveToDb(gmMessage, gameId);
+                voteResultMessages.push(await addMessageToChatAndSaveToDb(gmMessage, gameId));
                 
                 console.log('✅ VOTE FUNCTION: Successfully saved GM results message');
                 
@@ -1083,7 +1094,7 @@ async function voteImpl(gameId: string): Promise<Game> {
                         day: updatedGame.currentDay,
                         timestamp: Date.now(),
                     };
-                    await addMessageToChatAndSaveToDb(eliminationGmMessage, gameId);
+                    voteResultMessages.push(await addMessageToChatAndSaveToDb(eliminationGmMessage, gameId));
 
                     // Update game state based on elimination
                     if (isHumanEliminated) {
@@ -1124,7 +1135,7 @@ async function voteImpl(gameId: string): Promise<Game> {
                                 day: updatedGame.currentDay,
                                 timestamp: Date.now(),
                             };
-                            await addMessageToChatAndSaveToDb(gameEndMessage, gameId);
+                            voteResultMessages.push(await addMessageToChatAndSaveToDb(gameEndMessage, gameId));
 
                             // Update game state to GAME_OVER
                             await db.collection('games').doc(gameId).update({
@@ -1139,7 +1150,7 @@ async function voteImpl(gameId: string): Promise<Game> {
                 // Get final updated game state
                 const finalGame = await getGame(gameId) as Game;
                 console.log('✅ VOTE FUNCTION: Successfully completed voting and elimination, returning final game');
-                return finalGame;
+                return { game: finalGame, messages: voteResultMessages };
             }
             
             // Get the first name from queue
@@ -1147,7 +1158,7 @@ async function voteImpl(gameId: string): Promise<Game> {
             
             // If it's the human player, return to UI (UI will handle human voting)
             if (currentVoter === game.humanPlayerName) {
-                return game;
+                return { game, messages: [] };
             }
             
             // Find the bot
@@ -1165,7 +1176,7 @@ async function voteImpl(gameId: string): Promise<Game> {
             // Idempotency check: Verify this bot is still in the queue
             if (!currentGame.gameStateProcessQueue.includes(currentVoter)) {
                 console.log(`Bot ${currentVoter} already processed, skipping`);
-                return currentGame;
+                return { game: currentGame, messages: [] };
             }
             
             // Validate game state hasn't changed
@@ -1304,26 +1315,26 @@ async function voteImpl(gameId: string): Promise<Game> {
             };
             
             // Save messages to database sequentially
-            await addMessageToChatAndSaveToDb(gmMessage, gameId);
-            await addMessageToChatAndSaveToDb(voteMessage, gameId);
-            
+            const savedGmMsg = await addMessageToChatAndSaveToDb(gmMessage, gameId);
+            const savedVoteMsg = await addMessageToChatAndSaveToDb(voteMessage, gameId);
+
             // Update bot's token usage
             if (tokenUsage) {
                 await recordBotTokenUsage(gameId, bot.name, tokenUsage, session.user.email);
             }
-            
+
             // Remove the bot from queue and update voting results
             const newQueue = currentGame.gameStateProcessQueue.slice(1);
-            
+
             await db.collection('games').doc(gameId).update({
                 gameStateProcessQueue: newQueue,
                 gameStateParamQueue: [JSON.stringify(votingResults)]
             });
-            
+
             logger.info(`Successfully processed vote for bot ${bot.name}, removed from queue`, { gameId, botName: bot.name });
-            
+
             // Return updated game state
-            return await getGame(gameId) as Game;
+            return { game: await getGame(gameId) as Game, messages: [savedGmMsg, savedVoteMsg] };
         }
         
         else {
@@ -1343,7 +1354,7 @@ async function voteImpl(gameId: string): Promise<Game> {
     }
 }
 
-async function humanPlayerVoteImpl(gameId: string, targetPlayer: string, reason: string): Promise<Game> {
+async function humanPlayerVoteImpl(gameId: string, targetPlayer: string, reason: string): Promise<GameActionResponse> {
     const session = await auth();
     if (!session || !session.user?.email) {
         throw new Error('Not authenticated');
@@ -1422,7 +1433,7 @@ async function humanPlayerVoteImpl(gameId: string, targetPlayer: string, reason:
         };
         
         // Save vote message to database using the existing helper function
-        await addMessageToChatAndSaveToDb(voteMessage, gameId);
+        const savedVoteMessage = await addMessageToChatAndSaveToDb(voteMessage, gameId);
         
         // Remove the human player from queue and update voting results
         const newQueue = currentGame.gameStateProcessQueue.slice(1);
@@ -1437,9 +1448,12 @@ async function humanPlayerVoteImpl(gameId: string, targetPlayer: string, reason:
         
         // Return updated game state
         return {
-            ...currentGame,
-            gameStateProcessQueue: newQueue,
-            gameStateParamQueue: [JSON.stringify(votingResults)]
+            game: {
+                ...currentGame,
+                gameStateProcessQueue: newQueue,
+                gameStateParamQueue: [JSON.stringify(votingResults)]
+            },
+            messages: [savedVoteMessage]
         };
     } catch (error) {
         logger.error('Error in humanPlayerVote function:', { error, gameId });
@@ -1452,7 +1466,7 @@ async function humanPlayerVoteImpl(gameId: string, targetPlayer: string, reason:
  * NEW LOGIC: This function is only called when human player is the last in gameStateParamQueue
  * and needs to make the final target decision for their role
  */
-async function performHumanPlayerNightActionImpl(gameId: string, targetPlayer: string, message: string, actionType?: 'protect' | 'kill'): Promise<Game> {
+async function performHumanPlayerNightActionImpl(gameId: string, targetPlayer: string, message: string, actionType?: 'protect' | 'kill'): Promise<GameActionResponse> {
     const session = await auth();
     if (!session || !session.user?.email) {
         throw new Error('Not authenticated');
@@ -1565,7 +1579,7 @@ async function performHumanPlayerNightActionImpl(gameId: string, targetPlayer: s
         };
         
         // Save night action message to database
-        await addMessageToChatAndSaveToDb(nightActionMessage, gameId);
+        const savedNightActionMessage = await addMessageToChatAndSaveToDb(nightActionMessage, gameId);
         
         // Update night results with the target (include actionType for doctor's kill ability)
         const nightResultEntry: Record<string, any> = { target: targetPlayer };
@@ -1651,7 +1665,7 @@ async function performHumanPlayerNightActionImpl(gameId: string, targetPlayer: s
         logger.info(`Successfully processed final night action for human player ${game.humanPlayerName} targeting ${targetPlayer}`, { gameId, role: currentRole, target: targetPlayer });
         
         // Return updated game state
-        return await getGame(gameId) as Game;
+        return { game: await getGame(gameId) as Game, messages: [savedNightActionMessage] };
     } catch (error) {
         logger.error('Error in performHumanPlayerNightAction function:', { error, gameId });
         throw error;
@@ -1737,4 +1751,4 @@ export const keepBotsGoing = withGameErrorHandling(keepBotsGoingImpl);
 export const vote = withGameErrorHandling(voteImpl);
 export const humanPlayerVote = withGameErrorHandling(humanPlayerVoteImpl);
 export const performHumanPlayerNightAction = withGameErrorHandling(performHumanPlayerNightActionImpl);
-export const getSuggestion = withGameErrorHandling(getSuggestionImpl);
+export const getSuggestion = getSuggestionImpl;

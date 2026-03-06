@@ -666,6 +666,15 @@ export interface GameMessage {
     cost?: number;              // Cost in USD for this message (for AI-generated messages)
 }
 
+/**
+ * Response type for server actions that create messages.
+ * Contains the updated game state and any messages created during the action.
+ */
+export interface GameActionResponse {
+    game: Game;
+    messages: GameMessage[];
+}
+
 export interface AIMessage {
     role: 'system' | 'user' | 'assistant' | 'developer';
     content: string;

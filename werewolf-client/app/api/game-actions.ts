@@ -22,6 +22,7 @@ import {
     RECIPIENT_MANIAC,
     RECIPIENT_WEREWOLVES,
     ROLE_CONFIGS,
+    GameActionResponse,
     SystemErrorMessage,
     User,
     USER_TIERS
@@ -499,40 +500,41 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
     }
 }
 
-export async function addMessageToChatAndSaveToDb(gameMessage: GameMessage, gameId: string): Promise<string | undefined> {
+export async function addMessageToChatAndSaveToDb(gameMessage: GameMessage, gameId: string): Promise<GameMessage> {
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
     try {
         const gameRef = db.collection('games').doc(gameId);
         const gameDoc = await gameRef.get();
-        
+
         if (!gameDoc.exists) {
             throw new Error('Game not found');
         }
-        
+
         const gameData = gameDoc.data();
         const currentCounter = gameData?.messageCounter || 0;
         const newCounter = currentCounter + 1;
-        
+
         // Generate custom message ID: zero-padded-counter-author-to-recipient
         const sanitizedAuthor = sanitizeForId(gameMessage.authorName);
         const sanitizedRecipient = sanitizeForId(gameMessage.recipientName);
         const paddedCounter = newCounter.toString().padStart(6, '0'); // Zero-pad to 6 digits for proper sorting
         const customId = `${paddedCounter}-${sanitizedAuthor}-to-${sanitizedRecipient}`;
-        
+
         // Update game counter
         await gameRef.update({ messageCounter: newCounter });
-        
+
         // Add message with custom ID
         const messageRef = db.collection('games').doc(gameId).collection('messages').doc(customId);
+        const timestamp = Date.now();
         const messageData = {
             ...serializeMessageForFirestore(gameMessage),
-            timestamp: Date.now() // Set timestamp if not provided
+            timestamp
         };
         await messageRef.set(messageData);
-        
-        return customId;
+
+        return { ...gameMessage, id: customId, timestamp };
     } catch (error: any) {
         logger.error("Error adding message to chat: ", { error: error.message, gameId, author: gameMessage.authorName });
         throw new Error(`Failed to add message: ${error.message}`);
@@ -850,7 +852,7 @@ export async function clearGameErrorState(gameId: string): Promise<Game> {
  * Move game to AFTER_GAME_DISCUSSION state
  * This is called when the Game Over button is clicked
  */
-export async function afterGameDiscussion(gameId: string): Promise<Game> {
+export async function afterGameDiscussion(gameId: string): Promise<GameActionResponse> {
     const session = await auth();
     if (!session || !session.user?.email) {
         throw new Error('Not authenticated');
@@ -904,7 +906,7 @@ export async function afterGameDiscussion(gameId: string): Promise<Game> {
         };
 
         // Save the Game Master message
-        await addMessageToChatAndSaveToDb(gameMessage, gameId);
+        const savedMessage = await addMessageToChatAndSaveToDb(gameMessage, gameId);
 
         // Reset all bots to alive status for after-game discussion
         const revivedBots = game.bots.map(bot => ({
@@ -925,8 +927,9 @@ export async function afterGameDiscussion(gameId: string): Promise<Game> {
 
         logger.info(`Game moved to after-game discussion: ${gameId}`);
 
-        // Return the updated game
-        return await getGame(gameId) as Game;
+        // Return the updated game with messages
+        const updatedGame = await getGame(gameId) as Game;
+        return { game: updatedGame, messages: [savedMessage] };
     } catch (error: any) {
         logger.error("Error moving to after game discussion: ", { error: error.message, gameId });
         throw new Error(`Failed to move to after game discussion: ${error.message}`);

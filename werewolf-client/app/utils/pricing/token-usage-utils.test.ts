@@ -271,6 +271,7 @@ describe('Token Usage Utils', () => {
         it('should have pricing for all supported models', () => {
             const expectedModels = [
                 SupportedAiModels[LLM_CONSTANTS.GPT_5].modelApiName,
+                SupportedAiModels[LLM_CONSTANTS.GPT_5_4].modelApiName,
                 SupportedAiModels[LLM_CONSTANTS.GPT_5_MINI].modelApiName,
                 SupportedAiModels[LLM_CONSTANTS.DEEPSEEK_CHAT].modelApiName,
                 SupportedAiModels[LLM_CONSTANTS.DEEPSEEK_REASONER].modelApiName,
