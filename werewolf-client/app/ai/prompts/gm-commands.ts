@@ -12,7 +12,9 @@ Here are previous messages from other players you haven't yet seen:
 `
 
 export const GM_COMMAND_REPLY_TO_DISCUSSION: string = `%bot_name%, reply to the players in the discussion. Be thoughtful and consider what has been said so far. \
-Use your character and story to add thematic flavor to your response. Push your story a little further or keep it consistent with your background.`;
+Use your character and story to add thematic flavor to your response. Push your story a little further or keep it consistent with your background.
+
+⏳ **Discussion progress: %messages_used% of ~%messages_total% messages used (%vote_progress_pct%). Voting will be triggered automatically when the limit is reached, or the Game Master may call for a vote at any moment.**`;
 
 export const GM_COMMAND_GENERATE_NIGHT_RESULTS: string = `Generate the night results story based on the following night events.
 

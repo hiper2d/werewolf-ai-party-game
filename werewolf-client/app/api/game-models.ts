@@ -174,9 +174,17 @@ export interface Bot {
     roleKnowledge?: RoleKnowledge; // Structured role-specific knowledge (investigations, protections, etc.)
 }
 
+export interface IndividualVote {
+    voter: string;
+    target: string;
+    reason: string;
+    order: number; // 1-based position in voting order
+}
+
 export interface VotingDayResult {
     day: number;
     voteCounts: Record<string, number>; // e.g., { "Alice": 3, "Bob": 2 }
+    votes?: IndividualVote[]; // Individual votes in order (optional for backward compat)
     eliminatedPlayer: string | null;
     eliminatedPlayerRole: string | null;
 }

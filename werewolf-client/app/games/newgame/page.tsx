@@ -9,17 +9,25 @@ import {GAME_ROLES, GamePreview, GamePreviewWithGeneratedBots, GENDER_OPTIONS, g
 import {LLM_CONSTANTS, SupportedAiModels, getModelDisplayName} from "@/app/ai/ai-models";
 import {FREE_TIER_UNLIMITED, getCandidateModelsForTier, getPerGameModelLimit} from "@/app/ai/model-limit-utils";
 import MultiSelectDropdown from '@/app/components/MultiSelectDropdown';
+import ModelSelectDropdown from '@/app/components/ModelSelectDropdown';
 import {ttsService} from "@/app/services/tts-service";
 import {getVoiceConfig, getDefaultVoiceProvider, VOICE_PROVIDER_DISPLAY_NAMES} from "@/app/ai/voice-config";
 import {VoiceProvider} from "@/app/ai/voice-config/voice-config";
+
+const RANDOM_NAMES = ['Bob', 'John', 'Alex', 'Sam', 'Max', 'Leo', 'Kai', 'Finn'];
+const RANDOM_THEMES = ['Lord of the Rings', 'Harry Potter', 'Hunger Games', 'Star Wars'];
+
+function pickRandom<T>(arr: T[]): T {
+    return arr[Math.floor(Math.random() * arr.length)];
+}
 
 export default function CreateNewGamePage() {
     const { data: session, status } = useSession();
     const router = useRouter();
 
     // All hooks must be called before any conditional returns
-    const [name, setName] = useState('');
-    const [theme, setTheme] = useState('');
+    const [name, setName] = useState(() => pickRandom(RANDOM_NAMES));
+    const [theme, setTheme] = useState(() => pickRandom(RANDOM_THEMES));
     const [description, setDescription] = useState('');
     const [playerCount, setPlayerCount] = useState(12);
     const [werewolfCount, setWerewolfCount] = useState(3);
@@ -45,16 +53,28 @@ export default function CreateNewGamePage() {
     }, [userTier]);
     const allModels = useMemo(() => Object.values(LLM_CONSTANTS), []);
     const candidateModels = useMemo(() => getCandidateModelsForTier(userTier), [userTier]);
-    const gameMasterOptions = useMemo(() => {
-        if (userTier === USER_TIERS.FREE) {
-            return [LLM_CONSTANTS.RANDOM, ...candidateModels];
-        }
-        return allModels;
-    }, [userTier, candidateModels, allModels]);
+    // GM is always RANDOM before preview generation; user changes it in the preview section
     const playerModelOptions = useMemo(() => {
-        const base = userTier === USER_TIERS.FREE ? candidateModels : allModels;
+        // For free tier, show ALL models (available ones selectable, unavailable greyed out)
+        const base = allModels;
         return base.filter(model => model !== LLM_CONSTANTS.RANDOM);
-    }, [userTier, candidateModels, allModels]);
+    }, [allModels]);
+
+    // For the multi-select: provide meta (disabled + counter suffix) for each model option
+    const playerModelOptionMeta = useMemo(() => {
+        if (userTier !== USER_TIERS.FREE) return undefined;
+        return (model: string) => {
+            const config = SupportedAiModels[model];
+            if (!config?.freeTier?.available || config.freeTier.maxBotsPerGame === 0) {
+                return { disabled: true, suffix: '(not available)' };
+            }
+            const limit = config.freeTier.maxBotsPerGame;
+            if (limit === -1) {
+                return { suffix: '(unlimited)' };
+            }
+            return { suffix: `(${limit}x per game)` };
+        };
+    }, [userTier]);
 
     // Redirect to login if not authenticated
     useEffect(() => {
@@ -172,33 +192,25 @@ export default function CreateNewGamePage() {
         }
     }, [gameData]);
 
-    useEffect(() => {
-        if (!isTierLoaded) {
-            return;
-        }
-
-        setGameMasterAiType(prev => {
-            if (prev === LLM_CONSTANTS.RANDOM || gameMasterOptions.includes(prev)) {
-                return prev;
-            }
-            return gameMasterOptions[0] ?? LLM_CONSTANTS.RANDOM;
-        });
-    }, [isTierLoaded, gameMasterOptions]);
+    // GM defaults to RANDOM, resolved during preview generation
 
     useEffect(() => {
         if (!isTierLoaded) {
             return;
         }
+
+        // Only candidate (available) models should be auto-selected
+        const availablePlayerModels = candidateModels.filter(m => m !== LLM_CONSTANTS.RANDOM);
 
         setSelectedPlayerAiTypes(prev => {
-            const filtered = prev.filter(model => playerModelOptions.includes(model));
+            const filtered = prev.filter(model => playerModelOptions.includes(model) && availablePlayerModels.includes(model));
 
             if (!hasInitializedPlayerModels.current) {
                 hasInitializedPlayerModels.current = true;
                 if (filtered.length > 0) {
                     return filtered;
                 }
-                return playerModelOptions;
+                return availablePlayerModels;
             }
 
             if (filtered.length !== prev.length) {
@@ -207,7 +219,56 @@ export default function CreateNewGamePage() {
 
             return prev;
         });
-    }, [isTierLoaded, playerModelOptions]);
+    }, [isTierLoaded, playerModelOptions, candidateModels]);
+
+    // Compute per-model usage counts from preview data (GM + all bots)
+    const previewUsageCounts = useMemo(() => {
+        if (!gameData) return {};
+        const counts: Record<string, number> = {};
+        const increment = (model?: string) => {
+            if (!model) return;
+            counts[model] = (counts[model] ?? 0) + 1;
+        };
+        increment(gameData.gameMasterAiType);
+        for (const bot of gameData.bots) {
+            increment(bot.playerAiType);
+        }
+        return counts;
+    }, [gameData]);
+
+    // Build option list with remaining capacity for preview model dropdowns
+    const getPreviewModelOptions = useMemo(() => {
+        if (userTier !== USER_TIERS.FREE) {
+            // API tier: all models, no limits
+            return (currentModel: string) =>
+                playerModelOptions.map(model => {
+                    const name = getModelDisplayName(model);
+                    return { model, disabled: false, label: name, displayLabel: name };
+                });
+        }
+        return (currentModel: string) => {
+            return playerModelOptions
+                .filter(model => {
+                    const config = SupportedAiModels[model];
+                    return model === currentModel || (config?.freeTier?.available && config.freeTier.maxBotsPerGame !== 0);
+                })
+                .map(model => {
+                    const config = SupportedAiModels[model];
+                    const limit = config?.freeTier?.maxBotsPerGame ?? 0;
+                    const used = previewUsageCounts[model] ?? 0;
+                    const displayLabel = getModelDisplayName(model);
+
+                    if (limit === -1) {
+                        return { model, disabled: false, label: `${displayLabel} (unlimited)`, displayLabel };
+                    }
+
+                    const adjustedUsed = model === currentModel ? Math.max(0, used - 1) : used;
+                    const remaining = Math.max(0, limit - adjustedUsed);
+                    const disabled = remaining === 0;
+                    return { model, disabled, label: `${displayLabel} (${remaining} left)`, displayLabel };
+                });
+        };
+    }, [userTier, playerModelOptions, previewUsageCounts]);
 
     // Show loading while checking auth
     if (status === 'loading') {
@@ -503,36 +564,21 @@ export default function CreateNewGamePage() {
                     </div>
                 </div>
 
-                <div className={flexRowStyle}>
-                    <div className="flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-2 sm:flex-1">
-                        <label className={labelStyle}>Game Master AI:</label>
-                        <select
-                            className={`${inputStyle} w-full sm:flex-1`}
-                            value={gameMasterAiType}
-                            onChange={(e) => setGameMasterAiType(e.target.value as string)}
-                            required
+                <div className="flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-2">
+                    <label className={labelStyle}>Players AI *:</label>
+                    <div className="w-full sm:flex-1">
+                        <MultiSelectDropdown
+                            options={playerModelOptions}
+                            selectedOptions={selectedPlayerAiTypes}
+                            onChange={setSelectedPlayerAiTypes}
+                            placeholder="Select AI models for bots... *"
+                            className="w-full"
+                            hasError={!!playersAiError}
                             disabled={!isTierLoaded}
-                        >
-                            {gameMasterOptions.map(model => (
-                                <option key={model} value={model}>{getModelDisplayName(model)}</option>
-                            ))}
-                        </select>
-                    </div>
-                    <div className="flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-2 sm:flex-1">
-                        <label className={labelStyle}>Players AI *:</label>
-                        <div className="w-full sm:flex-1">
-                            <MultiSelectDropdown
-                                options={playerModelOptions}
-                                selectedOptions={selectedPlayerAiTypes}
-                                onChange={setSelectedPlayerAiTypes}
-                                placeholder="Select AI models for bots... *"
-                                className="w-full"
-                                hasError={!!playersAiError}
-                                disabled={!isTierLoaded}
-                                labelFn={getModelDisplayName}
-                            />
-                            {playersAiError && <p className="text-red-500 text-sm mt-1">{playersAiError}</p>}
-                        </div>
+                            labelFn={getModelDisplayName}
+                            optionMetaFn={playerModelOptionMeta}
+                        />
+                        {playersAiError && <p className="text-red-500 text-sm mt-1">{playersAiError}</p>}
                     </div>
                 </div>
 
@@ -616,15 +662,12 @@ export default function CreateNewGamePage() {
                             <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 mb-2">
                                 <div className="flex-1">
                                     <label className="block text-gray-400 text-sm mb-1">AI Model:</label>
-                                    <select
-                                        className="w-full h-10 p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
+                                    <ModelSelectDropdown
+                                        options={getPreviewModelOptions(gameData.gameMasterAiType)}
                                         value={gameData.gameMasterAiType}
-                                        onChange={(e) => handleGameMasterAiChange(e.target.value)}
-                                    >
-                                        {gameMasterOptions.filter(model => model !== LLM_CONSTANTS.RANDOM).map(model => (
-                                            <option key={model} value={model}>{getModelDisplayName(model)}</option>
-                                        ))}
-                                    </select>
+                                        onChange={(value) => handleGameMasterAiChange(value)}
+                                        className="w-full"
+                                    />
                                 </div>
                                 <div className="flex-1 flex gap-2">
                                     <div className="flex-1">
@@ -729,15 +772,12 @@ export default function CreateNewGamePage() {
                             <div className="flex flex-col sm:flex-row gap-2 mb-2">
                                 <div className="flex-1">
                                     <label className="block text-gray-400 text-sm mb-1">AI Model:</label>
-                                    <select
-                                        className="w-full h-10 p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
+                                    <ModelSelectDropdown
+                                        options={getPreviewModelOptions(player.playerAiType)}
                                         value={player.playerAiType}
-                                        onChange={(e) => handleBotAiChange(index, e.target.value)}
-                                    >
-                                        {playerModelOptions.map(model => (
-                                            <option key={model} value={model}>{getModelDisplayName(model)}</option>
-                                        ))}
-                                    </select>
+                                        onChange={(value) => handleBotAiChange(index, value)}
+                                        className="w-full"
+                                    />
                                 </div>
                                 <div className="flex-1 flex gap-2">
                                     <div className="flex-1">

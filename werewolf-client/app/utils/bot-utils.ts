@@ -177,17 +177,31 @@ export function generateBotContextSection(bot: Bot, game: Game): string {
         sections.push(`## Your Personal Summary\n\n${summary}`);
     }
 
-    // 3. Voting History
+    // 3. Voting History (with individual votes in order when available)
     if (game.votingHistory && game.votingHistory.length > 0) {
         const votingLines = game.votingHistory.map(v => {
-            const voteStr = Object.entries(v.voteCounts)
-                .map(([name, count]) => `${name}: ${count} vote(s)`)
-                .join(', ');
+            let result = `**Day ${v.day} Vote:**\n`;
+
+            // Show individual votes in order if available
+            if (v.votes && v.votes.length > 0) {
+                const sortedVotes = [...v.votes].sort((a, b) => a.order - b.order);
+                sortedVotes.forEach(vote => {
+                    result += `  ${vote.order}. ${vote.voter} → ${vote.target}\n`;
+                });
+            } else {
+                // Fallback to aggregated counts for older games
+                const voteStr = Object.entries(v.voteCounts)
+                    .map(([name, count]) => `${name}: ${count} vote(s)`)
+                    .join(', ');
+                result += `  Votes: ${voteStr}\n`;
+            }
+
             const eliminated = v.eliminatedPlayer
-                ? `${v.eliminatedPlayer} eliminated (was ${v.eliminatedPlayerRole})`
-                : 'No elimination';
-            return `**Day ${v.day}:** ${voteStr}. ${eliminated}.`;
-        }).join('\n');
+                ? `  Result: ${v.eliminatedPlayer} eliminated (was ${v.eliminatedPlayerRole})`
+                : '  Result: No elimination';
+            result += eliminated;
+            return result;
+        }).join('\n\n');
         sections.push(`## Voting History\n\n${votingLines}`);
     }
 

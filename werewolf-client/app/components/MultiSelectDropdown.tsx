@@ -2,6 +2,11 @@
 
 import React, {useState, useRef, useEffect} from 'react';
 
+interface OptionMeta {
+    disabled?: boolean;
+    suffix?: string;
+}
+
 interface MultiSelectDropdownProps {
     options: string[];
     selectedOptions: string[];
@@ -11,6 +16,7 @@ interface MultiSelectDropdownProps {
     disabled?: boolean;
     hasError?: boolean;
     labelFn?: (option: string) => string;
+    optionMetaFn?: (option: string) => OptionMeta | undefined;
 }
 
 export default function MultiSelectDropdown({
@@ -21,7 +27,8 @@ export default function MultiSelectDropdown({
     className = '',
     disabled = false,
     hasError = false,
-    labelFn = (o: string) => o
+    labelFn = (o: string) => o,
+    optionMetaFn
 }: MultiSelectDropdownProps) {
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
@@ -40,6 +47,8 @@ export default function MultiSelectDropdown({
     }, []);
 
     const handleToggleOption = (option: string) => {
+        const meta = optionMetaFn?.(option);
+        if (meta?.disabled && !selectedOptions.includes(option)) return;
         if (selectedOptions.includes(option)) {
             onChange(selectedOptions.filter(item => item !== option));
         } else {
@@ -47,11 +56,15 @@ export default function MultiSelectDropdown({
         }
     };
 
+    const selectableOptions = optionMetaFn
+        ? options.filter(o => !optionMetaFn(o)?.disabled)
+        : options;
+
     const handleSelectAll = () => {
-        if (selectedOptions.length === options.length) {
+        if (selectedOptions.length === selectableOptions.length) {
             onChange([]);
         } else {
-            onChange([...options]);
+            onChange([...selectableOptions]);
         }
     };
 
@@ -89,29 +102,36 @@ export default function MultiSelectDropdown({
                         <label className="flex items-center cursor-pointer hover:bg-gray-800 p-1 rounded">
                             <input
                                 type="checkbox"
-                                checked={selectedOptions.length === options.length}
+                                checked={selectedOptions.length === selectableOptions.length && selectableOptions.length > 0}
                                 onChange={handleSelectAll}
                                 className="mr-2 text-blue-500"
                             />
                             <span className="text-white font-medium">
-                                {selectedOptions.length === options.length ? 'Deselect All' : 'Select All'}
+                                {selectedOptions.length === selectableOptions.length ? 'Deselect All' : 'Select All'}
                             </span>
                         </label>
                     </div>
-                    {options.map((option) => (
-                        <label
-                            key={option}
-                            className="flex items-center cursor-pointer hover:bg-gray-800 p-2"
-                        >
-                            <input
-                                type="checkbox"
-                                checked={selectedOptions.includes(option)}
-                                onChange={() => handleToggleOption(option)}
-                                className="mr-2 text-blue-500"
-                            />
-                            <span className="text-white">{labelFn(option)}</span>
-                        </label>
-                    ))}
+                    {options.map((option) => {
+                        const meta = optionMetaFn?.(option);
+                        const isDisabled = meta?.disabled && !selectedOptions.includes(option);
+                        return (
+                            <label
+                                key={option}
+                                className={`flex items-center p-2 ${isDisabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:bg-gray-800'}`}
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={selectedOptions.includes(option)}
+                                    onChange={() => handleToggleOption(option)}
+                                    className="mr-2 text-blue-500"
+                                    disabled={isDisabled}
+                                />
+                                <span className={isDisabled ? 'text-gray-500' : 'text-white'}>
+                                    {labelFn(option)}{meta?.suffix ? ` ${meta.suffix}` : ''}
+                                </span>
+                            </label>
+                        );
+                    })}
                 </div>
             )}
         </div>

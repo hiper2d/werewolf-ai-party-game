@@ -7,7 +7,7 @@ export function format(template: string, params: Record<string, any>): string {
         return Array.isArray(value) ? value.join(', ') : String(value);
     });
     
-    if (result.includes('%')) {
+    if (/%\w+%/.test(result)) {
         throw new Error('Formatted string contains unformatted template variables');
     }
     

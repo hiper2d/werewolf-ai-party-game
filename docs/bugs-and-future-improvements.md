@@ -1,5 +1,6 @@
 # Bugs and improvements
 
+- Fix prompting for ordering and summaries: 
 - Update the landing page with more relevant info
 - Bots should have better notion of day and night events ordering. Review the summary logic, it should have
   - Unified past days summary text

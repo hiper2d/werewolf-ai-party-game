@@ -19,6 +19,7 @@ import {
     RECIPIENT_MANIAC,
     RECIPIENT_NONE,
     RECIPIENT_WEREWOLVES,
+    IndividualVote,
     VotingDayResult,
     GameActionResponse
 } from "@/app/api/game-models";
@@ -854,12 +855,22 @@ async function processNextBotInQueue(
         throw new Error(`Bot ${botName} not found in game`);
     }
 
+    // Calculate voting progress for the bot
+    const threshold = calculateAutoVoteThreshold(game);
+    const currentMessages = getTotalDayMessages(game);
+    const progressPct = threshold > 0 ? Math.min(Math.round((currentMessages / threshold) * 100), 100) : 0;
+
     // Create the game master command message
     const gmMessage: GameMessage = {
         id: null,
         recipientName: bot.name,
         authorName: GAME_MASTER,
-        msg: format(GM_COMMAND_REPLY_TO_DISCUSSION, { bot_name: bot.name }),
+        msg: format(GM_COMMAND_REPLY_TO_DISCUSSION, {
+            bot_name: bot.name,
+            messages_used: String(currentMessages),
+            messages_total: String(Math.round(threshold)),
+            vote_progress_pct: `${progressPct}%`
+        }),
         messageType: MessageType.GM_COMMAND,
         day: game.currentDay,
         timestamp: Date.now()
@@ -1074,10 +1085,21 @@ async function voteImpl(gameId: string): Promise<GameActionResponse> {
                     // Generate elimination message
                     const eliminationMessage = generateEliminationMessage(eliminatedPlayer, eliminatedRole);
 
+                    // Parse individual votes from gameStateParamQueue[1]
+                    let savedIndividualVotes: IndividualVote[] = [];
+                    if (updatedGame.gameStateParamQueue.length > 1) {
+                        try {
+                            savedIndividualVotes = JSON.parse(updatedGame.gameStateParamQueue[1]);
+                        } catch (e) {
+                            savedIndividualVotes = [];
+                        }
+                    }
+
                     // Create voting history entry
                     const votingDayResult: VotingDayResult = {
                         day: updatedGame.currentDay,
                         voteCounts: votingResults,
+                        votes: savedIndividualVotes,
                         eliminatedPlayer: eliminatedPlayer || null,
                         eliminatedPlayerRole: eliminatedRole || null
                     };
@@ -1224,12 +1246,16 @@ async function voteImpl(gameId: string): Promise<GameActionResponse> {
             agent.gameId = gameId;
             agent.userId = session.user!.email!;
 
+            // Compute voting position info
+            const totalVoters = currentGame.bots.filter(b => b.isAlive).length + 1; // +1 for human
+            const votePosition = totalVoters - currentGame.gameStateProcessQueue.length + 1;
+
             // Create the voting command message
             const gmMessage: GameMessage = {
                 id: null,
                 recipientName: bot.name,
                 authorName: GAME_MASTER,
-                msg: format(BOT_VOTE_PROMPT, { bot_name: bot.name }),
+                msg: format(BOT_VOTE_PROMPT, { bot_name: bot.name, vote_position: String(votePosition), total_voters: String(totalVoters) }),
                 messageType: MessageType.GM_COMMAND,
                 day: currentGame.currentDay,
                 timestamp: Date.now()
@@ -1294,10 +1320,26 @@ async function voteImpl(gameId: string): Promise<GameActionResponse> {
                     votingResults = {};
                 }
             }
-            
+
+            // Track individual votes in gameStateParamQueue[1]
+            let individualVotes: IndividualVote[] = [];
+            if (currentGame.gameStateParamQueue.length > 1) {
+                try {
+                    individualVotes = JSON.parse(currentGame.gameStateParamQueue[1]);
+                } catch (e) {
+                    individualVotes = [];
+                }
+            }
+
             // Add this vote
             votingResults[voteResponse.who] = (votingResults[voteResponse.who] || 0) + 1;
-            
+            individualVotes.push({
+                voter: bot.name,
+                target: voteResponse.who,
+                reason: voteResponse.why,
+                order: individualVotes.length + 1
+            });
+
             // Save the vote as a message
             const voteMessage: GameMessage = {
                 id: null,
@@ -1313,7 +1355,7 @@ async function voteImpl(gameId: string): Promise<GameActionResponse> {
                 day: currentGame.currentDay,
                 timestamp: Date.now()
             };
-            
+
             // Save messages to database sequentially
             const savedGmMsg = await addMessageToChatAndSaveToDb(gmMessage, gameId);
             const savedVoteMsg = await addMessageToChatAndSaveToDb(voteMessage, gameId);
@@ -1328,7 +1370,7 @@ async function voteImpl(gameId: string): Promise<GameActionResponse> {
 
             await db.collection('games').doc(gameId).update({
                 gameStateProcessQueue: newQueue,
-                gameStateParamQueue: [JSON.stringify(votingResults)]
+                gameStateParamQueue: [JSON.stringify(votingResults), JSON.stringify(individualVotes)]
             });
 
             logger.info(`Successfully processed vote for bot ${bot.name}, removed from queue`, { gameId, botName: bot.name });
@@ -1414,10 +1456,26 @@ async function humanPlayerVoteImpl(gameId: string, targetPlayer: string, reason:
                 votingResults = {};
             }
         }
-        
+
+        // Track individual votes in gameStateParamQueue[1]
+        let individualVotes: IndividualVote[] = [];
+        if (currentGame.gameStateParamQueue.length > 1) {
+            try {
+                individualVotes = JSON.parse(currentGame.gameStateParamQueue[1]);
+            } catch (e) {
+                individualVotes = [];
+            }
+        }
+
         // Add this vote
         votingResults[targetPlayer] = (votingResults[targetPlayer] || 0) + 1;
-        
+        individualVotes.push({
+            voter: currentGame.humanPlayerName,
+            target: targetPlayer,
+            reason: reason,
+            order: individualVotes.length + 1
+        });
+
         // Create the vote message
         const voteMessage: GameMessage = {
             id: null,
@@ -1431,17 +1489,17 @@ async function humanPlayerVoteImpl(gameId: string, targetPlayer: string, reason:
             day: currentGame.currentDay,
             timestamp: Date.now()
         };
-        
+
         // Save vote message to database using the existing helper function
         const savedVoteMessage = await addMessageToChatAndSaveToDb(voteMessage, gameId);
-        
+
         // Remove the human player from queue and update voting results
         const newQueue = currentGame.gameStateProcessQueue.slice(1);
-        
+
         const gameRef = db.collection('games').doc(gameId);
         await gameRef.update({
             gameStateProcessQueue: newQueue,
-            gameStateParamQueue: [JSON.stringify(votingResults)]
+            gameStateParamQueue: [JSON.stringify(votingResults), JSON.stringify(individualVotes)]
         });
         
         logger.info(`Successfully processed vote for human player ${currentGame.humanPlayerName}, removed from queue`, { gameId });

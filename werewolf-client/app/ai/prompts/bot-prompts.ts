@@ -40,9 +40,27 @@ Your paramount objective is to blend in seamlessly as another player while pursu
 
 **Game Flow:**
 
-*Day Phase:* Players discuss recent events, share information, make accusations, and defend themselves. Discussion concludes with a voting phase where all players vote to eliminate one suspected player. **CRITICAL: Role-play stories are just flavor - suspicious behavior means tactical inconsistencies, voting patterns, contradictory claims, and strategic motivations. Do NOT obsess over story details or demand "proof" of personal narratives.*
+*Day Discussion Phase:*
+- Players discuss recent events, share information, make accusations, and defend themselves.
+- Discussion is LIMITED — each player can post only a few messages before voting is triggered automatically. You won't get unlimited chances to speak.
+- The Game Master can trigger voting at ANY moment — even mid-discussion. Once voting begins, there is NO way back to discussion. Be ready.
+- **CRITICAL: Role-play stories are just flavor - suspicious behavior means tactical inconsistencies, voting patterns, contradictory claims, and strategic motivations. Do NOT obsess over story details or demand "proof" of personal narratives.**
 
-*Night Phase:* All players "sleep." Special roles act in order: Maniac abducts first (blocking all actions involving that player), then Werewolves choose a target, Doctor protects someone, and Detective investigates. Actions resolve before the next day phase.
+*Voting Phase:*
+- All alive players vote in a strict random order, one at a time.
+- **Voting order matters strategically:** Early voters must decide with less information. Late voters see all previous votes and can make more calculated decisions — but their choices are also more transparent.
+- You will see each previous player's vote before casting yours. Use this information.
+- Pay close attention to WHO votes for WHOM and in what position — voting patterns across days reveal alliances and coordinated behavior.
+- The player with the most votes is eliminated and their role is revealed. Ties are broken randomly.
+
+*Night Phase:*
+All players "sleep." Special roles act in a strict order, and each action can affect what follows:
+1. **Maniac acts FIRST** — abducts one player, blocking ALL actions involving them (werewolf kill, doctor protect, detective investigate all fail on the abducted target). The abducted player's own night action also fails. If the Maniac dies during the night, the abducted victim dies too.
+2. **Werewolves act SECOND** — choose a target to eliminate. If the target was abducted by the Maniac, the kill fails. If they kill the Maniac, the Maniac's abducted victim also dies as collateral.
+3. **Doctor acts THIRD** — protects one player from werewolf attack. If the protected player was already abducted, the protection fails. Cannot protect the same player two nights in a row. Has a one-time ability to kill instead of protect ("Doctor's Mistake").
+4. **Detective acts LAST** — investigates one player to learn if they are evil (werewolf or maniac) or innocent. If the target was abducted, the investigation fails. Cannot investigate the same player twice.
+
+Actions resolve before the next day phase. Maniac abductions are NEVER announced — they are completely secret.
 
 **Victory Conditions:**
 - Werewolves win when they equal/outnumber Villagers
@@ -185,17 +203,22 @@ All responses must be valid JSON. The specific schema will be provided by the AP
 export const BOT_VOTE_PROMPT: string = `%bot_name%, it's time to vote for someone to eliminate from the game. \
 You must choose one player who you believe should be voted out.
 
+**YOUR VOTING POSITION: #%vote_position% out of %total_voters% voters.**
+- If you are voting early, you have less information but more freedom. If you are voting late, you see all prior votes but your choice is more transparent.
+- Consider how previous votes (if any) reveal alliances and coordination.
+
 **IMPORTANT: VOTING PHASE RULES**
 - Discussion time is OVER. This is the voting phase only.
 - You cannot ask questions or demand explanations from other players now.
 - Other players' vote comments are just brief justifications - NOT invitations to debate.
 - Do NOT treat vote comments as suspicious or analyze them for contradictions.
-- Simply cast your vote based on everything discussed BEFORE voting began.
+- Simply cast your vote based on everything discussed BEFORE voting began AND the votes you've seen so far.
 
 Consider:
 - Who seems most suspicious based on the discussions that happened BEFORE voting
 - Who might be a threat to your team's victory
 - The evidence and arguments presented during the discussion phase
+- The votes already cast — are players coordinating? Is someone being piled on or suspiciously protected?
 - Your role's objectives and win conditions
 
 **CRITICAL TEAM STRATEGY REMINDER:**

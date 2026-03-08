@@ -5,6 +5,7 @@ import { LLM_CONSTANTS, SupportedAiModels, getModelDisplayName } from '@/app/ai/
 import { getCandidateModelsForTier, getPerGameModelLimit, FREE_TIER_UNLIMITED } from '@/app/ai/model-limit-utils';
 import { UserTier, USER_TIERS } from '@/app/api/game-models';
 import { buttonTransparentStyle } from '@/app/constants';
+import ModelSelectDropdown from '@/app/components/ModelSelectDropdown';
 import { useUIControls } from '../context/UIControlsContext';
 
 interface ModelSelectionDialogProps {
@@ -44,28 +45,35 @@ export default function ModelSelectionDialog({
         return tierFilteredModels
             .map(model => {
                 if (gameTier !== USER_TIERS.FREE) {
-                    return { model, disabled: false };
+                    const name = getModelDisplayName(model);
+                    return { model, disabled: false, label: name, displayLabel: name };
                 }
 
                 if (model === LLM_CONSTANTS.RANDOM) {
-                    return { model, disabled: true };
+                    const name = getModelDisplayName(model);
+                    return { model, disabled: true, label: name, displayLabel: name };
                 }
 
                 let disabled = false;
+                const displayLabel = getModelDisplayName(model);
+                let label = displayLabel;
 
                 try {
                     const limit = getPerGameModelLimit(model, USER_TIERS.FREE);
-                    if (limit !== FREE_TIER_UNLIMITED) {
+                    if (limit === FREE_TIER_UNLIMITED) {
+                        label = `${displayLabel} (unlimited)`;
+                    } else {
                         const used = usageCounts[model] ?? 0;
                         const adjustedUsage = model === currentModel ? Math.max(0, used - 1) : used;
-                        disabled = adjustedUsage >= limit;
+                        const remaining = Math.max(0, limit - adjustedUsage);
+                        disabled = remaining === 0;
+                        label = `${displayLabel} (${remaining} left)`;
                     }
                 } catch (err) {
-                    // If the model is not supported for free tier usage, hide it unless it's the current assignment.
                     disabled = model !== currentModel;
                 }
 
-                return { model, disabled };
+                return { model, disabled, label, displayLabel };
             })
             .filter(option => !(option.disabled && option.model !== currentModel));
     }, [tierFilteredModels, usageCounts, gameTier, currentModel]);
@@ -135,18 +143,13 @@ export default function ModelSelectionDialog({
 
                 <div className="mb-6">
                     <label className="block theme-text-primary text-sm mb-2">Select AI Model:</label>
-                    <select
-                        className="w-full p-2 rounded bg-[rgb(var(--color-input-bg))] text-[rgb(var(--color-input-text))] border border-[rgb(var(--color-input-border))] focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    <ModelSelectDropdown
+                        options={modelOptions}
                         value={selectedModel}
-                        onChange={(e) => setSelectedModel(e.target.value)}
+                        onChange={setSelectedModel}
                         disabled={isUpdating}
-                    >
-                        {modelOptions.map(({ model, disabled }) => (
-                            <option key={model} value={model} disabled={disabled}>
-                                {disabled && model !== currentModel ? `${getModelDisplayName(model)} (limit reached)` : getModelDisplayName(model)}
-                            </option>
-                        ))}
-                    </select>
+                        className="w-full"
+                    />
                 </div>
 
 
