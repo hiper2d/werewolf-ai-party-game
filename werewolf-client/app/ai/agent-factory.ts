@@ -40,18 +40,18 @@ export class AgentFactory {
             case LLM_CONSTANTS.GPT_5:
             case LLM_CONSTANTS.GPT_5_4:
             case LLM_CONSTANTS.GPT_5_MINI:
-                return new Gpt5Agent(name, instruction, model.modelApiName, key, 1, shouldEnableThinking);
+                return new Gpt5Agent(name, instruction, model.modelApiName, key, model.temperature!, shouldEnableThinking);
             case LLM_CONSTANTS.GEMINI_3_PRO:
             case LLM_CONSTANTS.GEMINI_3_FLASH:
                 return new GoogleAgent(name, instruction, model.modelApiName, key, shouldEnableThinking);
             case LLM_CONSTANTS.GROK_4:
             case LLM_CONSTANTS.GROK_4_1_FAST_REASONING:
-                return new GrokAgent(name, instruction, model.modelApiName, key, 0.7, shouldEnableThinking);
+                return new GrokAgent(name, instruction, model.modelApiName, key, model.temperature!, shouldEnableThinking);
 
             // DeepSeek models - separate chat and reasoner
             case LLM_CONSTANTS.DEEPSEEK_CHAT:
             case LLM_CONSTANTS.DEEPSEEK_REASONER:
-                return new DeepSeekV2Agent(name, instruction, model.modelApiName, key, 0.6, shouldEnableThinking);
+                return new DeepSeekV2Agent(name, instruction, model.modelApiName, key, model.temperature!, shouldEnableThinking);
 
             // Mistral models
             case LLM_CONSTANTS.MISTRAL_3_MEDIUM:
@@ -60,12 +60,11 @@ export class AgentFactory {
                 return new MistralAgent(name, instruction, model.modelApiName, key, shouldEnableThinking);
             case LLM_CONSTANTS.KIMI_K2_5:
             case LLM_CONSTANTS.KIMI_K2_5_THINKING:
-                return new KimiAgent(name, instruction, model.modelApiName, key, 1, shouldEnableThinking);
             case LLM_CONSTANTS.KIMI_K2:
             case LLM_CONSTANTS.KIMI_K2_THINKING:
             case LLM_CONSTANTS.KIMI_K2_TURBO:
             case LLM_CONSTANTS.KIMI_K2_TURBO_THINKING:
-                return new KimiAgent(name, instruction, model.modelApiName, key, 0.6, shouldEnableThinking);
+                return new KimiAgent(name, instruction, model.modelApiName, key, model.temperature!, shouldEnableThinking);
             default:
                 throw new Error(`Unknown Key: ${modelName}`);
         }

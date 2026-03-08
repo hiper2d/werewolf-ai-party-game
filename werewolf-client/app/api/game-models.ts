@@ -127,6 +127,7 @@ export interface DetectiveInvestigation {
     target: string;
     isEvil: boolean; // True for werewolf AND maniac — detective can't distinguish them
     success?: boolean; // False if investigation was blocked/failed (default: true)
+    actionType?: 'investigate' | 'kill'; // Whether this was an investigation or kill action
 }
 
 export interface DoctorProtection {
@@ -192,6 +193,14 @@ export interface VotingDayResult {
 export interface NightNarrativeResult {
     day: number;
     narrative: string; // The atmospheric GM story from night results
+    // Chronological night events in action order: Maniac → Werewolves → Doctor → Detective
+    // (optional for backward compat with older games)
+    events?: Array<{ order: number; role: string; description: string }>;
+}
+
+export interface DayDiscussionSummary {
+    day: number;
+    summary: string; // GM-generated summary of the day's discussion
 }
 
 export interface Game {
@@ -225,12 +234,14 @@ export interface Game {
     createdWithTier: UserTier; // Store the user's tier at the time the game was created
     votingHistory?: VotingDayResult[]; // History of voting results for each day
     nightNarratives?: NightNarrativeResult[]; // GM night result narratives for each night
+    dayDiscussionSummaries?: DayDiscussionSummary[]; // GM-generated summaries of day discussions
     chatResetCounts?: Record<number, number>; // game day number → reset count (free tier only)
     oneTimeAbilitiesUsed?: {
         doctorKill?: boolean;  // True if doctor has used their one-time kill ability
+        detectiveKill?: boolean; // True if detective has used their one-time kill ability
     };
     resolvedNightState?: {
-        deaths: Array<{ player: string; role: string; cause: 'werewolf_attack' | 'doctor_kill' | 'maniac_collateral' }>;
+        deaths: Array<{ player: string; role: string; cause: 'werewolf_attack' | 'doctor_kill' | 'detective_kill' | 'maniac_collateral' }>;
         abductedPlayer: string | null;
         detectiveResult: { target: string; isEvil: boolean; success: boolean } | null;
         actionsPrevented: Array<{ role: string; reason: 'abduction' | 'death' | 'doctor_save'; player: string | null; }>;

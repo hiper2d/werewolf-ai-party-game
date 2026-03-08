@@ -503,9 +503,11 @@ function GamePageContent({
                     showProgress: processQueue.length > 0
                 };
             case GAME_STATES.WELCOME:
+                const totalBots = game.bots.length;
+                const botsCompleted = totalBots - paramQueue.length;
                 return {
                     title: "👋 Introductions",
-                    description: paramQueue.length > 0 ? "Bots introducing themselves:" : "Introductions complete",
+                    description: paramQueue.length > 0 ? `Bots introducing themselves (${botsCompleted}/${totalBots} done):` : "Introductions complete",
                     items: paramQueue,
                     currentItem: paramQueue[0] || null,
                     showProgress: paramQueue.length > 0
@@ -891,21 +893,28 @@ function GamePageContent({
                 </div>
             )}
 
-            {queueInfo.showProgress && queueInfo.items.length > 0 && (
-                <div className="mt-3 pt-3 border-t theme-border-subtle">
-                    <div className="text-xs theme-text-secondary mb-1">
-                        Progress: {queueInfo.currentItem ? queueInfo.items.length - (queueInfo.items.indexOf(queueInfo.currentItem) + 1) : queueInfo.items.length} remaining
+            {queueInfo.showProgress && queueInfo.items.length > 0 && (() => {
+                // For WELCOME phase, track progress against total bots (since items shrink as bots complete)
+                const isWelcome = game.gameState === GAME_STATES.WELCOME;
+                const total = isWelcome ? game.bots.length : queueInfo.items.length;
+                const completed = isWelcome ? (game.bots.length - queueInfo.items.length) : (queueInfo.currentItem ? queueInfo.items.indexOf(queueInfo.currentItem) : 0);
+                const remaining = total - completed - (isWelcome ? 0 : 1);
+                const progressPct = total > 0 ? ((completed + (isWelcome ? 0 : 1)) / total) * 100 : 0;
+
+                return (
+                    <div className="mt-3 pt-3 border-t theme-border-subtle">
+                        <div className="text-xs theme-text-secondary mb-1">
+                            Progress: {remaining > 0 ? `${remaining} remaining` : 'Almost done'}
+                        </div>
+                        <div className="w-full bg-gray-300 dark:bg-neutral-700 rounded-full h-2">
+                            <div
+                                className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                                style={{ width: `${progressPct}%` }}
+                            ></div>
+                        </div>
                     </div>
-                    <div className="w-full bg-gray-300 dark:bg-neutral-700 rounded-full h-2">
-                        <div
-                            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                            style={{
-                                width: `${queueInfo.currentItem ? ((queueInfo.items.indexOf(queueInfo.currentItem) + 1) / queueInfo.items.length) * 100 : 0}%`
-                            }}
-                        ></div>
-                    </div>
-                </div>
-            )}
+                );
+            })()}
 
             {/* Manual Bot Selection Button */}
             {(game.gameState === GAME_STATES.DAY_DISCUSSION || game.gameState === GAME_STATES.AFTER_GAME_DISCUSSION) && game.gameStateProcessQueue.length === 0 && (

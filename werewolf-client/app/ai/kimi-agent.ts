@@ -130,13 +130,9 @@ export class KimiAgent extends AbstractAgent {
                         }
                     };
 
-                    // Special handling for Kimi K2.5 thinking parameter
-                    if (this.model === 'kimi-k2.5') {
-                        params.thinking = { type: this.enableThinking ? 'enabled' : 'disabled' };
-                        // Search results recommend temperature 1.0 for thinking
-                        if (this.enableThinking) {
-                            params.temperature = 1.0;
-                        }
+                    // Models that support a thinking toggle (e.g. Kimi K2.5)
+                    if (this.enableThinking) {
+                        params.thinking = { type: 'enabled' };
                     }
 
                     completion = await this.client.chat.completions.create(params) as OpenAI.Chat.Completions.ChatCompletion;
@@ -195,13 +191,9 @@ export class KimiAgent extends AbstractAgent {
                         messages: openAIMessages
                     };
 
-                    // Special handling for Kimi K2.5 thinking parameter
-                    if (this.model === 'kimi-k2.5') {
-                        params.thinking = { type: this.enableThinking ? 'enabled' : 'disabled' };
-                        // Search results recommend temperature 1.0 for thinking
-                        if (this.enableThinking) {
-                            params.temperature = 1.0;
-                        }
+                    // Models that support a thinking toggle (e.g. Kimi K2.5)
+                    if (this.enableThinking) {
+                        params.thinking = { type: 'enabled' };
                     }
 
                     completion = await this.client.chat.completions.create(params) as OpenAI.Chat.Completions.ChatCompletion;

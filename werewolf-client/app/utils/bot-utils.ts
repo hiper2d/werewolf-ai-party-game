@@ -64,6 +64,10 @@ export function generateRoleKnowledgeSection(bot: Bot): string {
     // Detective investigations
     if (bot.role === GAME_ROLES.DETECTIVE && bot.roleKnowledge.investigations && bot.roleKnowledge.investigations.length > 0) {
         const investigationLines = bot.roleKnowledge.investigations.map(inv => {
+            // Handle kill actions
+            if (inv.actionType === 'kill') {
+                return `- **Night ${inv.day}:** Used ONE-TIME KILL on **${inv.target}** 🗡️`;
+            }
             // Handle unsuccessful investigations (blocked by some future role)
             if (inv.success === false) {
                 return `- **Night ${inv.day}:** Investigated **${inv.target}** → ❌ Investigation failed/blocked`;
@@ -72,22 +76,27 @@ export function generateRoleKnowledgeSection(bot: Bot): string {
             return `- **Night ${inv.day}:** Investigated **${inv.target}** → ${status}`;
         }).join('\n');
 
-        // Only count successful investigations
+        // Only count successful investigations (exclude kills)
         const evilPlayers = bot.roleKnowledge.investigations
-            .filter(inv => inv.success !== false && inv.isEvil)
+            .filter(inv => inv.success !== false && inv.isEvil && inv.actionType !== 'kill')
             .map(inv => inv.target);
 
         const clearedPlayers = bot.roleKnowledge.investigations
-            .filter(inv => inv.success !== false && !inv.isEvil)
+            .filter(inv => inv.success !== false && !inv.isEvil && inv.actionType !== 'kill')
             .map(inv => inv.target);
 
-        let summary = `## 🔍 Your Detective Investigation Results\n\n${investigationLines}`;
+        const killUsed = bot.roleKnowledge.investigations.some(inv => inv.actionType === 'kill');
+
+        let summary = `## 🔍 Your Detective Action Results\n\n${investigationLines}`;
 
         if (evilPlayers.length > 0) {
             summary += `\n\n**DETECTED AS EVIL (werewolf or maniac):** ${evilPlayers.join(', ')}`;
         }
         if (clearedPlayers.length > 0) {
             summary += `\n**CLEARED PLAYERS:** ${clearedPlayers.join(', ')}`;
+        }
+        if (killUsed) {
+            summary += `\n\n⚠️ **Your one-time kill ability has been used.**`;
         }
 
         sections.push(summary);
@@ -163,7 +172,64 @@ export function generateBotContextSection(bot: Bot, game: Game): string {
         sections.push(roleKnowledge);
     }
 
-    // 2. Bot's Personal Summary (with legacy daySummaries fallback)
+    // 2. Chronological day-by-day history: GM day summary → Voting → Night narrative (with facts)
+    const maxDay = game.currentDay || 1;
+    const dayEntries: string[] = [];
+
+    for (let day = 1; day <= maxDay; day++) {
+        const dayParts: string[] = [];
+
+        // GM day discussion summary
+        const daySummary = (game.dayDiscussionSummaries || []).find(s => s.day === day);
+        if (daySummary) {
+            dayParts.push(`**Discussion:** ${daySummary.summary}`);
+        }
+
+        // Voting history for this day
+        const vote = (game.votingHistory || []).find(v => v.day === day);
+        if (vote) {
+            let voteText = '**Voting:**\n';
+            if (vote.votes && vote.votes.length > 0) {
+                const sortedVotes = [...vote.votes].sort((a, b) => a.order - b.order);
+                sortedVotes.forEach(v => {
+                    voteText += `  ${v.order}. ${v.voter} → ${v.target}\n`;
+                });
+            } else {
+                const voteStr = Object.entries(vote.voteCounts)
+                    .map(([name, count]) => `${name}: ${count} vote(s)`)
+                    .join(', ');
+                voteText += `  ${voteStr}\n`;
+            }
+            const eliminated = vote.eliminatedPlayer
+                ? `  Result: ${vote.eliminatedPlayer} eliminated (was ${vote.eliminatedPlayerRole})`
+                : '  Result: No elimination';
+            voteText += eliminated;
+            dayParts.push(voteText);
+        }
+
+        // Night narrative + factual summary for this day
+        const night = (game.nightNarratives || []).find(n => n.day === day);
+        if (night) {
+            let nightText = `**Night ${day} Story:**\n${night.narrative}`;
+
+            // Append chronological night events if available
+            if (night.events && night.events.length > 0) {
+                const eventLines = night.events.map(e => `${e.order + 1}. [${e.role}] ${e.description}`);
+                nightText += `\n**Night ${day} Events (in order):**\n${eventLines.join('\n')}`;
+            }
+            dayParts.push(nightText);
+        }
+
+        if (dayParts.length > 0) {
+            dayEntries.push(`### Day ${day}\n${dayParts.join('\n\n')}`);
+        }
+    }
+
+    if (dayEntries.length > 0) {
+        sections.push(`## Game History\n\n${dayEntries.join('\n\n---\n\n')}`);
+    }
+
+    // 3. Bot's Personal Summary (LAST - bot's own interpretation)
     let summary = bot.summary;
     if (!summary && bot.daySummaries && bot.daySummaries.length > 0) {
         // Legacy fallback: concatenate old daySummaries format
@@ -175,42 +241,6 @@ export function generateBotContextSection(bot: Bot, game: Game): string {
 
     if (summary && summary.trim()) {
         sections.push(`## Your Personal Summary\n\n${summary}`);
-    }
-
-    // 3. Voting History (with individual votes in order when available)
-    if (game.votingHistory && game.votingHistory.length > 0) {
-        const votingLines = game.votingHistory.map(v => {
-            let result = `**Day ${v.day} Vote:**\n`;
-
-            // Show individual votes in order if available
-            if (v.votes && v.votes.length > 0) {
-                const sortedVotes = [...v.votes].sort((a, b) => a.order - b.order);
-                sortedVotes.forEach(vote => {
-                    result += `  ${vote.order}. ${vote.voter} → ${vote.target}\n`;
-                });
-            } else {
-                // Fallback to aggregated counts for older games
-                const voteStr = Object.entries(v.voteCounts)
-                    .map(([name, count]) => `${name}: ${count} vote(s)`)
-                    .join(', ');
-                result += `  Votes: ${voteStr}\n`;
-            }
-
-            const eliminated = v.eliminatedPlayer
-                ? `  Result: ${v.eliminatedPlayer} eliminated (was ${v.eliminatedPlayerRole})`
-                : '  Result: No elimination';
-            result += eliminated;
-            return result;
-        }).join('\n\n');
-        sections.push(`## Voting History\n\n${votingLines}`);
-    }
-
-    // 4. Night Narratives
-    if (game.nightNarratives && game.nightNarratives.length > 0) {
-        const nightLines = game.nightNarratives.map(n =>
-            `**Night ${n.day}:**\n${n.narrative}`
-        ).join('\n\n');
-        sections.push(`## Night Events\n\n${nightLines}`);
     }
 
     if (sections.length === 0) {

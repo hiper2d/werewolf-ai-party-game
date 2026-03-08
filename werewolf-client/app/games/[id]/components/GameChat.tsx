@@ -1383,12 +1383,7 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
                     Viewing Day {selectedDay} history (read-only)
                 </div>
             )}
-            {game.errorState && (
-                <ErrorBanner
-                    error={game.errorState}
-                    onDismiss={handleDismissError}
-                />
-            )}
+            {/* Error is shown inline at the bottom of the chat messages */}
             {/* Messages area - grows to fill space, pushing input to bottom */}
             <div className="flex-1 mb-4 p-2 theme-bg-card theme-border border rounded">
                 {isLoadingMessages ? (
@@ -1425,7 +1420,7 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
                         Deleting messages...
                     </div>
                 )}
-                {(isProcessing || isExternalLoading || (game.gameState === GAME_STATES.VOTE && game.gameStateProcessQueue.length > 0 && !game.errorState)) && !isLoadingMessages && (
+                {(isProcessing || isExternalLoading || (game.gameState === GAME_STATES.VOTE && game.gameStateProcessQueue.length > 0 && !game.errorState) || (game.gameState === GAME_STATES.WELCOME && game.gameStateParamQueue.length > 0 && !game.errorState)) && !isLoadingMessages && (
                     <div className="flex items-center gap-2 py-2 px-3">
                         <div className="flex gap-1">
                             <span className="w-2 h-2 rounded-full bg-blue-400 animate-bounce" style={{ animationDelay: '0ms' }}></span>
@@ -1435,22 +1430,52 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
                         <span className="text-xs theme-text-secondary">
                             {game.gameState === GAME_STATES.VOTE && game.gameStateProcessQueue.length > 0
                                 ? `${game.gameStateProcessQueue[0]} is voting...`
-                                : game.gameStateProcessQueue.length > 0
-                                    ? `${game.gameStateProcessQueue[0]} is thinking...`
-                                    : 'Processing...'}
+                                : game.gameState === GAME_STATES.WELCOME && game.gameStateParamQueue.length > 0
+                                    ? `${game.gameStateParamQueue[0]} is thinking...`
+                                    : game.gameStateProcessQueue.length > 0
+                                        ? `${game.gameStateProcessQueue[0]} is thinking...`
+                                        : 'Processing...'}
                         </span>
                     </div>
                 )}
-                {!isProcessing && game.errorState && game.gameStateProcessQueue.length > 0 && !isLoadingMessages && (
-                    <div className="flex items-center gap-2 py-2 px-3 text-red-400">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0">
-                            <circle cx="12" cy="12" r="10"/>
-                            <line x1="15" y1="9" x2="9" y2="15"/>
-                            <line x1="9" y1="9" x2="15" y2="15"/>
-                        </svg>
-                        <span className="text-xs">
-                            {game.gameStateProcessQueue[0]} failed to respond. Dismiss the error above to retry.
-                        </span>
+                {!isProcessing && game.errorState && !isLoadingMessages && (
+                    <div className="mx-2 my-2 p-3 rounded-lg border bg-red-900/50 border-red-500/30 text-red-200">
+                        <div className="flex items-start gap-2">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0 mt-0.5 text-red-400">
+                                <circle cx="12" cy="12" r="10"/>
+                                <line x1="15" y1="9" x2="9" y2="15"/>
+                                <line x1="9" y1="9" x2="15" y2="15"/>
+                            </svg>
+                            <div className="flex-1 min-w-0">
+                                <div className="text-sm font-medium break-words">
+                                    {(() => {
+                                        const failedBot = game.gameState === GAME_STATES.WELCOME
+                                            ? game.gameStateParamQueue[0]
+                                            : game.gameStateProcessQueue[0];
+                                        return failedBot ? `${failedBot} failed to respond` : 'An error occurred';
+                                    })()}
+                                </div>
+                                {game.errorState.details && (
+                                    <div className="text-xs mt-1 opacity-80 break-words">
+                                        {game.errorState.details.length > 150 ? game.errorState.details.substring(0, 150) + '...' : game.errorState.details}
+                                    </div>
+                                )}
+                                <div className="text-xs mt-1.5 opacity-60">
+                                    If this keeps happening, try changing the AI model for this bot in the game settings.
+                                </div>
+                            </div>
+                            <button
+                                onClick={handleDismissError}
+                                className="flex-shrink-0 px-3 py-1.5 rounded text-btn-text-transparent bg-btn-transparent border border-card-border hover:bg-btn-transparent-hover text-xs font-medium transition-colors flex items-center gap-1.5"
+                                title="Dismiss error and retry"
+                            >
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="23 4 23 10 17 10"/>
+                                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                                </svg>
+                                Retry
+                            </button>
+                        </div>
                     </div>
                 )}
                 <div ref={messagesEndRef} />

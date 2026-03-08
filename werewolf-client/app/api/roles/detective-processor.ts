@@ -44,24 +44,47 @@ export class DetectiveProcessor extends BaseRoleProcessor {
         if (!nightResults.detective) return state;
 
         const detectiveTarget = nightResults.detective.target;
+        const actionType = nightResults.detective.actionType || 'investigate';
 
-        // If detective's target was abducted, investigation fails — no result
+        // If detective's target was abducted, action fails
         if (state.abductedPlayer === detectiveTarget) {
-            this.logNightAction(`Detective investigation of ${detectiveTarget} failed - target was abducted by Maniac`);
+            this.logNightAction(`Detective ${actionType} of ${detectiveTarget} failed - target was abducted by Maniac`);
             state.actionsPrevented.push({
                 role: GAME_ROLES.DETECTIVE,
                 reason: 'abduction',
-                player: null // Detective's target was abducted so investigation failed
+                player: null
             });
             return state;
         }
 
-        const targetRole = this.resolvePlayerRole(detectiveTarget);
-        state.detectiveResult = {
-            target: detectiveTarget,
-            isEvil: this.readsAsEvil(targetRole),
-            success: true
-        };
+        if (actionType === 'kill') {
+            // Detective's one-time kill ability
+            const victimRole = this.resolvePlayerRole(detectiveTarget);
+            state.deaths.push({ player: detectiveTarget, role: victimRole, cause: 'detective_kill' });
+            this.logNightAction(`Detective used one-time kill on ${detectiveTarget} (${victimRole})`);
+
+            // If killed target is the maniac, their abducted victim also dies
+            if (victimRole === GAME_ROLES.MANIAC && state.abductedPlayer) {
+                const collateralRole = this.resolvePlayerRole(state.abductedPlayer);
+                state.deaths.push({ player: state.abductedPlayer, role: collateralRole, cause: 'maniac_collateral' });
+                this.logNightAction(`Maniac killed by detective - abducted victim ${state.abductedPlayer} also dies`);
+            }
+
+            // Still set detectiveResult so the system knows detective acted (but no investigation result)
+            state.detectiveResult = {
+                target: detectiveTarget,
+                isEvil: this.readsAsEvil(victimRole),
+                success: true
+            };
+        } else {
+            // Normal investigation
+            const targetRole = this.resolvePlayerRole(detectiveTarget);
+            state.detectiveResult = {
+                target: detectiveTarget,
+                isEvil: this.readsAsEvil(targetRole),
+                success: true
+            };
+        }
         return state;
     }
 
@@ -172,6 +195,9 @@ export class DetectiveProcessor extends BaseRoleProcessor {
             agent.gameId = this.gameId;
             agent.userId = session.user.email;
 
+            // Check kill ability availability
+            const killAbilityAvailable = !this.game.oneTimeAbilitiesUsed?.detectiveKill;
+
             // Get all living players except the detective for investigation
             const allLivePlayers = [
                 ...this.game.bots.filter(bot => bot.isAlive && bot.name !== detectiveBot.name).map(bot => bot.name),
@@ -179,7 +205,10 @@ export class DetectiveProcessor extends BaseRoleProcessor {
             ];
             const targetNames = allLivePlayers.join(', ');
 
-            const detectiveActionPrompt = `${format(BOT_DETECTIVE_ACTION_PROMPT, { bot_name: detectiveBot.name })}\n\n**Available targets:** ${targetNames}`;
+            let detectiveActionPrompt = `${format(BOT_DETECTIVE_ACTION_PROMPT, { bot_name: detectiveBot.name })}\n\n**Available targets:** ${targetNames}`;
+            if (!killAbilityAvailable) {
+                detectiveActionPrompt += `\n\n⚠️ **Your one-time kill ability has already been used.** You can only investigate tonight.`;
+            }
 
             const gmMessage: GameMessage = {
                 id: null,
@@ -203,7 +232,7 @@ export class DetectiveProcessor extends BaseRoleProcessor {
                 throw new Error(`Detective ${detectiveBot.name} failed to respond to investigation prompt`);
             }
 
-            // Validate target - detective can investigate any living player except themselves
+            // Validate target - detective can target any living player except themselves
             if (!allLivePlayers.includes(detectiveResponse.target)) {
                 throw new BotResponseError(
                     `Invalid detective target: ${detectiveResponse.target}`,
@@ -217,23 +246,40 @@ export class DetectiveProcessor extends BaseRoleProcessor {
                 );
             }
 
-            // Save the target to nightResults
-            const currentNightResults = this.game.nightResults || {};
-            currentNightResults[GAME_ROLES.DETECTIVE] = { target: detectiveResponse.target };
+            // Determine action type (default to investigate)
+            const actionType = detectiveResponse.action_type || 'investigate';
 
-            // Calculate intermediate resolvedNightState to get the investigation result
+            // Validate kill ability usage
+            if (actionType === 'kill' && !killAbilityAvailable) {
+                throw new BotResponseError(
+                    `Detective ${detectiveBot.name} tried to use kill ability but it's already been used`,
+                    `Your one-time kill ability has already been used. You can only investigate.`,
+                    { detectiveName: detectiveBot.name, actionType },
+                    true
+                );
+            }
+
+            // Save the target and action type to nightResults
+            const currentNightResults = this.game.nightResults || {};
+            currentNightResults[GAME_ROLES.DETECTIVE] = { target: detectiveResponse.target, actionType };
+
+            // Calculate intermediate resolvedNightState to get the result
             const intermediateNightState = this.computeIntermediateNightState(currentNightResults, baseNightState);
             const detectiveResult = intermediateNightState.detectiveResult!;
 
-            // Create detective response message with investigation result (sent only to the detective)
-            // Result shows "evil" or "innocent" — not the actual role — to preserve ambiguity
-            const investigationResultMessage = !detectiveResult.success
-                ? `Investigation FAILED: ${detectiveResponse.target} could not be found tonight (they were abducted by the Maniac)`
-                : `Investigation reveals: ${detectiveResponse.target} appears to be ${detectiveResult.isEvil ? '**evil**' : '**innocent**'}`;
+            // Create detective response message based on action type
+            let resultMessage: string;
+            if (actionType === 'kill') {
+                resultMessage = `🗡️ You used your one-time kill ability on **${detectiveResponse.target}**. They will not survive the night.`;
+            } else {
+                resultMessage = !detectiveResult.success
+                    ? `Investigation FAILED: ${detectiveResponse.target} could not be found tonight (they were abducted by the Maniac)`
+                    : `Investigation reveals: ${detectiveResponse.target} appears to be ${detectiveResult.isEvil ? '**evil**' : '**innocent**'}`;
+            }
 
             const investigationResult = {
                 ...detectiveResponse,
-                result: investigationResultMessage,
+                result: resultMessage,
                 thinking: thinking || "",
                 ...getProviderSignatureFields(detectiveBot.aiType, thinkingSignature)
             };
@@ -258,15 +304,29 @@ export class DetectiveProcessor extends BaseRoleProcessor {
             }
 
             const targetRole = this.resolvePlayerRole(detectiveResponse.target);
-            this.logNightAction(`✅ Detective ${detectiveBot.name} investigated: ${detectiveResponse.target} (${targetRole})`);
+            if (actionType === 'kill') {
+                this.logNightAction(`✅ Detective ${detectiveBot.name} used ONE-TIME KILL on: ${detectiveResponse.target} (${targetRole})`);
+            } else {
+                this.logNightAction(`✅ Detective ${detectiveBot.name} investigated: ${detectiveResponse.target} (${targetRole})`);
+            }
+
+            // Build game updates — mark kill ability as used if applicable
+            const gameUpdates: Partial<any> = {
+                nightResults: currentNightResults,
+                gameStateParamQueue: remainingQueue,
+                resolvedNightState: intermediateNightState
+            };
+
+            if (actionType === 'kill') {
+                gameUpdates.oneTimeAbilitiesUsed = {
+                    ...this.game.oneTimeAbilitiesUsed,
+                    detectiveKill: true
+                };
+            }
 
             return {
                 success: true,
-                gameUpdates: {
-                    nightResults: currentNightResults,
-                    gameStateParamQueue: remainingQueue,
-                    resolvedNightState: intermediateNightState
-                },
+                gameUpdates,
                 messages: [savedGmMessage, savedDetectiveMessage]
             };
 

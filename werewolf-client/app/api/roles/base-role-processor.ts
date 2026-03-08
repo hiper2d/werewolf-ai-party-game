@@ -47,7 +47,7 @@ export interface RolePlayersInfo {
 export interface NightDeath {
     player: string;
     role: string;
-    cause: 'werewolf_attack' | 'doctor_kill' | 'maniac_collateral';
+    cause: 'werewolf_attack' | 'doctor_kill' | 'detective_kill' | 'maniac_collateral';
 }
 
 /**

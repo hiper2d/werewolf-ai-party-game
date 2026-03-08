@@ -61,8 +61,9 @@ export const DoctorActionZodSchema = z.object({
 
 // Detective action schema
 export const DetectiveActionZodSchema = z.object({
-  target: z.string().describe("The name of the player to investigate and learn their role"),
-  reasoning: z.string().describe("Reasoning for the investigation choice")
+  target: z.string().describe("The name of the player to investigate or kill"),
+  reasoning: z.string().describe("Reasoning for the action choice"),
+  action_type: z.enum(['investigate', 'kill']).optional().describe("The type of action: 'investigate' (default) to learn their role, or 'kill' (one-time ability) to eliminate them")
 });
 
 // Maniac action schema

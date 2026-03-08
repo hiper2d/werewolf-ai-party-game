@@ -40,6 +40,7 @@ export default function CreateNewGamePage() {
     const [error, setError] = useState<string | null>(null);
     const [isSpeaking, setIsSpeaking] = useState(false);
     const [showPlayStyleTooltip, setShowPlayStyleTooltip] = useState<number | null>(null);
+    const [showRoleTooltip, setShowRoleTooltip] = useState<string | null>(null);
     const [nameError, setNameError] = useState<string | null>(null);
     const [themeError, setThemeError] = useState<string | null>(null);
     const [playersAiError, setPlayersAiError] = useState<string | null>(null);
@@ -312,6 +313,11 @@ export default function CreateNewGamePage() {
     };
 
     const availableRoles = [GAME_ROLES.DOCTOR, GAME_ROLES.DETECTIVE, GAME_ROLES.MANIAC];
+    const roleTooltips: Record<string, string> = {
+        [GAME_ROLES.DOCTOR]: 'Each night, protects one player from werewolf attacks. Cannot protect the same player two nights in a row. Has a one-time ability to kill instead of protect.',
+        [GAME_ROLES.DETECTIVE]: 'Each night, investigates one player to learn if they are evil (werewolf or maniac) or innocent. Cannot investigate the same player twice. Has a one-time ability to kill a player instead of investigating.',
+        [GAME_ROLES.MANIAC]: 'Each night, abducts one player — blocking all their actions and any actions targeting them. Abductions are secret. If the maniac dies at night, the abducted victim dies too. Aligned with villagers.',
+    };
 
 
     const handleGeneratePreview = async () => {
@@ -588,7 +594,7 @@ export default function CreateNewGamePage() {
                         <label className={labelStyle}>Special Roles:</label>
                         <div className="flex gap-4">
                             {availableRoles.map(role => (
-                                <div key={role} className="flex items-center">
+                                <div key={role} className="relative flex items-center">
                                     <input
                                         type="checkbox"
                                         id={role}
@@ -602,9 +608,28 @@ export default function CreateNewGamePage() {
                                         }}
                                         className="mr-2"
                                     />
-                                    <label htmlFor={role} className="text-white">
+                                    <label htmlFor={role} className="text-white mr-1">
                                         {role.charAt(0).toUpperCase() + role.slice(1)}
                                     </label>
+                                    <button
+                                        type="button"
+                                        className="w-5 h-5 rounded-full bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white text-xs flex items-center justify-center transition-colors"
+                                        onMouseEnter={() => setShowRoleTooltip(role)}
+                                        onMouseLeave={() => setShowRoleTooltip(null)}
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            setShowRoleTooltip(showRoleTooltip === role ? null : role);
+                                        }}
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
+                                            <path fillRule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-7-4a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM9 9a.75.75 0 0 0 0 1.5h.253a.25.25 0 0 1 .244.304l-.459 2.066A1.75 1.75 0 0 0 10.747 15H11a.75.75 0 0 0 0-1.5h-.253a.25.25 0 0 1-.244-.304l.459-2.066A1.75 1.75 0 0 0 9.253 9H9Z" clipRule="evenodd" />
+                                        </svg>
+                                    </button>
+                                    {showRoleTooltip === role && (
+                                        <div className="absolute z-10 w-64 p-3 bg-gray-900 border border-gray-700 rounded-lg shadow-lg text-sm text-gray-300 top-full mt-2 left-0">
+                                            {roleTooltips[role]}
+                                        </div>
+                                    )}
                                 </div>
                             ))}
                         </div>

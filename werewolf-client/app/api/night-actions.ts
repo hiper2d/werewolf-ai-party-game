@@ -12,6 +12,8 @@ import {
     GameActionResponse,
     MessageType,
     NightNarrativeResult,
+    DayDiscussionSummary,
+    MESSAGE_ROLE,
     RECIPIENT_ALL,
     RECIPIENT_WEREWOLVES,
     RECIPIENT_DOCTOR,
@@ -25,16 +27,16 @@ import { getGame, addMessageToChatAndSaveToDb } from "./game-actions";
 import { RoleProcessorFactory } from "./roles";
 import { withGameErrorHandling } from "@/app/utils/server-action-wrapper";
 import { AgentFactory } from "@/app/ai/agent-factory";
-import { getUserFromFirestore, getBotMessages } from "@/app/api/game-actions";
+import { getUserFromFirestore, getBotMessages, getGameMessages } from "@/app/api/game-actions";
 import { getApiKeysForUser } from "@/app/utils/tier-utils";
-import { GM_NIGHT_RESULTS_SYSTEM_PROMPT } from "@/app/ai/prompts/gm-prompts";
+import { GM_NIGHT_RESULTS_SYSTEM_PROMPT, GM_DAY_SUMMARY_SYSTEM_PROMPT, GM_DAY_SUMMARY_COMMAND } from "@/app/ai/prompts/gm-prompts";
 import { GM_COMMAND_GENERATE_NIGHT_RESULTS } from "@/app/ai/prompts/gm-commands";
 import { NightResultsStoryZodSchema, BotAnswerZodSchema } from "@/app/ai/prompts/zod-schemas";
 import { NightResultsStory } from "@/app/ai/prompts/ai-schemas";
 import { BOT_DAY_SUMMARY_PROMPT, BOT_SYSTEM_PROMPT } from "@/app/ai/prompts/bot-prompts";
 import { generateBotContextSection, generateWerewolfTeammatesSection } from "@/app/utils/bot-utils";
 import { format } from "@/app/ai/prompts/utils";
-import { parseResponseToObj, convertToAIMessages, formatMessagesForNightSummary } from "@/app/utils/message-utils";
+import { parseResponseToObj, convertToAIMessages, convertMessageContent, formatMessagesForNightSummary } from "@/app/utils/message-utils";
 import { checkGameEndConditions } from "@/app/utils/game-utils";
 import { getProviderSignatureFields } from "@/app/ai/ai-models";
 import { GameEndChecker } from "@/app/utils/game-end-checker";
@@ -175,10 +177,84 @@ async function endNightWithResults(gameId: string, game: Game): Promise<GameActi
     // Save the Game Master message
     const savedNightSummaryMsg = await addMessageToChatAndSaveToDb(gameMessage, gameId);
 
+    // Build chronological night events following action order: Maniac(0) → Werewolves(1) → Doctor(2) → Detective(3)
+    const nightEvents: Array<{ order: number; role: string; description: string }> = [];
+
+    // Order 0: Maniac
+    if (nightState.abductedPlayer) {
+        nightEvents.push({ order: 0, role: 'maniac', description: `Abducted ${nightState.abductedPlayer} for the night, blocking all actions involving them` });
+    }
+    const maniacPrevented = nightState.actionsPrevented.filter(a => a.role === 'maniac');
+    maniacPrevented.forEach(a => {
+        nightEvents.push({ order: 0, role: 'maniac', description: `Maniac's action failed — ${a.reason === 'death' ? 'maniac died' : a.reason}` });
+    });
+
+    // Order 1: Werewolves
+    const werewolfDeaths = nightState.deaths.filter(d => d.cause === 'werewolf_attack');
+    const maniacCollateral = nightState.deaths.filter(d => d.cause === 'maniac_collateral');
+    const doctorSaved = nightState.actionsPrevented.some(a => a.reason === 'doctor_save');
+    if (werewolfDeaths.length > 0) {
+        werewolfDeaths.forEach(d => {
+            nightEvents.push({ order: 1, role: 'werewolves', description: `Killed ${d.player} (${d.role})` });
+        });
+    } else if (doctorSaved) {
+        nightEvents.push({ order: 1, role: 'werewolves', description: 'Attacked a player, but the doctor saved them' });
+    } else {
+        // Check if werewolf attack was blocked by abduction
+        const werewolfBlocked = nightState.actionsPrevented.filter(a => a.role === 'werewolf');
+        if (werewolfBlocked.length > 0) {
+            nightEvents.push({ order: 1, role: 'werewolves', description: 'Attack failed — target was abducted by the maniac' });
+        } else if (nightState.deaths.length === 0 && !doctorSaved) {
+            nightEvents.push({ order: 1, role: 'werewolves', description: 'No kill occurred' });
+        }
+    }
+    // Maniac collateral deaths happen as consequence of werewolf killing maniac
+    maniacCollateral.forEach(d => {
+        nightEvents.push({ order: 1, role: 'werewolves', description: `${d.player} (${d.role}) died as maniac collateral — maniac was killed and their abducted victim perished` });
+    });
+
+    // Order 2: Doctor
+    const doctorKill = nightState.deaths.filter(d => d.cause === 'doctor_kill');
+    const doctorPrevented = nightState.actionsPrevented.filter(a => a.role === 'doctor');
+    if (doctorKill.length > 0) {
+        doctorKill.forEach(d => {
+            nightEvents.push({ order: 2, role: 'doctor', description: `Used Doctor's Mistake to kill ${d.player} (${d.role})` });
+        });
+    } else if (doctorSaved) {
+        nightEvents.push({ order: 2, role: 'doctor', description: 'Successfully protected a player from werewolf attack' });
+    } else if (doctorPrevented.length > 0) {
+        doctorPrevented.forEach(a => {
+            nightEvents.push({ order: 2, role: 'doctor', description: `Protection failed — ${a.reason === 'abduction' ? 'target was abducted' : a.reason}` });
+        });
+    }
+
+    // Order 3: Detective
+    const detectiveKillDeaths = nightState.deaths.filter(d => d.cause === 'detective_kill');
+    if (detectiveKillDeaths.length > 0) {
+        detectiveKillDeaths.forEach(d => {
+            nightEvents.push({ order: 3, role: 'detective', description: `Used one-time kill ability on ${d.player} (${d.role})` });
+        });
+    } else if (nightState.detectiveResult) {
+        if (nightState.detectiveResult.success) {
+            const result = nightState.detectiveResult.isEvil ? 'found evil (werewolf or maniac)' : 'found innocent';
+            nightEvents.push({ order: 3, role: 'detective', description: `Investigated a player — ${result}` });
+        } else {
+            nightEvents.push({ order: 3, role: 'detective', description: 'Investigation failed — target was abducted' });
+        }
+    }
+    const detectivePrevented = nightState.actionsPrevented.filter(a => a.role === 'detective' && !nightState.detectiveResult);
+    detectivePrevented.forEach(a => {
+        nightEvents.push({ order: 3, role: 'detective', description: `Investigation failed — ${a.reason === 'abduction' ? 'target was abducted' : a.reason === 'death' ? 'detective died' : a.reason}` });
+    });
+
+    // Sort by order to ensure chronological display
+    nightEvents.sort((a, b) => a.order - b.order);
+
     // Store night narrative for bot context
     const nightNarrativeResult: NightNarrativeResult = {
         day: game.currentDay,
-        narrative: finalNightResultsMessage
+        narrative: finalNightResultsMessage,
+        events: nightEvents
     };
     const existingNightNarratives = game.nightNarratives || [];
     const updatedNightNarratives = [...existingNightNarratives, nightNarrativeResult];
@@ -976,11 +1052,12 @@ async function startNewDayImpl(gameId: string): Promise<GameActionResponse> {
         }
 
         // Transition to NEW_DAY_BOT_SUMMARIES state and populate processing queue
+        // First entry is a sentinel to trigger GM day discussion summary generation
         // Move nightResults to previousNightResults and clear nightResults for next night
         await gameRef.update({
             gameState: GAME_STATES.NEW_DAY_BOT_SUMMARIES,
             gameStateParamQueue: [],
-            gameStateProcessQueue: aliveBotNames,
+            gameStateProcessQueue: ['__GM_DAY_SUMMARY__', ...aliveBotNames],
             bots: updatedBots,
             previousNightResults: previousNightResults,
             nightResults: {}, // Clear night results for the next night phase
@@ -1056,7 +1133,84 @@ async function summarizePastDayImpl(gameId: string): Promise<GameActionResponse>
             return { game: dayBeginsGame, messages: [savedDayBeginsMsg] };
         }
 
-        const botName = processQueue.shift()!; // Get first bot and remove from queue
+        const nextInQueue = processQueue.shift()!; // Get first entry and remove from queue
+
+        // Handle GM day discussion summary generation (sentinel entry)
+        if (nextInQueue === '__GM_DAY_SUMMARY__') {
+            logger.info(`📝 Generating GM day discussion summary for day ${currentGame.currentDay}`, { gameId, day: currentGame.currentDay });
+
+            const session = await auth();
+            if (!session || !session.user?.email) {
+                throw new Error('Not authenticated');
+            }
+            await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: currentGame.createdWithTier });
+
+            try {
+                const apiKeys = await getApiKeysForUser(session.user.email);
+
+                // Get all public messages from this day for the GM to summarize
+                const allMessages = await getGameMessages(gameId);
+                const publicMessages = allMessages.filter(m =>
+                    m.day === currentGame.currentDay &&
+                    m.recipientName === RECIPIENT_ALL &&
+                    (m.messageType === MessageType.BOT_ANSWER ||
+                     m.messageType === MessageType.BOT_WELCOME ||
+                     m.messageType === MessageType.HUMAN_PLAYER_MESSAGE ||
+                     m.messageType === MessageType.VOTE_MESSAGE ||
+                     m.messageType === MessageType.GAME_STORY)
+                );
+
+                if (publicMessages.length > 0) {
+                    // Build a simple conversation text for the GM
+                    const conversationText = publicMessages.map(m => {
+                        const content = typeof m.msg === 'string' ? m.msg : convertMessageContent(m);
+                        return `**${m.authorName}:** ${content}`;
+                    }).join('\n\n');
+
+                    const gmSummaryCommand = format(GM_DAY_SUMMARY_COMMAND, {
+                        day_number: String(currentGame.currentDay)
+                    });
+
+                    const gmAgent = AgentFactory.createAgent(
+                        GAME_MASTER, GM_DAY_SUMMARY_SYSTEM_PROMPT,
+                        currentGame.gameMasterAiType, apiKeys, false
+                    );
+                    gmAgent.gameId = gameId;
+                    gmAgent.userId = session.user.email;
+
+                    const history = [{ role: MESSAGE_ROLE.USER, content: `${conversationText}\n\n---\n\n${gmSummaryCommand}` }];
+                    const [summaryResponse, , tokenUsage] = await gmAgent.askWithZodSchema(BotAnswerZodSchema, history);
+
+                    if (tokenUsage) {
+                        await recordGameMasterTokenUsage(gameId, tokenUsage, session.user.email);
+                    }
+
+                    if (summaryResponse?.reply) {
+                        const daySummaryEntry: DayDiscussionSummary = {
+                            day: currentGame.currentDay,
+                            summary: summaryResponse.reply
+                        };
+                        const existingSummaries = currentGame.dayDiscussionSummaries || [];
+                        await gameRef.update({
+                            gameStateProcessQueue: processQueue,
+                            dayDiscussionSummaries: [...existingSummaries, daySummaryEntry]
+                        });
+                        logger.info(`📝 GM day summary generated for day ${currentGame.currentDay}`, { gameId });
+                        const updatedGame = await getGame(gameId) as Game;
+                        return { game: updatedGame, messages: [] };
+                    }
+                }
+            } catch (error) {
+                logger.warn(`📝 Failed to generate GM day summary, skipping`, { gameId, error });
+            }
+
+            // If we get here (no messages or failure), just skip the sentinel
+            await gameRef.update({ gameStateProcessQueue: processQueue });
+            const skippedGame = await getGame(gameId) as Game;
+            return { game: skippedGame, messages: [] };
+        }
+
+        const botName = nextInQueue;
         const bot = currentGame.bots.find(b => b.name === botName);
 
         if (!bot || !bot.isAlive) {
@@ -1250,6 +1404,7 @@ function gameFromFirestore(id: string, data: any): Game {
         createdWithTier: data.createdWithTier || 'free',
         votingHistory: data.votingHistory || [],
         nightNarratives: data.nightNarratives || [],
+        dayDiscussionSummaries: data.dayDiscussionSummaries || [],
         oneTimeAbilitiesUsed: data.oneTimeAbilitiesUsed || {},
         resolvedNightState: data.resolvedNightState || null
     };

@@ -1042,6 +1042,7 @@ function gameFromFirestore(id: string, data: any): Game {
         createdWithTier: data.createdWithTier || 'free',
         votingHistory: data.votingHistory || [],
         nightNarratives: data.nightNarratives || [],
+        dayDiscussionSummaries: data.dayDiscussionSummaries || [],
         chatResetCounts: data.chatResetCounts || {},
         oneTimeAbilitiesUsed: data.oneTimeAbilitiesUsed || {},
         resolvedNightState: data.resolvedNightState || null

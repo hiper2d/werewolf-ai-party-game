@@ -82,6 +82,7 @@ export interface ModelConfig {
     modelApiName: string;
     apiKeyName: string;
     hasThinking: boolean;
+    temperature?: number; // Override agent default temperature; omit to use the agent's built-in default
     maxOutputTokens?: number;
     freeTier?: {
         available: boolean;
@@ -158,6 +159,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         modelApiName: 'deepseek-chat',
         apiKeyName: API_KEY_CONSTANTS.DEEPSEEK,
         hasThinking: false,
+        temperature: 0.6,
         maxOutputTokens: 8192,
         freeTier: {
             available: true,
@@ -169,6 +171,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         modelApiName: 'deepseek-reasoner',
         apiKeyName: API_KEY_CONSTANTS.DEEPSEEK,
         hasThinking: true,
+        temperature: 0.6,
         maxOutputTokens: 8192,
         freeTier: {
             available: true,
@@ -182,6 +185,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         modelApiName: 'gpt-5.3-chat-latest',
         apiKeyName: API_KEY_CONSTANTS.OPENAI,
         hasThinking: true,
+        temperature: 1,
         freeTier: {
             available: true,
             maxBotsPerGame: 1
@@ -192,6 +196,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         modelApiName: 'gpt-5.4',
         apiKeyName: API_KEY_CONSTANTS.OPENAI,
         hasThinking: true,
+        temperature: 1,
         freeTier: {
             available: false,
             maxBotsPerGame: 0
@@ -202,6 +207,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         modelApiName: 'gpt-5-mini',
         apiKeyName: API_KEY_CONSTANTS.OPENAI,
         hasThinking: true,
+        temperature: 1,
         freeTier: {
             available: true,
             maxBotsPerGame: 3
@@ -232,6 +238,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         modelApiName: 'grok-4',
         apiKeyName: API_KEY_CONSTANTS.GROK,
         hasThinking: true,
+        temperature: 0.7,
         freeTier: {
             available: true,
             maxBotsPerGame: 1
@@ -242,6 +249,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         modelApiName: 'grok-4-1-fast-reasoning',
         apiKeyName: API_KEY_CONSTANTS.GROK,
         hasThinking: true,
+        temperature: 0.7,
         freeTier: {
             available: true,
             maxBotsPerGame: -1 // Very affordable
@@ -286,6 +294,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         modelApiName: 'kimi-k2-0905-preview',
         apiKeyName: API_KEY_CONSTANTS.MOONSHOT,
         hasThinking: false,
+        temperature: 0.6,
         freeTier: {
             available: true,
             maxBotsPerGame: -1
@@ -296,6 +305,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         modelApiName: 'kimi-k2-thinking',
         apiKeyName: API_KEY_CONSTANTS.MOONSHOT,
         hasThinking: true,
+        temperature: 0.6,
         freeTier: {
             available: true,
             maxBotsPerGame: -1
@@ -306,6 +316,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         modelApiName: 'kimi-k2.5',
         apiKeyName: API_KEY_CONSTANTS.MOONSHOT,
         hasThinking: false,
+        temperature: 1, // Kimi K2.5 API only allows temperature=1
         freeTier: {
             available: false,
             maxBotsPerGame: 0
@@ -316,6 +327,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         modelApiName: 'kimi-k2.5',
         apiKeyName: API_KEY_CONSTANTS.MOONSHOT,
         hasThinking: true,
+        temperature: 1, // Kimi K2.5 API only allows temperature=1
         freeTier: {
             available: false,
             maxBotsPerGame: 0
@@ -326,6 +338,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         modelApiName: 'kimi-k2-turbo-preview',
         apiKeyName: API_KEY_CONSTANTS.MOONSHOT,
         hasThinking: false,
+        temperature: 0.6,
         freeTier: {
             available: false,
             maxBotsPerGame: 0
@@ -336,6 +349,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         modelApiName: 'kimi-k2-thinking-turbo',
         apiKeyName: API_KEY_CONSTANTS.MOONSHOT,
         hasThinking: true,
+        temperature: 0.6,
         freeTier: {
             available: false,
             maxBotsPerGame: 0

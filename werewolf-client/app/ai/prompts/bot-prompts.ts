@@ -35,7 +35,7 @@ Your paramount objective is to blend in seamlessly as another player while pursu
 
 **Special Roles (Village-aligned):**
 - **Doctor:** Each night, protects one player from werewolf attacks. Cannot protect the same player two nights in a row. Has a ONE-TIME "Doctor's Mistake" ability to kill a player instead of protecting.
-- **Detective:** Each night, investigates one player to learn their true role. Use this information strategically without revealing your role.
+- **Detective:** Each night, investigates one player to learn if they are evil or innocent. Has a ONE-TIME kill ability to eliminate a player instead of investigating. Use information strategically without revealing your role.
 - **Maniac:** Each night, abducts one player for the entire night. The abducted player's night action fails, and any actions targeting them also fail. Cannot abduct the same player twice in a row. If the Maniac dies at night, the abducted victim dies too. Abductions are secret and not announced.
 
 **Game Flow:**
@@ -58,7 +58,7 @@ All players "sleep." Special roles act in a strict order, and each action can af
 1. **Maniac acts FIRST** — abducts one player, blocking ALL actions involving them (werewolf kill, doctor protect, detective investigate all fail on the abducted target). The abducted player's own night action also fails. If the Maniac dies during the night, the abducted victim dies too.
 2. **Werewolves act SECOND** — choose a target to eliminate. If the target was abducted by the Maniac, the kill fails. If they kill the Maniac, the Maniac's abducted victim also dies as collateral.
 3. **Doctor acts THIRD** — protects one player from werewolf attack. If the protected player was already abducted, the protection fails. Cannot protect the same player two nights in a row. Has a one-time ability to kill instead of protect ("Doctor's Mistake").
-4. **Detective acts LAST** — investigates one player to learn if they are evil (werewolf or maniac) or innocent. If the target was abducted, the investigation fails. Cannot investigate the same player twice.
+4. **Detective acts LAST** — investigates one player to learn if they are evil (werewolf or maniac) or innocent, OR uses a one-time kill ability to eliminate a player. If the target was abducted, the action fails. Cannot investigate the same player twice. If the detective kills the Maniac, the abducted victim also dies.
 
 Actions resolve before the next day phase. Maniac abductions are NEVER announced — they are completely secret.
 
@@ -329,26 +329,35 @@ export const BOT_MANIAC_ACTION_PROMPT: string = `🎭 **Night Phase - Maniac Abd
 
 Your response must be a valid JSON object with your target choice and reasoning.`;
 
-export const BOT_DETECTIVE_ACTION_PROMPT: string = `🔍 **Night Phase - Detective Investigation**
+export const BOT_DETECTIVE_ACTION_PROMPT: string = `🔍 **Night Phase - Detective Action**
 
-%bot_name%, the night has fallen and it's time for you to investigate a player. As the Detective, you must choose one player to investigate and learn their true role.
+%bot_name%, the night has fallen and it's time for you to act. As the Detective, you have two options:
+
+**OPTION 1: INVESTIGATE (default)**
+- Investigate a living player to learn if they are evil (werewolf or maniac) or innocent
+- You CANNOT investigate the same player twice
+- Your investigation only reveals information to you — keep it secret!
+
+**OPTION 2: KILL (one-time ability)**
+- You have a ONE-TIME ability to kill any player instead of investigating
+- This is a lethal action — the target will die tonight
+- Use this only when you are confident about a target (e.g., confirmed werewolf from a previous investigation)
+- Once used, this ability is gone forever — you can only investigate in future nights
 
 **IMPORTANT RULES:**
-- You can investigate any living player except yourself
-- Your investigation will reveal the target's exact role (Villager, Werewolf, Doctor, etc.)
-- You CANNOT investigate the same player twice (this rule will be enforced later)
-- Your investigation only reveals information to you - keep it secret!
+- You can target any living player except yourself
+- Set action_type to "investigate" (or omit it) for investigation, or "kill" for the one-time kill
 
 Consider:
 - Who has been acting most suspiciously during day discussions?
 - Who might be a werewolf trying to blend in with villagers?
-- Who seems to have inside knowledge or is deflecting suspicion?
-- Which player's true role would give you the most strategic information?
-- Who are the most vocal or influential players that need investigation?
+- If you have confirmed evil players from previous investigations, should you use your kill ability?
+- Is it worth using your kill now, or save it for when you have more information?
+- The kill ability is most powerful when used on a confirmed werewolf
 
 **Remember:** Keep your role as Detective completely secret. Never directly reveal your investigation results or role to other players during day discussions. Use the information strategically to guide voting and discussions.
 
-Your response must be a valid JSON object with your target choice and reasoning.`;
+Your response must be a valid JSON object with your target choice, action_type, and reasoning.`;
 
 export const BOT_DAY_SUMMARY_PROMPT: string = `**End of Day %day_number% - Update Your Personal Summary**
 
@@ -380,7 +389,7 @@ export const BOT_DAY_SUMMARY_PROMPT: string = `**End of Day %day_number% - Updat
 - Rate each suspect: Highly suspicious / Somewhat suspicious / Worth watching
 
 **3. ROLE-SPECIFIC KNOWLEDGE** (CRITICAL - review the data provided above your previous summary)
-- **DETECTIVE:** Your investigation results are tracked for you. Summarize: CONFIRMED WEREWOLVES to eliminate, CLEARED PLAYERS to trust/protect, and WHO TO INVESTIGATE NEXT
+- **DETECTIVE:** Your investigation results are tracked for you. Summarize: CONFIRMED WEREWOLVES to eliminate, CLEARED PLAYERS to trust/protect, WHO TO INVESTIGATE NEXT, and whether your one-time kill ability is still available
 - **WEREWOLF:** Coordination with teammates, which innocents are threats, who suspects you
 - **DOCTOR:** Your protection history is tracked. Note: who seems most at risk, protection priorities. Remember your one-time kill ability if not yet used.
 - **MANIAC:** Your abduction history is tracked. Note: who you've blocked, patterns in werewolf targets, strategic opportunities to disrupt werewolves or protect key players

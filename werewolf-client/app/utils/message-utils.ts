@@ -35,7 +35,10 @@ export function convertMessageContent(message: GameMessage): string {
             return `Abducted ${maniacMsg.target} for the night. Reasoning: ${maniacMsg.reasoning}`;
 
         case MessageType.DETECTIVE_ACTION:
-            const detectiveMsg = message.msg as { target: string; reasoning: string };
+            const detectiveMsg = message.msg as { target: string; reasoning: string; action_type?: string };
+            if (detectiveMsg.action_type === 'kill') {
+                return `Used one-time kill on ${detectiveMsg.target}. Reasoning: ${detectiveMsg.reasoning}`;
+            }
             return `Investigated ${detectiveMsg.target}. Reasoning: ${detectiveMsg.reasoning}`;
 
         case MessageType.GAME_STORY:
@@ -171,8 +174,12 @@ export function convertToAIMessages(currentBotName: string, messages: GameMessag
                 anthropicThinkingSignature = maniacMsg.anthropicThinkingSignature;
                 googleThoughtSignature = maniacMsg.googleThoughtSignature;
             } else if (message.messageType === MessageType.DETECTIVE_ACTION) {
-                const detectiveMsg = message.msg as { target: string; reasoning: string; thinking?: string; anthropicThinkingSignature?: string; googleThoughtSignature?: string };
-                content = `Investigated ${detectiveMsg.target}. Reasoning: ${detectiveMsg.reasoning}`;
+                const detectiveMsg = message.msg as { target: string; reasoning: string; action_type?: string; thinking?: string; anthropicThinkingSignature?: string; googleThoughtSignature?: string };
+                if (detectiveMsg.action_type === 'kill') {
+                    content = `Used one-time kill on ${detectiveMsg.target}. Reasoning: ${detectiveMsg.reasoning}`;
+                } else {
+                    content = `Investigated ${detectiveMsg.target}. Reasoning: ${detectiveMsg.reasoning}`;
+                }
                 thinking = detectiveMsg.thinking;
                 anthropicThinkingSignature = detectiveMsg.anthropicThinkingSignature;
                 googleThoughtSignature = detectiveMsg.googleThoughtSignature;
