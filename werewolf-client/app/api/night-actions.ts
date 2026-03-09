@@ -459,7 +459,7 @@ async function beginNightImpl(gameId: string): Promise<GameActionResponse> {
         throw new BotResponseError(
             'System error occurred during night setup',
             error instanceof Error ? error.message : 'Unknown error',
-            { originalError: error },
+            { originalError: error instanceof Error ? error.message : String(error) },
             false // System errors are typically not recoverable
         );
     }
@@ -569,7 +569,7 @@ async function replayNightImpl(gameId: string): Promise<GameActionResponse> {
         throw new BotResponseError(
             'System error occurred during night replay',
             error instanceof Error ? error.message : 'Unknown error',
-            { originalError: error },
+            { originalError: error instanceof Error ? error.message : String(error) },
             false // System errors are typically not recoverable
         );
     }
@@ -756,7 +756,7 @@ async function processNightQueue(gameId: string, game: Game): Promise<GameAction
         throw new BotResponseError(
             'System error occurred during night queue processing',
             error instanceof Error ? error.message : 'Unknown error',
-            { originalError: error },
+            { originalError: error instanceof Error ? error.message : String(error) },
             false // System errors are typically not recoverable
         );
     }

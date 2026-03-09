@@ -40,6 +40,14 @@ Customize everything: bot names, backstories, AI models, play styles, voices, an
 
 ## Gameplay
 
+### Welcome Phase
+
+Once the game starts, the AI Game Master sets the scene and each bot introduces themselves — in character, with their own personality and agenda. You can see who's playing, their AI model, cost per bot, and a progress bar as introductions roll in.
+
+<a href="images/game-welcome.png" target="_blank"><img src="images/game-welcome.png" width="600"></a>
+
+### Day Discussion
+
 Chat with bots using text or voice (Text-to-Speech and Speech-to-Text). Stay in character, try to blend in, or go full meta and tell them they're AI — whatever it takes to survive. Jailbreaking them isn't easy though; the days of "ignore all previous instructions" are long gone.
 
 <a href="images/chat.png" target="_blank"><img src="images/chat.png" width="600"></a>
@@ -50,16 +58,19 @@ The Game Master decides who responds, or you can manually select bots yourself.
 
 ### Voting
 
-Survival isn't guaranteed. Everyone votes, and the majority rules.
+Each bot explains their reasoning and casts a vote. Then it's your turn — pick who you think is the werewolf and explain why. The Game Master announces the results and the eliminated player's true role is revealed.
 
-<a href="images/game_vote_all_for_bob.png" target="_blank"><img src="images/game_vote_all_for_bob.png" width="600"></a>
+<a href="images/voting.png" target="_blank"><img src="images/voting.png" width="600"></a>
+<a href="images/cast-vote.png" target="_blank"><img src="images/cast-vote.png" width="600"></a>
+<a href="images/vote-results.png" target="_blank"><img src="images/vote-results.png" width="600"></a>
 
 ### Night Phase
 
-Werewolves coordinate their actions at night. Reasoning models think through their strategy in detail.
+Werewolves coordinate their actions at night. The doctor protects, the detective investigates, and the maniac abducts. Reasoning models think through their strategy in detail. After the night resolves, the Game Master narrates what happened.
 
 <a href="images/wolfs-talking.png" target="_blank"><img src="images/wolfs-talking.png" width="600"></a>
 <a href="images/wolf-reasoning.png" target="_blank"><img src="images/wolf-reasoning.png" width="600"></a>
+<a href="images/night-results.png" target="_blank"><img src="images/night-results.png" width="600"></a>
 
 ### Post-Game Discussion
 
