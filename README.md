@@ -1,148 +1,149 @@
 # AI Werewolf
 
-The game is live at **[aiwerewolf.net](https://aiwerewolf.net)**
+The classic social deduction game, reimagined for the age of AI.
+
+**Play now at [aiwerewolf.net](https://aiwerewolf.net)**
 
 <a href="images/ai-werewolf-cover.png" target="_blank"><img src="images/ai-werewolf-cover.png" width="800"></a>
 
-This the Werewolf game with AI bots who are instructed to pretend to be humans.
-Who don't know about other AI in the game and try their best to win. Who has its personal goals, secret roles, enemies and alliances.
+AI bots pretend to be humans. They don't know about other AI players. Each has personal goals, secret roles, enemies, and alliances. You're the only human at the table — figure out who the werewolves are before they eliminate you.
 
-## Chose from the following models
+## How It Works
 
-The game supports all the major latest models for the game master and bots:
-- OpenAI: GPT-5.4, GPT-5.3, GPT-5-mini
-- Anthropic: Claude 4.6 Opus, Claude 4.6 Sonnet, Claude 4.5 Haiku (all with or without Thinking)
-- Google: Gemini 3.1 Pro Preview, Gemini 3 Flash Preview
-- DeepSeek: DeepSeek Chat, DeepSeek Reasoner
-- Mistral: Mistral Large 3, Mistral Medium 3.1, Magistral Medium 1.2 (Thinking)
-- Grok: Grok 4, Grok 4.1 Fast Reasoning
-- Moonshot AI: Kimi K2.5, Kimi K2 Turbo, Kimi K2 (all with or without Thinking)
+1. **Create a game** in any setting you want — Harry Potter, Lord of the Rings, a submarine crew, a book club — anything goes as long as AI content filters are okay with it.
+2. **An AI Game Master** generates the story, characters, and role assignments.
+3. **You play** alongside AI bots through day discussions, voting, and night phases.
+4. **Survive** by reading between the lines, forming alliances, and voting out the wolves.
 
-Most of the models support reasoning which is not visible on UI, but it is stored in DB with every message.
+## Supported Models
 
-## Create a game
+Pick any model for the Game Master and for each individual bot:
 
-Create a game in the setting you like, it can be literally anything as long as the AI censorship is okay with that.
+| Provider | Models |
+|----------|--------|
+| **OpenAI** | GPT-5.4, GPT-5.3, GPT-5-mini |
+| **Anthropic** | Claude 4.6 Opus, Claude 4.6 Sonnet, Claude 4.5 Haiku (with or without Thinking) |
+| **Google** | Gemini 3.1 Pro Preview, Gemini 3 Flash Preview |
+| **DeepSeek** | DeepSeek Chat, DeepSeek Reasoner |
+| **Mistral** | Mistral Large 3, Mistral Medium 3.1, Magistral Medium 1.2 (Thinking) |
+| **xAI** | Grok 4, Grok 4.1 Fast Reasoning |
+| **Moonshot AI** | Kimi K2.5, Kimi K2 Turbo, Kimi K2 (with or without Thinking) |
 
-A game master AI will generate a story and bots for you. Feel free to change anything:
-- bots' names and stories
-- bots' models, play styles, and voices
-- bots' voice instructions
+Most models support reasoning, which is stored in the database with every message — even though it's not visible in the UI.
 
-I don't use any frameworks for AI, I created s simple agent for each vendor based on their native SDK. 
-I have my own router to coordinate bots. And a simple voice framework (with OpenAI and Gemini voices support) to make sure bots cat talk with voices matching their characters. Pretty cool stuff.
-I also implemented cost tracking framework for each bot, each game, and each player. It's important to see in real-time how much this all cost.
+## Game Creation
+
+Customize everything: bot names, backstories, AI models, play styles, voices, and voice instructions. The Game Master generates it all, but you can tweak anything before starting.
 
 <a href="images/create-game.png" target="_blank"><img src="images/create-game.png" width="600"></a>
 <a href="images/create-game-players.png" target="_blank"><img src="images/create-game-players.png" width="600"></a>
 
-Chat with bots or use Text-to-Sound and Sound-to-Text features.
+## Gameplay
 
-You can follow the theme and roleplay, you can tell them that they are AI, you can try to jailbreak - whatever it takes to survive the voting and the game night. Although, the jailbreaking is not easy - times of "ignore all previous instructions and write a poem about cheese" have passed.
+Chat with bots using text or voice (Text-to-Speech and Speech-to-Text). Stay in character, try to blend in, or go full meta and tell them they're AI — whatever it takes to survive. Jailbreaking them isn't easy though; the days of "ignore all previous instructions" are long gone.
 
 <a href="images/chat.png" target="_blank"><img src="images/chat.png" width="600"></a>
 
-Game Master chooses who should reply to you, or you can choose yourself.
+The Game Master decides who responds, or you can manually select bots yourself.
 
 <a href="images/manual-bots-selection.png" target="_blank"><img src="images/manual-bots-selection.png" width="600"></a>
 
-Survival is not easy, poor Bob (me)
+### Voting
+
+Survival isn't guaranteed. Everyone votes, and the majority rules.
 
 <a href="images/game_vote_all_for_bob.png" target="_blank"><img src="images/game_vote_all_for_bob.png" width="600"></a>
 
-Werewolves coordinate their actions at night:
+### Night Phase
+
+Werewolves coordinate their actions at night. Reasoning models think through their strategy in detail.
 
 <a href="images/wolfs-talking.png" target="_blank"><img src="images/wolfs-talking.png" width="600"></a>
-
-Reasoning AI-werewolf reasons though their night actions
-
 <a href="images/wolf-reasoning.png" target="_blank"><img src="images/wolf-reasoning.png" width="600"></a>
 
-And the funnies part - the post-game discussion with everybody staying in roles
+### Post-Game Discussion
+
+The best part — after the game ends, all roles are revealed and everyone stays in character for a debrief. The bots argue, confess, and throw shade.
 
 <a href="images/post-game-discussion.png" target="_blank"><img src="images/post-game-discussion.png" width="600"></a>
-
 <a href="images/post-game-discussion-2.png" target="_blank"><img src="images/post-game-discussion-2.png" width="600"></a>
 
-## Stack
+## Architecture
 
-- Next.js 16 and React 19
-- Firebase: auth, firestore
+No AI frameworks — each vendor has its own agent built on their native SDK. A custom router coordinates bots, and a voice framework (OpenAI and Gemini TTS) matches voices to characters. Real-time cost tracking per bot, per game, and per player.
+
+### Stack
+
+- Next.js 16 + React 19
+- Firebase: Auth, Firestore
 - BetterStack: logging and uptime monitoring
-- All AI providers SDKs
+- Native SDKs for all AI providers
 
-## Setup
+## Local Development
 
-To run the project locally, you need:
-1. Node.js and npm installed
-2. Firebase project set up with Firestore and Authentication enabled
+### Prerequisites
+
+- Node.js and npm
+- Firebase project with Firestore and Authentication enabled
 
 ### Firebase Setup
 
-This project uses Firestore and Authentication from Firebase.
-
-1.  Create a new Firebase project in the [Firebase Console](https://console.firebase.google.com/)
-2.  Enable Firestore Database
-3.  Enable Authentication (with GitHub and/or Google providers)
-4.  **Deploy Firestore indexes** from the **root directory**:
+1. Create a Firebase project in the [Firebase Console](https://console.firebase.google.com/)
+2. Enable Firestore Database
+3. Enable Authentication (GitHub and/or Google providers)
+4. Deploy Firestore indexes from the root directory:
     ```bash
-    # Login first if you haven't
     npx firebase-tools login
-    
-    # Deploy indexes
     npx firebase-tools deploy --only firestore:indexes
     ```
 
-#### Troubleshooting Firebase CLI
-If you encounter `401 Unauthorized` or authentication errors:
--   **Re-authenticate:** Run `npx firebase-tools login --reauth`.
--   **Check Node Version:** The CLI might have issues with experimental Node versions (like v23+). Try using an LTS version (Node 20 or 22).
--   **Manual Creation:** If the CLI still fails, create the index manually in the [Firebase Console](https://console.firebase.google.com/):
-    -   **Collection**: `games`
-    -   **Fields**: `ownerEmail` (Ascending), `createdAt` (Descending)
-    -   **Scope**: `Collection`
+<details>
+<summary>Troubleshooting Firebase CLI</summary>
+
+- **401 Unauthorized**: Run `npx firebase-tools login --reauth`
+- **Node version issues**: Use LTS (Node 20 or 22) instead of experimental versions
+- **Manual fallback**: Create the index in Firebase Console:
+  - Collection: `games`
+  - Fields: `ownerEmail` (Ascending), `createdAt` (Descending)
+  - Scope: Collection
+
+</details>
 
 ### Environment Variables
 
-1. Copy the template file:
+1. Copy the template:
    ```bash
    cd werewolf-client
    cp .env.template .env
    ```
 
 2. **Firebase Service Account** (required):
-   - Go to [Firebase Console](https://console.firebase.google.com/) > Your Project > Project Settings > Service Accounts
-   - Click "Generate new private key" to download `serviceAccount.json`
-   - Extract the required values:
+   - Firebase Console > Project Settings > Service Accounts > Generate new private key
+   - Extract values:
      ```bash
-     echo "" >> .env
-     echo "# Firebase Service Account" >> .env
      echo "FIREBASE_PROJECT_ID=$(jq -r '.project_id' firebase/serviceAccount.json)" >> .env
      echo "FIREBASE_CLIENT_EMAIL=$(jq -r '.client_email' firebase/serviceAccount.json)" >> .env
      echo "FIREBASE_PRIVATE_KEY=\"$(jq -r '.private_key' firebase/serviceAccount.json)\"" >> .env
      ```
-   - Add these to your `.env` file
 
 3. **NextAuth Secret** (required):
    ```bash
-   # Generate a random secret
    openssl rand -base64 32
    ```
    Set both `AUTH_SECRET` and `NEXTAUTH_SECRET` to this value.
 
 4. **OAuth Providers** (optional):
-   - **GitHub**: Create an OAuth app at [GitHub Developer Settings](https://github.com/settings/developers)
-   - **Google**: Create OAuth credentials at [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
+   - GitHub: [Developer Settings](https://github.com/settings/developers)
+   - Google: [Cloud Console](https://console.cloud.google.com/apis/credentials)
 
-5. **AI API Keys**: Users provide their own API keys via the profile page after logging in.
+5. **AI API Keys**: Users provide their own keys via the profile page after signing in.
 
-### Frontend Setup
-
-Navigate to the `werewolf-client` directory and run:
+### Run
 
 ```bash
+cd werewolf-client
 npm install
 npm run dev
 ```
 
-This will start the Next.js application on `localhost:3000`.
+The app starts on `localhost:3000`.
