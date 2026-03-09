@@ -14,7 +14,7 @@ export default async function Home() {
     <div className="flex flex-col min-h-[calc(100vh-8rem)]">
       {/* Hero Section */}
       <section className="flex flex-col items-center justify-center py-12 px-4 text-center sm:py-20 lg:py-32">
-        <div className="mb-8 relative w-32 h-32 sm:w-48 sm:h-48">
+        <div className="mb-8 relative w-36 h-36 sm:w-52 sm:h-52 rounded-full logo-backdrop">
           <Image
             src="/werewolf-ai-logo-2.png"
             alt="Werewolf AI Logo"

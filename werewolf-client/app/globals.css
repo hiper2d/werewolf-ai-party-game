@@ -239,6 +239,22 @@ html {
   box-shadow: 0 4px 16px var(--color-card-shadow);
 }
 
+/* Logo backdrop: dark center fading to page background */
+[data-theme='light'] .logo-backdrop {
+  background: radial-gradient(circle, #1e293b 35%, rgba(248, 250, 252, 0) 70%);
+  padding: 0.75rem;
+}
+
+[data-theme='light'] .logo-backdrop-sm {
+  background: radial-gradient(circle, #1e293b 40%, rgba(248, 250, 252, 0) 70%);
+  padding: 0.25rem;
+}
+
+/* Navbar has white background, so fade to white instead */
+.navbar-root .logo-backdrop-sm {
+  background: radial-gradient(circle, #1e293b 40%, rgba(255, 255, 255, 0) 70%);
+}
+
 .hide-scrollbar {
   scrollbar-width: none;
   -ms-overflow-style: none;

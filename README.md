@@ -2,7 +2,7 @@
 
 The game is live at **[aiwerewolf.net](https://aiwerewolf.net)**
 
-<a href="images/werewolf-ai-logo-4.png" target="_blank"><img src="images/werewolf-ai-logo-4.png" width="800"></a>
+<a href="images/ai-werewolf-cover.png" target="_blank"><img src="images/ai-werewolf-cover.png" width="800"></a>
 
 This the Werewolf game with AI bots who are instructed to pretend to be humans.
 Who don't know about other AI in the game and try their best to win. Who has its personal goals, secret roles, enemies and alliances.
