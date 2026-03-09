@@ -386,6 +386,7 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
     const [isProcessing, setIsProcessing] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [isVoting, setIsVoting] = useState(false);
+    const voteSubmittedRef = useRef(false);
     const [isPerformingNightAction, setIsPerformingNightAction] = useState(false);
     const { openModal, closeModal, isModalOpen, areControlsEnabled } = useUIControls();
     const showVotingModal = isModalOpen('voting');
@@ -684,22 +685,20 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
 
     // Check if it's human player's turn to vote
     useEffect(() => {
-        console.log('🔍 VOTING MODAL TRIGGER CHECK:', {
-            gameState: game.gameState,
-            queueLength: game.gameStateProcessQueue.length,
-            firstInQueue: game.gameStateProcessQueue[0],
-            humanPlayerName: game.humanPlayerName,
-            showVotingModal,
-            isVoting,
-            timestamp: new Date().toISOString()
-        });
-        
+        // Reset the vote-submitted guard when human is no longer first in queue
+        if (voteSubmittedRef.current &&
+            (game.gameState !== GAME_STATES.VOTE ||
+             game.gameStateProcessQueue.length === 0 ||
+             game.gameStateProcessQueue[0] !== game.humanPlayerName)) {
+            voteSubmittedRef.current = false;
+        }
+
         if (game.gameState === GAME_STATES.VOTE &&
             game.gameStateProcessQueue.length > 0 &&
             game.gameStateProcessQueue[0] === game.humanPlayerName &&
             !showVotingModal &&
-            !isVoting) {
-            console.log('🚨 OPENING VOTING MODAL - This could be the loop source!');
+            !isVoting &&
+            !voteSubmittedRef.current) {
             openModal('voting');
         }
     }, [game.gameState, game.gameStateProcessQueue, game.humanPlayerName, showVotingModal, isVoting]);
@@ -997,20 +996,25 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
             queue: game.gameStateProcessQueue,
             timestamp: new Date().toISOString()
         });
-        
-        setIsVoting(true);
-        console.log('🚨 CALLING HUMAN_PLAYER_VOTE API - This could trigger the loop!');
-        const { game: updatedGame, messages: newMessages } = await humanPlayerVote(gameId, targetPlayer, reason);
-        console.log('✅ Human vote API completed, closing modal and updating state');
-        addMessages(newMessages);
-        closeModal('voting');
 
-        // Update game state if callback is provided
-        if (onGameStateChange) {
-            console.log('📊 Updating parent game state after vote');
-            onGameStateChange({ game: updatedGame, messages: [] });
+        setIsVoting(true);
+        voteSubmittedRef.current = true;
+        try {
+            const { game: updatedGame, messages: newMessages } = await humanPlayerVote(gameId, targetPlayer, reason);
+            console.log('✅ Human vote API completed, closing modal and updating state');
+            addMessages(newMessages);
+
+            // Update game state if callback is provided
+            if (onGameStateChange) {
+                console.log('📊 Updating parent game state after vote');
+                onGameStateChange({ game: updatedGame, messages: [] });
+            }
+        } catch (error) {
+            console.error('❌ Human vote failed:', error);
+        } finally {
+            closeModal('voting');
+            setIsVoting(false);
         }
-        setIsVoting(false);
     };
 
     const handleCloseVotingModal = () => {
@@ -1020,7 +1024,7 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
     };
 
     const handleNightAction = async (targetPlayer: string, message: string, actionType?: 'protect' | 'kill') => {
-        console.log('🌙 HUMAN NIGHT ACTION SUBMISSION:', {
+        console.log('HUMAN NIGHT ACTION SUBMISSION:', {
             targetPlayer,
             message,
             actionType,
@@ -1031,21 +1035,22 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
         });
 
         setIsPerformingNightAction(true);
-        console.log('🚨 CALLING PERFORM_HUMAN_PLAYER_NIGHT_ACTION API');
+        try {
+            const { performHumanPlayerNightAction } = await import("@/app/api/bot-actions");
+            const { game: updatedGame, messages: newMessages } = await performHumanPlayerNightAction(gameId, targetPlayer, message, actionType);
+            console.log('Human night action API completed, closing modal and updating state');
+            addMessages(newMessages);
 
-        // We'll need to import this function
-        const { performHumanPlayerNightAction } = await import("@/app/api/bot-actions");
-        const { game: updatedGame, messages: newMessages } = await performHumanPlayerNightAction(gameId, targetPlayer, message, actionType);
-        console.log('✅ Human night action API completed, closing modal and updating state');
-        addMessages(newMessages);
-        closeModal('nightAction');
-
-        // Update game state if callback is provided
-        if (onGameStateChange) {
-            console.log('📊 Updating parent game state after night action');
-            onGameStateChange({ game: updatedGame, messages: [] });
+            // Update game state if callback is provided
+            if (onGameStateChange) {
+                onGameStateChange({ game: updatedGame, messages: [] });
+            }
+        } catch (error) {
+            console.error('Night action failed:', error);
+        } finally {
+            closeModal('nightAction');
+            setIsPerformingNightAction(false);
         }
-        setIsPerformingNightAction(false);
     };
 
     const handleCloseNightActionModal = () => {

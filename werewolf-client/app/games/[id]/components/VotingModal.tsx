@@ -37,11 +37,9 @@ export default function VotingModal({
 
     const votableParticipants = participants.filter(p => p.isAlive && !p.isHuman);
 
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
         if (selectedPlayer && reason.trim()) {
-            onVote(selectedPlayer, reason.trim());
-            setSelectedPlayer('');
-            setReason('');
+            await onVote(selectedPlayer, reason.trim());
         }
     };
 
@@ -59,7 +57,7 @@ export default function VotingModal({
         >
             <div className="mb-6">
                 <div className="mb-4">
-                    <label className="block theme-text-primary text-sm mb-2">Who do you think should be eliminated?</label>
+                    <label className="block theme-text-primary text-sm mb-2">Who do you think should be eliminated? <span className="text-red-400">*</span></label>
                     <select
                         className="w-full p-2 rounded bg-[rgb(var(--color-input-bg))] text-[rgb(var(--color-input-text))] border border-[rgb(var(--color-input-border))] focus:outline-none focus:ring-1 focus:ring-blue-500"
                         value={selectedPlayer}
@@ -76,7 +74,7 @@ export default function VotingModal({
                 </div>
 
                 <div className="mb-4">
-                    <label className="block theme-text-primary text-sm mb-2">Reason for your vote:</label>
+                    <label className="block theme-text-primary text-sm mb-2">Reason for your vote: <span className="text-red-400">*</span></label>
                     <textarea
                         className="w-full p-2 rounded bg-[rgb(var(--color-input-bg))] text-[rgb(var(--color-input-text))] border border-[rgb(var(--color-input-border))] focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder-[rgb(var(--color-input-placeholder))]"
                         rows={3}

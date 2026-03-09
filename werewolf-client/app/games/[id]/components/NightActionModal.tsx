@@ -90,18 +90,15 @@ export default function NightActionModal({
         }
     };
 
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
         if (selectedPlayer) {
             const finalMessage = message.trim() || '';
             // Include actionType only for Doctor (when kill ability might be used)
             if (currentRole === GAME_ROLES.DOCTOR) {
-                onAction(selectedPlayer, finalMessage, actionType);
+                await onAction(selectedPlayer, finalMessage, actionType);
             } else {
-                onAction(selectedPlayer, finalMessage);
+                await onAction(selectedPlayer, finalMessage);
             }
-            setSelectedPlayer('');
-            setMessage('');
-            setActionType('protect');  // Reset to default
         }
     };
 
@@ -124,7 +121,7 @@ export default function NightActionModal({
 
             <div className="mb-6">
                 <div className="mb-4">
-                    <label className="block theme-text-primary text-sm mb-2">{roleConfig.targetLabel}</label>
+                    <label className="block theme-text-primary text-sm mb-2">{roleConfig.targetLabel} <span className="text-red-400">*</span></label>
                     <select
                         className="w-full p-2 rounded bg-[rgb(var(--color-input-bg))] text-[rgb(var(--color-input-text))] border border-[rgb(var(--color-input-border))] focus:outline-none focus:ring-1 focus:ring-blue-500"
                         value={selectedPlayer}
