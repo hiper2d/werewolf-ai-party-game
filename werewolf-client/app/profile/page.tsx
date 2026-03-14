@@ -39,7 +39,7 @@ export default async function UserProfilePage({ searchParams }: PageProps) {
     const tierColorClass = userTier === USER_TIERS.API
         ? 'text-green-600 dark:text-green-400'
         : userTier === USER_TIERS.PAID
-            ? 'text-blue-600 dark:text-blue-400'
+            ? 'text-blue-400/70 dark:text-blue-300/60'
             : 'text-yellow-600 dark:text-yellow-400';
 
     return (

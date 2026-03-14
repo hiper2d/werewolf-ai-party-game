@@ -1,15 +1,30 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Image from 'next/image';
 import AuthButtons from '@/components/auth-buttons';
 import ThemeSwitcher from '@/app/components/ThemeSwitcher';
 import Link from "next/link";
 import {useSession} from "next-auth/react";
+import { getUserTier } from '@/app/api/user-actions';
+import type { UserTier } from '@/app/api/game-models';
+
+const tierConfig: Record<UserTier, { label: string; className: string }> = {
+    free: { label: 'Free', className: 'border theme-border theme-text-secondary' },
+    api: { label: 'API', className: 'border theme-border theme-text-secondary' },
+    paid: { label: 'Paid', className: 'border border-blue-800/40 text-blue-300/50' },
+};
 
 const NavBar = () => {
     const { data: session, status } = useSession();
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const [userTier, setUserTier] = useState<UserTier | null>(null);
+
+    useEffect(() => {
+        if (status === 'authenticated' && session?.user?.email) {
+            getUserTier(session.user.email).then(setUserTier).catch(() => {});
+        }
+    }, [status, session?.user?.email]);
 
     return (
         <header className="navbar-root py-4 px-6 flex items-center justify-between h-16 sticky top-0 z-50">
@@ -26,6 +41,11 @@ const NavBar = () => {
                 {status === 'authenticated' && (
                     <span className="font-medium hidden sm:inline">
                         {session.user?.name}
+                        {userTier && (
+                            <span className={`ml-2 text-xs px-1.5 py-0.5 rounded ${tierConfig[userTier].className}`}>
+                                {tierConfig[userTier].label}
+                            </span>
+                        )}
                     </span>
                 )}
             </div>
