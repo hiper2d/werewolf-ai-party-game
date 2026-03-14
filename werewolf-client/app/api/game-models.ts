@@ -60,11 +60,12 @@ export interface GameTokenUsage {
     gameMasterUsage: TokenUsage;
 }
 
-export type UserTier = 'free' | 'api';
+export type UserTier = 'free' | 'api' | 'paid';
 
 export const USER_TIERS = {
     FREE: 'free' as const,
     API: 'api' as const,
+    PAID: 'paid' as const,
 };
 
 export interface User {
@@ -74,13 +75,16 @@ export interface User {
     tier: UserTier;
     spendings?: UserMonthlySpending[];
     voiceProvider?: VoiceProvider; // User's preferred TTS voice provider
+    balance?: number; // USD balance for paid tier users
+    stripeCustomerId?: string; // Stripe customer ID for paid tier users
 }
 
 export interface UserMonthlySpending {
     period: string; // Format: YYYY-MM
-    amountUSD: number; // Total spending (sum of free + api, for backward compatibility)
+    amountUSD: number; // Total spending (sum of free + api + paid, for backward compatibility)
     freeAmountUSD?: number; // Spending while on free tier
     apiAmountUSD?: number; // Spending while on API tier (user's own keys)
+    paidAmountUSD?: number; // Spending while on paid tier (from balance)
 }
 
 export interface GamePreview {

@@ -15,6 +15,7 @@ export async function getApiKeysForUser(userId: string): Promise<ApiKeyMap> {
     if (tier === USER_TIERS.API) {
         return await getUserApiKeys(userId);
     } else {
+        // Both 'free' and 'paid' tiers use platform API keys
         return await getFreeTierApiKeys();
     }
 }

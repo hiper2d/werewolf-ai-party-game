@@ -1552,8 +1552,8 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
                         {gameControls}
                     </div>
 
-                    {/* Right group: icon buttons (Mic, Suggestion, Expand) - only when input is enabled */}
-                    {isInputEnabled() && (
+                    {/* Right group: icon buttons (Mic, Suggestion, Expand) - visible when input is enabled OR during recording/transcribing */}
+                    {(isInputEnabled() || isRecording || isTranscribing) && (
                         <div className="flex items-center gap-1">
                             {/* Microphone button */}
                             <button

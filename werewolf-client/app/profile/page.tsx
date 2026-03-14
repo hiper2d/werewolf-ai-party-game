@@ -1,35 +1,46 @@
 import React from 'react';
-import {redirect} from "next/navigation";
+import { redirect } from 'next/navigation';
 import Image from 'next/image';
-import ApiKeyManagement from './components/ApiKeyManagement';
-import FreeUserLimits from './components/FreeUserLimits';
-import VoiceProviderSelector from './components/VoiceProviderSelector';
-import {getUserApiKeys, getUser} from "@/app/api/user-actions";
-import {UserTier, USER_TIERS} from "@/app/api/game-models";
-import {VoiceProvider, getDefaultVoiceProvider} from "@/app/ai/voice-config";
-import { auth } from "@/auth";
+import TierSwitcher from './components/TierSwitcher';
+import ModelPricingTable from './components/ModelPricingTable';
+import VoiceInfoSection from './components/VoiceInfoSection';
+import SpendingsDisplay from './components/SpendingsDisplay';
+import { getUserApiKeys, getUser } from '@/app/api/user-actions';
+import { UserTier, USER_TIERS } from '@/app/api/game-models';
+import { auth } from '@/auth';
 
-export default async function UserProfilePage() {
+interface PageProps {
+    searchParams: Promise<{ tab?: string; payment?: string }>;
+}
+
+export default async function UserProfilePage({ searchParams }: PageProps) {
     const session = await auth();
     if (!session) {
         redirect('/?login=true&callbackUrl=%2Fprofile');
     }
 
+    const params = await searchParams;
+
     let user = null;
     let apiKeys = {};
     let userTier: UserTier = USER_TIERS.FREE;
-    let voiceProvider: VoiceProvider = getDefaultVoiceProvider();
+    let balance = 0;
 
     try {
         user = await getUser(session.user?.email!);
         apiKeys = await getUserApiKeys(session.user?.email!);
         userTier = user?.tier || USER_TIERS.FREE;
-        voiceProvider = user?.voiceProvider || getDefaultVoiceProvider();
+        balance = user?.balance || 0;
     } catch (error) {
         console.error('Error fetching user data:', error);
         userTier = USER_TIERS.FREE;
-        voiceProvider = getDefaultVoiceProvider();
     }
+
+    const tierColorClass = userTier === USER_TIERS.API
+        ? 'text-green-600 dark:text-green-400'
+        : userTier === USER_TIERS.PAID
+            ? 'text-blue-600 dark:text-blue-400'
+            : 'text-yellow-600 dark:text-yellow-400';
 
     return (
         <div className="flex flex-col lg:flex-row theme-text-primary">
@@ -45,7 +56,7 @@ export default async function UserProfilePage() {
                             <p>{session.user?.email}</p>
                             <p className="mt-1">
                                 <span className="font-semibold">Tier: </span>
-                                <span className={userTier === USER_TIERS.API ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}>
+                                <span className={tierColorClass}>
                                     {userTier.toUpperCase()}
                                 </span>
                             </p>
@@ -55,71 +66,40 @@ export default async function UserProfilePage() {
 
                 {/* Monthly Spendings */}
                 <div className="border-t theme-border-subtle pt-3">
-                    <h2 className="text-lg font-bold mb-2">Monthly Spendings</h2>
-                    <ul>
-                        {buildMonthlySpendings(user?.spendings ?? []).map(({ label, amount }) => (
-                            <li key={label} className="mb-2 flex justify-between text-sm theme-text-secondary">
-                                <span>{label}</span>
-                                <span className="font-semibold">{formatCurrency(amount)}</span>
-                            </li>
-                        ))}
-                    </ul>
+                    <SpendingsDisplay spendings={user?.spendings ?? []} />
                 </div>
             </div>
 
             {/* Right column - Main content */}
             <div className="flex-1 min-w-0 lg:pl-4">
-                <div className="flex flex-col">
-                    {userTier === USER_TIERS.API ? (
-                        <ApiKeyManagement initialApiKeys={apiKeys} userId={session.user?.email!} />
-                    ) : (
-                        <FreeUserLimits userId={session.user?.email!} />
-                    )}
-
-                    {/* Voice Provider - in main panel */}
-                    <div className="mt-6 border-t theme-border-subtle pt-6">
-                        <VoiceProviderSelector
-                            userId={session.user?.email!}
-                            initialProvider={voiceProvider}
-                        />
+                {/* Payment success banner */}
+                {params.payment === 'success' && (
+                    <div className="mb-4 p-3 rounded-lg bg-green-500/10 border border-green-500/30 text-green-700 dark:text-green-400 text-sm">
+                        Payment successful! Your balance has been updated.
                     </div>
+                )}
+
+                {/* Tier switcher with tab panels */}
+                <div className="mb-8">
+                    <TierSwitcher
+                        currentTier={userTier}
+                        userId={session.user?.email!}
+                        apiKeys={apiKeys}
+                        balance={balance}
+                        initialTab={params.tab}
+                    />
+                </div>
+
+                {/* Common sections */}
+                <div className="space-y-6 border-t theme-border-subtle pt-6">
+                    <ModelPricingTable />
+
+                    <div className="border-t theme-border-subtle pt-6">
+                        <VoiceInfoSection />
+                    </div>
+
                 </div>
             </div>
         </div>
     );
-}
-
-function buildMonthlySpendings(
-    spendings: Array<{ period: string; amountUSD: number }> = []
-) {
-    const now = new Date();
-    const dateFormatter = new Intl.DateTimeFormat('en-US', {
-        month: 'long',
-        year: 'numeric'
-    });
-
-    return Array.from({ length: 5 }, (_, index) => {
-        const referenceDate = new Date(Date.UTC(
-            now.getUTCFullYear(),
-            now.getUTCMonth() - index,
-            1
-        ));
-
-        const periodKey = `${referenceDate.getUTCFullYear()}-${String(referenceDate.getUTCMonth() + 1).padStart(2, '0')}`;
-        const match = spendings.find(entry => entry.period === periodKey);
-
-        return {
-            label: dateFormatter.format(referenceDate),
-            amount: match?.amountUSD ?? 0
-        };
-    });
-}
-
-function formatCurrency(amount: number): string {
-    return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-    }).format(amount || 0);
 }

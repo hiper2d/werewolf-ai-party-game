@@ -149,6 +149,27 @@ No AI frameworks — each vendor has its own agent built on their native SDK. A 
 
 5. **AI API Keys**: Users provide their own keys via the profile page after signing in.
 
+6. **Stripe** (optional, for paid tier):
+   - Create a [Stripe account](https://dashboard.stripe.com) and get your test API keys from **Developers > API keys** (use Test mode toggle)
+   - Add to `.env`:
+     ```
+     STRIPE_SECRET_KEY=sk_test_...
+     STRIPE_PUBLISHABLE_KEY=pk_test_...
+     STRIPE_WEBHOOK_SECRET=whsec_...
+     ```
+   - Install the Stripe CLI for local webhook forwarding:
+     ```bash
+     brew install stripe/stripe-cli/stripe
+     stripe login    # one-time setup
+     ```
+   - To get your local `STRIPE_WEBHOOK_SECRET`, run:
+     ```bash
+     stripe listen --forward-to localhost:4000/api/webhooks/stripe
+     ```
+     It prints the signing secret (`whsec_...`) on startup. Use that value in your `.env`.
+   - You only need to run `stripe listen` when testing the credit purchase flow locally. Normal gameplay with existing credits doesn't require it.
+   - Test mode uses fake money. Use card `4242 4242 4242 4242` (any future expiry, any CVC) for successful payments.
+
 ### Run
 
 ```bash

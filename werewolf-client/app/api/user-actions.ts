@@ -156,17 +156,22 @@ export async function updateUserMonthlySpending(
                 let freeAmount = record.freeAmountUSD || 0;
                 let apiAmount = record.apiAmountUSD || 0;
 
+                let paidAmount = record.paidAmountUSD || 0;
+
                 if (tier === 'free') {
                     freeAmount = parseFloat((freeAmount + normalizedAmount).toFixed(6));
                 } else if (tier === 'api') {
                     apiAmount = parseFloat((apiAmount + normalizedAmount).toFixed(6));
+                } else if (tier === 'paid') {
+                    paidAmount = parseFloat((paidAmount + normalizedAmount).toFixed(6));
                 }
 
                 return {
                     period: record.period,
                     amountUSD: newTotal,
                     freeAmountUSD: freeAmount,
-                    apiAmountUSD: apiAmount
+                    apiAmountUSD: apiAmount,
+                    paidAmountUSD: paidAmount
                 } as UserMonthlySpending;
             }
             return record;
@@ -177,7 +182,8 @@ export async function updateUserMonthlySpending(
                 period,
                 amountUSD: normalizedAmount,
                 freeAmountUSD: tier === 'free' ? normalizedAmount : 0,
-                apiAmountUSD: tier === 'api' ? normalizedAmount : 0
+                apiAmountUSD: tier === 'api' ? normalizedAmount : 0,
+                paidAmountUSD: tier === 'paid' ? normalizedAmount : 0
             };
             updatedSpendings.push(newRecord);
         }
@@ -241,7 +247,9 @@ export async function getUser(userId: string): Promise<User> {
             apiKeys: userData?.apiKeys || {},
             tier: userData?.tier || 'free',
             spendings: normalizeSpendings(userData?.spendings),
-            voiceProvider: userData?.voiceProvider || getDefaultVoiceProvider()
+            voiceProvider: userData?.voiceProvider || getDefaultVoiceProvider(),
+            balance: userData?.balance || 0,
+            stripeCustomerId: userData?.stripeCustomerId
         } as User;
     } catch (error: any) {
         console.error("Error fetching user: ", error);
@@ -279,4 +287,77 @@ export async function updateVoiceProvider(userId: string, provider: VoiceProvide
         console.error("Error updating voice provider: ", error);
         throw new Error(`Failed to update voice provider: ${error.message}`);
     }
+}
+
+export async function getUserBalance(userId: string): Promise<number> {
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+    try {
+        const userDoc = await db.collection('users').doc(userId).get();
+        if (!userDoc.exists) {
+            return 0;
+        }
+        const userData = userDoc.data();
+        return userData?.balance || 0;
+    } catch (error: any) {
+        console.error("Error fetching user balance: ", error);
+        throw new Error(`Failed to fetch user balance: ${error.message}`);
+    }
+}
+
+export async function addBalance(userId: string, amountUSD: number): Promise<void> {
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+    if (amountUSD <= 0) {
+        throw new Error('Amount must be positive');
+    }
+
+    const userRef = db.collection('users').doc(userId);
+    await db.runTransaction(async (transaction) => {
+        const userSnap = await transaction.get(userRef);
+        if (!userSnap.exists) {
+            throw new Error('User not found');
+        }
+        const currentBalance = userSnap.data()?.balance || 0;
+        const newBalance = parseFloat((currentBalance + amountUSD).toFixed(2));
+        transaction.update(userRef, { balance: newBalance });
+    });
+}
+
+export async function deductBalance(userId: string, amountUSD: number): Promise<boolean> {
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+    if (amountUSD <= 0) {
+        return true;
+    }
+
+    const userRef = db.collection('users').doc(userId);
+    let success = false;
+
+    await db.runTransaction(async (transaction) => {
+        const userSnap = await transaction.get(userRef);
+        if (!userSnap.exists) {
+            return;
+        }
+        const currentBalance = userSnap.data()?.balance || 0;
+        if (currentBalance < amountUSD) {
+            return;
+        }
+        const newBalance = parseFloat((currentBalance - amountUSD).toFixed(2));
+        transaction.update(userRef, { balance: newBalance });
+        success = true;
+    });
+
+    return success;
+}
+
+export async function setStripeCustomerId(userId: string, stripeCustomerId: string): Promise<void> {
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+    const userRef = db.collection('users').doc(userId);
+    await userRef.update({ stripeCustomerId });
 }

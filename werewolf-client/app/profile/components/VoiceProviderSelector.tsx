@@ -82,9 +82,6 @@ export default function VoiceProviderSelector({
                     );
                 })}
             </div>
-            {isUpdating && (
-                <p className="text-sm theme-text-secondary mt-2">Updating...</p>
-            )}
         </div>
     );
 }
