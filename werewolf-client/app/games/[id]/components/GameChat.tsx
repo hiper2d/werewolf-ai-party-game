@@ -405,6 +405,7 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
     const daySelectorRef = useRef<HTMLDivElement | null>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const messagesContainerRef = useRef<HTMLDivElement>(null);
     const [showScrollToTop, setShowScrollToTop] = useState(false);
     
     // Mention state
@@ -744,13 +745,15 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages, isProcessing]);
 
-    // Show/hide scroll-to-top button based on window scroll position
+    // Show/hide scroll-to-top button based on messages container scroll position
     useEffect(() => {
+        const container = messagesContainerRef.current;
+        if (!container) return;
         const handleScroll = () => {
-            setShowScrollToTop(window.scrollY > 300);
+            setShowScrollToTop(container.scrollTop > 300);
         };
-        window.addEventListener('scroll', handleScroll);
-        return () => window.removeEventListener('scroll', handleScroll);
+        container.addEventListener('scroll', handleScroll);
+        return () => container.removeEventListener('scroll', handleScroll);
     }, []);
 
     // Cleanup recording on component unmount
@@ -1339,8 +1342,8 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
     };
 
     return (
-        <div className="flex flex-col min-h-[calc(100vh-10rem)]">
-            <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+            <div className="flex items-center justify-between mb-4 flex-shrink-0">
                 <div className="flex items-center gap-2">
                     <span className="text-xl font-bold theme-text-primary">
                         {headerTitle}
@@ -1389,8 +1392,8 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
                 </div>
             )}
             {/* Error is shown inline at the bottom of the chat messages */}
-            {/* Messages area - grows to fill space, pushing input to bottom */}
-            <div className="flex-1 mb-4 p-2 theme-bg-card theme-border border rounded">
+            {/* Messages area - grows to fill space, scrolls internally */}
+            <div ref={messagesContainerRef} className="flex-1 mb-4 p-2 theme-bg-card theme-border border rounded overflow-y-auto">
                 {isLoadingMessages ? (
                     <div className="text-center theme-text-secondary text-sm py-4">
                         Loading Day {selectedDay}...
@@ -1488,7 +1491,7 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
             {showScrollToTop && (
                 <button
                     type="button"
-                    onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                    onClick={() => messagesContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' })}
                     className="fixed bottom-20 right-6 w-7 h-7 flex items-center justify-center rounded-full theme-bg-card theme-border border theme-text-secondary hover:opacity-80 shadow transition-colors z-20"
                     title="Scroll to top"
                 >
@@ -1499,31 +1502,32 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
             )}
 
             {/* Input area */}
-            <form onSubmit={sendMessage} className="sticky bottom-0 z-10 mt-auto bg-[rgb(var(--color-page-bg-start))] pt-1">
-                {isInputEnabled() && (
-                    <div className="relative">
+            <form onSubmit={sendMessage} className="flex-shrink-0 z-10 mt-auto bg-[rgb(var(--color-page-bg-start))] pt-1">
+                <div className="relative">
+                    {isInputEnabled() && (
                         <MentionDropdown
                             candidates={mentionCandidates}
                             selectedIndex={mentionState.selectedIndex}
                             onSelect={handleMentionSelect}
                             onClose={() => setMentionState(prev => ({ ...prev, isOpen: false }))}
                         />
-                        <textarea
-                            ref={textareaRef}
-                            value={newMessage}
-                            onChange={handleTextareaChange}
-                            onKeyDown={handleTextareaKeyDown}
-                            onFocus={() => setIsInputFocused(true)}
-                            onBlur={() => {
-                                // Delay to allow button clicks to register before hiding toolbar
-                                setTimeout(() => setIsInputFocused(false), 150);
-                            }}
-                            rows={textareaRows}
-                            className="w-full p-3 rounded bg-input border border-input-border text-input-text placeholder-input-placeholder focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                            placeholder={getInputPlaceholder()}
-                        />
-                    </div>
-                )}
+                    )}
+                    <textarea
+                        ref={textareaRef}
+                        value={newMessage}
+                        onChange={handleTextareaChange}
+                        onKeyDown={handleTextareaKeyDown}
+                        onFocus={() => setIsInputFocused(true)}
+                        onBlur={() => {
+                            // Delay to allow button clicks to register before hiding toolbar
+                            setTimeout(() => setIsInputFocused(false), 150);
+                        }}
+                        disabled={!isInputEnabled()}
+                        rows={textareaRows}
+                        className={`w-full p-3 rounded bg-input border border-input-border text-input-text placeholder-input-placeholder focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none ${!isInputEnabled() ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        placeholder={getInputPlaceholder()}
+                    />
+                </div>
 
                 {/* Toolbar row: text buttons left, icon buttons right */}
                 <div className={`flex items-center justify-between mt-1 ${isInputEnabled() ? (isInputFocused ? 'flex' : 'hidden lg:flex') : 'flex'}`}>
@@ -1560,25 +1564,29 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
                                 type="button"
                                 onClick={handleToggleRecording}
                                 disabled={!isMicrophoneEnabled() || isTranscribing}
-                                className={`h-10 w-10 transition-colors ${
+                                className={`h-10 w-10 !p-0 flex items-center justify-center transition-colors ${
                                     isRecording
-                                        ? `${buttonTransparentStyle} animate-pulse`
+                                        ? `${buttonTransparentStyle} border-red-500 bg-red-500/10 hover:bg-red-500/20 text-red-500`
                                         : buttonTransparentStyle
                                 } ${!isMicrophoneEnabled() || isTranscribing ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 title={
                                     isTranscribing
                                         ? "Transcribing audio..."
                                         : isRecording
-                                            ? "Stop recording and transcribe"
+                                            ? "Stop recording"
                                             : "Start voice recording"
                                 }
                             >
                                 {isTranscribing ? (
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin mx-auto">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin">
                                         <path d="M21 12a9 9 0 11-6.219-8.56"/>
                                     </svg>
+                                ) : isRecording ? (
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" className="animate-pulse">
+                                        <rect x="4" y="4" width="16" height="16" rx="2"/>
+                                    </svg>
                                 ) : (
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mx-auto">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                         <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
                                         <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
                                         <line x1="12" y1="19" x2="12" y2="23"/>
@@ -1593,11 +1601,11 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
                                     type="button"
                                     onClick={handleGetSuggestion}
                                     disabled={isGettingSuggestion}
-                                    className={`h-10 w-10 ${buttonTransparentStyle} ${isGettingSuggestion ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    className={`h-10 w-10 !p-0 flex items-center justify-center ${buttonTransparentStyle} ${isGettingSuggestion ? 'opacity-50 cursor-not-allowed' : ''}`}
                                     title={isGettingSuggestion ? "Getting suggestion..." : "Get AI suggestion for your response"}
                                 >
                                     {isGettingSuggestion ? (
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin mx-auto">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin">
                                             <path d="M21 12a9 9 0 11-6.219-8.56"/>
                                         </svg>
                                     ) : (
@@ -1610,7 +1618,7 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
                             <button
                                 type="button"
                                 onClick={() => setTextareaRows(prev => prev === 2 ? 10 : 2)}
-                                className={`h-10 w-10 ${buttonTransparentStyle}`}
+                                className={`h-10 w-10 !p-0 flex items-center justify-center ${buttonTransparentStyle}`}
                                 title="Expand/shrink text area"
                             >
                                 <span className="text-sm">

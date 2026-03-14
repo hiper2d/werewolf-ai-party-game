@@ -164,7 +164,7 @@ No AI frameworks — each vendor has its own agent built on their native SDK. A 
      ```
    - To get your local `STRIPE_WEBHOOK_SECRET`, run:
      ```bash
-     stripe listen --forward-to localhost:4000/api/webhooks/stripe
+     stripe listen --forward-to localhost:3000/api/webhooks/stripe
      ```
      It prints the signing secret (`whsec_...`) on startup. Use that value in your `.env`.
    - You only need to run `stripe listen` when testing the credit purchase flow locally. Normal gameplay with existing credits doesn't require it.

@@ -933,7 +933,7 @@ function GamePageContent({
     );
 
     return (
-        <div className="flex flex-col lg:flex-row theme-text-primary">
+        <div className="flex flex-col lg:flex-row theme-text-primary h-[calc(100dvh-5rem)] sm:h-[calc(100dvh-6rem)] lg:h-[calc(100dvh-7rem)]">
             {/* Fixed edge drawer toggle buttons (mobile/tablet only) */}
             <button
                 className="fixed left-0 top-1/2 -translate-y-1/2 z-40 lg:hidden bg-[rgb(var(--color-card-bg))] border theme-border rounded-r-lg p-2 shadow-md"
@@ -963,12 +963,12 @@ function GamePageContent({
             </button>
 
             {/* Left column - Game info and participants (desktop only) */}
-            <div className="hidden lg:flex lg:w-1/5 lg:flex-col lg:sticky lg:top-20 lg:h-[calc(100vh-5rem)] lg:overflow-auto hide-scrollbar">
+            <div className="hidden lg:flex lg:w-1/5 lg:flex-col lg:h-full lg:overflow-auto hide-scrollbar">
                 {leftPanelContent}
             </div>
 
             {/* Center - Chat */}
-            <div className="flex-1 min-w-0 lg:px-4">
+            <div className="flex-1 min-w-0 min-h-0 flex flex-col lg:px-4">
                 <GameChat
                     gameId={game.id}
                     game={game}
@@ -983,7 +983,7 @@ function GamePageContent({
             </div>
 
             {/* Right column - Queue Info (desktop only) */}
-            <div className="hidden lg:flex lg:w-1/5 lg:flex-col lg:sticky lg:top-20 lg:h-[calc(100vh-5rem)] lg:overflow-auto hide-scrollbar">
+            <div className="hidden lg:flex lg:w-1/5 lg:flex-col lg:h-full lg:overflow-auto hide-scrollbar">
                 {rightPanelContent}
             </div>
 
