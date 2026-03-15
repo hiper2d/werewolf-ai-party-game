@@ -4,8 +4,10 @@ import { auth } from "@/auth";
 import { getUserApiKeys } from "@/app/api/user-actions";
 import { GoogleGenAI } from "@google/genai";
 import { API_KEY_CONSTANTS } from "@/app/ai/ai-models";
-import { updateUserMonthlySpending } from "@/app/api/user-actions";
+import { updateUserMonthlySpending, deductBalance } from "@/app/api/user-actions";
 import { recordGameCost, getGameTier } from "@/app/api/cost-tracking";
+import { USER_TIERS } from "@/app/api/game-models";
+import { PAID_TIER_MARKUP } from "@/app/config/credit-packages";
 
 export interface GoogleTTSOptions {
   voiceName: string;       // e.g., "Kore", "Puck"
@@ -157,6 +159,13 @@ export async function generateGoogleSpeech(
     const cost = calculateGoogleTtsCost(text.length);
     if (cost > 0) {
       const tier = await getGameTier(options.gameId);
+      if (tier === USER_TIERS.PAID) {
+        const chargedAmount = parseFloat((cost * (1 + PAID_TIER_MARKUP)).toFixed(6));
+        const success = await deductBalance(session.user.email, chargedAmount);
+        if (!success) {
+          throw new Error('Insufficient balance. Please add funds on your profile page to continue playing.');
+        }
+      }
       await updateUserMonthlySpending(session.user.email, cost, tier);
       if (options.gameId) {
         await recordGameCost(options.gameId, cost);

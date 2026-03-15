@@ -4,7 +4,6 @@ import React, { useState } from 'react';
 import ApiKeyList from './ApiKeyList';
 import { ApiKeyMap, UserTier } from '@/app/api/game-models';
 import { updateUserTier } from '@/app/api/user-actions';
-import { useRouter } from 'next/navigation';
 interface ApiTierPanelProps {
     userId: string;
     currentTier: UserTier;
@@ -13,7 +12,6 @@ interface ApiTierPanelProps {
 
 export default function ApiTierPanel({ userId, currentTier, apiKeys }: ApiTierPanelProps) {
     const [isLoading, setIsLoading] = useState(false);
-    const router = useRouter();
     const isCurrentTier = currentTier === 'api';
 
     const handleSwitchTier = async () => {
@@ -21,7 +19,7 @@ export default function ApiTierPanel({ userId, currentTier, apiKeys }: ApiTierPa
         setIsLoading(true);
         try {
             await updateUserTier(userId, 'api');
-            router.refresh();
+            window.location.reload();
         } catch (error) {
             console.error('Failed to switch tier:', error);
             alert('Failed to switch tier. Please try again.');

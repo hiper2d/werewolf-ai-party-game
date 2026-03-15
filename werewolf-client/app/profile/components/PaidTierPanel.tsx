@@ -5,7 +5,6 @@ import { UserTier } from '@/app/api/game-models';
 import { updateUserTier } from '@/app/api/user-actions';
 import { createCheckoutSession } from '@/app/api/stripe-actions';
 import { CREDIT_PACKAGES, PAID_TIER_MARKUP } from '@/app/config/credit-packages';
-import { useRouter } from 'next/navigation';
 interface PaidTierPanelProps {
     userId: string;
     currentTier: UserTier;
@@ -24,7 +23,6 @@ function formatCurrency(amount: number): string {
 export default function PaidTierPanel({ userId, currentTier, balance }: PaidTierPanelProps) {
     const [isLoading, setIsLoading] = useState(false);
     const [buyingPackage, setBuyingPackage] = useState<string | null>(null);
-    const router = useRouter();
     const isCurrentTier = currentTier === 'paid';
     const markupPercent = Math.round(PAID_TIER_MARKUP * 100);
 
@@ -33,7 +31,7 @@ export default function PaidTierPanel({ userId, currentTier, balance }: PaidTier
         setIsLoading(true);
         try {
             await updateUserTier(userId, 'paid');
-            router.refresh();
+            window.location.reload();
         } catch (error) {
             console.error('Failed to switch tier:', error);
             alert('Failed to switch tier. Please try again.');

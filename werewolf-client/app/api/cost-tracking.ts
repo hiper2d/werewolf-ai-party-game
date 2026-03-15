@@ -1,6 +1,7 @@
 import {db} from "@/firebase/server";
-import {Game, TokenUsage, UserTier} from "@/app/api/game-models";
-import {updateUserMonthlySpending} from "@/app/api/user-actions";
+import {Game, TokenUsage, UserTier, USER_TIERS} from "@/app/api/game-models";
+import {updateUserMonthlySpending, deductBalance} from "@/app/api/user-actions";
+import {PAID_TIER_MARKUP} from "@/app/config/credit-packages";
 
 type TokenUsageInput = Partial<TokenUsage> | null | undefined;
 
@@ -30,6 +31,15 @@ async function applyUserSpending(
     }
     if (!(amountUSD > 0)) {
         return;
+    }
+
+    // For paid tier, deduct model cost + markup from user balance
+    if (tier === USER_TIERS.PAID) {
+        const chargedAmount = parseFloat((amountUSD * (1 + PAID_TIER_MARKUP)).toFixed(6));
+        const success = await deductBalance(userEmail, chargedAmount);
+        if (!success) {
+            throw new Error('Insufficient balance. Please add funds on your profile page to continue playing.');
+        }
     }
 
     await updateUserMonthlySpending(userEmail, amountUSD, tier);

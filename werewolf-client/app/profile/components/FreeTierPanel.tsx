@@ -4,7 +4,6 @@ import React, { useState } from 'react';
 import { SupportedAiModels } from '@/app/ai/ai-models';
 import { UserTier } from '@/app/api/game-models';
 import { updateUserTier } from '@/app/api/user-actions';
-import { useRouter } from 'next/navigation';
 
 interface FreeTierPanelProps {
     userId: string;
@@ -13,7 +12,6 @@ interface FreeTierPanelProps {
 
 export default function FreeTierPanel({ userId, currentTier }: FreeTierPanelProps) {
     const [isLoading, setIsLoading] = useState(false);
-    const router = useRouter();
     const isCurrentTier = currentTier === 'free';
 
     const allModels = Object.entries(SupportedAiModels).map(([modelName, config]) => ({
@@ -26,7 +24,7 @@ export default function FreeTierPanel({ userId, currentTier }: FreeTierPanelProp
         setIsLoading(true);
         try {
             await updateUserTier(userId, 'free');
-            router.refresh();
+            window.location.reload();
         } catch (error) {
             console.error('Failed to switch tier:', error);
             alert('Failed to switch tier. Please try again.');

@@ -31,7 +31,7 @@ import {auth} from "@/auth";
 import {AgentFactory} from "@/app/ai/agent-factory";
 import {STORY_SYSTEM_PROMPT, STORY_USER_PROMPT} from "@/app/ai/prompts/story-gen-prompts";
 import {getUserTierAndApiKeys} from "@/app/utils/tier-utils";
-import {getUserTier, getVoiceProvider, updateUserMonthlySpending} from "@/app/api/user-actions";
+import {getUserTier, getUserBalance, getVoiceProvider, updateUserMonthlySpending} from "@/app/api/user-actions";
 import {getDefaultVoiceProvider, getVoiceConfig} from "@/app/ai/voice-config";
 import {normalizeSpendings} from "@/app/utils/spending-utils";
 import {convertToAIMessage} from "@/app/utils/message-utils";
@@ -142,6 +142,14 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
     }
 
     const {tier, apiKeys} = await getUserTierAndApiKeys(session.user.email);
+
+    // Enforce minimum balance for paid-tier users
+    if (tier === USER_TIERS.PAID) {
+        const balance = await getUserBalance(session.user.email);
+        if (balance <= 0) {
+            throw new Error('Insufficient balance. Please add funds on your profile page before starting a game.');
+        }
+    }
 
     // Enforce daily game creation limit for free-tier users
     if (tier === USER_TIERS.FREE) {

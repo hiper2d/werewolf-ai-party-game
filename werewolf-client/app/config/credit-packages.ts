@@ -13,6 +13,12 @@ export const CREDIT_PACKAGES: CreditPackage[] = [
         stripePriceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_1 || '',
     },
     {
+        id: 'medium-small',
+        amountUSD: 3,
+        label: '$3.00',
+        stripePriceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_3 || '',
+    },
+    {
         id: 'medium',
         amountUSD: 5,
         label: '$5.00',
@@ -20,9 +26,9 @@ export const CREDIT_PACKAGES: CreditPackage[] = [
     },
     {
         id: 'large',
-        amountUSD: 20,
-        label: '$20.00',
-        stripePriceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_20 || '',
+        amountUSD: 10,
+        label: '$10.00',
+        stripePriceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_10 || '',
     },
 ];
 

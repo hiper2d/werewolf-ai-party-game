@@ -5,8 +5,10 @@ import { getUserApiKeys } from "@/app/api/user-actions";
 import { OpenAI } from "openai";
 import { API_KEY_CONSTANTS, AUDIO_MODEL_CONSTANTS } from "@/app/ai/ai-models";
 import { calculateOpenAITtsCost } from "@/app/utils/pricing";
-import { updateUserMonthlySpending } from "@/app/api/user-actions";
+import { updateUserMonthlySpending, deductBalance } from "@/app/api/user-actions";
 import { recordGameCost, getGameTier } from "@/app/api/cost-tracking";
+import { USER_TIERS } from "@/app/api/game-models";
+import { PAID_TIER_MARKUP } from "@/app/config/credit-packages";
 import { VoiceProvider } from "@/app/ai/voice-config";
 import { generateGoogleSpeech, GoogleTTSOptions } from "@/app/api/google-tts-actions";
 
@@ -105,6 +107,13 @@ export async function generateSpeech(
     const cost = calculateOpenAITtsCost(text.length);
     if (cost > 0) {
       const tier = await getGameTier(options.gameId);
+      if (tier === USER_TIERS.PAID) {
+        const chargedAmount = parseFloat((cost * (1 + PAID_TIER_MARKUP)).toFixed(6));
+        const success = await deductBalance(session.user.email, chargedAmount);
+        if (!success) {
+          throw new Error('Insufficient balance. Please add funds on your profile page to continue playing.');
+        }
+      }
       await updateUserMonthlySpending(session.user.email, cost, tier);
       if (options.gameId) {
         await recordGameCost(options.gameId, cost);
