@@ -31,7 +31,8 @@ import {auth} from "@/auth";
 import {AgentFactory} from "@/app/ai/agent-factory";
 import {STORY_SYSTEM_PROMPT, STORY_USER_PROMPT} from "@/app/ai/prompts/story-gen-prompts";
 import {getUserTierAndApiKeys} from "@/app/utils/tier-utils";
-import {getUserTier, getUserBalance, getVoiceProvider, updateUserMonthlySpending} from "@/app/api/user-actions";
+import {getUserTier, getUserBalance, getVoiceProvider, updateUserMonthlySpending, deductBalance} from "@/app/api/user-actions";
+import {PAID_TIER_MARKUP} from "@/app/config/credit-packages";
 import {getDefaultVoiceProvider, getVoiceConfig} from "@/app/ai/voice-config";
 import {normalizeSpendings} from "@/app/utils/spending-utils";
 import {convertToAIMessage} from "@/app/utils/message-utils";
@@ -252,7 +253,17 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
         throw new Error('Failed to get AI response');
     }
 
+    logger.info(`Preview token usage: ${JSON.stringify(tokenUsage)}, tier: ${tier}`);
     if (tokenUsage) {
+        // For paid tier, deduct preview cost + markup from user balance
+        if (tier === USER_TIERS.PAID && tokenUsage.costUSD > 0) {
+            const chargedAmount = parseFloat((tokenUsage.costUSD * (1 + PAID_TIER_MARKUP)).toFixed(6));
+            logger.info(`Paid tier preview: deducting ${chargedAmount} from balance for user ${session.user.email}`);
+            const success = await deductBalance(session.user.email, chargedAmount);
+            if (!success) {
+                throw new Error('Insufficient balance. Please add funds on your profile page before starting a game.');
+            }
+        }
         await updateUserMonthlySpending(session.user.email, tokenUsage.costUSD, tier);
     }
     const defaultPlayerCandidates = getCandidateModelsForTier(tier);

@@ -7,9 +7,7 @@
   - Past days voting results (who voted for whom, in what order; the reasons can be omitted)
   - Past nights results (who died and how, what else happened)
 - Add game rules page. Add hints to roles on the game prev
-- Add payments
 - Add fast Kimi models
-- Make sure errors are shown on UI
 - Add Google voices
 - Need to refactor agent answer type determination in parseResponseToObj function. It doesn't use types from
 - When bot votes or speaks, the scroll is not moving on UI
