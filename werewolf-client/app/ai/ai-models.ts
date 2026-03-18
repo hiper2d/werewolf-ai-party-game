@@ -5,7 +5,7 @@
  * and pricing information for all supported AI providers.
  * 
  * All model definitions are actively used and up-to-date.
- * Pricing is updated as of January 2025.
+ * Pricing is updated as of March 2026.
  */
 
 export const API_KEY_CONSTANTS = {
@@ -38,7 +38,6 @@ export const LLM_CONSTANTS = {
     DEEPSEEK_CHAT: 'deepseek-chat',
     DEEPSEEK_REASONER: 'deepseek-reasoner',
     GPT_5: 'gpt',
-    GPT_5_4: 'gpt-5.4',
     GPT_5_MINI: 'gpt-mini',
     GEMINI_3_PRO: 'gemini-pro',
     GEMINI_3_FLASH: 'gemini-flash',
@@ -181,8 +180,8 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
 
     // Models with always-on reasoning
     [LLM_CONSTANTS.GPT_5]: {
-        displayName: 'GPT-5.3',
-        modelApiName: 'gpt-5.3-chat-latest',
+        displayName: 'GPT-5.4',
+        modelApiName: 'gpt-5.4',
         apiKeyName: API_KEY_CONSTANTS.OPENAI,
         hasThinking: true,
         temperature: 1,
@@ -191,20 +190,9 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
             maxBotsPerGame: 1
         }
     },
-    [LLM_CONSTANTS.GPT_5_4]: {
-        displayName: 'GPT-5.4',
-        modelApiName: 'gpt-5.4',
-        apiKeyName: API_KEY_CONSTANTS.OPENAI,
-        hasThinking: true,
-        temperature: 1,
-        freeTier: {
-            available: false,
-            maxBotsPerGame: 0
-        }
-    },
     [LLM_CONSTANTS.GPT_5_MINI]: {
-        displayName: 'GPT-5-mini',
-        modelApiName: 'gpt-5-mini',
+        displayName: 'GPT-5.4-mini',
+        modelApiName: 'gpt-5.4-mini',
         apiKeyName: API_KEY_CONSTANTS.OPENAI,
         hasThinking: true,
         temperature: 1,
@@ -384,24 +372,19 @@ export interface ModelPricing {
 /**
  * Centralized pricing configuration for all AI models
  * All prices are per million (1,000,000) tokens
- * Updated as of January 2025
+ * Updated as of March 2026
  */
 export const MODEL_PRICING: Record<string, ModelPricing> = {
     // OpenAI models
     [SupportedAiModels[LLM_CONSTANTS.GPT_5].modelApiName]: {
-        inputPrice: 1.750,
-        outputPrice: 14.000,
-        cacheHitPrice: 0.175
-    },
-    [SupportedAiModels[LLM_CONSTANTS.GPT_5_4].modelApiName]: {
         inputPrice: 2.500,
         outputPrice: 15.000,
         cacheHitPrice: 0.250
     },
     [SupportedAiModels[LLM_CONSTANTS.GPT_5_MINI].modelApiName]: {
-        inputPrice: 0.250,
-        outputPrice: 2.000,
-        cacheHitPrice: 0.025
+        inputPrice: 0.750,
+        outputPrice: 4.500,
+        cacheHitPrice: 0.075
     },
 
     // DeepSeek models (both models have the same pricing)
