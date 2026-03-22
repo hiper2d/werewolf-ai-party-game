@@ -1630,7 +1630,7 @@ async function performHumanPlayerNightActionImpl(gameId: string, targetPlayer: s
             id: null,
             recipientName: recipient,
             authorName: game.humanPlayerName,
-            msg: { target: targetPlayer, reasoning: message, ...(currentRole === GAME_ROLES.DOCTOR && actionType ? { action_type: actionType } : {}) },
+            msg: { target: targetPlayer, reasoning: message, ...((currentRole === GAME_ROLES.DOCTOR || currentRole === GAME_ROLES.DETECTIVE) && actionType ? { action_type: actionType } : {}) },
             messageType: messageType,
             day: game.currentDay,
             timestamp: Date.now()
@@ -1639,9 +1639,9 @@ async function performHumanPlayerNightActionImpl(gameId: string, targetPlayer: s
         // Save night action message to database
         const savedNightActionMessage = await addMessageToChatAndSaveToDb(nightActionMessage, gameId);
         
-        // Update night results with the target (include actionType for doctor's kill ability)
+        // Update night results with the target (include actionType for doctor's/detective's kill ability)
         const nightResultEntry: Record<string, any> = { target: targetPlayer };
-        if (currentRole === GAME_ROLES.DOCTOR && actionType) {
+        if ((currentRole === GAME_ROLES.DOCTOR || currentRole === GAME_ROLES.DETECTIVE) && actionType) {
             nightResultEntry.actionType = actionType;
         }
         const updatedNightResults = {
@@ -1649,12 +1649,17 @@ async function performHumanPlayerNightActionImpl(gameId: string, targetPlayer: s
             [currentRole]: nightResultEntry
         };
 
-        // If doctor used kill ability, mark it as used
+        // If doctor or detective used kill ability, mark it as used
         let oneTimeAbilitiesUpdate: Record<string, any> | undefined;
         if (currentRole === GAME_ROLES.DOCTOR && actionType === 'kill') {
             oneTimeAbilitiesUpdate = {
                 ...(game.oneTimeAbilitiesUsed || {}),
                 doctorKill: true
+            };
+        } else if (currentRole === GAME_ROLES.DETECTIVE && actionType === 'kill') {
+            oneTimeAbilitiesUpdate = {
+                ...(game.oneTimeAbilitiesUsed || {}),
+                detectiveKill: true
             };
         }
 

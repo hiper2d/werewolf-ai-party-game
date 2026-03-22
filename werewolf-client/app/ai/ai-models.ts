@@ -180,8 +180,8 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
 
     // Models with always-on reasoning
     [LLM_CONSTANTS.GPT_5]: {
-        displayName: 'GPT-5.4',
-        modelApiName: 'gpt-5.4',
+        displayName: 'GPT-5',
+        modelApiName: 'gpt-5',
         apiKeyName: API_KEY_CONSTANTS.OPENAI,
         hasThinking: true,
         temperature: 1,
@@ -191,8 +191,8 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         }
     },
     [LLM_CONSTANTS.GPT_5_MINI]: {
-        displayName: 'GPT-5.4-mini',
-        modelApiName: 'gpt-5.4-mini',
+        displayName: 'GPT-5-mini',
+        modelApiName: 'gpt-5-mini',
         apiKeyName: API_KEY_CONSTANTS.OPENAI,
         hasThinking: true,
         temperature: 1,

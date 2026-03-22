@@ -366,7 +366,20 @@ You have discovered a ONE-TIME ability: You can choose to KILL a player instead 
         targetLabel: 'Who do you want to investigate tonight?',
         messageLabel: 'Message to other detectives:',
         messagePlaceholder: 'Share your thoughts...',
-        submitButtonText: 'Investigate Target'
+        submitButtonText: 'Investigate Target',
+        oneTimeAbilities: {
+            kill: {
+                description: "Detective's Kill - eliminate one player instead of investigating",
+                promptAddition: `
+
+**ONE-TIME SPECIAL ABILITY - DETECTIVE'S KILL:**
+You have discovered a ONE-TIME ability: You can choose to KILL a player instead of investigating them tonight.
+- This ability can only be used ONCE per game
+- If you choose to kill, your target will die (unless they are abducted by the Maniac)
+- You must decide: INVESTIGATE someone OR KILL someone - you cannot do both
+- After using this kill ability, you will only have the regular investigation ability for the rest of the game`
+            }
+        }
     },
     [GAME_ROLES.VILLAGER]: {
         name: 'Villager',

@@ -27,13 +27,20 @@ export default function NightActionModal({
     const isOpen = isModalOpen('nightAction');
     const [selectedPlayer, setSelectedPlayer] = useState<string>('');
     const [message, setMessage] = useState<string>('');
-    const [actionType, setActionType] = useState<'protect' | 'kill'>('protect');
+    const [actionType, setActionType] = useState<'protect' | 'kill' | 'investigate'>(() => {
+        if (currentRole === GAME_ROLES.DETECTIVE) return 'investigate';
+        return 'protect';
+    });
 
     if (!isOpen) return null;
 
     // Check if Doctor's kill ability is available
     const isDoctorWithKillAbility = currentRole === GAME_ROLES.DOCTOR &&
         !game.oneTimeAbilitiesUsed?.doctorKill;
+
+    // Check if Detective's kill ability is available
+    const isDetectiveWithKillAbility = currentRole === GAME_ROLES.DETECTIVE &&
+        !game.oneTimeAbilitiesUsed?.detectiveKill;
 
     const roleConfig = ROLE_CONFIGS[currentRole];
     if (!roleConfig) {
@@ -93,9 +100,11 @@ export default function NightActionModal({
     const handleSubmit = async () => {
         if (selectedPlayer) {
             const finalMessage = message.trim() || '';
-            // Include actionType only for Doctor (when kill ability might be used)
-            if (currentRole === GAME_ROLES.DOCTOR) {
-                await onAction(selectedPlayer, finalMessage, actionType);
+            // Include actionType for Doctor and Detective when kill is selected
+            if (currentRole === GAME_ROLES.DOCTOR && isDoctorWithKillAbility) {
+                await onAction(selectedPlayer, finalMessage, actionType as 'protect' | 'kill');
+            } else if (currentRole === GAME_ROLES.DETECTIVE && actionType === 'kill') {
+                await onAction(selectedPlayer, finalMessage, 'kill');
             } else {
                 await onAction(selectedPlayer, finalMessage);
             }
@@ -105,7 +114,7 @@ export default function NightActionModal({
     const handleClose = () => {
         setSelectedPlayer('');
         setMessage('');
-        setActionType('protect');  // Reset to default
+        setActionType(currentRole === GAME_ROLES.DETECTIVE ? 'investigate' : 'protect');  // Reset to default
         onClose();
     };
 
@@ -181,6 +190,50 @@ export default function NightActionModal({
                     </div>
                 )}
 
+                {/* Detective's action type toggle - only show when kill ability is available */}
+                {isDetectiveWithKillAbility && (
+                    <div className="mb-4 p-3 rounded border border-[rgb(var(--color-input-border))] bg-[rgb(var(--color-input-bg))]">
+                        <label className="block theme-text-primary text-sm mb-2 font-semibold">
+                            Choose your action:
+                        </label>
+                        <div className="flex space-x-4">
+                            <label className="flex items-center cursor-pointer">
+                                <input
+                                    type="radio"
+                                    name="detectiveAction"
+                                    value="investigate"
+                                    checked={actionType === 'investigate'}
+                                    onChange={() => setActionType('investigate')}
+                                    disabled={isSubmitting}
+                                    className="mr-2"
+                                />
+                                <span className="theme-text-primary">
+                                    Investigate
+                                </span>
+                            </label>
+                            <label className="flex items-center cursor-pointer">
+                                <input
+                                    type="radio"
+                                    name="detectiveAction"
+                                    value="kill"
+                                    checked={actionType === 'kill'}
+                                    onChange={() => setActionType('kill')}
+                                    disabled={isSubmitting}
+                                    className="mr-2"
+                                />
+                                <span className="text-red-400">
+                                    Kill (One-Time)
+                                </span>
+                            </label>
+                        </div>
+                        {actionType === 'kill' && (
+                            <p className="text-xs text-red-400 mt-2">
+                                Warning: This is a ONE-TIME ability. Once used, you cannot use it again.
+                            </p>
+                        )}
+                    </div>
+                )}
+
                 <div className="mb-4">
                     <label className="block theme-text-primary text-sm mb-2">{getMessageLabel()} <span className="text-xs theme-text-secondary font-normal">(Optional)</span></label>
                     <textarea
@@ -210,7 +263,9 @@ export default function NightActionModal({
                     {isSubmitting ? 'Submitting...' : (
                         currentRole === GAME_ROLES.DOCTOR && actionType === 'kill'
                             ? "Doctor's Mistake (Kill)"
-                            : roleConfig.submitButtonText
+                            : currentRole === GAME_ROLES.DETECTIVE && actionType === 'kill'
+                                ? "Detective's Kill"
+                                : roleConfig.submitButtonText
                     )}
                 </button>
             </div>
