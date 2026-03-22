@@ -227,13 +227,14 @@ export interface Game {
     gameStateParamQueue: Array<string>; // some states require a queue of params, usually bot names
     gameStateProcessQueue: Array<string>; // some states need to keep intermediate results
     errorState?: SystemErrorMessage | null; // Persistent error state stored in the game object
-    nightResults?: Record<string, { target: string; actionType?: string }>; // Dynamic night results for each role that has night actions
-    previousNightResults?: Record<string, { target: string; actionType?: string }>; // Previous night's results for reference
+    nightResults?: Record<string, { target: string; actionType?: string; narrativeHint?: string }>; // Dynamic night results for each role that has night actions
+    previousNightResults?: Record<string, { target: string; actionType?: string; narrativeHint?: string }>; // Previous night's results for reference
     messageCounter?: number; // Counter for generating incremental message IDs
     dayActivityCounter?: Record<string, number>; // Track number of messages each bot has sent during current day
     gameMasterTokenUsage?: TokenUsage; // Track token usage for the Game Master only
     totalGameCost?: number; // Total cost in USD for all AI calls in this game (bots + game master)
     createdAt?: number; // UTC timestamp when the game was created
+    expireAt?: any; // Firestore Timestamp for TTL auto-deletion (30 days after creation)
     ownerEmail: string; // Email of the user who created this game
     createdWithTier: UserTier; // Store the user's tier at the time the game was created
     votingHistory?: VotingDayResult[]; // History of voting results for each day

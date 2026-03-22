@@ -53,28 +53,65 @@ export default async function RulesPage() {
             {/* Game Phases */}
             <section className="theme-bg-card theme-border border rounded-lg p-6 theme-shadow mb-6">
                 <h2 className="text-2xl font-semibold mb-4">Game Phases</h2>
+                <p className="theme-text-secondary text-sm mb-4">
+                    The game alternates between Day and Night phases, starting with Day.
+                    It continues until one team achieves victory.
+                </p>
                 <div className="space-y-4">
                     <div>
                         <h3 className="text-lg font-semibold mb-1">1. Day Discussion</h3>
                         <p className="theme-text-secondary text-sm">
-                            All players discuss who they think the werewolves are. Bots share observations,
-                            make accusations, and defend themselves. You can send messages to participate
-                            in the discussion. After enough messages have been exchanged, voting begins automatically.
+                            All alive players discuss who they think the werewolves are. Players can say
+                            anything — there are no limitations, and it doesn&apos;t have to be true.
+                            Nobody has to believe you. After a certain number of messages, the human player
+                            can trigger the voting. Voting can also be triggered automatically when the
+                            discussion reaches a message limit.
                         </p>
                     </div>
                     <div>
                         <h3 className="text-lg font-semibold mb-1">2. Voting</h3>
                         <p className="theme-text-secondary text-sm">
-                            Each player votes to eliminate one suspect. The player with the most votes is
-                            eliminated and their role is revealed. If there is a tie, no one is eliminated.
+                            Each alive player votes for exactly one other alive player. The order is fixed
+                            but arbitrary — no one is allowed to skip and must vote when it&apos;s their turn.
+                            The player with the most votes is eliminated and their role is revealed. In case
+                            of a tie, the Game Master decides who dies randomly.
                         </p>
                     </div>
                     <div>
                         <h3 className="text-lg font-semibold mb-1">3. Night</h3>
-                        <p className="theme-text-secondary text-sm">
-                            Special roles act in order: the Maniac abducts a player (blocking their actions),
-                            the Werewolves choose a victim to eliminate, the Doctor protects someone, and the
-                            Detective investigates a player. Results are revealed the next morning.
+                        <p className="theme-text-secondary text-sm mb-2">
+                            During the night, werewolves and villagers with special roles take their turns
+                            in a predefined order:
+                        </p>
+                        <ol className="list-decimal list-inside theme-text-secondary text-sm space-y-2 ml-2">
+                            <li>
+                                <span className="font-semibold theme-text-primary">Maniac</span> — Picks any
+                                other alive player to abduct for the night. The abducted player cannot perform
+                                any actions and cannot be targeted by other players (all attempts fail). If the
+                                Maniac dies during the night, the abducted player also dies. Abducting a werewolf
+                                has no effect, unless it is the last alive werewolf — in that case, the werewolf
+                                skips their turn.
+                            </li>
+                            <li>
+                                <span className="font-semibold theme-text-primary">Werewolves</span> — They have
+                                a short private chat, then decide who to target. If nobody saves the target, they die.
+                            </li>
+                            <li>
+                                <span className="font-semibold theme-text-primary">Doctor</span> — Picks an alive
+                                player to heal (including themselves). The healed player cannot die this night for
+                                any reason. Cannot heal the same player two nights in a row. Also has a one-per-game
+                                ability to kill a target instead of healing.
+                            </li>
+                            <li>
+                                <span className="font-semibold theme-text-primary">Detective</span> — Picks an alive
+                                player to either check or kill (one-time ability). If checking, the Game Master reveals
+                                whether the target is good or bad without revealing names or giving hints. All villagers
+                                except the Maniac are good. All werewolves and the Maniac are bad.
+                            </li>
+                        </ol>
+                        <p className="theme-text-secondary text-sm mt-2">
+                            After all roles act, the Game Master announces who died and provides a high-level
+                            summary of what happened. Then the next day begins.
                         </p>
                     </div>
                 </div>

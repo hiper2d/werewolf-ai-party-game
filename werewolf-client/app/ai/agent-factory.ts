@@ -69,23 +69,31 @@ export class AgentFactory {
         }
     }
 
+    // Map deprecated model identifiers to their current equivalents
+    private static readonly DEPRECATED_MODEL_MAP: Record<string, string> = {
+        'gpt-5.4': LLM_CONSTANTS.GPT_5,
+    };
+
     private static validateLlmTypeAndGet(llmType: string): string {
+        // Migrate deprecated model types to current equivalents
+        const migratedType = this.DEPRECATED_MODEL_MAP[llmType] ?? llmType;
+
         const llmValues = Object.values(LLM_CONSTANTS) as string[];
 
         // Check if llmType is one of the constants
-        if (!llmValues.includes(llmType)) {
+        if (!llmValues.includes(migratedType)) {
             throw new Error(`Invalid llmType: ${llmType}`);
         }
 
         // If llmType is RANDOM, pick one randomly from other constants
-        if (llmType === LLM_CONSTANTS.RANDOM) {
+        if (migratedType === LLM_CONSTANTS.RANDOM) {
             // Exclude RANDOM from the options
             const llmOptions = llmValues.filter(type => type !== LLM_CONSTANTS.RANDOM);
             const randomIndex = Math.floor(Math.random() * llmOptions.length);
             return llmOptions[randomIndex];
         }
 
-        // Return the llmType as it is
-        return llmType;
+        // Return the migrated llmType
+        return migratedType;
     }
 }

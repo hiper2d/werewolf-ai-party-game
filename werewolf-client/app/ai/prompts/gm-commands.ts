@@ -66,6 +66,13 @@ export const GM_COMMAND_GENERATE_NIGHT_RESULTS: string = `Generate the night res
 - Detective findings: Follow DetectiveResult value (FOUND_EVIL, FOUND_INNOCENT, BLOCKED, INACTIVE)
 - Always maintain game balance and fairness in information revelation
 - NEVER reveal maniac activity or abductions - this is secret information
+
+**Narrative Hints from Players:**
+- Players may provide short narrative hints describing how they imagine their role's action playing out
+- If provided, weave these hints naturally into the night story as atmospheric flavor
+- NEVER reveal which player wrote the hint or which role it came from — use the hint as anonymous inspiration for the scene
+- The hint should influence the mood, imagery, or style of the relevant part of the narrative, not be quoted directly
+- If no hints are provided (NONE), generate the story entirely from the night events
 </StorytellingRules>
 
 `;

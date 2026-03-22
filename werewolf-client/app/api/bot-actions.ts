@@ -928,13 +928,19 @@ async function processNextBotInQueue(
     // Increment day activity counter for the bot
     await incrementDayActivity(gameId, bot.name, game.currentDay);
 
-    // Update queue
+    // Update queue — re-read from Firestore to respect cancellation
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
-    await db.collection('games').doc(gameId).update({
-        gameStateProcessQueue: newQueue
-    });
+    const freshGame = await getGame(gameId);
+    if (freshGame && freshGame.gameStateProcessQueue.length === 0) {
+        // Queue was cleared (e.g. by cancel) — don't overwrite it
+        logger.info(`Queue was cleared while processing bot ${botName}, not overwriting`, { gameId });
+    } else {
+        await db.collection('games').doc(gameId).update({
+            gameStateProcessQueue: newQueue
+        });
+    }
 
     return [savedGmMessage, savedBotMessage];
 }
@@ -1644,6 +1650,10 @@ async function performHumanPlayerNightActionImpl(gameId: string, targetPlayer: s
         if ((currentRole === GAME_ROLES.DOCTOR || currentRole === GAME_ROLES.DETECTIVE) && actionType) {
             nightResultEntry.actionType = actionType;
         }
+        // Store narrative hint from human player for GM story generation
+        if (message.trim()) {
+            nightResultEntry.narrativeHint = message.trim();
+        }
         const updatedNightResults = {
             ...(game.nightResults || {}),
             [currentRole]: nightResultEntry
@@ -1807,6 +1817,42 @@ async function getSuggestionImpl(gameId: string): Promise<string> {
     }
 }
 
+async function cancelBotResponsesImpl(gameId: string): Promise<GameActionResponse> {
+    const session = await auth();
+    if (!session || !session.user?.email) {
+        throw new Error('Not authenticated');
+    }
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+
+    const game = await getGame(gameId);
+    if (!game) {
+        throw new Error('Game not found');
+    }
+
+    await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: game.createdWithTier });
+
+    // Only cancel during states that have bot response queues
+    if (game.gameState !== GAME_STATES.DAY_DISCUSSION && game.gameState !== GAME_STATES.AFTER_GAME_DISCUSSION) {
+        throw new Error('Cannot cancel bot responses in current game state');
+    }
+
+    if (game.gameStateProcessQueue.length === 0) {
+        // Nothing to cancel
+        return { game, messages: [] };
+    }
+
+    logger.info(`Cancelling bot responses, clearing ${game.gameStateProcessQueue.length} bots from queue`, { gameId });
+
+    await db.collection('games').doc(gameId).update({
+        gameStateProcessQueue: []
+    });
+
+    const updatedGame = await getGame(gameId) as Game;
+    return { game: updatedGame, messages: [] };
+}
+
 // Wrapped exports with error handling
 export const welcome = withGameErrorHandling(welcomeImpl);
 export const talkToAll = withGameErrorHandling(talkToAllImpl);
@@ -1814,4 +1860,5 @@ export const keepBotsGoing = withGameErrorHandling(keepBotsGoingImpl);
 export const vote = withGameErrorHandling(voteImpl);
 export const humanPlayerVote = withGameErrorHandling(humanPlayerVoteImpl);
 export const performHumanPlayerNightAction = withGameErrorHandling(performHumanPlayerNightActionImpl);
+export const cancelBotResponses = withGameErrorHandling(cancelBotResponsesImpl);
 export const getSuggestion = getSuggestionImpl;

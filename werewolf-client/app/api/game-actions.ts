@@ -1,6 +1,7 @@
 'use server'
 
 import {db} from "@/firebase/server";
+import {firestore} from "firebase-admin";
 import {
     Bot,
     BotPreview,
@@ -456,6 +457,7 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
 
         // Create the game object
         const timestamp = Date.now();
+        const expireAt = firestore.Timestamp.fromMillis(timestamp + 30 * 24 * 60 * 60 * 1000); // 30 days TTL
         const previewCost = gamePreview.tokenUsage?.costUSD || 0;
         
         const game = {
@@ -478,6 +480,7 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
             messageCounter: 0, // Initialize message counter for new games
             ownerEmail: session.user.email, // Store the owner's email for per-user isolation
             createdAt: timestamp, // Store creation timestamp
+            expireAt: expireAt, // Firestore TTL: auto-delete after 30 days
             createdWithTier: tier,
             totalGameCost: previewCost, // Total cost starts with preview generation cost
             gameMasterTokenUsage: gamePreview.tokenUsage ? {
@@ -547,9 +550,11 @@ export async function addMessageToChatAndSaveToDb(gameMessage: GameMessage, game
         // Add message with custom ID
         const messageRef = db.collection('games').doc(gameId).collection('messages').doc(customId);
         const timestamp = Date.now();
+        const expireAt = gameData?.expireAt || firestore.Timestamp.fromMillis(timestamp + 30 * 24 * 60 * 60 * 1000); // Inherit game TTL or default 30 days
         const messageData = {
             ...serializeMessageForFirestore(gameMessage),
-            timestamp
+            timestamp,
+            expireAt
         };
         await messageRef.set(messageData);
 

@@ -55,7 +55,7 @@ Your paramount objective is to blend in seamlessly as another player while pursu
 
 *Night Phase:*
 All players "sleep." Special roles act in a strict order, and each action can affect what follows:
-1. **Maniac acts FIRST** — abducts one player, blocking ALL actions involving them (werewolf kill, doctor protect, detective investigate all fail on the abducted target). The abducted player's own night action also fails. If the Maniac dies during the night, the abducted victim dies too.
+1. **Maniac acts FIRST** — abducts one player, blocking ALL actions involving them (werewolf kill, doctor protect, detective investigate all fail on the abducted target). The abducted player's own night action also fails. If the Maniac dies during the night, the abducted victim dies too. Abducting a werewolf has no effect, unless it is the last alive werewolf — in that case, the last werewolf skips their turn.
 2. **Werewolves act SECOND** — choose a target to eliminate. If the target was abducted by the Maniac, the kill fails. If they kill the Maniac, the Maniac's abducted victim also dies as collateral.
 3. **Doctor acts THIRD** — protects one player from werewolf attack. If the protected player was already abducted, the protection fails. Cannot protect the same player two nights in a row. Has a one-time ability to kill instead of protect ("Doctor's Mistake").
 4. **Detective acts LAST** — investigates one player to learn if they are evil (werewolf or maniac) or innocent, OR uses a one-time kill ability to eliminate a player. If the target was abducted, the action fails. Cannot investigate the same player twice. If the detective kills the Maniac, the abducted victim also dies.
@@ -320,7 +320,7 @@ export const BOT_MANIAC_ACTION_PROMPT: string = `🎭 **Night Phase - Maniac Abd
 
 **Strategic Considerations:**
 - Abducting the werewolf target saves that player (werewolf attack fails)
-- Abducting a werewolf prevents them from participating in the kill (but if there are multiple werewolves, they can still act)
+- Abducting a werewolf has NO effect, unless it is the LAST alive werewolf — then that werewolf skips their turn
 - Abducting the doctor or detective prevents their night action
 - If you suspect someone is a werewolf, abducting them could disrupt their plans
 - Consider who the werewolves might target and abduct that person to save them

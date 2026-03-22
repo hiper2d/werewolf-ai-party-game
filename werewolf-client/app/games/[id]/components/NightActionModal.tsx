@@ -89,14 +89,6 @@ export default function NightActionModal({
 
     const availableTargets = getAvailableTargets();
 
-    const getMessageLabel = () => {
-        if (isLastInQueue) {
-            return `Last ${roleConfig.messageLabel}`;
-        } else {
-            return roleConfig.messageLabel;
-        }
-    };
-
     const handleSubmit = async () => {
         if (selectedPlayer) {
             const finalMessage = message.trim() || '';
@@ -235,11 +227,12 @@ export default function NightActionModal({
                 )}
 
                 <div className="mb-4">
-                    <label className="block theme-text-primary text-sm mb-2">{getMessageLabel()} <span className="text-xs theme-text-secondary font-normal">(Optional)</span></label>
+                    <label className="block theme-text-primary text-sm mb-2">Narrative hint <span className="text-xs theme-text-secondary font-normal">(Optional)</span></label>
+                    <p className="text-xs theme-text-secondary mb-2">Describe how you imagine this action playing out. The Game Master will weave it into the night story without revealing your identity.</p>
                     <textarea
                         className="w-full p-2 rounded bg-[rgb(var(--color-input-bg))] text-[rgb(var(--color-input-text))] border border-[rgb(var(--color-input-border))] focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder-[rgb(var(--color-input-placeholder))]"
                         rows={3}
-                        placeholder={roleConfig.messagePlaceholder}
+                        placeholder="e.g. &quot;A shadow slipped through the fog, silent as death itself...&quot;"
                         value={message}
                         onChange={(e) => setMessage(e.target.value)}
                         disabled={isSubmitting}

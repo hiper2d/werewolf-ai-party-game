@@ -100,6 +100,18 @@ async function endNightWithResults(gameId: string, game: Game): Promise<GameActi
 
     const quietNight = nightState.deaths.length === 0 && !werewolfKillPrevented;
 
+    // Collect narrative hints from human player's night actions
+    const narrativeHints: string[] = [];
+    const nightResults = game.nightResults || {};
+    for (const [role, result] of Object.entries(nightResults)) {
+        if (result.narrativeHint) {
+            narrativeHints.push(`${role}: "${result.narrativeHint}"`);
+        }
+    }
+    const narrativeHintsSummary = narrativeHints.length > 0
+        ? narrativeHints.join('; ')
+        : 'NONE';
+
     // Create GM command with simplified night events
     // We append actionsPreventedSummary to the command context
     const nightResultsCommand = format(GM_COMMAND_GENERATE_NIGHT_RESULTS, {
@@ -107,7 +119,8 @@ async function endNightWithResults(gameId: string, game: Game): Promise<GameActi
         werewolfKillPrevented: werewolfKillPrevented ? 'TRUE' : 'FALSE',
         quietNight: quietNight ? 'TRUE' : 'FALSE',
         detectiveResultSummary
-    }) + `\n\n**Blocked Actions:** ${actionsPreventedSummary}`;
+    }) + `\n\n**Blocked Actions:** ${actionsPreventedSummary}`
+       + `\n\n**Narrative Hints:** ${narrativeHintsSummary}`;
 
     // Create Game Master agent with system prompt
     const gmAgent = AgentFactory.createAgent(GAME_MASTER, gmSystemPrompt, game.gameMasterAiType, apiKeys, false);

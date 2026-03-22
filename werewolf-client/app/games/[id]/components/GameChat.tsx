@@ -10,6 +10,7 @@ import { clearGameErrorState } from "@/app/api/game-actions";
 import VotingModal from "./VotingModal";
 import NightActionModal from "./NightActionModal";
 import MentionDropdown from "./MentionDropdown";
+import ConfirmModal from "./ConfirmModal";
 import { ttsService } from "@/app/services/tts-service";
 import { sttService } from "@/app/services/stt-service";
 import { getDefaultVoiceProvider } from "@/app/ai/voice-config";
@@ -25,6 +26,8 @@ interface GameChatProps {
     onErrorHandled?: () => void;
     isExternalLoading?: boolean;
     gameControls?: React.ReactNode;
+    onBeforeAction?: () => void;
+    cancelButton?: React.ReactNode;
 }
 
 interface BotAnswer {
@@ -380,11 +383,16 @@ function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcludin
     );
 }
 
-export default function GameChat({ gameId, game, onGameStateChange, pendingMessages, onPendingMessagesConsumed, clearNightMessages, onErrorHandled, isExternalLoading, gameControls }: GameChatProps) {
+export default function GameChat({ gameId, game, onGameStateChange, pendingMessages, onPendingMessagesConsumed, clearNightMessages, onErrorHandled, isExternalLoading, gameControls, onBeforeAction, cancelButton }: GameChatProps) {
     const [messages, setMessages] = useState<GameMessage[]>([]);
     const [newMessage, setNewMessage] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [confirmModal, setConfirmModal] = useState<{
+        isOpen: boolean;
+        message: string;
+        onConfirm: () => void;
+    }>({ isOpen: false, message: '', onConfirm: () => {} });
     const [isVoting, setIsVoting] = useState(false);
     const voteSubmittedRef = useRef(false);
     const [isPerformingNightAction, setIsPerformingNightAction] = useState(false);
@@ -802,6 +810,7 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
                 }
             }
 
+            onBeforeAction?.();
             const { game: updatedGame, messages: newMessages } = await talkToAll(gameId, trimmed);
             addMessages(newMessages);
 
@@ -872,13 +881,16 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
         }
     };
 
-    const handleDeleteAfter = async (messageId: string) => {
-        const confirmed = window.confirm(
-            'Are you sure you want to delete this message and all messages after it? This action cannot be undone.'
-        );
+    const handleDeleteAfter = (messageId: string) => {
+        setConfirmModal({
+            isOpen: true,
+            message: 'Are you sure you want to delete this message and all messages after it? This action cannot be undone.',
+            onConfirm: () => doDeleteAfter(messageId),
+        });
+    };
 
-        if (!confirmed) return;
-
+    const doDeleteAfter = async (messageId: string) => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
         try {
             setIsDeleting(true);
             const response = await fetch(`/api/games/${gameId}/messages/delete-after`, {
@@ -931,13 +943,16 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
         }
     };
 
-    const handleDeleteAfterExcluding = async (messageId: string) => {
-        const confirmed = window.confirm(
-            'Are you sure you want to delete all messages after this one (keeping this message)? This action cannot be undone.'
-        );
+    const handleDeleteAfterExcluding = (messageId: string) => {
+        setConfirmModal({
+            isOpen: true,
+            message: 'Are you sure you want to delete all messages after this one (keeping this message)? This action cannot be undone.',
+            onConfirm: () => doDeleteAfterExcluding(messageId),
+        });
+    };
 
-        if (!confirmed) return;
-
+    const doDeleteAfterExcluding = async (messageId: string) => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
         try {
             setIsDeleting(true);
             const response = await fetch(`/api/games/${gameId}/messages/delete-after-excluding`, {
@@ -1527,6 +1542,11 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
                         className={`w-full p-3 rounded bg-input border border-input-border text-input-text placeholder-input-placeholder focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none ${!isInputEnabled() ? 'opacity-50 cursor-not-allowed' : ''}`}
                         placeholder={getInputPlaceholder()}
                     />
+                    {cancelButton && (
+                        <div className="absolute top-1 right-1">
+                            {cancelButton}
+                        </div>
+                    )}
                 </div>
 
                 {/* Toolbar row: text buttons left, icon buttons right */}
@@ -1642,6 +1662,13 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
                 onAction={handleNightAction}
                 onClose={handleCloseNightActionModal}
                 isSubmitting={isPerformingNightAction}
+            />
+            <ConfirmModal
+                isOpen={confirmModal.isOpen}
+                title="Confirm Deletion"
+                message={confirmModal.message}
+                onConfirm={confirmModal.onConfirm}
+                onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
             />
         </div>
     );

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getGame, updateBotModel, updateGameMasterModel, clearGameErrorState, setGameErrorState, afterGameDiscussion } from "@/app/api/game-actions";
 import { startNewDay, summarizePastDay } from "@/app/api/night-actions";
 import GameChat from "@/app/games/[id]/components/GameChat";
@@ -10,7 +10,7 @@ import { getModelDisplayName } from "@/app/ai/ai-models";
 import { GAME_STATES, GAME_ROLES, AUTO_VOTE_COEFFICIENT, BOT_SELECTION_CONFIG } from "@/app/api/game-models";
 import type { Game, GameActionResponse, GameMessage } from "@/app/api/game-models";
 import type { Session } from "next-auth";
-import { welcome, vote, keepBotsGoing, manualSelectBots } from '@/app/api/bot-actions';
+import { welcome, vote, keepBotsGoing, manualSelectBots, cancelBotResponses } from '@/app/api/bot-actions';
 import BotSelectionDialog from '@/app/games/[id]/components/BotSelectionDialog';
 import { replayNight, performNightAction } from '@/app/api/night-actions';
 import { getPlayerColor } from "@/app/utils/color-utils";
@@ -55,9 +55,18 @@ function GamePageContent({
     const [selectedBot, setSelectedBot] = useState<{ name: string; aiType: string; enableThinking?: boolean } | null>(null);
     const [clearNightMessages, setClearNightMessages] = useState(false);
     const [isKeepGoingLoading, setIsKeepGoingLoading] = useState(false);
+    const [showCancel, setShowCancel] = useState(false);
+    const preActionGameRef = useRef<Game | null>(null);
 
     const applyActionResult = useCallback((result: GameActionResponse) => {
-        setGame(result.game);
+        setGame(prev => {
+            // If queue was locally cleared by cancel, don't restore it from a stale in-flight result
+            if (prev.gameStateProcessQueue.length === 0 && result.game.gameStateProcessQueue.length > 0
+                && (prev.gameState === GAME_STATES.DAY_DISCUSSION || prev.gameState === GAME_STATES.AFTER_GAME_DISCUSSION)) {
+                return { ...result.game, gameStateProcessQueue: [] };
+            }
+            return result.game;
+        });
         if (result.messages.length > 0) {
             setPendingMessages(prev => [...prev, ...result.messages]);
         }
@@ -133,6 +142,41 @@ function GamePageContent({
             messagesLeft
         };
     }, [game.gameState, game.bots, game.dayActivityCounter]);
+
+    // Show Cancel button after 10 seconds of bot processing
+    useEffect(() => {
+        const isProcessing = (game.gameState === GAME_STATES.DAY_DISCUSSION || game.gameState === GAME_STATES.AFTER_GAME_DISCUSSION)
+            && (game.gameStateProcessQueue.length > 0 || isKeepGoingLoading);
+
+        if (isProcessing) {
+            const timer = setTimeout(() => setShowCancel(true), 10_000);
+            return () => clearTimeout(timer);
+        } else {
+            setShowCancel(false);
+            preActionGameRef.current = null;
+        }
+    }, [game.gameState, game.gameStateProcessQueue.length, isKeepGoingLoading]);
+
+    // Handle cancel: restore pre-action state, clear server queue
+    const handleCancelBotResponses = useCallback(async () => {
+        setShowCancel(false);
+        setIsKeepGoingLoading(false);
+
+        // Clear server queue
+        await cancelBotResponses(game.id).catch(() => {});
+
+        // Restore pre-action game state or re-fetch from server
+        if (preActionGameRef.current) {
+            setGame({
+                ...preActionGameRef.current,
+                gameStateProcessQueue: [],
+            });
+            preActionGameRef.current = null;
+        } else {
+            // Fallback: just clear the queue locally
+            setGame(prev => ({ ...prev, gameStateProcessQueue: [] }));
+        }
+    }, [game.id]);
 
     // Handle exit game
     const handleExitGame = () => {
@@ -560,6 +604,21 @@ function GamePageContent({
     // Build game controls JSX to pass to GameChat
     const gameControlsElement = buildGameControls();
 
+    // Cancel button shown in the top-right corner of the input area after 10s
+    const cancelButtonElement = showCancel ? (
+        <button
+            type="button"
+            onClick={handleCancelBotResponses}
+            className="w-7 h-7 flex items-center justify-center rounded-full bg-red-500/80 hover:bg-red-600 text-white transition-colors"
+            title="Cancel bot responses"
+        >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+        </button>
+    ) : null;
+
     function buildGameControls(): React.ReactNode {
         const showControls = isGameOver || game.gameState === GAME_STATES.DAY_DISCUSSION || game.gameState === GAME_STATES.VOTE_RESULTS || game.gameState === GAME_STATES.NIGHT || game.gameState === GAME_STATES.NIGHT_RESULTS || (game.gameState === GAME_STATES.NEW_DAY_BOT_SUMMARIES && game.gameStateProcessQueue.length > 0);
 
@@ -568,39 +627,39 @@ function GamePageContent({
         if (game.gameState === GAME_STATES.AFTER_GAME_DISCUSSION) {
             return (
                 <div className="flex items-center gap-2 flex-wrap">
-                    <button
-                        className={`${buttonTransparentStyle} ${!areControlsEnabled || game.gameStateProcessQueue.length > 0 || isKeepGoingLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        disabled={!areControlsEnabled || game.gameStateProcessQueue.length > 0 || isKeepGoingLoading}
-                        onClick={async () => {
-                            setIsKeepGoingLoading(true);
-                            try {
-                                const result = await runGameAction(() => keepBotsGoing(game.id));
-                                if (result) {
-                                    applyActionResult(result);
-                                }
-                            } finally {
-                                setIsKeepGoingLoading(false);
-                            }
-                        }}
-                        title={game.gameStateProcessQueue.length > 0 ? 'Bots are already talking' : `Let ${BOT_SELECTION_CONFIG.MIN}-${BOT_SELECTION_CONFIG.MAX} bots continue the conversation`}
-                    >
-                        {isKeepGoingLoading ? (
-                            <span className="flex items-center gap-2">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin">
-                                    <path d="M21 12a9 9 0 11-6.219-8.56"/>
-                                </svg>
-                                Starting...
-                            </span>
-                        ) : 'Go on'}
-                    </button>
-                    <button
-                        className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500 !text-white ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        onClick={handleExitGame}
-                        disabled={!areControlsEnabled}
-                        title="Return to the games list"
-                    >
-                        Exit Game
-                    </button>
+                    {game.gameStateProcessQueue.length > 0 || isKeepGoingLoading ? (
+                        null
+                    ) : (
+                        <>
+                            <button
+                                className={`${buttonTransparentStyle} ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                disabled={!areControlsEnabled}
+                                onClick={async () => {
+                                    preActionGameRef.current = game;
+                                    setIsKeepGoingLoading(true);
+                                    try {
+                                        const result = await runGameAction(() => keepBotsGoing(game.id));
+                                        if (result) {
+                                            applyActionResult(result);
+                                        }
+                                    } finally {
+                                        setIsKeepGoingLoading(false);
+                                    }
+                                }}
+                                title={`Let ${BOT_SELECTION_CONFIG.MIN}-${BOT_SELECTION_CONFIG.MAX} bots continue the conversation`}
+                            >
+                                Go on
+                            </button>
+                            <button
+                                className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500 !text-white ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                onClick={handleExitGame}
+                                disabled={!areControlsEnabled}
+                                title="Return to the games list"
+                            >
+                                Exit Game
+                            </button>
+                        </>
+                    )}
                 </div>
             );
         }
@@ -625,46 +684,46 @@ function GamePageContent({
             <div className="flex items-center gap-2 flex-wrap">
                 {game.gameState === GAME_STATES.DAY_DISCUSSION && (
                     <>
-                        <button
-                            className={`${buttonTransparentStyle} ${!areControlsEnabled || game.gameStateProcessQueue.length > 0 || isKeepGoingLoading ? 'opacity-50 cursor-not-allowed' : ''} ${voteUrgency.isUrgent && !isKeepGoingLoading && game.gameStateProcessQueue.length === 0 ? 'bg-red-600 hover:bg-red-700 border-red-500 !text-white animate-pulse' : voteUrgency.isWarning && !isKeepGoingLoading && game.gameStateProcessQueue.length === 0 ? 'bg-yellow-500 hover:bg-yellow-600 border-yellow-400 !text-black' : ''}`}
-                            disabled={!areControlsEnabled || game.gameStateProcessQueue.length > 0 || isKeepGoingLoading}
-                            onClick={async () => {
-                                const result = await runGameAction(() => vote(game.id));
-                                if (result) {
-                                    applyActionResult(result);
-                                }
-                            }}
-                            title={voteUrgency.isUrgent
-                                ? `Vote now! Auto-voting in ${Math.ceil(voteUrgency.messagesLeft)} messages`
-                                : `Start the voting phase (${Math.round(voteUrgency.percentage)}% to auto-vote)`}
-                        >
-                            Vote {(voteUrgency.isUrgent || voteUrgency.isWarning) && '⚠️'}
-                        </button>
-                        <button
-                            className={`${buttonTransparentStyle} ${!areControlsEnabled || game.gameStateProcessQueue.length > 0 || isKeepGoingLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            disabled={!areControlsEnabled || game.gameStateProcessQueue.length > 0 || isKeepGoingLoading}
-                            onClick={async () => {
-                                setIsKeepGoingLoading(true);
-                                try {
-                                    const result = await runGameAction(() => keepBotsGoing(game.id));
-                                    if (result) {
-                                        applyActionResult(result);
-                                    }
-                                } finally {
-                                    setIsKeepGoingLoading(false);
-                                }
-                            }}
-                            title={game.gameStateProcessQueue.length > 0 ? 'Bots are already talking' : `Let ${BOT_SELECTION_CONFIG.MIN}-${BOT_SELECTION_CONFIG.MAX} bots continue the conversation`}
-                        >
-                            {isKeepGoingLoading ? (
-                                <span className="flex items-center gap-2">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin">
-                                        <path d="M21 12a9 9 0 11-6.219-8.56"/>
-                                    </svg>
-                                    Starting...
-                                </span>
-                            ) : 'Go on'}
-                        </button>
+                        {game.gameStateProcessQueue.length > 0 || isKeepGoingLoading ? (
+                            null
+                        ) : (
+                            <>
+                                <button
+                                    className={`${buttonTransparentStyle} ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''} ${voteUrgency.isUrgent ? 'bg-red-600 hover:bg-red-700 border-red-500 !text-white animate-pulse' : voteUrgency.isWarning ? 'bg-yellow-500 hover:bg-yellow-600 border-yellow-400 !text-black' : ''}`}
+                                    disabled={!areControlsEnabled}
+                                    onClick={async () => {
+                                        const result = await runGameAction(() => vote(game.id));
+                                        if (result) {
+                                            applyActionResult(result);
+                                        }
+                                    }}
+                                    title={voteUrgency.isUrgent
+                                        ? `Vote now! Auto-voting in ${Math.ceil(voteUrgency.messagesLeft)} messages`
+                                        : `Start the voting phase (${Math.round(voteUrgency.percentage)}% to auto-vote)`}
+                                >
+                                    Vote {(voteUrgency.isUrgent || voteUrgency.isWarning) && '⚠️'}
+                                </button>
+                                <button
+                                    className={`${buttonTransparentStyle} ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    disabled={!areControlsEnabled}
+                                    onClick={async () => {
+                                        preActionGameRef.current = game;
+                                        setIsKeepGoingLoading(true);
+                                        try {
+                                            const result = await runGameAction(() => keepBotsGoing(game.id));
+                                            if (result) {
+                                                applyActionResult(result);
+                                            }
+                                        } finally {
+                                            setIsKeepGoingLoading(false);
+                                        }
+                                    }}
+                                    title={`Let ${BOT_SELECTION_CONFIG.MIN}-${BOT_SELECTION_CONFIG.MAX} bots continue the conversation`}
+                                >
+                                    Go on
+                                </button>
+                            </>
+                        )}
                     </>
                 )}
                 {game.gameState === GAME_STATES.VOTE_RESULTS && (
@@ -972,13 +1031,15 @@ function GamePageContent({
                 <GameChat
                     gameId={game.id}
                     game={game}
-                    onGameStateChange={(response: GameActionResponse) => setGame(response.game)}
+                    onGameStateChange={applyActionResult}
                     pendingMessages={pendingMessages}
                     onPendingMessagesConsumed={() => setPendingMessages([])}
                     clearNightMessages={clearNightMessages}
                     onErrorHandled={handleErrorCleared}
                     isExternalLoading={isKeepGoingLoading}
                     gameControls={gameControlsElement}
+                    onBeforeAction={() => { preActionGameRef.current = game; }}
+                    cancelButton={cancelButtonElement}
                 />
             </div>
 
