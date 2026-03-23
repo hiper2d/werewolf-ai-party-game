@@ -29,6 +29,15 @@ export async function createCheckoutSession(
 
     // Get or create Stripe customer
     let customerId = user.stripeCustomerId;
+    if (customerId) {
+        // Verify the stored customer still exists in Stripe
+        try {
+            await stripe.customers.retrieve(customerId);
+        } catch {
+            // Customer was deleted or belongs to a different Stripe environment
+            customerId = undefined;
+        }
+    }
     if (!customerId) {
         const customer = await stripe.customers.create({
             email: userId,
