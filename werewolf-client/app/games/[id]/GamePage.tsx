@@ -18,6 +18,8 @@ import { checkGameEndConditions } from "@/app/utils/game-utils";
 import { isTierMismatchError } from '@/app/api/errors';
 import { UIControlsProvider, useUIControls } from './context/UIControlsContext';
 import React from 'react';
+import CampfireScene, { type CampfirePlayer, type GamePhase, type QueueItem } from '@/components/game/CampfireScene';
+import { getColor } from '@/utils/ember-colors';
 
 interface Participant {
     name: string;
@@ -142,6 +144,107 @@ function GamePageContent({
             messagesLeft
         };
     }, [game.gameState, game.bots, game.dayActivityCounter]);
+
+    // ═══════════ Campfire Scene data mapping ═══════════
+
+    // Map game.gameState to CampfireScene's GamePhase
+    const campfirePhase: GamePhase = useMemo(() => {
+        switch (game.gameState) {
+            case GAME_STATES.NIGHT:
+            case GAME_STATES.NIGHT_RESULTS:
+                return 'night';
+            case GAME_STATES.VOTE:
+                return 'voting';
+            case GAME_STATES.VOTE_RESULTS:
+                return 'results';
+            default:
+                return 'day';
+        }
+    }, [game.gameState]);
+
+    // Build CampfirePlayer[] from game data
+    const campfirePlayers: CampfirePlayer[] = useMemo(() => {
+        const players: CampfirePlayer[] = [];
+
+        // Game Master
+        players.push({
+            id: '__gm__',
+            name: 'Game Master',
+            colorIdx: 'gm' as unknown as number,
+            spriteSeed: 99,
+            role: 'Game Master',
+            isAlive: true,
+            isYou: false,
+            isGM: true,
+            model: getModelDisplayName(game.gameMasterAiType),
+            cost: game.gameMasterTokenUsage?.costUSD,
+        });
+
+        // Human player
+        players.push({
+            id: '__human__',
+            name: game.humanPlayerName,
+            colorIdx: 0,
+            spriteSeed: 0,
+            role: game.humanPlayerRole,
+            isAlive: !isGameOver || game.gameState === GAME_STATES.AFTER_GAME_DISCUSSION,
+            isYou: true,
+            isGM: false,
+        });
+
+        // Bots
+        game.bots.forEach((bot, i) => {
+            players.push({
+                id: bot.name,
+                name: bot.name,
+                colorIdx: (i + 1) % 16,
+                spriteSeed: i + 1,
+                role: bot.role,
+                isAlive: bot.isAlive,
+                isYou: false,
+                isGM: false,
+                model: getModelDisplayName(bot.aiType),
+                cost: bot.tokenUsage?.costUSD,
+            });
+        });
+
+        return players;
+    }, [game.bots, game.humanPlayerName, game.humanPlayerRole, game.gameMasterAiType, game.gameMasterTokenUsage, isGameOver, game.gameState]);
+
+    // Dead player IDs
+    const deadIds = useMemo(() =>
+        game.bots.filter(b => !b.isAlive).map(b => b.name),
+        [game.bots]
+    );
+
+    // Currently speaking player (first in process queue)
+    const speakingId = useMemo(() => {
+        const q = game.gameStateProcessQueue;
+        if (q.length === 0) return null;
+        // The first item in processQueue is the currently processing bot name
+        return q[0] || null;
+    }, [game.gameStateProcessQueue]);
+
+    // Map process queue to CampfireScene queue items
+    const campfireQueue: QueueItem[] = useMemo(() => {
+        return game.gameStateProcessQueue.map((name, i) => ({
+            pid: name,
+            status: i === 0 ? 'current' as const : 'queued' as const,
+        }));
+    }, [game.gameStateProcessQueue]);
+
+    // Message counts per bot for the current day
+    const campfireMsgCounts = useMemo(() =>
+        game.dayActivityCounter || {},
+        [game.dayActivityCounter]
+    );
+
+    // Vote counts (from most recent voting history entry for the current day)
+    const campfireVotes = useMemo(() => {
+        if (game.gameState !== GAME_STATES.VOTE && game.gameState !== GAME_STATES.VOTE_RESULTS) return undefined;
+        const current = game.votingHistory?.find(v => v.day === game.currentDay);
+        return current?.voteCounts;
+    }, [game.gameState, game.votingHistory, game.currentDay]);
 
     // Show Cancel button after 10 seconds of bot processing
     useEffect(() => {
@@ -830,84 +933,47 @@ function GamePageContent({
         );
     }
 
+    // Campfire scene click handler — open model dialog for bots
+    const handleCampfirePlayerTap = useCallback((player: CampfirePlayer) => {
+        if (player.isGM) {
+            openModelDialog('Game Master', game.gameMasterAiType);
+        } else if (!player.isYou) {
+            const bot = game.bots.find(b => b.name === player.name);
+            if (bot) {
+                openModelDialog(bot.name, bot.aiType, bot.enableThinking);
+            }
+        }
+    }, [game.bots, game.gameMasterAiType]);
+
     // Left panel content (reused in desktop sidebar and mobile overlay)
     const leftPanelContent = (
-        <>
-            {/* Game info */}
-            <div className="mb-3 flex-shrink-0">
-                <h1 className="text-2xl font-bold mb-1">{game.theme}</h1>
-                <p className="text-sm theme-text-secondary mb-2">{game.description}</p>
+        <div className="flex flex-col h-full">
+            {/* Game info header */}
+            <div className="mb-2 flex-shrink-0 px-2 pt-2">
+                <h1 className="pixel-text text-sm mb-1" style={{ color: 'var(--ember-fire-4)' }}>{game.theme}</h1>
+                <p className="text-xs" style={{ color: 'var(--ember-ink-2)' }}>{game.description}</p>
                 {game.totalGameCost !== undefined && game.totalGameCost > 0 && (
-                    <div className="text-xs text-left w-full">
-                        <span className="theme-text-secondary font-mono">
-                            Total Game Cost: ${game.totalGameCost.toFixed(4)}
-                        </span>
+                    <div className="console-text text-xs mt-1" style={{ color: 'var(--ember-ink-3)' }}>
+                        COST: ${game.totalGameCost.toFixed(4)}
                     </div>
                 )}
             </div>
 
-            {/* Participants list */}
-            <div className="flex-grow overflow-auto hide-scrollbar border-t theme-border-subtle pt-3">
-                <h2 className="text-lg font-bold mb-2">Participants</h2>
-                <ul>
-                    {participants.map((participant, index) => (
-                        <li
-                            key={index}
-                            className={`mb-3 flex flex-col ${!participant.isAlive ? 'opacity-60' : ''}`}
-                        >
-                            <div className="flex items-center justify-between">
-                                <span
-                                    style={{ color: getPlayerColor(participant.name) }}
-                                    className={!participant.isAlive ? 'line-through' : ''}
-                                >
-                                    {participant.name}
-                                    {participant.isHuman && ' (You)'}
-                                </span>
-                                <div className="flex items-center gap-2">
-                                    {!participant.isHuman && !participant.isGameMaster && (() => {
-                                        const bot = game.bots.find(b => b.name === participant.name);
-                                        const cost = bot?.tokenUsage?.costUSD;
-                                        return cost && cost > 0 ? (
-                                            <span className="text-xs theme-text-secondary font-mono">
-                                                ${cost.toFixed(4)}
-                                            </span>
-                                        ) : null;
-                                    })()}
-                                    {game.humanPlayerRole === GAME_ROLES.WEREWOLF && participant.role === GAME_ROLES.WEREWOLF && (
-                                        <span className="text-sm" title="Werewolf teammate">🐺</span>
-                                    )}
-                                    {!participant.isAlive && (
-                                        <span className="text-sm" title="Eliminated">💀</span>
-                                    )}
-                                </div>
-                            </div>
-                            {!participant.isHuman && participant.aiType && (
-                                <div className="text-xs mt-1 text-left w-full">
-                                    <button
-                                        onClick={() => openModelDialog(participant.name, participant.aiType!, participant.enableThinking)}
-                                        className={`theme-text-secondary hover:opacity-70 transition-colors duration-200 text-left w-full ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                        title="Click to change AI model"
-                                        disabled={!areControlsEnabled}
-                                    >
-                                        Model: {getModelDisplayName(participant.aiType!)}
-                                    </button>
-                                </div>
-                            )}
-                            {participant.isHuman && (
-                                <div className="text-xs theme-text-secondary mt-1 ml-2">
-                                    Role: {participant.role}
-                                </div>
-                            )}
-                            {(!participant.isAlive || isGameOver || (game.humanPlayerRole === GAME_ROLES.WEREWOLF && participant.role === GAME_ROLES.WEREWOLF)) && !participant.isHuman && (
-                                <div className="text-xs theme-text-secondary mt-1 ml-2">
-                                    Role: {participant.role}
-                                </div>
-                            )}
-                        </li>
-                    ))}
-                </ul>
+            {/* Campfire scene */}
+            <div className="flex-grow min-h-0">
+                <CampfireScene
+                    players={campfirePlayers}
+                    phase={campfirePhase}
+                    speakingId={speakingId}
+                    deadIds={deadIds}
+                    votes={campfireVotes}
+                    queue={campfireQueue}
+                    msgCounts={campfireMsgCounts}
+                    revealDead={true}
+                    onPlayerTap={handleCampfirePlayerTap}
+                />
             </div>
-        </>
+        </div>
     );
 
     // Right panel content (queue info only, no game controls since those moved to chat)

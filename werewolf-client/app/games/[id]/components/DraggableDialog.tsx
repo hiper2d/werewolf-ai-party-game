@@ -7,13 +7,17 @@ interface DraggableDialogProps {
     children: React.ReactNode;
     title: string;
     className?: string;
+    accent?: string;
+    onClose?: () => void;
 }
 
 export default function DraggableDialog({
     isOpen,
     children,
     title,
-    className = ''
+    className = '',
+    accent = 'var(--ember-fire-3)',
+    onClose,
 }: DraggableDialogProps) {
     const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
     const [isDragging, setIsDragging] = useState(false);
@@ -88,24 +92,65 @@ export default function DraggableDialog({
         };
 
     return (
-        <div
-            ref={dialogRef}
-            className={`z-50 bg-white dark:bg-neutral-900 border theme-border rounded-lg shadow-xl ${className}`}
-            style={dialogStyle}
-        >
-            {/* Draggable header */}
+        <>
+            {/* Backdrop */}
             <div
-                className={`px-6 pt-6 pb-2 cursor-move select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
-                onMouseDown={handleMouseDown}
+                style={{
+                    position: 'fixed', inset: 0,
+                    background: 'rgba(5,5,10,0.78)',
+                    backdropFilter: 'blur(2px)',
+                    zIndex: 999,
+                }}
+                onClick={onClose}
+            />
+            <div
+                ref={dialogRef}
+                className={`${className}`}
+                style={{
+                    ...dialogStyle,
+                    zIndex: 1000,
+                    maxWidth: '92vw',
+                    maxHeight: '86vh',
+                    background: 'var(--ember-bg-2)',
+                    border: `2px solid ${accent}`,
+                    boxShadow: `0 0 0 2px var(--ember-bg-0), 0 0 0 4px ${accent}, 8px 8px 0 rgba(0,0,0,0.6)`,
+                    display: 'flex',
+                    flexDirection: 'column' as const,
+                    overflow: 'hidden',
+                    borderRadius: 0,
+                }}
             >
-                <h3 className="text-xl font-bold theme-text-primary">
-                    {title}
-                </h3>
+                {/* Header bar */}
+                <div
+                    style={{
+                        padding: '12px 16px',
+                        background: 'var(--ember-bg-0)',
+                        borderBottom: `2px solid ${accent}`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                    }}
+                    className={`select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+                    onMouseDown={handleMouseDown}
+                >
+                    <div className="pixel-text" style={{ fontSize: 11, color: accent, letterSpacing: 2 }}>
+                        ▸ {title.toUpperCase()}
+                    </div>
+                    {onClose && (
+                        <button
+                            onClick={onClose}
+                            className="pixel-text"
+                            style={{ fontSize: 12, color: 'var(--ember-ink-2)' }}
+                        >
+                            ✕
+                        </button>
+                    )}
+                </div>
+                {/* Content */}
+                <div style={{ padding: 20, overflowY: 'auto' }}>
+                    {children}
+                </div>
             </div>
-            {/* Content */}
-            <div className="px-6 pb-6">
-                {children}
-            </div>
-        </div>
+        </>
     );
 }

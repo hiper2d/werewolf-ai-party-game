@@ -1,0 +1,264 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Default dark background to prevent flash before theme loads */
+html {
+  background-color: #121216; /* matches dark theme --color-page-bg-start */
+}
+
+/* Light Theme */
+[data-theme='light'] {
+  background-color: #f8fafc; /* override default dark background */
+
+  --color-text-primary: 15, 23, 42;
+  --color-text-secondary: 71, 85, 105;
+
+  --color-page-bg-start: 248, 250, 252;
+  --color-page-bg-end: 226, 232, 240;
+
+  --color-navbar-bg: 255, 255, 255;
+  --color-navbar-text: 15, 23, 42;
+  --color-navbar-link: 51, 65, 85;
+  --color-navbar-link-hover: 15, 23, 42;
+  --color-navbar-divider: 203, 213, 225;
+
+  --color-toggle-bg: rgba(0, 0, 0, 0.05);
+  --color-toggle-hover-bg: rgba(0, 0, 0, 0.1);
+  --color-toggle-border: rgba(0, 0, 0, 0.15);
+  --color-toggle-text: 30, 41, 59;
+
+  --color-card-bg: 255, 255, 255;
+  --color-card-border: 203, 213, 225;
+  --color-card-shadow: rgba(15, 23, 42, 0.12);
+
+  --color-button-bg: 15, 23, 42;
+  --color-button-text: 255, 255, 255;
+  --color-button-text-transparent: 15, 23, 42;
+  --color-button-hover-bg: 30, 41, 59;
+  --color-button-transparent-bg: rgba(15, 23, 42, 0.08);
+  --color-button-transparent-hover-bg: rgba(15, 23, 42, 0.12);
+
+  --color-input-bg: 255, 255, 255;
+  --color-input-border: 203, 213, 225;
+  --color-input-text: 15, 23, 42;
+  --color-input-placeholder: 148, 163, 184;
+
+  --color-scrollbar-track: 241, 245, 249;
+  --color-scrollbar-thumb: 203, 213, 225;
+  --color-scrollbar-thumb-hover: 148, 163, 184;
+}
+
+/* Dark Theme */
+[data-theme='dark'] {
+  --color-text-primary: 240, 240, 245;
+  --color-text-secondary: 160, 160, 170;
+
+  --color-page-bg-start: 18, 18, 22;
+  --color-page-bg-end: 12, 12, 16;
+
+  --color-navbar-bg: 18, 18, 22;
+  --color-navbar-text: 240, 240, 245;
+  --color-navbar-link: 200, 200, 210;
+  --color-navbar-link-hover: 240, 240, 245;
+  --color-navbar-divider: 120, 120, 130;
+
+  --color-toggle-bg: rgba(255, 255, 255, 0.08);
+  --color-toggle-hover-bg: rgba(255, 255, 255, 0.16);
+  --color-toggle-border: rgba(160, 160, 170, 0.35);
+  --color-toggle-text: 240, 240, 245;
+
+  --color-card-bg: 32, 32, 38;
+  --color-card-border: 55, 55, 62;
+  --color-card-shadow: rgba(0, 0, 0, 0.3);
+
+  --color-button-bg: 55, 55, 62;
+  --color-button-text: 240, 240, 245;
+  --color-button-text-transparent: 240, 240, 245;
+  --color-button-hover-bg: 72, 72, 80;
+  --color-button-transparent-bg: rgba(255, 255, 255, 0.1);
+  --color-button-transparent-hover-bg: rgba(255, 255, 255, 0.15);
+
+  --color-input-bg: 32, 32, 38;
+  --color-input-border: 55, 55, 62;
+  --color-input-text: 240, 240, 245;
+  --color-input-placeholder: 120, 120, 130;
+
+  --color-scrollbar-track: 18, 18, 22;
+  --color-scrollbar-thumb: 75, 75, 82;
+  --color-scrollbar-thumb-hover: 100, 100, 108;
+}
+
+/* Dark theme glassmorphism */
+[data-theme='dark'] .theme-bg-card {
+  background-color: rgba(32, 32, 38, 0.15);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+[data-theme='dark'] .theme-border {
+  border-color: rgba(160, 160, 170, 0.4);
+}
+
+[data-theme='dark'] .theme-border-subtle {
+  border-color: rgba(160, 160, 170, 0.2);
+}
+
+[data-theme='dark'] .theme-shadow {
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.15),
+    inset 0 0.5px 0 0 rgba(160, 160, 170, 0.12);
+}
+
+[data-theme='dark'] .navbar-root {
+  background-color: rgb(18, 18, 22);
+  border-bottom-color: rgba(160, 160, 170, 0.35);
+}
+
+body {
+  color: rgb(var(--color-text-primary));
+  background: linear-gradient(160deg,
+      rgba(var(--color-page-bg-start), 0.96) 0%,
+      rgba(var(--color-page-bg-end), 0.92) 100%);
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+
+html {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--color-scrollbar-thumb)) rgb(var(--color-scrollbar-track));
+  background-color: rgb(var(--color-page-bg-start));
+}
+
+*::-webkit-scrollbar {
+  width: 0.65rem;
+  height: 0.65rem;
+}
+
+*::-webkit-scrollbar-track {
+  background: rgb(var(--color-scrollbar-track));
+}
+
+*::-webkit-scrollbar-thumb {
+  background: rgb(var(--color-scrollbar-thumb));
+  border-radius: 999px;
+  border: 2px solid rgb(var(--color-scrollbar-track));
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--color-scrollbar-thumb-hover));
+}
+
+.navbar-root {
+  background-color: rgb(var(--color-navbar-bg));
+  color: rgb(var(--color-navbar-text));
+  box-shadow: 0 4px 12px var(--color-card-shadow);
+  border-bottom: 1px solid rgb(var(--color-card-border));
+}
+
+.navbar-root .nav-link {
+  color: rgb(var(--color-navbar-link));
+  transition: color 150ms ease;
+}
+
+.navbar-root .nav-link:hover,
+.navbar-root .nav-link:focus {
+  color: rgb(var(--color-navbar-link-hover));
+}
+
+.navbar-root .nav-divider {
+  color: rgb(var(--color-navbar-divider));
+}
+
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.9rem;
+  border-radius: 9999px;
+  border: 1px solid var(--color-toggle-border);
+  background-color: var(--color-toggle-bg);
+  color: rgb(var(--color-toggle-text));
+  font-size: 0.85rem;
+  line-height: 1.25rem;
+  font-weight: 500;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+
+.theme-toggle:hover,
+.theme-toggle:focus-visible {
+  background-color: var(--color-toggle-hover-bg);
+  outline: none;
+}
+
+.theme-toggle-label {
+  font-size: 0.625rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(var(--color-text-secondary), 0.9);
+}
+
+.theme-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.theme-name {
+  font-variant: small-caps;
+  letter-spacing: 0.08em;
+}
+
+.app-shell {
+  background: linear-gradient(160deg,
+      rgba(var(--color-page-bg-start), 0.85) 0%,
+      rgba(var(--color-page-bg-end), 0.9) 100%);
+}
+
+/* Theme-aware utility classes */
+.theme-text-primary {
+  color: rgb(var(--color-text-primary));
+}
+
+.theme-text-secondary {
+  color: rgb(var(--color-text-secondary));
+}
+
+.theme-bg-card {
+  background-color: rgb(var(--color-card-bg));
+}
+
+.theme-border {
+  border-color: rgb(var(--color-card-border));
+}
+
+.theme-border-subtle {
+  border-color: rgba(var(--color-card-border), 0.5);
+}
+
+.theme-shadow {
+  box-shadow: 0 4px 16px var(--color-card-shadow);
+}
+
+/* Logo backdrop: dark center fading to page background */
+[data-theme='light'] .logo-backdrop {
+  background: radial-gradient(circle, #1e293b 35%, rgba(248, 250, 252, 0) 70%);
+  padding: 0.75rem;
+}
+
+[data-theme='light'] .logo-backdrop-sm {
+  background: radial-gradient(circle, #1e293b 40%, rgba(248, 250, 252, 0) 70%);
+  padding: 0.25rem;
+}
+
+/* Navbar has white background, so fade to white instead */
+.navbar-root .logo-backdrop-sm {
+  background: radial-gradient(circle, #1e293b 40%, rgba(255, 255, 255, 0) 70%);
+}
+
+.hide-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}

@@ -31,49 +31,6 @@ const config: Config = {
           text: 'rgb(var(--color-input-text))',
           placeholder: 'rgb(var(--color-input-placeholder))',
         },
-        // Ember design system colors
-        ember: {
-          bg: {
-            0: 'var(--ember-bg-0)',
-            1: 'var(--ember-bg-1)',
-            2: 'var(--ember-bg-2)',
-            3: 'var(--ember-bg-3)',
-            4: 'var(--ember-bg-4)',
-          },
-          border: {
-            DEFAULT: 'var(--ember-border)',
-            strong: 'var(--ember-border-strong)',
-          },
-          fire: {
-            0: 'var(--ember-fire-0)',
-            1: 'var(--ember-fire-1)',
-            2: 'var(--ember-fire-2)',
-            3: 'var(--ember-fire-3)',
-            4: 'var(--ember-fire-4)',
-            5: 'var(--ember-fire-5)',
-          },
-          moon: {
-            0: 'var(--ember-moon-0)',
-            1: 'var(--ember-moon-1)',
-            2: 'var(--ember-moon-2)',
-            3: 'var(--ember-moon-3)',
-          },
-          blood: {
-            1: 'var(--ember-blood-1)',
-            2: 'var(--ember-blood-2)',
-            3: 'var(--ember-blood-3)',
-          },
-          team: {
-            village: 'var(--ember-team-village)',
-            wolf: 'var(--ember-team-wolf)',
-          },
-          ink: {
-            0: 'var(--ember-ink-0)',
-            1: 'var(--ember-ink-1)',
-            2: 'var(--ember-ink-2)',
-            3: 'var(--ember-ink-3)',
-          },
-        },
       },
       backgroundImage: {
         "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
@@ -83,9 +40,6 @@ const config: Config = {
       fontFamily: {
         inter: ['var(--font-inter)'],
         mono: ['var(--font-roboto-mono)'],
-        pixel: ['var(--f-pixel)'],
-        console: ['var(--f-console)'],
-        body: ['var(--f-body)'],
       },
       boxShadow: {
         card: '0 4px 16px var(--color-card-shadow)',

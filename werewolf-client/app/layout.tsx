@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, Roboto_Mono } from "next/font/google";
+import { Inter, Roboto_Mono, Press_Start_2P, VT323 } from "next/font/google";
 import "./globals.css";
 import NavBar from "@/components/navbar";
 import React from "react";
@@ -18,6 +18,20 @@ const roboto_mono = Roboto_Mono({
   subsets: ['latin'],
   display: 'swap',
   variable: '--font-roboto-mono',
+})
+
+const pressStart2P = Press_Start_2P({
+  weight: '400',
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-pixel',
+})
+
+const vt323 = VT323({
+  weight: '400',
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-console',
 })
 
 export const metadata: Metadata = {
@@ -47,7 +61,7 @@ export default function RootLayout(
     { children }: Readonly<{ children: React.ReactNode; }>
 ) {
   return (
-      <html suppressHydrationWarning lang="en" className={`${inter.variable} ${roboto_mono.variable} min-h-full`}>
+      <html suppressHydrationWarning lang="en" className={`${inter.variable} ${roboto_mono.variable} ${pressStart2P.variable} ${vt323.variable} min-h-full`}>
           <head>
             <script dangerouslySetInnerHTML={{ __html: themeScript }} />
           </head>

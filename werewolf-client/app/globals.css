@@ -262,3 +262,463 @@ html {
 .hide-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   EMBER DESIGN SYSTEM — v2 tokens & utilities
+   Added alongside v1 vars. Do NOT remove v1 vars yet.
+   ═══════════════════════════════════════════════════════════════ */
+
+:root {
+  /* Base — deep forest night */
+  --ember-bg-0: #0a0a14;
+  --ember-bg-1: #12121e;
+  --ember-bg-2: #1a1a2a;
+  --ember-bg-3: #232338;
+  --ember-bg-4: #2d2d46;
+  --ember-border: #3a3a58;
+  --ember-border-strong: #4a4a70;
+
+  /* Fire — the anchor color */
+  --ember-fire-0: #2a0a05;
+  --ember-fire-1: #7a1f0a;
+  --ember-fire-2: #c4421a;
+  --ember-fire-3: #f07a22;
+  --ember-fire-4: #ffb347;
+  --ember-fire-5: #ffe58a;
+  --ember-fire-glow: 255 127 40;
+
+  /* Moonlight — cool accent */
+  --ember-moon-0: #1a2840;
+  --ember-moon-1: #4a6a9a;
+  --ember-moon-2: #8ab4e8;
+  --ember-moon-3: #c7dcf5;
+  --ember-moon-glow: 138 180 232;
+
+  /* Blood — danger / werewolf */
+  --ember-blood-1: #4a0f18;
+  --ember-blood-2: #a01830;
+  --ember-blood-3: #e23e52;
+
+  /* Team badges */
+  --ember-team-village: #5ec76a;
+  --ember-team-wolf: #e23e52;
+
+  /* Text */
+  --ember-ink-0: #f5f0e0;
+  --ember-ink-1: #d8d0bc;
+  --ember-ink-2: #9a94a8;
+  --ember-ink-3: #6a6480;
+
+  /* Typography */
+  --f-pixel: var(--font-pixel), 'Press Start 2P', monospace;
+  --f-console: var(--font-console), 'VT323', monospace;
+  --f-body: var(--font-inter), 'Inter', -apple-system, system-ui, sans-serif;
+
+  /* 16 player colors */
+  --ember-p00: #f07a22;
+  --ember-p01: #ffb347;
+  --ember-p02: #8ab4e8;
+  --ember-p03: #c7dcf5;
+  --ember-p04: #5ec76a;
+  --ember-p05: #a3e635;
+  --ember-p06: #e23e52;
+  --ember-p07: #ec4899;
+  --ember-p08: #a78bfa;
+  --ember-p09: #22d3ee;
+  --ember-p10: #f5dc6f;
+  --ember-p11: #14b8a6;
+  --ember-p12: #d4a574;
+  --ember-p13: #b45309;
+  --ember-p14: #dbb4ff;
+  --ember-p15: #96c8a2;
+  --ember-pgm: #ffe58a;
+}
+
+/* Player color data attributes */
+[data-c="0"]  { --pc: var(--ember-p00); }
+[data-c="1"]  { --pc: var(--ember-p01); }
+[data-c="2"]  { --pc: var(--ember-p02); }
+[data-c="3"]  { --pc: var(--ember-p03); }
+[data-c="4"]  { --pc: var(--ember-p04); }
+[data-c="5"]  { --pc: var(--ember-p05); }
+[data-c="6"]  { --pc: var(--ember-p06); }
+[data-c="7"]  { --pc: var(--ember-p07); }
+[data-c="8"]  { --pc: var(--ember-p08); }
+[data-c="9"]  { --pc: var(--ember-p09); }
+[data-c="10"] { --pc: var(--ember-p10); }
+[data-c="11"] { --pc: var(--ember-p11); }
+[data-c="12"] { --pc: var(--ember-p12); }
+[data-c="13"] { --pc: var(--ember-p13); }
+[data-c="14"] { --pc: var(--ember-p14); }
+[data-c="15"] { --pc: var(--ember-p15); }
+[data-c="gm"] { --pc: var(--ember-pgm); }
+
+/* ═══════════ Ember utility classes ═══════════ */
+
+/* Pixel-bordered panel — signature chrome */
+.panel {
+  background: var(--ember-bg-3);
+  border: 2px solid var(--ember-border);
+  box-shadow:
+    0 0 0 2px var(--ember-bg-1),
+    0 0 0 4px var(--ember-border),
+    0 8px 0 0 rgba(0,0,0,0.4);
+  border-radius: 0;
+}
+
+.panel-sm {
+  background: var(--ember-bg-2);
+  border: 2px solid var(--ember-border);
+  border-radius: 0;
+}
+
+/* Pixel button */
+.pbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  font-family: var(--f-pixel);
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  color: var(--ember-ink-0);
+  background: var(--ember-bg-3);
+  border: 2px solid var(--ember-border-strong);
+  box-shadow: 0 3px 0 0 var(--ember-bg-0), inset 0 1px 0 0 rgba(255,255,255,0.05);
+  text-transform: uppercase;
+  transition: transform 80ms, box-shadow 80ms;
+  cursor: pointer;
+  user-select: none;
+}
+.pbtn:hover { background: var(--ember-bg-4); border-color: var(--ember-ink-2); }
+.pbtn:active { transform: translateY(2px); box-shadow: 0 1px 0 0 var(--ember-bg-0); }
+
+.pbtn-primary {
+  background: linear-gradient(180deg, var(--ember-fire-3), var(--ember-fire-2));
+  border-color: var(--ember-fire-4);
+  color: #1a0a00;
+  box-shadow: 0 3px 0 0 var(--ember-fire-1), inset 0 1px 0 0 var(--ember-fire-4);
+  text-shadow: 0 1px 0 rgba(255,200,100,0.3);
+}
+.pbtn-primary:hover {
+  background: linear-gradient(180deg, var(--ember-fire-4), var(--ember-fire-3));
+}
+
+.pbtn-danger {
+  background: linear-gradient(180deg, var(--ember-blood-3), var(--ember-blood-2));
+  border-color: #ff6676;
+  color: #fff;
+  box-shadow: 0 3px 0 0 var(--ember-blood-1), inset 0 1px 0 0 #ff8090;
+}
+
+.pbtn-ghost {
+  background: transparent;
+  border-color: var(--ember-border);
+  color: var(--ember-ink-1);
+  box-shadow: none;
+}
+.pbtn-ghost:hover { background: var(--ember-bg-3); color: var(--ember-ink-0); }
+
+.pbtn-sm { padding: 6px 10px; font-size: 8px; }
+
+/* Text utilities */
+.pixel-text { font-family: var(--f-pixel); letter-spacing: 0.5px; }
+.console-text { font-family: var(--f-console); letter-spacing: 1px; font-size: 1.15em; }
+
+/* Pixel rendering for sprites */
+.pixel, .sprite, svg.pixel { image-rendering: pixelated; image-rendering: crisp-edges; }
+
+/* Ember animations */
+@keyframes ember-flicker {
+  0%   { opacity: 0.8; transform: scale(1); }
+  50%  { opacity: 1;   transform: scale(1.04); }
+  100% { opacity: 0.85; transform: scale(0.98); }
+}
+@keyframes ember-flameDance {
+  0%, 100% { transform: translateX(-50%) scaleY(1)   scaleX(1); }
+  25%      { transform: translateX(-50%) scaleY(1.1) scaleX(0.9); }
+  50%      { transform: translateX(-50%) scaleY(0.95) scaleX(1.05); }
+  75%      { transform: translateX(-50%) scaleY(1.05) scaleX(0.95); }
+}
+@keyframes ember-bob {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-3px); }
+}
+@keyframes ember-pulse {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50%      { opacity: 1;   transform: scale(1.15); }
+}
+
+/* Ember input */
+.chat-input {
+  background: var(--ember-bg-0);
+  border: 2px solid var(--ember-border);
+  color: var(--ember-ink-0);
+  padding: 10px 14px;
+  font-size: 14.5px;
+  outline: none;
+  resize: none;
+  font-family: var(--f-body);
+  border-radius: 0;
+}
+.chat-input:focus { border-color: var(--ember-fire-3); }
+.chat-input::placeholder { color: var(--ember-ink-3); font-style: italic; }
+.chat-input:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Pixel divider */
+.hr-pixel {
+  height: 2px;
+  background: repeating-linear-gradient(90deg, var(--ember-border) 0 4px, transparent 4px 8px);
+  margin: 16px 0;
+}
+
+/* ═══════════ Campfire Scene ═══════════ */
+
+.scene {
+  position: relative;
+  background:
+    radial-gradient(ellipse 60% 40% at 50% 80%, rgba(var(--ember-fire-glow), 0.18), transparent 70%),
+    radial-gradient(ellipse 100% 60% at 50% 100%, var(--ember-bg-0), transparent 80%),
+    linear-gradient(180deg, #0a0a18 0%, #12121e 50%, #1a1625 100%);
+  overflow: hidden;
+  isolation: isolate;
+}
+.scene.night {
+  background:
+    radial-gradient(ellipse 40% 30% at 50% 80%, rgba(var(--ember-fire-glow), 0.12), transparent 70%),
+    radial-gradient(ellipse 100% 60% at 70% 20%, rgba(var(--ember-moon-glow), 0.14), transparent 60%),
+    linear-gradient(180deg, #05050e 0%, #0a0a18 50%, #12121e 100%);
+}
+.scene.voting {
+  background:
+    radial-gradient(ellipse 60% 40% at 50% 80%, rgba(var(--ember-fire-glow), 0.22), transparent 70%),
+    linear-gradient(180deg, #1a0a12 0%, #12121e 50%, #1a1625 100%);
+}
+.scene.results {
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 50%, rgba(var(--ember-fire-glow), 0.30), transparent 70%),
+    linear-gradient(180deg, #1a0f08 0%, #12121e 100%);
+}
+
+/* Stars */
+.scene .stars {
+  position: absolute; inset: 0;
+  background-image:
+    radial-gradient(1px 1px at 14% 18%, #fff, transparent),
+    radial-gradient(1px 1px at 34% 9%,  #e8d8a0, transparent),
+    radial-gradient(1px 1px at 56% 24%, #fff, transparent),
+    radial-gradient(1px 1px at 78% 12%, #c7dcf5, transparent),
+    radial-gradient(1px 1px at 92% 22%, #fff, transparent),
+    radial-gradient(1px 1px at 22% 32%, #a0b0d0, transparent),
+    radial-gradient(1px 1px at 68% 34%, #fff, transparent),
+    radial-gradient(1px 1px at 46% 16%, #d8d0bc, transparent),
+    radial-gradient(1px 1px at 8%  44%, #c7dcf5, transparent),
+    radial-gradient(1px 1px at 88% 48%, #fff, transparent);
+  opacity: 0.7;
+  pointer-events: none;
+}
+.scene.night .stars { opacity: 1; }
+.scene.day .stars { opacity: 0.15; }
+
+/* Treeline silhouette */
+.scene .treeline {
+  position: absolute; left: 0; right: 0; bottom: 38%; height: 20%;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='60' viewBox='0 0 400 60'><path fill='%23050510' d='M0 60V40l12-8 6 4 10-12 8 6 12-16 10 10 6-6 14 10 8-4 12 8 14-14 10 8 8-4 14 10 6-6 12 12 10-8 8 6 14-14 10 10 8-8 12 14 14-4 6 8 12-10 10 10 14-8 6 4 12 6 8-12 10 8 12-6 6 8 12 2 8-8 14 10 6-4 10 4 14-6 6 6 10-2 8 4V60z'/></svg>");
+  background-repeat: repeat-x;
+  background-size: 400px 60px;
+  image-rendering: pixelated;
+  opacity: 0.9;
+}
+
+/* Moon */
+.scene .moon {
+  position: absolute; top: 8%; right: 10%;
+  width: 56px; height: 56px;
+  background: radial-gradient(circle at 35% 35%, #fff 0%, #e8dcb8 40%, #c7b888 70%, transparent 72%);
+  box-shadow: 0 0 40px 8px rgba(var(--ember-moon-glow), 0.2);
+  filter: drop-shadow(0 0 2px rgba(199,220,245,0.4));
+  pointer-events: none;
+}
+.scene.day .moon { opacity: 0; }
+
+/* Sun */
+.scene .sun {
+  position: absolute; top: 8%; right: 10%;
+  width: 56px; height: 56px;
+  background: radial-gradient(circle at 40% 40%, #ffe58a 0%, #f07a22 60%, transparent 70%);
+  box-shadow: 0 0 60px 16px rgba(255,183,71,0.4);
+  opacity: 0;
+  pointer-events: none;
+}
+.scene.day .sun { opacity: 1; }
+
+/* Ground ellipse */
+.scene .ground {
+  position: absolute; inset: 60% 0 0 0;
+  background: radial-gradient(ellipse 80% 100% at 50% 0%, #1f1a15 0%, transparent 70%);
+  pointer-events: none;
+}
+
+/* Campfire at center */
+.scene .campfire {
+  position: absolute;
+  left: 50%; top: 62%;
+  transform: translate(-50%, -50%);
+  width: 80px; height: 80px;
+  pointer-events: none;
+  z-index: 5;
+}
+.scene .campfire .glow {
+  position: absolute; inset: -60px;
+  background: radial-gradient(circle, rgba(var(--ember-fire-glow), 0.45) 0%, rgba(var(--ember-fire-glow), 0.15) 40%, transparent 70%);
+  animation: ember-flicker 1.2s ease-in-out infinite alternate;
+}
+.scene.night .campfire .glow { opacity: 0.8; }
+
+/* Fire sparks */
+.scene .sparks { position: absolute; inset: 0; pointer-events: none; }
+.scene .spark {
+  position: absolute; bottom: 50%; left: 50%;
+  width: 3px; height: 3px;
+  background: var(--ember-fire-4);
+  box-shadow: 0 0 4px var(--ember-fire-4);
+  animation: ember-sparkRise 2s ease-out infinite;
+}
+@keyframes ember-sparkRise {
+  0%   { transform: translate(-50%, 0) scale(1); opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--dx, 0px)), -120px) scale(0); opacity: 0; }
+}
+
+/* Seat logs */
+.scene .log {
+  position: absolute;
+  width: 48px; height: 12px;
+  background: linear-gradient(180deg, #5a3a20 0%, #3a2515 60%, #2a1a0c 100%);
+  border: 1px solid #1a0e06;
+  box-shadow: inset 0 1px 0 rgba(255,180,100,0.2), 0 2px 0 rgba(0,0,0,0.5);
+  image-rendering: pixelated;
+}
+.scene .log::before {
+  content: ''; position: absolute; left: 2px; top: 2px; width: 4px; height: 4px;
+  background: #7a5030; border-radius: 50%;
+  box-shadow: 8px 1px 0 #7a5030, 18px 0 0 #7a5030, 28px 2px 0 #7a5030, 38px 0 0 #7a5030;
+}
+
+/* Character seat */
+.scene .seat {
+  position: absolute;
+  width: 56px; height: 72px;
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+  cursor: pointer;
+  transition: transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  z-index: 4;
+}
+.scene .seat:hover { transform: translateY(-4px); }
+.scene .seat.you { z-index: 6; }
+
+/* Nameplate */
+.scene .seat .nameplate {
+  position: absolute; top: -2px; left: 50%; transform: translateX(-50%);
+  font-family: var(--f-pixel); font-size: 7px;
+  white-space: nowrap; padding: 3px 5px;
+  background: var(--ember-bg-0); color: var(--pc, var(--ember-ink-0));
+  border: 1px solid var(--pc, var(--ember-border));
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  pointer-events: none;
+  opacity: 0.9;
+}
+.scene .seat.speaking .nameplate { background: var(--pc); color: #0a0a14; }
+.scene .seat.dead .nameplate { color: var(--ember-ink-3); border-color: var(--ember-ink-3); opacity: 0.6; text-decoration: line-through; }
+
+/* Sprite wrapper */
+.scene .seat .sprite-wrap {
+  position: relative;
+  width: 48px; height: 56px;
+  margin-bottom: 4px;
+  display: flex; align-items: flex-end; justify-content: center;
+}
+
+/* Speaking glow */
+.scene .seat.speaking .sprite-wrap::before {
+  content: '';
+  position: absolute; inset: -8px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,183,71,0.4) 0%, transparent 70%);
+  animation: ember-pulse 1s ease-in-out infinite;
+  z-index: -1;
+}
+
+/* Dead state */
+.scene .seat.dead .sprite-wrap { filter: grayscale(1) brightness(0.45); }
+.scene .seat.dead { opacity: 0.75; }
+
+/* "YOU" marker */
+.scene .seat .you-marker {
+  position: absolute; bottom: -12px; left: 50%; transform: translateX(-50%);
+  font-family: var(--f-pixel); font-size: 6px; color: var(--ember-fire-4);
+  text-shadow: 0 0 4px var(--ember-fire-3);
+}
+
+/* Dead shadow */
+.scene .seat.dead .sprite-wrap::after {
+  content: ''; position: absolute; bottom: -4px;
+  width: 40px; height: 4px; background: rgba(0,0,0,0.6);
+  border-radius: 50%; filter: blur(2px);
+}
+
+/* Thinking dots */
+.thinking {
+  display: inline-flex; gap: 3px; align-items: center;
+}
+.thinking span {
+  width: 5px; height: 5px; background: var(--ember-fire-4);
+  animation: ember-dotPulse 1s ease-in-out infinite;
+}
+.thinking span:nth-child(2) { animation-delay: 0.15s; }
+.thinking span:nth-child(3) { animation-delay: 0.3s; }
+@keyframes ember-dotPulse {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50%      { opacity: 1; transform: scale(1); }
+}
+
+/* Hover card (desktop) */
+.scene .hover-card {
+  position: absolute;
+  z-index: 100;
+  background: var(--ember-bg-0);
+  border: 2px solid var(--pc, var(--ember-fire-4));
+  box-shadow: 4px 4px 0 rgba(0,0,0,0.6);
+  padding: 12px;
+  width: 200px;
+  pointer-events: none;
+  font-size: 12px;
+}
+.scene .hover-card h4 {
+  font-family: var(--f-pixel); font-size: 11px; margin: 0 0 6px 0;
+  color: var(--pc);
+}
+.scene .hover-card .row { display: flex; justify-content: space-between; gap: 8px; padding: 2px 0; color: var(--ember-ink-1); }
+.scene .hover-card .row .k { color: var(--ember-ink-3); font-family: var(--f-console); font-size: 13px; }
+
+/* Mobile scene strip */
+@media (max-width: 900px) {
+  .scene.mobile-strip {
+    height: 200px !important;
+    min-height: 200px !important;
+    border-right: none !important;
+  }
+  .scene.mobile-strip .moon { top: 6%; right: 6%; width: 36px; height: 36px; }
+  .scene.mobile-strip .sun { top: 6%; right: 6%; width: 36px; height: 36px; }
+  .scene.mobile-strip .campfire { width: 56px; height: 56px; }
+  .scene.mobile-strip .seat { width: 40px; height: 52px; }
+  .scene.mobile-strip .seat .nameplate { font-size: 6px; padding: 2px 3px; }
+  .scene.mobile-strip .log { width: 32px; height: 8px; transform: scale(0.85) !important; }
+
+  .scene .hover-card { display: none; }
+}
+
+@media (max-width: 480px) {
+  .scene.mobile-strip { height: 170px !important; min-height: 170px !important; }
+  .scene.mobile-strip .seat { width: 34px; height: 44px; }
+}

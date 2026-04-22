@@ -1,17 +1,31 @@
 'use client';
 
 import React, { useState } from 'react';
-import { buttonTransparentStyle } from '@/app/constants';
 import { ROLE_CONFIGS, Game, GAME_ROLES } from '@/app/api/game-models';
 import DraggableDialog from './DraggableDialog';
 import { useUIControls } from '../context/UIControlsContext';
+import { getColor } from '@/utils/ember-colors';
+
+const ROLE_ACCENTS: Record<string, string> = {
+    [GAME_ROLES.WEREWOLF]:  'var(--ember-blood-3)',
+    [GAME_ROLES.DOCTOR]:    'var(--ember-team-village)',
+    [GAME_ROLES.DETECTIVE]: 'var(--ember-moon-2)',
+    [GAME_ROLES.MANIAC]:    'var(--ember-fire-3)',
+};
+
+const ROLE_DESCS: Record<string, string> = {
+    [GAME_ROLES.WEREWOLF]:  'The pack hunts tonight. Who will not see the dawn?',
+    [GAME_ROLES.DOCTOR]:    'Your healing wards off one death tonight. Choose wisely.',
+    [GAME_ROLES.DETECTIVE]: 'Peer beneath the mask. Is this soul Good or Bad?',
+    [GAME_ROLES.MANIAC]:    'Drag one soul into the night. All actions against them fail.',
+};
 
 interface NightActionModalProps {
     onClose: () => void;
     onAction: (targetPlayer: string, message: string, actionType?: 'protect' | 'kill') => void;
     game: Game;
     currentRole: string;
-    isLastInQueue: boolean; // Whether this is the last player in the action queue
+    isLastInQueue: boolean;
     isSubmitting?: boolean;
 }
 
@@ -34,21 +48,17 @@ export default function NightActionModal({
 
     if (!isOpen) return null;
 
-    // Check if Doctor's kill ability is available
+    const accent = ROLE_ACCENTS[currentRole] || 'var(--ember-fire-3)';
+    const flavorText = ROLE_DESCS[currentRole] || '';
+
     const isDoctorWithKillAbility = currentRole === GAME_ROLES.DOCTOR &&
         !game.oneTimeAbilitiesUsed?.doctorKill;
-
-    // Check if Detective's kill ability is available
     const isDetectiveWithKillAbility = currentRole === GAME_ROLES.DETECTIVE &&
         !game.oneTimeAbilitiesUsed?.detectiveKill;
 
     const roleConfig = ROLE_CONFIGS[currentRole];
-    if (!roleConfig) {
-        console.error(`Role config not found for role: ${currentRole}`);
-        return null;
-    }
+    if (!roleConfig) return null;
 
-    // Get available targets based on role
     const getAvailableTargets = () => {
         const allPlayers = [
             { name: game.humanPlayerName, isAlive: true, isHuman: true },
@@ -58,30 +68,17 @@ export default function NightActionModal({
                 isHuman: false
             }))
         ];
-
-        // Get previous target for roles that can't target same player twice in a row
         const previousTarget = game.previousNightResults?.[currentRole]?.target;
 
         switch (currentRole) {
             case GAME_ROLES.WEREWOLF:
-                // Can target anyone alive except themselves (and other werewolves)
                 return allPlayers.filter(p => p.isAlive && p.name !== game.humanPlayerName);
             case GAME_ROLES.DOCTOR:
-                // Can protect anyone alive including themselves, but not same target as last night
-                return allPlayers.filter(p =>
-                    p.isAlive &&
-                    p.name !== previousTarget
-                );
+                return allPlayers.filter(p => p.isAlive && p.name !== previousTarget);
             case GAME_ROLES.DETECTIVE:
-                // Can investigate anyone alive except themselves
                 return allPlayers.filter(p => p.isAlive && p.name !== game.humanPlayerName);
             case GAME_ROLES.MANIAC:
-                // Can abduct anyone alive except themselves, but not same target as last night
-                return allPlayers.filter(p =>
-                    p.isAlive &&
-                    p.name !== game.humanPlayerName &&
-                    p.name !== previousTarget
-                );
+                return allPlayers.filter(p => p.isAlive && p.name !== game.humanPlayerName && p.name !== previousTarget);
             default:
                 return [];
         }
@@ -90,23 +87,21 @@ export default function NightActionModal({
     const availableTargets = getAvailableTargets();
 
     const handleSubmit = async () => {
-        if (selectedPlayer) {
-            const finalMessage = message.trim() || '';
-            // Include actionType for Doctor and Detective when kill is selected
-            if (currentRole === GAME_ROLES.DOCTOR && isDoctorWithKillAbility) {
-                await onAction(selectedPlayer, finalMessage, actionType as 'protect' | 'kill');
-            } else if (currentRole === GAME_ROLES.DETECTIVE && actionType === 'kill') {
-                await onAction(selectedPlayer, finalMessage, 'kill');
-            } else {
-                await onAction(selectedPlayer, finalMessage);
-            }
+        if (!selectedPlayer) return;
+        const finalMessage = message.trim() || '';
+        if (currentRole === GAME_ROLES.DOCTOR && isDoctorWithKillAbility) {
+            await onAction(selectedPlayer, finalMessage, actionType as 'protect' | 'kill');
+        } else if (currentRole === GAME_ROLES.DETECTIVE && actionType === 'kill') {
+            await onAction(selectedPlayer, finalMessage, 'kill');
+        } else {
+            await onAction(selectedPlayer, finalMessage);
         }
     };
 
     const handleClose = () => {
         setSelectedPlayer('');
         setMessage('');
-        setActionType(currentRole === GAME_ROLES.DETECTIVE ? 'investigate' : 'protect');  // Reset to default
+        setActionType(currentRole === GAME_ROLES.DETECTIVE ? 'investigate' : 'protect');
         onClose();
     };
 
@@ -114,151 +109,226 @@ export default function NightActionModal({
         <DraggableDialog
             isOpen={isOpen}
             title={roleConfig.actionTitle || 'Night Action'}
-            className="max-w-md w-full mx-4"
+            className="w-[540px]"
+            accent={accent}
+            onClose={handleClose}
         >
-            <div className="mb-2 text-sm theme-text-secondary">
-                {roleConfig.description}
+            {/* Flavor text */}
+            <p style={{ color: 'var(--ember-ink-1)', margin: '0 0 14px 0', fontSize: 14 }}>
+                {flavorText}
+            </p>
+
+            {/* Target grid */}
+            <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(2, 1fr)',
+                gap: 6,
+                marginBottom: 14,
+            }}>
+                {availableTargets.map((p, i) => {
+                    const colorIdx = (i + 1) % 16;
+                    const color = getColor(colorIdx);
+                    const isSelected = selectedPlayer === p.name;
+
+                    return (
+                        <button
+                            key={p.name}
+                            data-c={colorIdx}
+                            onClick={() => setSelectedPlayer(p.name)}
+                            disabled={isSubmitting}
+                            style={{
+                                padding: '10px 12px',
+                                background: isSelected ? color : 'var(--ember-bg-3)',
+                                border: `2px solid ${isSelected ? 'var(--ember-ink-0)' : 'var(--ember-border)'}`,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 10,
+                                color: isSelected ? '#0a0a14' : 'var(--ember-ink-1)',
+                                cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                                textAlign: 'left' as const,
+                            }}
+                        >
+                            <div style={{
+                                width: 18, height: 18,
+                                background: color,
+                                border: '2px solid var(--ember-bg-0)',
+                                flexShrink: 0,
+                            }} />
+                            <div className="pixel-text" style={{ fontSize: 9, flex: 1 }}>
+                                {p.name.split(' ')[0]}
+                            </div>
+                        </button>
+                    );
+                })}
             </div>
 
-            <div className="mb-6">
-                <div className="mb-4">
-                    <label className="block theme-text-primary text-sm mb-2">{roleConfig.targetLabel} <span className="text-red-400">*</span></label>
-                    <select
-                        className="w-full p-2 rounded bg-[rgb(var(--color-input-bg))] text-[rgb(var(--color-input-text))] border border-[rgb(var(--color-input-border))] focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        value={selectedPlayer}
-                        onChange={(e) => setSelectedPlayer(e.target.value)}
-                        disabled={isSubmitting}
-                    >
-                        <option value="">Select a player...</option>
-                        {availableTargets.map((target) => (
-                            <option key={target.name} value={target.name}>
-                                {target.name}
-                            </option>
-                        ))}
-                    </select>
-                </div>
-
-                {/* Doctor's action type toggle - only show when kill ability is available */}
-                {isDoctorWithKillAbility && (
-                    <div className="mb-4 p-3 rounded border border-[rgb(var(--color-input-border))] bg-[rgb(var(--color-input-bg))]">
-                        <label className="block theme-text-primary text-sm mb-2 font-semibold">
-                            Choose your action:
-                        </label>
-                        <div className="flex space-x-4">
-                            <label className="flex items-center cursor-pointer">
-                                <input
-                                    type="radio"
-                                    name="doctorAction"
-                                    value="protect"
-                                    checked={actionType === 'protect'}
-                                    onChange={() => setActionType('protect')}
-                                    disabled={isSubmitting}
-                                    className="mr-2"
-                                />
-                                <span className="theme-text-primary">
-                                    Protect
-                                </span>
-                            </label>
-                            <label className="flex items-center cursor-pointer">
-                                <input
-                                    type="radio"
-                                    name="doctorAction"
-                                    value="kill"
-                                    checked={actionType === 'kill'}
-                                    onChange={() => setActionType('kill')}
-                                    disabled={isSubmitting}
-                                    className="mr-2"
-                                />
-                                <span className="text-red-400">
-                                    Kill (One-Time)
-                                </span>
-                            </label>
-                        </div>
-                        {actionType === 'kill' && (
-                            <p className="text-xs text-red-400 mt-2">
-                                Warning: This is a ONE-TIME ability. Once used, you cannot use it again.
-                            </p>
-                        )}
+            {/* Doctor's action type toggle */}
+            {isDoctorWithKillAbility && (
+                <div style={{
+                    marginBottom: 14,
+                    padding: 12,
+                    background: 'var(--ember-bg-0)',
+                    border: '2px solid var(--ember-border)',
+                }}>
+                    <div className="pixel-text" style={{
+                        fontSize: 9, color: 'var(--ember-ink-2)',
+                        marginBottom: 8, letterSpacing: 1,
+                    }}>
+                        CHOOSE YOUR ACTION
                     </div>
-                )}
-
-                {/* Detective's action type toggle - only show when kill ability is available */}
-                {isDetectiveWithKillAbility && (
-                    <div className="mb-4 p-3 rounded border border-[rgb(var(--color-input-border))] bg-[rgb(var(--color-input-bg))]">
-                        <label className="block theme-text-primary text-sm mb-2 font-semibold">
-                            Choose your action:
-                        </label>
-                        <div className="flex space-x-4">
-                            <label className="flex items-center cursor-pointer">
-                                <input
-                                    type="radio"
-                                    name="detectiveAction"
-                                    value="investigate"
-                                    checked={actionType === 'investigate'}
-                                    onChange={() => setActionType('investigate')}
-                                    disabled={isSubmitting}
-                                    className="mr-2"
-                                />
-                                <span className="theme-text-primary">
-                                    Investigate
-                                </span>
-                            </label>
-                            <label className="flex items-center cursor-pointer">
-                                <input
-                                    type="radio"
-                                    name="detectiveAction"
-                                    value="kill"
-                                    checked={actionType === 'kill'}
-                                    onChange={() => setActionType('kill')}
-                                    disabled={isSubmitting}
-                                    className="mr-2"
-                                />
-                                <span className="text-red-400">
-                                    Kill (One-Time)
-                                </span>
-                            </label>
-                        </div>
-                        {actionType === 'kill' && (
-                            <p className="text-xs text-red-400 mt-2">
-                                Warning: This is a ONE-TIME ability. Once used, you cannot use it again.
-                            </p>
-                        )}
+                    <div style={{ display: 'flex', gap: 0, border: '1px solid var(--ember-border)' }}>
+                        <button
+                            onClick={() => setActionType('protect')}
+                            disabled={isSubmitting}
+                            className="pixel-text"
+                            style={{
+                                flex: 1, padding: '8px 4px', fontSize: 8,
+                                background: actionType === 'protect' ? 'var(--ember-team-village)' : 'var(--ember-bg-2)',
+                                color: actionType === 'protect' ? '#0a0a14' : 'var(--ember-ink-2)',
+                                borderRight: '1px solid var(--ember-border)',
+                                cursor: 'pointer',
+                            }}
+                        >
+                            PROTECT
+                        </button>
+                        <button
+                            onClick={() => setActionType('kill')}
+                            disabled={isSubmitting}
+                            className="pixel-text"
+                            style={{
+                                flex: 1, padding: '8px 4px', fontSize: 8,
+                                background: actionType === 'kill' ? 'var(--ember-blood-3)' : 'var(--ember-bg-2)',
+                                color: actionType === 'kill' ? '#fff' : 'var(--ember-ink-2)',
+                                cursor: 'pointer',
+                            }}
+                        >
+                            KILL (ONE-TIME)
+                        </button>
                     </div>
-                )}
-
-                <div className="mb-4">
-                    <label className="block theme-text-primary text-sm mb-2">Narrative hint <span className="text-xs theme-text-secondary font-normal">(Optional)</span></label>
-                    <p className="text-xs theme-text-secondary mb-2">Describe how you imagine this action playing out. The Game Master will weave it into the night story without revealing your identity.</p>
-                    <textarea
-                        className="w-full p-2 rounded bg-[rgb(var(--color-input-bg))] text-[rgb(var(--color-input-text))] border border-[rgb(var(--color-input-border))] focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder-[rgb(var(--color-input-placeholder))]"
-                        rows={3}
-                        placeholder="e.g. &quot;A shadow slipped through the fog, silent as death itself...&quot;"
-                        value={message}
-                        onChange={(e) => setMessage(e.target.value)}
-                        disabled={isSubmitting}
-                    />
+                    {actionType === 'kill' && (
+                        <p className="console-text" style={{
+                            fontSize: 12, color: 'var(--ember-blood-3)',
+                            marginTop: 6, marginBottom: 0,
+                        }}>
+                            ⚠ This is a ONE-TIME ability. Once used, you cannot use it again.
+                        </p>
+                    )}
                 </div>
-            </div>
+            )}
 
-            <div className="flex space-x-3 justify-end">
-                <button
-                    className={`${buttonTransparentStyle}`}
-                    onClick={handleClose}
+            {/* Detective's action type toggle */}
+            {isDetectiveWithKillAbility && (
+                <div style={{
+                    marginBottom: 14,
+                    padding: 12,
+                    background: 'var(--ember-bg-0)',
+                    border: '2px solid var(--ember-border)',
+                }}>
+                    <div className="pixel-text" style={{
+                        fontSize: 9, color: 'var(--ember-ink-2)',
+                        marginBottom: 8, letterSpacing: 1,
+                    }}>
+                        CHOOSE YOUR ACTION
+                    </div>
+                    <div style={{ display: 'flex', gap: 0, border: '1px solid var(--ember-border)' }}>
+                        <button
+                            onClick={() => setActionType('investigate')}
+                            disabled={isSubmitting}
+                            className="pixel-text"
+                            style={{
+                                flex: 1, padding: '8px 4px', fontSize: 8,
+                                background: actionType === 'investigate' ? 'var(--ember-moon-2)' : 'var(--ember-bg-2)',
+                                color: actionType === 'investigate' ? '#0a0a14' : 'var(--ember-ink-2)',
+                                borderRight: '1px solid var(--ember-border)',
+                                cursor: 'pointer',
+                            }}
+                        >
+                            INVESTIGATE
+                        </button>
+                        <button
+                            onClick={() => setActionType('kill')}
+                            disabled={isSubmitting}
+                            className="pixel-text"
+                            style={{
+                                flex: 1, padding: '8px 4px', fontSize: 8,
+                                background: actionType === 'kill' ? 'var(--ember-blood-3)' : 'var(--ember-bg-2)',
+                                color: actionType === 'kill' ? '#fff' : 'var(--ember-ink-2)',
+                                cursor: 'pointer',
+                            }}
+                        >
+                            KILL (ONE-TIME)
+                        </button>
+                    </div>
+                    {actionType === 'kill' && (
+                        <p className="console-text" style={{
+                            fontSize: 12, color: 'var(--ember-blood-3)',
+                            marginTop: 6, marginBottom: 0,
+                        }}>
+                            ⚠ This is a ONE-TIME ability. Once used, you cannot use it again.
+                        </p>
+                    )}
+                </div>
+            )}
+
+            {/* Narrative hint textarea */}
+            <div style={{ marginBottom: 14 }}>
+                <label className="pixel-text" style={{
+                    display: 'block', fontSize: 9,
+                    color: 'var(--ember-ink-2)', marginBottom: 4, letterSpacing: 1,
+                }}>
+                    NARRATIVE HINT <span className="console-text" style={{ fontSize: 11, color: 'var(--ember-ink-3)' }}>(Optional)</span>
+                </label>
+                <p className="console-text" style={{
+                    fontSize: 13, color: 'var(--ember-ink-3)',
+                    margin: '0 0 6px 0',
+                }}>
+                    Describe how you imagine this action playing out. The Game Master will weave it into the night story.
+                </p>
+                <textarea
+                    className="chat-input"
+                    rows={3}
+                    placeholder='e.g. "A shadow slipped through the fog, silent as death itself..."'
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
                     disabled={isSubmitting}
-                >
-                    Cancel
+                    style={{ width: '100%', boxSizing: 'border-box' }}
+                />
+            </div>
+
+            {/* Warning box */}
+            <div style={{
+                background: 'var(--ember-bg-0)',
+                padding: 10,
+                border: '1px dashed var(--ember-border)',
+                fontFamily: 'var(--f-console)',
+                fontSize: 13,
+                color: 'var(--ember-ink-2)',
+                marginBottom: 14,
+            }}>
+                ⚠ This action is final.
+                {currentRole === GAME_ROLES.WEREWOLF && ' Other wolves will see your choice.'}
+            </div>
+
+            {/* Actions */}
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                <button className="pbtn pbtn-ghost" onClick={handleClose} disabled={isSubmitting}>
+                    CANCEL
                 </button>
                 <button
-                    className={`${buttonTransparentStyle} ${(!selectedPlayer || isSubmitting) ? 'opacity-50 cursor-not-allowed' : ''} ${actionType === 'kill' ? 'bg-red-600/80 hover:bg-red-700/80 border-red-500' : 'bg-blue-600/80 hover:bg-blue-700/80 border-blue-500'} text-white`}
-                    onClick={handleSubmit}
+                    className={`pbtn ${actionType === 'kill' ? 'pbtn-danger' : 'pbtn-primary'}`}
                     disabled={!selectedPlayer || isSubmitting}
+                    style={{
+                        opacity: (selectedPlayer && !isSubmitting) ? 1 : 0.4,
+                        borderColor: accent,
+                    }}
+                    onClick={handleSubmit}
                 >
-                    {isSubmitting ? 'Submitting...' : (
+                    {isSubmitting ? '▸ ACTING...' : (
                         currentRole === GAME_ROLES.DOCTOR && actionType === 'kill'
-                            ? "Doctor's Mistake (Kill)"
+                            ? "▸ DOCTOR'S MISTAKE"
                             : currentRole === GAME_ROLES.DETECTIVE && actionType === 'kill'
-                                ? "Detective's Kill"
-                                : roleConfig.submitButtonText
+                                ? "▸ DETECTIVE'S KILL"
+                                : `▸ ${(roleConfig.submitButtonText || 'ACT').toUpperCase()}`
                     )}
                 </button>
             </div>
