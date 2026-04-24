@@ -5,7 +5,6 @@ import { getGame, updateBotModel, updateGameMasterModel, clearGameErrorState, se
 import { startNewDay, summarizePastDay } from "@/app/api/night-actions";
 import GameChat from "@/app/games/[id]/components/GameChat";
 import ModelSelectionDialog from "@/app/games/[id]/components/ModelSelectionDialog";
-import { buttonTransparentStyle } from "@/app/constants";
 import { getModelDisplayName } from "@/app/ai/ai-models";
 import { GAME_STATES, GAME_ROLES, AUTO_VOTE_COEFFICIENT, BOT_SELECTION_CONFIG } from "@/app/api/game-models";
 import type { Game, GameActionResponse, GameMessage } from "@/app/api/game-models";
@@ -77,7 +76,10 @@ function GamePageContent({
     const isGameOver = game.gameState === GAME_STATES.GAME_OVER || game.gameState === GAME_STATES.AFTER_GAME_DISCUSSION;
 
     // Mobile panel overlay state
-    const [mobilePanel, setMobilePanel] = useState<'players' | 'status' | null>(null);
+    const [mobilePanel, setMobilePanel] = useState<'status' | null>(null);
+
+    // Campfire scene visibility — when collapsed, chat takes full height
+    const [sceneCollapsed, setSceneCollapsed] = useState(false);
 
     const modelUsageCounts = useMemo(() => {
         const counts: Record<string, number> = {};
@@ -735,7 +737,7 @@ function GamePageContent({
                     ) : (
                         <>
                             <button
-                                className={`${buttonTransparentStyle} ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                className={`pbtn pbtn-ghost pbtn-sm ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 disabled={!areControlsEnabled}
                                 onClick={async () => {
                                     preActionGameRef.current = game;
@@ -754,7 +756,7 @@ function GamePageContent({
                                 Go on
                             </button>
                             <button
-                                className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500 !text-white ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                className={`pbtn pbtn-danger pbtn-sm ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 onClick={handleExitGame}
                                 disabled={!areControlsEnabled}
                                 title="Return to the games list"
@@ -770,9 +772,9 @@ function GamePageContent({
         if (isGameOver) {
             return (
                 <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-red-600 dark:text-red-400">Game Over</span>
+                    <span className="pixel-text" style={{ fontSize: 10, color: 'var(--ember-blood-3)' }}>GAME OVER</span>
                     <button
-                        className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500 !text-white ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        className={`pbtn pbtn-danger pbtn-sm ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                         onClick={handleExitGame}
                         disabled={!areControlsEnabled}
                         title="Return to the games list"
@@ -792,7 +794,7 @@ function GamePageContent({
                         ) : (
                             <>
                                 <button
-                                    className={`${buttonTransparentStyle} ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''} ${voteUrgency.isUrgent ? 'bg-red-600 hover:bg-red-700 border-red-500 !text-white animate-pulse' : voteUrgency.isWarning ? 'bg-yellow-500 hover:bg-yellow-600 border-yellow-400 !text-black' : ''}`}
+                                    className={`pbtn pbtn-sm ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''} ${voteUrgency.isUrgent ? 'pbtn-danger' : voteUrgency.isWarning ? 'pbtn-primary' : 'pbtn-ghost'}`}
                                     disabled={!areControlsEnabled}
                                     onClick={async () => {
                                         const result = await runGameAction(() => vote(game.id));
@@ -807,7 +809,7 @@ function GamePageContent({
                                     Vote {(voteUrgency.isUrgent || voteUrgency.isWarning) && '⚠️'}
                                 </button>
                                 <button
-                                    className={`${buttonTransparentStyle} ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    className={`pbtn pbtn-ghost pbtn-sm ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                                     disabled={!areControlsEnabled}
                                     onClick={async () => {
                                         preActionGameRef.current = game;
@@ -838,7 +840,7 @@ function GamePageContent({
                         )}
                         {!showVoteGameOverCTA && (
                             <button
-                                className={`${buttonTransparentStyle} bg-blue-600 hover:bg-blue-700 border-blue-500 !text-white ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                className={`pbtn pbtn-primary pbtn-sm ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 disabled={!areControlsEnabled}
                                 onClick={async () => {
                                     const result = await runGameAction(() => performNightAction(game.id));
@@ -853,7 +855,7 @@ function GamePageContent({
                         )}
                         {showVoteGameOverCTA && (
                             <button
-                                className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500 !text-white ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                className={`pbtn pbtn-danger pbtn-sm ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 disabled={!areControlsEnabled}
                                 onClick={async () => {
                                     const result = await runGameAction(() => afterGameDiscussion(game.id));
@@ -869,7 +871,7 @@ function GamePageContent({
                     </>
                 )}
                 {game.gameState === GAME_STATES.NIGHT && (
-                    <span className="text-sm text-yellow-400">🌙 Night in progress...</span>
+                    <span className="console-text" style={{ fontSize: 14, color: 'var(--ember-moon-2)' }}>☾ Night in progress...</span>
                 )}
                 {game.gameState === GAME_STATES.NIGHT_RESULTS && (
                     <>
@@ -879,7 +881,7 @@ function GamePageContent({
                             </span>
                         )}
                         <button
-                            className={`${buttonTransparentStyle} ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            className={`pbtn pbtn-ghost pbtn-sm ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                             disabled={!areControlsEnabled}
                             onClick={async () => {
                                 setClearNightMessages(true);
@@ -895,7 +897,7 @@ function GamePageContent({
                         </button>
                         {showNightGameOverCTA ? (
                             <button
-                                className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500 !text-white ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                className={`pbtn pbtn-danger pbtn-sm ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 disabled={!areControlsEnabled}
                                 onClick={async () => {
                                     const result = await runGameAction(() => afterGameDiscussion(game.id));
@@ -909,7 +911,7 @@ function GamePageContent({
                             </button>
                         ) : (
                             <button
-                                className={`${buttonTransparentStyle} ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                className={`pbtn pbtn-ghost pbtn-sm ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 disabled={!areControlsEnabled}
                                 onClick={async () => {
                                     const result = await runGameAction(() => startNewDay(game.id));
@@ -944,37 +946,6 @@ function GamePageContent({
             }
         }
     }, [game.bots, game.gameMasterAiType]);
-
-    // Left panel content (reused in desktop sidebar and mobile overlay)
-    const leftPanelContent = (
-        <div className="flex flex-col h-full">
-            {/* Game info header */}
-            <div className="mb-2 flex-shrink-0 px-2 pt-2">
-                <h1 className="pixel-text text-sm mb-1" style={{ color: 'var(--ember-fire-4)' }}>{game.theme}</h1>
-                <p className="text-xs" style={{ color: 'var(--ember-ink-2)' }}>{game.description}</p>
-                {game.totalGameCost !== undefined && game.totalGameCost > 0 && (
-                    <div className="console-text text-xs mt-1" style={{ color: 'var(--ember-ink-3)' }}>
-                        COST: ${game.totalGameCost.toFixed(4)}
-                    </div>
-                )}
-            </div>
-
-            {/* Campfire scene */}
-            <div className="flex-grow min-h-0">
-                <CampfireScene
-                    players={campfirePlayers}
-                    phase={campfirePhase}
-                    speakingId={speakingId}
-                    deadIds={deadIds}
-                    votes={campfireVotes}
-                    queue={campfireQueue}
-                    msgCounts={campfireMsgCounts}
-                    revealDead={true}
-                    onPlayerTap={handleCampfirePlayerTap}
-                />
-            </div>
-        </div>
-    );
 
     // Right panel content (queue info only, no game controls since those moved to chat)
     const rightPanelContent = (
@@ -1045,7 +1016,7 @@ function GamePageContent({
             {(game.gameState === GAME_STATES.DAY_DISCUSSION || game.gameState === GAME_STATES.AFTER_GAME_DISCUSSION) && game.gameStateProcessQueue.length === 0 && (
                 <div className="mt-3 pt-3 border-t theme-border-subtle">
                     <button
-                        className={`w-full ${buttonTransparentStyle} text-sm ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        className={`pbtn pbtn-ghost pbtn-sm w-full ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                         onClick={() => openModal('botSelection')}
                         disabled={!areControlsEnabled}
                         title="Manually select which bots should respond"
@@ -1058,90 +1029,162 @@ function GamePageContent({
     );
 
     return (
-        <div className="flex flex-col lg:flex-row theme-text-primary h-[calc(100dvh-5rem)] sm:h-[calc(100dvh-6rem)] lg:h-[calc(100dvh-7rem)]">
-            {/* Fixed edge drawer toggle buttons (mobile/tablet only) */}
-            <button
-                className="fixed left-0 top-1/2 -translate-y-1/2 z-40 lg:hidden bg-[rgb(var(--color-card-bg))] border theme-border rounded-r-lg p-2 shadow-md"
-                onClick={() => setMobilePanel('players')}
-                aria-label="Open players panel"
-            >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="theme-text-secondary">
-                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                    <circle cx="9" cy="7" r="4"/>
-                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-                    <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-                </svg>
-            </button>
-            <button
-                className="fixed right-0 top-1/2 -translate-y-1/2 z-40 lg:hidden bg-[rgb(var(--color-card-bg))] border theme-border rounded-l-lg p-2 shadow-md"
-                onClick={() => setMobilePanel('status')}
-                aria-label="Open status panel"
-            >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="theme-text-secondary">
-                    <line x1="8" y1="6" x2="21" y2="6"/>
-                    <line x1="8" y1="12" x2="21" y2="12"/>
-                    <line x1="8" y1="18" x2="21" y2="18"/>
-                    <line x1="3" y1="6" x2="3.01" y2="6"/>
-                    <line x1="3" y1="12" x2="3.01" y2="12"/>
-                    <line x1="3" y1="18" x2="3.01" y2="18"/>
-                </svg>
-            </button>
+        <div className="flex flex-row h-[calc(100dvh-5rem)] sm:h-[calc(100dvh-6rem)] lg:h-[calc(100dvh-7rem)]" style={{ color: 'var(--ember-ink-0)', background: 'var(--ember-bg-1)' }}>
+            {/* Main content — vertical stack: campfire on top, chat below */}
+            <div className="flex-1 min-w-0 flex flex-col min-h-0">
 
-            {/* Left column - Game info and participants (desktop only) */}
-            <div className="hidden lg:flex lg:w-1/5 lg:flex-col lg:h-full lg:overflow-auto hide-scrollbar">
-                {leftPanelContent}
+                {/* Campfire scene — top 1/3 (collapsible) */}
+                {!sceneCollapsed && (
+                    <div className="relative flex-shrink-0" style={{ height: '33.33%', minHeight: 200 }}>
+                        {/* Game info overlay */}
+                        <div
+                            className="absolute top-0 left-0 z-10 px-3 pt-2"
+                            style={{ pointerEvents: 'none' }}
+                        >
+                            <h1
+                                className="pixel-text mb-0"
+                                style={{ fontSize: 11, color: 'var(--ember-fire-4)', textShadow: '2px 2px 0 var(--ember-bg-0)' }}
+                            >
+                                {game.theme}
+                            </h1>
+                            {game.totalGameCost !== undefined && game.totalGameCost > 0 && (
+                                <div
+                                    className="console-text"
+                                    style={{ fontSize: 12, color: 'var(--ember-ink-3)', textShadow: '1px 1px 0 var(--ember-bg-0)' }}
+                                >
+                                    COST: ${game.totalGameCost.toFixed(4)}
+                                </div>
+                            )}
+                        </div>
+
+                        <CampfireScene
+                            players={campfirePlayers}
+                            phase={campfirePhase}
+                            speakingId={speakingId}
+                            deadIds={deadIds}
+                            votes={campfireVotes}
+                            queue={campfireQueue}
+                            msgCounts={campfireMsgCounts}
+                            revealDead={true}
+                            onPlayerTap={handleCampfirePlayerTap}
+                        />
+
+                        {/* Bottom fade — blends scene into chat */}
+                        <div
+                            style={{
+                                position: 'absolute', bottom: 0, left: 0, right: 0,
+                                height: 40,
+                                background: 'linear-gradient(to bottom, transparent, var(--ember-bg-1))',
+                                pointerEvents: 'none',
+                                zIndex: 6,
+                            }}
+                        />
+
+                        {/* Collapse button — bottom-right of scene */}
+                        <button
+                            onClick={() => setSceneCollapsed(true)}
+                            className="pbtn pbtn-ghost pbtn-sm"
+                            style={{
+                                position: 'absolute', bottom: 6, right: 6, zIndex: 10,
+                                padding: '4px 8px', fontSize: 7, opacity: 0.7,
+                            }}
+                            title="Expand chat to full screen"
+                        >
+                            ▼ HIDE SCENE
+                        </button>
+                    </div>
+                )}
+
+                {/* Show-scene bar — visible only when collapsed */}
+                {sceneCollapsed && (
+                    <button
+                        onClick={() => setSceneCollapsed(false)}
+                        className="flex-shrink-0 w-full"
+                        style={{
+                            height: 28,
+                            background: 'var(--ember-bg-0)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                            cursor: 'pointer',
+                            border: 'none',
+                            borderBottom: '1px solid var(--ember-border)',
+                        }}
+                        title="Show campfire scene"
+                    >
+                        <span className="pixel-text" style={{ fontSize: 7, color: 'var(--ember-ink-3)', letterSpacing: 1 }}>
+                            ▲ SHOW CAMPFIRE
+                        </span>
+                    </button>
+                )}
+
+                {/* Chat — fills remaining space, background matches scene bottom */}
+                <div className="flex-1 min-w-0 min-h-0 flex flex-col" style={{ background: 'var(--ember-bg-1)' }}>
+                    <GameChat
+                        gameId={game.id}
+                        game={game}
+                        onGameStateChange={applyActionResult}
+                        pendingMessages={pendingMessages}
+                        onPendingMessagesConsumed={() => setPendingMessages([])}
+                        clearNightMessages={clearNightMessages}
+                        onErrorHandled={handleErrorCleared}
+                        isExternalLoading={isKeepGoingLoading}
+                        gameControls={gameControlsElement}
+                        onBeforeAction={() => { preActionGameRef.current = game; }}
+                        cancelButton={cancelButtonElement}
+                    />
+                </div>
             </div>
 
-            {/* Center - Chat */}
-            <div className="flex-1 min-w-0 min-h-0 flex flex-col lg:px-4">
-                <GameChat
-                    gameId={game.id}
-                    game={game}
-                    onGameStateChange={applyActionResult}
-                    pendingMessages={pendingMessages}
-                    onPendingMessagesConsumed={() => setPendingMessages([])}
-                    clearNightMessages={clearNightMessages}
-                    onErrorHandled={handleErrorCleared}
-                    isExternalLoading={isKeepGoingLoading}
-                    gameControls={gameControlsElement}
-                    onBeforeAction={() => { preActionGameRef.current = game; }}
-                    cancelButton={cancelButtonElement}
-                />
-            </div>
-
-            {/* Right column - Queue Info (desktop only) */}
-            <div className="hidden lg:flex lg:w-1/5 lg:flex-col lg:h-full lg:overflow-auto hide-scrollbar">
+            {/* Right column — Queue Info (desktop only) */}
+            <div className="hidden lg:flex lg:w-1/5 lg:flex-col lg:h-full lg:overflow-auto hide-scrollbar lg:pl-2">
                 {rightPanelContent}
             </div>
 
-            {/* Mobile drawer overlay */}
-            {mobilePanel && (
+            {/* Status drawer toggle (mobile/tablet only) */}
+            <button
+                className="fixed right-0 top-1/2 -translate-y-1/2 z-40 lg:hidden"
+                onClick={() => setMobilePanel('status')}
+                aria-label="Open status panel"
+                style={{
+                    background: 'var(--ember-bg-0)',
+                    border: '2px solid var(--ember-border)',
+                    borderRight: 'none',
+                    padding: '8px 6px',
+                }}
+            >
+                <span className="pixel-text" style={{ fontSize: 7, color: 'var(--ember-ink-2)', writingMode: 'vertical-rl' }}>
+                    STATUS
+                </span>
+            </button>
+
+            {/* Mobile drawer overlay (status only) */}
+            {mobilePanel === 'status' && (
                 <div
                     className="fixed inset-0 z-50 lg:hidden"
                     onClick={() => setMobilePanel(null)}
                 >
                     <div className="absolute inset-0 bg-black/50" />
                     <div
-                        className={`absolute inset-y-0 w-80 max-w-[85vw] bg-[rgb(var(--color-card-bg))] overflow-auto p-4 flex flex-col shadow-xl ${
-                            mobilePanel === 'players' ? 'left-0' : 'right-0'
-                        }`}
+                        className="absolute inset-y-0 right-0 w-80 max-w-[85vw] overflow-auto p-4 flex flex-col"
+                        style={{
+                            background: 'var(--ember-bg-1)',
+                            borderLeft: '2px solid var(--ember-fire-3)',
+                            boxShadow: '-6px 0 0 rgba(0,0,0,0.6)',
+                        }}
                         onClick={e => e.stopPropagation()}
                     >
-                        <div className={`flex items-center justify-between mb-4 ${mobilePanel === 'status' ? 'flex-row-reverse' : ''}`}>
-                            <h2 className="text-lg font-bold">
-                                {mobilePanel === 'players' ? 'Players & Info' : 'Game Status'}
+                        <div className="flex items-center justify-between mb-4 flex-row-reverse">
+                            <h2 className="pixel-text" style={{ fontSize: 10, color: 'var(--ember-fire-4)' }}>
+                                GAME STATUS
                             </h2>
                             <button
-                                className="p-2 rounded hover:bg-gray-200 dark:hover:bg-neutral-700"
                                 onClick={() => setMobilePanel(null)}
+                                className="pixel-text"
+                                style={{ fontSize: 12, color: 'var(--ember-ink-2)', cursor: 'pointer', background: 'none', border: 'none', padding: 8 }}
                             >
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <line x1="18" y1="6" x2="6" y2="18"/>
-                                    <line x1="6" y1="6" x2="18" y2="18"/>
-                                </svg>
+                                ✕
                             </button>
                         </div>
-                        {mobilePanel === 'players' ? leftPanelContent : rightPanelContent}
+                        {rightPanelContent}
                     </div>
                 </div>
             )}

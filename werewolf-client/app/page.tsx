@@ -1,106 +1,196 @@
 import Link from 'next/link';
-import Image from 'next/image';
 import { auth } from "@/auth";
 import PlayNowButton from "@/app/components/PlayNowButton";
+import CampfireSprite from "@/components/sprites/CampfireSprite";
 
 export default async function Home() {
   const session = await auth();
 
   return (
-    <div className="flex flex-col min-h-[calc(100vh-8rem)]">
+    <div
+      style={{
+        minHeight: 'calc(100vh - 8rem)',
+        background: 'linear-gradient(180deg, #0a0a18 0%, var(--ember-bg-1) 40%, var(--ember-bg-0) 100%)',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
       {/* Hero Section */}
-      <section className="flex flex-col items-center justify-center py-12 px-4 text-center sm:py-20 lg:py-32">
-        <div className="mb-8 relative w-36 h-36 sm:w-52 sm:h-52 rounded-full logo-backdrop">
-          <Image
-            src="/werewolf-ai-logo-2.png"
-            alt="Werewolf AI Logo"
-            fill
-            className="object-contain drop-shadow-2xl"
-            priority
-          />
+      <section
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '48px 16px 64px',
+          textAlign: 'center',
+          position: 'relative',
+          overflow: 'hidden',
+        }}
+      >
+        {/* Background stars */}
+        <div className="stars" style={{ position: 'absolute', inset: 0, opacity: 0.5 }} />
+
+        {/* Fire glow behind campfire */}
+        <div
+          style={{
+            position: 'absolute',
+            top: '50%', left: '50%',
+            transform: 'translate(-50%, -30%)',
+            width: 400, height: 300,
+            background: 'radial-gradient(circle, rgba(var(--ember-fire-glow), 0.2) 0%, transparent 70%)',
+            pointerEvents: 'none',
+          }}
+        />
+
+        {/* Campfire */}
+        <div style={{ position: 'relative', marginBottom: 24 }}>
+          <CampfireSprite scale={6} />
         </div>
-        <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight theme-text-primary mb-6">
-          Werewolf <span className="text-btn">AI</span>
+
+        <h1
+          className="pixel-text"
+          style={{
+            fontSize: 'clamp(24px, 5vw, 42px)',
+            color: 'var(--ember-fire-4)',
+            textShadow: '0 0 20px rgba(var(--ember-fire-glow), 0.5), 4px 4px 0 rgba(0,0,0,0.7)',
+            margin: '0 0 16px 0',
+            lineHeight: 1.3,
+          }}
+        >
+          WEREWOLF<span style={{ color: 'var(--ember-fire-5)' }}>.AI</span>
         </h1>
-        <p className="text-xl sm:text-2xl theme-text-secondary max-w-2xl mb-4 leading-relaxed">
+
+        <p
+          className="console-text"
+          style={{
+            fontSize: 'clamp(18px, 3vw, 24px)',
+            color: 'var(--ember-ink-1)',
+            maxWidth: 600,
+            margin: '0 0 8px 0',
+            letterSpacing: 1,
+          }}
+        >
           The ultimate social deduction game where you play against the world&apos;s best AI models.
         </p>
-        <p className="text-lg theme-text-secondary max-w-2xl mb-10 leading-relaxed">
+
+        <p
+          style={{
+            fontSize: 15,
+            color: 'var(--ember-ink-2)',
+            maxWidth: 560,
+            margin: '0 0 32px 0',
+            lineHeight: 1.6,
+          }}
+        >
           Put GPT, Claude, Gemini, DeepSeek, and others at the same table.
           Each bot has its own personality, goals, and strategy.
           You&apos;re the only human — can you outsmart them all?
         </p>
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
           {session ? (
-            <Link
-              href="/games"
-              className="px-8 py-4 bg-btn text-btn-text rounded-lg font-bold text-xl hover:bg-btn-hover transition-all transform hover:scale-105 shadow-lg"
-            >
-              Go to Game Lobby
+            <Link href="/games" className="pbtn pbtn-primary" style={{ fontSize: 12, padding: '14px 28px', textDecoration: 'none' }}>
+              ▸ GAME LOBBY
             </Link>
           ) : (
             <PlayNowButton />
           )}
-          <Link
-            href="/rules"
-            className="px-8 py-4 bg-transparent border-2 border-btn text-btn rounded-lg font-bold text-xl hover:bg-btn/10 transition-all shadow-md"
-          >
-            How to Play
+          <Link href="/rules" className="pbtn pbtn-ghost" style={{ fontSize: 12, padding: '14px 28px', textDecoration: 'none' }}>
+            HOW TO PLAY
           </Link>
         </div>
       </section>
 
       {/* Features Section */}
-      <section className="py-16 px-4 bg-black/5 dark:bg-white/5 rounded-3xl mb-16">
-        <div className="max-w-5xl mx-auto">
-          <h2 className="text-3xl font-bold text-center theme-text-primary mb-12">Why Play Werewolf AI?</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
-            <div className="p-6 rounded-xl theme-bg-card theme-border border shadow-sm">
-              <div className="w-12 h-12 bg-blue-500/20 text-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-              </div>
-              <h3 className="text-xl font-bold theme-text-primary mb-2">Immersive Werewolf Experience</h3>
-              <p className="theme-text-secondary">
-                Custom themes, unique characters, voice acting, and full role-playing.
-                Every game feels different — from Harry Potter to a submarine crew.
-              </p>
-            </div>
-            <div className="p-6 rounded-xl theme-bg-card theme-border border shadow-sm">
-              <div className="w-12 h-12 bg-purple-500/20 text-purple-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-              </div>
-              <h3 className="text-xl font-bold theme-text-primary mb-2">All Top AI Models Together</h3>
-              <p className="theme-text-secondary">
-                Mix GPT, Claude, Gemini, DeepSeek, Grok, Mistral, and Kimi in the same game.
-                Watch them argue, deceive, and form alliances against each other — and you.
-              </p>
-            </div>
-            <div className="p-6 rounded-xl theme-bg-card theme-border border shadow-sm">
-              <div className="w-12 h-12 bg-red-500/20 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
-              </div>
-              <h3 className="text-xl font-bold theme-text-primary mb-2">AI Intelligence Benchmark</h3>
-              <p className="theme-text-secondary">
-                Test how well the latest models handle deduction, bluffing, and social reasoning.
-                See which AI is the best liar — and which one you can fool.
-              </p>
-            </div>
-          </div>
+      <section style={{ padding: '48px 16px', maxWidth: 1000, margin: '0 auto', width: '100%' }}>
+        <div className="pixel-text" style={{
+          fontSize: 8, letterSpacing: 3, color: 'var(--ember-fire-3)',
+          textAlign: 'center', marginBottom: 8,
+        }}>
+          WHY PLAY
+        </div>
+        <h2
+          className="pixel-text"
+          style={{
+            fontSize: 'clamp(14px, 2.5vw, 20px)',
+            color: 'var(--ember-ink-0)',
+            textAlign: 'center',
+            marginBottom: 32,
+          }}
+        >
+          WEREWOLF AI?
+        </h2>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
+          <FeatureCard
+            icon="🐺"
+            title="IMMERSIVE EXPERIENCE"
+            description="Custom themes, unique characters, voice acting, and full role-playing. Every game feels different — from Harry Potter to a submarine crew."
+          />
+          <FeatureCard
+            icon="⚡"
+            title="ALL TOP AI MODELS"
+            description="Mix GPT, Claude, Gemini, DeepSeek, Grok, Mistral, and Kimi in the same game. Watch them argue, deceive, and form alliances."
+          />
+          <FeatureCard
+            icon="🎯"
+            title="AI BENCHMARK"
+            description="Test how well the latest models handle deduction, bluffing, and social reasoning. See which AI is the best liar — and which one you can fool."
+          />
         </div>
       </section>
 
-      {/* Trust Footer (to satisfy Google Scanners) */}
-      <footer className="mt-auto py-12 border-t theme-border flex flex-col items-center">
-        <div className="flex flex-wrap justify-center gap-x-8 gap-y-4 mb-8">
-          <Link href="/about" className="theme-text-secondary hover:theme-text-primary text-sm transition-colors">About the Project</Link>
-          <Link href="/privacy" className="theme-text-secondary hover:theme-text-primary text-sm transition-colors">Privacy Policy</Link>
-          <Link href="/terms" className="theme-text-secondary hover:theme-text-primary text-sm transition-colors">Terms of Service</Link>
-          <Link href="https://github.com/hiper2d/werewolf-ai-party-game" className="theme-text-secondary hover:theme-text-primary text-sm transition-colors">GitHub</Link>
+      {/* Footer */}
+      <footer
+        style={{
+          marginTop: 'auto',
+          padding: '32px 16px',
+          borderTop: '2px solid var(--ember-border)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+        }}
+      >
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '8px 24px', marginBottom: 16 }}>
+          <FooterLink href="/about">About</FooterLink>
+          <FooterLink href="/privacy">Privacy</FooterLink>
+          <FooterLink href="/terms">Terms</FooterLink>
+          <FooterLink href="https://github.com/hiper2d/werewolf-ai-party-game">GitHub</FooterLink>
         </div>
-        <p className="theme-text-secondary opacity-60 text-xs">
-          © {new Date().getFullYear()} AIWerewolf.net
+        <p className="console-text" style={{ fontSize: 12, color: 'var(--ember-ink-3)' }}>
+          {new Date().getFullYear()} AIWEREWOLF.NET
         </p>
       </footer>
     </div>
+  );
+}
+
+function FeatureCard({ icon, title, description }: { icon: string; title: string; description: string }) {
+  return (
+    <div
+      className="panel-sm"
+      style={{ padding: 20 }}
+    >
+      <div style={{ fontSize: 28, marginBottom: 10 }}>{icon}</div>
+      <h3 className="pixel-text" style={{ fontSize: 10, color: 'var(--ember-fire-4)', marginBottom: 8 }}>
+        {title}
+      </h3>
+      <p style={{ fontSize: 14, color: 'var(--ember-ink-2)', lineHeight: 1.6, margin: 0 }}>
+        {description}
+      </p>
+    </div>
+  );
+}
+
+function FooterLink({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <Link
+      href={href}
+      className="pixel-text"
+      style={{ fontSize: 8, color: 'var(--ember-ink-3)', textDecoration: 'none', letterSpacing: 1 }}
+    >
+      {children}
+    </Link>
   );
 }

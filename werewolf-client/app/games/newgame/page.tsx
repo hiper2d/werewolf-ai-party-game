@@ -3,7 +3,6 @@
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {useRouter} from 'next/navigation';
 import {useSession} from 'next-auth/react';
-import {buttonBlackStyle, buttonTransparentStyle} from "@/app/constants";
 import {createGame, previewGame} from '@/app/api/game-actions';
 import {GAME_ROLES, GamePreview, GamePreviewWithGeneratedBots, GENDER_OPTIONS, getVoicesForGender, getRandomVoiceForGender, PLAY_STYLES, PLAY_STYLE_CONFIGS, UserTier, USER_TIERS} from "@/app/api/game-models";
 import {LLM_CONSTANTS, SupportedAiModels, getModelDisplayName} from "@/app/ai/ai-models";
@@ -471,70 +470,66 @@ export default function CreateNewGamePage() {
         setIsSpeaking(false);
     };
 
-    // Common styles
-    const inputStyle = "p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50";
-    const labelStyle = "text-white whitespace-nowrap w-full sm:w-36";
+    // Common Ember styles
+    const inputStyle = "chat-input w-full";
+    const labelStyle = "pixel-text whitespace-nowrap w-full sm:w-36";
     const flexRowStyle = "flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4";
     const flexItemStyle = "flex-1 flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-2";
-    const buttonDisabledStyle = "opacity-50 cursor-not-allowed";
+    const buttonDisabledStyle = "opacity-40 cursor-not-allowed";
+    const selectStyle = "chat-input w-full h-10";
 
     return (
-        <div className="flex flex-col w-full h-full p-4 sm:p-6">
+        <div className="flex flex-col w-full h-full p-4 sm:p-6" style={{ color: 'var(--ember-ink-0)' }}>
             <div className="flex justify-between items-center mb-6">
-                <h1 className="text-2xl font-bold text-white">Create New Game</h1>
+                <h1 className="pixel-text" style={{ fontSize: 16, color: 'var(--ember-fire-4)' }}>CREATE NEW GAME</h1>
                 <div className={`${flexRowStyle} justify-end mb-4`}>
                     <button
-                        className={`${buttonBlackStyle} ${(!isFormValid || isLoading) ? buttonDisabledStyle : ''}`}
+                        className={`pbtn pbtn-primary ${(!isFormValid || isLoading) ? buttonDisabledStyle : ''}`}
                         onClick={handleGeneratePreview}
                         disabled={!isFormValid || isLoading}
                     >
-                        {isLoading ? (
-                            <span className="flex items-center space-x-2">
-                                <span className="animate-spin">⏳</span>
-                                <span>Generating Preview...</span>
-                            </span>
-                        ) : (gameData ? 'Generate Preview Again' : 'Generate Preview')}
+                        {isLoading ? '▸ GENERATING...' : (gameData ? '▸ REGENERATE' : '▸ GENERATE PREVIEW')}
                     </button>
                     {gameData && (
                         <button
-                            className={`${buttonBlackStyle} ${isLoading ? buttonDisabledStyle : ''}`}
+                            className={`pbtn pbtn-primary ${isLoading ? buttonDisabledStyle : ''}`}
                             onClick={handleCreateGame}
                             disabled={isLoading}
                         >
-                            {isLoading ? 'Processing...' : 'Create Game'}
+                            {isLoading ? '▸ CREATING...' : '▸ CREATE GAME'}
                         </button>
                     )}
                 </div>
             </div>
 
-            <form id="create-game-form" className="space-y-2">
+            <form id="create-game-form" className="space-y-3">
                 <div className="flex space-x-2">
                     <div className="w-1/2">
                         <input
-                            className={`w-full p-2 rounded bg-black bg-opacity-30 text-white border ${nameError ? 'border-red-500' : 'border-white border-opacity-30'} focus:outline-none focus:border-white focus:border-opacity-50`}
+                            className={`chat-input w-full ${nameError ? '!border-[var(--ember-blood-3)]' : ''}`}
                             type="text"
                             placeholder="Name *"
                             value={name}
                             onChange={(e) => setName(e.target.value)}
                             required
                         />
-                        {nameError && <p className="text-red-500 text-sm mt-1">{nameError}</p>}
+                        {nameError && <p className="console-text" style={{ fontSize: 12, color: 'var(--ember-blood-3)', marginTop: 4 }}>{nameError}</p>}
                     </div>
                     <div className="w-1/2">
                         <input
-                            className={`w-full p-2 rounded bg-black bg-opacity-30 text-white border ${themeError ? 'border-red-500' : 'border-white border-opacity-30'} focus:outline-none focus:border-white focus:border-opacity-50`}
+                            className={`chat-input w-full ${themeError ? '!border-[var(--ember-blood-3)]' : ''}`}
                             type="text"
                             placeholder="Theme *"
                             value={theme}
                             onChange={(e) => setTheme(e.target.value)}
                             required
                         />
-                        {themeError && <p className="text-red-500 text-sm mt-1">{themeError}</p>}
+                        {themeError && <p className="console-text" style={{ fontSize: 12, color: 'var(--ember-blood-3)', marginTop: 4 }}>{themeError}</p>}
                     </div>
                 </div>
 
                 <textarea
-                    className="w-full p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
+                    className="chat-input w-full"
                     placeholder="Description (optional)"
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
@@ -543,26 +538,16 @@ export default function CreateNewGamePage() {
 
                 <div className={flexRowStyle}>
                     <div className={flexItemStyle}>
-                        <label className={labelStyle}>Player Count:</label>
-                        <select
-                            className={`${inputStyle} flex-1`}
-                            value={playerCount}
-                            onChange={(e) => setPlayerCount(Number(e.target.value))}
-                            required
-                        >
+                        <label className={labelStyle} style={{ fontSize: 9, color: 'var(--ember-ink-2)', letterSpacing: 1 }}>PLAYER COUNT:</label>
+                        <select className={selectStyle} value={playerCount} onChange={(e) => setPlayerCount(Number(e.target.value))} required>
                             {playerOptions.map(count => (
                                 <option key={count} value={count}>{count} players</option>
                             ))}
                         </select>
                     </div>
                     <div className={flexItemStyle}>
-                        <label className={labelStyle}>Werewolf Count:</label>
-                        <select
-                            className={`${inputStyle} flex-1`}
-                            value={werewolfCount}
-                            onChange={(e) => setWerewolfCount(Number(e.target.value))}
-                            required
-                        >
+                        <label className={labelStyle} style={{ fontSize: 9, color: 'var(--ember-ink-2)', letterSpacing: 1 }}>WEREWOLF COUNT:</label>
+                        <select className={selectStyle} value={werewolfCount} onChange={(e) => setWerewolfCount(Number(e.target.value))} required>
                             {Array.from({length: playerCount - 1}, (_, i) => (
                                 <option key={i} value={i}>{i} werewolves</option>
                             ))}
@@ -571,7 +556,7 @@ export default function CreateNewGamePage() {
                 </div>
 
                 <div className="flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-2">
-                    <label className={labelStyle}>Players AI *:</label>
+                    <label className={labelStyle} style={{ fontSize: 9, color: 'var(--ember-ink-2)', letterSpacing: 1 }}>PLAYERS AI *:</label>
                     <div className="w-full sm:flex-1">
                         <MultiSelectDropdown
                             options={playerModelOptions}
@@ -584,14 +569,14 @@ export default function CreateNewGamePage() {
                             labelFn={getModelDisplayName}
                             optionMetaFn={playerModelOptionMeta}
                         />
-                        {playersAiError && <p className="text-red-500 text-sm mt-1">{playersAiError}</p>}
+                        {playersAiError && <p className="console-text" style={{ fontSize: 12, color: 'var(--ember-blood-3)', marginTop: 4 }}>{playersAiError}</p>}
                     </div>
                 </div>
 
 
                 <div className={flexRowStyle}>
                     <div className={flexItemStyle}>
-                        <label className={labelStyle}>Special Roles:</label>
+                        <label className={labelStyle} style={{ fontSize: 9, color: 'var(--ember-ink-2)', letterSpacing: 1 }}>SPECIAL ROLES:</label>
                         <div className="flex gap-4">
                             {availableRoles.map(role => (
                                 <div key={role} className="relative flex items-center">
@@ -608,12 +593,13 @@ export default function CreateNewGamePage() {
                                         }}
                                         className="mr-2"
                                     />
-                                    <label htmlFor={role} className="text-white mr-1">
+                                    <label htmlFor={role} style={{ color: 'var(--ember-ink-1)', marginRight: 4 }}>
                                         {role.charAt(0).toUpperCase() + role.slice(1)}
                                     </label>
                                     <button
                                         type="button"
-                                        className="w-5 h-5 rounded-full bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white text-xs flex items-center justify-center transition-colors"
+                                        className="pixel-text"
+                                        style={{ width: 18, height: 18, background: 'var(--ember-bg-3)', border: '1px solid var(--ember-border)', color: 'var(--ember-ink-2)', fontSize: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
                                         onMouseEnter={() => setShowRoleTooltip(role)}
                                         onMouseLeave={() => setShowRoleTooltip(null)}
                                         onClick={(e) => {
@@ -626,7 +612,7 @@ export default function CreateNewGamePage() {
                                         </svg>
                                     </button>
                                     {showRoleTooltip === role && (
-                                        <div className="absolute z-10 w-64 p-3 bg-gray-900 border border-gray-700 rounded-lg shadow-lg text-sm text-gray-300 top-full mt-2 left-0">
+                                        <div className="absolute z-10 w-64 p-3 top-full mt-2 left-0" style={{ background: 'var(--ember-bg-0)', border: '2px solid var(--ember-border)', boxShadow: '4px 4px 0 rgba(0,0,0,0.6)', fontSize: 13, color: 'var(--ember-ink-1)', fontFamily: 'var(--f-console)' }}>
                                             {roleTooltips[role]}
                                         </div>
                                     )}
@@ -638,24 +624,24 @@ export default function CreateNewGamePage() {
             </form>
 
             {isLoading && (
-                <div className="mt-4 p-4 bg-blue-900 bg-opacity-50 border border-blue-500 rounded-lg">
+                <div className="panel-sm mt-4 p-4" style={{ borderColor: 'var(--ember-moon-1)' }}>
                     <div className="flex items-start space-x-2">
-                        <span className="text-blue-400 text-lg animate-spin">⏳</span>
+                        <span className="thinking"><span /><span /><span /></span>
                         <div>
-                            <h3 className="text-blue-400 font-semibold mb-1">Generating Game Preview...</h3>
-                            <p className="text-blue-300 text-sm">The AI is creating your game story and characters. This may take a moment.</p>
+                            <h3 className="pixel-text" style={{ fontSize: 10, color: 'var(--ember-moon-2)', marginBottom: 4 }}>GENERATING PREVIEW...</h3>
+                            <p className="console-text" style={{ fontSize: 13, color: 'var(--ember-ink-2)' }}>The AI is creating your game story and characters.</p>
                         </div>
                     </div>
                 </div>
             )}
 
             {error && (
-                <div className="mt-4 p-4 bg-red-900 bg-opacity-50 border border-red-500 rounded-lg">
+                <div className="panel-sm mt-4 p-4" style={{ borderColor: 'var(--ember-blood-3)' }}>
                     <div className="flex items-start space-x-2">
-                        <span className="text-red-400 text-lg">⚠️</span>
+                        <span style={{ color: 'var(--ember-blood-3)', fontSize: 16 }}>⚠</span>
                         <div>
-                            <h3 className="text-red-400 font-semibold mb-1">Game Preview Generation Failed</h3>
-                            <p className="text-red-300 text-sm">{error}</p>
+                            <h3 className="pixel-text" style={{ fontSize: 10, color: 'var(--ember-blood-3)', marginBottom: 4 }}>GENERATION FAILED</h3>
+                            <p className="console-text" style={{ fontSize: 13, color: 'var(--ember-ink-1)' }}>{error}</p>
                         </div>
                     </div>
                 </div>
@@ -664,13 +650,14 @@ export default function CreateNewGamePage() {
             {/* Preview section remains unchanged */}
             {gameData && (
                 <div className="mt-8">
-                    <h2 className="text-2xl font-bold text-white mb-6">Preview</h2>
+                    <div className="hr-pixel" />
+                    <h2 className="pixel-text mb-6" style={{ fontSize: 14, color: 'var(--ember-fire-4)' }}>PREVIEW</h2>
 
                     <div className="mb-4">
-                        <label htmlFor="gameStory" className="block text-white mb-2">Game Story:</label>
+                        <label htmlFor="gameStory" className="pixel-text block mb-2" style={{ fontSize: 9, color: 'var(--ember-ink-2)', letterSpacing: 1 }}>GAME STORY:</label>
                         <textarea
                             id="gameStory"
-                            className="w-full p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
+                            className="chat-input w-full"
                             rows={5}
                             value={gameData.scene}
                             onChange={(e) => handleStoryChange(e.target.value)}
@@ -678,15 +665,14 @@ export default function CreateNewGamePage() {
                     </div>
 
                     <div className="mb-6">
-                        <h3 className="text-xl font-bold text-white mb-4">Game Master:</h3>
-                        <div className="p-4 bg-gray-900 bg-opacity-50 rounded-lg">
-                            {/* Voice Provider indicator */}
-                            <div className="mb-2 text-sm text-gray-400">
+                        <h3 className="pixel-text mb-4" style={{ fontSize: 11, color: 'var(--ember-fire-4)' }}>GAME MASTER:</h3>
+                        <div className="panel-sm p-4">
+                            <div className="console-text mb-2" style={{ fontSize: 13, color: 'var(--ember-ink-3)' }}>
                                 Voice Provider: <span className="text-white font-medium">{VOICE_PROVIDER_DISPLAY_NAMES[gameData.voiceProvider] || gameData.voiceProvider}</span>
                             </div>
                             <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 mb-2">
                                 <div className="flex-1">
-                                    <label className="block text-gray-400 text-sm mb-1">AI Model:</label>
+                                    <label className="pixel-text block mb-1" style={{ fontSize: 8, color: 'var(--ember-ink-3)', letterSpacing: 1 }}>AI MODEL:</label>
                                     <ModelSelectDropdown
                                         options={getPreviewModelOptions(gameData.gameMasterAiType)}
                                         value={gameData.gameMasterAiType}
@@ -696,9 +682,8 @@ export default function CreateNewGamePage() {
                                 </div>
                                 <div className="flex-1 flex gap-2">
                                     <div className="flex-1">
-                                        <label className="block text-gray-400 text-sm mb-1">Voice:</label>
-                                        <select
-                                            className="w-full h-10 p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
+                                        <label className="pixel-text block mb-1" style={{ fontSize: 8, color: 'var(--ember-ink-3)', letterSpacing: 1 }}>VOICE:</label>
+                                        <select className={selectStyle}
                                             value={gameData.gameMasterVoice || getVoiceConfig(gameData.voiceProvider).getVoicesByGender('male')[0]?.id}
                                             onChange={(e) => setGameData({ ...gameData, gameMasterVoice: e.target.value })}
                                         >
@@ -709,24 +694,23 @@ export default function CreateNewGamePage() {
                                     </div>
                                     <div className="flex flex-col justify-end">
                                         <button
-                                            className={`w-10 h-10 ${buttonTransparentStyle} ${(!gameData.scene || isSpeaking) ? 'opacity-50 cursor-not-allowed' : ''} flex items-center justify-center`}
+                                            className={`pbtn pbtn-ghost ${(!gameData.scene || isSpeaking) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                            style={{ width: 40, height: 40, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                             onClick={() => isSpeaking ? handleStopTTS() : handlePlayStory(gameData.scene, gameData.gameMasterVoice || getVoiceConfig(gameData.voiceProvider).getVoicesByGender('male')[0]?.id || '', gameData.gameMasterVoiceStyle)}
                                             disabled={!gameData.scene}
                                             title={isSpeaking ? "Stop speaking" : "Play game story"}
                                         >
-                                            <span className="text-lg">
-                                                {isSpeaking ? '⏹️' : '🔊'}
-                                            </span>
+                                            {isSpeaking ? '⏹' : '🔊'}
                                         </button>
                                     </div>
                                 </div>
                             </div>
                             {gameData.gameMasterVoiceStyle && (
                                 <div className="mt-2">
-                                    <label className="block text-gray-400 text-sm mb-1">Voice Style:</label>
+                                    <label className="pixel-text block mb-1" style={{ fontSize: 8, color: 'var(--ember-ink-3)', letterSpacing: 1 }}>VOICE STYLE:</label>
                                     <input
                                         type="text"
-                                        className="w-full p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
+                                        className="chat-input w-full"
                                         value={gameData.gameMasterVoiceStyle}
                                         onChange={(e) => setGameData({ ...gameData, gameMasterVoiceStyle: e.target.value })}
                                         placeholder="Voice style (e.g., authoritatively, dramatically)"
@@ -736,26 +720,25 @@ export default function CreateNewGamePage() {
                         </div>
                     </div>
 
-                    <h3 className="text-xl font-bold text-white mb-4">Players:</h3>
+                    <h3 className="pixel-text mb-4" style={{ fontSize: 11, color: 'var(--ember-fire-4)' }}>PLAYERS:</h3>
                     {gameData.bots.map((player, index) => (
-                        <div key={index} className="mb-4 p-4 bg-gray-900 bg-opacity-50 rounded-lg">
+                        <div key={index} className="panel-sm mb-4 p-4">
                             <div className="flex flex-col gap-2 mb-2">
                                 <div className="flex flex-col sm:flex-row gap-2">
                                     <div className="flex-1">
-                                        <label className="block text-gray-400 text-sm mb-1">Name:</label>
+                                        <label className="pixel-text block mb-1" style={{ fontSize: 8, color: 'var(--ember-ink-3)', letterSpacing: 1 }}>NAME:</label>
                                         <input
                                             type="text"
-                                            className={`w-full h-10 p-2 rounded bg-gray-900 text-white border ${botNameErrors[index] ? 'border-red-500' : 'border-white border-opacity-30'} focus:outline-none focus:border-white focus:border-opacity-50`}
+                                            className={`chat-input w-full h-10 ${botNameErrors[index] ? '!border-[var(--ember-blood-3)]' : ''}`}
                                             value={player.name}
                                             onChange={(e) => handlePlayerChange(index, 'name', e.target.value)}
                                             placeholder="Player Name"
                                         />
-                                        {botNameErrors[index] && <p className="text-red-500 text-xs mt-1">{botNameErrors[index]}</p>}
+                                        {botNameErrors[index] && <p className="console-text" style={{ fontSize: 11, color: 'var(--ember-blood-3)', marginTop: 2 }}>{botNameErrors[index]}</p>}
                                     </div>
                                     <div className="flex-1">
-                                        <label className="block text-gray-400 text-sm mb-1">Gender:</label>
-                                        <select
-                                            className="w-full h-10 p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
+                                        <label className="pixel-text block mb-1" style={{ fontSize: 8, color: 'var(--ember-ink-3)', letterSpacing: 1 }}>GENDER:</label>
+                                        <select className={selectStyle}
                                             value={player.gender}
                                             onChange={(e) => handlePlayerChange(index, 'gender', e.target.value)}
                                         >
@@ -768,9 +751,8 @@ export default function CreateNewGamePage() {
                                     </div>
                                     <div className="flex-1 flex gap-2">
                                         <div className="flex-1">
-                                            <label className="block text-gray-400 text-sm mb-1">Voice:</label>
-                                            <select
-                                                className="w-full h-10 p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
+                                            <label className="pixel-text block mb-1" style={{ fontSize: 8, color: 'var(--ember-ink-3)', letterSpacing: 1 }}>VOICE:</label>
+                                            <select className={selectStyle}
                                                 value={player.voice}
                                                 onChange={(e) => handlePlayerChange(index, 'voice', e.target.value)}
                                             >
@@ -781,14 +763,13 @@ export default function CreateNewGamePage() {
                                         </div>
                                         <div className="flex flex-col justify-end">
                                             <button
-                                                className={`w-10 h-10 ${buttonTransparentStyle} ${(!player.story || isSpeaking) ? 'opacity-50 cursor-not-allowed' : ''} flex items-center justify-center`}
+                                                className={`pbtn pbtn-ghost ${(!player.story || isSpeaking) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                style={{ width: 40, height: 40, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                                 onClick={() => isSpeaking ? handleStopTTS() : handlePlayStory(player.story, player.voice, player.voiceStyle)}
                                                 disabled={!player.story}
                                                 title={isSpeaking ? "Stop speaking" : "Play story"}
                                             >
-                                                <span className="text-lg">
-                                                    {isSpeaking ? '⏹️' : '🔊'}
-                                                </span>
+                                                {isSpeaking ? '⏹' : '🔊'}
                                             </button>
                                         </div>
                                     </div>
@@ -796,7 +777,7 @@ export default function CreateNewGamePage() {
                             </div>
                             <div className="flex flex-col sm:flex-row gap-2 mb-2">
                                 <div className="flex-1">
-                                    <label className="block text-gray-400 text-sm mb-1">AI Model:</label>
+                                    <label className="pixel-text block mb-1" style={{ fontSize: 8, color: 'var(--ember-ink-3)', letterSpacing: 1 }}>AI MODEL:</label>
                                     <ModelSelectDropdown
                                         options={getPreviewModelOptions(player.playerAiType)}
                                         value={player.playerAiType}
@@ -806,11 +787,8 @@ export default function CreateNewGamePage() {
                                 </div>
                                 <div className="flex-1 flex gap-2">
                                     <div className="flex-1">
-                                        <label className="block text-gray-400 text-sm mb-1">
-                                            Play Style:
-                                        </label>
-                                        <select
-                                            className="w-full h-10 p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
+                                        <label className="pixel-text block mb-1" style={{ fontSize: 8, color: 'var(--ember-ink-3)', letterSpacing: 1 }}>PLAY STYLE:</label>
+                                        <select className={selectStyle}
                                             value={player.playStyle}
                                             onChange={(e) => handlePlayerChange(index, 'playStyle', e.target.value)}
                                         >
@@ -824,7 +802,8 @@ export default function CreateNewGamePage() {
                                     <div className="relative flex flex-col justify-end">
                                         <button
                                             type="button"
-                                            className="w-10 h-10 rounded-full bg-gray-700 hover:bg-gray-600 text-white text-xs flex items-center justify-center transition-colors"
+                                            className="pbtn pbtn-ghost"
+                                            style={{ width: 40, height: 40, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10 }}
                                             onMouseEnter={() => setShowPlayStyleTooltip(index)}
                                             onMouseLeave={() => setShowPlayStyleTooltip(null)}
                                             onClick={(e) => {
@@ -835,11 +814,11 @@ export default function CreateNewGamePage() {
                                             ?
                                         </button>
                                         {showPlayStyleTooltip === index && (
-                                            <div className="absolute z-10 w-64 sm:w-72 md:w-80 p-3 bg-gray-900 border border-gray-700 rounded-lg shadow-lg text-sm text-white top-full mt-2 right-0 transform -translate-x-full sm:-translate-x-3/4 md:translate-x-0">
-                                                <div className="font-semibold mb-2">
+                                            <div className="absolute z-10 w-64 sm:w-72 md:w-80 p-3 top-full mt-2 right-0" style={{ background: 'var(--ember-bg-0)', border: '2px solid var(--ember-border)', boxShadow: '4px 4px 0 rgba(0,0,0,0.6)' }}>
+                                                <div className="pixel-text mb-2" style={{ fontSize: 9, color: 'var(--ember-fire-4)' }}>
                                                     {PLAY_STYLE_CONFIGS[player.playStyle]?.name || player.playStyle}
                                                 </div>
-                                                <div className="text-gray-300">
+                                                <div className="console-text" style={{ fontSize: 13, color: 'var(--ember-ink-1)' }}>
                                                     {PLAY_STYLE_CONFIGS[player.playStyle]?.uiDescription || 'No description available'}
                                                 </div>
                                             </div>
@@ -848,9 +827,9 @@ export default function CreateNewGamePage() {
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-gray-400 text-sm mb-1">Story:</label>
+                                <label className="pixel-text block mb-1" style={{ fontSize: 8, color: 'var(--ember-ink-3)', letterSpacing: 1 }}>STORY:</label>
                                 <textarea
-                                    className="w-full p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
+                                    className="chat-input w-full"
                                     rows={3}
                                     value={player.story}
                                     onChange={(e) => handlePlayerChange(index, 'story', e.target.value)}
@@ -859,10 +838,10 @@ export default function CreateNewGamePage() {
                             </div>
                             {player.voiceStyle && (
                                 <div className="mt-2">
-                                    <label className="block text-gray-400 text-sm mb-1">Voice Style:</label>
+                                    <label className="pixel-text block mb-1" style={{ fontSize: 8, color: 'var(--ember-ink-3)', letterSpacing: 1 }}>VOICE STYLE:</label>
                                     <input
                                         type="text"
-                                        className="w-full p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
+                                        className="chat-input w-full"
                                         value={player.voiceStyle}
                                         onChange={(e) => handlePlayerChange(index, 'voiceStyle', e.target.value)}
                                         placeholder="Voice style (e.g., mysteriously, excitedly)"
@@ -872,25 +851,21 @@ export default function CreateNewGamePage() {
                         </div>
                     ))}
 
-                    <div className="flex justify-end space-x-4 mt-6">
+                    <div className="hr-pixel" />
+                    <div className="flex justify-end space-x-4 mt-4">
                         <button
-                            className={`${buttonTransparentStyle} ${(!isFormValid || isLoading) ? buttonDisabledStyle : ''}`}
+                            className={`pbtn pbtn-ghost ${(!isFormValid || isLoading) ? buttonDisabledStyle : ''}`}
                             onClick={handleGeneratePreview}
                             disabled={!isFormValid || isLoading}
                         >
-                            {isLoading ? (
-                                <span className="flex items-center space-x-2">
-                                    <span className="animate-spin">⏳</span>
-                                    <span>Generating Preview...</span>
-                                </span>
-                            ) : 'Generate Preview Again'}
+                            {isLoading ? '▸ GENERATING...' : '▸ REGENERATE'}
                         </button>
                         <button
-                            className={`${buttonTransparentStyle} ${isLoading ? buttonDisabledStyle : ''}`}
+                            className={`pbtn pbtn-primary ${isLoading ? buttonDisabledStyle : ''}`}
                             onClick={handleCreateGame}
                             disabled={isLoading}
                         >
-                            {isLoading ? 'Processing...' : 'Create Game'}
+                            {isLoading ? '▸ CREATING...' : '▸ CREATE GAME'}
                         </button>
                     </div>
                 </div>

@@ -3,7 +3,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { talkToAll, humanPlayerVote, getSuggestion } from "@/app/api/bot-actions";
 import { humanPlayerTalkWerewolves } from "@/app/api/night-actions";
-import { buttonTransparentStyle } from "@/app/constants";
 import { GAME_STATES, MessageType, RECIPIENT_ALL, RECIPIENT_WEREWOLVES, RECIPIENT_DOCTOR, RECIPIENT_DETECTIVE, RECIPIENT_MANIAC, GameMessage, Game, GameActionResponse, SystemErrorMessage, BotResponseError, GAME_MASTER, ROLE_CONFIGS, GAME_ROLES, FREE_TIER_LIMITS } from "@/app/api/game-models";
 import { getPlayerColor } from "@/app/utils/color-utils";
 import { clearGameErrorState } from "@/app/api/game-actions";
@@ -1358,9 +1357,9 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
 
     return (
         <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-            <div className="flex items-center justify-between mb-4 flex-shrink-0">
+            <div className="flex items-center justify-between px-3 py-2 flex-shrink-0" style={{ borderBottom: '1px solid var(--ember-border)' }}>
                 <div className="flex items-center gap-2">
-                    <span className="text-xl font-bold theme-text-primary">
+                    <span className="pixel-text" style={{ fontSize: 10, color: 'var(--ember-ink-0)' }}>
                         {headerTitle}
                     </span>
                 </div>
@@ -1408,7 +1407,7 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
             )}
             {/* Error is shown inline at the bottom of the chat messages */}
             {/* Messages area - grows to fill space, scrolls internally */}
-            <div ref={messagesContainerRef} className="flex-1 mb-4 p-2 theme-bg-card theme-border border rounded overflow-y-auto">
+            <div ref={messagesContainerRef} className="flex-1 p-2 overflow-y-auto" style={{ background: 'transparent' }}>
                 {isLoadingMessages ? (
                     <div className="text-center theme-text-secondary text-sm py-4">
                         Loading Day {selectedDay}...
@@ -1558,7 +1557,7 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
                             <button
                                 type="submit"
                                 disabled={isProcessing}
-                                className={`h-10 px-4 ${buttonTransparentStyle} ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                className={`pbtn pbtn-primary pbtn-sm ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 title={isProcessing ? "Waiting for response..." : "Send your message to all players"}
                             >
                                 {isProcessing ? (
@@ -1584,11 +1583,8 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
                                 type="button"
                                 onClick={handleToggleRecording}
                                 disabled={!isMicrophoneEnabled() || isTranscribing}
-                                className={`h-10 w-10 !p-0 flex items-center justify-center transition-colors ${
-                                    isRecording
-                                        ? `${buttonTransparentStyle} border-red-500 bg-red-500/10 hover:bg-red-500/20 text-red-500`
-                                        : buttonTransparentStyle
-                                } ${!isMicrophoneEnabled() || isTranscribing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                className={`pbtn ${isRecording ? 'pbtn-danger' : 'pbtn-ghost'} ${!isMicrophoneEnabled() || isTranscribing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                style={{ width: 40, height: 40, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                 title={
                                     isTranscribing
                                         ? "Transcribing audio..."
@@ -1621,7 +1617,8 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
                                     type="button"
                                     onClick={handleGetSuggestion}
                                     disabled={isGettingSuggestion}
-                                    className={`h-10 w-10 !p-0 flex items-center justify-center ${buttonTransparentStyle} ${isGettingSuggestion ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    className={`pbtn pbtn-ghost ${isGettingSuggestion ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    style={{ width: 40, height: 40, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                     title={isGettingSuggestion ? "Getting suggestion..." : "Get AI suggestion for your response"}
                                 >
                                     {isGettingSuggestion ? (
@@ -1638,7 +1635,8 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
                             <button
                                 type="button"
                                 onClick={() => setTextareaRows(prev => prev === 2 ? 10 : 2)}
-                                className={`h-10 w-10 !p-0 flex items-center justify-center ${buttonTransparentStyle}`}
+                                className="pbtn pbtn-ghost"
+                                style={{ width: 40, height: 40, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                 title="Expand/shrink text area"
                             >
                                 <span className="text-sm">

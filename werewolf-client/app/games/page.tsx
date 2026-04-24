@@ -8,7 +8,7 @@ import { getUserTier } from "@/app/api/user-actions";
 
 function formatCreationDate(timestamp?: number): string {
     if (!timestamp) return '';
-    
+
     const date = new Date(timestamp);
     return date.toLocaleDateString('en-US', {
         month: 'short',
@@ -37,56 +37,56 @@ const GamePages = async ({searchParams}: {searchParams?: Promise<{error?: string
     const errorCode = resolvedSearchParams?.error;
     const blockedGameId = resolvedSearchParams?.blocked;
     return (
-        <div className="flex flex-col h-full theme-text-primary overflow-hidden">
+        <div className="flex flex-col h-full overflow-hidden" style={{ color: 'var(--ember-ink-0)' }}>
             <div className="flex justify-between items-center mb-6">
-                <h1 className="text-2xl font-bold theme-text-primary">Game List</h1>
-                <Link href="/games/newgame" className="text-btn-text bg-btn hover:bg-btn-hover p-3 text-xl rounded">
-                    Create Game
+                <h1 className="pixel-text" style={{ fontSize: 16, color: 'var(--ember-fire-4)' }}>GAME LIST</h1>
+                <Link href="/games/newgame" className="pbtn pbtn-primary" style={{ textDecoration: 'none' }}>
+                    ▸ CREATE GAME
                 </Link>
             </div>
 
             {errorCode === 'tier_mismatch' && (
-                <div className="mb-4 p-4 border-2 border-yellow-600 bg-yellow-100 dark:bg-yellow-900/40 text-yellow-900 dark:text-yellow-200 rounded flex items-start justify-between gap-4">
-                    <div>
-                        You can only open games created on your current tier. {blockedGameId ? `Game ${blockedGameId} is locked.` : ''}
+                <div className="panel-sm mb-4 p-4" style={{ borderColor: 'var(--ember-fire-4)' }}>
+                    <div className="flex items-start justify-between gap-4">
+                        <span className="console-text" style={{ fontSize: 14, color: 'var(--ember-fire-4)' }}>
+                            You can only open games created on your current tier. {blockedGameId ? `Game ${blockedGameId} is locked.` : ''}
+                        </span>
+                        <Link
+                            href="/games"
+                            className="pixel-text"
+                            style={{ fontSize: 8, color: 'var(--ember-ink-2)', textDecoration: 'none' }}
+                        >
+                            DISMISS
+                        </Link>
                     </div>
-                    <Link
-                        href="/games"
-                        className="text-yellow-800 dark:text-yellow-100 hover:underline text-sm font-medium"
-                        aria-label="Dismiss tier warning"
-                    >
-                        Dismiss
-                    </Link>
                 </div>
             )}
 
             <div className="flex-grow overflow-auto">
-                <ul className="space-y-4">
+                <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
                     {games.map((game) => {
                         const isSameTier = game.createdWithTier === userTier;
-                        const listClasses = [
-                            'theme-bg-card theme-border border rounded-lg px-2 py-4 sm:px-4 transition-colors theme-shadow'
-                        ];
-                        if (isSameTier) {
-                            listClasses.push('hover:opacity-90');
-                        } else {
-                            listClasses.push('opacity-60');
-                        }
                         return (
                         <li
                             key={game.id}
-                            className={listClasses.join(' ')}
+                            className="panel-sm"
+                            style={{
+                                marginBottom: 8,
+                                padding: '12px 16px',
+                                opacity: isSameTier ? 1 : 0.5,
+                                transition: 'opacity 150ms',
+                            }}
                         >
                             <div className="flex justify-between items-start gap-2">
                                 {isSameTier ? (
-                                    <Link href={`/games/${game.id}`} className="flex-grow">
+                                    <Link href={`/games/${game.id}`} className="flex-grow" style={{ textDecoration: 'none', color: 'inherit' }}>
                                         <GameListEntryContent game={game} />
                                     </Link>
                                 ) : (
-                                    <div className="flex-grow cursor-not-allowed">
+                                    <div className="flex-grow" style={{ cursor: 'not-allowed' }}>
                                         <GameListEntryContent game={game} locked />
-                                        <p className="mt-2 text-xs text-yellow-800 dark:text-yellow-200">
-                                            Switch back to the {game.createdWithTier.toUpperCase()} tier to continue this game.
+                                        <p className="console-text" style={{ fontSize: 12, color: 'var(--ember-fire-4)', marginTop: 6 }}>
+                                            Switch to {game.createdWithTier.toUpperCase()} tier to continue.
                                         </p>
                                     </div>
                                 )}
@@ -112,25 +112,24 @@ function GameListEntryContent({
 }) {
     const stateLabel = game.gameState.toLowerCase().replace(/_/g, ' ');
     return (
-        <div className={`flex flex-col gap-1.5 ${locked ? 'pointer-events-none' : ''}`}>
-            {/* Top row: Theme and Date/Status */}
+        <div className={`flex flex-col gap-1 ${locked ? 'pointer-events-none' : ''}`}>
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-4">
-                <h2 className="text-lg capitalize theme-text-primary font-semibold truncate">{game.theme}</h2>
-                <div className="flex flex-wrap items-center gap-x-2 text-xs theme-text-secondary">
+                <h2 className="pixel-text" style={{ fontSize: 11, color: 'var(--ember-ink-0)' }}>
+                    {game.theme.toUpperCase()}
+                </h2>
+                <div className="console-text flex flex-wrap items-center gap-x-2" style={{ fontSize: 13, color: 'var(--ember-ink-3)' }}>
                     <span>{formatCreationDate(game.createdAt)}</span>
-                    <span className="hidden sm:inline opacity-40">•</span>
-                    <span className="font-medium theme-text-primary uppercase tracking-tight bg-opacity-10 bg-gray-500 px-1.5 py-0.5 rounded sm:bg-transparent sm:p-0">
-                        Day {game.currentDay} • {stateLabel}
+                    <span style={{ opacity: 0.4 }}>·</span>
+                    <span style={{ color: 'var(--ember-fire-4)' }}>
+                        DAY {game.currentDay} · {stateLabel.toUpperCase()}
                     </span>
                 </div>
             </div>
-            
-            {/* Description row: Full width */}
-            <p className="text-sm theme-text-secondary line-clamp-2 leading-relaxed">{game.description}</p>
-            
-            {/* Bottom row: Tier */}
-            <div className="text-[10px] uppercase tracking-wider theme-text-secondary opacity-60">
-                Tier: {game.createdWithTier}
+            <p style={{ fontSize: 14, color: 'var(--ember-ink-2)', lineHeight: 1.5, margin: 0 }} className="line-clamp-2">
+                {game.description}
+            </p>
+            <div className="pixel-text" style={{ fontSize: 7, color: 'var(--ember-ink-3)', letterSpacing: 2 }}>
+                {game.createdWithTier.toUpperCase()} TIER
             </div>
         </div>
     );

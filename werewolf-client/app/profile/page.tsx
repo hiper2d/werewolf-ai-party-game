@@ -42,23 +42,26 @@ export default async function UserProfilePage({ searchParams }: PageProps) {
             ? 'text-blue-400/70 dark:text-blue-300/60'
             : 'text-yellow-600 dark:text-yellow-400';
 
+    const tierEmberColor = userTier === USER_TIERS.API
+        ? 'var(--ember-team-village)'
+        : userTier === USER_TIERS.PAID
+            ? 'var(--ember-moon-2)'
+            : 'var(--ember-fire-4)';
+
     return (
-        <div className="flex flex-col lg:flex-row theme-text-primary">
+        <div className="flex flex-col lg:flex-row" style={{ color: 'var(--ember-ink-0)' }}>
             {/* Left column - User info & spendings */}
             <div className="lg:w-1/4 lg:sticky lg:top-20 lg:h-[calc(100vh-5rem)] lg:overflow-auto hide-scrollbar lg:pr-4 mb-6 lg:mb-0">
                 {/* User info */}
                 <div className="mb-4">
-                    <h1 className="text-2xl font-bold mb-2">User Profile</h1>
+                    <h1 className="pixel-text" style={{ fontSize: 14, color: 'var(--ember-fire-4)', marginBottom: 12 }}>PROFILE</h1>
                     <div className="flex items-center gap-4 mb-3">
-                        <Image src={session.user?.image ?? '/mememan.webp'} width="64" height="64" alt="User profile" className="rounded-full" />
-                        <div className="text-sm theme-text-secondary">
-                            <p>{session.user?.name}</p>
-                            <p>{session.user?.email}</p>
-                            <p className="mt-1">
-                                <span className="font-semibold">Tier: </span>
-                                <span className={tierColorClass}>
-                                    {userTier.toUpperCase()}
-                                </span>
+                        <Image src={session.user?.image ?? '/mememan.webp'} width="64" height="64" alt="User profile" className="rounded-full" style={{ border: '2px solid var(--ember-border)' }} />
+                        <div>
+                            <p className="pixel-text" style={{ fontSize: 9, color: 'var(--ember-ink-0)', marginBottom: 2 }}>{session.user?.name?.toUpperCase()}</p>
+                            <p className="console-text" style={{ fontSize: 13, color: 'var(--ember-ink-2)' }}>{session.user?.email}</p>
+                            <p className="console-text" style={{ fontSize: 13, marginTop: 4 }}>
+                                Tier: <span style={{ color: tierEmberColor }}>{userTier.toUpperCase()}</span>
                             </p>
                         </div>
                     </div>

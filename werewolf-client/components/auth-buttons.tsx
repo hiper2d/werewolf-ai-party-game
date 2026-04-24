@@ -1,9 +1,8 @@
 "use client"
 
 import React from 'react';
-import {buttonTransparentStyle} from "@/app/constants";
-import {signOut, useSession} from "next-auth/react";
-import {useLoginDialog} from "@/app/providers/LoginDialogProvider";
+import { signOut, useSession } from "next-auth/react";
+import { useLoginDialog } from "@/app/providers/LoginDialogProvider";
 
 const AuthButtons = () => {
     const { data: session, status } = useSession();
@@ -11,15 +10,15 @@ const AuthButtons = () => {
 
     if (status === 'unauthenticated') {
         return (
-            <button onClick={() => openLoginDialog()} className={buttonTransparentStyle}>
-                Login
+            <button onClick={() => openLoginDialog()} className="pbtn pbtn-primary pbtn-sm">
+                LOGIN
             </button>
         );
     }
 
     return (
-        <button onClick={() => signOut()} className={buttonTransparentStyle}>
-            <span>Logout</span>
+        <button onClick={() => signOut()} className="pbtn pbtn-ghost pbtn-sm">
+            LOGOUT
         </button>
     );
 };

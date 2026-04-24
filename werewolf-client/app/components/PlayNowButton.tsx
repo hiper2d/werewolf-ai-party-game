@@ -8,9 +8,10 @@ export default function PlayNowButton() {
   return (
     <button
       onClick={() => openLoginDialog('/games')}
-      className="px-8 py-4 bg-btn text-btn-text rounded-lg font-bold text-xl hover:bg-btn-hover transition-all transform hover:scale-105 shadow-lg"
+      className="pbtn pbtn-primary"
+      style={{ fontSize: 12, padding: '14px 28px' }}
     >
-      Play Now (Sign In)
+      ▸ PLAY NOW
     </button>
   );
 }
