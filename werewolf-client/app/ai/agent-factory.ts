@@ -37,8 +37,8 @@ export class AgentFactory {
                 return new ClaudeAgent(name, instruction, model.modelApiName, key, shouldEnableThinking);
 
             // Always-on reasoning models
-            case LLM_CONSTANTS.GPT_5:
-            case LLM_CONSTANTS.GPT_5_MINI:
+            case LLM_CONSTANTS.GPT_5_5:
+            case LLM_CONSTANTS.GPT_5_4_MINI:
                 return new Gpt5Agent(name, instruction, model.modelApiName, key, model.temperature!, shouldEnableThinking);
             case LLM_CONSTANTS.GEMINI_3_PRO:
             case LLM_CONSTANTS.GEMINI_3_FLASH:
@@ -47,18 +47,20 @@ export class AgentFactory {
             case LLM_CONSTANTS.GROK_4_1_FAST_REASONING:
                 return new GrokAgent(name, instruction, model.modelApiName, key, model.temperature!, shouldEnableThinking);
 
-            // DeepSeek models - separate chat and reasoner
-            case LLM_CONSTANTS.DEEPSEEK_CHAT:
-            case LLM_CONSTANTS.DEEPSEEK_REASONER:
-                return new DeepSeekV2Agent(name, instruction, model.modelApiName, key, model.temperature!, shouldEnableThinking);
+            // DeepSeek V4 models - flash and pro, with thinking toggle
+            case LLM_CONSTANTS.DEEPSEEK_V4_FLASH:
+            case LLM_CONSTANTS.DEEPSEEK_V4_FLASH_THINKING:
+            case LLM_CONSTANTS.DEEPSEEK_V4_PRO:
+            case LLM_CONSTANTS.DEEPSEEK_V4_PRO_THINKING:
+                return new DeepSeekV2Agent(name, instruction, model.modelApiName, key, model.temperature ?? 0, shouldEnableThinking);
 
             // Mistral models
             case LLM_CONSTANTS.MISTRAL_3_MEDIUM:
             case LLM_CONSTANTS.MISTRAL_3_LARGE:
             case LLM_CONSTANTS.MISTRAL_MAGISTRAL:
                 return new MistralAgent(name, instruction, model.modelApiName, key, shouldEnableThinking);
-            case LLM_CONSTANTS.KIMI_K2_5:
-            case LLM_CONSTANTS.KIMI_K2_5_THINKING:
+            case LLM_CONSTANTS.KIMI_K2_6:
+            case LLM_CONSTANTS.KIMI_K2_6_THINKING:
             case LLM_CONSTANTS.KIMI_K2:
             case LLM_CONSTANTS.KIMI_K2_THINKING:
             case LLM_CONSTANTS.KIMI_K2_TURBO:
@@ -71,7 +73,9 @@ export class AgentFactory {
 
     // Map deprecated model identifiers to their current equivalents
     private static readonly DEPRECATED_MODEL_MAP: Record<string, string> = {
-        'gpt-5.4': LLM_CONSTANTS.GPT_5,
+        'gpt-5.4': LLM_CONSTANTS.GPT_5_5,
+        'deepseek-chat': LLM_CONSTANTS.DEEPSEEK_V4_FLASH,
+        'deepseek-reasoner': LLM_CONSTANTS.DEEPSEEK_V4_FLASH_THINKING,
     };
 
     private static validateLlmTypeAndGet(llmType: string): string {

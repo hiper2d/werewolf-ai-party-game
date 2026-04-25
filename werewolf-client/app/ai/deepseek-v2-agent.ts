@@ -75,9 +75,9 @@ export class DeepSeekV2Agent extends AbstractAgent {
      * New method using Zod with DeepSeek API
      * This provides better schema handling and runtime validation
      * 
-     * According to DeepSeek documentation, similar to OpenAI:
-     * 1. Set response_format to { type: 'json_object' } for non-reasoning models
-     * 2. For reasoning models (deepseek-reasoner), schema guidance via prompts
+     * DeepSeek V4 uses thinking toggle via extra_body.
+     * Non-thinking: response_format json_object + schema in prompt
+     * Thinking: schema in prompt only, reasoning via reasoning_content
      */
     async askWithZodSchema<T>(zodSchema: z.ZodSchema<T>, messages: AIMessage[]): Promise<[T, string, TokenUsage?, string?]> {
         try {
@@ -95,33 +95,26 @@ export class DeepSeekV2Agent extends AbstractAgent {
             let requestParams: any = {
                 model: this.model,
                 messages: this.addSystemInstruction(modifiedInput),
-                temperature: this.temperature,
                 max_tokens: maxOutputTokens,
+                ...(this.enableThinking ? {} : { temperature: this.temperature }),
             };
 
+            // Add schema description to the last user message
+            const schemaDescription = ZodSchemaConverter.toPromptDescription(zodSchema);
+            const lastMessage = modifiedInput[modifiedInput.length - 1];
+            if (lastMessage && lastMessage.role === 'user') {
+                modifiedInput[modifiedInput.length - 1] = {
+                    ...lastMessage,
+                    content: `${lastMessage.content}\n\nYour response must be a valid JSON object matching this schema:\n${schemaDescription}`
+                };
+                requestParams.messages = this.addSystemInstruction(modifiedInput);
+            }
+
             if (this.enableThinking) {
-                // For deepseek-reasoner: Add schema description to the last message
-                const schemaDescription = ZodSchemaConverter.toPromptDescription(zodSchema);
-                const lastMessage = modifiedInput[modifiedInput.length - 1];
-                if (lastMessage && lastMessage.role === 'user') {
-                    modifiedInput[modifiedInput.length - 1] = {
-                        ...lastMessage,
-                        content: `${lastMessage.content}\n\nYour response must be a valid JSON object matching this schema:\n${schemaDescription}`
-                    };
-                    requestParams.messages = this.addSystemInstruction(modifiedInput);
-                }
+                // DeepSeek V4: enable thinking via extra_body
+                requestParams.extra_body = { thinking: { type: 'enabled' } };
             } else {
-                // For deepseek-chat: Use JSON object format with schema description in prompt
-                // DeepSeek doesn't support structured schemas like OpenAI, so we use prompt-based approach
-                const schemaDescription = ZodSchemaConverter.toPromptDescription(zodSchema);
-                const lastMessage = modifiedInput[modifiedInput.length - 1];
-                if (lastMessage && lastMessage.role === 'user') {
-                    modifiedInput[modifiedInput.length - 1] = {
-                        ...lastMessage,
-                        content: `${lastMessage.content}\n\nYour response must be a valid JSON object matching this schema:\n${schemaDescription}`
-                    };
-                    requestParams.messages = this.addSystemInstruction(modifiedInput);
-                }
+                // Non-thinking: use JSON object response format
                 requestParams.response_format = {
                     type: 'json_object'
                 };
@@ -136,7 +129,7 @@ export class DeepSeekV2Agent extends AbstractAgent {
                 throw new Error(this.errorMessages.apiError(apiError));
             }
 
-            // Extract reasoning content if available (from deepseek-reasoner)
+            // Extract reasoning content if available (from thinking mode)
             let thinkingContent = "";
             if (this.enableThinking && response.choices[0]?.message) {
                 const reasoning = (response.choices[0].message as any).reasoning_content;

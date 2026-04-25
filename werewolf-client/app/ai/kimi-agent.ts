@@ -130,7 +130,7 @@ export class KimiAgent extends AbstractAgent {
                         }
                     };
 
-                    // Models that support a thinking toggle (e.g. Kimi K2.5)
+                    // Models that support a thinking toggle (e.g. Kimi K2.6)
                     if (this.enableThinking) {
                         params.thinking = { type: 'enabled' };
                     }
@@ -191,7 +191,7 @@ export class KimiAgent extends AbstractAgent {
                         messages: openAIMessages
                     };
 
-                    // Models that support a thinking toggle (e.g. Kimi K2.5)
+                    // Models that support a thinking toggle (e.g. Kimi K2.6)
                     if (this.enableThinking) {
                         params.thinking = { type: 'enabled' };
                     }

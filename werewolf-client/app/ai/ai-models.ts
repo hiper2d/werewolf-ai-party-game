@@ -35,10 +35,12 @@ export const LLM_CONSTANTS = {
     CLAUDE_4_SONNET_THINKING: 'claude-sonnet-thinking',
     CLAUDE_4_HAIKU: 'claude-haiku',
     CLAUDE_4_HAIKU_THINKING: 'claude-haiku-thinking',
-    DEEPSEEK_CHAT: 'deepseek-chat',
-    DEEPSEEK_REASONER: 'deepseek-reasoner',
-    GPT_5: 'gpt',
-    GPT_5_MINI: 'gpt-mini',
+    DEEPSEEK_V4_FLASH: 'deepseek-flash',
+    DEEPSEEK_V4_FLASH_THINKING: 'deepseek-flash-thinking',
+    DEEPSEEK_V4_PRO: 'deepseek-pro',
+    DEEPSEEK_V4_PRO_THINKING: 'deepseek-pro-thinking',
+    GPT_5_5: 'gpt',
+    GPT_5_4_MINI: 'gpt-mini',
     GEMINI_3_PRO: 'gemini-pro',
     GEMINI_3_FLASH: 'gemini-flash',
     MISTRAL_3_LARGE: 'mistral-large',
@@ -48,8 +50,8 @@ export const LLM_CONSTANTS = {
     GROK_4_1_FAST_REASONING: 'grok-fast',
     KIMI_K2: 'kimi',
     KIMI_K2_THINKING: 'kimi-thinking',
-    KIMI_K2_5: 'kimi-k2.5',
-    KIMI_K2_5_THINKING: 'kimi-k2.5-thinking',
+    KIMI_K2_6: 'kimi-k2.6',
+    KIMI_K2_6_THINKING: 'kimi-k2.6-thinking',
     KIMI_K2_TURBO: 'kimi-turbo',
     KIMI_K2_TURBO_THINKING: 'kimi-turbo-thinking',
     RANDOM: 'random',
@@ -152,10 +154,10 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         }
     },
 
-    // DeepSeek models - separate Chat and Reasoner
-    [LLM_CONSTANTS.DEEPSEEK_CHAT]: {
-        displayName: 'DeepSeek Chat',
-        modelApiName: 'deepseek-chat',
+    // DeepSeek V4 models - Flash and Pro, each with thinking toggle
+    [LLM_CONSTANTS.DEEPSEEK_V4_FLASH]: {
+        displayName: 'DeepSeek V4 Flash',
+        modelApiName: 'deepseek-v4-flash',
         apiKeyName: API_KEY_CONSTANTS.DEEPSEEK,
         hasThinking: false,
         temperature: 0.6,
@@ -165,23 +167,45 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
             maxBotsPerGame: -1 // Unlimited - very affordable
         }
     },
-    [LLM_CONSTANTS.DEEPSEEK_REASONER]: {
-        displayName: 'DeepSeek Reasoner',
-        modelApiName: 'deepseek-reasoner',
+    [LLM_CONSTANTS.DEEPSEEK_V4_FLASH_THINKING]: {
+        displayName: 'DeepSeek V4 Flash (Thinking)',
+        modelApiName: 'deepseek-v4-flash',
         apiKeyName: API_KEY_CONSTANTS.DEEPSEEK,
         hasThinking: true,
-        temperature: 0.6,
         maxOutputTokens: 8192,
         freeTier: {
             available: true,
             maxBotsPerGame: -1
         }
     },
+    [LLM_CONSTANTS.DEEPSEEK_V4_PRO]: {
+        displayName: 'DeepSeek V4 Pro',
+        modelApiName: 'deepseek-v4-pro',
+        apiKeyName: API_KEY_CONSTANTS.DEEPSEEK,
+        hasThinking: false,
+        temperature: 0.6,
+        maxOutputTokens: 8192,
+        freeTier: {
+            available: true,
+            maxBotsPerGame: 1
+        }
+    },
+    [LLM_CONSTANTS.DEEPSEEK_V4_PRO_THINKING]: {
+        displayName: 'DeepSeek V4 Pro (Thinking)',
+        modelApiName: 'deepseek-v4-pro',
+        apiKeyName: API_KEY_CONSTANTS.DEEPSEEK,
+        hasThinking: true,
+        maxOutputTokens: 8192,
+        freeTier: {
+            available: true,
+            maxBotsPerGame: 1
+        }
+    },
 
     // Models with always-on reasoning
-    [LLM_CONSTANTS.GPT_5]: {
-        displayName: 'GPT-5',
-        modelApiName: 'gpt-5',
+    [LLM_CONSTANTS.GPT_5_5]: {
+        displayName: 'GPT-5.5',
+        modelApiName: 'gpt-5.5',
         apiKeyName: API_KEY_CONSTANTS.OPENAI,
         hasThinking: true,
         temperature: 1,
@@ -190,9 +214,9 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
             maxBotsPerGame: 1
         }
     },
-    [LLM_CONSTANTS.GPT_5_MINI]: {
-        displayName: 'GPT-5-mini',
-        modelApiName: 'gpt-5-mini',
+    [LLM_CONSTANTS.GPT_5_4_MINI]: {
+        displayName: 'GPT-5.4-mini',
+        modelApiName: 'gpt-5.4-mini',
         apiKeyName: API_KEY_CONSTANTS.OPENAI,
         hasThinking: true,
         temperature: 1,
@@ -299,23 +323,23 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
             maxBotsPerGame: -1
         }
     },
-    [LLM_CONSTANTS.KIMI_K2_5]: {
-        displayName: 'Kimi K2.5',
-        modelApiName: 'kimi-k2.5',
+    [LLM_CONSTANTS.KIMI_K2_6]: {
+        displayName: 'Kimi K2.6',
+        modelApiName: 'kimi-k2.6',
         apiKeyName: API_KEY_CONSTANTS.MOONSHOT,
         hasThinking: false,
-        temperature: 1, // Kimi K2.5 API only allows temperature=1
+        temperature: 1, // Kimi K2.6 API only allows temperature=1
         freeTier: {
             available: false,
             maxBotsPerGame: 0
         }
     },
-    [LLM_CONSTANTS.KIMI_K2_5_THINKING]: {
-        displayName: 'Kimi K2.5 (Thinking)',
-        modelApiName: 'kimi-k2.5',
+    [LLM_CONSTANTS.KIMI_K2_6_THINKING]: {
+        displayName: 'Kimi K2.6 (Thinking)',
+        modelApiName: 'kimi-k2.6',
         apiKeyName: API_KEY_CONSTANTS.MOONSHOT,
         hasThinking: true,
-        temperature: 1, // Kimi K2.5 API only allows temperature=1
+        temperature: 1, // Kimi K2.6 API only allows temperature=1
         freeTier: {
             available: false,
             maxBotsPerGame: 0
@@ -372,31 +396,31 @@ export interface ModelPricing {
 /**
  * Centralized pricing configuration for all AI models
  * All prices are per million (1,000,000) tokens
- * Updated as of March 2026
+ * Updated as of April 2026
  */
 export const MODEL_PRICING: Record<string, ModelPricing> = {
     // OpenAI models
-    [SupportedAiModels[LLM_CONSTANTS.GPT_5].modelApiName]: {
-        inputPrice: 2.500,
-        outputPrice: 15.000,
-        cacheHitPrice: 0.250
+    [SupportedAiModels[LLM_CONSTANTS.GPT_5_5].modelApiName]: {
+        inputPrice: 5.000,
+        outputPrice: 30.000,
+        cacheHitPrice: 2.500
     },
-    [SupportedAiModels[LLM_CONSTANTS.GPT_5_MINI].modelApiName]: {
+    [SupportedAiModels[LLM_CONSTANTS.GPT_5_4_MINI].modelApiName]: {
         inputPrice: 0.750,
         outputPrice: 4.500,
         cacheHitPrice: 0.075
     },
 
-    // DeepSeek models (both models have the same pricing)
-    [SupportedAiModels[LLM_CONSTANTS.DEEPSEEK_CHAT].modelApiName]: {
-        inputPrice: 0.28,
-        outputPrice: 0.42,
+    // DeepSeek V4 models
+    [SupportedAiModels[LLM_CONSTANTS.DEEPSEEK_V4_FLASH].modelApiName]: {
+        inputPrice: 0.14,
+        outputPrice: 0.28,
         cacheHitPrice: 0.028
     },
-    [SupportedAiModels[LLM_CONSTANTS.DEEPSEEK_REASONER].modelApiName]: {
-        inputPrice: 0.28,
-        outputPrice: 1.68,
-        cacheHitPrice: 0.028
+    [SupportedAiModels[LLM_CONSTANTS.DEEPSEEK_V4_PRO].modelApiName]: {
+        inputPrice: 1.74,
+        outputPrice: 3.48,
+        cacheHitPrice: 0.145
     },
 
     // Kimi/Moonshot models
@@ -410,10 +434,10 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
         outputPrice: 2.50,
         cacheHitPrice: 0.15
     },
-    [SupportedAiModels[LLM_CONSTANTS.KIMI_K2_5].modelApiName]: {
-        inputPrice: 0.60,
-        outputPrice: 3.00,
-        cacheHitPrice: 0.10
+    [SupportedAiModels[LLM_CONSTANTS.KIMI_K2_6].modelApiName]: {
+        inputPrice: 0.95,
+        outputPrice: 4.00,
+        cacheHitPrice: 0.16
     },
     [SupportedAiModels[LLM_CONSTANTS.KIMI_K2_TURBO].modelApiName]: {
         inputPrice: 1.15,

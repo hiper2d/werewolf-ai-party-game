@@ -11,7 +11,7 @@ import { format } from "@/app/ai/prompts/utils";
 import { ROLE_CONFIGS, PLAY_STYLE_CONFIGS } from "@/app/api/game-models";
 
 // Helper function to create a Gpt5Agent instance (defaults to GPT-5-mini)
-const createAgent = (botName: string, modelType: string = LLM_CONSTANTS.GPT_5_MINI, enableThinking: boolean = true): Gpt5Agent => {
+const createAgent = (botName: string, modelType: string = LLM_CONSTANTS.GPT_5_4_MINI, enableThinking: boolean = true): Gpt5Agent => {
   const testBot = {
     name: botName,
     story: "A mysterious wanderer with a hidden past",
@@ -51,7 +51,7 @@ describe("Gpt5Agent integration", () => {
   
   describeOrSkip("askWithZodSchema with real API", () => {
     it("should respond with valid schema-based answer using GPT-5-mini (with reasoning)", async () => {
-      const agent = createAgent("TestBot", LLM_CONSTANTS.GPT_5_MINI, true);
+      const agent = createAgent("TestBot", LLM_CONSTANTS.GPT_5_4_MINI, true);
       const messages: AIMessage[] = [{
         role: 'user',
         content: 'What do you think about the current situation in the village?'
@@ -98,7 +98,7 @@ describe("Gpt5Agent integration", () => {
       const gmAgent = new Gpt5Agent(
         GAME_MASTER,
         STORY_SYSTEM_PROMPT,
-        SupportedAiModels[LLM_CONSTANTS.GPT_5_MINI].modelApiName,
+        SupportedAiModels[LLM_CONSTANTS.GPT_5_4_MINI].modelApiName,
         process.env.OPENAI_K!,
         0.7,
         false // Disable reasoning for this test
@@ -204,7 +204,7 @@ describe("Gpt5Agent integration", () => {
       const agent = new Gpt5Agent(
         "TestBot",
         "Test instruction",
-        SupportedAiModels[LLM_CONSTANTS.GPT_5_MINI].modelApiName,
+        SupportedAiModels[LLM_CONSTANTS.GPT_5_4_MINI].modelApiName,
         "invalid_api_key",
         0.7,
         false

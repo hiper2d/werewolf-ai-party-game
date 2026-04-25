@@ -1,6 +1,6 @@
 /**
  * Script to find and migrate games using old GPT model IDs in Firestore.
- * Migrates 'gpt-5.4' -> 'gpt' (GPT_5_4 was removed, GPT_5 now points to gpt-5.4).
+ * Migrates 'gpt-5.4' -> 'gpt' (GPT_5_4 was removed, GPT_5_5 now points to gpt-5.5).
  *
  * Dry run (default): npx tsx scripts/check-gpt-models.ts
  * Apply migration:   npx tsx scripts/check-gpt-models.ts --apply
@@ -9,7 +9,7 @@
 import { db } from '../firebase/server';
 
 const OLD_TO_NEW: Record<string, string> = {
-    'gpt-5.4': 'gpt', // GPT_5_4 removed, migrate to GPT_5
+    'gpt-5.4': 'gpt', // GPT_5_4 removed, migrate to GPT_5_5
 };
 
 async function checkAndMigrateGptModels() {

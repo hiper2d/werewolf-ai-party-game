@@ -25,8 +25,8 @@ const OLD_TO_NEW: Record<string, string> = {
     'Grok 4.1 Fast Reasoning': 'grok-fast',
     'Kimi K2': 'kimi',
     'Kimi K2 (Thinking)': 'kimi-thinking',
-    'Kimi K2.5': 'kimi-k2.5',
-    'Kimi K2.5 (Thinking)': 'kimi-k2.5-thinking',
+    'Kimi K2.5': 'kimi-k2.6',
+    'Kimi K2.5 (Thinking)': 'kimi-k2.6-thinking',
     'Random': 'random',
 };
 

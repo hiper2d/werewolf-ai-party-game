@@ -67,7 +67,7 @@ export function extractTokenUsage(response: any): TokenUsage | null {
 
 /**
  * Calculate cost for any AI provider using the centralized pricing
- * @param modelApiName - The API name of the model (e.g., 'gpt-4', 'deepseek-chat')
+ * @param modelApiName - The API name of the model (e.g., 'gpt-5.5', 'deepseek-v4-flash')
  * @param inputTokens - Number of input tokens used
  * @param outputTokens - Number of output tokens used  
  * @param options - Additional calculation details (cache hits, context tokens, etc.)

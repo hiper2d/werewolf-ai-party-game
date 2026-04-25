@@ -7,7 +7,7 @@ import {
 describe('free tier model limits', () => {
     it('allows unlimited models to be reused by bots', () => {
         expect(() =>
-            validateModelUsageForTier('free', LLM_CONSTANTS.DEEPSEEK_CHAT, [LLM_CONSTANTS.DEEPSEEK_CHAT, LLM_CONSTANTS.DEEPSEEK_CHAT])
+            validateModelUsageForTier('free', LLM_CONSTANTS.DEEPSEEK_V4_FLASH, [LLM_CONSTANTS.DEEPSEEK_V4_FLASH, LLM_CONSTANTS.DEEPSEEK_V4_FLASH])
         ).not.toThrow();
     });
 

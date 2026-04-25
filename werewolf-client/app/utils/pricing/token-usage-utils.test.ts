@@ -85,8 +85,8 @@ describe('Token Usage Utils', () => {
 
     describe('calculateCost', () => {
         it('should calculate cost for known models', () => {
-            const pricing = MODEL_PRICING['deepseek-chat'];
-            const cost = calculateCost('deepseek-chat', 1_000_000, 500_000);
+            const pricing = MODEL_PRICING['deepseek-v4-flash'];
+            const cost = calculateCost('deepseek-v4-flash', 1_000_000, 500_000);
 
             const expectedCost =
                 (1_000_000 * pricing.inputPrice) / 1_000_000 +
@@ -96,8 +96,8 @@ describe('Token Usage Utils', () => {
         });
 
         it('should calculate cost with cache hits', () => {
-            const pricing = MODEL_PRICING['deepseek-chat'];
-            const cost = calculateCost('deepseek-chat', 1_000_000, 500_000, { cacheHitTokens: 500_000 });
+            const pricing = MODEL_PRICING['deepseek-v4-flash'];
+            const cost = calculateCost('deepseek-v4-flash', 1_000_000, 500_000, { cacheHitTokens: 500_000 });
 
             const expectedCost =
                 (500_000 * pricing.inputPrice) / 1_000_000 +
@@ -129,7 +129,7 @@ describe('Token Usage Utils', () => {
                 }
             };
 
-            const result = extractUsageAndCalculateCost('deepseek-chat', mockResponse);
+            const result = extractUsageAndCalculateCost('deepseek-v4-flash', mockResponse);
             
             expect(result).not.toBeNull();
             expect(result!.usage).toEqual({
@@ -139,7 +139,7 @@ describe('Token Usage Utils', () => {
                 cacheHitTokens: 200000
             });
             
-            const pricing = MODEL_PRICING['deepseek-chat'];
+            const pricing = MODEL_PRICING['deepseek-v4-flash'];
             // Verify cost calculation: 800K uncached + 200K cached + 500K output
             const expectedCost =
                 (800_000 * pricing.inputPrice) / 1_000_000 +
@@ -149,8 +149,8 @@ describe('Token Usage Utils', () => {
         });
 
         it('should return null for invalid responses', () => {
-            expect(extractUsageAndCalculateCost('deepseek-chat', null)).toBeNull();
-            expect(extractUsageAndCalculateCost('deepseek-chat', {})).toBeNull();
+            expect(extractUsageAndCalculateCost('deepseek-v4-flash', null)).toBeNull();
+            expect(extractUsageAndCalculateCost('deepseek-v4-flash', {})).toBeNull();
         });
     });
 
@@ -270,10 +270,10 @@ describe('Token Usage Utils', () => {
     describe('MODEL_PRICING integration', () => {
         it('should have pricing for all supported models', () => {
             const expectedModels = [
-                SupportedAiModels[LLM_CONSTANTS.GPT_5].modelApiName,
-                SupportedAiModels[LLM_CONSTANTS.GPT_5_MINI].modelApiName,
-                SupportedAiModels[LLM_CONSTANTS.DEEPSEEK_CHAT].modelApiName,
-                SupportedAiModels[LLM_CONSTANTS.DEEPSEEK_REASONER].modelApiName,
+                SupportedAiModels[LLM_CONSTANTS.GPT_5_5].modelApiName,
+                SupportedAiModels[LLM_CONSTANTS.GPT_5_4_MINI].modelApiName,
+                SupportedAiModels[LLM_CONSTANTS.DEEPSEEK_V4_FLASH].modelApiName,
+                SupportedAiModels[LLM_CONSTANTS.DEEPSEEK_V4_PRO].modelApiName,
                 SupportedAiModels[LLM_CONSTANTS.KIMI_K2].modelApiName,
                 SupportedAiModels[LLM_CONSTANTS.KIMI_K2_THINKING].modelApiName,
                 SupportedAiModels[LLM_CONSTANTS.CLAUDE_4_OPUS].modelApiName,

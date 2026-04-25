@@ -1,7 +1,11 @@
 # Bugs and improvements
 
+- Update models:
+  - Opus 4.7
+  - Kimi 2.6
+  - DeepSeek v4
+- Mark some models as "fast" and let to select only fast models when generating preview
 - Fix prompting for ordering and summaries:
-- 
 - Bots should have better notion of day and night events ordering. Review the summary logic, it should have
   - Unified past days summary text
   - Past days voting results (who voted for whom, in what order; the reasons can be omitted)

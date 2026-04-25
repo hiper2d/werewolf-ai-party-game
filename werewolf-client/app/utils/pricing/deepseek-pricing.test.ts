@@ -1,5 +1,5 @@
-import { 
-    extractTokenUsageFromResponse, 
+import {
+    extractTokenUsageFromResponse,
     calculateDeepSeekCost
 } from './deepseek-pricing';
 import { MODEL_PRICING } from '../../ai/ai-models';
@@ -16,7 +16,7 @@ describe('DeepSeek Pricing Utils', () => {
             };
 
             const result = extractTokenUsageFromResponse(mockResponse);
-            
+
             expect(result).toEqual({
                 promptTokens: 100,
                 completionTokens: 50,
@@ -36,7 +36,7 @@ describe('DeepSeek Pricing Utils', () => {
             };
 
             const result = extractTokenUsageFromResponse(mockResponse);
-            
+
             expect(result).toEqual({
                 promptTokens: 200,
                 completionTokens: 75,
@@ -46,7 +46,7 @@ describe('DeepSeek Pricing Utils', () => {
             });
         });
 
-        it('should extract token usage with reasoning tokens (deepseek-reasoner)', () => {
+        it('should extract token usage with reasoning tokens', () => {
             const mockResponse = {
                 usage: {
                     prompt_tokens: 100,
@@ -59,7 +59,7 @@ describe('DeepSeek Pricing Utils', () => {
             };
 
             const result = extractTokenUsageFromResponse(mockResponse);
-            
+
             expect(result).toEqual({
                 promptTokens: 100,
                 completionTokens: 150,
@@ -84,7 +84,7 @@ describe('DeepSeek Pricing Utils', () => {
             };
 
             const result = extractTokenUsageFromResponse(mockResponse);
-            
+
             expect(result).toEqual({
                 promptTokens: 0,
                 completionTokens: 0,
@@ -94,70 +94,70 @@ describe('DeepSeek Pricing Utils', () => {
     });
 
     describe('calculateDeepSeekCost', () => {
-        it('should calculate cost for deepseek-chat model', () => {
-            // deepseek-chat: $0.56/M input, $1.68/M output
-            const cost = calculateDeepSeekCost('deepseek-chat', 1000000, 500000);
-            
-            // 1M input tokens * $0.56/M + 0.5M output tokens * $1.68/M
-            expect(cost).toBeCloseTo(0.56 + 0.84, 5);
+        it('should calculate cost for deepseek-v4-flash model', () => {
+            // deepseek-v4-flash: $0.14/M input, $0.28/M output
+            const cost = calculateDeepSeekCost('deepseek-v4-flash', 1000000, 500000);
+
+            // 1M input tokens * $0.14/M + 0.5M output tokens * $0.28/M
+            expect(cost).toBeCloseTo(0.14 + 0.14, 5);
         });
 
-        it('should calculate cost for deepseek-reasoner model', () => {
-            // deepseek-reasoner: $0.56/M input, $1.68/M output (same as chat)
-            const cost = calculateDeepSeekCost('deepseek-reasoner', 1000000, 1000000);
-            
-            // 1M input tokens * $0.56/M + 1M output tokens * $1.68/M
-            expect(cost).toBeCloseTo(0.56 + 1.68, 5);
+        it('should calculate cost for deepseek-v4-pro model', () => {
+            // deepseek-v4-pro: $1.74/M input, $3.48/M output
+            const cost = calculateDeepSeekCost('deepseek-v4-pro', 1000000, 1000000);
+
+            // 1M input tokens * $1.74/M + 1M output tokens * $3.48/M
+            expect(cost).toBeCloseTo(1.74 + 3.48, 5);
         });
 
-        it('should calculate cost with cache hits for deepseek-chat', () => {
+        it('should calculate cost with cache hits for deepseek-v4-flash', () => {
             // 1M total input, 500K cached
-            const cost = calculateDeepSeekCost('deepseek-chat', 1000000, 500000, 500000);
-            
-            // 500K uncached * $0.56/M + 500K cached * $0.07/M + 500K output * $1.68/M
-            const expectedCost = (500000 * 0.56 / 1000000) + (500000 * 0.07 / 1000000) + (500000 * 1.68 / 1000000);
+            const cost = calculateDeepSeekCost('deepseek-v4-flash', 1000000, 500000, 500000);
+
+            // 500K uncached * $0.14/M + 500K cached * $0.028/M + 500K output * $0.28/M
+            const expectedCost = (500000 * 0.14 / 1000000) + (500000 * 0.028 / 1000000) + (500000 * 0.28 / 1000000);
             expect(cost).toBeCloseTo(expectedCost, 5);
         });
 
         it('should handle unknown model gracefully', () => {
             const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
-            
+
             const cost = calculateDeepSeekCost('unknown-model', 1000, 500);
-            
+
             // Should return 0 for unknown model
             expect(cost).toBe(0);
             expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('No pricing information available'));
-            
+
             consoleSpy.mockRestore();
         });
 
         it('should handle zero tokens', () => {
-            const cost = calculateDeepSeekCost('deepseek-chat', 0, 0);
+            const cost = calculateDeepSeekCost('deepseek-v4-flash', 0, 0);
             expect(cost).toBe(0);
         });
 
         it('should handle cache hits exceeding input tokens', () => {
             // Edge case: more cache hits than input tokens (shouldn't happen but handle gracefully)
-            const cost = calculateDeepSeekCost('deepseek-chat', 100000, 50000, 150000);
-            
+            const cost = calculateDeepSeekCost('deepseek-v4-flash', 100000, 50000, 150000);
+
             // When cache hits exceed input, only the actual input amount should be considered cached
             // So 100K input tokens are all cached (capped at input amount)
-            const expectedCost = (100000 * 0.07 / 1000000) + (50000 * 1.68 / 1000000);
+            const expectedCost = (100000 * 0.028 / 1000000) + (50000 * 0.28 / 1000000);
             expect(cost).toBeCloseTo(expectedCost, 5);
         });
     });
 
     describe('MODEL_PRICING integration', () => {
-        it('should have pricing for DeepSeek models', () => {
-            expect(MODEL_PRICING['deepseek-chat']).toBeDefined();
-            expect(MODEL_PRICING['deepseek-chat'].inputPrice).toBe(0.56);
-            expect(MODEL_PRICING['deepseek-chat'].outputPrice).toBe(1.68);
-            expect(MODEL_PRICING['deepseek-chat'].cacheHitPrice).toBe(0.07);
+        it('should have pricing for DeepSeek V4 models', () => {
+            expect(MODEL_PRICING['deepseek-v4-flash']).toBeDefined();
+            expect(MODEL_PRICING['deepseek-v4-flash'].inputPrice).toBe(0.14);
+            expect(MODEL_PRICING['deepseek-v4-flash'].outputPrice).toBe(0.28);
+            expect(MODEL_PRICING['deepseek-v4-flash'].cacheHitPrice).toBe(0.028);
 
-            expect(MODEL_PRICING['deepseek-reasoner']).toBeDefined();
-            expect(MODEL_PRICING['deepseek-reasoner'].inputPrice).toBe(0.56);
-            expect(MODEL_PRICING['deepseek-reasoner'].outputPrice).toBe(1.68);
-            expect(MODEL_PRICING['deepseek-reasoner'].cacheHitPrice).toBe(0.07);
+            expect(MODEL_PRICING['deepseek-v4-pro']).toBeDefined();
+            expect(MODEL_PRICING['deepseek-v4-pro'].inputPrice).toBe(1.74);
+            expect(MODEL_PRICING['deepseek-v4-pro'].outputPrice).toBe(3.48);
+            expect(MODEL_PRICING['deepseek-v4-pro'].cacheHitPrice).toBe(0.145);
         });
     });
 });

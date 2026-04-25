@@ -15,7 +15,7 @@ describe("DeepSeekV2Agent integration", () => {
   const describeOrSkip = hasApiKey ? describe : describe.skip;
   
   // Helper function to create a DeepSeek agent (focusing on reasoner model only)
-  const createAgent = (modelType: string = LLM_CONSTANTS.DEEPSEEK_REASONER): DeepSeekV2Agent => {
+  const createAgent = (modelType: string = LLM_CONSTANTS.DEEPSEEK_V4_PRO_THINKING): DeepSeekV2Agent => {
     const testBot = {
       name: "TestBot",
       story: "A brilliant strategist with deep analytical capabilities",
@@ -51,7 +51,7 @@ describe("DeepSeekV2Agent integration", () => {
   describe("Zod integration with DeepSeek Reasoner", () => {
     describeOrSkip("askWithZodSchema with real API", () => {
       it("should work with Zod schema for bot answers using DeepSeek Reasoner", async () => {
-        const agent = createAgent(LLM_CONSTANTS.DEEPSEEK_REASONER);
+        const agent = createAgent(LLM_CONSTANTS.DEEPSEEK_V4_PRO_THINKING);
         const messages: AIMessage[] = [{
           role: 'user',
           content: 'Think step by step: What do you think about the current situation in the village after David was revealed as a werewolf?'
@@ -93,7 +93,7 @@ describe("DeepSeekV2Agent integration", () => {
         const gmAgent = new DeepSeekV2Agent(
           GAME_MASTER,
           STORY_SYSTEM_PROMPT,
-          SupportedAiModels[LLM_CONSTANTS.DEEPSEEK_REASONER].modelApiName,
+          SupportedAiModels[LLM_CONSTANTS.DEEPSEEK_V4_PRO_THINKING].modelApiName,
           process.env.DEEP_SEEK_K!,
           0.7,
           true // Enable thinking for story generation
@@ -145,7 +145,7 @@ describe("DeepSeekV2Agent integration", () => {
         console.log("📝 Requesting game story and characters...");
         console.log("Theme:", gamePreview.theme);
         console.log("Players to generate:", botCount);
-        console.log("Model:", "deepseek-reasoner");
+        console.log("Model:", "deepseek-v4-pro");
         
         // Call askWithZodSchema with GameSetupZodSchema
         const [gameSetup, thinking, tokenUsage] = await gmAgent.askWithZodSchema(
@@ -236,11 +236,11 @@ describe("DeepSeekV2Agent integration", () => {
   describe("Reasoning model characteristics", () => {
     it("should properly differentiate reasoning vs non-reasoning model behavior", () => {
       // Test that reasoning model is configured correctly
-      const reasonerAgent = createAgent(LLM_CONSTANTS.DEEPSEEK_REASONER);
+      const reasonerAgent = createAgent(LLM_CONSTANTS.DEEPSEEK_V4_PRO_THINKING);
       
       // Verify the reasoner agent has thinking enabled
       expect((reasonerAgent as any).enableThinking).toBe(true);
-      expect((reasonerAgent as any).model).toContain('reasoner');
+      expect((reasonerAgent as any).model).toContain('deepseek-v4');
       
       console.log("✅ DeepSeek Reasoner model configuration verified");
       console.log("ℹ️  Note: Reasoning model uses prompt-based schema guidance + thinking content");
