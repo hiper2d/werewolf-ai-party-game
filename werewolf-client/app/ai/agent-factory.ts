@@ -43,7 +43,7 @@ export class AgentFactory {
             case LLM_CONSTANTS.GEMINI_3_PRO:
             case LLM_CONSTANTS.GEMINI_3_FLASH:
                 return new GoogleAgent(name, instruction, model.modelApiName, key, shouldEnableThinking);
-            case LLM_CONSTANTS.GROK_4:
+            case LLM_CONSTANTS.GROK_4_2:
             case LLM_CONSTANTS.GROK_4_1_FAST_REASONING:
                 return new GrokAgent(name, instruction, model.modelApiName, key, model.temperature!, shouldEnableThinking);
 

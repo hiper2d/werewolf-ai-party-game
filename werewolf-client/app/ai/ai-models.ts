@@ -46,7 +46,7 @@ export const LLM_CONSTANTS = {
     MISTRAL_3_LARGE: 'mistral-large',
     MISTRAL_3_MEDIUM: 'mistral-medium',
     MISTRAL_MAGISTRAL: 'mistral-magistral',
-    GROK_4: 'grok',
+    GROK_4_2: 'grok',
     GROK_4_1_FAST_REASONING: 'grok-fast',
     KIMI_K2: 'kimi',
     KIMI_K2_THINKING: 'kimi-thinking',
@@ -94,8 +94,8 @@ export interface ModelConfig {
 export const SupportedAiModels: Record<string, ModelConfig> = {
     // Claude models - separate with/without thinking versions
     [LLM_CONSTANTS.CLAUDE_4_OPUS]: {
-        displayName: 'Claude 4.6 Opus',
-        modelApiName: 'claude-opus-4-6',
+        displayName: 'Claude 4.7 Opus',
+        modelApiName: 'claude-opus-4-7',
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
         hasThinking: false,
         freeTier: {
@@ -104,8 +104,8 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         }
     },
     [LLM_CONSTANTS.CLAUDE_4_OPUS_THINKING]: {
-        displayName: 'Claude 4.6 Opus (Thinking)',
-        modelApiName: 'claude-opus-4-6',
+        displayName: 'Claude 4.7 Opus (Thinking)',
+        modelApiName: 'claude-opus-4-7',
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
         hasThinking: true,
         freeTier: {
@@ -245,9 +245,9 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
             maxBotsPerGame: -1 // Unlimited
         }
     },
-    [LLM_CONSTANTS.GROK_4]: {
-        displayName: 'Grok 4',
-        modelApiName: 'grok-4',
+    [LLM_CONSTANTS.GROK_4_2]: {
+        displayName: 'Grok 4.2',
+        modelApiName: 'grok-4.20',
         apiKeyName: API_KEY_CONSTANTS.GROK,
         hasThinking: true,
         temperature: 0.7,
@@ -495,11 +495,11 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
         outputPrice: 5.0
     },
 
-    // Grok models (placeholder pricing)
-    [SupportedAiModels[LLM_CONSTANTS.GROK_4].modelApiName]: {
-        inputPrice: 3.0,
-        outputPrice: 15.0,
-        cacheHitPrice: 0.75
+    // Grok models
+    [SupportedAiModels[LLM_CONSTANTS.GROK_4_2].modelApiName]: {
+        inputPrice: 2.0,
+        outputPrice: 6.0,
+        cacheHitPrice: 0.20
     },
     [SupportedAiModels[LLM_CONSTANTS.GROK_4_1_FAST_REASONING].modelApiName]: {
         inputPrice: 0.20,

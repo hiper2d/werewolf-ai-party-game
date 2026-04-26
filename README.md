@@ -22,11 +22,11 @@ Pick any model for the Game Master and for each individual bot:
 | Provider | Models                                                                         |
 |----------|--------------------------------------------------------------------------------|
 | **OpenAI** | GPT-5.5, GPT-5.4-mini                                                          |
-| **Anthropic** | Claude 4.6 Opus, Claude 4.6 Sonnet, Claude 4.5 Haiku (with or without Thinking) |
+| **Anthropic** | Claude 4.7 Opus, Claude 4.6 Sonnet, Claude 4.5 Haiku (with or without Thinking) |
 | **Google** | Gemini 3.1 Pro Preview, Gemini 3 Flash Preview                                 |
 | **DeepSeek** | DeepSeek V4 Flash, DeepSeek V4 Pro (with or without Thinking)                  |
 | **Mistral** | Mistral Large 3, Mistral Medium 3.1, Magistral Medium 1.2 (Thinking)           |
-| **xAI** | Grok 4, Grok 4.1 Fast Reasoning                                                |
+| **xAI** | Grok 4.2, Grok 4.1 Fast Reasoning                                               |
 | **Moonshot AI** | Kimi K2.6, Kimi K2 Turbo, Kimi K2 (with or without Thinking)                   |
 
 Most models support reasoning, which is stored in the database with every message — even though it's not visible in the UI.

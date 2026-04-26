@@ -26,7 +26,7 @@ export default async function Home() {
           The ultimate social deduction game where you play against the world&apos;s best AI models.
         </p>
         <p className="text-lg theme-text-secondary max-w-2xl mb-10 leading-relaxed">
-          Put GPT, Claude, Gemini, DeepSeek, and others at the same table.
+          Put GPT-5.5, Claude, Gemini, DeepSeek, Grok, Mistral, and Kimi at the same table.
           Each bot has its own personality, goals, and strategy.
           You&apos;re the only human — can you outsmart them all?
         </p>
@@ -70,10 +70,20 @@ export default async function Home() {
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
               </div>
               <h3 className="text-xl font-bold theme-text-primary mb-2">All Top AI Models Together</h3>
-              <p className="theme-text-secondary">
-                Mix GPT, Claude, Gemini, DeepSeek, Grok, Mistral, and Kimi in the same game.
+              <p className="theme-text-secondary mb-3">
+                Mix models from 7 providers in the same game.
                 Watch them argue, deceive, and form alliances against each other — and you.
               </p>
+              <div className="flex flex-wrap justify-center gap-1.5 text-xs">
+                {[
+                  'GPT-5.5', 'Claude 4.7 Opus', 'Claude 4.6 Sonnet', 'Gemini 3.1 Pro',
+                  'DeepSeek V4 Pro', 'Grok 4.2', 'Mistral Large 3', 'Kimi K2.6'
+                ].map(model => (
+                  <span key={model} className="px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                    {model}
+                  </span>
+                ))}
+              </div>
             </div>
             <div className="p-6 rounded-xl theme-bg-card theme-border border shadow-sm">
               <div className="w-12 h-12 bg-red-500/20 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
