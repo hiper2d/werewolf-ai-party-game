@@ -182,11 +182,17 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
     // Resolve Game Master AI type with tier-aware restrictions
     let resolvedGmAiType = gamePreview.gameMasterAiType;
     if (resolvedGmAiType === LLM_CONSTANTS.RANDOM) {
-        const candidates = getCandidateModelsForTier(tier).filter(model => hasCapacity(model, tier, usageCounts));
-        if (candidates.length === 0) {
+        // Prefer selected player models when available, fall back to all tier candidates
+        const selectedModels = Array.isArray(gamePreview.playersAiType) && gamePreview.playersAiType.length > 0
+            ? gamePreview.playersAiType.filter(m => m !== LLM_CONSTANTS.RANDOM)
+            : [];
+        const pool = selectedModels.length > 0
+            ? selectedModels.filter(model => hasCapacity(model, tier, usageCounts))
+            : getCandidateModelsForTier(tier).filter(model => hasCapacity(model, tier, usageCounts));
+        if (pool.length === 0) {
             throw new Error('No AI models are available for the game master on your current tier. Please adjust your selection or upgrade your plan.');
         }
-        resolvedGmAiType = candidates[Math.floor(Math.random() * candidates.length)];
+        resolvedGmAiType = pool[Math.floor(Math.random() * pool.length)];
     }
 
     consumeModelUsage(resolvedGmAiType, tier, usageCounts, 'as the game master');

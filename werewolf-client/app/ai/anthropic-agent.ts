@@ -35,7 +35,6 @@ export class ClaudeAgent extends AbstractAgent {
         max_tokens: this.maxTokens,
         system: this.instruction,
         model: this.model,
-        temperature: this.temperature,
     };
 
     // Log message templates
@@ -192,15 +191,21 @@ export class ClaudeAgent extends AbstractAgent {
             };
 
             // Add thinking config for Anthropic models with thinking mode
+            const isOpus = this.model.includes('opus');
             if (canUseThinking) {
-                (params as any).thinking = {
-                    type: "enabled",
-                    budget_tokens: 1024
-                };
-                // Anthropic requires temperature to be 1 when thinking is enabled
-                params.temperature = 1;
-                // Increase max_tokens to be greater than budget_tokens
-                params.max_tokens = 16384; 
+                if (isOpus) {
+                    // Opus 4.7+ uses adaptive thinking with effort control
+                    (params as any).thinking = { type: "adaptive" };
+                    (params as any).output_config = { effort: "high" };
+                } else {
+                    // Sonnet 4.6, Haiku 4.5 use enabled thinking with budget
+                    (params as any).thinking = { type: "enabled", budget_tokens: 1024 };
+                    params.temperature = 1;
+                }
+                params.max_tokens = 16384;
+            } else if (!isOpus) {
+                // Temperature is deprecated for Opus 4.7+
+                params.temperature = this.temperature;
             }
 
             let response;

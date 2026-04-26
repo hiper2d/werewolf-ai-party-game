@@ -115,7 +115,12 @@ function GameListEntryContent({
         <div className={`flex flex-col gap-1.5 ${locked ? 'pointer-events-none' : ''}`}>
             {/* Top row: Theme and Date/Status */}
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-4">
-                <h2 className="text-lg capitalize theme-text-primary font-semibold truncate">{game.theme}</h2>
+                <h2 className="text-lg capitalize theme-text-primary font-semibold truncate">
+                    {game.theme}
+                    {game.humanPlayerName && (
+                        <span className="text-sm font-normal theme-text-secondary ml-2">as {game.humanPlayerName}</span>
+                    )}
+                </h2>
                 <div className="flex flex-wrap items-center gap-x-2 text-xs theme-text-secondary">
                     <span>{formatCreationDate(game.createdAt)}</span>
                     <span className="hidden sm:inline opacity-40">•</span>

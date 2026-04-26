@@ -44,6 +44,7 @@ export default function CreateNewGamePage() {
     const [nameError, setNameError] = useState<string | null>(null);
     const [themeError, setThemeError] = useState<string | null>(null);
     const [playersAiError, setPlayersAiError] = useState<string | null>(null);
+    const [fastModelsOnly, setFastModelsOnly] = useState(false);
     const [botNameErrors, setBotNameErrors] = useState<{[key: number]: string}>({});
     const [userTier, setUserTier] = useState<UserTier>('free');
     const [isTierLoaded, setIsTierLoaded] = useState(false);
@@ -54,6 +55,17 @@ export default function CreateNewGamePage() {
     }, [userTier]);
     const allModels = useMemo(() => Object.values(LLM_CONSTANTS), []);
     const candidateModels = useMemo(() => getCandidateModelsForTier(userTier), [userTier]);
+    const FAST_MODELS = useMemo(() => new Set([
+        LLM_CONSTANTS.CLAUDE_4_HAIKU,
+        LLM_CONSTANTS.CLAUDE_4_HAIKU_THINKING,
+        LLM_CONSTANTS.GPT_5_4_MINI,
+        LLM_CONSTANTS.GEMINI_3_FLASH,
+        LLM_CONSTANTS.DEEPSEEK_V4_FLASH,
+        LLM_CONSTANTS.DEEPSEEK_V4_FLASH_THINKING,
+        LLM_CONSTANTS.GROK_4_1_FAST_REASONING,
+        LLM_CONSTANTS.KIMI_K2_TURBO,
+        LLM_CONSTANTS.KIMI_K2_TURBO_THINKING,
+    ]), []);
     // GM is always RANDOM before preview generation; user changes it in the preview section
     const playerModelOptions = useMemo(() => {
         // For free tier, show ALL models (available ones selectable, unavailable greyed out)
@@ -571,7 +583,23 @@ export default function CreateNewGamePage() {
                 </div>
 
                 <div className="flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-2">
-                    <label className={labelStyle}>Players AI *:</label>
+                    <div className="flex items-center gap-3">
+                        <label className={labelStyle}>Players AI:</label>
+                        <label className="flex items-center gap-1.5 text-xs theme-text-secondary cursor-pointer select-none">
+                            <input
+                                type="checkbox"
+                                checked={fastModelsOnly}
+                                onChange={(e) => {
+                                    setFastModelsOnly(e.target.checked);
+                                    if (e.target.checked) {
+                                        setSelectedPlayerAiTypes(prev => prev.filter(m => FAST_MODELS.has(m)));
+                                    }
+                                }}
+                                className="rounded"
+                            />
+                            Fast only
+                        </label>
+                    </div>
                     <div className="w-full sm:flex-1">
                         <MultiSelectDropdown
                             options={playerModelOptions}

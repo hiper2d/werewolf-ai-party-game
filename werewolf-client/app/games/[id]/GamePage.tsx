@@ -57,12 +57,14 @@ function GamePageContent({
     const [isKeepGoingLoading, setIsKeepGoingLoading] = useState(false);
     const [showCancel, setShowCancel] = useState(false);
     const preActionGameRef = useRef<Game | null>(null);
+    const cancelledRef = useRef(false);
 
     const applyActionResult = useCallback((result: GameActionResponse) => {
         setGame(prev => {
             // If queue was locally cleared by cancel, don't restore it from a stale in-flight result
-            if (prev.gameStateProcessQueue.length === 0 && result.game.gameStateProcessQueue.length > 0
+            if (cancelledRef.current && result.game.gameStateProcessQueue.length > 0
                 && (prev.gameState === GAME_STATES.DAY_DISCUSSION || prev.gameState === GAME_STATES.AFTER_GAME_DISCUSSION)) {
+                cancelledRef.current = false;
                 return { ...result.game, gameStateProcessQueue: [] };
             }
             return result.game;
@@ -161,6 +163,7 @@ function GamePageContent({
     const handleCancelBotResponses = useCallback(async () => {
         setShowCancel(false);
         setIsKeepGoingLoading(false);
+        cancelledRef.current = true;
 
         // Clear server queue
         await cancelBotResponses(game.id).catch(() => {});
