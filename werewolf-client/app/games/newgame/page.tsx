@@ -620,46 +620,44 @@ export default function CreateNewGamePage() {
                 <div className={flexRowStyle}>
                     <div className={flexItemStyle}>
                         <label className={labelStyle}>Special Roles:</label>
-                        <div className="flex gap-4">
-                            {availableRoles.map(role => (
-                                <div key={role} className="relative flex items-center">
-                                    <input
-                                        type="checkbox"
-                                        id={role}
-                                        checked={specialRoles.includes(role)}
-                                        onChange={(e) => {
-                                            if (e.target.checked) {
-                                                setSpecialRoles([...specialRoles, role]);
-                                            } else {
-                                                setSpecialRoles(specialRoles.filter(r => r !== role));
-                                            }
-                                        }}
-                                        className="mr-2"
-                                    />
-                                    <label htmlFor={role} className="text-white mr-1">
-                                        {role.charAt(0).toUpperCase() + role.slice(1)}
-                                    </label>
-                                    <button
-                                        type="button"
-                                        className="w-5 h-5 rounded-full bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white text-xs flex items-center justify-center transition-colors"
-                                        onMouseEnter={() => setShowRoleTooltip(role)}
-                                        onMouseLeave={() => setShowRoleTooltip(null)}
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            setShowRoleTooltip(showRoleTooltip === role ? null : role);
-                                        }}
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
-                                            <path fillRule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-7-4a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM9 9a.75.75 0 0 0 0 1.5h.253a.25.25 0 0 1 .244.304l-.459 2.066A1.75 1.75 0 0 0 10.747 15H11a.75.75 0 0 0 0-1.5h-.253a.25.25 0 0 1-.244-.304l.459-2.066A1.75 1.75 0 0 0 9.253 9H9Z" clipRule="evenodd" />
-                                        </svg>
-                                    </button>
-                                    {showRoleTooltip === role && (
-                                        <div className="absolute z-10 w-64 p-3 bg-gray-900 border border-gray-700 rounded-lg shadow-lg text-sm text-gray-300 top-full mt-2 left-0">
-                                            {roleTooltips[role]}
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
+                        <div className="flex flex-wrap gap-2">
+                            {availableRoles.map(role => {
+                                const isSelected = specialRoles.includes(role);
+                                const roleEmoji: Record<string, string> = {
+                                    doctor: '\u{1FA7A}',
+                                    detective: '\u{1F575}',
+                                    maniac: '\u{1F52A}',
+                                };
+                                return (
+                                    <div key={role} className="relative">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                if (isSelected) {
+                                                    setSpecialRoles(specialRoles.filter(r => r !== role));
+                                                } else {
+                                                    setSpecialRoles([...specialRoles, role]);
+                                                }
+                                            }}
+                                            onMouseEnter={() => setShowRoleTooltip(role)}
+                                            onMouseLeave={() => setShowRoleTooltip(null)}
+                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-medium transition-all ${
+                                                isSelected
+                                                    ? 'border-purple-500 bg-purple-500/20 text-purple-300'
+                                                    : 'border-gray-600 bg-gray-800/50 text-gray-400 hover:border-gray-500 hover:text-gray-300'
+                                            }`}
+                                        >
+                                            <span className="text-base">{roleEmoji[role] || ''}</span>
+                                            {role.charAt(0).toUpperCase() + role.slice(1)}
+                                        </button>
+                                        {showRoleTooltip === role && (
+                                            <div className="absolute z-10 w-64 p-3 bg-gray-900 border border-gray-700 rounded-lg shadow-lg text-sm text-gray-300 top-full mt-2 left-0">
+                                                {roleTooltips[role]}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
                         </div>
                     </div>
                 </div>

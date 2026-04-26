@@ -29,7 +29,7 @@ const NavBar = () => {
     return (
         <header className="navbar-root py-4 px-6 flex items-center justify-between h-16 sticky top-0 z-50">
             <div className="flex items-center">
-                <div className="mr-4 md:mr-8 rounded-full logo-backdrop-sm">
+                <Link href="/" className="mr-4 md:mr-8 rounded-full logo-backdrop-sm">
                     <Image
                         src="/werewolf-ai-logo-2.png"
                         alt="Werewolf AI Logo"
@@ -37,16 +37,16 @@ const NavBar = () => {
                         height={50}
                         className="object-contain"
                     />
-                </div>
+                </Link>
                 {status === 'authenticated' && (
-                    <span className="font-medium hidden sm:inline">
+                    <Link href="/" className="font-medium hidden sm:inline hover:opacity-80 transition-opacity">
                         {session.user?.name}
                         {userTier && (
                             <span className={`ml-2 text-xs px-1.5 py-0.5 rounded ${tierConfig[userTier].className}`}>
                                 {tierConfig[userTier].label}
                             </span>
                         )}
-                    </span>
+                    </Link>
                 )}
             </div>
 

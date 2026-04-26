@@ -10,6 +10,8 @@ import { db } from '../firebase/server';
 
 const OLD_TO_NEW: Record<string, string> = {
     'gpt-5.4': 'gpt', // GPT_5_4 removed, migrate to GPT_5_5
+    'deepseek-chat': 'deepseek-flash', // DeepSeek v3.2 Chat -> V4 Flash
+    'deepseek-reasoner': 'deepseek-flash-thinking', // DeepSeek v3.2 Reasoner -> V4 Flash Thinking
 };
 
 async function checkAndMigrateGptModels() {
