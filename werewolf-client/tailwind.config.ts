@@ -11,6 +11,34 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        // New design tokens
+        surface: {
+          0: 'var(--bg-0)',
+          1: 'var(--bg-1)',
+          2: 'var(--bg-2)',
+          3: 'var(--bg-3)',
+          4: 'var(--bg-4)',
+        },
+        line: {
+          1: 'var(--line-1)',
+          2: 'var(--line-2)',
+          3: 'var(--line-3)',
+        },
+        fg: {
+          0: 'var(--fg-0)',
+          1: 'var(--fg-1)',
+          2: 'var(--fg-2)',
+          3: 'var(--fg-3)',
+        },
+        accent: {
+          DEFAULT: 'var(--accent)',
+          soft: 'var(--accent-soft)',
+          line: 'var(--accent-line)',
+          fg: 'var(--accent-fg)',
+        },
+        danger: 'var(--danger)',
+
+        // Legacy tokens — keep existing components working
         primary: 'rgb(var(--color-text-primary))',
         secondary: 'rgb(var(--color-text-secondary))',
         card: {
@@ -32,17 +60,25 @@ const config: Config = {
           placeholder: 'rgb(var(--color-input-placeholder))',
         },
       },
+      borderRadius: {
+        sm: 'var(--radius-sm)',
+        md: 'var(--radius-md)',
+        lg: 'var(--radius-lg)',
+        xl: 'var(--radius-xl)',
+      },
+      boxShadow: {
+        card: 'var(--shadow-2)',
+        pop: 'var(--shadow-pop)',
+        subtle: 'var(--shadow-1)',
+      },
+      fontFamily: {
+        inter: ['var(--font-inter)'],
+        mono: ['var(--font-jetbrains-mono)', 'var(--font-roboto-mono)'],
+      },
       backgroundImage: {
         "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
         "gradient-conic":
           "conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))",
-      },
-      fontFamily: {
-        inter: ['var(--font-inter)'],
-        mono: ['var(--font-roboto-mono)'],
-      },
-      boxShadow: {
-        card: '0 4px 16px var(--color-card-shadow)',
       },
     },
   },

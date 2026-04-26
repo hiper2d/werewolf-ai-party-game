@@ -6,10 +6,11 @@ import {useSession} from 'next-auth/react';
 import {buttonBlackStyle, buttonTransparentStyle} from "@/app/constants";
 import {createGame, previewGame} from '@/app/api/game-actions';
 import {GAME_ROLES, GamePreview, GamePreviewWithGeneratedBots, GENDER_OPTIONS, getVoicesForGender, getRandomVoiceForGender, PLAY_STYLES, PLAY_STYLE_CONFIGS, UserTier, USER_TIERS} from "@/app/api/game-models";
-import {LLM_CONSTANTS, SupportedAiModels, getModelDisplayName} from "@/app/ai/ai-models";
+import {LLM_CONSTANTS, SupportedAiModels, getModelDisplayName, modelHasTag} from "@/app/ai/ai-models";
 import {FREE_TIER_UNLIMITED, getCandidateModelsForTier, getPerGameModelLimit} from "@/app/ai/model-limit-utils";
-import MultiSelectDropdown from '@/app/components/MultiSelectDropdown';
+import AIModelSelect from '@/app/components/AIModelSelect';
 import ModelSelectDropdown from '@/app/components/ModelSelectDropdown';
+import SelectDropdown from '@/app/components/SelectDropdown';
 import {ttsService} from "@/app/services/tts-service";
 import {getVoiceConfig, getDefaultVoiceProvider, VOICE_PROVIDER_DISPLAY_NAMES} from "@/app/ai/voice-config";
 import {VoiceProvider} from "@/app/ai/voice-config/voice-config";
@@ -55,17 +56,9 @@ export default function CreateNewGamePage() {
     }, [userTier]);
     const allModels = useMemo(() => Object.values(LLM_CONSTANTS), []);
     const candidateModels = useMemo(() => getCandidateModelsForTier(userTier), [userTier]);
-    const FAST_MODELS = useMemo(() => new Set([
-        LLM_CONSTANTS.CLAUDE_4_HAIKU,
-        LLM_CONSTANTS.CLAUDE_4_HAIKU_THINKING,
-        LLM_CONSTANTS.GPT_5_4_MINI,
-        LLM_CONSTANTS.GEMINI_3_FLASH,
-        LLM_CONSTANTS.DEEPSEEK_V4_FLASH,
-        LLM_CONSTANTS.DEEPSEEK_V4_FLASH_THINKING,
-        LLM_CONSTANTS.GROK_4_1_FAST_REASONING,
-        LLM_CONSTANTS.KIMI_K2_TURBO,
-        LLM_CONSTANTS.KIMI_K2_TURBO_THINKING,
-    ]), []);
+    const FAST_MODELS = useMemo(() => new Set(
+        Object.values(LLM_CONSTANTS).filter(m => modelHasTag(m, 'fast'))
+    ), []);
     // GM is always RANDOM before preview generation; user changes it in the preview section
     const playerModelOptions = useMemo(() => {
         // For free tier, show ALL models (available ones selectable, unavailable greyed out)
@@ -484,235 +477,261 @@ export default function CreateNewGamePage() {
     };
 
     // Common styles
-    const inputStyle = "p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50";
-    const labelStyle = "text-white whitespace-nowrap w-full sm:w-36";
+    const inputStyle = "w-full px-3 py-2 rounded-[var(--radius-md)] bg-[var(--bg-2)] border border-[var(--line-2)] text-[var(--fg-0)] text-[13px] placeholder:text-[var(--fg-3)] focus:outline-none focus:border-[var(--accent-line)] focus:shadow-[0_0_0_3px_var(--accent-soft)] transition-all duration-[120ms]";
+    const labelStyle = "text-[12px] font-medium text-[var(--fg-1)] whitespace-nowrap";
     const flexRowStyle = "flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4";
     const flexItemStyle = "flex-1 flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-2";
     const buttonDisabledStyle = "opacity-50 cursor-not-allowed";
 
     return (
-        <div className="flex flex-col w-full h-full p-4 sm:p-6">
-            <div className="flex justify-between items-center mb-6">
-                <h1 className="text-2xl font-bold text-white">Create New Game</h1>
-                <div className={`${flexRowStyle} justify-end mb-4`}>
-                    <button
-                        className={`${buttonBlackStyle} ${(!isFormValid || isLoading) ? buttonDisabledStyle : ''}`}
-                        onClick={handleGeneratePreview}
-                        disabled={!isFormValid || isLoading}
-                    >
-                        {isLoading ? (
-                            <span className="flex items-center space-x-2">
-                                <span className="animate-spin">⏳</span>
-                                <span>Generating Preview...</span>
-                            </span>
-                        ) : (gameData ? 'Generate Preview Again' : 'Generate Preview')}
-                    </button>
-                    {gameData && (
+        <div className="flex flex-col w-full h-full max-w-[1040px] mx-auto pt-6 sm:pt-10">
+            {/* Card */}
+            <div className="bg-[var(--bg-1)] border border-[var(--line-1)] rounded-[var(--radius-xl)] shadow-card">
+                {/* Card header */}
+                <div className="flex items-center justify-between px-5 sm:px-7 py-5 border-b border-[var(--line-1)]">
+                    <h1 className="text-lg font-semibold text-[var(--fg-0)]">Create New Game</h1>
+                    <div className="flex gap-2">
                         <button
-                            className={`${buttonBlackStyle} ${isLoading ? buttonDisabledStyle : ''}`}
-                            onClick={handleCreateGame}
-                            disabled={isLoading}
+                            className={`px-4 py-2 text-[13px] font-medium rounded-[var(--radius-md)] bg-[var(--bg-3)] border border-[var(--line-3)] text-[var(--fg-0)] hover:bg-[var(--bg-4)] transition-all duration-[120ms] ${(!isFormValid || isLoading) ? buttonDisabledStyle : ''}`}
+                            onClick={handleGeneratePreview}
+                            disabled={!isFormValid || isLoading}
                         >
-                            {isLoading ? 'Processing...' : 'Create Game'}
+                            {isLoading ? (
+                                <span className="flex items-center gap-2">
+                                    <span className="animate-spin">&#9203;</span>
+                                    <span>Generating...</span>
+                                </span>
+                            ) : (gameData ? 'Regenerate Preview' : 'Generate Preview')}
                         </button>
-                    )}
+                        {gameData && (
+                            <button
+                                className={`px-4 py-2 text-[13px] font-medium rounded-[var(--radius-md)] bg-[var(--accent)] text-[var(--accent-fg)] hover:brightness-110 transition-all duration-[120ms] ${isLoading ? buttonDisabledStyle : ''}`}
+                                onClick={handleCreateGame}
+                                disabled={isLoading}
+                            >
+                                {isLoading ? 'Processing...' : 'Create Game'}
+                            </button>
+                        )}
+                    </div>
                 </div>
-            </div>
 
-            <form id="create-game-form" className="space-y-2">
-                <div className="flex space-x-2">
-                    <div className="w-1/2">
+                {/* Card body */}
+                <div className="px-5 sm:px-7 py-6">
+
+            <form id="create-game-form" className="space-y-4">
+                {/* Row 1: Name + Theme */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label className={`${labelStyle} block mb-1.5`}>Host Name</label>
                         <input
-                            className={`w-full p-2 rounded bg-black bg-opacity-30 text-white border ${nameError ? 'border-red-500' : 'border-white border-opacity-30'} focus:outline-none focus:border-white focus:border-opacity-50`}
+                            className={`${inputStyle} ${nameError ? '!border-[var(--danger)]' : ''}`}
                             type="text"
-                            placeholder="Name *"
+                            placeholder="Your name"
                             value={name}
                             onChange={(e) => setName(e.target.value)}
                             required
                         />
-                        {nameError && <p className="text-red-500 text-sm mt-1">{nameError}</p>}
+                        {nameError && <p className="text-[var(--danger)] text-[12px] mt-1">{nameError}</p>}
                     </div>
-                    <div className="w-1/2">
+                    <div>
+                        <label className={`${labelStyle} block mb-1.5`}>Game Title</label>
                         <input
-                            className={`w-full p-2 rounded bg-black bg-opacity-30 text-white border ${themeError ? 'border-red-500' : 'border-white border-opacity-30'} focus:outline-none focus:border-white focus:border-opacity-50`}
+                            className={`${inputStyle} ${themeError ? '!border-[var(--danger)]' : ''}`}
                             type="text"
-                            placeholder="Theme *"
+                            placeholder="Theme or setting"
                             value={theme}
                             onChange={(e) => setTheme(e.target.value)}
                             required
                         />
-                        {themeError && <p className="text-red-500 text-sm mt-1">{themeError}</p>}
+                        {themeError && <p className="text-[var(--danger)] text-[12px] mt-1">{themeError}</p>}
                     </div>
                 </div>
 
-                <textarea
-                    className="w-full p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
-                    placeholder="Description (optional)"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    rows={3}
-                />
+                {/* Row 2: Description */}
+                <div>
+                    <label className={`${labelStyle} block mb-1.5`}>Description <span className="text-[var(--fg-3)] font-normal">(optional)</span></label>
+                    <textarea
+                        className={`${inputStyle} min-h-[76px] resize-y`}
+                        placeholder="Describe the setting for your game..."
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        rows={3}
+                    />
+                </div>
 
-                <div className={flexRowStyle}>
-                    <div className={flexItemStyle}>
-                        <label className={labelStyle}>Player Count:</label>
-                        <select
-                            className={`${inputStyle} flex-1`}
-                            value={playerCount}
-                            onChange={(e) => setPlayerCount(Number(e.target.value))}
-                            required
-                        >
-                            {playerOptions.map(count => (
-                                <option key={count} value={count}>{count} players</option>
-                            ))}
-                        </select>
+                {/* Row 3: Counts */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-[140px_1fr] items-center gap-4">
+                        <label className={labelStyle}>Player Count</label>
+                        <SelectDropdown
+                            options={playerOptions.map(count => ({ value: String(count), label: `${count} players` }))}
+                            value={String(playerCount)}
+                            onChange={(val) => setPlayerCount(Number(val))}
+                        />
                     </div>
-                    <div className={flexItemStyle}>
-                        <label className={labelStyle}>Werewolf Count:</label>
-                        <select
-                            className={`${inputStyle} flex-1`}
-                            value={werewolfCount}
-                            onChange={(e) => setWerewolfCount(Number(e.target.value))}
-                            required
-                        >
-                            {Array.from({length: playerCount - 1}, (_, i) => (
-                                <option key={i} value={i}>{i} werewolves</option>
-                            ))}
-                        </select>
+                    <div className="grid grid-cols-[140px_1fr] items-center gap-4">
+                        <label className={labelStyle}>Werewolf Count</label>
+                        <SelectDropdown
+                            options={Array.from({length: playerCount - 1}, (_, i) => ({ value: String(i), label: `${i} werewolves` }))}
+                            value={String(werewolfCount)}
+                            onChange={(val) => setWerewolfCount(Number(val))}
+                        />
                     </div>
                 </div>
 
-                <div className="flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-2">
-                    <div className="flex items-center gap-3">
-                        <label className={labelStyle}>Players AI:</label>
-                        <label className="flex items-center gap-1.5 text-xs theme-text-secondary cursor-pointer select-none">
-                            <input
-                                type="checkbox"
-                                checked={fastModelsOnly}
-                                onChange={(e) => {
-                                    setFastModelsOnly(e.target.checked);
-                                    if (e.target.checked) {
-                                        setSelectedPlayerAiTypes(prev => prev.filter(m => FAST_MODELS.has(m)));
-                                    }
-                                }}
-                                className="rounded"
-                            />
-                            Fast only
-                        </label>
-                    </div>
-                    <div className="w-full sm:flex-1">
-                        <MultiSelectDropdown
+                {/* Row 4: Players AI */}
+                <div className="grid grid-cols-[140px_1fr] items-start gap-4">
+                    <label className={`${labelStyle} pt-2.5`}>Players AI</label>
+                    <div>
+                        <AIModelSelect
                             options={playerModelOptions}
                             selectedOptions={selectedPlayerAiTypes}
                             onChange={setSelectedPlayerAiTypes}
-                            placeholder="Select AI models for bots... *"
+                            placeholder="Select AI models for bots..."
                             className="w-full"
                             hasError={!!playersAiError}
                             disabled={!isTierLoaded}
-                            labelFn={getModelDisplayName}
                             optionMetaFn={playerModelOptionMeta}
+                            onFastOnlyChange={setFastModelsOnly}
                         />
-                        {playersAiError && <p className="text-red-500 text-sm mt-1">{playersAiError}</p>}
+                        {playersAiError && <p className="text-[var(--danger)] text-[12px] mt-1">{playersAiError}</p>}
                     </div>
                 </div>
 
 
-                <div className={flexRowStyle}>
-                    <div className={flexItemStyle}>
-                        <label className={labelStyle}>Special Roles:</label>
-                        <div className="flex flex-wrap gap-2">
-                            {availableRoles.map(role => {
-                                const isSelected = specialRoles.includes(role);
-                                const roleEmoji: Record<string, string> = {
-                                    doctor: '\u{1FA7A}',
-                                    detective: '\u{1F575}',
-                                    maniac: '\u{1F52A}',
-                                };
-                                return (
-                                    <div key={role} className="relative">
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                if (isSelected) {
-                                                    setSpecialRoles(specialRoles.filter(r => r !== role));
-                                                } else {
-                                                    setSpecialRoles([...specialRoles, role]);
-                                                }
-                                            }}
-                                            onMouseEnter={() => setShowRoleTooltip(role)}
-                                            onMouseLeave={() => setShowRoleTooltip(null)}
-                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-medium transition-all ${
-                                                isSelected
-                                                    ? 'border-purple-500 bg-purple-500/20 text-purple-300'
-                                                    : 'border-gray-600 bg-gray-800/50 text-gray-400 hover:border-gray-500 hover:text-gray-300'
-                                            }`}
-                                        >
-                                            <span className="text-base">{roleEmoji[role] || ''}</span>
-                                            {role.charAt(0).toUpperCase() + role.slice(1)}
-                                        </button>
-                                        {showRoleTooltip === role && (
-                                            <div className="absolute z-10 w-64 p-3 bg-gray-900 border border-gray-700 rounded-lg shadow-lg text-sm text-gray-300 top-full mt-2 left-0">
-                                                {roleTooltips[role]}
-                                            </div>
-                                        )}
-                                    </div>
-                                );
-                            })}
-                        </div>
+                {/* Row 5: Special Roles */}
+                <div className="grid grid-cols-[140px_1fr] items-start gap-4">
+                    <label className={`${labelStyle} pt-2`}>Special Roles</label>
+                    <div className="flex flex-wrap gap-2">
+                        {availableRoles.map(role => {
+                            const isSelected = specialRoles.includes(role);
+                            const roleGlyphs: Record<string, React.ReactNode> = {
+                                doctor: (
+                                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M7 3v8M3 7h8" />
+                                    </svg>
+                                ),
+                                detective: (
+                                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <circle cx="5.5" cy="5.5" r="3.5" />
+                                        <path d="M8.5 8.5L12.5 12.5" />
+                                    </svg>
+                                ),
+                                maniac: (
+                                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M7 2L12 12H2L7 2Z" />
+                                    </svg>
+                                ),
+                            };
+                            return (
+                                <div key={role} className="relative">
+                                    <button
+                                        type="button"
+                                        aria-pressed={isSelected}
+                                        onClick={() => {
+                                            if (isSelected) {
+                                                setSpecialRoles(specialRoles.filter(r => r !== role));
+                                            } else {
+                                                setSpecialRoles([...specialRoles, role]);
+                                            }
+                                        }}
+                                        onMouseEnter={() => setShowRoleTooltip(role)}
+                                        onMouseLeave={() => setShowRoleTooltip(null)}
+                                        className={`flex items-center gap-2 px-3 py-[7px] rounded-[var(--radius-md)] border text-[13px] font-medium transition-all duration-[120ms] ${
+                                            isSelected
+                                                ? 'bg-[var(--accent-soft)] border-[var(--accent-line)] text-[var(--accent)]'
+                                                : 'bg-[var(--bg-2)] border-[var(--line-2)] text-[var(--fg-1)] hover:bg-[var(--bg-3)] hover:border-[var(--line-3)] hover:text-[var(--fg-0)]'
+                                        }`}
+                                    >
+                                        {/* Icon container */}
+                                        <span className={`w-[22px] h-[22px] rounded-full flex items-center justify-center ${
+                                            isSelected ? 'bg-[var(--accent-line)]' : 'bg-[var(--bg-3)]'
+                                        }`}>
+                                            {roleGlyphs[role]}
+                                        </span>
+                                        {role.charAt(0).toUpperCase() + role.slice(1)}
+                                        {/* Trailing check */}
+                                        <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-all duration-[120ms] ${
+                                            isSelected
+                                                ? 'bg-[var(--accent)] border-[var(--accent)]'
+                                                : 'bg-transparent border-[var(--line-2)]'
+                                        }`}>
+                                            {isSelected && (
+                                                <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M1.5 4.5L3 6L6.5 2" />
+                                                </svg>
+                                            )}
+                                        </span>
+                                    </button>
+                                    {showRoleTooltip === role && (
+                                        <div className="absolute z-10 w-64 p-3 bg-[var(--bg-1)] border border-[var(--line-2)] rounded-[var(--radius-lg)] shadow-pop text-[13px] text-[var(--fg-1)] top-full mt-2 left-0">
+                                            {roleTooltips[role]}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
             </form>
 
+                </div>{/* end card body */}
+            </div>{/* end card */}
+
             {isLoading && (
-                <div className="mt-4 p-4 bg-blue-900 bg-opacity-50 border border-blue-500 rounded-lg">
-                    <div className="flex items-start space-x-2">
-                        <span className="text-blue-400 text-lg animate-spin">⏳</span>
+                <div className="mt-6 p-4 bg-[var(--accent-soft)] border border-[var(--accent-line)] rounded-[var(--radius-lg)]">
+                    <div className="flex items-center gap-3">
+                        <svg className="w-5 h-5 text-[var(--accent)] animate-spin flex-none" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                            <path d="M10 2a8 8 0 0 1 8 8" />
+                        </svg>
                         <div>
-                            <h3 className="text-blue-400 font-semibold mb-1">Generating Game Preview...</h3>
-                            <p className="text-blue-300 text-sm">The AI is creating your game story and characters. This may take a moment.</p>
+                            <h3 className="text-[14px] font-semibold text-[var(--fg-0)] mb-0.5">Generating Game Preview<span className="inline-block w-6 text-left animate-pulse">...</span></h3>
+                            <p className="text-[13px] text-[var(--fg-1)]">The AI is creating your game story and characters. This may take a moment.</p>
                         </div>
                     </div>
                 </div>
             )}
 
             {error && (
-                <div className="mt-4 p-4 bg-red-900 bg-opacity-50 border border-red-500 rounded-lg">
-                    <div className="flex items-start space-x-2">
-                        <span className="text-red-400 text-lg">⚠️</span>
+                <div className="mt-6 p-4 bg-[oklch(70%_0.13_25_/_0.08)] border border-[oklch(70%_0.13_25_/_0.3)] rounded-[var(--radius-lg)]">
+                    <div className="flex items-start gap-2">
+                        <span className="text-[var(--danger)] text-lg flex-none">&#9888;</span>
                         <div>
-                            <h3 className="text-red-400 font-semibold mb-1">Game Preview Generation Failed</h3>
-                            <p className="text-red-300 text-sm">{error}</p>
+                            <h3 className="text-[var(--danger)] font-semibold text-[14px] mb-1">Game Preview Generation Failed</h3>
+                            <p className="text-[var(--fg-1)] text-[13px]">{error}</p>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* Preview section remains unchanged */}
+            {/* Preview section */}
             {gameData && (
-                <div className="mt-8">
-                    <h2 className="text-2xl font-bold text-white mb-6">Preview</h2>
+                <div className="mt-8 space-y-6">
+                    <h2 className="text-[20px] font-semibold text-[var(--fg-0)] tracking-[-0.01em]">Preview</h2>
 
-                    <div className="mb-4">
-                        <label htmlFor="gameStory" className="block text-white mb-2">Game Story:</label>
+                    {/* Game Story */}
+                    <div>
+                        <label htmlFor="gameStory" className={`${labelStyle} block mb-1.5`}>Game Story</label>
                         <textarea
                             id="gameStory"
-                            className="w-full p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
+                            className={`${inputStyle} min-h-[130px] resize-y`}
                             rows={5}
                             value={gameData.scene}
                             onChange={(e) => handleStoryChange(e.target.value)}
                         />
                     </div>
 
-                    <div className="mb-6">
-                        <h3 className="text-xl font-bold text-white mb-4">Game Master:</h3>
-                        <div className="p-4 bg-gray-900 bg-opacity-50 rounded-lg">
-                            {/* Voice Provider indicator */}
-                            <div className="mb-2 text-sm text-gray-400">
-                                Voice Provider: <span className="text-white font-medium">{VOICE_PROVIDER_DISPLAY_NAMES[gameData.voiceProvider] || gameData.voiceProvider}</span>
+                    {/* Game Master */}
+                    <div>
+                        <h3 className="text-[15px] font-semibold text-[var(--fg-0)] mb-3 flex items-center gap-3 after:content-[''] after:flex-1 after:h-px after:bg-[var(--line-1)]">Game Master</h3>
+                        <div className="p-4 bg-[var(--bg-1)] border border-[var(--line-1)] rounded-[var(--radius-lg)] space-y-3">
+                            {/* Voice Provider meta */}
+                            <div className="text-[11px] font-mono uppercase tracking-[0.06em] text-[var(--fg-2)]">
+                                Voice Provider <span className="text-[13px] font-sans font-semibold normal-case tracking-normal text-[var(--fg-0)] ml-1">{VOICE_PROVIDER_DISPLAY_NAMES[gameData.voiceProvider] || gameData.voiceProvider}</span>
                             </div>
-                            <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 mb-2">
-                                <div className="flex-1">
-                                    <label className="block text-gray-400 text-sm mb-1">AI Model:</label>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                    <label className={`${labelStyle} block mb-1.5`}>AI Model</label>
                                     <ModelSelectDropdown
                                         options={getPreviewModelOptions(gameData.gameMasterAiType)}
                                         value={gameData.gameMasterAiType}
@@ -720,39 +739,33 @@ export default function CreateNewGamePage() {
                                         className="w-full"
                                     />
                                 </div>
-                                <div className="flex-1 flex gap-2">
+                                <div className="flex gap-2">
                                     <div className="flex-1">
-                                        <label className="block text-gray-400 text-sm mb-1">Voice:</label>
-                                        <select
-                                            className="w-full h-10 p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
-                                            value={gameData.gameMasterVoice || getVoiceConfig(gameData.voiceProvider).getVoicesByGender('male')[0]?.id}
-                                            onChange={(e) => setGameData({ ...gameData, gameMasterVoice: e.target.value })}
-                                        >
-                                            {getVoiceConfig(gameData.voiceProvider).getVoicesByGender('male').map(voice => (
-                                                <option key={voice.id} value={voice.id}>{voice.id}</option>
-                                            ))}
-                                        </select>
+                                        <label className={`${labelStyle} block mb-1.5`}>Voice</label>
+                                        <SelectDropdown
+                                            options={getVoiceConfig(gameData.voiceProvider).getVoicesByGender('male').map(voice => ({ value: voice.id, label: voice.id }))}
+                                            value={gameData.gameMasterVoice || getVoiceConfig(gameData.voiceProvider).getVoicesByGender('male')[0]?.id || ''}
+                                            onChange={(val) => setGameData({ ...gameData, gameMasterVoice: val })}
+                                        />
                                     </div>
                                     <div className="flex flex-col justify-end">
                                         <button
-                                            className={`w-10 h-10 ${buttonTransparentStyle} ${(!gameData.scene || isSpeaking) ? 'opacity-50 cursor-not-allowed' : ''} flex items-center justify-center`}
+                                            className={`w-8 h-8 rounded-[var(--radius-md)] bg-[var(--bg-3)] border border-[var(--line-2)] text-[var(--fg-1)] hover:bg-[var(--bg-4)] hover:text-[var(--fg-0)] transition-all duration-[120ms] flex items-center justify-center ${(!gameData.scene || isSpeaking) ? 'opacity-50 cursor-not-allowed' : ''}`}
                                             onClick={() => isSpeaking ? handleStopTTS() : handlePlayStory(gameData.scene, gameData.gameMasterVoice || getVoiceConfig(gameData.voiceProvider).getVoicesByGender('male')[0]?.id || '', gameData.gameMasterVoiceStyle)}
                                             disabled={!gameData.scene}
                                             title={isSpeaking ? "Stop speaking" : "Play game story"}
                                         >
-                                            <span className="text-lg">
-                                                {isSpeaking ? '⏹️' : '🔊'}
-                                            </span>
+                                            <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><path d={isSpeaking ? "M3 3h8v8H3z" : "M4 2.5l8 4.5-8 4.5z"} /></svg>
                                         </button>
                                     </div>
                                 </div>
                             </div>
                             {gameData.gameMasterVoiceStyle && (
-                                <div className="mt-2">
-                                    <label className="block text-gray-400 text-sm mb-1">Voice Style:</label>
+                                <div>
+                                    <label className={`${labelStyle} block mb-1.5`}>Voice Style</label>
                                     <input
                                         type="text"
-                                        className="w-full p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
+                                        className={inputStyle}
                                         value={gameData.gameMasterVoiceStyle}
                                         onChange={(e) => setGameData({ ...gameData, gameMasterVoiceStyle: e.target.value })}
                                         placeholder="Voice style (e.g., authoritatively, dramatically)"
@@ -762,157 +775,148 @@ export default function CreateNewGamePage() {
                         </div>
                     </div>
 
-                    <h3 className="text-xl font-bold text-white mb-4">Players:</h3>
-                    {gameData.bots.map((player, index) => (
-                        <div key={index} className="mb-4 p-4 bg-gray-900 bg-opacity-50 rounded-lg">
-                            <div className="flex flex-col gap-2 mb-2">
-                                <div className="flex flex-col sm:flex-row gap-2">
-                                    <div className="flex-1">
-                                        <label className="block text-gray-400 text-sm mb-1">Name:</label>
+                    {/* Players */}
+                    <div>
+                        <h3 className="text-[15px] font-semibold text-[var(--fg-0)] mb-3 flex items-center gap-3 after:content-[''] after:flex-1 after:h-px after:bg-[var(--line-1)]">
+                            Players <span className="text-[var(--fg-2)] font-normal">&middot; {gameData.bots.length} of {playerCount}</span>
+                        </h3>
+                        <div className="space-y-3">
+                        {gameData.bots.map((player, index) => (
+                            <div key={index} className="p-4 bg-[var(--bg-1)] border border-[var(--line-1)] rounded-[var(--radius-lg)] space-y-3">
+                                {/* Player head row */}
+                                <div className="flex items-center gap-3">
+                                    {/* Avatar */}
+                                    <div className="w-9 h-9 rounded-full bg-[var(--bg-3)] text-[var(--fg-1)] flex items-center justify-center text-[14px] font-semibold">
+                                        {player.name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
                                         <input
                                             type="text"
-                                            className={`w-full h-10 p-2 rounded bg-gray-900 text-white border ${botNameErrors[index] ? 'border-red-500' : 'border-white border-opacity-30'} focus:outline-none focus:border-white focus:border-opacity-50`}
+                                            className={`text-[14px] font-semibold text-[var(--fg-0)] bg-transparent border-none p-0 focus:outline-none w-full ${botNameErrors[index] ? 'text-[var(--danger)]' : ''}`}
                                             value={player.name}
                                             onChange={(e) => handlePlayerChange(index, 'name', e.target.value)}
                                             placeholder="Player Name"
                                         />
-                                        {botNameErrors[index] && <p className="text-red-500 text-xs mt-1">{botNameErrors[index]}</p>}
+                                        {botNameErrors[index] && <p className="text-[var(--danger)] text-[11px]">{botNameErrors[index]}</p>}
+                                        <div className="text-[11px] font-mono text-[var(--fg-2)]">
+                                            {player.gender} &middot; {player.voice}
+                                        </div>
                                     </div>
-                                    <div className="flex-1">
-                                        <label className="block text-gray-400 text-sm mb-1">Gender:</label>
-                                        <select
-                                            className="w-full h-10 p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
-                                            value={player.gender}
-                                            onChange={(e) => handlePlayerChange(index, 'gender', e.target.value)}
-                                        >
-                                            {GENDER_OPTIONS.map(gender => (
-                                                <option key={gender} value={gender}>
-                                                    {gender.charAt(0).toUpperCase() + gender.slice(1)}
-                                                </option>
-                                            ))}
-                                        </select>
+                                </div>
+
+                                {/* AI Model + Play Style */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div>
+                                        <label className={`${labelStyle} block mb-1.5`}>AI Model</label>
+                                        <ModelSelectDropdown
+                                            options={getPreviewModelOptions(player.playerAiType)}
+                                            value={player.playerAiType}
+                                            onChange={(value) => handleBotAiChange(index, value)}
+                                            className="w-full"
+                                        />
                                     </div>
-                                    <div className="flex-1 flex gap-2">
+                                    <div className="flex gap-2">
                                         <div className="flex-1">
-                                            <label className="block text-gray-400 text-sm mb-1">Voice:</label>
-                                            <select
-                                                className="w-full h-10 p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
-                                                value={player.voice}
-                                                onChange={(e) => handlePlayerChange(index, 'voice', e.target.value)}
+                                            <label className={`${labelStyle} block mb-1.5`}>Play Style</label>
+                                            <SelectDropdown
+                                                options={Object.values(PLAY_STYLES).map(style => ({
+                                                    value: style,
+                                                    label: style.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' '),
+                                                }))}
+                                                value={player.playStyle}
+                                                onChange={(val) => handlePlayerChange(index, 'playStyle', val)}
+                                            />
+                                        </div>
+                                        <div className="relative flex flex-col justify-end">
+                                            <button
+                                                type="button"
+                                                className="w-8 h-8 rounded-[var(--radius-md)] bg-[var(--bg-3)] border border-[var(--line-2)] text-[var(--fg-2)] hover:bg-[var(--bg-4)] hover:text-[var(--fg-0)] transition-all duration-[120ms] flex items-center justify-center text-[12px] font-medium"
+                                                onMouseEnter={() => setShowPlayStyleTooltip(index)}
+                                                onMouseLeave={() => setShowPlayStyleTooltip(null)}
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    setShowPlayStyleTooltip(showPlayStyleTooltip === index ? null : index);
+                                                }}
                                             >
-                                                {getVoiceConfig(gameData.voiceProvider).getVoicesByGender(player.gender).map(voice => (
-                                                    <option key={voice.id} value={voice.id}>{voice.id}</option>
-                                                ))}
-                                            </select>
+                                                ?
+                                            </button>
+                                            {showPlayStyleTooltip === index && (
+                                                <div className="absolute z-10 w-64 sm:w-72 md:w-80 p-3 bg-[var(--bg-1)] border border-[var(--line-2)] rounded-[var(--radius-lg)] shadow-pop text-[13px] top-full mt-2 right-0">
+                                                    <div className="font-semibold text-[var(--fg-0)] mb-1">
+                                                        {PLAY_STYLE_CONFIGS[player.playStyle]?.name || player.playStyle}
+                                                    </div>
+                                                    <div className="text-[var(--fg-1)]">
+                                                        {PLAY_STYLE_CONFIGS[player.playStyle]?.uiDescription || 'No description available'}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Story */}
+                                <div>
+                                    <label className={`${labelStyle} block mb-1.5`}>Story</label>
+                                    <textarea
+                                        className={`${inputStyle} min-h-[70px] resize-y`}
+                                        rows={3}
+                                        value={player.story}
+                                        onChange={(e) => handlePlayerChange(index, 'story', e.target.value)}
+                                        placeholder="Player's story"
+                                    />
+                                </div>
+
+                                {/* Voice Style + Voice */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    {player.voiceStyle !== undefined && (
+                                        <div>
+                                            <label className={`${labelStyle} block mb-1.5`}>Voice Style</label>
+                                            <input
+                                                type="text"
+                                                className={inputStyle}
+                                                value={player.voiceStyle}
+                                                onChange={(e) => handlePlayerChange(index, 'voiceStyle', e.target.value)}
+                                                placeholder="e.g., mysteriously, excitedly"
+                                            />
+                                        </div>
+                                    )}
+                                    <div className="flex gap-2">
+                                        <div className="flex-1">
+                                            <label className={`${labelStyle} block mb-1.5`}>Voice</label>
+                                            <SelectDropdown
+                                                options={getVoiceConfig(gameData.voiceProvider).getVoicesByGender(player.gender).map(voice => ({ value: voice.id, label: voice.id }))}
+                                                value={player.voice}
+                                                onChange={(val) => handlePlayerChange(index, 'voice', val)}
+                                            />
                                         </div>
                                         <div className="flex flex-col justify-end">
                                             <button
-                                                className={`w-10 h-10 ${buttonTransparentStyle} ${(!player.story || isSpeaking) ? 'opacity-50 cursor-not-allowed' : ''} flex items-center justify-center`}
+                                                className={`w-8 h-8 rounded-[var(--radius-md)] bg-[var(--bg-3)] border border-[var(--line-2)] text-[var(--fg-1)] hover:bg-[var(--bg-4)] hover:text-[var(--fg-0)] transition-all duration-[120ms] flex items-center justify-center ${(!player.story || isSpeaking) ? 'opacity-50 cursor-not-allowed' : ''}`}
                                                 onClick={() => isSpeaking ? handleStopTTS() : handlePlayStory(player.story, player.voice, player.voiceStyle)}
                                                 disabled={!player.story}
                                                 title={isSpeaking ? "Stop speaking" : "Play story"}
                                             >
-                                                <span className="text-lg">
-                                                    {isSpeaking ? '⏹️' : '🔊'}
-                                                </span>
+                                                <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><path d={isSpeaking ? "M3 3h8v8H3z" : "M4 2.5l8 4.5-8 4.5z"} /></svg>
                                             </button>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                            <div className="flex flex-col sm:flex-row gap-2 mb-2">
-                                <div className="flex-1">
-                                    <label className="block text-gray-400 text-sm mb-1">AI Model:</label>
-                                    <ModelSelectDropdown
-                                        options={getPreviewModelOptions(player.playerAiType)}
-                                        value={player.playerAiType}
-                                        onChange={(value) => handleBotAiChange(index, value)}
-                                        className="w-full"
-                                    />
-                                </div>
-                                <div className="flex-1 flex gap-2">
-                                    <div className="flex-1">
-                                        <label className="block text-gray-400 text-sm mb-1">
-                                            Play Style:
-                                        </label>
-                                        <select
-                                            className="w-full h-10 p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
-                                            value={player.playStyle}
-                                            onChange={(e) => handlePlayerChange(index, 'playStyle', e.target.value)}
-                                        >
-                                            {Object.values(PLAY_STYLES).map(style => (
-                                                <option key={style} value={style}>
-                                                    {style.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div className="relative flex flex-col justify-end">
-                                        <button
-                                            type="button"
-                                            className="w-10 h-10 rounded-full bg-gray-700 hover:bg-gray-600 text-white text-xs flex items-center justify-center transition-colors"
-                                            onMouseEnter={() => setShowPlayStyleTooltip(index)}
-                                            onMouseLeave={() => setShowPlayStyleTooltip(null)}
-                                            onClick={(e) => {
-                                                e.preventDefault();
-                                                setShowPlayStyleTooltip(showPlayStyleTooltip === index ? null : index);
-                                            }}
-                                        >
-                                            ?
-                                        </button>
-                                        {showPlayStyleTooltip === index && (
-                                            <div className="absolute z-10 w-64 sm:w-72 md:w-80 p-3 bg-gray-900 border border-gray-700 rounded-lg shadow-lg text-sm text-white top-full mt-2 right-0 transform -translate-x-full sm:-translate-x-3/4 md:translate-x-0">
-                                                <div className="font-semibold mb-2">
-                                                    {PLAY_STYLE_CONFIGS[player.playStyle]?.name || player.playStyle}
-                                                </div>
-                                                <div className="text-gray-300">
-                                                    {PLAY_STYLE_CONFIGS[player.playStyle]?.uiDescription || 'No description available'}
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                            <div>
-                                <label className="block text-gray-400 text-sm mb-1">Story:</label>
-                                <textarea
-                                    className="w-full p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
-                                    rows={3}
-                                    value={player.story}
-                                    onChange={(e) => handlePlayerChange(index, 'story', e.target.value)}
-                                    placeholder="Player's Story"
-                                />
-                            </div>
-                            {player.voiceStyle && (
-                                <div className="mt-2">
-                                    <label className="block text-gray-400 text-sm mb-1">Voice Style:</label>
-                                    <input
-                                        type="text"
-                                        className="w-full p-2 rounded bg-black bg-opacity-30 text-white border border-white border-opacity-30 focus:outline-none focus:border-white focus:border-opacity-50"
-                                        value={player.voiceStyle}
-                                        onChange={(e) => handlePlayerChange(index, 'voiceStyle', e.target.value)}
-                                        placeholder="Voice style (e.g., mysteriously, excitedly)"
-                                    />
-                                </div>
-                            )}
+                        ))}
                         </div>
-                    ))}
+                    </div>
 
-                    <div className="flex justify-end space-x-4 mt-6">
+                    {/* Bottom actions */}
+                    <div className="flex justify-end gap-3 pt-2">
                         <button
-                            className={`${buttonTransparentStyle} ${(!isFormValid || isLoading) ? buttonDisabledStyle : ''}`}
+                            className={`px-4 py-2 text-[13px] font-medium rounded-[var(--radius-md)] bg-[var(--bg-3)] border border-[var(--line-3)] text-[var(--fg-0)] hover:bg-[var(--bg-4)] transition-all duration-[120ms] ${(!isFormValid || isLoading) ? buttonDisabledStyle : ''}`}
                             onClick={handleGeneratePreview}
                             disabled={!isFormValid || isLoading}
                         >
-                            {isLoading ? (
-                                <span className="flex items-center space-x-2">
-                                    <span className="animate-spin">⏳</span>
-                                    <span>Generating Preview...</span>
-                                </span>
-                            ) : 'Generate Preview Again'}
+                            {isLoading ? 'Generating...' : 'Regenerate Preview'}
                         </button>
                         <button
-                            className={`${buttonTransparentStyle} ${isLoading ? buttonDisabledStyle : ''}`}
+                            className={`px-4 py-2 text-[13px] font-medium rounded-[var(--radius-md)] bg-[var(--accent)] text-[var(--accent-fg)] hover:brightness-110 transition-all duration-[120ms] ${isLoading ? buttonDisabledStyle : ''}`}
                             onClick={handleCreateGame}
                             disabled={isLoading}
                         >

@@ -8,7 +8,7 @@ import { getUserTier } from "@/app/api/user-actions";
 
 function formatCreationDate(timestamp?: number): string {
     if (!timestamp) return '';
-    
+
     const date = new Date(timestamp);
     return date.toLocaleDateString('en-US', {
         month: 'short',
@@ -37,22 +37,25 @@ const GamePages = async ({searchParams}: {searchParams?: Promise<{error?: string
     const errorCode = resolvedSearchParams?.error;
     const blockedGameId = resolvedSearchParams?.blocked;
     return (
-        <div className="flex flex-col h-full theme-text-primary overflow-hidden">
-            <div className="flex justify-between items-center mb-6">
-                <h1 className="text-2xl font-bold theme-text-primary">Game List</h1>
-                <Link href="/games/newgame" className="text-btn-text bg-btn hover:bg-btn-hover p-3 text-xl rounded">
+        <div className="flex flex-col h-full overflow-hidden max-w-[1040px] mx-auto w-full">
+            <div className="flex justify-between items-center mb-6 pt-4">
+                <h1 className="text-[20px] font-semibold text-[var(--fg-0)] tracking-[-0.01em]">Game List</h1>
+                <Link
+                    href="/games/newgame"
+                    className="px-4 py-2 text-[13px] font-medium rounded-[var(--radius-md)] bg-[var(--accent)] text-[var(--accent-fg)] hover:brightness-110 transition-all duration-[120ms]"
+                >
                     Create Game
                 </Link>
             </div>
 
             {errorCode === 'tier_mismatch' && (
-                <div className="mb-4 p-4 border-2 border-yellow-600 bg-yellow-100 dark:bg-yellow-900/40 text-yellow-900 dark:text-yellow-200 rounded flex items-start justify-between gap-4">
-                    <div>
+                <div className="mb-4 p-4 border border-[oklch(75%_0.10_65_/_0.4)] bg-[oklch(75%_0.10_65_/_0.08)] rounded-[var(--radius-lg)] flex items-start justify-between gap-4">
+                    <div className="text-[13px] text-[var(--fg-0)]">
                         You can only open games created on your current tier. {blockedGameId ? `Game ${blockedGameId} is locked.` : ''}
                     </div>
                     <Link
                         href="/games"
-                        className="text-yellow-800 dark:text-yellow-100 hover:underline text-sm font-medium"
+                        className="text-[var(--fg-1)] hover:text-[var(--fg-0)] text-[12px] font-medium transition-colors"
                         aria-label="Dismiss tier warning"
                     >
                         Dismiss
@@ -61,21 +64,15 @@ const GamePages = async ({searchParams}: {searchParams?: Promise<{error?: string
             )}
 
             <div className="flex-grow overflow-auto">
-                <ul className="space-y-4">
+                <ul className="space-y-3">
                     {games.map((game) => {
                         const isSameTier = game.createdWithTier === userTier;
-                        const listClasses = [
-                            'theme-bg-card theme-border border rounded-lg px-2 py-4 sm:px-4 transition-colors theme-shadow'
-                        ];
-                        if (isSameTier) {
-                            listClasses.push('hover:opacity-90');
-                        } else {
-                            listClasses.push('opacity-60');
-                        }
                         return (
                         <li
                             key={game.id}
-                            className={listClasses.join(' ')}
+                            className={`bg-[var(--bg-1)] border border-[var(--line-1)] rounded-[var(--radius-lg)] px-4 py-4 shadow-subtle transition-all duration-[120ms] ${
+                                isSameTier ? 'hover:border-[var(--line-3)]' : 'opacity-50'
+                            }`}
                         >
                             <div className="flex justify-between items-start gap-2">
                                 {isSameTier ? (
@@ -85,8 +82,8 @@ const GamePages = async ({searchParams}: {searchParams?: Promise<{error?: string
                                 ) : (
                                     <div className="flex-grow cursor-not-allowed">
                                         <GameListEntryContent game={game} locked />
-                                        <p className="mt-2 text-xs text-yellow-800 dark:text-yellow-200">
-                                            Switch back to the {game.createdWithTier.toUpperCase()} tier to continue this game.
+                                        <p className="mt-2 text-[11px] text-[var(--fg-2)]">
+                                            Switch to the <span className="font-medium uppercase">{game.createdWithTier}</span> tier to continue this game.
                                         </p>
                                     </div>
                                 )}
@@ -115,27 +112,27 @@ function GameListEntryContent({
         <div className={`flex flex-col gap-1.5 ${locked ? 'pointer-events-none' : ''}`}>
             {/* Top row: Theme and Date/Status */}
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-4">
-                <h2 className="text-lg capitalize theme-text-primary font-semibold truncate">
+                <h2 className="text-[16px] capitalize text-[var(--fg-0)] font-semibold truncate">
                     {game.theme}
                     {game.humanPlayerName && (
-                        <span className="text-sm font-normal theme-text-secondary ml-2">as {game.humanPlayerName}</span>
+                        <span className="text-[13px] font-normal text-[var(--fg-2)] ml-2">as {game.humanPlayerName}</span>
                     )}
                 </h2>
-                <div className="flex flex-wrap items-center gap-x-2 text-xs theme-text-secondary">
+                <div className="flex flex-wrap items-center gap-x-2 text-[11px] font-mono text-[var(--fg-2)]">
                     <span>{formatCreationDate(game.createdAt)}</span>
-                    <span className="hidden sm:inline opacity-40">•</span>
-                    <span className="font-medium theme-text-primary uppercase tracking-tight bg-opacity-10 bg-gray-500 px-1.5 py-0.5 rounded sm:bg-transparent sm:p-0">
-                        Day {game.currentDay} • {stateLabel}
+                    <span className="hidden sm:inline text-[var(--line-3)]">&middot;</span>
+                    <span className="font-medium text-[var(--fg-1)] uppercase tracking-[0.04em]">
+                        Day {game.currentDay} &middot; {stateLabel}
                     </span>
                 </div>
             </div>
-            
-            {/* Description row: Full width */}
-            <p className="text-sm theme-text-secondary line-clamp-2 leading-relaxed">{game.description}</p>
-            
+
+            {/* Description row */}
+            <p className="text-[13px] text-[var(--fg-1)] line-clamp-2 leading-relaxed">{game.description}</p>
+
             {/* Bottom row: Tier */}
-            <div className="text-[10px] uppercase tracking-wider theme-text-secondary opacity-60">
-                Tier: {game.createdWithTier}
+            <div className="text-[10px] font-mono uppercase tracking-[0.06em] text-[var(--fg-3)]">
+                {game.createdWithTier} tier
             </div>
         </div>
     );

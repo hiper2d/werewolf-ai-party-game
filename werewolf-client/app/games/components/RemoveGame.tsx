@@ -3,7 +3,6 @@
 import {removeGameById} from "@/app/api/game-actions";
 import {useRouter} from "next/navigation";
 import {useState} from "react";
-import { buttonTransparentStyle } from '@/app/constants';
 
 interface RemoveGameProps {
     gameId: string;
@@ -34,29 +33,35 @@ export default function RemoveGame({gameId, ownerEmail}: RemoveGameProps) {
 
     return (
         <>
-            <button className="ml-8 p-4 border-l-2 theme-border-subtle hover:opacity-70 w-16" onClick={handleRemoveClick}>
-                X
+            <button
+                className="ml-4 px-3 py-2 border-l border-[var(--line-1)] text-[var(--fg-3)] hover:text-[var(--danger)] transition-colors duration-[120ms]"
+                onClick={handleRemoveClick}
+                title="Remove game"
+            >
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3.5 3.5l7 7M10.5 3.5l-7 7" />
+                </svg>
             </button>
 
             {showConfirmDialog && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="theme-bg-card theme-border border rounded-lg p-6 max-w-md mx-4 theme-shadow">
-                        <h3 className="text-xl font-bold theme-text-primary mb-4">
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div className="bg-[var(--bg-1)] border border-[var(--line-2)] rounded-[var(--radius-xl)] p-6 max-w-md mx-4 shadow-pop">
+                        <h3 className="text-[16px] font-semibold text-[var(--fg-0)] mb-3">
                             Confirm Game Removal
                         </h3>
-                        <p className="theme-text-primary mb-6">
+                        <p className="text-[13px] text-[var(--fg-1)] mb-6">
                             Are you sure you want to remove this game? This action is permanent and cannot be undone.
                         </p>
-                        <div className="flex justify-end space-x-3">
+                        <div className="flex justify-end gap-2">
                             <button
                                 onClick={handleCancel}
-                                className={`${buttonTransparentStyle} bg-gray-600 hover:bg-gray-700 border-gray-500 !text-white`}
+                                className="px-4 py-2 text-[13px] font-medium rounded-[var(--radius-md)] bg-[var(--bg-3)] border border-[var(--line-3)] text-[var(--fg-0)] hover:bg-[var(--bg-4)] transition-all duration-[120ms]"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={handleConfirm}
-                                className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500 !text-white`}
+                                className="px-4 py-2 text-[13px] font-medium rounded-[var(--radius-md)] bg-[var(--danger)] text-white hover:brightness-110 transition-all duration-[120ms]"
                             >
                                 Remove Game
                             </button>

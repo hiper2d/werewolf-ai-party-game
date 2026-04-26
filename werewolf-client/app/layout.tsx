@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, Roboto_Mono } from "next/font/google";
+import { Inter, Roboto_Mono, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import NavBar from "@/components/navbar";
 import React from "react";
@@ -18,6 +18,13 @@ const roboto_mono = Roboto_Mono({
   subsets: ['latin'],
   display: 'swap',
   variable: '--font-roboto-mono',
+})
+
+const jetbrains_mono = JetBrains_Mono({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-jetbrains-mono',
+  weight: ['400', '500'],
 })
 
 export const metadata: Metadata = {
@@ -47,7 +54,7 @@ export default function RootLayout(
     { children }: Readonly<{ children: React.ReactNode; }>
 ) {
   return (
-      <html suppressHydrationWarning lang="en" className={`${inter.variable} ${roboto_mono.variable} min-h-full`}>
+      <html suppressHydrationWarning lang="en" className={`${inter.variable} ${roboto_mono.variable} ${jetbrains_mono.variable} min-h-full`}>
           <head>
             <script dangerouslySetInnerHTML={{ __html: themeScript }} />
           </head>

@@ -2,132 +2,188 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Design Tokens ─────────────────────────────────────────────── */
+
 /* Default dark background to prevent flash before theme loads */
 html {
-  background-color: #121216; /* matches dark theme --color-page-bg-start */
+  background-color: #0b0c0f;
 }
 
-/* Light Theme */
-[data-theme='light'] {
-  background-color: #f8fafc; /* override default dark background */
-
-  --color-text-primary: 15, 23, 42;
-  --color-text-secondary: 71, 85, 105;
-
-  --color-page-bg-start: 248, 250, 252;
-  --color-page-bg-end: 226, 232, 240;
-
-  --color-navbar-bg: 255, 255, 255;
-  --color-navbar-text: 15, 23, 42;
-  --color-navbar-link: 51, 65, 85;
-  --color-navbar-link-hover: 15, 23, 42;
-  --color-navbar-divider: 203, 213, 225;
-
-  --color-toggle-bg: rgba(0, 0, 0, 0.05);
-  --color-toggle-hover-bg: rgba(0, 0, 0, 0.1);
-  --color-toggle-border: rgba(0, 0, 0, 0.15);
-  --color-toggle-text: 30, 41, 59;
-
-  --color-card-bg: 255, 255, 255;
-  --color-card-border: 203, 213, 225;
-  --color-card-shadow: rgba(15, 23, 42, 0.12);
-
-  --color-button-bg: 15, 23, 42;
-  --color-button-text: 255, 255, 255;
-  --color-button-text-transparent: 15, 23, 42;
-  --color-button-hover-bg: 30, 41, 59;
-  --color-button-transparent-bg: rgba(15, 23, 42, 0.08);
-  --color-button-transparent-hover-bg: rgba(15, 23, 42, 0.12);
-
-  --color-input-bg: 255, 255, 255;
-  --color-input-border: 203, 213, 225;
-  --color-input-text: 15, 23, 42;
-  --color-input-placeholder: 148, 163, 184;
-
-  --color-scrollbar-track: 241, 245, 249;
-  --color-scrollbar-thumb: 203, 213, 225;
-  --color-scrollbar-thumb-hover: 148, 163, 184;
-}
-
-/* Dark Theme */
+/* ── Dark Theme ─────────────────────────────────────────────────── */
 [data-theme='dark'] {
-  --color-text-primary: 240, 240, 245;
-  --color-text-secondary: 160, 160, 170;
+  /* Backgrounds */
+  --bg-0: #0b0c0f;
+  --bg-1: #111317;
+  --bg-2: #161a20;
+  --bg-3: #1d2229;
+  --bg-4: #252a33;
 
-  --color-page-bg-start: 18, 18, 22;
-  --color-page-bg-end: 12, 12, 16;
+  /* Lines / borders */
+  --line-1: #1f242c;
+  --line-2: #2a313b;
+  --line-3: #3a4250;
 
-  --color-navbar-bg: 18, 18, 22;
-  --color-navbar-text: 240, 240, 245;
-  --color-navbar-link: 200, 200, 210;
-  --color-navbar-link-hover: 240, 240, 245;
-  --color-navbar-divider: 120, 120, 130;
+  /* Foreground / text */
+  --fg-0: #ecedef;
+  --fg-1: #b9bcc3;
+  --fg-2: #7e848f;
+  --fg-3: #555b66;
 
-  --color-toggle-bg: rgba(255, 255, 255, 0.08);
-  --color-toggle-hover-bg: rgba(255, 255, 255, 0.16);
-  --color-toggle-border: rgba(160, 160, 170, 0.35);
-  --color-toggle-text: 240, 240, 245;
+  /* Accent — cool blue */
+  --accent: oklch(72% 0.09 230);
+  --accent-soft: oklch(72% 0.09 230 / 0.14);
+  --accent-line: oklch(72% 0.09 230 / 0.45);
+  --accent-fg: #0b0c0f;
 
-  --color-card-bg: 32, 32, 38;
-  --color-card-border: 55, 55, 62;
-  --color-card-shadow: rgba(0, 0, 0, 0.3);
+  /* Danger */
+  --danger: oklch(70% 0.13 25);
 
-  --color-button-bg: 55, 55, 62;
-  --color-button-text: 240, 240, 245;
-  --color-button-text-transparent: 240, 240, 245;
-  --color-button-hover-bg: 72, 72, 80;
-  --color-button-transparent-bg: rgba(255, 255, 255, 0.1);
-  --color-button-transparent-hover-bg: rgba(255, 255, 255, 0.15);
+  /* Shadows */
+  --shadow-1: 0 1px 0 rgba(255,255,255,0.02) inset, 0 1px 2px rgba(0,0,0,0.4);
+  --shadow-2: 0 8px 24px rgba(0,0,0,0.4), 0 2px 6px rgba(0,0,0,0.3);
+  --shadow-pop: 0 16px 40px rgba(0,0,0,0.55), 0 4px 12px rgba(0,0,0,0.4);
 
-  --color-input-bg: 32, 32, 38;
-  --color-input-border: 55, 55, 62;
-  --color-input-text: 240, 240, 245;
-  --color-input-placeholder: 120, 120, 130;
+  /* Scrollbar */
+  --scrollbar-track: #0b0c0f;
+  --scrollbar-thumb: #2a313b;
+  --scrollbar-thumb-hover: #3a4250;
 
-  --color-scrollbar-track: 18, 18, 22;
-  --color-scrollbar-thumb: 75, 75, 82;
-  --color-scrollbar-thumb-hover: 100, 100, 108;
+  /* Legacy aliases — keep existing components working */
+  --color-text-primary: 236, 237, 239;
+  --color-text-secondary: 185, 188, 195;
+  --color-page-bg-start: 11, 12, 15;
+  --color-page-bg-end: 11, 12, 15;
+  --color-navbar-bg: 17, 19, 23;
+  --color-navbar-text: 236, 237, 239;
+  --color-navbar-link: 185, 188, 195;
+  --color-navbar-link-hover: 236, 237, 239;
+  --color-navbar-divider: 42, 49, 59;
+  --color-toggle-bg: rgba(255, 255, 255, 0.06);
+  --color-toggle-hover-bg: rgba(255, 255, 255, 0.12);
+  --color-toggle-border: rgba(58, 66, 80, 0.8);
+  --color-toggle-text: 236, 237, 239;
+  --color-card-bg: 17, 19, 23;
+  --color-card-border: 31, 36, 44;
+  --color-card-shadow: rgba(0, 0, 0, 0.4);
+  --color-button-bg: 29, 34, 41;
+  --color-button-text: 236, 237, 239;
+  --color-button-text-transparent: 236, 237, 239;
+  --color-button-hover-bg: 37, 42, 51;
+  --color-button-transparent-bg: rgba(255, 255, 255, 0.06);
+  --color-button-transparent-hover-bg: rgba(255, 255, 255, 0.12);
+  --color-input-bg: 22, 26, 32;
+  --color-input-border: 42, 49, 59;
+  --color-input-text: 236, 237, 239;
+  --color-input-placeholder: 85, 91, 102;
+  --color-scrollbar-track: 11, 12, 15;
+  --color-scrollbar-thumb: 42, 49, 59;
+  --color-scrollbar-thumb-hover: 58, 66, 80;
 }
 
-/* Dark theme glassmorphism */
-[data-theme='dark'] .theme-bg-card {
-  background-color: rgba(32, 32, 38, 0.15);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+/* ── Light Theme ────────────────────────────────────────────────── */
+[data-theme='light'] {
+  background-color: #f7f8fa;
+
+  /* Backgrounds */
+  --bg-0: #f5f6f8;
+  --bg-1: #ffffff;
+  --bg-2: #f3f4f6;
+  --bg-3: #eaecef;
+  --bg-4: #dfe2e7;
+
+  /* Lines / borders */
+  --line-1: #e6e8ec;
+  --line-2: #d4d8de;
+  --line-3: #b7bdc6;
+
+  /* Foreground / text */
+  --fg-0: #15181d;
+  --fg-1: #3d4450;
+  --fg-2: #6b727d;
+  --fg-3: #9aa0aa;
+
+  /* Accent — cool blue (darker for light bg contrast) */
+  --accent: oklch(55% 0.12 235);
+  --accent-soft: oklch(55% 0.12 235 / 0.10);
+  --accent-line: oklch(55% 0.12 235 / 0.40);
+  --accent-fg: #ffffff;
+
+  /* Danger */
+  --danger: oklch(55% 0.18 25);
+
+  /* Shadows */
+  --shadow-1: 0 1px 0 rgba(0,0,0,0.03) inset, 0 1px 2px rgba(0,0,0,0.06);
+  --shadow-2: 0 8px 24px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04);
+  --shadow-pop: 0 16px 40px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.08);
+
+  /* Scrollbar */
+  --scrollbar-track: #f0f1f4;
+  --scrollbar-thumb: #cdd1d9;
+  --scrollbar-thumb-hover: #b0b6c1;
+
+  /* Legacy aliases */
+  --color-text-primary: 21, 24, 29;
+  --color-text-secondary: 61, 68, 80;
+  --color-page-bg-start: 245, 246, 248;
+  --color-page-bg-end: 243, 244, 246;
+  --color-navbar-bg: 255, 255, 255;
+  --color-navbar-text: 21, 24, 29;
+  --color-navbar-link: 61, 68, 80;
+  --color-navbar-link-hover: 21, 24, 29;
+  --color-navbar-divider: 212, 216, 222;
+  --color-toggle-bg: rgba(0, 0, 0, 0.04);
+  --color-toggle-hover-bg: rgba(0, 0, 0, 0.08);
+  --color-toggle-border: rgba(0, 0, 0, 0.12);
+  --color-toggle-text: 21, 24, 29;
+  --color-card-bg: 255, 255, 255;
+  --color-card-border: 230, 232, 236;
+  --color-card-shadow: rgba(0, 0, 0, 0.08);
+  --color-button-bg: 21, 24, 29;
+  --color-button-text: 245, 246, 248;
+  --color-button-text-transparent: 21, 24, 29;
+  --color-button-hover-bg: 37, 42, 51;
+  --color-button-transparent-bg: rgba(0, 0, 0, 0.04);
+  --color-button-transparent-hover-bg: rgba(0, 0, 0, 0.08);
+  --color-input-bg: 243, 244, 246;
+  --color-input-border: 212, 216, 222;
+  --color-input-text: 21, 24, 29;
+  --color-input-placeholder: 154, 160, 170;
+  --color-scrollbar-track: 243, 244, 246;
+  --color-scrollbar-thumb: 212, 216, 222;
+  --color-scrollbar-thumb-hover: 183, 189, 198;
 }
 
-[data-theme='dark'] .theme-border {
-  border-color: rgba(160, 160, 170, 0.4);
+/* ── Border Radius Tokens ───────────────────────────────────────── */
+:root {
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
 }
 
-[data-theme='dark'] .theme-border-subtle {
-  border-color: rgba(160, 160, 170, 0.2);
+/* ── Speed Tag Colors (semantic, theme-independent) ─────────────── */
+:root {
+  --tag-fast-text: oklch(80% 0.13 145);
+  --tag-fast-border: oklch(60% 0.10 145 / 0.5);
+  --tag-fast-bg: oklch(60% 0.10 145 / 0.1);
+  --tag-std-text: oklch(78% 0.10 65);
+  --tag-std-border: oklch(60% 0.08 65 / 0.5);
+  --tag-std-bg: oklch(60% 0.08 65 / 0.1);
 }
 
-[data-theme='dark'] .theme-shadow {
-  box-shadow:
-    0 4px 24px rgba(0, 0, 0, 0.15),
-    inset 0 0.5px 0 0 rgba(160, 160, 170, 0.12);
-}
-
-[data-theme='dark'] .navbar-root {
-  background-color: rgb(18, 18, 22);
-  border-bottom-color: rgba(160, 160, 170, 0.35);
-}
+/* ── Base Styles ────────────────────────────────────────────────── */
 
 body {
-  color: rgb(var(--color-text-primary));
-  background: linear-gradient(160deg,
-      rgba(var(--color-page-bg-start), 0.96) 0%,
-      rgba(var(--color-page-bg-end), 0.92) 100%);
-  background-attachment: fixed;
+  color: var(--fg-0);
+  background: var(--bg-0);
+  -webkit-font-smoothing: antialiased;
   min-height: 100vh;
 }
 
 html {
   scrollbar-width: thin;
-  scrollbar-color: rgb(var(--color-scrollbar-thumb)) rgb(var(--color-scrollbar-track));
-  background-color: rgb(var(--color-page-bg-start));
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  background-color: var(--bg-0);
 }
 
 *::-webkit-scrollbar {
@@ -136,39 +192,43 @@ html {
 }
 
 *::-webkit-scrollbar-track {
-  background: rgb(var(--color-scrollbar-track));
+  background: var(--scrollbar-track);
 }
 
 *::-webkit-scrollbar-thumb {
-  background: rgb(var(--color-scrollbar-thumb));
+  background: var(--scrollbar-thumb);
   border-radius: 999px;
-  border: 2px solid rgb(var(--color-scrollbar-track));
+  border: 2px solid var(--scrollbar-track);
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  background: rgb(var(--color-scrollbar-thumb-hover));
+  background: var(--scrollbar-thumb-hover);
 }
 
+/* ── Navbar ─────────────────────────────────────────────────────── */
+
 .navbar-root {
-  background-color: rgb(var(--color-navbar-bg));
-  color: rgb(var(--color-navbar-text));
-  box-shadow: 0 4px 12px var(--color-card-shadow);
-  border-bottom: 1px solid rgb(var(--color-card-border));
+  background-color: var(--bg-1);
+  color: var(--fg-0);
+  box-shadow: var(--shadow-1);
+  border-bottom: 1px solid var(--line-1);
 }
 
 .navbar-root .nav-link {
-  color: rgb(var(--color-navbar-link));
-  transition: color 150ms ease;
+  color: var(--fg-1);
+  transition: color 120ms ease;
 }
 
 .navbar-root .nav-link:hover,
 .navbar-root .nav-link:focus {
-  color: rgb(var(--color-navbar-link-hover));
+  color: var(--fg-0);
 }
 
 .navbar-root .nav-divider {
-  color: rgb(var(--color-navbar-divider));
+  color: var(--line-2);
 }
+
+/* ── Theme Toggle ───────────────────────────────────────────────── */
 
 .theme-toggle {
   display: inline-flex;
@@ -176,18 +236,19 @@ html {
   gap: 0.5rem;
   padding: 0.4rem 0.9rem;
   border-radius: 9999px;
-  border: 1px solid var(--color-toggle-border);
-  background-color: var(--color-toggle-bg);
-  color: rgb(var(--color-toggle-text));
+  border: 1px solid var(--line-2);
+  background-color: var(--bg-2);
+  color: var(--fg-1);
   font-size: 0.85rem;
   line-height: 1.25rem;
   font-weight: 500;
-  transition: background-color 150ms ease, border-color 150ms ease;
+  transition: background-color 120ms ease, border-color 120ms ease;
 }
 
 .theme-toggle:hover,
 .theme-toggle:focus-visible {
-  background-color: var(--color-toggle-hover-bg);
+  background-color: var(--bg-3);
+  border-color: var(--line-3);
   outline: none;
 }
 
@@ -195,7 +256,7 @@ html {
   font-size: 0.625rem;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: rgba(var(--color-text-secondary), 0.9);
+  color: var(--fg-2);
 }
 
 .theme-icon {
@@ -208,52 +269,66 @@ html {
   letter-spacing: 0.08em;
 }
 
+/* ── App Shell ──────────────────────────────────────────────────── */
+
 .app-shell {
-  background: linear-gradient(160deg,
-      rgba(var(--color-page-bg-start), 0.85) 0%,
-      rgba(var(--color-page-bg-end), 0.9) 100%);
+  background: var(--bg-0);
 }
 
-/* Theme-aware utility classes */
+/* ── Theme-Aware Utility Classes ────────────────────────────────── */
+
 .theme-text-primary {
-  color: rgb(var(--color-text-primary));
+  color: var(--fg-0);
 }
 
 .theme-text-secondary {
-  color: rgb(var(--color-text-secondary));
+  color: var(--fg-1);
 }
 
 .theme-bg-card {
-  background-color: rgb(var(--color-card-bg));
+  background-color: var(--bg-1);
 }
 
 .theme-border {
-  border-color: rgb(var(--color-card-border));
+  border-color: var(--line-1);
 }
 
 .theme-border-subtle {
-  border-color: rgba(var(--color-card-border), 0.5);
+  border-color: var(--line-1);
 }
 
 .theme-shadow {
-  box-shadow: 0 4px 16px var(--color-card-shadow);
+  box-shadow: var(--shadow-2);
 }
 
-/* Logo backdrop: dark center fading to page background */
+/* ── Logo Backdrop ──────────────────────────────────────────────── */
+
 [data-theme='light'] .logo-backdrop {
-  background: radial-gradient(circle, #1e293b 35%, rgba(248, 250, 252, 0) 70%);
+  background: radial-gradient(circle, #1e293b 35%, rgba(247, 248, 250, 0) 70%);
   padding: 0.75rem;
 }
 
 [data-theme='light'] .logo-backdrop-sm {
-  background: radial-gradient(circle, #1e293b 40%, rgba(248, 250, 252, 0) 70%);
+  background: radial-gradient(circle, #1e293b 40%, rgba(255, 255, 255, 0) 70%);
   padding: 0.25rem;
 }
 
-/* Navbar has white background, so fade to white instead */
-.navbar-root .logo-backdrop-sm {
-  background: radial-gradient(circle, #1e293b 40%, rgba(255, 255, 255, 0) 70%);
+[data-theme='dark'] .logo-backdrop {
+  background: radial-gradient(circle, #111317 35%, rgba(11, 12, 15, 0) 70%);
+  padding: 0.75rem;
 }
+
+[data-theme='dark'] .logo-backdrop-sm {
+  background: radial-gradient(circle, #111317 40%, rgba(17, 19, 23, 0) 70%);
+  padding: 0.25rem;
+}
+
+/* Navbar logo always fades to navbar bg */
+.navbar-root .logo-backdrop-sm {
+  background: radial-gradient(circle, #1e293b 40%, transparent 70%);
+}
+
+/* ── Scrollbar Utility ──────────────────────────────────────────── */
 
 .hide-scrollbar {
   scrollbar-width: none;
