@@ -62,10 +62,10 @@ export default function RootLayout(
             <ThemeProvider>
               <AuthProvider>
                 <LoginDialogProvider>
-                  <div className="flex flex-col min-h-screen">
+                  <div className="flex flex-col h-[100dvh]">
                     <NavBar />
                     <LoginDialog />
-                    <main className="flex-1 flex app-shell">
+                    <main className="flex-1 flex app-shell min-h-0 overflow-auto">
                       <div className="w-full max-w-7xl mx-auto p-2 sm:p-4 lg:p-6">
                         {children}
                       </div>

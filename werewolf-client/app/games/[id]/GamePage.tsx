@@ -1028,7 +1028,7 @@ function GamePageContent({
     );
 
     return (
-        <div className="flex flex-col lg:flex-row text-[var(--fg-0)] h-[calc(100dvh-3.5rem-4px)] sm:h-[calc(100dvh-3.5rem-2rem)] lg:h-[calc(100dvh-3.5rem-3rem)]">
+        <div className="flex flex-col lg:flex-row text-[var(--fg-0)] h-full">
             {/* Fixed edge drawer toggle buttons (mobile/tablet only) */}
             <button
                 className="fixed left-0 top-1/2 -translate-y-1/2 z-40 lg:hidden bg-[var(--bg-1)] border border-[var(--line-2)] rounded-r-lg p-2 shadow-subtle"
