@@ -25,6 +25,7 @@ interface GameChatProps {
     onErrorHandled?: () => void;
     isExternalLoading?: boolean;
     gameControls?: React.ReactNode;
+    chatControls?: React.ReactNode;
     onBeforeAction?: () => void;
     cancelButton?: React.ReactNode;
 }
@@ -100,6 +101,55 @@ function ErrorBanner({ error, onDismiss }: ErrorBannerProps) {
             </div>
         </div>
     );
+}
+
+function renderMessageContent(content: string) {
+    // Detect voting results and render as a formatted table
+    const voteMatch = content.match(/^Voting results(?:\s*\(tie\))?:\n([\s\S]+?)\n\n(.+)$/);
+    if (voteMatch) {
+        const lines = voteMatch[1].split('\n').filter(l => l.trim());
+        const conclusion = voteMatch[2];
+        // Parse "Name: N votes" lines
+        const votes = lines.map(line => {
+            const m = line.match(/^(.+?):\s*(\d+)\s*vote/);
+            return m ? { name: m[1].trim(), count: parseInt(m[2]) } : null;
+        }).filter(Boolean) as { name: string; count: number }[];
+
+        if (votes.length > 0) {
+            const maxVotes = Math.max(...votes.map(v => v.count));
+            const sorted = [...votes].sort((a, b) => b.count - a.count);
+            return (
+                <div className="space-y-2">
+                    <div className="text-[12px] font-semibold uppercase tracking-[0.04em] text-[var(--fg-2)] mb-1">Voting Results</div>
+                    <div className="space-y-1">
+                        {sorted.map(({ name, count }) => {
+                            const pct = maxVotes > 0 ? (count / maxVotes) * 100 : 0;
+                            const isTop = count === maxVotes;
+                            return (
+                                <div key={name} className="flex items-center gap-2">
+                                    <span className={`text-[13px] w-24 truncate ${isTop ? 'font-semibold text-[var(--fg-0)]' : 'text-[var(--fg-1)]'}`}>{name}</span>
+                                    <div className="flex-1 h-[6px] rounded-full bg-[var(--bg-3)] overflow-hidden">
+                                        <div
+                                            className={`h-full rounded-full transition-all duration-300 ${isTop ? 'bg-[var(--werewolf-fg)]' : 'bg-[var(--fg-3)]'}`}
+                                            style={{ width: `${pct}%` }}
+                                        />
+                                    </div>
+                                    <span className={`text-[12px] font-mono w-8 text-right ${isTop ? 'text-[var(--fg-0)] font-semibold' : 'text-[var(--fg-2)]'}`}>{count}</span>
+                                </div>
+                            );
+                        })}
+                    </div>
+                    <div className="text-[13px] text-[var(--fg-1)] pt-1 border-t border-[var(--line-1)]">{conclusion}</div>
+                </div>
+            );
+        }
+    }
+
+    // Default: render as text with newlines preserved
+    if (content.includes('\n')) {
+        return <span className="whitespace-pre-wrap">{content}</span>;
+    }
+    return content;
 }
 
 interface GameMessageItemProps {
@@ -313,13 +363,13 @@ function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcludin
                 isVoteMessage ? 'bg-[var(--bg-2)] border-[var(--line-1)] pl-4 border-l-[3px] border-l-[var(--werewolf-fg)]' :
                 isUserMessage ? 'bg-[var(--accent-soft)] border-[var(--accent-line)]' : 'bg-[var(--bg-2)] border-[var(--line-1)] hover:border-[var(--line-2)]'
             } text-[var(--fg-0)]`}>
-                {displayContent}
+                {renderMessageContent(displayContent)}
             </span>
         </div>
     );
 }
 
-export default function GameChat({ gameId, game, onGameStateChange, pendingMessages, onPendingMessagesConsumed, clearNightMessages, onErrorHandled, isExternalLoading, gameControls, onBeforeAction, cancelButton }: GameChatProps) {
+export default function GameChat({ gameId, game, onGameStateChange, pendingMessages, onPendingMessagesConsumed, clearNightMessages, onErrorHandled, isExternalLoading, gameControls, chatControls, onBeforeAction, cancelButton }: GameChatProps) {
     const [messages, setMessages] = useState<GameMessage[]>([]);
     const [newMessage, setNewMessage] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
@@ -1474,8 +1524,15 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
                 </button>
             )}
 
+            {/* Game controls bar — always visible outside the composer */}
+            {gameControls && (
+                <div className="flex-shrink-0 flex items-center gap-2 px-1 py-1.5">
+                    {gameControls}
+                </div>
+            )}
+
             {/* Input area */}
-            <form ref={composerRef} onSubmit={sendMessage} className="flex-shrink-0 z-10 mt-auto pt-1">
+            <form ref={composerRef} onSubmit={sendMessage} className="flex-shrink-0 z-10 pt-1">
                 <div
                     className={`relative rounded-[var(--radius-lg)] bg-[var(--bg-2)] border transition-all duration-200 ${!isInputEnabled() ? 'opacity-50 border-[var(--line-2)] pointer-events-none' : composerExpanded ? 'border-[var(--accent-line)] shadow-[0_0_0_3px_var(--accent-soft)]' : 'border-[var(--line-2)] cursor-text'}`}
                     onClick={() => { if (isInputEnabled() && !composerExpanded) { setComposerExpanded(true); textareaRef.current?.focus(); } }}
@@ -1535,11 +1592,11 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
                             </button>
                         )}
 
-                        {/* Game controls (Vote, Keep Going, etc.) */}
-                        {gameControls}
+                        {/* Chat controls (Vote, Go on) — inside composer alongside Send */}
+                        {chatControls}
                     </div>
 
-                    {/* Right group: icon buttons (Mic, Suggestion, Expand) - visible when input is enabled OR during recording/transcribing */}
+                    {/* Right group: icon buttons (Mic, Suggestion) - visible when input is enabled OR during recording/transcribing */}
                     {(isInputEnabled() || isRecording || isTranscribing) && (
                         <div className="flex items-center gap-1">
                             {/* Microphone button */}

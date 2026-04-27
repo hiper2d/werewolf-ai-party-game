@@ -608,7 +608,8 @@ function GamePageContent({
     const queueInfo = getQueueInfo();
 
     // Build game controls JSX to pass to GameChat
-    const gameControlsElement = buildGameControls();
+    const flowControlsElement = buildFlowControls();
+    const chatControlsElement = buildChatControls();
 
     // Cancel button shown in the top-right corner of the input area after 10s
     const cancelButtonElement = showCancel ? (
@@ -625,47 +626,96 @@ function GamePageContent({
         </button>
     ) : null;
 
-    function buildGameControls(): React.ReactNode {
-        const showControls = isGameOver || game.gameState === GAME_STATES.DAY_DISCUSSION || game.gameState === GAME_STATES.VOTE_RESULTS || game.gameState === GAME_STATES.NIGHT || game.gameState === GAME_STATES.NIGHT_RESULTS || (game.gameState === GAME_STATES.NEW_DAY_BOT_SUMMARIES && game.gameStateProcessQueue.length > 0);
+    // Chat controls: Vote + Go On — shown inside the composer toolbar alongside Send
+    function buildChatControls(): React.ReactNode {
+        if (game.gameState === GAME_STATES.DAY_DISCUSSION &&
+            game.gameStateProcessQueue.length === 0 && !isKeepGoingLoading) {
+            return (
+                <>
+                    <button
+                        className={`${voteUrgency.isUrgent ? btnDanger + ' animate-pulse' : voteUrgency.isWarning ? btnWarn : btnGhost} ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        disabled={!areControlsEnabled}
+                        onClick={async () => {
+                            const result = await runGameAction(() => vote(game.id));
+                            if (result) {
+                                applyActionResult(result);
+                            }
+                        }}
+                        title={voteUrgency.isUrgent
+                            ? `Vote now! Auto-voting in ${Math.ceil(voteUrgency.messagesLeft)} messages`
+                            : `Start the voting phase (${Math.round(voteUrgency.percentage)}% to auto-vote)`}
+                    >
+                        Vote {(voteUrgency.isUrgent || voteUrgency.isWarning) && '\u26A0\uFE0F'}
+                    </button>
+                    <button
+                        className={`${btnGhost} ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        disabled={!areControlsEnabled}
+                        onClick={async () => {
+                            preActionGameRef.current = game;
+                            setIsKeepGoingLoading(true);
+                            try {
+                                const result = await runGameAction(() => keepBotsGoing(game.id));
+                                if (result) {
+                                    applyActionResult(result);
+                                }
+                            } finally {
+                                setIsKeepGoingLoading(false);
+                            }
+                        }}
+                        title={`Let ${BOT_SELECTION_CONFIG.MIN}-${BOT_SELECTION_CONFIG.MAX} bots continue the conversation`}
+                    >
+                        Go on
+                    </button>
+                </>
+            );
+        }
+
+        if (game.gameState === GAME_STATES.AFTER_GAME_DISCUSSION &&
+            game.gameStateProcessQueue.length === 0 && !isKeepGoingLoading) {
+            return (
+                <button
+                    className={`${btnGhost} ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    disabled={!areControlsEnabled}
+                    onClick={async () => {
+                        preActionGameRef.current = game;
+                        setIsKeepGoingLoading(true);
+                        try {
+                            const result = await runGameAction(() => keepBotsGoing(game.id));
+                            if (result) {
+                                applyActionResult(result);
+                            }
+                        } finally {
+                            setIsKeepGoingLoading(false);
+                        }
+                    }}
+                    title={`Let ${BOT_SELECTION_CONFIG.MIN}-${BOT_SELECTION_CONFIG.MAX} bots continue the conversation`}
+                >
+                    Go on
+                </button>
+            );
+        }
+
+        return null;
+    }
+
+    // Flow controls: Start Night, Game Over, Next Day, etc. — shown in standalone bar above composer
+    function buildFlowControls(): React.ReactNode {
+        const showControls = isGameOver || game.gameState === GAME_STATES.VOTE_RESULTS || game.gameState === GAME_STATES.NIGHT || game.gameState === GAME_STATES.NIGHT_RESULTS || (game.gameState === GAME_STATES.NEW_DAY_BOT_SUMMARIES && game.gameStateProcessQueue.length > 0);
 
         if (!showControls) return null;
 
         if (game.gameState === GAME_STATES.AFTER_GAME_DISCUSSION) {
+            if (game.gameStateProcessQueue.length > 0 || isKeepGoingLoading) return null;
             return (
-                <div className="flex items-center gap-2 flex-wrap">
-                    {game.gameStateProcessQueue.length > 0 || isKeepGoingLoading ? (
-                        null
-                    ) : (
-                        <>
-                            <button
-                                className={`${btnGhost} ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                disabled={!areControlsEnabled}
-                                onClick={async () => {
-                                    preActionGameRef.current = game;
-                                    setIsKeepGoingLoading(true);
-                                    try {
-                                        const result = await runGameAction(() => keepBotsGoing(game.id));
-                                        if (result) {
-                                            applyActionResult(result);
-                                        }
-                                    } finally {
-                                        setIsKeepGoingLoading(false);
-                                    }
-                                }}
-                                title={`Let ${BOT_SELECTION_CONFIG.MIN}-${BOT_SELECTION_CONFIG.MAX} bots continue the conversation`}
-                            >
-                                Go on
-                            </button>
-                            <button
-                                className={`${btnDanger} ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                onClick={handleExitGame}
-                                disabled={!areControlsEnabled}
-                                title="Return to the games list"
-                            >
-                                Exit Game
-                            </button>
-                        </>
-                    )}
+                <div className="flex items-center gap-2">
+                    <button
+                        className={`${btnDanger} ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        onClick={handleExitGame}
+                        disabled={!areControlsEnabled}
+                        title="Return to the games list"
+                    >
+                        Exit Game
+                    </button>
                 </div>
             );
         }
@@ -688,50 +738,6 @@ function GamePageContent({
 
         return (
             <div className="flex items-center gap-2 flex-wrap">
-                {game.gameState === GAME_STATES.DAY_DISCUSSION && (
-                    <>
-                        {game.gameStateProcessQueue.length > 0 || isKeepGoingLoading ? (
-                            null
-                        ) : (
-                            <>
-                                <button
-                                    className={`${voteUrgency.isUrgent ? btnDanger + ' animate-pulse' : voteUrgency.isWarning ? btnWarn : btnGhost} ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                    disabled={!areControlsEnabled}
-                                    onClick={async () => {
-                                        const result = await runGameAction(() => vote(game.id));
-                                        if (result) {
-                                            applyActionResult(result);
-                                        }
-                                    }}
-                                    title={voteUrgency.isUrgent
-                                        ? `Vote now! Auto-voting in ${Math.ceil(voteUrgency.messagesLeft)} messages`
-                                        : `Start the voting phase (${Math.round(voteUrgency.percentage)}% to auto-vote)`}
-                                >
-                                    Vote {(voteUrgency.isUrgent || voteUrgency.isWarning) && '⚠️'}
-                                </button>
-                                <button
-                                    className={`${btnGhost} ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                    disabled={!areControlsEnabled}
-                                    onClick={async () => {
-                                        preActionGameRef.current = game;
-                                        setIsKeepGoingLoading(true);
-                                        try {
-                                            const result = await runGameAction(() => keepBotsGoing(game.id));
-                                            if (result) {
-                                                applyActionResult(result);
-                                            }
-                                        } finally {
-                                            setIsKeepGoingLoading(false);
-                                        }
-                                    }}
-                                    title={`Let ${BOT_SELECTION_CONFIG.MIN}-${BOT_SELECTION_CONFIG.MAX} bots continue the conversation`}
-                                >
-                                    Go on
-                                </button>
-                            </>
-                        )}
-                    </>
-                )}
                 {game.gameState === GAME_STATES.VOTE_RESULTS && (
                     <>
                         {showVoteGameOverCTA && pendingGameOverReason && (
@@ -741,7 +747,7 @@ function GamePageContent({
                         )}
                         {!showVoteGameOverCTA && (
                             <button
-                                className={`${btnAccent} ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                className={`${btnGhost} ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 disabled={!areControlsEnabled}
                                 onClick={async () => {
                                     const result = await runGameAction(() => performNightAction(game.id));
@@ -1075,7 +1081,8 @@ function GamePageContent({
                     clearNightMessages={clearNightMessages}
                     onErrorHandled={handleErrorCleared}
                     isExternalLoading={isKeepGoingLoading}
-                    gameControls={gameControlsElement}
+                    gameControls={flowControlsElement}
+                    chatControls={chatControlsElement}
                     onBeforeAction={() => { preActionGameRef.current = game; }}
                     cancelButton={cancelButtonElement}
                 />
