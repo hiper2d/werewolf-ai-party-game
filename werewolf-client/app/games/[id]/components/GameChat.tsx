@@ -5,6 +5,7 @@ import { talkToAll, humanPlayerVote, getSuggestion } from "@/app/api/bot-actions
 import { humanPlayerTalkWerewolves } from "@/app/api/night-actions";
 import { GAME_STATES, MessageType, RECIPIENT_ALL, RECIPIENT_WEREWOLVES, RECIPIENT_DOCTOR, RECIPIENT_DETECTIVE, RECIPIENT_MANIAC, GameMessage, Game, GameActionResponse, SystemErrorMessage, BotResponseError, GAME_MASTER, ROLE_CONFIGS, GAME_ROLES, FREE_TIER_LIMITS } from "@/app/api/game-models";
 import { getPlayerColor } from "@/app/utils/color-utils";
+import PlayerAvatar from "@/app/components/PlayerAvatar";
 import { clearGameErrorState } from "@/app/api/game-actions";
 import VotingModal from "./VotingModal";
 import NightActionModal from "./NightActionModal";
@@ -262,7 +263,10 @@ function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcludin
     const isVoteMessage = message.messageType === MessageType.VOTE_MESSAGE;
     
     return (
-        <div className={`${isGameMaster ? 'py-1.5' : 'mb-2'} ${isUserMessage ? 'text-right' : 'text-left'} group`}>
+        <div className={`${isGameMaster ? 'py-1.5' : 'mb-2'} group`}>
+            <div className="flex gap-2.5">
+                <PlayerAvatar name={message.authorName} size={36} isGM={isGameMaster} className="mt-0.5" />
+                <div className="flex-1 min-w-0 text-left">
             <div className="flex items-center justify-between mb-1">
                 <div className="flex items-center gap-2">
                     <span className={`text-[12px] font-semibold ${
@@ -361,10 +365,12 @@ function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcludin
             <span className={`inline-block px-3.5 py-2.5 text-[13.5px] leading-[1.55] rounded-[var(--radius-lg)] border transition-colors duration-[120ms] ${
                 isGameMaster ? 'bg-[var(--gm-bg)] border-[var(--gm-border)] pl-4 border-l-[3px] border-l-[var(--gm-rail)]' :
                 isVoteMessage ? 'bg-[var(--bg-2)] border-[var(--line-1)] pl-4 border-l-[3px] border-l-[var(--werewolf-fg)]' :
-                isUserMessage ? 'bg-[var(--accent-soft)] border-[var(--accent-line)]' : 'bg-[var(--bg-2)] border-[var(--line-1)] hover:border-[var(--line-2)]'
+                isUserMessage ? 'bg-[var(--accent-soft)] border-[var(--accent-line)] pl-4 border-l-[3px] border-l-[var(--accent)]' : 'bg-[var(--bg-2)] border-[var(--line-1)] hover:border-[var(--line-2)]'
             } text-[var(--fg-0)]`}>
                 {renderMessageContent(displayContent)}
             </span>
+                </div>{/* end message column */}
+            </div>{/* end avatar + message row */}
         </div>
     );
 }

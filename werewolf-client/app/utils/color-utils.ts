@@ -20,6 +20,40 @@ const GAME_MASTER_COLOR = '#FF6B6B'; // Coral red, more visible on dark backgrou
  * @param playerName The name of the player
  * @returns A hex color code from the playerColors array
  */
+// 12-color avatar gradient palette (deterministic by name hash)
+const avatarPalette: [string, string][] = [
+    ['oklch(60% 0.18 25)',  'oklch(45% 0.18 25)'],   // red
+    ['oklch(65% 0.16 60)',  'oklch(50% 0.16 60)'],   // orange
+    ['oklch(70% 0.14 90)',  'oklch(55% 0.14 90)'],   // amber
+    ['oklch(65% 0.14 145)', 'oklch(50% 0.14 145)'],  // green
+    ['oklch(63% 0.13 195)', 'oklch(48% 0.13 195)'],  // teal
+    ['oklch(60% 0.14 230)', 'oklch(45% 0.14 230)'],  // blue
+    ['oklch(58% 0.16 270)', 'oklch(42% 0.16 270)'],  // indigo
+    ['oklch(60% 0.18 310)', 'oklch(45% 0.18 310)'],  // magenta
+    ['oklch(63% 0.16 345)', 'oklch(48% 0.16 345)'],  // pink
+    ['oklch(58% 0.10 110)', 'oklch(45% 0.10 110)'],  // olive
+    ['oklch(62% 0.12 175)', 'oklch(48% 0.12 175)'],  // cyan
+    ['oklch(58% 0.14 290)', 'oklch(42% 0.14 290)'],  // violet
+];
+
+const GM_AVATAR_GRADIENT: [string, string] = ['oklch(65% 0.14 145)', 'oklch(50% 0.14 145)']; // green
+
+function nameHash(name: string): number {
+    let h = 0;
+    for (let i = 0; i < name.length; i++) {
+        h = (name.charCodeAt(i) + ((h << 5) - h)) | 0;
+    }
+    return Math.abs(h);
+}
+
+/**
+ * Returns a [lightColor, darkColor] gradient pair for a player avatar
+ */
+export function getAvatarGradient(playerName: string): [string, string] {
+    if (playerName === 'Game Master') return GM_AVATAR_GRADIENT;
+    return avatarPalette[nameHash(playerName) % avatarPalette.length];
+}
+
 export function getPlayerColor(playerName: string): string {
     // Special case for Game Master
     if (playerName === 'Game Master') {

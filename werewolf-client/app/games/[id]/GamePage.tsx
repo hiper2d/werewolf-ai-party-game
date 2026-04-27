@@ -17,6 +17,7 @@ import { welcome, vote, keepBotsGoing, manualSelectBots, cancelBotResponses } fr
 import BotSelectionDialog from '@/app/games/[id]/components/BotSelectionDialog';
 import { replayNight, performNightAction } from '@/app/api/night-actions';
 import { getPlayerColor } from "@/app/utils/color-utils";
+import PlayerAvatar from "@/app/components/PlayerAvatar";
 import { checkGameEndConditions } from "@/app/utils/game-utils";
 import { isTierMismatchError } from '@/app/api/errors';
 import { UIControlsProvider, useUIControls } from './context/UIControlsContext';
@@ -875,8 +876,10 @@ function GamePageContent({
                                 'hover:bg-[var(--bg-2)]'
                             }`}
                         >
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
+                            <div className="flex items-center gap-2">
+                                <PlayerAvatar name={participant.name} size={32} isGM={participant.isGameMaster} isDead={isDead} />
+                                <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5 flex-wrap">
                                     <span
                                         className={`text-[13px] font-medium truncate ${isDead ? 'line-through' : ''}`}
                                         style={{ color: getPlayerColor(participant.name) }}
@@ -908,20 +911,7 @@ function GamePageContent({
                                         </span>
                                     )}
                                 </div>
-                                <div className="flex items-center gap-1.5">
-                                    {!participant.isHuman && !participant.isGameMaster && (() => {
-                                        const bot = game.bots.find(b => b.name === participant.name);
-                                        const cost = bot?.tokenUsage?.costUSD;
-                                        return cost && cost > 0 ? (
-                                            <span className="text-[10px] font-mono text-[var(--fg-3)]">
-                                                ${cost.toFixed(4)}
-                                            </span>
-                                        ) : null;
-                                    })()}
-                                    {isDead && <span className="text-[11px] text-[var(--fg-3)]" title="Eliminated">&times;</span>}
-                                </div>
-                            </div>
-                            <div className="text-[11px] font-mono text-[var(--fg-2)] mt-0.5">
+                                <div className="text-[11px] font-mono text-[var(--fg-2)]">
                                 {isHuman ? (
                                     <span>Playing as you</span>
                                 ) : participant.aiType ? (
@@ -935,6 +925,8 @@ function GamePageContent({
                                     </button>
                                 ) : null}
                             </div>
+                            </div>{/* end flex-1 column */}
+                            </div>{/* end avatar row */}
                         </li>
                         );
                     })}

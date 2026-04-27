@@ -118,11 +118,15 @@ For dead participants the sub-line replaces the model name with:
 | Author class | Visual                                                                        |
 |--------------|-------------------------------------------------------------------------------|
 | `gm`         | Green name; bubble has a 3px green left rail + soft green tint (8% green over `--bg-2`) |
-| `you`        | Blue name; bubble has soft accent tint (`--accent-soft`) + 1px `--accent-line` border  |
+| `you`        | Blue name; bubble has a 3px accent-blue left rail + `--accent-soft` fill + 1px `--accent-line` border |
 | `werewolf` (visible to viewer) | Red name; standard bubble                                  |
 | (default)    | `--fg-0` name; standard bubble                                                 |
 
 When a viewer is a werewolf, fellow-werewolf authors get the `werewolf` class even if they are not "you". `you` always wins over `werewolf` in the className chain.
+
+**User-message rail rationale** — GM and the current user are both "special speakers" in the discussion. They share the *colored-rail* pattern (green for GM, accent-blue for you) so the visual language stays consistent: important roles get a rail in their role's color. **Do not right-align user messages** — this is a group/Slack-style log, not a 1:1 chat; right-aligning breaks scannability when 13 speakers interleave. The rail + author color + `YOU` pill + bubble tint together provide enough disambiguation without horizontal layout shifts.
+
+**Implementation** — the user-message class is `.you-msg` on the `.msg` element. Mirror the existing `.msg.gm-msg` rule: 3px solid `--accent` left rail (border-radius `3px 0 0 3px` so the rail butts cleanly into the corner), `--accent-soft` fill, `--accent-line` border. GM rail (green) stays unchanged.
 
 ### Message header role tag
 The same `<RoleTag>` rendered in the sidebar appears beside the author's name in the message header when `getRoleVisibility(author, viewer).visible` is true (and `reason !== 'dead'` — dead players don't appear in the active stream in the prototype, but if they did, the tag would render as the `dead` variant).
@@ -269,45 +273,45 @@ Same token system as the Create Game handoff. If both pages live in the same app
 ### Light
 ```css
 [data-theme="light"] {
-    --bg-base: oklch(98% 0.003 250);
-    --bg-0:    oklch(99.5% 0.002 250);
-    --bg-1:    oklch(97% 0.004 250);
-    --bg-2:    oklch(94% 0.005 250);
-    --bg-3:    oklch(90% 0.006 250);
-    --line-1:  oklch(88% 0.006 250);
-    --line-2:  oklch(80% 0.008 250);
-    --line-3:  oklch(70% 0.010 250);
-    --fg-0:    oklch(20% 0.010 250);
-    --fg-1:    oklch(34% 0.010 250);
-    --fg-2:    oklch(50% 0.010 250);
-    --fg-3:    oklch(62% 0.010 250);
-    --accent:       oklch(54% 0.18 240);
-    --accent-hover: oklch(48% 0.18 240);
-    --accent-soft:  color-mix(in oklch, oklch(54% 0.18 240) 12%, transparent);
-    --accent-line:  color-mix(in oklch, oklch(54% 0.18 240) 35%, transparent);
-    --accent-fg:    oklch(38% 0.18 240);
-    --on-accent:    oklch(99% 0 0);
-    --gm-fg:        oklch(40% 0.13 145);
-    --gm-rail:      oklch(50% 0.14 145);
-    --gm-tint:      color-mix(in oklch, oklch(50% 0.14 145) 10%, transparent);
+  --bg-base: oklch(98% 0.003 250);
+  --bg-0:    oklch(99.5% 0.002 250);
+  --bg-1:    oklch(97% 0.004 250);
+  --bg-2:    oklch(94% 0.005 250);
+  --bg-3:    oklch(90% 0.006 250);
+  --line-1:  oklch(88% 0.006 250);
+  --line-2:  oklch(80% 0.008 250);
+  --line-3:  oklch(70% 0.010 250);
+  --fg-0:    oklch(20% 0.010 250);
+  --fg-1:    oklch(34% 0.010 250);
+  --fg-2:    oklch(50% 0.010 250);
+  --fg-3:    oklch(62% 0.010 250);
+  --accent:       oklch(54% 0.18 240);
+  --accent-hover: oklch(48% 0.18 240);
+  --accent-soft:  color-mix(in oklch, oklch(54% 0.18 240) 12%, transparent);
+  --accent-line:  color-mix(in oklch, oklch(54% 0.18 240) 35%, transparent);
+  --accent-fg:    oklch(38% 0.18 240);
+  --on-accent:    oklch(99% 0 0);
+  --gm-fg:        oklch(40% 0.13 145);
+  --gm-rail:      oklch(50% 0.14 145);
+  --gm-tint:      color-mix(in oklch, oklch(50% 0.14 145) 10%, transparent);
 }
 ```
 
 ### Avatar palette (12 hues)
 ```js
 [
-    ['oklch(60% 0.18 25)',  'oklch(45% 0.18 25)'],   // red
-    ['oklch(65% 0.16 60)',  'oklch(50% 0.16 60)'],   // orange
-    ['oklch(70% 0.14 90)',  'oklch(55% 0.14 90)'],   // amber
-    ['oklch(65% 0.14 145)', 'oklch(50% 0.14 145)'],  // green
-    ['oklch(63% 0.13 195)', 'oklch(48% 0.13 195)'],  // teal
-    ['oklch(60% 0.14 230)', 'oklch(45% 0.14 230)'],  // blue
-    ['oklch(58% 0.16 270)', 'oklch(42% 0.16 270)'],  // indigo
-    ['oklch(60% 0.18 310)', 'oklch(45% 0.18 310)'],  // magenta
-    ['oklch(63% 0.16 345)', 'oklch(48% 0.16 345)'],  // pink
-    ['oklch(58% 0.10 110)', 'oklch(45% 0.10 110)'],  // olive
-    ['oklch(62% 0.12 175)', 'oklch(48% 0.12 175)'],  // cyan
-    ['oklch(58% 0.14 290)', 'oklch(42% 0.14 290)'],  // violet
+  ['oklch(60% 0.18 25)',  'oklch(45% 0.18 25)'],   // red
+  ['oklch(65% 0.16 60)',  'oklch(50% 0.16 60)'],   // orange
+  ['oklch(70% 0.14 90)',  'oklch(55% 0.14 90)'],   // amber
+  ['oklch(65% 0.14 145)', 'oklch(50% 0.14 145)'],  // green
+  ['oklch(63% 0.13 195)', 'oklch(48% 0.13 195)'],  // teal
+  ['oklch(60% 0.14 230)', 'oklch(45% 0.14 230)'],  // blue
+  ['oklch(58% 0.16 270)', 'oklch(42% 0.16 270)'],  // indigo
+  ['oklch(60% 0.18 310)', 'oklch(45% 0.18 310)'],  // magenta
+  ['oklch(63% 0.16 345)', 'oklch(48% 0.16 345)'],  // pink
+  ['oklch(58% 0.10 110)', 'oklch(45% 0.10 110)'],  // olive
+  ['oklch(62% 0.12 175)', 'oklch(48% 0.12 175)'],  // cyan
+  ['oklch(58% 0.14 290)', 'oklch(42% 0.14 290)'],  // violet
 ]
 ```
 Hash function in `chat-data.jsx`: `Σ (charCode × 31^i) | 0`, then `% 12`. Use the same algorithm in production so avatars are stable across page loads.
@@ -320,28 +324,28 @@ Hash function in `chat-data.jsx`: `Σ (charCode × 31^i) | 0`, then `% 12`. Use 
 type Role = 'gm' | 'villager' | 'werewolf' | 'doctor' | 'detective' | 'maniac';
 
 interface Participant {
-    id: string;
-    name: string;
-    model: string | null;        // null for the human "you"
-    cost: number;                // session cost in USD
-    role: Role;
-    you?: boolean;               // true on exactly one participant
-    dead?: boolean;
-    deathDay?: number;           // present when deathCause === 'lynched'
-    deathNight?: number;         // present when deathCause === 'killed'
-    deathCause?: 'killed' | 'lynched';
+  id: string;
+  name: string;
+  model: string | null;        // null for the human "you"
+  cost: number;                // session cost in USD
+  role: Role;
+  you?: boolean;               // true on exactly one participant
+  dead?: boolean;
+  deathDay?: number;           // present when deathCause === 'lynched'
+  deathNight?: number;         // present when deathCause === 'killed'
+  deathCause?: 'killed' | 'lynched';
 }
 ```
 
 ```ts
 function getRoleVisibility(p: Participant, viewer: Participant) {
-    if (p.role === 'gm') return { visible: false };
-    if (p.dead)         return { visible: true, reason: 'dead' as const };
-    if (p.you || viewer?.id === p.id) return { visible: true, reason: 'self' as const };
-    if (viewer?.role === 'werewolf' && p.role === 'werewolf') {
-        return { visible: true, reason: 'fellow-wolf' as const };
-    }
-    return { visible: false };
+  if (p.role === 'gm') return { visible: false };
+  if (p.dead)         return { visible: true, reason: 'dead' as const };
+  if (p.you || viewer?.id === p.id) return { visible: true, reason: 'self' as const };
+  if (viewer?.role === 'werewolf' && p.role === 'werewolf') {
+    return { visible: true, reason: 'fellow-wolf' as const };
+  }
+  return { visible: false };
 }
 ```
 
