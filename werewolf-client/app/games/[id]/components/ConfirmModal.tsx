@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import { buttonTransparentStyle } from '@/app/constants';
 
 interface ConfirmModalProps {
     isOpen: boolean;
@@ -26,27 +25,22 @@ export default function ConfirmModal({
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-            {/* Backdrop */}
-            <div
-                className="absolute inset-0 bg-black/60"
-                onClick={onCancel}
-            />
-            {/* Dialog */}
-            <div className="relative z-10 max-w-md w-full mx-4 border theme-border rounded-lg shadow-xl" style={{ backgroundColor: 'rgb(var(--color-card-bg))' }}>
-                <div className="px-6 pt-6 pb-2">
-                    <h3 className="text-xl font-bold theme-text-primary">{title}</h3>
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onCancel} />
+            <div className="relative z-10 max-w-md w-full mx-4 bg-[var(--bg-1)] border border-[var(--line-1)] rounded-[var(--radius-xl)] shadow-pop">
+                <div className="px-5 pt-5 pb-2">
+                    <h3 className="text-[16px] font-semibold text-[var(--fg-0)]">{title}</h3>
                 </div>
-                <div className="px-6 pb-6">
-                    <p className="theme-text-secondary mb-6">{message}</p>
-                    <div className="flex justify-end gap-3">
+                <div className="px-5 pb-5">
+                    <p className="text-[13px] text-[var(--fg-1)] mb-6">{message}</p>
+                    <div className="flex justify-end gap-2">
                         <button
-                            className={`${buttonTransparentStyle} rounded`}
+                            className="px-4 py-2 text-[13px] font-medium rounded-[var(--radius-md)] bg-[var(--bg-3)] border border-[var(--line-3)] text-[var(--fg-0)] hover:bg-[var(--bg-4)] transition-all duration-[120ms]"
                             onClick={onCancel}
                         >
                             {cancelLabel}
                         </button>
                         <button
-                            className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded transition-colors"
+                            className="px-4 py-2 text-[13px] font-medium rounded-[var(--radius-md)] bg-[var(--danger)] text-white hover:brightness-110 transition-all duration-[120ms]"
                             onClick={onConfirm}
                         >
                             {confirmLabel}

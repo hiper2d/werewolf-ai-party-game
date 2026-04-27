@@ -5,7 +5,10 @@ import { getGame, updateBotModel, updateGameMasterModel, clearGameErrorState, se
 import { startNewDay, summarizePastDay } from "@/app/api/night-actions";
 import GameChat from "@/app/games/[id]/components/GameChat";
 import ModelSelectionDialog from "@/app/games/[id]/components/ModelSelectionDialog";
-import { buttonTransparentStyle } from "@/app/constants";
+const btnGhost = "px-3 py-1.5 text-[13px] font-medium rounded-[var(--radius-md)] bg-[var(--bg-3)] border border-[var(--line-3)] text-[var(--fg-0)] hover:bg-[var(--bg-4)] transition-all duration-[120ms]";
+const btnDanger = "px-3 py-1.5 text-[13px] font-medium rounded-[var(--radius-md)] bg-[var(--danger)] text-white hover:brightness-110 transition-all duration-[120ms]";
+const btnAccent = "px-3 py-1.5 text-[13px] font-medium rounded-[var(--radius-md)] bg-[var(--accent)] text-[var(--on-accent)] hover:brightness-110 transition-all duration-[120ms]";
+const btnWarn = "px-3 py-1.5 text-[13px] font-medium rounded-[var(--radius-md)] bg-[oklch(75%_0.10_65)] text-[var(--bg-0)] hover:brightness-110 transition-all duration-[120ms]";
 import { getModelDisplayName } from "@/app/ai/ai-models";
 import { GAME_STATES, GAME_ROLES, AUTO_VOTE_COEFFICIENT, BOT_SELECTION_CONFIG } from "@/app/api/game-models";
 import type { Game, GameActionResponse, GameMessage } from "@/app/api/game-models";
@@ -612,7 +615,7 @@ function GamePageContent({
         <button
             type="button"
             onClick={handleCancelBotResponses}
-            className="w-7 h-7 flex items-center justify-center rounded-full bg-red-500/80 hover:bg-red-600 text-white transition-colors"
+            className="w-7 h-7 flex items-center justify-center rounded-full bg-[var(--danger)] text-white hover:brightness-110 transition-all duration-[120ms]"
             title="Cancel bot responses"
         >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -635,7 +638,7 @@ function GamePageContent({
                     ) : (
                         <>
                             <button
-                                className={`${buttonTransparentStyle} ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                className={`${btnGhost} ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 disabled={!areControlsEnabled}
                                 onClick={async () => {
                                     preActionGameRef.current = game;
@@ -654,7 +657,7 @@ function GamePageContent({
                                 Go on
                             </button>
                             <button
-                                className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500 !text-white ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                className={`${btnDanger} ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 onClick={handleExitGame}
                                 disabled={!areControlsEnabled}
                                 title="Return to the games list"
@@ -670,9 +673,9 @@ function GamePageContent({
         if (isGameOver) {
             return (
                 <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-red-600 dark:text-red-400">Game Over</span>
+                    <span className="text-sm font-bold text-[var(--danger)]">Game Over</span>
                     <button
-                        className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500 !text-white ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        className={`${btnDanger} ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                         onClick={handleExitGame}
                         disabled={!areControlsEnabled}
                         title="Return to the games list"
@@ -692,7 +695,7 @@ function GamePageContent({
                         ) : (
                             <>
                                 <button
-                                    className={`${buttonTransparentStyle} ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''} ${voteUrgency.isUrgent ? 'bg-red-600 hover:bg-red-700 border-red-500 !text-white animate-pulse' : voteUrgency.isWarning ? 'bg-yellow-500 hover:bg-yellow-600 border-yellow-400 !text-black' : ''}`}
+                                    className={`${voteUrgency.isUrgent ? btnDanger + ' animate-pulse' : voteUrgency.isWarning ? btnWarn : btnGhost} ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                                     disabled={!areControlsEnabled}
                                     onClick={async () => {
                                         const result = await runGameAction(() => vote(game.id));
@@ -707,7 +710,7 @@ function GamePageContent({
                                     Vote {(voteUrgency.isUrgent || voteUrgency.isWarning) && '⚠️'}
                                 </button>
                                 <button
-                                    className={`${buttonTransparentStyle} ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    className={`${btnGhost} ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                                     disabled={!areControlsEnabled}
                                     onClick={async () => {
                                         preActionGameRef.current = game;
@@ -732,13 +735,13 @@ function GamePageContent({
                 {game.gameState === GAME_STATES.VOTE_RESULTS && (
                     <>
                         {showVoteGameOverCTA && pendingGameOverReason && (
-                            <span className="text-sm text-red-600 dark:text-red-300">
+                            <span className="text-sm text-[var(--danger)]">
                                 {pendingGameOverReason}
                             </span>
                         )}
                         {!showVoteGameOverCTA && (
                             <button
-                                className={`${buttonTransparentStyle} bg-blue-600 hover:bg-blue-700 border-blue-500 !text-white ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                className={`${btnAccent} ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 disabled={!areControlsEnabled}
                                 onClick={async () => {
                                     const result = await runGameAction(() => performNightAction(game.id));
@@ -753,7 +756,7 @@ function GamePageContent({
                         )}
                         {showVoteGameOverCTA && (
                             <button
-                                className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500 !text-white ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                className={`${btnDanger} ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 disabled={!areControlsEnabled}
                                 onClick={async () => {
                                     const result = await runGameAction(() => afterGameDiscussion(game.id));
@@ -769,17 +772,17 @@ function GamePageContent({
                     </>
                 )}
                 {game.gameState === GAME_STATES.NIGHT && (
-                    <span className="text-sm text-yellow-400">🌙 Night in progress...</span>
+                    <span className="text-sm text-[var(--fg-2)]">Night in progress...</span>
                 )}
                 {game.gameState === GAME_STATES.NIGHT_RESULTS && (
                     <>
                         {showNightGameOverCTA && pendingGameOverReason && (
-                            <span className="text-sm text-red-600 dark:text-red-300">
+                            <span className="text-sm text-[var(--danger)]">
                                 {pendingGameOverReason}
                             </span>
                         )}
                         <button
-                            className={`${buttonTransparentStyle} ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            className={`${btnGhost} ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                             disabled={!areControlsEnabled}
                             onClick={async () => {
                                 setClearNightMessages(true);
@@ -795,7 +798,7 @@ function GamePageContent({
                         </button>
                         {showNightGameOverCTA ? (
                             <button
-                                className={`${buttonTransparentStyle} bg-red-600 hover:bg-red-700 border-red-500 !text-white ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                className={`${btnDanger} ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 disabled={!areControlsEnabled}
                                 onClick={async () => {
                                     const result = await runGameAction(() => afterGameDiscussion(game.id));
@@ -809,7 +812,7 @@ function GamePageContent({
                             </button>
                         ) : (
                             <button
-                                className={`${buttonTransparentStyle} ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                className={`${btnGhost} ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 disabled={!areControlsEnabled}
                                 onClick={async () => {
                                     const result = await runGameAction(() => startNewDay(game.id));
@@ -825,7 +828,7 @@ function GamePageContent({
                     </>
                 )}
                 {game.gameState === GAME_STATES.NEW_DAY_BOT_SUMMARIES && (
-                    <span className="text-sm text-blue-600 dark:text-blue-400">
+                    <span className="text-[13px] text-[var(--fg-2)]">
                         💭 {game.gameStateProcessQueue[0]} is generating summary... ({game.gameStateProcessQueue.length} remaining)
                     </span>
                 )}
@@ -1034,7 +1037,7 @@ function GamePageContent({
                 onClick={() => setMobilePanel('players')}
                 aria-label="Open players panel"
             >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="theme-text-secondary">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--fg-1)]">
                     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
                     <circle cx="9" cy="7" r="4"/>
                     <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
@@ -1046,7 +1049,7 @@ function GamePageContent({
                 onClick={() => setMobilePanel('status')}
                 aria-label="Open status panel"
             >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="theme-text-secondary">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--fg-1)]">
                     <line x1="8" y1="6" x2="21" y2="6"/>
                     <line x1="8" y1="12" x2="21" y2="12"/>
                     <line x1="8" y1="18" x2="21" y2="18"/>
@@ -1089,7 +1092,7 @@ function GamePageContent({
                     className="fixed inset-0 z-50 lg:hidden"
                     onClick={() => setMobilePanel(null)}
                 >
-                    <div className="absolute inset-0 bg-black/50" />
+                    <div className="absolute inset-0 bg-[var(--overlay)]" />
                     <div
                         className={`absolute inset-y-0 w-80 max-w-[85vw] bg-[var(--bg-1)] border-[var(--line-1)] overflow-auto p-4 flex flex-col shadow-pop ${
                             mobilePanel === 'players' ? 'left-0 border-r' : 'right-0 border-l'

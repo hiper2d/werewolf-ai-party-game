@@ -1,14 +1,14 @@
 'use client';
 
 import React, { useState } from 'react';
-import { buttonTransparentStyle } from '@/app/constants';
+import SelectDropdown from '@/app/components/SelectDropdown';
 import DraggableDialog from './DraggableDialog';
 import { useUIControls } from '../context/UIControlsContext';
 
 interface VotingModalProps {
     onClose: () => void;
     onVote: (targetPlayer: string, reason: string) => void;
-    game: any; // Game object with participants info
+    game: any;
     isSubmitting?: boolean;
 }
 
@@ -25,7 +25,6 @@ export default function VotingModal({
 
     if (!isOpen) return null;
 
-    // Extract participants from game object
     const participants = [
         { name: game.humanPlayerName, isAlive: true, isHuman: true },
         ...game.bots.map((bot: any) => ({
@@ -55,28 +54,26 @@ export default function VotingModal({
             title="Cast Your Vote"
             className="max-w-md w-full mx-4"
         >
-            <div className="mb-6">
-                <div className="mb-4">
-                    <label className="block theme-text-primary text-sm mb-2">Who do you think should be eliminated? <span className="text-red-400">*</span></label>
-                    <select
-                        className="w-full p-2 rounded bg-[rgb(var(--color-input-bg))] text-[rgb(var(--color-input-text))] border border-[rgb(var(--color-input-border))] focus:outline-none focus:ring-1 focus:ring-blue-500"
+            <div className="mb-6 space-y-4">
+                <div>
+                    <label className="block text-[12px] font-medium text-[var(--fg-1)] mb-1.5">
+                        Who should be eliminated? <span className="text-[var(--danger)]">*</span>
+                    </label>
+                    <SelectDropdown
+                        options={votableParticipants.map(p => ({ value: p.name, label: p.name }))}
                         value={selectedPlayer}
-                        onChange={(e) => setSelectedPlayer(e.target.value)}
+                        onChange={setSelectedPlayer}
+                        placeholder="Select a player..."
                         disabled={isSubmitting}
-                    >
-                        <option value="">Select a player...</option>
-                        {votableParticipants.map((participant) => (
-                            <option key={participant.name} value={participant.name}>
-                                {participant.name}
-                            </option>
-                        ))}
-                    </select>
+                    />
                 </div>
 
-                <div className="mb-4">
-                    <label className="block theme-text-primary text-sm mb-2">Reason for your vote: <span className="text-red-400">*</span></label>
+                <div>
+                    <label className="block text-[12px] font-medium text-[var(--fg-1)] mb-1.5">
+                        Reason for your vote <span className="text-[var(--danger)]">*</span>
+                    </label>
                     <textarea
-                        className="w-full p-2 rounded bg-[rgb(var(--color-input-bg))] text-[rgb(var(--color-input-text))] border border-[rgb(var(--color-input-border))] focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder-[rgb(var(--color-input-placeholder))]"
+                        className="w-full px-3 py-2 rounded-[var(--radius-md)] bg-[var(--bg-2)] border border-[var(--line-2)] text-[var(--fg-0)] text-[13px] placeholder:text-[var(--fg-3)] focus:outline-none focus:border-[var(--accent-line)] focus:shadow-[0_0_0_3px_var(--accent-soft)] transition-all duration-[120ms] resize-y"
                         rows={3}
                         placeholder="Explain why you think this player should be eliminated..."
                         value={reason}
@@ -86,16 +83,16 @@ export default function VotingModal({
                 </div>
             </div>
 
-            <div className="flex space-x-3 justify-end">
+            <div className="flex justify-end gap-2">
                 <button
-                    className={`${buttonTransparentStyle}`}
+                    className="px-4 py-2 text-[13px] font-medium rounded-[var(--radius-md)] bg-[var(--bg-3)] border border-[var(--line-3)] text-[var(--fg-0)] hover:bg-[var(--bg-4)] transition-all duration-[120ms]"
                     onClick={handleClose}
                     disabled={isSubmitting}
                 >
                     Cancel
                 </button>
                 <button
-                    className={`${buttonTransparentStyle} ${(!selectedPlayer || !reason.trim() || isSubmitting) ? 'opacity-50 cursor-not-allowed' : ''} bg-red-600/80 hover:bg-red-700/80 text-white border-red-500`}
+                    className={`px-4 py-2 text-[13px] font-medium rounded-[var(--radius-md)] bg-[var(--danger)] text-white hover:brightness-110 transition-all duration-[120ms] ${(!selectedPlayer || !reason.trim() || isSubmitting) ? 'opacity-50 cursor-not-allowed' : ''}`}
                     onClick={handleSubmit}
                     disabled={!selectedPlayer || !reason.trim() || isSubmitting}
                 >

@@ -10,9 +10,9 @@ import { getUserTier } from '@/app/api/user-actions';
 import type { UserTier } from '@/app/api/game-models';
 
 const tierConfig: Record<UserTier, { label: string; className: string }> = {
-    free: { label: 'Free', className: 'border theme-border theme-text-secondary' },
-    api: { label: 'API', className: 'border theme-border theme-text-secondary' },
-    paid: { label: 'Paid', className: 'border border-blue-800/40 text-blue-300/50' },
+    free: { label: 'Free', className: 'border border-[var(--line-2)] text-[var(--fg-2)]' },
+    api: { label: 'API', className: 'border border-[var(--line-2)] text-[var(--fg-2)]' },
+    paid: { label: 'Paid', className: 'border border-[var(--accent-line)] text-[var(--accent)]' },
 };
 
 const NavBar = () => {
@@ -66,7 +66,7 @@ const NavBar = () => {
 
                 {/* Mobile hamburger */}
                 <button
-                    className="md:hidden p-2 rounded hover:bg-gray-200 dark:hover:bg-neutral-700 transition-colors"
+                    className="md:hidden p-2 rounded-[var(--radius-md)] hover:bg-[var(--bg-3)] transition-colors duration-[120ms]"
                     onClick={() => setMobileMenuOpen(prev => !prev)}
                     aria-label="Toggle menu"
                 >
@@ -87,7 +87,7 @@ const NavBar = () => {
 
             {/* Mobile dropdown menu */}
             {mobileMenuOpen && (
-                <nav className="absolute top-full left-0 right-0 navbar-root border-t theme-border px-6 py-3 md:hidden z-50">
+                <nav className="absolute top-full left-0 right-0 navbar-root border-t border-[var(--line-1)] px-6 py-3 md:hidden z-50">
                     <ul className="flex flex-col space-y-3">
                         <li><Link href="/games" className="nav-link block py-1" onClick={() => setMobileMenuOpen(false)}>All games</Link></li>
                         <li><Link href="/rules" className="nav-link block py-1" onClick={() => setMobileMenuOpen(false)}>Rules</Link></li>

@@ -24,43 +24,39 @@ export default function MentionDropdown({ candidates, selectedIndex, onSelect, o
         }
     }, [selectedIndex]);
 
-    // Close when clicking outside
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (listRef.current && !listRef.current.contains(event.target as Node)) {
                 onClose();
             }
         };
-
         document.addEventListener('mousedown', handleClickOutside);
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-        };
+        return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [onClose]);
 
     if (candidates.length === 0) return null;
 
     return (
-        <div className="absolute bottom-full left-0 mb-1 w-64 max-h-48 overflow-y-auto bg-white dark:bg-neutral-800 theme-border border rounded-lg shadow-lg z-50">
+        <div className="absolute bottom-full left-0 mb-1 w-64 max-h-48 overflow-y-auto bg-[var(--bg-1)] border border-[var(--line-2)] rounded-[var(--radius-lg)] shadow-pop z-50">
             <ul ref={listRef} className="py-1">
                 {candidates.map((candidate, index) => (
                     <li
                         key={candidate.name}
                         onMouseDown={(e) => {
-                            e.preventDefault(); // Prevent focus loss on textarea
+                            e.preventDefault();
                             onSelect(candidate.name);
                         }}
-                        className={`px-4 py-2 cursor-pointer flex items-center justify-between ${
+                        className={`px-3 py-2 cursor-pointer flex items-center justify-between transition-colors duration-[120ms] ${
                             index === selectedIndex
-                                ? 'bg-blue-100 dark:bg-blue-900/30'
-                                : 'hover:bg-gray-100 dark:hover:bg-gray-700/50'
+                                ? 'bg-[var(--accent-soft)]'
+                                : 'hover:bg-[var(--bg-3)]'
                         }`}
                     >
-                        <span className={`text-sm theme-text-primary ${!candidate.isAlive ? 'line-through opacity-60' : ''}`}>
+                        <span className={`text-[13px] text-[var(--fg-0)] ${!candidate.isAlive ? 'line-through opacity-60' : ''}`}>
                             {candidate.name}
                         </span>
                         {!candidate.isAlive && (
-                            <span className="text-xs text-gray-500">💀</span>
+                            <span className="text-[11px] text-[var(--fg-3)]">&times;</span>
                         )}
                     </li>
                 ))}

@@ -3,7 +3,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { talkToAll, humanPlayerVote, getSuggestion } from "@/app/api/bot-actions";
 import { humanPlayerTalkWerewolves } from "@/app/api/night-actions";
-import { buttonTransparentStyle } from "@/app/constants";
 import { GAME_STATES, MessageType, RECIPIENT_ALL, RECIPIENT_WEREWOLVES, RECIPIENT_DOCTOR, RECIPIENT_DETECTIVE, RECIPIENT_MANIAC, GameMessage, Game, GameActionResponse, SystemErrorMessage, BotResponseError, GAME_MASTER, ROLE_CONFIGS, GAME_ROLES, FREE_TIER_LIMITS } from "@/app/api/game-models";
 import { getPlayerColor } from "@/app/utils/color-utils";
 import { clearGameErrorState } from "@/app/api/game-actions";
@@ -52,9 +51,9 @@ interface ErrorBannerProps {
 
 function ErrorBanner({ error, onDismiss }: ErrorBannerProps) {
     const isWarning = error.error.toLowerCase().includes('warning');
-    const bgColor = isWarning ? 'bg-yellow-900/50 border-yellow-500/30' : 'bg-red-900/50 border-red-500/30';
-    const textColor = isWarning ? 'text-yellow-200' : 'text-red-200';
-    const iconColor = isWarning ? 'text-yellow-400' : 'text-red-400';
+    const bgColor = isWarning ? 'bg-[oklch(75%_0.10_65_/_0.08)] border-[oklch(75%_0.10_65_/_0.3)]' : 'bg-[oklch(70%_0.13_25_/_0.08)] border-[oklch(70%_0.13_25_/_0.3)]';
+    const textColor = 'text-[var(--fg-0)]';
+    const iconColor = isWarning ? 'text-[oklch(75%_0.10_65)]' : 'text-[var(--danger)]';
 
     // Truncate very long error messages to prevent UI blocking
     const truncateText = (text: string, maxLength: number = 200) => {
@@ -90,7 +89,7 @@ function ErrorBanner({ error, onDismiss }: ErrorBannerProps) {
                 </div>
                 <button
                     onClick={onDismiss}
-                    className="ml-4 flex-shrink-0 p-1.5 rounded bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+                    className="ml-4 flex-shrink-0 p-1.5 rounded-[var(--radius-md)] bg-[var(--bg-3)] border border-[var(--line-3)] text-[var(--fg-0)] hover:bg-[var(--bg-4)] transition-all duration-[120ms]"
                     title="Dismiss error and retry"
                 >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1361,7 +1360,7 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
                 </div>
             </div>
             {!isCurrentDaySelected && (
-                <div className="mb-3 text-xs theme-text-secondary italic">
+                <div className="mb-3 text-xs text-[var(--fg-2)] italic">
                     Viewing Day {selectedDay} history (read-only)
                 </div>
             )}
