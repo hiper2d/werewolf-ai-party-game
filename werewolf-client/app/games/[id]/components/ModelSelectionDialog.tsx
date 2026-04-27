@@ -1,12 +1,17 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { LLM_CONSTANTS, SupportedAiModels, getModelDisplayName } from '@/app/ai/ai-models';
+import { LLM_CONSTANTS, SupportedAiModels, getModelDisplayName, getModelTags, type ModelTag } from '@/app/ai/ai-models';
 import { getCandidateModelsForTier, getPerGameModelLimit, FREE_TIER_UNLIMITED } from '@/app/ai/model-limit-utils';
 import { UserTier, USER_TIERS } from '@/app/api/game-models';
-import { buttonTransparentStyle } from '@/app/constants';
-import ModelSelectDropdown from '@/app/components/ModelSelectDropdown';
 import { useUIControls } from '../context/UIControlsContext';
+
+const TAG_STYLES: Record<ModelTag, { text: string; border: string; bg: string; label: string }> = {
+    fast: { text: 'var(--tag-fast-text)', border: 'var(--tag-fast-border)', bg: 'var(--tag-fast-bg)', label: 'fast' },
+    slow: { text: 'var(--tag-std-text)', border: 'var(--tag-std-border)', bg: 'var(--tag-std-bg)', label: 'slow' },
+    cheap: { text: 'var(--tag-fast-text)', border: 'var(--tag-fast-border)', bg: 'var(--tag-fast-bg)', label: 'cheap' },
+    expensive: { text: 'var(--tag-std-text)', border: 'var(--tag-std-border)', bg: 'var(--tag-std-bg)', label: 'expensive' },
+};
 
 interface ModelSelectionDialogProps {
     onClose: () => void;
@@ -28,16 +33,16 @@ export default function ModelSelectionDialog({
 }: ModelSelectionDialogProps) {
     const { isModalOpen } = useUIControls();
     const isOpen = isModalOpen('modelSelection');
+    const [search, setSearch] = useState('');
+
     const tierFilteredModels = useMemo(() => {
         if (gameTier === USER_TIERS.FREE) {
             const models = new Set(getCandidateModelsForTier(USER_TIERS.FREE));
             if (currentModel && currentModel !== '' && currentModel !== LLM_CONSTANTS.RANDOM) {
-                // Ensure current assignments remain visible even if capacity is exhausted.
                 models.add(currentModel);
             }
             return Array.from(models);
         }
-
         return Object.values(LLM_CONSTANTS).filter(model => model !== LLM_CONSTANTS.RANDOM);
     }, [gameTier, currentModel]);
 
@@ -45,82 +50,80 @@ export default function ModelSelectionDialog({
         return tierFilteredModels
             .map(model => {
                 if (gameTier !== USER_TIERS.FREE) {
-                    const name = getModelDisplayName(model);
-                    return { model, disabled: false, label: name, displayLabel: name };
+                    return { model, disabled: false };
                 }
-
                 if (model === LLM_CONSTANTS.RANDOM) {
-                    const name = getModelDisplayName(model);
-                    return { model, disabled: true, label: name, displayLabel: name };
+                    return { model, disabled: true };
                 }
-
                 let disabled = false;
-                const displayLabel = getModelDisplayName(model);
-                let label = displayLabel;
-
                 try {
                     const limit = getPerGameModelLimit(model, USER_TIERS.FREE);
-                    if (limit === FREE_TIER_UNLIMITED) {
-                        label = `${displayLabel} (unlimited)`;
-                    } else {
+                    if (limit !== FREE_TIER_UNLIMITED) {
                         const used = usageCounts[model] ?? 0;
                         const adjustedUsage = model === currentModel ? Math.max(0, used - 1) : used;
                         const remaining = Math.max(0, limit - adjustedUsage);
                         disabled = remaining === 0;
-                        label = `${displayLabel} (${remaining} left)`;
                     }
-                } catch (err) {
+                } catch {
                     disabled = model !== currentModel;
                 }
-
-                return { model, disabled, label, displayLabel };
+                return { model, disabled };
             })
             .filter(option => !(option.disabled && option.model !== currentModel));
     }, [tierFilteredModels, usageCounts, gameTier, currentModel]);
-    
-    const selectableModels = useMemo(() => modelOptions.filter(option => !option.disabled).map(option => option.model), [modelOptions]);
-    
-    // Helper function to check if a model has thinking capabilities
+
+    // Group by provider
+    const groupedModels = useMemo(() => {
+        const groups: Record<string, typeof modelOptions> = {};
+        const providerNames: Record<string, string> = {
+            ANTHROPIC_API_KEY: 'Anthropic', OPENAI_API_KEY: 'OpenAI', GOOGLE_API_KEY: 'Google',
+            DEEPSEEK_API_KEY: 'DeepSeek', GROK_API_KEY: 'Grok', MISTRAL_API_KEY: 'Mistral', MOONSHOT_API_KEY: 'Moonshot'
+        };
+        for (const opt of modelOptions) {
+            const config = SupportedAiModels[opt.model];
+            const provider = config ? (providerNames[config.apiKeyName] || 'Other') : 'Other';
+            if (!groups[provider]) groups[provider] = [];
+            groups[provider].push(opt);
+        }
+        return Object.entries(groups);
+    }, [modelOptions]);
+
+    // Filter by search
+    const filteredGroups = useMemo(() => {
+        const q = search.toLowerCase();
+        if (!q) return groupedModels;
+        return groupedModels
+            .map(([provider, models]) => [provider, models.filter(m => {
+                const name = getModelDisplayName(m.model).toLowerCase();
+                return name.includes(q) || provider.toLowerCase().includes(q);
+            })] as [string, typeof modelOptions])
+            .filter(([, models]) => models.length > 0);
+    }, [groupedModels, search]);
+
+    const selectableModels = useMemo(() => modelOptions.filter(o => !o.disabled).map(o => o.model), [modelOptions]);
+
     const hasThinkingMode = (aiType: string): boolean => {
-        const modelConfig = SupportedAiModels[aiType];
-        return modelConfig?.hasThinking === true;
+        return SupportedAiModels[aiType]?.hasThinking === true;
     };
 
     const [selectedModel, setSelectedModel] = useState('');
     const [isUpdating, setIsUpdating] = useState(false);
 
-    // Update state when dialog opens with new bot data
     useEffect(() => {
         if (isOpen) {
             const fallbackModel = selectableModels[0] ?? modelOptions[0]?.model ?? '';
-            const validModel = currentModel && modelOptions.some(option => option.model === currentModel)
-                ? currentModel
-                : fallbackModel;
-
-            console.log('ModelSelectionDialog opening:', {
-                botName,
-                currentModel,
-                validModel,
-                tier: gameTier,
-                selectableModels,
-            });
-
+            const validModel = currentModel && modelOptions.some(o => o.model === currentModel)
+                ? currentModel : fallbackModel;
             setSelectedModel(validModel ?? '');
+            setSearch('');
         }
-    }, [isOpen, currentModel, botName, gameTier, modelOptions, selectableModels]);
+    }, [isOpen, currentModel, modelOptions, selectableModels]);
 
     const handleConfirm = async () => {
-        // Only skip update if we have a valid currentModel and it matches selectedModel
-        if (!selectedModel) {
+        if (!selectedModel || (currentModel && selectedModel === currentModel)) {
             onClose();
             return;
         }
-
-        if (currentModel && selectedModel === currentModel) {
-            onClose();
-            return;
-        }
-
         setIsUpdating(true);
         try {
             await onSelect(selectedModel, hasThinkingMode(selectedModel));
@@ -135,38 +138,104 @@ export default function ModelSelectionDialog({
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white dark:bg-neutral-900 border theme-border rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
-                <h3 className="text-xl font-bold theme-text-primary mb-4">
-                    Change AI Model for {botName}
-                </h3>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50" onClick={onClose}>
+            <div className="bg-[var(--bg-1)] border border-[var(--line-1)] rounded-[var(--radius-xl)] p-0 max-w-lg w-full mx-4 shadow-pop" onClick={e => e.stopPropagation()}>
+                {/* Header */}
+                <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--line-1)]">
+                    <div>
+                        <h3 className="text-[16px] font-semibold text-[var(--fg-0)]">Change AI Model</h3>
+                        <p className="text-[12px] text-[var(--fg-2)] mt-0.5">
+                            {botName} &middot; Currently: <span className="font-mono">{getModelDisplayName(currentModel)}</span>
+                        </p>
+                    </div>
+                    <button onClick={onClose} className="w-8 h-8 rounded-[var(--radius-md)] hover:bg-[var(--bg-3)] text-[var(--fg-2)] flex items-center justify-center transition-colors duration-[120ms]">
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M3.5 3.5l7 7M10.5 3.5l-7 7" /></svg>
+                    </button>
+                </div>
 
-                <div className="mb-6">
-                    <label className="block theme-text-primary text-sm mb-2">Select AI Model:</label>
-                    <ModelSelectDropdown
-                        options={modelOptions}
-                        value={selectedModel}
-                        onChange={setSelectedModel}
-                        disabled={isUpdating}
-                        className="w-full"
+                {/* Search */}
+                <div className="px-5 py-3 border-b border-[var(--line-1)]">
+                    <input
+                        type="text"
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                        placeholder="Search models..."
+                        className="w-full px-3 py-1.5 text-[13px] bg-[var(--bg-2)] border border-[var(--line-2)] rounded-[var(--radius-sm)] text-[var(--fg-0)] placeholder:text-[var(--fg-3)] focus:outline-none focus:border-[var(--accent-line)] focus:shadow-[0_0_0_3px_var(--accent-soft)] transition-all duration-[120ms]"
+                        autoFocus
                     />
                 </div>
 
+                {/* Model list */}
+                <div className="max-h-[340px] overflow-y-auto px-2 py-2">
+                    {filteredGroups.map(([provider, models]) => (
+                        <div key={provider}>
+                            <div className="px-3 py-1.5 text-[10px] font-mono font-medium uppercase tracking-[0.08em] text-[var(--fg-3)]">
+                                {provider}
+                            </div>
+                            {models.map(({ model, disabled: optDisabled }) => {
+                                const isSelected = model === selectedModel;
+                                const tags = getModelTags(model);
+                                const config = SupportedAiModels[model];
+                                return (
+                                    <button
+                                        key={model}
+                                        type="button"
+                                        onClick={() => !optDisabled && setSelectedModel(model)}
+                                        disabled={optDisabled}
+                                        className={`w-full flex items-center gap-3 px-3 py-2 rounded-[var(--radius-md)] transition-all duration-[120ms] ${
+                                            optDisabled ? 'opacity-40 cursor-not-allowed' :
+                                            isSelected ? 'bg-[var(--accent-soft)]' : 'hover:bg-[var(--bg-3)] cursor-pointer'
+                                        }`}
+                                    >
+                                        {/* Radio circle */}
+                                        <span className={`flex-none w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all duration-[120ms] ${
+                                            isSelected ? 'border-[var(--accent)] bg-[var(--accent)]' : 'border-[var(--line-2)]'
+                                        }`}>
+                                            {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-white"></span>}
+                                        </span>
+                                        <div className="flex-1 min-w-0 text-left">
+                                            <div className="flex items-center gap-2">
+                                                <span className={`text-[13px] font-medium ${isSelected ? 'text-[var(--fg-0)]' : 'text-[var(--fg-1)]'}`}>
+                                                    {getModelDisplayName(model)}
+                                                </span>
+                                                {tags.map(tag => {
+                                                    const s = TAG_STYLES[tag];
+                                                    return (
+                                                        <span key={tag} className="text-[9px] font-mono px-1.5 py-0.5 rounded border"
+                                                            style={{ color: s.text, borderColor: s.border, backgroundColor: s.bg }}>
+                                                            {s.label}
+                                                        </span>
+                                                    );
+                                                })}
+                                                {config?.hasThinking && (
+                                                    <span className="text-[9px] font-mono px-1.5 py-0.5 rounded border border-[var(--accent-line)] bg-[var(--accent-soft)] text-[var(--accent)]">
+                                                        thinking
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    ))}
+                </div>
 
-                <div className="flex space-x-3 justify-end">
+                {/* Footer */}
+                <div className="flex justify-end gap-2 px-5 py-4 border-t border-[var(--line-1)]">
                     <button
-                        className={`${buttonTransparentStyle} bg-neutral-200 dark:bg-neutral-600 hover:bg-neutral-300 dark:hover:bg-neutral-700 border-neutral-300 dark:border-neutral-500`}
                         onClick={onClose}
                         disabled={isUpdating}
+                        className="px-4 py-2 text-[13px] font-medium rounded-[var(--radius-md)] bg-[var(--bg-3)] border border-[var(--line-3)] text-[var(--fg-0)] hover:bg-[var(--bg-4)] transition-all duration-[120ms]"
                     >
                         Cancel
                     </button>
                     <button
-                        className={`${buttonTransparentStyle} ${isUpdating ? 'opacity-50 cursor-not-allowed' : ''}`}
                         onClick={handleConfirm}
-                        disabled={isUpdating}
+                        disabled={isUpdating || selectedModel === currentModel}
+                        className={`px-4 py-2 text-[13px] font-medium rounded-[var(--radius-md)] bg-[var(--accent)] text-[var(--on-accent)] hover:brightness-110 transition-all duration-[120ms] ${isUpdating || selectedModel === currentModel ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
-                        {isUpdating ? 'Updating...' : 'Update Model'}
+                        {isUpdating ? 'Updating...' : 'Apply'}
                     </button>
                 </div>
             </div>

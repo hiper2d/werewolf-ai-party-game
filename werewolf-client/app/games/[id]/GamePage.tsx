@@ -838,76 +838,97 @@ function GamePageContent({
         <>
             {/* Game info */}
             <div className="mb-3 flex-shrink-0">
-                <h1 className="text-2xl font-bold mb-1">{game.theme}</h1>
-                <p className="text-sm theme-text-secondary mb-2">{game.description}</p>
+                <h1 className="text-[18px] font-semibold text-[var(--fg-0)] mb-1">{game.theme}</h1>
+                <p className="text-[12px] text-[var(--fg-2)] mb-2 leading-relaxed">{game.description}</p>
                 {game.totalGameCost !== undefined && game.totalGameCost > 0 && (
-                    <div className="text-xs text-left w-full">
-                        <span className="theme-text-secondary font-mono">
-                            Total Game Cost: ${game.totalGameCost.toFixed(4)}
-                        </span>
+                    <div className="flex items-center gap-1.5 text-[11px] font-mono text-[var(--fg-2)]">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[var(--tag-fast-text)]"></span>
+                        ${game.totalGameCost.toFixed(4)}
                     </div>
                 )}
             </div>
 
             {/* Participants list */}
-            <div className="flex-grow overflow-auto hide-scrollbar border-t theme-border-subtle pt-3">
-                <h2 className="text-lg font-bold mb-2">Participants</h2>
-                <ul>
-                    {participants.map((participant, index) => (
+            <div className="flex-grow overflow-auto hide-scrollbar border-t border-[var(--line-1)] pt-3">
+                <div className="flex items-center justify-between mb-2">
+                    <h2 className="text-[10px] font-mono font-medium uppercase tracking-[0.08em] text-[var(--fg-3)]">Participants</h2>
+                </div>
+                <ul className="space-y-1">
+                    {participants.map((participant, index) => {
+                        const isHuman = participant.isHuman;
+                        const isDead = !participant.isAlive;
+                        return (
                         <li
                             key={index}
-                            className={`mb-3 flex flex-col ${!participant.isAlive ? 'opacity-60' : ''}`}
+                            className={`flex flex-col px-2 py-1.5 rounded-[var(--radius-md)] transition-all duration-[120ms] ${
+                                isHuman ? 'bg-[var(--accent-soft)] border border-[var(--accent-line)]' :
+                                isDead ? 'opacity-70 hover:opacity-100 hover:bg-[var(--bg-1)]' :
+                                'hover:bg-[var(--bg-2)]'
+                            }`}
                         >
                             <div className="flex items-center justify-between">
-                                <span
-                                    style={{ color: getPlayerColor(participant.name) }}
-                                    className={!participant.isAlive ? 'line-through' : ''}
-                                >
-                                    {participant.name}
-                                    {participant.isHuman && ' (You)'}
-                                </span>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
+                                    <span
+                                        className={`text-[13px] font-medium truncate ${isDead ? 'line-through' : ''}`}
+                                        style={{ color: getPlayerColor(participant.name) }}
+                                    >
+                                        {participant.name}
+                                    </span>
+                                    {/* "You" chip */}
+                                    {isHuman && (
+                                        <span className="text-[9px] font-mono font-semibold uppercase tracking-[0.08em] px-1.5 py-0.5 rounded border bg-[var(--accent-soft)] border-[var(--accent-line)] text-[var(--accent)]">
+                                            you
+                                        </span>
+                                    )}
+                                    {/* Inline role tag */}
+                                    {(isHuman || isDead || isGameOver || (game.humanPlayerRole === GAME_ROLES.WEREWOLF && participant.role === GAME_ROLES.WEREWOLF)) && !participant.isGameMaster && (
+                                        <span className={`text-[9px] font-mono font-semibold uppercase tracking-[0.08em] px-1.5 py-0.5 rounded border ${
+                                            participant.role === GAME_ROLES.WEREWOLF
+                                                ? 'bg-[oklch(60%_0.13_25_/_0.12)] border-[oklch(60%_0.13_25_/_0.3)] text-[var(--werewolf-fg)]'
+                                                : participant.role === GAME_ROLES.DOCTOR
+                                                    ? 'bg-[oklch(60%_0.14_145_/_0.12)] border-[oklch(60%_0.14_145_/_0.3)] text-[oklch(65%_0.14_145)]'
+                                                    : participant.role === GAME_ROLES.DETECTIVE
+                                                        ? 'bg-[oklch(60%_0.10_70_/_0.12)] border-[oklch(60%_0.10_70_/_0.3)] text-[oklch(75%_0.10_70)]'
+                                                        : participant.role === GAME_ROLES.MANIAC
+                                                            ? 'bg-[oklch(60%_0.14_320_/_0.12)] border-[oklch(60%_0.14_320_/_0.3)] text-[oklch(65%_0.14_320)]'
+                                                            : isDead
+                                                                ? 'bg-transparent border-[var(--line-2)] text-[var(--fg-3)] opacity-85'
+                                                                : 'bg-[var(--bg-2)] border-[var(--line-2)] text-[var(--fg-2)]'
+                                        }`}>
+                                            {participant.role}
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-1.5">
                                     {!participant.isHuman && !participant.isGameMaster && (() => {
                                         const bot = game.bots.find(b => b.name === participant.name);
                                         const cost = bot?.tokenUsage?.costUSD;
                                         return cost && cost > 0 ? (
-                                            <span className="text-xs theme-text-secondary font-mono">
+                                            <span className="text-[10px] font-mono text-[var(--fg-3)]">
                                                 ${cost.toFixed(4)}
                                             </span>
                                         ) : null;
                                     })()}
-                                    {game.humanPlayerRole === GAME_ROLES.WEREWOLF && participant.role === GAME_ROLES.WEREWOLF && (
-                                        <span className="text-sm" title="Werewolf teammate">🐺</span>
-                                    )}
-                                    {!participant.isAlive && (
-                                        <span className="text-sm" title="Eliminated">💀</span>
-                                    )}
+                                    {isDead && <span className="text-[11px] text-[var(--fg-3)]" title="Eliminated">&times;</span>}
                                 </div>
                             </div>
-                            {!participant.isHuman && participant.aiType && (
-                                <div className="text-xs mt-1 text-left w-full">
+                            <div className="text-[11px] font-mono text-[var(--fg-2)] mt-0.5">
+                                {isHuman ? (
+                                    <span>Playing as you</span>
+                                ) : participant.aiType ? (
                                     <button
                                         onClick={() => openModelDialog(participant.name, participant.aiType!, participant.enableThinking)}
-                                        className={`theme-text-secondary hover:opacity-70 transition-colors duration-200 text-left w-full ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                        className={`hover:text-[var(--fg-0)] transition-colors duration-[120ms] text-left ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                                         title="Click to change AI model"
                                         disabled={!areControlsEnabled}
                                     >
-                                        Model: {getModelDisplayName(participant.aiType!)}
+                                        {getModelDisplayName(participant.aiType!)}
                                     </button>
-                                </div>
-                            )}
-                            {participant.isHuman && (
-                                <div className="text-xs theme-text-secondary mt-1 ml-2">
-                                    Role: {participant.role}
-                                </div>
-                            )}
-                            {(!participant.isAlive || isGameOver || (game.humanPlayerRole === GAME_ROLES.WEREWOLF && participant.role === GAME_ROLES.WEREWOLF)) && !participant.isHuman && (
-                                <div className="text-xs theme-text-secondary mt-1 ml-2">
-                                    Role: {participant.role}
-                                </div>
-                            )}
+                                ) : null}
+                            </div>
                         </li>
-                    ))}
+                        );
+                    })}
                 </ul>
             </div>
         </>
@@ -916,47 +937,54 @@ function GamePageContent({
     // Right panel content (queue info only, no game controls since those moved to chat)
     const rightPanelContent = (
         <div className="flex-grow overflow-auto hide-scrollbar">
-            <h2 className="text-lg font-bold mb-2">{queueInfo.title}</h2>
-            <p className="text-sm theme-text-secondary mb-3">{queueInfo.description}</p>
+            <h2 className="text-[15px] font-semibold text-[var(--fg-0)] mb-1">{queueInfo.title}</h2>
+            <p className="text-[12px] text-[var(--fg-2)] mb-3">{queueInfo.description}</p>
             {queueInfo.subtitle && (
-                <p className="text-xs theme-text-secondary mb-3">{queueInfo.subtitle}</p>
+                <p className="text-[11px] text-[var(--fg-3)] mb-3">{queueInfo.subtitle}</p>
             )}
 
             {queueInfo.items.length > 0 ? (
-                <ul className="space-y-2">
-                    {queueInfo.items.map((item, index) => (
+                <ul className="space-y-1.5">
+                    {queueInfo.items.map((item, index) => {
+                        const isCurrent = item === queueInfo.currentItem;
+                        return (
                         <li
                             key={index}
-                            className={`text-sm p-2 rounded ${
-                                item === queueInfo.currentItem
-                                    ? 'bg-blue-600 bg-opacity-50 border border-blue-400'
-                                    : 'bg-gray-200 dark:bg-neutral-700 bg-opacity-50'
+                            className={`text-[13px] px-3 py-2 rounded-[var(--radius-md)] border transition-all duration-[120ms] ${
+                                isCurrent
+                                    ? 'bg-[var(--accent-soft)] border-[var(--accent-line)]'
+                                    : 'bg-[var(--bg-2)] border-[var(--line-1)]'
                             }`}
                         >
                             <div className="flex items-center justify-between">
                                 <span
                                     style={{ color: getPlayerColor(item) }}
-                                    className={item === queueInfo.currentItem ? 'font-semibold' : ''}
+                                    className={isCurrent ? 'font-medium' : ''}
                                 >
                                     {item}
-                                    {item === game.humanPlayerName && ' (You)'}
+                                    {item === game.humanPlayerName && <span className="text-[var(--fg-3)] ml-1">(You)</span>}
                                 </span>
-                                {item === queueInfo.currentItem && (
-                                    <span className="text-xs text-blue-300">▶ Current</span>
+                                {isCurrent && (
+                                    <span className="text-[10px] font-mono italic text-[var(--accent)]">replying...</span>
                                 )}
                             </div>
                         </li>
-                    ))}
+                        );
+                    })}
                 </ul>
             ) : (
                 <div className="text-center py-8">
-                    <div className="text-4xl mb-2">🤖</div>
-                    <p className="text-sm theme-text-secondary italic">All bots are idle</p>
+                    <div className="w-10 h-10 mx-auto mb-3 rounded-full bg-[var(--bg-2)] border border-[var(--line-2)] flex items-center justify-center text-[var(--fg-3)]">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="3"/><path d="M7 11V8a5 5 0 0 1 10 0v3"/>
+                        </svg>
+                    </div>
+                    <p className="text-[13px] font-medium text-[var(--fg-1)] mb-1">Auto-discussion paused</p>
+                    <p className="text-[12px] italic text-[var(--fg-2)]">Bots respond after you speak</p>
                 </div>
             )}
 
             {queueInfo.showProgress && queueInfo.items.length > 0 && (() => {
-                // For WELCOME phase, track progress against total bots (since items shrink as bots complete)
                 const isWelcome = game.gameState === GAME_STATES.WELCOME;
                 const total = isWelcome ? game.bots.length : queueInfo.items.length;
                 const completed = isWelcome ? (game.bots.length - queueInfo.items.length) : (queueInfo.currentItem ? queueInfo.items.indexOf(queueInfo.currentItem) : 0);
@@ -964,13 +992,13 @@ function GamePageContent({
                 const progressPct = total > 0 ? ((completed + (isWelcome ? 0 : 1)) / total) * 100 : 0;
 
                 return (
-                    <div className="mt-3 pt-3 border-t theme-border-subtle">
-                        <div className="text-xs theme-text-secondary mb-1">
-                            Progress: {remaining > 0 ? `${remaining} remaining` : 'Almost done'}
+                    <div className="mt-3 pt-3 border-t border-[var(--line-1)]">
+                        <div className="text-[11px] font-mono text-[var(--fg-2)] mb-1.5">
+                            {remaining > 0 ? `${remaining} remaining` : 'Almost done'}
                         </div>
-                        <div className="w-full bg-gray-300 dark:bg-neutral-700 rounded-full h-2">
+                        <div className="w-full bg-[var(--bg-3)] rounded-full h-1.5">
                             <div
-                                className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                                className="bg-[var(--accent)] h-1.5 rounded-full transition-all duration-300"
                                 style={{ width: `${progressPct}%` }}
                             ></div>
                         </div>
@@ -980,14 +1008,18 @@ function GamePageContent({
 
             {/* Manual Bot Selection Button */}
             {(game.gameState === GAME_STATES.DAY_DISCUSSION || game.gameState === GAME_STATES.AFTER_GAME_DISCUSSION) && game.gameStateProcessQueue.length === 0 && (
-                <div className="mt-3 pt-3 border-t theme-border-subtle">
+                <div className="mt-3 pt-3 border-t border-[var(--line-1)]">
                     <button
-                        className={`w-full ${buttonTransparentStyle} text-sm ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        className={`w-full px-3 py-2 text-[13px] font-medium rounded-[var(--radius-md)] bg-[var(--bg-3)] border border-[var(--line-3)] text-[var(--fg-0)] hover:bg-[var(--bg-4)] transition-all duration-[120ms] flex items-center justify-center gap-2 ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                         onClick={() => openModal('botSelection')}
                         disabled={!areControlsEnabled}
                         title="Manually select which bots should respond"
                     >
-                        ✋ Select Bots Manually
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M18 11V6a2 2 0 0 0-2-2 2 2 0 0 0-2 2M14 10V4a2 2 0 0 0-2-2 2 2 0 0 0-2 2v6M10 10.5V6a2 2 0 0 0-2-2 2 2 0 0 0-2 2v8"/>
+                            <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/>
+                        </svg>
+                        Select Bots Manually
                     </button>
                 </div>
             )}
@@ -995,10 +1027,10 @@ function GamePageContent({
     );
 
     return (
-        <div className="flex flex-col lg:flex-row theme-text-primary h-[calc(100dvh-5rem)] sm:h-[calc(100dvh-6rem)] lg:h-[calc(100dvh-7rem)]">
+        <div className="flex flex-col lg:flex-row text-[var(--fg-0)] h-[calc(100dvh-5rem)] sm:h-[calc(100dvh-6rem)] lg:h-[calc(100dvh-7rem)]">
             {/* Fixed edge drawer toggle buttons (mobile/tablet only) */}
             <button
-                className="fixed left-0 top-1/2 -translate-y-1/2 z-40 lg:hidden bg-[rgb(var(--color-card-bg))] border theme-border rounded-r-lg p-2 shadow-md"
+                className="fixed left-0 top-1/2 -translate-y-1/2 z-40 lg:hidden bg-[var(--bg-1)] border border-[var(--line-2)] rounded-r-lg p-2 shadow-subtle"
                 onClick={() => setMobilePanel('players')}
                 aria-label="Open players panel"
             >
@@ -1010,7 +1042,7 @@ function GamePageContent({
                 </svg>
             </button>
             <button
-                className="fixed right-0 top-1/2 -translate-y-1/2 z-40 lg:hidden bg-[rgb(var(--color-card-bg))] border theme-border rounded-l-lg p-2 shadow-md"
+                className="fixed right-0 top-1/2 -translate-y-1/2 z-40 lg:hidden bg-[var(--bg-1)] border border-[var(--line-2)] rounded-l-lg p-2 shadow-subtle"
                 onClick={() => setMobilePanel('status')}
                 aria-label="Open status panel"
             >
@@ -1059,17 +1091,17 @@ function GamePageContent({
                 >
                     <div className="absolute inset-0 bg-black/50" />
                     <div
-                        className={`absolute inset-y-0 w-80 max-w-[85vw] bg-[rgb(var(--color-card-bg))] overflow-auto p-4 flex flex-col shadow-xl ${
-                            mobilePanel === 'players' ? 'left-0' : 'right-0'
+                        className={`absolute inset-y-0 w-80 max-w-[85vw] bg-[var(--bg-1)] border-[var(--line-1)] overflow-auto p-4 flex flex-col shadow-pop ${
+                            mobilePanel === 'players' ? 'left-0 border-r' : 'right-0 border-l'
                         }`}
                         onClick={e => e.stopPropagation()}
                     >
                         <div className={`flex items-center justify-between mb-4 ${mobilePanel === 'status' ? 'flex-row-reverse' : ''}`}>
-                            <h2 className="text-lg font-bold">
+                            <h2 className="text-[15px] font-semibold text-[var(--fg-0)]">
                                 {mobilePanel === 'players' ? 'Players & Info' : 'Game Status'}
                             </h2>
                             <button
-                                className="p-2 rounded hover:bg-gray-200 dark:hover:bg-neutral-700"
+                                className="p-2 rounded-[var(--radius-md)] hover:bg-[var(--bg-3)] text-[var(--fg-2)] transition-colors duration-[120ms]"
                                 onClick={() => setMobilePanel(null)}
                             >
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

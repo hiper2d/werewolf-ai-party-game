@@ -213,51 +213,40 @@ function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcludin
     const isVoteMessage = message.messageType === MessageType.VOTE_MESSAGE;
     
     return (
-        <div className={`${isGameMaster ? 'py-2' : 'mb-2'} ${isUserMessage ? 'text-right' : 'text-left'} group`}>
+        <div className={`${isGameMaster ? 'py-1.5' : 'mb-2'} ${isUserMessage ? 'text-right' : 'text-left'} group`}>
             <div className="flex items-center justify-between mb-1">
                 <div className="flex items-center gap-2">
-                    <span className={`text-xs font-semibold ${
-                        isGameMaster ? (isNightMessage ? 'text-blue-600 dark:text-blue-300' : 'text-green-600 dark:text-green-400') :
-                        isUserMessage ? 'theme-text-secondary' : ''
+                    <span className={`text-[12px] font-semibold ${
+                        isGameMaster ? 'text-[var(--gm-fg)]' :
+                        isUserMessage ? 'text-[var(--you-fg)]' : ''
                     }`} style={!isUserMessage && !isGameMaster ? { color: getPlayerColor(message.authorName) } : undefined}>
                         {message.authorName}
                     </span>
                     {message.cost !== undefined && message.cost > 0 && (
-                        <span className="text-xs theme-text-secondary bg-gray-200/60 dark:bg-neutral-800/30 px-1 py-0.5 rounded text-xs font-mono">
+                        <span className="text-[10px] font-mono text-[var(--fg-3)] opacity-0 group-hover:opacity-100 transition-opacity duration-[120ms]">
                             ${message.cost.toFixed(4)}
                         </span>
                     )}
                 </div>
                 {message.id && !isVoteMessage && displayContent && displayContent.trim() && (
-                    <div className="flex gap-1">
+                    <div className="flex gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-[120ms]">
                         {/* Delete menu */}
                         {canShowResetButton && (
                             <div className="relative" ref={menuRef}>
                                 <button
                                     onClick={() => setShowDeleteMenu(!showDeleteMenu)}
-                                    className={`opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-200 p-1 rounded hover:bg-gray-300/50 dark:hover:bg-gray-600/50 ${showDeleteMenu ? '!opacity-100' : ''} ${resetsRemaining === 0 ? '!opacity-30 cursor-not-allowed' : ''}`}
+                                    className={`p-1 rounded-[var(--radius-sm)] hover:bg-[var(--bg-3)] transition-colors duration-[120ms] ${showDeleteMenu ? 'bg-[var(--bg-3)]' : ''} ${resetsRemaining === 0 ? 'opacity-30 cursor-not-allowed' : ''}`}
                                     title={resetsRemaining === 0 ? 'Reset limit reached for today' : 'Delete options'}
                                     disabled={resetsRemaining === 0}
                                 >
-                                    <svg
-                                        width="16"
-                                        height="16"
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        strokeWidth="2"
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        className="theme-text-secondary hover:text-red-600 dark:hover:text-red-400"
-                                    >
-                                        <line x1="18" y1="6" x2="6" y2="18"></line>
-                                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--fg-2)] hover:text-[var(--danger)]">
+                                        <path d="M3.5 3.5l7 7M10.5 3.5l-7 7" />
                                     </svg>
                                 </button>
                                 {showDeleteMenu && (
-                                    <div className="absolute right-0 top-full mt-1 w-64 bg-white dark:bg-neutral-800 theme-border border rounded shadow-lg z-50 flex flex-col overflow-hidden">
+                                    <div className="absolute right-0 top-full mt-1 w-56 bg-[var(--bg-1)] border border-[var(--line-2)] rounded-[var(--radius-lg)] shadow-pop z-50 flex flex-col overflow-hidden">
                                         {resetsRemaining !== null && (
-                                            <div className="px-4 py-1.5 text-xs theme-text-secondary border-b border-gray-200 dark:border-neutral-700">
+                                            <div className="px-3 py-1.5 text-[11px] text-[var(--fg-2)] border-b border-[var(--line-1)]">
                                                 {resetsRemaining > 0
                                                     ? `${resetsRemaining} reset${resetsRemaining === 1 ? '' : 's'} left today`
                                                     : 'Reset limit reached for today'}
@@ -265,27 +254,20 @@ function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcludin
                                         )}
                                         <button
                                             onClick={() => { onDeleteAfter(message.id!); setShowDeleteMenu(false); }}
-                                            className="px-4 py-2 text-left text-sm hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 flex items-center gap-2"
+                                            className="px-3 py-2 text-left text-[13px] hover:bg-[var(--bg-3)] text-[var(--danger)] flex items-center gap-2 transition-colors duration-[120ms]"
                                         >
                                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0">
-                                                <circle cx="6" cy="6" r="3"/>
-                                                <path d="M8.12 8.12 12 12"/>
-                                                <path d="M20 4 8.12 15.88"/>
-                                                <circle cx="6" cy="18" r="3"/>
-                                                <path d="M14.8 14.8 20 20"/>
+                                                <circle cx="6" cy="6" r="3"/><path d="M8.12 8.12 12 12"/><path d="M20 4 8.12 15.88"/><circle cx="6" cy="18" r="3"/><path d="M14.8 14.8 20 20"/>
                                             </svg>
                                             <span>Delete from here (incl.)</span>
                                         </button>
-                                        <div className="h-px bg-gray-200 dark:bg-neutral-700"></div>
+                                        <div className="h-px bg-[var(--line-1)]"></div>
                                         <button
                                             onClick={() => { onDeleteAfterExcluding(message.id!); setShowDeleteMenu(false); }}
-                                            className="px-4 py-2 text-left text-sm hover:bg-orange-50 dark:hover:bg-orange-900/20 text-orange-600 dark:text-orange-400 flex items-center gap-2"
+                                            className="px-3 py-2 text-left text-[13px] hover:bg-[var(--bg-3)] text-[var(--fg-1)] flex items-center gap-2 transition-colors duration-[120ms]"
                                         >
                                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0">
-                                                <path d="M5 12h14"/>
-                                                <path d="M12 5l7 7-7 7"/>
-                                                <circle cx="9" cy="9" r="1.5"/>
-                                                <circle cx="9" cy="15" r="1.5"/>
+                                                <path d="M5 12h14"/><path d="M12 5l7 7-7 7"/>
                                             </svg>
                                             <span>Delete after here (excl.)</span>
                                         </button>
@@ -293,11 +275,11 @@ function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcludin
                                 )}
                             </div>
                         )}
-                        
+
                         {/* Speaker icon for TTS */}
                         <button
                             onClick={() => onSpeak(message.id!, displayContent)}
-                            className="p-1 rounded hover:bg-gray-300/50 dark:hover:bg-gray-600/50"
+                            className="p-1 rounded-[var(--radius-sm)] hover:bg-[var(--bg-3)] transition-colors duration-[120ms]"
                             disabled={loadingMessageId === message.id}
                             title={
                                 loadingMessageId === message.id ? "Loading audio..." :
@@ -307,76 +289,31 @@ function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcludin
                             }
                         >
                             {loadingMessageId === message.id ? (
-                                // Loading spinner
-                                <svg
-                                    width="14"
-                                    height="14"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2"
-                                    className="text-blue-600 dark:text-blue-400 animate-spin"
-                                >
-                                    <circle cx="12" cy="12" r="10" strokeOpacity="0.25"/>
-                                    <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round"/>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[var(--accent)] animate-spin">
+                                    <circle cx="12" cy="12" r="10" strokeOpacity="0.25"/><path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round"/>
                                 </svg>
                             ) : speakingMessageId === message.id ? (
-                                // Pause icon (two vertical bars)
-                                <svg
-                                    width="14"
-                                    height="14"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
-                                >
-                                    <rect x="6" y="4" width="4" height="16"/>
-                                    <rect x="14" y="4" width="4" height="16"/>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--accent)]">
+                                    <rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>
                                 </svg>
                             ) : pausedMessageId === message.id ? (
-                                // Play icon (triangle) for paused state
-                                <svg
-                                    width="14"
-                                    height="14"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
-                                >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--accent)]">
                                     <polygon points="5 3,19 12,5 21,5 3"/>
                                 </svg>
                             ) : (
-                                // Speaker icon (default state)
-                                <svg
-                                    width="14"
-                                    height="14"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    className="theme-text-secondary hover:text-blue-600 dark:hover:text-blue-400"
-                                >
-                                    <polygon points="11 5,6 9,2 9,2 15,6 15,11 19"/>
-                                    <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--fg-2)] hover:text-[var(--accent)]">
+                                    <polygon points="11 5,6 9,2 9,2 15,6 15,11 19"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
                                 </svg>
                             )}
                         </button>
                     </div>
                 )}
             </div>
-            <span className={`inline-block p-2 ${
-                isGameMaster ? (isNightMessage ? 'rounded-lg bg-blue-100 dark:bg-blue-950/60 border border-blue-400 dark:border-blue-600/20' : 'rounded-lg bg-green-100 dark:bg-green-900/50 border border-green-500 dark:border-green-500/30') :
-                isVoteMessage ? 'rounded-lg bg-orange-100 dark:bg-orange-900/50 border border-orange-500 dark:border-orange-500/30' :
-                isUserMessage ? 'rounded-lg bg-slate-200 dark:bg-slate-700' : 'rounded-lg'
-            } theme-text-primary`} style={!isUserMessage && !isGameMaster && !isVoteMessage ? { backgroundColor: `${getPlayerColor(message.authorName)}33` } : undefined}>
+            <span className={`inline-block px-3.5 py-2.5 text-[13.5px] leading-[1.55] rounded-[var(--radius-lg)] border transition-colors duration-[120ms] ${
+                isGameMaster ? 'bg-[var(--gm-bg)] border-[var(--gm-border)] pl-4 border-l-[3px] border-l-[var(--gm-rail)]' :
+                isVoteMessage ? 'bg-[var(--bg-2)] border-[var(--line-1)] pl-4 border-l-[3px] border-l-[var(--werewolf-fg)]' :
+                isUserMessage ? 'bg-[var(--accent-soft)] border-[var(--accent-line)]' : 'bg-[var(--bg-2)] border-[var(--line-1)] hover:border-[var(--line-2)]'
+            } text-[var(--fg-0)]`}>
                 {displayContent}
             </span>
         </div>
@@ -405,8 +342,8 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
     const [pausedMessageId, setPausedMessageId] = useState<string | null>(null);
     const [isRecording, setIsRecording] = useState(false);
     const [isTranscribing, setIsTranscribing] = useState(false);
-    const [textareaRows, setTextareaRows] = useState(2);
-    const [isInputFocused, setIsInputFocused] = useState(false);
+    const [composerExpanded, setComposerExpanded] = useState(false);
+    const composerRef = useRef<HTMLFormElement>(null);
     const [selectedDay, setSelectedDay] = useState(game.currentDay);
     const [isLoadingMessages, setIsLoadingMessages] = useState(false);
     const [showDaySelector, setShowDaySelector] = useState(false);
@@ -647,6 +584,26 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
             document.removeEventListener('mousedown', handleClickOutside);
         };
     }, [showDaySelector]);
+
+    // Collapse composer when input gets disabled (voting, night phase, etc.)
+    useEffect(() => {
+        if (!isInputEnabled()) {
+            setComposerExpanded(false);
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [game.gameState, isProcessing, isExternalLoading]);
+
+    // Composer outside-click collapse
+    useEffect(() => {
+        if (!composerExpanded) return;
+        const handleOutsideClick = (e: MouseEvent) => {
+            if (composerRef.current && !composerRef.current.contains(e.target as Node)) {
+                setComposerExpanded(false);
+            }
+        };
+        document.addEventListener('mousedown', handleOutsideClick);
+        return () => document.removeEventListener('mousedown', handleOutsideClick);
+    }, [composerExpanded]);
 
     // Auto-process queue when not empty
     useEffect(() => {
@@ -1358,38 +1315,40 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
 
     return (
         <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-            <div className="flex items-center justify-between mb-4 flex-shrink-0">
+            <div className="flex items-center justify-between mb-3 flex-shrink-0 px-1">
                 <div className="flex items-center gap-2">
-                    <span className="text-xl font-bold theme-text-primary">
+                    <span className="text-[10px] font-mono font-semibold uppercase tracking-[0.06em] px-2 py-1 rounded-[var(--radius-sm)] bg-[oklch(80%_0.10_85_/_0.10)] border border-[oklch(80%_0.10_85_/_0.35)] text-[oklch(82%_0.10_85)]">
+                        Day {game.currentDay}
+                    </span>
+                    <span className="text-[16px] font-semibold text-[var(--fg-0)]">
                         {headerTitle}
                     </span>
                 </div>
                 <div className="flex items-center gap-3">
                     {shouldShowMessageCount && (
-                        <span className="text-xs theme-text-secondary">
+                        <span className="text-[12px] font-mono text-[var(--fg-2)]">
                             {messageCountLabel}
                         </span>
                     )}
                     {availableDays.length > 1 && (
                         <div className="flex items-center gap-2" ref={daySelectorRef}>
-                            <span className="text-sm theme-text-secondary hidden sm:inline">History:</span>
                             <div className="relative">
                                 <button
                                     type="button"
                                     onClick={() => setShowDaySelector(prev => !prev)}
-                                    className={`flex items-center gap-1 text-sm px-3 py-1 rounded theme-border border theme-bg-card hover:opacity-90 transition-colors ${showDaySelector ? 'text-blue-600 dark:text-blue-300' : 'theme-text-primary'}`}
+                                    className={`flex items-center gap-1.5 text-[13px] px-3 py-1.5 rounded-[var(--radius-md)] border transition-all duration-[120ms] ${showDaySelector ? 'border-[var(--accent-line)] bg-[var(--accent-soft)] text-[var(--accent)]' : 'border-[var(--line-2)] bg-[var(--bg-2)] text-[var(--fg-1)] hover:border-[var(--line-3)]'}`}
                                 >
                                     Day {selectedDay}
-                                    <span className="text-xs">{showDaySelector ? '▲' : '▼'}</span>
+                                    <svg className={`w-3 h-3 transition-transform duration-[160ms] ${showDaySelector ? 'rotate-180' : ''}`} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M3.5 5.25L7 8.75L10.5 5.25" /></svg>
                                 </button>
                                 {showDaySelector && (
-                                    <div className="absolute right-0 top-full mt-2 w-40 rounded theme-border border bg-white dark:bg-neutral-800 shadow-lg z-20 max-h-60 overflow-y-auto">
+                                    <div className="absolute right-0 top-full mt-1.5 w-40 bg-[var(--bg-1)] border border-[var(--line-2)] rounded-[var(--radius-lg)] shadow-pop z-20 max-h-60 overflow-y-auto">
                                         {availableDays.map(day => (
                                             <button
                                                 key={day}
                                                 type="button"
                                                 onClick={() => handleDaySelect(day)}
-                                                className={`block w-full px-3 py-2 text-left text-sm hover:bg-gray-200 dark:hover:bg-white/10 ${day === selectedDay ? 'bg-gray-200 dark:bg-white/10' : ''}`}
+                                                className={`block w-full px-3 py-2 text-left text-[13px] transition-colors duration-[120ms] ${day === selectedDay ? 'bg-[var(--accent-soft)] text-[var(--fg-0)]' : 'text-[var(--fg-1)] hover:bg-[var(--bg-3)]'}`}
                                             >
                                                 Day {day}{day === game.currentDay ? ' (current)' : ''}
                                             </button>
@@ -1408,13 +1367,13 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
             )}
             {/* Error is shown inline at the bottom of the chat messages */}
             {/* Messages area - grows to fill space, scrolls internally */}
-            <div ref={messagesContainerRef} className="flex-1 mb-4 p-2 theme-bg-card theme-border border rounded overflow-y-auto">
+            <div ref={messagesContainerRef} className="flex-1 mb-3 px-3 py-2 overflow-y-auto">
                 {isLoadingMessages ? (
-                    <div className="text-center theme-text-secondary text-sm py-4">
+                    <div className="text-center text-[var(--fg-2)] text-[13px] py-4">
                         Loading Day {selectedDay}...
                     </div>
                 ) : messages.length === 0 ? (
-                    <div className="text-center theme-text-secondary text-sm py-4">
+                    <div className="text-center text-[var(--fg-2)] text-[13px] py-4">
                         No messages for Day {selectedDay} yet.
                     </div>
                 ) : (
@@ -1439,18 +1398,18 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
                     })
                 )}
                 {isDeleting && !isLoadingMessages && (
-                    <div className="text-center text-gray-400 text-sm py-2">
+                    <div className="text-center text-[var(--fg-2)] text-[13px] py-2">
                         Deleting messages...
                     </div>
                 )}
                 {(isProcessing || isExternalLoading || (game.gameState === GAME_STATES.VOTE && game.gameStateProcessQueue.length > 0 && !game.errorState) || (game.gameState === GAME_STATES.WELCOME && game.gameStateParamQueue.length > 0 && !game.errorState)) && !isLoadingMessages && (
                     <div className="flex items-center gap-2 py-2 px-3">
                         <div className="flex gap-1">
-                            <span className="w-2 h-2 rounded-full bg-blue-400 animate-bounce" style={{ animationDelay: '0ms' }}></span>
-                            <span className="w-2 h-2 rounded-full bg-blue-400 animate-bounce" style={{ animationDelay: '150ms' }}></span>
-                            <span className="w-2 h-2 rounded-full bg-blue-400 animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                            <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                            <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                            <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-bounce" style={{ animationDelay: '300ms' }}></span>
                         </div>
-                        <span className="text-xs theme-text-secondary">
+                        <span className="text-[12px] italic text-[var(--fg-2)]">
                             {game.gameState === GAME_STATES.VOTE && game.gameStateProcessQueue.length > 0
                                 ? `${game.gameStateProcessQueue[0]} is voting...`
                                 : game.gameState === GAME_STATES.WELCOME && game.gameStateParamQueue.length > 0
@@ -1462,15 +1421,15 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
                     </div>
                 )}
                 {!isProcessing && game.errorState && !isLoadingMessages && (
-                    <div className="mx-2 my-2 p-3 rounded-lg border bg-red-900/50 border-red-500/30 text-red-200">
+                    <div className="mx-2 my-2 p-3 rounded-[var(--radius-lg)] border bg-[oklch(70%_0.13_25_/_0.08)] border-[oklch(70%_0.13_25_/_0.3)]">
                         <div className="flex items-start gap-2">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0 mt-0.5 text-red-400">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0 mt-0.5 text-[var(--danger)]">
                                 <circle cx="12" cy="12" r="10"/>
                                 <line x1="15" y1="9" x2="9" y2="15"/>
                                 <line x1="9" y1="9" x2="15" y2="15"/>
                             </svg>
                             <div className="flex-1 min-w-0">
-                                <div className="text-sm font-medium break-words">
+                                <div className="text-[13px] font-medium text-[var(--fg-0)] break-words">
                                     {(() => {
                                         const failedBot = game.gameState === GAME_STATES.WELCOME
                                             ? game.gameStateParamQueue[0]
@@ -1479,17 +1438,17 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
                                     })()}
                                 </div>
                                 {game.errorState.details && (
-                                    <div className="text-xs mt-1 opacity-80 break-words">
+                                    <div className="text-[12px] mt-1 text-[var(--fg-1)] break-words">
                                         {game.errorState.details.length > 150 ? game.errorState.details.substring(0, 150) + '...' : game.errorState.details}
                                     </div>
                                 )}
-                                <div className="text-xs mt-1.5 opacity-60">
+                                <div className="text-[11px] mt-1.5 text-[var(--fg-2)]">
                                     If this keeps happening, try changing the AI model for this bot in the game settings.
                                 </div>
                             </div>
                             <button
                                 onClick={handleDismissError}
-                                className="flex-shrink-0 px-3 py-1.5 rounded text-btn-text-transparent bg-btn-transparent border border-card-border hover:bg-btn-transparent-hover text-xs font-medium transition-colors flex items-center gap-1.5"
+                                className="flex-shrink-0 px-3 py-1.5 rounded-[var(--radius-md)] bg-[var(--bg-3)] border border-[var(--line-3)] text-[var(--fg-0)] hover:bg-[var(--bg-4)] text-[12px] font-medium transition-all duration-[120ms] flex items-center gap-1.5"
                                 title="Dismiss error and retry"
                             >
                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1507,7 +1466,7 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
                 <button
                     type="button"
                     onClick={() => messagesContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' })}
-                    className="fixed bottom-20 right-6 w-7 h-7 flex items-center justify-center rounded-full theme-bg-card theme-border border theme-text-secondary hover:opacity-80 shadow transition-colors z-20"
+                    className="fixed bottom-20 right-6 w-7 h-7 flex items-center justify-center rounded-full bg-[var(--bg-1)] border border-[var(--line-2)] text-[var(--fg-2)] hover:text-[var(--fg-0)] hover:border-[var(--line-3)] shadow-subtle transition-all duration-[120ms] z-20"
                     title="Scroll to top"
                 >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1517,8 +1476,11 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
             )}
 
             {/* Input area */}
-            <form onSubmit={sendMessage} className="flex-shrink-0 z-10 mt-auto bg-[rgb(var(--color-page-bg-start))] pt-1">
-                <div className="relative">
+            <form ref={composerRef} onSubmit={sendMessage} className="flex-shrink-0 z-10 mt-auto pt-1">
+                <div
+                    className={`relative rounded-[var(--radius-lg)] bg-[var(--bg-2)] border transition-all duration-200 ${!isInputEnabled() ? 'opacity-50 border-[var(--line-2)] pointer-events-none' : composerExpanded ? 'border-[var(--accent-line)] shadow-[0_0_0_3px_var(--accent-soft)]' : 'border-[var(--line-2)] cursor-text'}`}
+                    onClick={() => { if (isInputEnabled() && !composerExpanded) { setComposerExpanded(true); textareaRef.current?.focus(); } }}
+                >
                     {isInputEnabled() && (
                         <MentionDropdown
                             candidates={mentionCandidates}
@@ -1532,14 +1494,12 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
                         value={newMessage}
                         onChange={handleTextareaChange}
                         onKeyDown={handleTextareaKeyDown}
-                        onFocus={() => setIsInputFocused(true)}
-                        onBlur={() => {
-                            // Delay to allow button clicks to register before hiding toolbar
-                            setTimeout(() => setIsInputFocused(false), 150);
-                        }}
+                        onFocus={() => setComposerExpanded(true)}
                         disabled={!isInputEnabled()}
-                        rows={textareaRows}
-                        className={`w-full p-3 rounded bg-input border border-input-border text-input-text placeholder-input-placeholder focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none ${!isInputEnabled() ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        rows={composerExpanded ? 5 : 1}
+                        className={`w-full px-4 bg-transparent text-[14px] leading-[1.5] text-[var(--fg-0)] placeholder:text-[var(--fg-3)] focus:outline-none resize-none transition-all duration-200 ${
+                            composerExpanded ? 'pt-3.5 pb-1.5 min-h-[140px] max-h-[280px]' : 'py-2.5 min-h-[40px] max-h-[56px]'
+                        } ${!isInputEnabled() ? 'cursor-not-allowed' : ''}`}
                         placeholder={getInputPlaceholder()}
                     />
                     {cancelButton && (
@@ -1547,28 +1507,32 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
                             {cancelButton}
                         </div>
                     )}
-                </div>
 
-                {/* Toolbar row: text buttons left, icon buttons right */}
-                <div className={`flex items-center justify-between mt-1 ${isInputEnabled() ? (isInputFocused ? 'flex' : 'hidden lg:flex') : 'flex'}`}>
+                {/* Toolbar row inside composer — hidden when collapsed */}
+                <div className={`flex items-center justify-between px-3 overflow-hidden transition-all duration-200 ${composerExpanded ? 'max-h-[60px] opacity-100 pb-2' : 'max-h-0 opacity-0 pb-0'}`}>
                     {/* Left group: text buttons (Send + game controls) */}
                     <div className="flex items-center gap-1">
                         {/* Send button - only when input is enabled */}
                         {isInputEnabled() && (
                             <button
                                 type="submit"
-                                disabled={isProcessing}
-                                className={`h-10 px-4 ${buttonTransparentStyle} ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                disabled={isProcessing || !newMessage.trim()}
+                                className={`h-[34px] px-3.5 rounded-[var(--radius-md)] bg-[var(--accent)] text-[var(--on-accent)] text-[13px] font-medium flex items-center gap-2 transition-all duration-[120ms] hover:bg-[var(--accent-strong)] ${isProcessing || !newMessage.trim() ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 title={isProcessing ? "Waiting for response..." : "Send your message to all players"}
                             >
                                 {isProcessing ? (
-                                    <div className="flex items-center gap-2">
+                                    <>
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin">
                                             <path d="M21 12a9 9 0 11-6.219-8.56"/>
                                         </svg>
-                                        <span className="text-sm">Sending...</span>
-                                    </div>
-                                ) : <span className="text-sm">Send</span>}
+                                        <span>Sending...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><path d="M1.5 1.5L12.5 7L1.5 12.5V8L8.5 7L1.5 6V1.5Z"/></svg>
+                                        <span>Send</span>
+                                    </>
+                                )}
                             </button>
                         )}
 
@@ -1584,10 +1548,10 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
                                 type="button"
                                 onClick={handleToggleRecording}
                                 disabled={!isMicrophoneEnabled() || isTranscribing}
-                                className={`h-10 w-10 !p-0 flex items-center justify-center transition-colors ${
+                                className={`w-8 h-8 rounded-[var(--radius-md)] flex items-center justify-center transition-all duration-[120ms] ${
                                     isRecording
-                                        ? `${buttonTransparentStyle} border-red-500 bg-red-500/10 hover:bg-red-500/20 text-red-500`
-                                        : buttonTransparentStyle
+                                        ? 'bg-[oklch(70%_0.13_25_/_0.12)] border border-[oklch(70%_0.13_25_/_0.4)] text-[var(--danger)]'
+                                        : 'hover:bg-[var(--bg-3)] text-[var(--fg-2)] hover:text-[var(--fg-0)]'
                                 } ${!isMicrophoneEnabled() || isTranscribing ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 title={
                                     isTranscribing
@@ -1621,33 +1585,24 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
                                     type="button"
                                     onClick={handleGetSuggestion}
                                     disabled={isGettingSuggestion}
-                                    className={`h-10 w-10 !p-0 flex items-center justify-center ${buttonTransparentStyle} ${isGettingSuggestion ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    className={`w-8 h-8 rounded-[var(--radius-md)] flex items-center justify-center hover:bg-[var(--bg-3)] text-[var(--fg-2)] hover:text-[var(--fg-0)] transition-all duration-[120ms] ${isGettingSuggestion ? 'opacity-50 cursor-not-allowed' : ''}`}
                                     title={isGettingSuggestion ? "Getting suggestion..." : "Get AI suggestion for your response"}
                                 >
                                     {isGettingSuggestion ? (
-                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin">
                                             <path d="M21 12a9 9 0 11-6.219-8.56"/>
                                         </svg>
                                     ) : (
-                                        <span className="text-sm">💡</span>
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M9 18h6M10 22h4M12 2a7 7 0 0 1 4 12.7V17a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1v-2.3A7 7 0 0 1 12 2z"/>
+                                        </svg>
                                     )}
                                 </button>
                             )}
-
-                            {/* Expand/Shrink button */}
-                            <button
-                                type="button"
-                                onClick={() => setTextareaRows(prev => prev === 2 ? 10 : 2)}
-                                className={`h-10 w-10 !p-0 flex items-center justify-center ${buttonTransparentStyle}`}
-                                title="Expand/shrink text area"
-                            >
-                                <span className="text-sm">
-                                    {textareaRows === 2 ? '⬆️' : '⬇️'}
-                                </span>
-                            </button>
                         </div>
                     )}
                 </div>
+                </div>{/* end composer wrapper */}
             </form>
             <VotingModal
                 game={game}

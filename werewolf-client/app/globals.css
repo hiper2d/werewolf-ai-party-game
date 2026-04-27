@@ -161,6 +161,31 @@ html {
   --radius-xl: 16px;
 }
 
+/* ── Chat-Specific Colors ───────────────────────────────────────── */
+[data-theme='dark'] {
+  --gm-fg: oklch(82% 0.10 155);
+  --gm-rail: oklch(60% 0.14 155);
+  --gm-bg: color-mix(in oklch, oklch(60% 0.14 155) 8%, var(--bg-2));
+  --gm-border: color-mix(in oklch, oklch(60% 0.14 155) 20%, transparent);
+  --you-fg: oklch(75% 0.10 230);
+  --werewolf-fg: oklch(72% 0.14 25);
+  --accent-strong: oklch(62% 0.10 230);
+  --on-accent: #ffffff;
+  --overlay: rgba(0,0,0,0.55);
+}
+
+[data-theme='light'] {
+  --gm-fg: oklch(40% 0.13 155);
+  --gm-rail: oklch(50% 0.14 155);
+  --gm-bg: color-mix(in oklch, oklch(50% 0.14 155) 10%, var(--bg-2));
+  --gm-border: color-mix(in oklch, oklch(50% 0.14 155) 25%, transparent);
+  --you-fg: oklch(48% 0.12 230);
+  --werewolf-fg: oklch(50% 0.16 25);
+  --accent-strong: oklch(48% 0.13 235);
+  --on-accent: #ffffff;
+  --overlay: rgba(15,20,30,0.30);
+}
+
 /* ── Speed Tag Colors (semantic, theme-independent) ─────────────── */
 :root {
   --tag-fast-text: oklch(80% 0.13 145);

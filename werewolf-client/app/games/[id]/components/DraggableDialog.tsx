@@ -90,20 +90,20 @@ export default function DraggableDialog({
     return (
         <div
             ref={dialogRef}
-            className={`z-50 bg-white dark:bg-neutral-900 border theme-border rounded-lg shadow-xl ${className}`}
+            className={`z-50 bg-[var(--bg-1)] border border-[var(--line-1)] rounded-[var(--radius-xl)] shadow-pop ${className}`}
             style={dialogStyle}
         >
             {/* Draggable header */}
             <div
-                className={`px-6 pt-6 pb-2 cursor-move select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+                className={`px-5 pt-5 pb-2 cursor-move select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
                 onMouseDown={handleMouseDown}
             >
-                <h3 className="text-xl font-bold theme-text-primary">
+                <h3 className="text-[16px] font-semibold text-[var(--fg-0)]">
                     {title}
                 </h3>
             </div>
             {/* Content */}
-            <div className="px-6 pb-6">
+            <div className="px-5 pb-5">
                 {children}
             </div>
         </div>
