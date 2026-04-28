@@ -32,7 +32,10 @@ export default function CreateNewGamePage() {
     const [playerCount, setPlayerCount] = useState(12);
     const [werewolfCount, setWerewolfCount] = useState(3);
     const [specialRoles, setSpecialRoles] = useState([GAME_ROLES.DOCTOR, GAME_ROLES.DETECTIVE, GAME_ROLES.MANIAC]);
-    const [gameMasterAiType, setGameMasterAiType] = useState<string>(LLM_CONSTANTS.RANDOM);
+    const [gameMasterAiType, setGameMasterAiType] = useState<string>(() => {
+        const fastModels = Object.values(LLM_CONSTANTS).filter(m => m !== LLM_CONSTANTS.RANDOM && modelHasTag(m, 'fast'));
+        return fastModels.length > 0 ? fastModels[Math.floor(Math.random() * fastModels.length)] : LLM_CONSTANTS.RANDOM;
+    });
     const [selectedPlayerAiTypes, setSelectedPlayerAiTypes] = useState<string[]>(Object.values(LLM_CONSTANTS).filter(model => model !== LLM_CONSTANTS.RANDOM));
     const [isFormValid, setIsFormValid] = useState(false);
     const [gameData, setGameData] = useState<GamePreviewWithGeneratedBots | null>(null);
@@ -58,7 +61,13 @@ export default function CreateNewGamePage() {
     const FAST_MODELS = useMemo(() => new Set(
         Object.values(LLM_CONSTANTS).filter(m => modelHasTag(m, 'fast'))
     ), []);
-    // GM is always RANDOM before preview generation; user changes it in the preview section
+    const gmModelOptions = useMemo(() => {
+        return allModels.filter(model => model !== LLM_CONSTANTS.RANDOM).map(model => {
+            const name = getModelDisplayName(model);
+            return { model, disabled: false, label: name, displayLabel: name };
+        });
+    }, [allModels]);
+
     const playerModelOptions = useMemo(() => {
         // For free tier, show ALL models (available ones selectable, unavailable greyed out)
         const base = allModels;
@@ -576,6 +585,16 @@ export default function CreateNewGamePage() {
                             onChange={(val) => setWerewolfCount(Number(val))}
                         />
                     </div>
+                </div>
+
+                {/* Row 3.5: Game Master AI */}
+                <div className="grid grid-cols-[140px_1fr] items-center gap-4">
+                    <label className={labelStyle}>Game Master</label>
+                    <ModelSelectDropdown
+                        options={gmModelOptions}
+                        value={gameMasterAiType}
+                        onChange={setGameMasterAiType}
+                    />
                 </div>
 
                 {/* Row 4: Players AI */}

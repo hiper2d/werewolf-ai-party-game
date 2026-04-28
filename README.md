@@ -31,53 +31,71 @@ Pick any model for the Game Master and for each individual bot:
 
 Most models support reasoning, which is stored in the database with every message — even though it's not visible in the UI.
 
+## Game List
+
+After signing in, the Game List shows every game you've started — theme, the character you're playing, the current day, and the phase.
+
+<a href="images/game-list.png" target="_blank"><img src="images/game-list.png" width="800"></a>
+
 ## Game Creation
 
-Customize everything: bot names, backstories, AI models, play styles, voices, and voice instructions. The Game Master generates it all, but you can tweak anything before starting.
+Click **Create Game** and pick a theme — Star Wars, a submarine crew, a Jane Austen novel, anything the AI content filters tolerate. Set player count (up to 12), werewolf count, the AI models bots can be drawn from, and which special roles to include.
 
-<a href="images/create-game.png" target="_blank"><img src="images/create-game.png" width="600"></a>
-<a href="images/create-game-players.png" target="_blank"><img src="images/create-game-players.png" width="600"></a>
+<a href="images/create-game-form.png" target="_blank"><img src="images/create-game-form.png" width="800"></a>
+
+`Generate Preview` kicks off the AI pipeline that writes the story, picks a Game Master config, and rolls every player. Generating 11–12 player configs against a slower model takes 60–90s — a polite blue toast tells you it's working.
+
+<a href="images/generating-preview.png" target="_blank"><img src="images/generating-preview.png" width="800"></a>
+
+When the call returns, the **Preview** section appears below the form: AI-written game story, then the Game Master config (model, voice, voice style).
+
+<a href="images/preview-story-gm.png" target="_blank"><img src="images/preview-story-gm.png" width="800"></a>
+
+Below that, every player has its own card — name, gender, AI model, play style, backstory, voice, and voice style. Anything can be tweaked before clicking **Create Game**.
+
+<a href="images/preview-players.png" target="_blank"><img src="images/preview-players.png" width="800"></a>
 
 ## Gameplay
 
-### Welcome Phase
+The in-game screen is three columns:
 
-Once the game starts, the AI Game Master sets the scene and each bot introduces themselves — in character, with their own personality and agenda. You can see who's playing, their AI model, cost per bot, and a progress bar as introductions roll in.
+- **Left** — participants with the Game Master at the top, then players. The human is highlighted as `YOU`. Each row shows the assigned AI model, and the total game cost so far sits next to the title.
+- **Center** — chat. Game Master messages, player dialogue, and votes scroll here. The Day selector at the top right lets you jump between days.
+- **Right** — discussion queue. Live status of who's thinking, plus a **Select Bots Manually** button to override the GM and pick which 1–5 bots speak next.
 
-<a href="images/game-welcome.png" target="_blank"><img src="images/game-welcome.png" width="600"></a>
+<a href="images/game-luna.png" target="_blank"><img src="images/game-luna.png" width="800"></a>
 
 ### Day Discussion
 
-Chat with bots using text or voice (Text-to-Speech and Speech-to-Text). Stay in character, try to blend in, or go full meta and tell them they're AI — whatever it takes to survive. Jailbreaking them isn't easy though; the days of "ignore all previous instructions" are long gone.
+The AI Game Master opens each day, then the bots pile in with their analysis. Chat with them using text or voice (TTS/STT). Stay in character, try to blend in, or go full meta and tell them they're AI — whatever it takes to survive. Jailbreaking isn't easy; the days of "ignore all previous instructions" are long gone.
 
-<a href="images/chat.png" target="_blank"><img src="images/chat.png" width="600"></a>
+<a href="images/day-discussion.png" target="_blank"><img src="images/day-discussion.png" width="800"></a>
 
-The Game Master decides who responds, or you can manually select bots yourself.
+### Day History
 
-<a href="images/manual-bots-selection.png" target="_blank"><img src="images/manual-bots-selection.png" width="600"></a>
+The Day selector at the top right opens a dropdown of every day played so far. Past days load in **read-only history mode** — full transcript, no input box.
+
+<a href="images/day-selector.png" target="_blank"><img src="images/day-selector.png" width="800"></a>
+
+<a href="images/day-history.png" target="_blank"><img src="images/day-history.png" width="800"></a>
 
 ### Voting
 
-Each bot explains their reasoning and casts a vote. Then it's your turn — pick who you think is the werewolf and explain why. The Game Master announces the results and the eliminated player's true role is revealed.
+Once voting starts, each bot posts a `🗳️ Votes for X` message with their reasoning. The human gets a Cast Your Vote modal — pick a player from the dropdown and write a reason (required).
 
-<a href="images/voting.png" target="_blank"><img src="images/voting.png" width="600"></a>
-<a href="images/cast-vote.png" target="_blank"><img src="images/cast-vote.png" width="600"></a>
-<a href="images/vote-results.png" target="_blank"><img src="images/vote-results.png" width="600"></a>
+<a href="images/voting.png" target="_blank"><img src="images/voting.png" width="800"></a>
+
+After all votes are in, the Game Master posts a tally chart and announces the elimination — and the eliminated player's true role is revealed.
+
+<a href="images/vote-results.png" target="_blank"><img src="images/vote-results.png" width="800"></a>
 
 ### Night Phase
 
-Werewolves coordinate their actions at night. The doctor protects, the detective investigates, and the maniac abducts. Reasoning models think through their strategy in detail. After the night resolves, the Game Master narrates what happened.
-
-<a href="images/wolfs-talking.png" target="_blank"><img src="images/wolfs-talking.png" width="600"></a>
-<a href="images/wolf-reasoning.png" target="_blank"><img src="images/wolf-reasoning.png" width="600"></a>
-<a href="images/night-results.png" target="_blank"><img src="images/night-results.png" width="600"></a>
+Werewolves coordinate privately, the doctor protects, the detective investigates, and the maniac abducts. Reasoning models think through their strategy in detail. The Game Master narrates the results at dawn.
 
 ### Post-Game Discussion
 
-The best part — after the game ends, all roles are revealed and everyone stays in character for a debrief. The bots argue, confess, and throw shade.
-
-<a href="images/post-game-discussion.png" target="_blank"><img src="images/post-game-discussion.png" width="600"></a>
-<a href="images/post-game-discussion-2.png" target="_blank"><img src="images/post-game-discussion-2.png" width="600"></a>
+When the game ends — werewolves wiped out, or werewolves outnumbering villagers — all roles are revealed and the bots stay in character for a debrief. They argue, confess, and throw shade.
 
 ## Architecture
 

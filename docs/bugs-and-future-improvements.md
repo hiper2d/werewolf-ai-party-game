@@ -1,10 +1,6 @@
 # Bugs and improvements
 
-- Update models:
-  - Opus 4.7
-  - Kimi 2.6
-  - DeepSeek v4
-- Mark some models as "fast" and let to select only fast models when generating preview
+- Let preview generation model to be selected with some fast model by default. Use the same model as preselected GM as well
 - Fix prompting for ordering and summaries:
 - Bots should have better notion of day and night events ordering. Review the summary logic, it should have
   - Unified past days summary text

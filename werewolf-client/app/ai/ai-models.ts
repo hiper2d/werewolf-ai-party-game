@@ -78,7 +78,7 @@ export const AUDIO_MODEL_PRICING: Record<string, AudioModelPricing> = {
     },
 };
 
-export type ModelTag = 'fast' | 'slow' | 'cheap' | 'expensive';
+export type ModelTag = 'fast' | 'slow' | 'very-slow' | 'cheap' | 'very-cheap' | 'expensive';
 
 export interface ModelConfig {
     displayName: string;
@@ -171,7 +171,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         hasThinking: false,
         temperature: 0.6,
         maxOutputTokens: 8192,
-        tags: ['fast', 'cheap'],
+        tags: ['fast', 'very-cheap'],
         freeTier: {
             available: true,
             maxBotsPerGame: -1 // Unlimited - very affordable
@@ -183,7 +183,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         apiKeyName: API_KEY_CONSTANTS.DEEPSEEK,
         hasThinking: true,
         maxOutputTokens: 8192,
-        tags: ['fast', 'cheap'],
+        tags: ['fast', 'very-cheap'],
         freeTier: {
             available: true,
             maxBotsPerGame: -1
@@ -196,7 +196,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         hasThinking: false,
         temperature: 0.6,
         maxOutputTokens: 8192,
-        tags: ['slow'],
+        tags: ['slow', 'very-cheap'],
         freeTier: {
             available: true,
             maxBotsPerGame: 1
@@ -208,7 +208,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         apiKeyName: API_KEY_CONSTANTS.DEEPSEEK,
         hasThinking: true,
         maxOutputTokens: 8192,
-        tags: ['slow'],
+        tags: ['slow', 'very-cheap'],
         freeTier: {
             available: true,
             maxBotsPerGame: 1
@@ -304,7 +304,6 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         modelApiName: 'mistral-medium-latest',
         apiKeyName: API_KEY_CONSTANTS.MISTRAL,
         hasThinking: false,
-        tags: ['fast', 'cheap'],
         freeTier: {
             available: true,
             maxBotsPerGame: -1
@@ -315,7 +314,6 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         modelApiName: 'magistral-medium-latest',
         apiKeyName: API_KEY_CONSTANTS.MISTRAL,
         hasThinking: true,
-        tags: ['slow'],
         freeTier: {
             available: true,
             maxBotsPerGame: 1
@@ -329,7 +327,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         apiKeyName: API_KEY_CONSTANTS.MOONSHOT,
         hasThinking: false,
         temperature: 0.6,
-        tags: ['slow', 'cheap'],
+        tags: ['very-slow', 'cheap'],
         freeTier: {
             available: true,
             maxBotsPerGame: -1
@@ -341,7 +339,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         apiKeyName: API_KEY_CONSTANTS.MOONSHOT,
         hasThinking: true,
         temperature: 0.6,
-        tags: ['slow', 'cheap'],
+        tags: ['very-slow', 'cheap'],
         freeTier: {
             available: true,
             maxBotsPerGame: -1
@@ -377,7 +375,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         apiKeyName: API_KEY_CONSTANTS.MOONSHOT,
         hasThinking: false,
         temperature: 0.6,
-        tags: ['fast', 'cheap'],
+        tags: ['fast'],
         freeTier: {
             available: false,
             maxBotsPerGame: 0
@@ -389,7 +387,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         apiKeyName: API_KEY_CONSTANTS.MOONSHOT,
         hasThinking: true,
         temperature: 0.6,
-        tags: ['fast', 'cheap'],
+        tags: ['fast'],
         freeTier: {
             available: false,
             maxBotsPerGame: 0
