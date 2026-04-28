@@ -60,11 +60,11 @@ export default function FreeUserLimits({ userId }: { userId: string }) {
         <>
             <div className="mb-4">
                 <h2 className="text-2xl font-bold mb-2">Free Tier</h2>
-                <p className="theme-text-secondary text-sm">
+                <p className="text-[var(--fg-1)] text-sm">
                     You are currently on the free tier. You can use the following models without providing API keys.
                     Each model has a limit on how many bots (including the Game Master) can use it in a single game.
                 </p>
-                <p className="theme-text-secondary text-xs mt-2">
+                <p className="text-[var(--fg-1)] text-xs mt-2">
                     TTS (text-to-speech) and STT (speech-to-text) are available on every tier when you provide your own OpenAI key.
                 </p>
             </div>
@@ -76,7 +76,7 @@ export default function FreeUserLimits({ userId }: { userId: string }) {
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                             <thead>
-                                <tr className="border-b theme-border">
+                                <tr className="border-b border-[var(--line-1)]">
                                     <th className="text-left py-2">Model</th>
                                     <th className="text-right py-2">Max Bots / Game</th>
                                     <th className="text-right py-2">Input Cost*</th>
@@ -101,19 +101,19 @@ export default function FreeUserLimits({ userId }: { userId: string }) {
                                     }
 
                                     return (
-                                        <tr key={index} className={`border-b theme-border-subtle ${!isAvailable ? 'opacity-50' : ''}`}>
+                                        <tr key={index} className={`border-b border-[var(--line-1)] ${!isAvailable ? 'opacity-50' : ''}`}>
                                             <td className="py-2">{config.displayName}</td>
                                             <td className="py-2 text-right text-xs">{displayLimit}</td>
                                             <td className="py-2 text-right">
                                                 <div>{inputDisplay.base}</div>
                                                 {inputDisplay.extended && (
-                                                    <div className="text-xs theme-text-secondary">{inputDisplay.extended}</div>
+                                                    <div className="text-xs text-[var(--fg-1)]">{inputDisplay.extended}</div>
                                                 )}
                                             </td>
                                             <td className="py-2 text-right">
                                                 <div>{outputDisplay.base}</div>
                                                 {outputDisplay.extended && (
-                                                    <div className="text-xs theme-text-secondary">{outputDisplay.extended}</div>
+                                                    <div className="text-xs text-[var(--fg-1)]">{outputDisplay.extended}</div>
                                                 )}
                                             </td>
                                         </tr>
@@ -122,16 +122,16 @@ export default function FreeUserLimits({ userId }: { userId: string }) {
                             </tbody>
                         </table>
                     </div>
-                    <p className="text-xs theme-text-secondary mt-2">* Per million tokens (extended context rates shown when available)</p>
+                    <p className="text-xs text-[var(--fg-1)] mt-2">* Per million tokens (extended context rates shown when available)</p>
                 </div>
 
                 {/* Voice Options */}
-                <div className="border-t theme-border-subtle pt-4">
+                <div className="border-t border-[var(--line-1)] pt-4">
                     <h3 className="text-xl font-bold mb-3">Voice Options (TTS/STT)</h3>
-                    <p className="text-sm theme-text-secondary mb-3">
+                    <p className="text-sm text-[var(--fg-1)] mb-3">
                         Provide an OpenAI key and you can enable both text-to-speech and speech-to-text even on the free tier.
                     </p>
-                    <div className="text-xs theme-text-secondary">
+                    <div className="text-xs text-[var(--fg-1)]">
                         <p className="mb-1"><strong>Requires:</strong> {API_KEY_CONSTANTS.OPENAI}</p>
                         <p className="mb-1"><strong>TTS:</strong> {AUDIO_MODEL_CONSTANTS.TTS} ($15 per 1M characters)</p>
                         <p className="mb-1"><strong>STT:</strong> {AUDIO_MODEL_CONSTANTS.STT} ($0.006 per audio minute)</p>
@@ -140,12 +140,12 @@ export default function FreeUserLimits({ userId }: { userId: string }) {
                 </div>
 
                 {/* Upgrade Notice */}
-                <div className="border-t theme-border-subtle pt-4">
-                    <h3 className="text-xl font-bold mb-2 text-yellow-600 dark:text-yellow-400">Want More?</h3>
-                    <p className="text-sm theme-text-secondary mb-3">
+                <div className="border-t border-[var(--line-1)] pt-4">
+                    <h3 className="text-xl font-bold mb-2 text-[var(--fg-2)]">Want More?</h3>
+                    <p className="text-sm text-[var(--fg-1)] mb-3">
                         Switch to the API tier to:
                     </p>
-                    <ul className="text-sm theme-text-secondary space-y-1 ml-4 list-disc">
+                    <ul className="text-sm text-[var(--fg-1)] space-y-1 ml-4 list-disc">
                         <li>Access all available AI models</li>
                         <li>Remove usage limits per game</li>
                         <li>Manage your API keys directly in the app</li>
@@ -153,7 +153,7 @@ export default function FreeUserLimits({ userId }: { userId: string }) {
                     <button
                         onClick={handleSwitchToApiTier}
                         disabled={isLoading}
-                        className="mt-4 px-4 py-2 bg-yellow-600 hover:bg-yellow-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded transition"
+                        className="mt-4 px-4 py-2 bg-[var(--accent)] hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed text-[var(--on-accent)] rounded-[var(--radius-md)] transition"
                     >
                         {isLoading ? 'Switching...' : 'Switch to API Tier'}
                     </button>

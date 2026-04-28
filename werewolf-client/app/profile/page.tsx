@@ -37,26 +37,24 @@ export default async function UserProfilePage({ searchParams }: PageProps) {
     }
 
     const tierColorClass = userTier === USER_TIERS.API
-        ? 'text-green-600 dark:text-green-400'
+        ? 'text-[var(--gm-fg)]'
         : userTier === USER_TIERS.PAID
-            ? 'text-blue-400/70 dark:text-blue-300/60'
-            : 'text-yellow-600 dark:text-yellow-400';
+            ? 'text-[var(--accent)]'
+            : 'text-[var(--fg-2)]';
 
     return (
-        <div className="flex flex-col lg:flex-row theme-text-primary">
+        <div className="flex flex-col lg:flex-row text-[var(--fg-0)] max-w-[1100px] mx-auto w-full">
             {/* Left column - User info & spendings */}
-            <div className="lg:w-1/4 lg:sticky lg:top-20 lg:h-[calc(100vh-5rem)] lg:overflow-auto hide-scrollbar lg:pr-4 mb-6 lg:mb-0">
-                {/* User info */}
+            <div className="lg:w-1/4 lg:sticky lg:top-20 lg:h-[calc(100dvh-5rem)] lg:overflow-auto hide-scrollbar lg:pr-4 mb-6 lg:mb-0 pt-4">
                 <div className="mb-4">
-                    <h1 className="text-2xl font-bold mb-2">User Profile</h1>
+                    <h1 className="text-[20px] font-semibold tracking-[-0.01em] mb-3">User Profile</h1>
                     <div className="flex items-center gap-4 mb-3">
-                        <Image src={session.user?.image ?? '/mememan.webp'} width="64" height="64" alt="User profile" className="rounded-full" />
-                        <div className="text-sm theme-text-secondary">
-                            <p>{session.user?.name}</p>
-                            <p>{session.user?.email}</p>
+                        <Image src={session.user?.image ?? '/mememan.webp'} width="56" height="56" alt="User profile" className="rounded-full border border-[var(--line-2)]" />
+                        <div className="text-[13px] text-[var(--fg-1)]">
+                            <p className="font-medium text-[var(--fg-0)]">{session.user?.name}</p>
+                            <p className="text-[12px]">{session.user?.email}</p>
                             <p className="mt-1">
-                                <span className="font-semibold">Tier: </span>
-                                <span className={tierColorClass}>
+                                <span className={`text-[10px] font-mono uppercase tracking-[0.06em] px-1.5 py-0.5 rounded border border-[var(--line-2)] ${tierColorClass}`}>
                                     {userTier.toUpperCase()}
                                 </span>
                             </p>
@@ -64,22 +62,19 @@ export default async function UserProfilePage({ searchParams }: PageProps) {
                     </div>
                 </div>
 
-                {/* Monthly Spendings */}
-                <div className="border-t theme-border-subtle pt-3">
+                <div className="border-t border-[var(--line-1)] pt-3">
                     <SpendingsDisplay spendings={user?.spendings ?? []} />
                 </div>
             </div>
 
             {/* Right column - Main content */}
-            <div className="flex-1 min-w-0 lg:pl-4">
-                {/* Payment success banner */}
+            <div className="flex-1 min-w-0 lg:pl-4 pt-4">
                 {params.payment === 'success' && (
-                    <div className="mb-4 p-3 rounded-lg bg-green-500/10 border border-green-500/30 text-green-700 dark:text-green-400 text-sm">
+                    <div className="mb-4 p-3 rounded-[var(--radius-lg)] bg-[oklch(60%_0.14_145_/_0.08)] border border-[oklch(60%_0.14_145_/_0.3)] text-[var(--gm-fg)] text-[13px]">
                         Payment successful! Your balance has been updated.
                     </div>
                 )}
 
-                {/* Tier switcher with tab panels */}
                 <div className="mb-8">
                     <TierSwitcher
                         currentTier={userTier}
@@ -90,14 +85,11 @@ export default async function UserProfilePage({ searchParams }: PageProps) {
                     />
                 </div>
 
-                {/* Common sections */}
-                <div className="space-y-6 border-t theme-border-subtle pt-6">
+                <div className="space-y-6 border-t border-[var(--line-1)] pt-6">
                     <ModelPricingTable />
-
-                    <div className="border-t theme-border-subtle pt-6">
+                    <div className="border-t border-[var(--line-1)] pt-6">
                         <VoiceInfoSection />
                     </div>
-
                 </div>
             </div>
         </div>

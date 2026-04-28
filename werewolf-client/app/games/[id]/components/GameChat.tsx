@@ -4,7 +4,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { talkToAll, humanPlayerVote, getSuggestion } from "@/app/api/bot-actions";
 import { humanPlayerTalkWerewolves } from "@/app/api/night-actions";
 import { GAME_STATES, MessageType, RECIPIENT_ALL, RECIPIENT_WEREWOLVES, RECIPIENT_DOCTOR, RECIPIENT_DETECTIVE, RECIPIENT_MANIAC, GameMessage, Game, GameActionResponse, SystemErrorMessage, BotResponseError, GAME_MASTER, ROLE_CONFIGS, GAME_ROLES, FREE_TIER_LIMITS } from "@/app/api/game-models";
-import { getPlayerColor } from "@/app/utils/color-utils";
 import PlayerAvatar from "@/app/components/PlayerAvatar";
 import { clearGameErrorState } from "@/app/api/game-actions";
 import VotingModal from "./VotingModal";
@@ -271,8 +270,8 @@ function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcludin
                 <div className="flex items-center gap-2">
                     <span className={`text-[12px] font-semibold ${
                         isGameMaster ? 'text-[var(--gm-fg)]' :
-                        isUserMessage ? 'text-[var(--you-fg)]' : ''
-                    }`} style={!isUserMessage && !isGameMaster ? { color: getPlayerColor(message.authorName) } : undefined}>
+                        isUserMessage ? 'text-[var(--you-fg)]' : 'text-[var(--fg-0)]'
+                    }`}>
                         {message.authorName}
                     </span>
                     {message.cost !== undefined && message.cost > 0 && (

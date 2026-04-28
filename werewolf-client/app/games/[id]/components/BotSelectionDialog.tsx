@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { BOT_SELECTION_CONFIG } from '@/app/api/game-models';
-import { getPlayerColor } from '@/app/utils/color-utils';
 import DraggableDialog from './DraggableDialog';
 import { useUIControls } from '../context/UIControlsContext';
 
@@ -113,8 +112,7 @@ export default function BotSelectionDialog({
                                     {isSelected ? selectionIndex + 1 : ''}
                                 </div>
                                 <span
-                                    className="text-[13px] font-medium"
-                                    style={{ color: getPlayerColor(bot.name) }}
+                                    className="text-[13px] font-medium text-[var(--fg-0)]"
                                 >
                                     {bot.name}
                                 </span>

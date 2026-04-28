@@ -16,7 +16,6 @@ import type { Session } from "next-auth";
 import { welcome, vote, keepBotsGoing, manualSelectBots, cancelBotResponses } from '@/app/api/bot-actions';
 import BotSelectionDialog from '@/app/games/[id]/components/BotSelectionDialog';
 import { replayNight, performNightAction } from '@/app/api/night-actions';
-import { getPlayerColor } from "@/app/utils/color-utils";
 import PlayerAvatar from "@/app/components/PlayerAvatar";
 import { checkGameEndConditions } from "@/app/utils/game-utils";
 import { isTierMismatchError } from '@/app/api/errors';
@@ -881,8 +880,7 @@ function GamePageContent({
                                 <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-1.5 flex-wrap">
                                     <span
-                                        className={`text-[13px] font-medium truncate ${isDead ? 'line-through' : ''}`}
-                                        style={{ color: getPlayerColor(participant.name) }}
+                                        className={`text-[13px] font-medium truncate ${isDead ? 'line-through text-[var(--fg-3)]' : participant.isGameMaster ? 'text-[var(--gm-fg)]' : isHuman ? 'text-[var(--you-fg)]' : 'text-[var(--fg-0)]'}`}
                                     >
                                         {participant.name}
                                     </span>
@@ -959,8 +957,7 @@ function GamePageContent({
                         >
                             <div className="flex items-center justify-between">
                                 <span
-                                    style={{ color: getPlayerColor(item) }}
-                                    className={isCurrent ? 'font-medium' : ''}
+                                    className={`text-[var(--fg-0)] ${isCurrent ? 'font-medium' : ''}`}
                                 >
                                     {item}
                                     {item === game.humanPlayerName && <span className="text-[var(--fg-3)] ml-1">(You)</span>}

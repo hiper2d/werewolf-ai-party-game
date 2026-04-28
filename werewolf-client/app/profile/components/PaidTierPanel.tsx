@@ -55,12 +55,12 @@ export default function PaidTierPanel({ userId, currentTier, balance }: PaidTier
 
     return (
         <div className="space-y-6">
-            <p className="theme-text-secondary text-sm">
+            <p className="text-[var(--fg-1)] text-sm">
                 Add balance and play without managing API keys. Access all available AI models with no bot limits per game.
             </p>
 
-            <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/30">
-                <p className="text-xs theme-text-secondary">
+            <div className="p-4 rounded-lg bg-[var(--accent-soft)] border border-[var(--accent-line)]">
+                <p className="text-xs text-[var(--fg-1)]">
                     Each AI call costs the model&apos;s base price + {markupPercent}% (covers hosting and beer for devs).
                 </p>
             </div>
@@ -69,7 +69,7 @@ export default function PaidTierPanel({ userId, currentTier, balance }: PaidTier
                 <button
                     onClick={handleSwitchTier}
                     disabled={isLoading}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500/60 dark:hover:bg-blue-500/70 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded transition text-sm"
+                    className="px-4 py-2 bg-[var(--accent)] hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed text-[var(--on-accent)] rounded-[var(--radius-md)] transition text-sm"
                 >
                     {isLoading ? 'Switching...' : 'Switch to Paid Tier'}
                 </button>
@@ -78,7 +78,7 @@ export default function PaidTierPanel({ userId, currentTier, balance }: PaidTier
             {/* Balance Display */}
             <div>
                 <h3 className="text-lg font-bold mb-2">Balance</h3>
-                <p className="text-3xl font-bold text-green-600 dark:text-green-400">
+                <p className="text-3xl font-bold text-[var(--gm-fg)]">
                     {formatCurrency(balance)}
                 </p>
             </div>
@@ -92,7 +92,7 @@ export default function PaidTierPanel({ userId, currentTier, balance }: PaidTier
                             key={pkg.id}
                             onClick={() => handleBuyCredits(pkg.id)}
                             disabled={!!buyingPackage}
-                            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500/60 dark:hover:bg-blue-500/70 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition font-semibold"
+                            className="px-6 py-3 bg-[var(--accent)] hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed text-[var(--on-accent)] rounded-[var(--radius-md)]-lg transition font-semibold"
                         >
                             {buyingPackage === pkg.id ? 'Redirecting...' : pkg.label}
                         </button>

@@ -46,7 +46,7 @@ export default function SpendingsDisplay({ spendings }: SpendingsDisplayProps) {
             <h3 className="text-lg font-bold mb-2">Monthly Spendings</h3>
             <ul>
                 {monthly.map(({ label, amount }) => (
-                    <li key={label} className="mb-2 flex justify-between text-sm theme-text-secondary">
+                    <li key={label} className="mb-2 flex justify-between text-sm text-[var(--fg-1)]">
                         <span>{label}</span>
                         <span className="font-semibold">{formatCurrency(amount)}</span>
                     </li>

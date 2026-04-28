@@ -54,7 +54,7 @@ export default function ModelPricingTable() {
             <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                     <thead>
-                        <tr className="border-b theme-border">
+                        <tr className="border-b border-[var(--line-1)]">
                             <th className="text-left py-2">Model</th>
                             <th className="text-right py-2">Input Cost*</th>
                             <th className="text-right py-2">Output Cost*</th>
@@ -62,18 +62,18 @@ export default function ModelPricingTable() {
                     </thead>
                     <tbody>
                         {allModels.map((model, index) => (
-                            <tr key={index} className="border-b theme-border-subtle">
+                            <tr key={index} className="border-b border-[var(--line-1)]">
                                 <td className="py-2">{model.name}</td>
                                 <td className="py-2 text-right">
                                     <div>{model.inputDisplay.base}</div>
                                     {model.inputDisplay.extended && (
-                                        <div className="text-xs theme-text-secondary">{model.inputDisplay.extended}</div>
+                                        <div className="text-xs text-[var(--fg-1)]">{model.inputDisplay.extended}</div>
                                     )}
                                 </td>
                                 <td className="py-2 text-right">
                                     <div>{model.outputDisplay.base}</div>
                                     {model.outputDisplay.extended && (
-                                        <div className="text-xs theme-text-secondary">{model.outputDisplay.extended}</div>
+                                        <div className="text-xs text-[var(--fg-1)]">{model.outputDisplay.extended}</div>
                                     )}
                                 </td>
                             </tr>
@@ -81,7 +81,7 @@ export default function ModelPricingTable() {
                     </tbody>
                 </table>
             </div>
-            <p className="text-xs theme-text-secondary mt-2">* Per million tokens (extended context rates shown when available)</p>
+            <p className="text-xs text-[var(--fg-1)] mt-2">* Per million tokens (extended context rates shown when available)</p>
         </div>
     );
 }

@@ -35,7 +35,7 @@ export default function FreeTierPanel({ userId, currentTier }: FreeTierPanelProp
 
     return (
         <div className="space-y-6">
-            <p className="theme-text-secondary text-sm">
+            <p className="text-[var(--fg-1)] text-sm">
                 Play with shared AI keys. Limited model selection and bot count per game.
             </p>
 
@@ -43,7 +43,7 @@ export default function FreeTierPanel({ userId, currentTier }: FreeTierPanelProp
                 <button
                     onClick={handleSwitchTier}
                     disabled={isLoading}
-                    className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded transition text-sm"
+                    className="px-4 py-2 bg-[var(--accent)] hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed text-[var(--on-accent)] rounded-[var(--radius-md)] transition text-sm"
                 >
                     {isLoading ? 'Switching...' : 'Switch to Free Tier'}
                 </button>
@@ -55,7 +55,7 @@ export default function FreeTierPanel({ userId, currentTier }: FreeTierPanelProp
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                         <thead>
-                            <tr className="border-b theme-border">
+                            <tr className="border-b border-[var(--line-1)]">
                                 <th className="text-left py-2">Model</th>
                                 <th className="text-right py-2">Max Bots / Game</th>
                             </tr>
@@ -75,7 +75,7 @@ export default function FreeTierPanel({ userId, currentTier }: FreeTierPanelProp
                                 }
 
                                 return (
-                                    <tr key={index} className={`border-b theme-border-subtle ${!isAvailable ? 'opacity-50' : ''}`}>
+                                    <tr key={index} className={`border-b border-[var(--line-1)] ${!isAvailable ? 'opacity-50' : ''}`}>
                                         <td className="py-2">{config.displayName}</td>
                                         <td className="py-2 text-right text-xs">{displayLimit}</td>
                                     </tr>

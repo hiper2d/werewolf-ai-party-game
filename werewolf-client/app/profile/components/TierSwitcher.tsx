@@ -19,22 +19,22 @@ const TIER_TABS: { id: UserTier; label: string; tooltip: string; color: string; 
         id: 'free',
         label: 'FREE',
         tooltip: 'Play with shared AI keys. Limited model selection and bot count per game.',
-        color: 'text-yellow-600 dark:text-yellow-400',
-        activeColor: 'border-yellow-500 bg-yellow-500/10',
+        color: 'text-[var(--fg-2)]',
+        activeColor: 'border-[var(--accent-line)] bg-[var(--accent-soft)]',
     },
     {
         id: 'api',
         label: 'API',
         tooltip: 'Bring your own API keys. All models unlocked, no bot limits.',
-        color: 'text-green-600 dark:text-green-400',
-        activeColor: 'border-green-500 bg-green-500/10',
+        color: 'text-[var(--gm-fg)]',
+        activeColor: 'border-[var(--accent-line)] bg-[var(--accent-soft)]',
     },
     {
         id: 'paid',
         label: 'PAID',
         tooltip: 'Buy balance and play with all models. No API keys needed.',
-        color: 'text-blue-600 dark:text-blue-400',
-        activeColor: 'border-blue-500 bg-blue-500/10',
+        color: 'text-[var(--accent)]',
+        activeColor: 'border-[var(--accent-line)] bg-[var(--accent-soft)]',
     },
 ];
 
@@ -52,7 +52,7 @@ export default function TierSwitcher({
     return (
         <div>
             {/* Tab buttons */}
-            <div className="flex border-b theme-border mb-6">
+            <div className="flex border-b border-[var(--line-1)] mb-6">
                 {TIER_TABS.map((tab) => {
                     const isActive = activeTab === tab.id;
                     const isCurrent = currentTier === tab.id;
@@ -65,12 +65,12 @@ export default function TierSwitcher({
                             className={`relative px-6 py-3 text-sm font-semibold transition-colors border-b-2 ${
                                 isActive
                                     ? `${tab.activeColor} ${tab.color}`
-                                    : 'border-transparent theme-text-secondary hover:theme-text-primary'
+                                    : 'border-transparent text-[var(--fg-1)] hover:text-[var(--fg-0)]'
                             }`}
                         >
                             {tab.label}
                             {isCurrent && (
-                                <span className="ml-2 text-xs font-normal px-1.5 py-0.5 rounded bg-gray-200 dark:bg-neutral-700 theme-text-secondary">
+                                <span className="ml-2 text-xs font-normal px-1.5 py-0.5 rounded bg-[var(--bg-2)] text-[var(--fg-1)]">
                                     Current
                                 </span>
                             )}

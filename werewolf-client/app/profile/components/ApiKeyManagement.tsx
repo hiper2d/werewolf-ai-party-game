@@ -76,14 +76,14 @@ export default function ApiKeyManagement({ initialApiKeys, userId }: { initialAp
                 <div className="flex justify-between items-start gap-4">
                     <div className="flex-1">
                         <h2 className="text-2xl font-bold mb-2">API Key Management</h2>
-                        <p className="theme-text-secondary text-sm">
+                        <p className="text-[var(--fg-1)] text-sm">
                             Add your API keys to access all available AI models with no usage limits.
                         </p>
                     </div>
                     <button
                         onClick={handleSwitchToFreeTier}
                         disabled={isLoading}
-                        className="px-3 py-1.5 bg-gray-500 hover:bg-gray-600 dark:bg-gray-600 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm rounded transition whitespace-nowrap flex-shrink-0"
+                        className="px-3 py-1.5 text-[13px] font-medium rounded-[var(--radius-md)] bg-[var(--bg-3)] border border-[var(--line-3)] text-[var(--fg-0)] hover:bg-[var(--bg-4)] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-[120ms] whitespace-nowrap flex-shrink-0"
                     >
                         {isLoading ? 'Switching...' : 'Switch to Free Tier'}
                     </button>
@@ -98,12 +98,12 @@ export default function ApiKeyManagement({ initialApiKeys, userId }: { initialAp
                 </div>
 
                 {/* Model Pricing Information */}
-                <div className="border-t theme-border-subtle pt-4">
+                <div className="border-t border-[var(--line-1)] pt-4">
                     <h3 className="text-xl font-bold mb-4">Available Models</h3>
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                             <thead>
-                                <tr className="border-b theme-border">
+                                <tr className="border-b border-[var(--line-1)]">
                                     <th className="text-left py-2">Model</th>
                                     <th className="text-right py-2">Input Cost*</th>
                                     <th className="text-right py-2">Output Cost*</th>
@@ -111,18 +111,18 @@ export default function ApiKeyManagement({ initialApiKeys, userId }: { initialAp
                             </thead>
                             <tbody>
                                 {allModels.map((model, index) => (
-                                    <tr key={index} className="border-b theme-border-subtle">
+                                    <tr key={index} className="border-b border-[var(--line-1)]">
                                         <td className="py-2">{model.name}</td>
                                         <td className="py-2 text-right">
                                             <div>{model.inputDisplay.base}</div>
                                             {model.inputDisplay.extended && (
-                                                <div className="text-xs theme-text-secondary">{model.inputDisplay.extended}</div>
+                                                <div className="text-xs text-[var(--fg-1)]">{model.inputDisplay.extended}</div>
                                             )}
                                         </td>
                                         <td className="py-2 text-right">
                                             <div>{model.outputDisplay.base}</div>
                                             {model.outputDisplay.extended && (
-                                                <div className="text-xs theme-text-secondary">{model.outputDisplay.extended}</div>
+                                                <div className="text-xs text-[var(--fg-1)]">{model.outputDisplay.extended}</div>
                                             )}
                                         </td>
                                     </tr>
@@ -130,16 +130,16 @@ export default function ApiKeyManagement({ initialApiKeys, userId }: { initialAp
                             </tbody>
                         </table>
                     </div>
-                    <p className="text-xs theme-text-secondary mt-2">* Per million tokens (extended context rates shown when available)</p>
+                    <p className="text-xs text-[var(--fg-1)] mt-2">* Per million tokens (extended context rates shown when available)</p>
                 </div>
 
                 {/* TTS/STT Options */}
-                <div className="border-t theme-border-subtle pt-4">
+                <div className="border-t border-[var(--line-1)] pt-4">
                     <h3 className="text-xl font-bold mb-4">Voice Options (TTS/STT)</h3>
-                    <p className="text-sm theme-text-secondary mb-3">
+                    <p className="text-sm text-[var(--fg-1)] mb-3">
                         Currently, only OpenAI provides Text-to-Speech (TTS) and Speech-to-Text (STT) capabilities. Both free and API tiers can use these features when you supply an OpenAI key.
                     </p>
-                    <div className="text-xs theme-text-secondary">
+                    <div className="text-xs text-[var(--fg-1)]">
                         <p className="mb-2"><strong>Available with:</strong> {API_KEY_CONSTANTS.OPENAI}</p>
                         <p className="mb-1"><strong>TTS Model:</strong> {AUDIO_MODEL_CONSTANTS.TTS}</p>
                         <p><strong>STT Model:</strong> {AUDIO_MODEL_CONSTANTS.STT}</p>

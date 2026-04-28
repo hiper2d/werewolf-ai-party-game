@@ -5,10 +5,10 @@ export default function VoiceInfoSection() {
     return (
         <div>
             <h3 className="text-xl font-bold mb-3">Voice Models (TTS/STT)</h3>
-            <p className="text-sm theme-text-secondary mb-3">
+            <p className="text-sm text-[var(--fg-1)] mb-3">
                 Text-to-speech and speech-to-text are available on every tier when you provide your own OpenAI key.
             </p>
-            <div className="text-xs theme-text-secondary">
+            <div className="text-xs text-[var(--fg-1)]">
                 <p className="mb-1"><strong>Requires:</strong> {API_KEY_CONSTANTS.OPENAI}</p>
                 <p className="mb-1"><strong>TTS:</strong> {AUDIO_MODEL_CONSTANTS.TTS} ($15 per 1M characters)</p>
                 <p className="mb-1"><strong>STT:</strong> {AUDIO_MODEL_CONSTANTS.STT} ($0.006 per audio minute)</p>
