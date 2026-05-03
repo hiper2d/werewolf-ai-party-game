@@ -1369,18 +1369,18 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
 
     return (
         <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-            <div className="flex items-center justify-between mb-3 flex-shrink-0 px-1">
-                <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-mono font-semibold uppercase tracking-[0.06em] px-2 py-1 rounded-[var(--radius-sm)] bg-[oklch(80%_0.10_85_/_0.10)] border border-[oklch(80%_0.10_85_/_0.35)] text-[oklch(82%_0.10_85)]">
+            <div className="flex items-center justify-between mb-3 flex-shrink-0 px-1 max-[720px]:gap-2 max-[720px]:px-3 max-[720px]:py-[10px]">
+                <div className="flex items-center gap-2 max-[720px]:flex-1 max-[720px]:min-w-0">
+                    <span className="text-[10px] font-mono font-semibold uppercase tracking-[0.06em] px-2 py-1 rounded-[var(--radius-sm)] bg-[oklch(80%_0.10_85_/_0.10)] border border-[oklch(80%_0.10_85_/_0.35)] text-[oklch(82%_0.10_85)] max-[720px]:text-[9px] max-[720px]:px-1.5 max-[720px]:py-0.5 max-[720px]:tracking-[0.05em] max-[720px]:whitespace-nowrap max-[720px]:flex-shrink-0">
                         Day {game.currentDay}
                     </span>
-                    <span className="text-[16px] font-semibold text-[var(--fg-0)]">
+                    <span className="text-[16px] font-semibold text-[var(--fg-0)] max-[720px]:text-[14px] max-[720px]:flex-1 max-[720px]:min-w-0 max-[720px]:truncate">
                         {headerTitle}
                     </span>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 max-[720px]:gap-2 max-[720px]:flex-shrink-0">
                     {shouldShowMessageCount && (
-                        <span className="text-[12px] font-mono text-[var(--fg-2)]">
+                        <span className="msg-count text-[12px] font-mono text-[var(--fg-2)] max-[720px]:hidden">
                             {messageCountLabel}
                         </span>
                     )}
@@ -1390,7 +1390,7 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
                                 <button
                                     type="button"
                                     onClick={() => setShowDaySelector(prev => !prev)}
-                                    className={`flex items-center gap-1.5 text-[13px] px-3 py-1.5 rounded-[var(--radius-md)] border transition-all duration-[120ms] ${showDaySelector ? 'border-[var(--accent-line)] bg-[var(--accent-soft)] text-[var(--accent)]' : 'border-[var(--line-2)] bg-[var(--bg-2)] text-[var(--fg-1)] hover:border-[var(--line-3)]'}`}
+                                    className={`flex items-center gap-1.5 text-[13px] px-3 py-1.5 rounded-[var(--radius-md)] border transition-all duration-[120ms] max-[720px]:text-[12px] max-[720px]:px-2 max-[720px]:py-1 max-[720px]:whitespace-nowrap ${showDaySelector ? 'border-[var(--accent-line)] bg-[var(--accent-soft)] text-[var(--accent)]' : 'border-[var(--line-2)] bg-[var(--bg-2)] text-[var(--fg-1)] hover:border-[var(--line-3)]'}`}
                                 >
                                     Day {selectedDay}
                                     <svg className={`w-3 h-3 transition-transform duration-[160ms] ${showDaySelector ? 'rotate-180' : ''}`} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M3.5 5.25L7 8.75L10.5 5.25" /></svg>

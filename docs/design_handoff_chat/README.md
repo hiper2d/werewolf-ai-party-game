@@ -1,393 +1,264 @@
-# Handoff: Game Chat — page redesign
+# Handoff: Create New Game — page redesign
 
 ## Overview
-Redesign of the in-game **Chat** page in the Werewolf app — the screen used during day-discussion phases. Companion to the Create Game handoff (same design tokens, same theme system).
+Redesign of the **Create New Game** page in the Werewolf app, plus the **Generating Game Preview** notification and the **Generated Game Preview** section that appears below it.
 
-Key changes vs. the previous design:
-1. **Three-column shell** — Sidebar (participants + cost) · Chat stream · Discussion Queue panel.
-2. **Per-character avatars** — deterministic hash → 12-color palette. GM gets a green gradient + `GM` mark. "You" gets a soft accent-fill row + blue name + `you` chip.
-3. **Role visibility tags** — your own role, fellow werewolves (when you are one), and dead players' revealed roles are shown as small uppercase mono chips beside the name.
-4. **Dead-player treatment** — desaturated avatar with overlaid `✕`, strikethrough name, sub-line shows revealed role + cause + day/night.
-5. **GM rail** — Game Master messages get a green left rail + soft green tint instead of the previous flat color block.
-6. **Cost display is hover-only** by default, with a `$ on/off` toggle to pin it visible.
-7. **Thinking state** — skeleton bubble with shimmering lines + "X is thinking…" italic label; composer disables with a pulsing-dot hint.
-8. **Discussion Queue** — idle state with bot illustration + helper copy; live state with numbered queue (`Current` / `Up next` / strike-through `Done`) and gradient progress bar.
-9. **Modals** — Select Bots to Respond and Change AI Model both polished, centered, backdrop-blur, consistent token system.
-10. **Light theme parity** — full token set; tags and rails remain readable in both modes.
+Key fixes vs. the previous design:
+1. **Special Roles** are now toggle chips (all visible, click to toggle) instead of awkward selected-pills.
+2. **"Fast only"** is no longer a stranded checkbox — it's a filter pill *inside* the AI multi-select dropdown.
+3. **Purple removed** from the palette. Replaced with a neutral cool-grey scale + a single restrained blue accent.
+4. **Light theme** added. Selected chip text uses `--accent-fg` so labels stay legible against soft accent fills in both modes.
+5. **Generating banner** redesigned as a proper info banner (subtle accent-tinted fill, spinning icon, animated dots, secondary description text).
+6. **Game Preview** section laid out as a clear hierarchy: Game Story → Game Master card → Players cards.
 
 ## About the Design Files
-The files in this bundle (`Game Chat.html`, `chat-app.jsx`, `chat-components.jsx`, `chat-data.jsx`, `tweaks-panel.jsx`) are **design references created in HTML** — a working prototype showing intended look and behavior. They are not production code. Recreate this design in the existing Werewolf codebase, using its component library and styling conventions.
+The files in this bundle (`Create Game.html`, `app.jsx`, `components.jsx`, `tweaks-panel.jsx`) are **design references created in HTML** — a working prototype showing intended look and behavior. They are not meant to be dropped into production. The task is to **recreate this design in the existing Werewolf codebase**, using its established framework, component library, and styling conventions. If the codebase is React, port the components directly; otherwise translate the structure and styling but preserve the visual specifications below.
 
-To run the prototype: open `Game Chat.html` in any browser. No build step. URL params:
+To run the prototype: open `Create Game.html` in any browser. No build step. URL params:
+- `?state=generating` — boots straight to the generating banner state.
+- `?state=preview` — boots straight to the rendered preview state.
 - `?theme=light` or `?theme=dark` — sets initial theme.
 
 ## Fidelity
-**High-fidelity.** Final colors, typography, spacing, and interactions are intended to be implemented as-shown. Tokens and behavior tables below are the source of truth.
+**High-fidelity.** Final colors, typography, spacing, and interactions are intended to be implemented as-shown. Use the exact tokens listed in *Design Tokens*.
 
 ---
 
-## Layout
+## Screens / Views
 
-CSS Grid, three columns, full viewport height under the 56px top nav.
+### 1. Top Nav
+- 56px sticky bar, hairline bottom border. Left: brand mark + host name + `API` tag. Right: text links (`All games`, `Rules`, `User Profile`) separated by 1×16px dividers, then `Dark`/`Light` mode pill toggle, then `Logout` button.
+- **Brand mark:** 28×28 rounded-square, subtle gradient, 1px border, monospace letter glyph.
+- **Mode toggle:** clicking flips `[data-theme]` on `<html>` between `dark` and `light`. Icon = moon (dark) or sun (light).
 
-| Column            | Width  | Notes                                                                |
-|-------------------|--------|----------------------------------------------------------------------|
-| Sidebar           | 280px  | Independent vertical scroll for participants list                    |
-| Chat              | 1fr    | Flex column: header (fixed) → stream (scroll) → composer (fixed)     |
-| Discussion Queue  | 320px  | Hidden below 1024px viewport (responsive)                            |
+### 2. Create New Game card
+- Centered, max-width 1040px, 40px top padding. Card uses `--bg-1`, 1px border `--line-1`, `border-radius: 16px`, soft shadow.
+- **Header:** Title `Create New Game` (18px/600). Right: `Generate Preview` button. Button has three states: idle (bolt icon + label), busy (spinning bolt + "Generating…", disabled), and post-success returns to idle.
+- **Body fields top-to-bottom:**
+    - **Row 1:** Two columns — `Host Name` text input, `Game Title` text input.
+    - **Row 2:** Full-width `Description (optional)` textarea (76px min-height).
+    - **Row 3:** Two columns with 140px inline labels — `Player Count` select (4–20), `Werewolf Count` select (1–6).
+    - **Row 4:** 140px inline label `Players AI` → custom multi-select.
+    - **Row 5:** 140px inline label `Special Roles` → toggle chips.
 
-Background scale: viewport `--bg-base` → sidebar/queue `--bg-1` → chat column `--bg-0` → cards/inputs `--bg-2`. Hairline borders (`--line-1`) separate columns.
+#### Players AI multi-select
+- **Trigger:** single row, `min-height: 38px`, 1px border. Contains: circular count badge (monospace), summary text, optional `Fast only` accent pill (only when filter is on), chevron.
+- Open state gets `--accent-line` border + 3px `--accent-soft` glow.
+- **Popover (6px below):** 1px border, 12px radius, popover shadow, 140ms fade+translate.
+- **Header:** search input with leading magnifier icon.
+- **Toolbar:** `Fast only` filter pill (left) + `Select visible` / `Clear` text buttons (right).
+- **List:** scrollable (max-height 280px), grouped by provider with 10px uppercase monospace labels. Each row: 16×16 custom checkbox (accent-filled when checked), model name + speed tag (`fast` green-tinted, `standard` amber-tinted), `provider · model-id` sub-row.
+- When `Fast only` is on: non-fast rows are 0.4 opacity, not clickable. Toggling on auto-selects all fast models. Toggling off lifts restriction but doesn't auto-deselect.
+- **Footer:** `<count> selected · <count> shown` monospace + `Done` ghost button.
 
----
+#### Special Roles toggle chips
+- All 5 roles always visible: **Doctor, Detective, Maniac, Seer, Hunter**.
+- **Layout:** `border-radius: 8px` (squared), 1px border, `padding: 7px 12px 7px 10px`, gap 8px.
+    - Leading 22×22 rounded icon container (border-radius 6px) with role glyph.
+    - Label text 13px/500.
+    - Trailing 16×16 rounded check square — transparent border unselected, `--accent` filled with `--on-accent` glyph when selected.
+- **Unselected:** `--bg-2` fill, `--line-2` border, `--fg-1` text.
+- **Hover:** `--bg-3` fill, `--line-3` border, `--fg-0` text.
+- **Selected:** `--accent-soft` fill, `--accent-line` border, **`--accent-fg`** text (this is the contrast fix — chip labels are dark blue in light mode, light blue in dark mode, both legible against the soft accent fill).
 
-## Sidebar
+### 3. Generating banner
+- Appears below the card immediately when generation starts.
+- 1px border `--info-border`, fill `--info-bg`, `border-radius: 12px`, 14×18px padding, 12px gap.
+- **Leading icon block:** 28×28, 8px radius, accent-soft fill, accent-line border, accent-fg foreground. Bolt icon spins (`spin 1.4s linear infinite`).
+- **Title:** 14px/600 in `--info-fg`, "Generating Game Preview" with animated trailing dots (CSS `@keyframes` cycling content "" → "." → ".." → "…" every 1.4s).
+- **Body:** 13px secondary copy: "The AI is creating your game story and characters. This may take a moment."
+- 200ms pop-in animation on appear.
+- The original screenshot's banner had purple-blue opaque fill with white-ish text on white-ish background — replace with this restrained, accent-tinted design that works in both themes.
 
-### Header block
-- **Game title** — 18px / 600.
-- **Meta row** — three items separated by `·`:
-    - Cost pill: `$0.0000` with leading green dot. Title attr: `Total game cost so far`.
-    - Alive count: `10/12 alive` (alive non-GM / total non-GM).
-    - Phase: `Day 2`.
+### 4. Game Preview section
+Renders below the card after generation completes (~1.8s in the mock).
 
-### Participants section
-- Section label `PARTICIPANTS` (10px mono, uppercase, tracked) on the left; `$ on`/`$ off` cost-toggle pill on the right.
-- List is independently scrollable; rows are 8px gap, full width.
+#### Heading
+- `Preview` H1 — 20px/600, letter-spacing -0.01em.
 
-### Participant row
-- 32×32 avatar (rounded-full), name + tags line, sub-line, optional cost on right.
-- **Avatar gradient** — deterministic by name hash; 12-color palette (see `chat-data.jsx`). GM uses a fixed green gradient. Dead players: avatar is grayscaled and overlaid with `✕` glyph in the center.
-- **Name line** — name (13px / 500, ellipsis); inline tags follow with 6px gap, wrap allowed.
-- **Sub-line** — 11px mono, `--fg-2`. Shows model name for AI players, `Playing as you` for the human, death info for dead players.
-- **Cost** — 10px mono, `--fg-3`, right-aligned, opacity 0 → 1 on hover (or always 1 when toggle is on). Hidden for "you" and dead players.
-- **Click target** — entire row is clickable for AI players (opens Change Model modal). "You" and dead players are not clickable.
-- **Hover** — `--bg-1` background. "You" row has a permanent `--accent-soft` background.
-- **GM row** — green name color, no cost shown.
+#### Game Story
+- Full-width labeled textarea, pre-filled with the generated story. 130px min-height.
+- Editable so the user can tweak the AI output.
 
-### Role visibility logic
-Computed by `getRoleVisibility(participant, viewer)`:
+#### Game Master subsection
+- H2 `Game Master` (15px/600) with trailing horizontal rule (flex: 1 line on the right).
+- Card (`--bg-1`, 1px border, 12px radius, 16×18 padding):
+    - Top meta line: `Voice Provider: <bold value>` in 11px monospace uppercase + 13px sans bold for the value.
+    - Two-column grid (`AI Model` select | `Voice` select + voice-preview icon button).
+    - Full-width `Voice Style` text input below.
+- **Icon button:** 32×32 square with play glyph (or speaker icon), `--bg-2` fill, hover `--bg-3`.
 
-| Subject                                   | Tag visible? | Where shown                                 |
-|-------------------------------------------|--------------|---------------------------------------------|
-| GM                                        | No tag       | Existing GM treatment (green name + avatar) |
-| You (the viewer)                          | Yes          | Beside name in sidebar AND in messages      |
-| Another player when *you* are a werewolf and *they* are a werewolf | Yes (variant `fellow-wolf`) | Sidebar + messages |
-| Dead player                               | Yes (variant `dead`)        | Death sub-line + messages         |
-| Anyone else (alive, not on your team)     | Hidden       | —                                            |
-
-This is a hard rule — never leak roles the human player wouldn't legitimately know in werewolf.
-
-### Role tag styles
-Small uppercase mono pill, 9px / 600, 1px solid 5-px-radius, `letter-spacing: 0.08em`. One color per role; alive variants use a tinted fill, `dead` variant uses transparent fill + outline.
-
-| Role        | Hue (oklch H)  | Visual                                                |
-|-------------|----------------|-------------------------------------------------------|
-| `werewolf`  | 25  (red)      | Tinted red fill + red border + bright-red text        |
-| `doctor`    | 145 (green)    | Tinted green                                          |
-| `detective` | 70  (amber)    | Tinted amber                                          |
-| `maniac`    | 320 (magenta)  | Tinted magenta                                        |
-| `villager`  | (neutral)      | `--bg-2` fill, `--fg-2` text, `--line-2` border       |
-| `dead` variant (any role) | —    | Transparent fill, neutral border, `--fg-3` text, 0.85 opacity |
-
-### Death sub-line
-For dead participants the sub-line replaces the model name with:
-`<RoleTag variant="dead">VILLAGER</RoleTag> <span>Killed · Night 1</span>`
-- Cause is `Killed · Night N` (werewolf attack) or `Lynched · Day N` (vote-out).
-- Whole row gets `opacity: 0.78`; brightens to 1 on hover with a `--bg-1` background so dead players are still selectable for inspection.
-
-### Cost toggle
-- Pill button to the right of the section label. Off: ghost outline. On: `--accent-soft` fill, `--accent-fg` text, `--accent-line` border.
-- Persists costs visible regardless of hover.
-
----
-
-## Chat column
-
-### Chat header
-- 56px tall, hairline bottom border, 24px horizontal padding.
-- Left: phase tag (`Day 2`) + title (`Day discussion`, 16px / 600).
-- Right: message count (`9 messages`, 12px mono, `--fg-2`).
-
-### Message stream
-- Vertical scroll, 24px horizontal padding, 16px gap between message groups.
-- Each group: 36×36 avatar on the left, message column on the right.
-- **Header row** — author name (clickable to change model) + optional role tag + optional cost ($ format) + hover-revealed action buttons (read-aloud, delete).
-- **Bubble** — `--bg-2` background, 1px `--line-1` border, 14px radius, 12px / 16px padding. Body text `--fg-0` 14px / 1.55.
-- **Author wrap nit** — author + model + cost may wrap to a second line at narrow widths. Acceptable; do not constrain.
-
-### Author treatments
-| Author class | Visual                                                                        |
-|--------------|-------------------------------------------------------------------------------|
-| `gm`         | Green name; bubble has a 3px green left rail + soft green tint (8% green over `--bg-2`) |
-| `you`        | Blue name; bubble has a 3px accent-blue left rail + `--accent-soft` fill + 1px `--accent-line` border |
-| `werewolf` (visible to viewer) | Red name; standard bubble                                  |
-| (default)    | `--fg-0` name; standard bubble                                                 |
-
-When a viewer is a werewolf, fellow-werewolf authors get the `werewolf` class even if they are not "you". `you` always wins over `werewolf` in the className chain.
-
-**User-message rail rationale** — GM and the current user are both "special speakers" in the discussion. They share the *colored-rail* pattern (green for GM, accent-blue for you) so the visual language stays consistent: important roles get a rail in their role's color. **Do not right-align user messages** — this is a group/Slack-style log, not a 1:1 chat; right-aligning breaks scannability when 13 speakers interleave. The rail + author color + `YOU` pill + bubble tint together provide enough disambiguation without horizontal layout shifts.
-
-**Implementation** — the user-message class is `.you-msg` on the `.msg` element. Mirror the existing `.msg.gm-msg` rule: 3px solid `--accent` left rail (border-radius `3px 0 0 3px` so the rail butts cleanly into the corner), `--accent-soft` fill, `--accent-line` border. GM rail (green) stays unchanged.
-
-### Message header role tag
-The same `<RoleTag>` rendered in the sidebar appears beside the author's name in the message header when `getRoleVisibility(author, viewer).visible` is true (and `reason !== 'dead'` — dead players don't appear in the active stream in the prototype, but if they did, the tag would render as the `dead` variant).
-
-### Action buttons (hover-revealed)
-Float above the message header on the right. Two icons:
-- **Read aloud** — speaker icon. Toggles between idle and active state (active = accent-tinted bg, accent icon).
-- **Delete** — `✕` icon. Click opens a small popover (`role="menu"`) with two destructive choices:
-    - `Delete from here (incl.)` — danger color, scissor icon.
-    - `Delete after this message` — warning color, forward icon.
-- Popover closes on outside click. Both actions take the message id; behavior is left to the consuming app.
-
-### Thinking state
-Replaces a message bubble while a model is generating its response.
-- Same avatar + author header (with `… is thinking` italic label appended after the name).
-- Bubble: skeleton with three shimmering placeholder lines (last one 60% width); shimmer is a 1.4s linear gradient sweep using `--bg-1`/`--bg-2`.
-- Three bouncing dots (`.dot.bounce`) play at 0/0.15/0.3s offsets to confirm activity.
-- While any thinking bubble is on screen, the composer is disabled and shows `… {Name} is replying` muted-pulsing copy below the input.
+#### Players subsection
+- H2 `Players · N of 12` with trailing rule. Count secondary in 12px `--fg-2`.
+- One **player card** per generated player:
+    - **Head row:** 36×36 round avatar (initial letter), name (14px/600), gender + voice sub (11px monospace), role tag right-aligned. Bottom border.
+    - **Role tag:** rounded pill, uppercase 10px. Werewolves use red-tinted variant (`oklch(60% 0.13 25)` bg + border + `oklch(70% 0.13 25)` text). Villagers use neutral.
+    - **Two-column grid:** `AI Model` select | `Play Style` select.
+    - **Story:** full-width textarea (70px min-height), editable.
+    - **Two-column grid:** `Voice Style` text input | `Voice` select + preview button.
+- All fields editable so the user can refine the generated content before starting.
 
 ---
 
-## Composer
+## Interactions & Behavior
 
-The composer has **two states**: `collapsed` (default) and `expanded`. State is driven by a single `expanded: boolean` plus a className on the wrapper (`.composer-collapsed` / `.composer-expanded`).
-
-### Collapsed (default — also the mobile-optimized state)
-- Single-line input, ~40px tall (min-height 40, max-height 56).
-- Action bar **fully hidden** — Send, Vote, Go on, mic, lightbulb all gone.
-- Hint text hidden.
-- Cursor is `text` over the whole composer card; clicking anywhere expands it.
-
-### Expanded
-- Input min-height 140px; auto-grows up to 280px max as the user types, then scrolls internally.
-- Action bar slides in:
-    - **Primary buttons (left):** `Send` (accent fill), `Vote` (ghost outline, check icon), `Go on` (ghost outline, fast-forward icon — tells AI bots to continue without user input).
-    - **Icon buttons (right):** `Mic` (voice input), `Lightbulb` (hint).
-- Hint text shows below the card if a hint is set (e.g. "X is replying" while disabled).
-
-### Transitions between states
-- **Expand on:** click anywhere within the composer card, OR input focus.
-- **Collapse on:** mousedown anywhere outside the composer wrapper. **Always collapses** — do not gate on "input is empty". The draft text is preserved across collapse/expand.
-- Animate on the bar: `max-height` (0 → 60px), `opacity` (0 → 1), `padding`, ~200ms ease.
-- Animate on the textarea: `min-height` (40px → 140px), 180ms ease.
-- Use `overflow: hidden` on `.composer-bar` so it slides cleanly.
-
-### Implementation
-- One `useState` (`expanded`). Wrapper className toggles `.composer-collapsed` / `.composer-expanded`.
-- Auto-size the textarea on every value change AND on state change: reset `height: auto`, set to `scrollHeight`, clamp by min/max for the current state.
-- Outside-click detection: `mousedown` listener on `document`, gated by a ref to the composer wrapper, registered only while `expanded === true`.
-- Behavior is identical on desktop and mobile — no media queries needed for this feature. The collapsed state IS the mobile design.
-- **Disabled state** (AI thinking): opacity 0.5, no pointer events; the hint text below the card shows muted "… {Name} is replying" copy. Disabled does not auto-expand.
-
-### Acceptance
-- On page load → composer is collapsed (one line, no buttons visible).
-- Click on the composer → smoothly expands; cursor lands in input; buttons appear.
-- Click on a chat message or sidebar → composer collapses; any typed text is preserved (verify by re-expanding).
-- Typing more text in expanded state grows the input up to ~280px, then scrolls.
-- No layout jump when toggling — smooth animation only.
+- **All inputs:** focus = `--accent-line` border + 3px `--accent-soft` ring. 120ms transitions on border/background.
+- **Theme toggle:** flips `data-theme` attribute on `<html>` between `dark` and `light`. All tokens cascade.
+- **Role chips:** click anywhere toggles selection; `aria-pressed` reflects state.
+- **AI multi-select:** outside-click closes, search filters by model name OR provider, `Select visible` adds filtered IDs (idempotent), `Clear` empties selection. Toggling Fast-only on auto-selects fast models; off lifts the restriction.
+- **Generate Preview flow:**
+    1. Click → button enters busy state (spinning bolt, "Generating…" label, disabled).
+    2. Banner appears below card with spinning bolt + animated dots.
+    3. After ~1.8s, banner is replaced by the Preview section.
+    4. Button returns to idle state. Clicking again re-runs the flow.
+- **All animations:** chevron rotate 160ms, popover fade+translate 140ms, banner/preview pop 200ms, hover transitions 120ms.
 
 ---
 
-## Discussion Queue (right column)
+## State Management
 
-### Idle state
-Shown when no bots are queued for the next turn.
-- Bot illustration (40×40, `Icons.Bot`) inside a 64×64 circle with a subtle pulsing accent ring (3s ease-in-out, scale 1 → 1.08, opacity 0.6 → 0.2).
-- Headline: `Auto-discussion paused`.
-- Helper copy (italic, `--fg-2`): explains that bots will respond after the player speaks, or the player can manually pick which bots respond.
-- Outline button: `Select bots manually` (opens Select Bots modal).
+| Field | Type | Notes |
+|---|---|---|
+| `name` | string | Host name |
+| `title` | string | Game title |
+| `description` | string | Optional |
+| `playerCount` | string/number | "4"–"20" |
+| `werewolves` | string/number | "1"–"6" |
+| `roles` | string[] | Selected role IDs |
+| `models` | string[] | Selected AI model IDs |
+| `genState` | `"idle" \| "generating" \| "done"` | Drives button + banner + preview |
+| `preview` | object \| null | Generated content |
+| `theme` | `"dark" \| "light"` | Persist to localStorage; reflect on `<html data-theme>` |
 
-### Live state
-- Headline: `Discussion Queue` + small mono badge `3 of 5` (current / total).
-- List of queued items, one row each. Status drives the visual:
-
-| Status     | Visual                                                                            |
-|------------|-----------------------------------------------------------------------------------|
-| `done`     | Number circle: dim outline. Name: strikethrough, `--fg-3`. No metadata shown.     |
-| `current`  | Number circle: accent fill + pulsing dot in the corner. Row: accent-soft bg, accent border. Status text: italic `replying…` |
-| `next`     | Number circle: solid `--bg-2`, `--fg-1` numeral. Row: standard bubble.            |
-
-- Footer: gradient progress bar (`--accent-soft` → `--accent`) sized to `current / total`. Below it: `1 done · 1 replying · 3 up next` mono summary.
+AI multi-select holds local UI state for: `open`, `query`, `fastOnly`. These do not persist outside the component.
 
 ---
 
-## Modals
+## Design Tokens
 
-Both modals share the same chrome:
-- Full-viewport backdrop: `rgba(0,0,0,0.5)` + `backdrop-filter: blur(6px)`.
-- Centered card, 480–560px wide, 16px radius, soft shadow, 1px `--line-1` border.
-- Header: title + close `✕` button. Footer: secondary action left (or empty), primary action right.
-- ESC closes; click on backdrop closes; tab focus is trapped.
+### Dark theme (default — `:root` / `[data-theme="dark"]`)
 
-### Change AI Model
-Triggered by clicking a participant row or message author name.
-- Header subtitle: shows player avatar + name + `Currently using: <model>`.
-- Search input at the top (filters across providers).
-- List grouped by provider (Anthropic, OpenAI, DeepSeek, Google, xAI, Moonshot). Each provider header is sticky-ish: 11px mono uppercase, `--fg-2`.
-- Each row: custom radio (16px circle, accent-filled when selected) + model name + tag pills (`fast`, `thinking`).
-- Footer: `Cancel` (ghost) · `Apply` (accent, disabled until selection differs).
+| Token | Value | Usage |
+|---|---|---|
+| `--bg-0` | `#0b0c0f` | Page background |
+| `--bg-1` | `#111317` | Card background, popover |
+| `--bg-2` | `#161a20` | Input/trigger background |
+| `--bg-3` | `#1d2229` | Hover surface, secondary button |
+| `--bg-4` | `#252a33` | Active/pressed surface |
+| `--line-1` | `#1f242c` | Hairline dividers |
+| `--line-2` | `#2a313b` | Standard input borders |
+| `--line-3` | `#3a4250` | Hover/focus border base |
+| `--fg-0` | `#ecedef` | Primary text |
+| `--fg-1` | `#b9bcc3` | Secondary text, labels |
+| `--fg-2` | `#7e848f` | Tertiary text, helper, monospace |
+| `--fg-3` | `#555b66` | Muted, placeholder |
+| `--accent` | `oklch(72% 0.09 230)` | Selected fills |
+| `--accent-soft` | `oklch(72% 0.09 230 / 0.14)` | Selected chip fill, focus ring |
+| `--accent-line` | `oklch(72% 0.09 230 / 0.45)` | Selected/focus borders |
+| `--accent-fg` | `oklch(96% 0.02 230)` | Text on accent-soft |
+| `--on-accent` | `#0b0c0f` | Text/glyph on solid accent |
+| `--info-bg` | `oklch(72% 0.09 230 / 0.10)` | Banner fill |
+| `--info-border` | `oklch(72% 0.09 230 / 0.40)` | Banner border |
+| `--info-fg` | `oklch(85% 0.06 230)` | Banner title text |
 
-### Select Bots to Respond
-Triggered by the hand icon in the composer or `Select bots manually` in the queue.
-- Subtitle: `Pick which bots respond next, in what order, and how many messages each sends.`
-- List of all alive non-GM bots. Each row:
-    - Order badge — circle on the far left. Empty (outline) when not selected; accent-filled with the order number (1, 2, 3…) when selected. Click toggles selection.
-    - Avatar + name.
-    - Message count stepper on the right: `–` button, mono number, `+` button. Range 1–5. Stepper is disabled while the bot is unselected.
-- Footer: left = mono summary `3 selected · 5 messages total`. Right = `Cancel` · `Start` (accent, disabled at 0 selected).
+### Light theme (`[data-theme="light"]`)
 
----
+| Token | Value |
+|---|---|
+| `--bg-0` | `#f5f6f8` |
+| `--bg-1` | `#ffffff` |
+| `--bg-2` | `#f3f4f6` |
+| `--bg-3` | `#eaecef` |
+| `--bg-4` | `#dfe2e7` |
+| `--line-1` | `#e6e8ec` |
+| `--line-2` | `#d4d8de` |
+| `--line-3` | `#b7bdc6` |
+| `--fg-0` | `#15181d` |
+| `--fg-1` | `#3d4450` |
+| `--fg-2` | `#6b727d` |
+| `--fg-3` | `#9aa0aa` |
+| `--accent` | `oklch(55% 0.12 235)` |
+| `--accent-soft` | `oklch(55% 0.12 235 / 0.10)` |
+| `--accent-line` | `oklch(55% 0.12 235 / 0.45)` |
+| `--accent-fg` | `oklch(38% 0.12 235)` |
+| `--on-accent` | `#ffffff` |
+| `--info-bg` | `oklch(55% 0.12 235 / 0.07)` |
+| `--info-border` | `oklch(55% 0.12 235 / 0.35)` |
+| `--info-fg` | `oklch(40% 0.12 235)` |
 
-## Tokens (paste into the codebase)
+### Semantic accents
 
-Same token system as the Create Game handoff. If both pages live in the same app, define these once globally.
+- **Fast tag (green):** text `oklch(80% 0.13 145)`, border `oklch(60% 0.10 145 / 0.5)`, bg `oklch(60% 0.10 145 / 0.1)`.
+- **Standard tag (amber):** text `oklch(78% 0.10 65)`, border `oklch(60% 0.08 65 / 0.5)`, bg `oklch(60% 0.08 65 / 0.1)`.
+- **Werewolf tag (red):** text `oklch(70% 0.13 25)`, border `oklch(60% 0.13 25 / 0.45)`, bg `oklch(60% 0.13 25 / 0.12)`.
 
-### Dark (default)
-```css
---bg-base: oklch(15% 0.005 250);
---bg-0:    oklch(17% 0.005 250);
---bg-1:    oklch(20% 0.005 250);
---bg-2:    oklch(23% 0.006 250);
---bg-3:    oklch(27% 0.007 250);
---line-1:  oklch(28% 0.008 250);
---line-2:  oklch(34% 0.009 250);
---line-3:  oklch(42% 0.010 250);
---fg-0:    oklch(96% 0.005 250);
---fg-1:    oklch(82% 0.008 250);
---fg-2:    oklch(64% 0.010 250);
---fg-3:    oklch(48% 0.010 250);
---accent:       oklch(62% 0.16 240);
---accent-hover: oklch(67% 0.16 240);
---accent-soft:  color-mix(in oklch, oklch(62% 0.16 240) 14%, transparent);
---accent-line:  color-mix(in oklch, oklch(62% 0.16 240) 35%, transparent);
---accent-fg:    oklch(78% 0.13 240);
---on-accent:    oklch(98% 0 0);
---gm-fg:        oklch(75% 0.12 145);
---gm-rail:      oklch(60% 0.14 145);
---gm-tint:      color-mix(in oklch, oklch(60% 0.14 145) 8%, transparent);
---you-fg:       var(--accent-fg);
---font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Inter, sans-serif;
---font-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
-```
+### Typography
 
-### Light
-```css
-[data-theme="light"] {
-  --bg-base: oklch(98% 0.003 250);
-  --bg-0:    oklch(99.5% 0.002 250);
-  --bg-1:    oklch(97% 0.004 250);
-  --bg-2:    oklch(94% 0.005 250);
-  --bg-3:    oklch(90% 0.006 250);
-  --line-1:  oklch(88% 0.006 250);
-  --line-2:  oklch(80% 0.008 250);
-  --line-3:  oklch(70% 0.010 250);
-  --fg-0:    oklch(20% 0.010 250);
-  --fg-1:    oklch(34% 0.010 250);
-  --fg-2:    oklch(50% 0.010 250);
-  --fg-3:    oklch(62% 0.010 250);
-  --accent:       oklch(54% 0.18 240);
-  --accent-hover: oklch(48% 0.18 240);
-  --accent-soft:  color-mix(in oklch, oklch(54% 0.18 240) 12%, transparent);
-  --accent-line:  color-mix(in oklch, oklch(54% 0.18 240) 35%, transparent);
-  --accent-fg:    oklch(38% 0.18 240);
-  --on-accent:    oklch(99% 0 0);
-  --gm-fg:        oklch(40% 0.13 145);
-  --gm-rail:      oklch(50% 0.14 145);
-  --gm-tint:      color-mix(in oklch, oklch(50% 0.14 145) 10%, transparent);
-}
-```
+- **Sans:** Inter, weights 400/500/600/700.
+- **Mono:** JetBrains Mono, weights 400/500. Used for: API tag, count badges, model IDs, footer info, preview meta lines.
 
-### Avatar palette (12 hues)
-```js
-[
-  ['oklch(60% 0.18 25)',  'oklch(45% 0.18 25)'],   // red
-  ['oklch(65% 0.16 60)',  'oklch(50% 0.16 60)'],   // orange
-  ['oklch(70% 0.14 90)',  'oklch(55% 0.14 90)'],   // amber
-  ['oklch(65% 0.14 145)', 'oklch(50% 0.14 145)'],  // green
-  ['oklch(63% 0.13 195)', 'oklch(48% 0.13 195)'],  // teal
-  ['oklch(60% 0.14 230)', 'oklch(45% 0.14 230)'],  // blue
-  ['oklch(58% 0.16 270)', 'oklch(42% 0.16 270)'],  // indigo
-  ['oklch(60% 0.18 310)', 'oklch(45% 0.18 310)'],  // magenta
-  ['oklch(63% 0.16 345)', 'oklch(48% 0.16 345)'],  // pink
-  ['oklch(58% 0.10 110)', 'oklch(45% 0.10 110)'],  // olive
-  ['oklch(62% 0.12 175)', 'oklch(48% 0.12 175)'],  // cyan
-  ['oklch(58% 0.14 290)', 'oklch(42% 0.14 290)'],  // violet
-]
-```
-Hash function in `chat-data.jsx`: `Σ (charCode × 31^i) | 0`, then `% 12`. Use the same algorithm in production so avatars are stable across page loads.
+| Element | Size | Weight |
+|---|---|---|
+| Preview H1 | 20px | 600 |
+| Card title | 18px | 600 |
+| Player name | 14px | 600 |
+| Body / inputs / chip labels | 13px | 400/500 |
+| Banner title / preview H2 | 14–15px | 600 |
+| Labels / banner body | 12–13px | 400/500 |
+| Helper / monospace info | 11px | 400 |
+| Tag/uppercase labels | 10px | 500/600, uppercase, 0.05–0.08em letter-spacing |
+
+### Spacing & Radii
+
+- Card body: 24/28/28px padding. Form rows: 16–18px gap. Inline label column: 140px. Chip gap: 8px.
+- Radii: `--radius-sm` 6px, `--radius-md` 8px (inputs, buttons, chips), `--radius-lg` 12px (popover, banner, player card), `--radius-xl` 16px (main card), 999px (count badge, mode toggle, filter pills, role tag).
+
+### Shadows
+
+- `--shadow-1`: `0 1px 0 rgba(255,255,255,0.02) inset, 0 1px 2px rgba(0,0,0,0.4)` — brand mark.
+- `--shadow-2`: `0 8px 24px rgba(0,0,0,0.4), 0 2px 6px rgba(0,0,0,0.3)` — main card.
+- `--shadow-pop`: `0 16px 40px rgba(0,0,0,0.55), 0 4px 12px rgba(0,0,0,0.4)` — popover.
 
 ---
 
-## Data shape
+## Assets
 
-```ts
-type Role = 'gm' | 'villager' | 'werewolf' | 'doctor' | 'detective' | 'maniac';
+All icons are **inline SVG**, drawn from scratch as simple geometric glyphs. Replace with the codebase's existing icon library where natural mappings exist:
 
-interface Participant {
-  id: string;
-  name: string;
-  model: string | null;        // null for the human "you"
-  cost: number;                // session cost in USD
-  role: Role;
-  you?: boolean;               // true on exactly one participant
-  dead?: boolean;
-  deathDay?: number;           // present when deathCause === 'lynched'
-  deathNight?: number;         // present when deathCause === 'killed'
-  deathCause?: 'killed' | 'lynched';
-}
-```
+| Glyph | Suggested replacement |
+|---|---|
+| Doctor (cross) | medical/plus icon |
+| Detective (magnifier) | search/magnifier icon |
+| Maniac (triangle warning) | alert/warning icon |
+| Seer (eye) | eye icon |
+| Hunter (arrow up-right) | arrow icon |
+| Witch (potion) | flask icon (unused but defined) |
+| Bolt (fast / generating) | bolt/zap icon |
+| Magnifier (search) | search icon |
+| Caret (chevron) | chevron-down |
+| Check | check |
+| Moon/Sun (theme) | moon/sun |
+| Play (voice preview) | play / speaker icon |
 
-```ts
-function getRoleVisibility(p: Participant, viewer: Participant) {
-  if (p.role === 'gm') return { visible: false };
-  if (p.dead)         return { visible: true, reason: 'dead' as const };
-  if (p.you || viewer?.id === p.id) return { visible: true, reason: 'self' as const };
-  if (viewer?.role === 'werewolf' && p.role === 'werewolf') {
-    return { visible: true, reason: 'fellow-wolf' as const };
-  }
-  return { visible: false };
-}
-```
-
-This single function is the only place role visibility is decided. Do not branch on role anywhere else in the UI.
+Brand mark is a single-letter monospace glyph in a gradient square — substitute the actual app logo.
 
 ---
 
-## Asset / icon mapping
+## Files
 
-The prototype draws inline SVG icons. Substitute with the codebase's existing icon library where available; only fall back to bespoke SVG if no equivalent exists.
-
-| Prototype icon         | Used in                        | Suggested name in your icon set |
-|------------------------|--------------------------------|---------------------------------|
-| Bolt                   | brand mark, generate-button    | `bolt` / `zap`                  |
-| Send (paper-plane)     | composer primary               | `send`                          |
-| Check                  | Vote button, queue done        | `check`                         |
-| Forward (>>)           | Go on, delete-after            | `fast-forward`                  |
-| Mic                    | composer right cluster         | `mic`                           |
-| Lightbulb              | composer right cluster         | `lightbulb` / `hint`            |
-| Hand                   | composer → open Select Bots    | `hand` / `select`               |
-| Speaker                | message read-aloud             | `volume`                        |
-| ✕                      | message delete, modal close, dead-mark overlay | `x` / `close`   |
-| Cut (scissors)         | delete-from-here               | `scissors`                      |
-| Bot                    | queue idle illustration        | `bot` / `robot`                 |
-| Search                 | Change Model search input      | `search`                        |
-| Plus / Minus           | Select Bots stepper            | `plus`, `minus`                 |
-| Moon / Sun             | theme toggle                   | `moon`, `sun`                   |
+- `Create Game.html` — entry HTML with all global tokens (dark + light) and styles in `<style>`.
+- `components.jsx` — reusable components: `Icon` set, `RoleGlyph`, `RoleChip`, `SpecialRoles`, `AIMultiSelect`, `MODELS` data, `ROLES` data.
+- `app.jsx` — page composition (nav + form + banner + preview), state, generation flow, theme handling, tweak wiring.
+- `tweaks-panel.jsx` — design-time tweak controls (chip style, theme, fast-pill visibility, generation flow trigger). **Not part of production UI**; can be ignored when implementing.
 
 ---
 
-## Behavior summary
+## Notes for the implementer
 
-- **Cost toggle** persists per session (the prototype keeps it in component state; production should use the same store as the Create Game cost preferences if they share one).
-- **Click participant row → Change Model** (live AI players only; "you" and dead are not clickable).
-- **Click author name in a message → Change Model** (same scope).
-- **Hover message → reveal action buttons.**
-- **Delete popover**: outside-click closes; both actions return `(messageId, mode)` where mode is `'incl'` or `'after'`.
-- **ESC closes any open modal**; backdrop click closes; focus is trapped while open.
-- **Discussion Queue auto-collapses** below 1024px viewport. The composer's hand icon stays available so users can still open Select Bots.
-- **No purple anywhere.** The brand-blue accent and per-character avatar gradients are the only saturated colors. Role tags use their own hue family but never appear elsewhere.
-
----
-
-## Tweaks panel
-The prototype includes a Tweaks toggle (toolbar). Production does not need this — the panel is purely for design iteration. Ignore `tweaks-panel.jsx` and the `useTweaks` hook when porting.
+- **Do not introduce purple** anywhere. The accent is a single cool blue; the rest is neutral grey.
+- The `Fast only` filter being **inside** the dropdown panel (rather than outside as a stranded checkbox) is the most important UX change — preserve this.
+- The role chip's trailing checkbox is intentionally redundant with the fill state — it gives an accessible affordance and a clear visual confirmation of "this is a toggle, not a tag". Keep it.
+- In light mode, the originally-faded chip text was a contrast failure. The fix is `--accent-fg` (a darkened version of the accent hue). Don't substitute pure white or pure foreground — the soft accent fill needs the matching accent-foreground for legibility.
+- The banner's spinning icon and animated dots are small but make the loading state feel alive. Both are pure CSS (`@keyframes spin` and `@keyframes dots`).
+- Speed tags (`fast` / `standard`) on each model row are optional but useful — they let users see why something would be filtered without toggling Fast-only.
+- The `?state=` URL params are demo-only — strip them when implementing in production.
