@@ -11,7 +11,7 @@ import { format } from "@/app/ai/prompts/utils";
 import { ROLE_CONFIGS, PLAY_STYLE_CONFIGS } from "@/app/api/game-models";
 
 // Helper function to create a GrokAgent instance (defaults to GROK-4)
-const createAgent = (botName: string, modelType: string = LLM_CONSTANTS.GROK_4_2, enableThinking: boolean = true): GrokAgent => {
+const createAgent = (botName: string, modelType: string = LLM_CONSTANTS.GROK_4_3, enableThinking: boolean = true): GrokAgent => {
   const testBot = {
     name: botName,
     story: "A mysterious wanderer with a hidden past",
@@ -52,7 +52,7 @@ describe("GrokAgent integration", () => {
   
   describeOrSkip("askWithZodSchema with real API", () => {
     it("should respond with valid schema-based answer using grok-4 (with reasoning)", async () => {
-      const agent = createAgent("TestBot", LLM_CONSTANTS.GROK_4_2, true);
+      const agent = createAgent("TestBot", LLM_CONSTANTS.GROK_4_3, true);
       const messages: AIMessage[] = [{
         role: 'user',
         content: 'What do you think about the current situation in the village?'
@@ -99,7 +99,7 @@ describe("GrokAgent integration", () => {
       const gmAgent = new GrokAgent(
         GAME_MASTER,
         STORY_SYSTEM_PROMPT,
-        SupportedAiModels[LLM_CONSTANTS.GROK_4_2].modelApiName,
+        SupportedAiModels[LLM_CONSTANTS.GROK_4_3].modelApiName,
         process.env.GROK_K!,
         0.7,
         false // Disable reasoning for this test
@@ -206,7 +206,7 @@ describe("GrokAgent integration", () => {
       const agent = new GrokAgent(
         "TestBot",
         "Test instruction",
-        SupportedAiModels[LLM_CONSTANTS.GROK_4_2].modelApiName,
+        SupportedAiModels[LLM_CONSTANTS.GROK_4_3].modelApiName,
         "invalid_api_key",
         0.7,
         false
@@ -224,11 +224,11 @@ describe("GrokAgent integration", () => {
   });
   
   describe("token usage calculation", () => {
-    it("should calculate correct costs for grok-4.20", () => {
+    it("should calculate correct costs for grok-4.3", () => {
       // Test the external pricing function that Grok agent uses
-      const cost = calculateGrokCost("grok-4.20", 1000000, 1000000);
-      // Based on ai-models.ts pricing: $2 per 1M input, $6 per 1M output
-      expect(cost).toBeCloseTo(8, 2);
+      const cost = calculateGrokCost("grok-4.3", 1000000, 1000000);
+      // Based on ai-models.ts pricing: $1.25 per 1M input, $2.50 per 1M output
+      expect(cost).toBeCloseTo(3.75, 2);
     });
   });
 

@@ -282,9 +282,10 @@ describe('Token Usage Utils', () => {
                 SupportedAiModels[LLM_CONSTANTS.GEMINI_3_PRO].modelApiName,
                 SupportedAiModels[LLM_CONSTANTS.GEMINI_3_FLASH].modelApiName,
                 SupportedAiModels[LLM_CONSTANTS.MISTRAL_3_LARGE].modelApiName,
-                SupportedAiModels[LLM_CONSTANTS.MISTRAL_3_MEDIUM].modelApiName,
+                SupportedAiModels[LLM_CONSTANTS.MISTRAL_3_5_MEDIUM].modelApiName,
+                SupportedAiModels[LLM_CONSTANTS.MISTRAL_4_SMALL].modelApiName,
                 SupportedAiModels[LLM_CONSTANTS.MISTRAL_MAGISTRAL].modelApiName,
-                SupportedAiModels[LLM_CONSTANTS.GROK_4_2].modelApiName,
+                SupportedAiModels[LLM_CONSTANTS.GROK_4_3].modelApiName,
             ];
 
             expectedModels.forEach(model => {

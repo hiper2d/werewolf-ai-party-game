@@ -43,7 +43,7 @@ export class AgentFactory {
             case LLM_CONSTANTS.GEMINI_3_PRO:
             case LLM_CONSTANTS.GEMINI_3_FLASH:
                 return new GoogleAgent(name, instruction, model.modelApiName, key, shouldEnableThinking);
-            case LLM_CONSTANTS.GROK_4_2:
+            case LLM_CONSTANTS.GROK_4_3:
             case LLM_CONSTANTS.GROK_4_1_FAST_REASONING:
                 return new GrokAgent(name, instruction, model.modelApiName, key, model.temperature!, shouldEnableThinking);
 
@@ -55,7 +55,8 @@ export class AgentFactory {
                 return new DeepSeekV2Agent(name, instruction, model.modelApiName, key, model.temperature ?? 0, shouldEnableThinking);
 
             // Mistral models
-            case LLM_CONSTANTS.MISTRAL_3_MEDIUM:
+            case LLM_CONSTANTS.MISTRAL_3_5_MEDIUM:
+            case LLM_CONSTANTS.MISTRAL_4_SMALL:
             case LLM_CONSTANTS.MISTRAL_3_LARGE:
             case LLM_CONSTANTS.MISTRAL_MAGISTRAL:
                 return new MistralAgent(name, instruction, model.modelApiName, key, shouldEnableThinking);

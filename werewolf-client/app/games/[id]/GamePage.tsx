@@ -427,6 +427,7 @@ function GamePageContent({
 
     // Handle manual bot selection
     const handleManualBotSelection = async (selectedBots: string[]) => {
+        setMobilePanel(null);
         try {
             const result = await runGameAction(() => manualSelectBots(game.id, selectedBots));
             if (result) {

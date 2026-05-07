@@ -44,9 +44,10 @@ export const LLM_CONSTANTS = {
     GEMINI_3_PRO: 'gemini-pro',
     GEMINI_3_FLASH: 'gemini-flash',
     MISTRAL_3_LARGE: 'mistral-large',
-    MISTRAL_3_MEDIUM: 'mistral-medium',
+    MISTRAL_3_5_MEDIUM: 'mistral-medium',
+    MISTRAL_4_SMALL: 'mistral-small',
     MISTRAL_MAGISTRAL: 'mistral-magistral',
-    GROK_4_2: 'grok',
+    GROK_4_3: 'grok',
     GROK_4_1_FAST_REASONING: 'grok-fast',
     KIMI_K2: 'kimi',
     KIMI_K2_THINKING: 'kimi-thinking',
@@ -262,9 +263,9 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
             maxBotsPerGame: -1 // Unlimited
         }
     },
-    [LLM_CONSTANTS.GROK_4_2]: {
-        displayName: 'Grok 4.2',
-        modelApiName: 'grok-4.20',
+    [LLM_CONSTANTS.GROK_4_3]: {
+        displayName: 'Grok 4.3',
+        modelApiName: 'grok-4.3',
         apiKeyName: API_KEY_CONSTANTS.GROK,
         hasThinking: true,
         temperature: 0.7,
@@ -299,11 +300,23 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
             maxBotsPerGame: -1 // Unlimited - very affordable
         }
     },
-    [LLM_CONSTANTS.MISTRAL_3_MEDIUM]: {
-        displayName: 'Mistral Medium 3.1',
-        modelApiName: 'mistral-medium-latest',
+    [LLM_CONSTANTS.MISTRAL_3_5_MEDIUM]: {
+        displayName: 'Mistral Medium 3.5',
+        modelApiName: 'mistral-medium-3',
         apiKeyName: API_KEY_CONSTANTS.MISTRAL,
         hasThinking: false,
+        tags: ['expensive'],
+        freeTier: {
+            available: false,
+            maxBotsPerGame: 0
+        }
+    },
+    [LLM_CONSTANTS.MISTRAL_4_SMALL]: {
+        displayName: 'Mistral 4 Small',
+        modelApiName: 'mistral-small-latest',
+        apiKeyName: API_KEY_CONSTANTS.MISTRAL,
+        hasThinking: false,
+        tags: ['fast', 'cheap'],
         freeTier: {
             available: true,
             maxBotsPerGame: -1
@@ -520,9 +533,13 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
         inputPrice: 0.5,
         outputPrice: 1.5
     },
-    [SupportedAiModels[LLM_CONSTANTS.MISTRAL_3_MEDIUM].modelApiName]: {
-        inputPrice: 0.4,
-        outputPrice: 2
+    [SupportedAiModels[LLM_CONSTANTS.MISTRAL_3_5_MEDIUM].modelApiName]: {
+        inputPrice: 1.5,
+        outputPrice: 7.5
+    },
+    [SupportedAiModels[LLM_CONSTANTS.MISTRAL_4_SMALL].modelApiName]: {
+        inputPrice: 0.15,
+        outputPrice: 0.6
     },
     [SupportedAiModels[LLM_CONSTANTS.MISTRAL_MAGISTRAL].modelApiName]: {
         inputPrice: 2.0,
@@ -530,9 +547,9 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
     },
 
     // Grok models
-    [SupportedAiModels[LLM_CONSTANTS.GROK_4_2].modelApiName]: {
-        inputPrice: 2.0,
-        outputPrice: 6.0,
+    [SupportedAiModels[LLM_CONSTANTS.GROK_4_3].modelApiName]: {
+        inputPrice: 1.25,
+        outputPrice: 2.50,
         cacheHitPrice: 0.20
     },
     [SupportedAiModels[LLM_CONSTANTS.GROK_4_1_FAST_REASONING].modelApiName]: {

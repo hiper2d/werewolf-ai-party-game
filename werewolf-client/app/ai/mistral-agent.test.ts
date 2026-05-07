@@ -31,10 +31,11 @@ const createAgent = (botName: string, modelType: string): MistralAgent => {
     personal_story: testBot.story,
     play_style: "",
     role: testBot.role,
+    human_player_name: "Player",
     werewolf_teammates_section: "",
     players_names: "Alice, Bob, Charlie",
     dead_players_names_with_roles: "David (Werewolf)",
-    bot_context: "" // Add missing parameter
+    bot_context: ""
   });
   
   // Enable thinking for Magistral model
@@ -113,7 +114,7 @@ describe("MistralAgent integration", () => {
 
 
     it("should respond with valid schema-based answer and token usage using Mistral Medium", async () => {
-      await testSchemaResponse(LLM_CONSTANTS.MISTRAL_3_MEDIUM, false);
+      await testSchemaResponse(LLM_CONSTANTS.MISTRAL_3_5_MEDIUM, false);
     }, 30000);
     
     it("should respond with valid schema-based answer and token usage using Magistral Medium (JSON format - no thinking)", async () => {
@@ -127,7 +128,7 @@ describe("MistralAgent integration", () => {
       const agent = new MistralAgent(
         "TestBot",
         "Test instruction",
-        SupportedAiModels[LLM_CONSTANTS.MISTRAL_3_MEDIUM].modelApiName,
+        SupportedAiModels[LLM_CONSTANTS.MISTRAL_3_5_MEDIUM].modelApiName,
         "invalid_api_key",
         false
       );
@@ -144,7 +145,7 @@ describe("MistralAgent integration", () => {
     });
 
     it("should handle empty responses", async () => {
-      const agent = createAgent("TestBot", LLM_CONSTANTS.MISTRAL_3_MEDIUM);
+      const agent = createAgent("TestBot", LLM_CONSTANTS.MISTRAL_3_5_MEDIUM);
       const messages: AIMessage[] = [{
         role: 'user',
         content: 'Test message'
@@ -162,7 +163,7 @@ describe("MistralAgent integration", () => {
     });
     
     it("should handle missing content in response", async () => {
-      const agent = createAgent("TestBot", LLM_CONSTANTS.MISTRAL_3_MEDIUM);
+      const agent = createAgent("TestBot", LLM_CONSTANTS.MISTRAL_3_5_MEDIUM);
       const messages: AIMessage[] = [{
         role: 'user',
         content: 'Test message'
@@ -227,10 +228,10 @@ describe("MistralAgent integration", () => {
 
     it("should calculate correct costs for Mistral Medium model", () => {
       // Use centralized pricing from ai-models.ts
-      const modelApiName = SupportedAiModels[LLM_CONSTANTS.MISTRAL_3_MEDIUM].modelApiName;
+      const modelApiName = SupportedAiModels[LLM_CONSTANTS.MISTRAL_3_5_MEDIUM].modelApiName;
       const cost = calculateCost(modelApiName, 1000000, 1000000);
-      // Based on ai-models.ts pricing: $0.4 per 1M input, $2.0 per 1M output
-      expect(cost).toBeCloseTo(2.4, 2);
+      // Based on ai-models.ts pricing: $1.5 per 1M input, $7.5 per 1M output
+      expect(cost).toBeCloseTo(9.0, 2);
     });
 
     it("should calculate correct costs for Magistral Medium model", () => {
@@ -294,7 +295,7 @@ describe("MistralAgent integration", () => {
         const gmAgent = new MistralAgent(
           GAME_MASTER,
           STORY_SYSTEM_PROMPT,
-          SupportedAiModels[LLM_CONSTANTS.MISTRAL_3_MEDIUM].modelApiName,
+          SupportedAiModels[LLM_CONSTANTS.MISTRAL_3_5_MEDIUM].modelApiName,
           mistralKey,
           false // No thinking for story generation
         );
@@ -335,7 +336,8 @@ describe("MistralAgent integration", () => {
           number_of_players: botCount,
           game_roles: gameRolesText,
           werewolf_count: gamePreview.werewolfCount,
-          play_styles: playStylesText
+          play_styles: playStylesText,
+          available_voices: "alloy, echo, fable, onyx, nova, shimmer"
         });
 
         const messages: AIMessage[] = [{
@@ -346,7 +348,7 @@ describe("MistralAgent integration", () => {
         console.log("📝 Requesting game story and characters...");
         console.log("Theme:", gamePreview.theme);
         console.log("Players to generate:", botCount);
-        console.log("Model:", "mistral-medium-latest");
+        console.log("Model:", "mistral-medium-3");
         
         // Call askWithZodSchema with GameSetupZodSchema
         const [gameSetup, , tokenUsage] = await gmAgent.askWithZodSchema(
@@ -461,7 +463,8 @@ describe("MistralAgent integration", () => {
           number_of_players: botCount,
           game_roles: gameRolesText,
           werewolf_count: gamePreview.werewolfCount,
-          play_styles: playStylesText
+          play_styles: playStylesText,
+          available_voices: "alloy, echo, fable, onyx, nova, shimmer"
         });
 
         const messages: AIMessage[] = [{
