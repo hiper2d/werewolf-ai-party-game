@@ -33,11 +33,11 @@ export default function CreateNewGamePage() {
     const [werewolfCount, setWerewolfCount] = useState(3);
     const [specialRoles, setSpecialRoles] = useState([GAME_ROLES.DOCTOR, GAME_ROLES.DETECTIVE, GAME_ROLES.MANIAC]);
     const [gameMasterAiType, setGameMasterAiType] = useState<string>(() => {
-        // Initial seed: random cheap/very-cheap model from the full catalog.
+        // Initial seed: random cheap model from the full catalog.
         // Tier/key data isn't loaded yet on first render — a reconciliation effect below
         // re-picks from the user's actually-allowed pool once that data is in.
         const cheap = Object.values(LLM_CONSTANTS).filter(
-            m => m !== LLM_CONSTANTS.RANDOM && (modelHasTag(m, 'cheap') || modelHasTag(m, 'very-cheap'))
+            m => m !== LLM_CONSTANTS.RANDOM && modelHasTag(m, 'cheap')
         );
         return cheap.length > 0 ? cheap[Math.floor(Math.random() * cheap.length)] : LLM_CONSTANTS.RANDOM;
     });
@@ -289,7 +289,7 @@ export default function CreateNewGamePage() {
     }, [isTierLoaded, isKeysLoaded, userTier, playerModelOptions, candidateModels]);
 
     // If the auto-picked GM model isn't allowed for the current tier+keys, re-pick from
-    // the user's actually-allowed cheap/very-cheap models (random), regardless of tier.
+    // the user's actually-allowed cheap models (random), regardless of tier.
     useEffect(() => {
         if (!isTierLoaded) return;
         if (userTier === USER_TIERS.API && !isKeysLoaded) return;
@@ -308,11 +308,9 @@ export default function CreateNewGamePage() {
 
         if (allowed.has(gameMasterAiType)) return;
 
-        // Re-pick: prefer cheap / very-cheap from the allowed set; if none, any allowed model.
+        // Re-pick: prefer cheap from the allowed set; if none, any allowed model.
         const allowedArr = Array.from(allowed).filter(m => m !== LLM_CONSTANTS.RANDOM);
-        const cheapAllowed = allowedArr.filter(
-            m => modelHasTag(m, 'cheap') || modelHasTag(m, 'very-cheap')
-        );
+        const cheapAllowed = allowedArr.filter(m => modelHasTag(m, 'cheap'));
         const pool = cheapAllowed.length > 0 ? cheapAllowed : allowedArr;
         const replacement = pool.length > 0
             ? pool[Math.floor(Math.random() * pool.length)]

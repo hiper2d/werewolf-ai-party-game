@@ -87,6 +87,65 @@ export class GlmAgent extends AbstractAgent {
         return { thinkingContent, tokenUsage };
     }
 
+    /**
+     * Try to extract the first balanced JSON object embedded in `text`.
+     * Naive brace-depth scanner — good enough when the model wraps JSON in prose.
+     * Returns null when no parseable object is found.
+     */
+    private extractEmbeddedJson(text: string): unknown | null {
+        const start = text.indexOf('{');
+        if (start < 0) return null;
+        let depth = 0;
+        for (let i = start; i < text.length; i++) {
+            const ch = text[i];
+            if (ch === '{') depth++;
+            else if (ch === '}') {
+                depth--;
+                if (depth === 0) {
+                    const slice = text.slice(start, i + 1);
+                    try { return JSON.parse(slice); } catch { return null; }
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Robust schema-aware coercion of a model reply.
+     * Order: strict JSON parse → embedded {…} extraction → wrap-as-reply (BotAnswer-shaped schemas).
+     * Returns the validated value or throws.
+     */
+    private parseAndValidate<T>(rawReply: string, zodSchema: z.ZodSchema<T>): T {
+        const cleaned = cleanResponse(rawReply);
+
+        // 1. Strict JSON parse
+        try {
+            const parsed = JSON.parse(cleaned);
+            const result = safeValidateResponse(zodSchema, parsed);
+            if (result.success) return result.data;
+        } catch { /* fall through to extraction */ }
+
+        // 2. Extract first balanced {...} from prose
+        const extracted = this.extractEmbeddedJson(cleaned);
+        if (extracted !== null) {
+            const result = safeValidateResponse(zodSchema, extracted);
+            if (result.success) {
+                this.logger(`Recovered JSON from prose-wrapped response (${cleaned.length} chars)`);
+                return result.data;
+            }
+        }
+
+        // 3. Last resort: wrap raw prose as `{reply: ...}` if the schema accepts it.
+        // This rescues bot dialogue when the model "speaks in character" instead of returning JSON.
+        const wrapped = safeValidateResponse(zodSchema, { reply: cleaned });
+        if (wrapped.success) {
+            this.logger(`Wrapped prose as BotAnswer reply (${cleaned.length} chars)`);
+            return wrapped.data;
+        }
+
+        throw new Error(`Failed to parse JSON response: model did not return valid JSON or BotAnswer-compatible prose. First 200 chars: ${cleaned.slice(0, 200)}`);
+    }
+
     async askWithZodSchema<T>(zodSchema: z.ZodSchema<T>, messages: AIMessage[]): Promise<[T, string, TokenUsage?, string?]> {
         try {
             const preparedMessages = this.prepareMessages(messages);
@@ -105,111 +164,45 @@ export class GlmAgent extends AbstractAgent {
             this.logAsking(messages);
             this.logMessages(messages);
 
-            // Try JSON mode first (OpenAI-compatible)
-            try {
-                const glmSchema = ZodSchemaConverter.toOpenAIJsonSchema(zodSchema, 'response_schema');
-
-                let completion;
-                try {
-                    const params: any = {
-                        ...this.defaultParams,
-                        messages: openAIMessages,
-                        response_format: {
-                            type: 'json_schema',
-                            json_schema: glmSchema
-                        },
-                        thinking: { type: this.enableThinking ? 'enabled' : 'disabled' }
-                    };
-
-                    completion = await this.client.chat.completions.create(params) as OpenAI.Chat.Completions.ChatCompletion;
-                } catch (apiError) {
-                    this.logger(this.logTemplates.error(this.name, apiError));
-                    throw new Error(this.errorMessages.apiError(apiError));
-                }
-
-                const reply = completion.choices[0]?.message?.content;
-                if (!reply) {
-                    throw new Error(this.errorMessages.emptyResponse);
-                }
-
-                let parsedContent: unknown;
-                try {
-                    const cleanedResponse = cleanResponse(reply);
-                    parsedContent = JSON.parse(cleanedResponse);
-                } catch (parseError) {
-                    throw new Error(`Failed to parse JSON response: ${parseError}`);
-                }
-
-                const validationResult = safeValidateResponse(zodSchema, parsedContent);
-                if (!validationResult.success) {
-                    this.logger(`Zod validation failed: ${JSON.stringify(validationResult.error.errors)}`);
-                    throw new Error(`Response validation failed: ${validationResult.error.message}`);
-                }
-
-                this.logger(`✅ Response validated successfully with Zod schema (JSON mode)`);
-
-                const { thinkingContent, tokenUsage } = this.extractThinkingAndUsage(completion);
-
-                if (validationResult.data) {
-                    this.logReply(validationResult.data, thinkingContent, tokenUsage);
-                }
-
-                return [validationResult.data, thinkingContent, tokenUsage];
-
-            } catch (jsonModeError) {
-                // Fall back to prompt-based schema if JSON mode is unsupported
-                this.logger(`JSON mode failed, falling back to prompt-based schema: ${jsonModeError}`);
-
-                const schemaDescription = ZodSchemaConverter.toPromptDescription(zodSchema);
-                const lastMessage = openAIMessages[openAIMessages.length - 1];
-
-                if (lastMessage) {
-                    lastMessage.content += `\n\nYour response must be a valid JSON object matching this schema:\n${schemaDescription}`;
-                }
-
-                let completion;
-                try {
-                    const params: any = {
-                        ...this.defaultParams,
-                        messages: openAIMessages,
-                        thinking: { type: this.enableThinking ? 'enabled' : 'disabled' }
-                    };
-
-                    completion = await this.client.chat.completions.create(params) as OpenAI.Chat.Completions.ChatCompletion;
-                } catch (apiError) {
-                    this.logger(this.logTemplates.error(this.name, apiError));
-                    throw new Error(this.errorMessages.apiError(apiError));
-                }
-
-                const reply = completion.choices[0]?.message?.content;
-                if (!reply) {
-                    throw new Error(this.errorMessages.emptyResponse);
-                }
-
-                let parsedContent: unknown;
-                try {
-                    const cleanedResponse = cleanResponse(reply);
-                    parsedContent = JSON.parse(cleanedResponse);
-                } catch (parseError) {
-                    throw new Error(`Failed to parse JSON response: ${parseError}`);
-                }
-
-                const validationResult = safeValidateResponse(zodSchema, parsedContent);
-                if (!validationResult.success) {
-                    this.logger(`Zod validation failed: ${JSON.stringify(validationResult.error.errors)}`);
-                    throw new Error(`Response validation failed: ${validationResult.error.message}`);
-                }
-
-                this.logger(`✅ Response validated successfully with Zod schema (prompt mode)`);
-
-                const { thinkingContent, tokenUsage } = this.extractThinkingAndUsage(completion);
-
-                if (validationResult.data) {
-                    this.logReply(validationResult.data, thinkingContent, tokenUsage);
-                }
-
-                return [validationResult.data, thinkingContent, tokenUsage];
+            // Z.AI's JSON mode is `{ type: 'json_object' }` (OpenAI's older shape) — it does NOT
+            // accept `{ type: 'json_schema', json_schema: ... }`. Schema constraints must be
+            // conveyed in-prompt. See https://docs.z.ai → Structured Output.
+            const schemaDescription = ZodSchemaConverter.toPromptDescription(zodSchema);
+            const lastMessage = openAIMessages[openAIMessages.length - 1];
+            if (lastMessage) {
+                lastMessage.content += `\n\nIMPORTANT: Respond with ONLY a valid JSON object matching this schema. Do NOT write narration, roleplay actions, asterisks, or commentary outside the JSON. Output the JSON object and nothing else.\n${schemaDescription}`;
             }
+
+            let completion;
+            try {
+                const params: any = {
+                    ...this.defaultParams,
+                    messages: openAIMessages,
+                    response_format: { type: 'json_object' },
+                    thinking: { type: this.enableThinking ? 'enabled' : 'disabled' }
+                };
+                completion = await this.client.chat.completions.create(params) as OpenAI.Chat.Completions.ChatCompletion;
+            } catch (apiError) {
+                this.logger(this.logTemplates.error(this.name, apiError));
+                throw new Error(this.errorMessages.apiError(apiError));
+            }
+
+            const reply = completion.choices[0]?.message?.content;
+            if (!reply) {
+                throw new Error(this.errorMessages.emptyResponse);
+            }
+
+            const validated = this.parseAndValidate(reply, zodSchema);
+
+            this.logger(`✅ Response validated successfully with Zod schema`);
+
+            const { thinkingContent, tokenUsage } = this.extractThinkingAndUsage(completion);
+
+            if (validated) {
+                this.logReply(validated, thinkingContent, tokenUsage);
+            }
+
+            return [validated, thinkingContent, tokenUsage];
 
         } catch (error) {
             this.logger(this.logTemplates.error(this.name, error));

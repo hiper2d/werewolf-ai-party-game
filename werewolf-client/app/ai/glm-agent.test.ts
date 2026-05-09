@@ -180,6 +180,47 @@ describe("GlmAgent integration", () => {
         });
     });
 
+    describe("robust response parsing", () => {
+        // Use a non-API-touching agent instance with a fake key.
+        const offlineAgent = new GlmAgent(
+            "ParseBot",
+            "Test instruction",
+            SupportedAiModels[LLM_CONSTANTS.GLM].modelApiName,
+            "fake_key_not_used",
+            0.7,
+            false
+        );
+        const parseAndValidate = (offlineAgent as any).parseAndValidate.bind(offlineAgent);
+
+        it("parses clean JSON directly", () => {
+            const result = parseAndValidate('{"reply":"hello"}', BotAnswerZodSchema);
+            expect(result.reply).toBe('hello');
+        });
+
+        it("strips markdown fences then parses", () => {
+            const result = parseAndValidate('```json\n{"reply":"hi"}\n```', BotAnswerZodSchema);
+            expect(result.reply).toBe('hi');
+        });
+
+        it("extracts a JSON object embedded in prose", () => {
+            const raw = 'Here is my answer:\n{"reply":"I think Bob did it"}\nThanks.';
+            const result = parseAndValidate(raw, BotAnswerZodSchema);
+            expect(result.reply).toBe('I think Bob did it');
+        });
+
+        it("wraps pure prose as BotAnswer reply (the original GLM thinking-mode bug)", () => {
+            const prose = '*draws her sword* I think Bob is the werewolf.';
+            const result = parseAndValidate(prose, BotAnswerZodSchema);
+            expect(result.reply).toBe(prose);
+        });
+
+        it("throws for non-JSON prose against a stricter schema", () => {
+            const prose = '*shrugs* I have no idea.';
+            // GameSetupZodSchema requires fields beyond just `reply` — wrap fallback should not rescue it.
+            expect(() => parseAndValidate(prose, GameSetupZodSchema)).toThrow(/Failed to parse JSON response/);
+        });
+    });
+
     describe("token usage calculation", () => {
         it("should calculate correct costs for glm-5.1", () => {
             // Pricing in ai-models.ts: $1.4/M input, $4.4/M output

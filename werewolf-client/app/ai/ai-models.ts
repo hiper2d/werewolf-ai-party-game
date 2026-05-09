@@ -79,7 +79,7 @@ export const AUDIO_MODEL_PRICING: Record<string, AudioModelPricing> = {
     },
 };
 
-export type ModelTag = 'very-fast' | 'fast' | 'slow' | 'very-slow' | 'cheap' | 'very-cheap' | 'expensive';
+export type ModelTag = 'fast' | 'slow' | 'very-slow' | 'cheap' | 'expensive';
 
 export interface ModelConfig {
     displayName: string;
@@ -146,7 +146,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         modelApiName: 'claude-haiku-4-5',
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
         hasThinking: false,
-        tags: ['very-fast', 'cheap'],
+        tags: ['fast', 'cheap'],
         freeTier: {
             available: true,
             maxBotsPerGame: 3
@@ -157,7 +157,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         modelApiName: 'claude-haiku-4-5',
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
         hasThinking: true,
-        tags: ['very-fast', 'cheap'],
+        tags: ['fast', 'cheap'],
         freeTier: {
             available: true,
             maxBotsPerGame: 1
@@ -172,7 +172,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         hasThinking: false,
         temperature: 0.6,
         maxOutputTokens: 8192,
-        tags: ['fast', 'very-cheap'],
+        tags: ['fast', 'cheap'],
         freeTier: {
             available: true,
             maxBotsPerGame: -1 // Unlimited - very affordable
@@ -184,7 +184,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         apiKeyName: API_KEY_CONSTANTS.DEEPSEEK,
         hasThinking: true,
         maxOutputTokens: 8192,
-        tags: ['fast', 'very-cheap'],
+        tags: ['fast', 'cheap'],
         freeTier: {
             available: true,
             maxBotsPerGame: -1
@@ -197,7 +197,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         hasThinking: false,
         temperature: 0.6,
         maxOutputTokens: 8192,
-        tags: ['slow', 'very-cheap'],
+        tags: ['slow', 'cheap'],
         freeTier: {
             available: true,
             maxBotsPerGame: 1
@@ -209,7 +209,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         apiKeyName: API_KEY_CONSTANTS.DEEPSEEK,
         hasThinking: true,
         maxOutputTokens: 8192,
-        tags: ['slow', 'very-cheap'],
+        tags: ['slow', 'cheap'],
         freeTier: {
             available: true,
             maxBotsPerGame: 1
@@ -257,7 +257,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         modelApiName: 'gemini-3-flash-preview',
         apiKeyName: API_KEY_CONSTANTS.GOOGLE,
         hasThinking: true,
-        tags: ['very-fast', 'cheap'],
+        tags: ['fast', 'cheap'],
         freeTier: {
             available: true,
             maxBotsPerGame: -1 // Unlimited
@@ -315,7 +315,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         modelApiName: 'mistral-small-latest',
         apiKeyName: API_KEY_CONSTANTS.MISTRAL,
         hasThinking: false,
-        tags: ['very-fast', 'cheap'],
+        tags: ['fast', 'cheap'],
         freeTier: {
             available: true,
             maxBotsPerGame: -1
@@ -376,9 +376,10 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         hasThinking: true,
         temperature: 0.7,
         tags: ['slow'],
+        // Thinking variant is paid/API-tier only — reasoning tokens make it too expensive for free tier.
         freeTier: {
-            available: true,
-            maxBotsPerGame: 1
+            available: false,
+            maxBotsPerGame: 0
         }
     },
 };
