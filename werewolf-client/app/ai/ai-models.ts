@@ -49,12 +49,8 @@ export const LLM_CONSTANTS = {
     MISTRAL_MAGISTRAL: 'mistral-magistral',
     GROK_4_3: 'grok',
     GROK_4_1_FAST_REASONING: 'grok-fast',
-    KIMI_K2: 'kimi',
-    KIMI_K2_THINKING: 'kimi-thinking',
-    KIMI_K2_6: 'kimi-k2.6',
-    KIMI_K2_6_THINKING: 'kimi-k2.6-thinking',
-    KIMI_K2_TURBO: 'kimi-turbo',
-    KIMI_K2_TURBO_THINKING: 'kimi-turbo-thinking',
+    KIMI: 'kimi',
+    KIMI_THINKING: 'kimi-thinking',
     RANDOM: 'random',
 }
 
@@ -79,7 +75,7 @@ export const AUDIO_MODEL_PRICING: Record<string, AudioModelPricing> = {
     },
 };
 
-export type ModelTag = 'fast' | 'slow' | 'very-slow' | 'cheap' | 'very-cheap' | 'expensive';
+export type ModelTag = 'very-fast' | 'fast' | 'slow' | 'very-slow' | 'cheap' | 'very-cheap' | 'expensive';
 
 export interface ModelConfig {
     displayName: string;
@@ -146,7 +142,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         modelApiName: 'claude-haiku-4-5',
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
         hasThinking: false,
-        tags: ['fast', 'cheap'],
+        tags: ['very-fast', 'cheap'],
         freeTier: {
             available: true,
             maxBotsPerGame: 3
@@ -157,7 +153,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         modelApiName: 'claude-haiku-4-5',
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
         hasThinking: true,
-        tags: ['fast', 'cheap'],
+        tags: ['very-fast', 'cheap'],
         freeTier: {
             available: true,
             maxBotsPerGame: 1
@@ -257,7 +253,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         modelApiName: 'gemini-3-flash-preview',
         apiKeyName: API_KEY_CONSTANTS.GOOGLE,
         hasThinking: true,
-        tags: ['fast', 'cheap'],
+        tags: ['very-fast', 'cheap'],
         freeTier: {
             available: true,
             maxBotsPerGame: -1 // Unlimited
@@ -294,7 +290,6 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         modelApiName: 'mistral-large-latest',
         apiKeyName: API_KEY_CONSTANTS.MISTRAL,
         hasThinking: false,
-        tags: ['fast', 'cheap'],
         freeTier: {
             available: true,
             maxBotsPerGame: -1 // Unlimited - very affordable
@@ -305,7 +300,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         modelApiName: 'mistral-medium-3',
         apiKeyName: API_KEY_CONSTANTS.MISTRAL,
         hasThinking: false,
-        tags: ['expensive'],
+        tags: ['fast', 'expensive'],
         freeTier: {
             available: false,
             maxBotsPerGame: 0
@@ -316,7 +311,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         modelApiName: 'mistral-small-latest',
         apiKeyName: API_KEY_CONSTANTS.MISTRAL,
         hasThinking: false,
-        tags: ['fast', 'cheap'],
+        tags: ['very-fast', 'cheap'],
         freeTier: {
             available: true,
             maxBotsPerGame: -1
@@ -334,76 +329,27 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
     },
 
     // Kimi models
-    [LLM_CONSTANTS.KIMI_K2]: {
-        displayName: 'Kimi K2',
-        modelApiName: 'kimi-k2-0905-preview',
-        apiKeyName: API_KEY_CONSTANTS.MOONSHOT,
-        hasThinking: false,
-        temperature: 0.6,
-        tags: ['very-slow', 'cheap'],
-        freeTier: {
-            available: true,
-            maxBotsPerGame: -1
-        }
-    },
-    [LLM_CONSTANTS.KIMI_K2_THINKING]: {
-        displayName: 'Kimi K2 (Thinking)',
-        modelApiName: 'kimi-k2-thinking',
-        apiKeyName: API_KEY_CONSTANTS.MOONSHOT,
-        hasThinking: true,
-        temperature: 0.6,
-        tags: ['very-slow', 'cheap'],
-        freeTier: {
-            available: true,
-            maxBotsPerGame: -1
-        }
-    },
-    [LLM_CONSTANTS.KIMI_K2_6]: {
+    [LLM_CONSTANTS.KIMI]: {
         displayName: 'Kimi K2.6',
         modelApiName: 'kimi-k2.6',
         apiKeyName: API_KEY_CONSTANTS.MOONSHOT,
         hasThinking: false,
-        temperature: 1, // Kimi K2.6 API only allows temperature=1
-        tags: ['slow'],
+        // Temperature is omitted from the request: Kimi K2.6 uses a fixed default per Moonshot docs.
         freeTier: {
-            available: false,
-            maxBotsPerGame: 0
+            available: true,
+            maxBotsPerGame: 1
         }
     },
-    [LLM_CONSTANTS.KIMI_K2_6_THINKING]: {
+    [LLM_CONSTANTS.KIMI_THINKING]: {
         displayName: 'Kimi K2.6 (Thinking)',
         modelApiName: 'kimi-k2.6',
         apiKeyName: API_KEY_CONSTANTS.MOONSHOT,
         hasThinking: true,
-        temperature: 1, // Kimi K2.6 API only allows temperature=1
-        tags: ['slow'],
+        // Temperature is omitted from the request: Kimi K2.6 uses a fixed default per Moonshot docs.
+        tags: ['very-slow'],
         freeTier: {
-            available: false,
-            maxBotsPerGame: 0
-        }
-    },
-    [LLM_CONSTANTS.KIMI_K2_TURBO]: {
-        displayName: 'Kimi K2 Turbo',
-        modelApiName: 'kimi-k2-turbo-preview',
-        apiKeyName: API_KEY_CONSTANTS.MOONSHOT,
-        hasThinking: false,
-        temperature: 0.6,
-        tags: ['fast'],
-        freeTier: {
-            available: false,
-            maxBotsPerGame: 0
-        }
-    },
-    [LLM_CONSTANTS.KIMI_K2_TURBO_THINKING]: {
-        displayName: 'Kimi K2 Turbo (Thinking)',
-        modelApiName: 'kimi-k2-thinking-turbo',
-        apiKeyName: API_KEY_CONSTANTS.MOONSHOT,
-        hasThinking: true,
-        temperature: 0.6,
-        tags: ['fast'],
-        freeTier: {
-            available: false,
-            maxBotsPerGame: 0
+            available: true,
+            maxBotsPerGame: 1
         }
     },
 };
@@ -471,30 +417,10 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
     },
 
     // Kimi/Moonshot models
-    [SupportedAiModels[LLM_CONSTANTS.KIMI_K2].modelApiName]: {
-        inputPrice: 0.6,
-        outputPrice: 2.50,
-        cacheHitPrice: 0.15
-    },
-    [SupportedAiModels[LLM_CONSTANTS.KIMI_K2_THINKING].modelApiName]: {
-        inputPrice: 0.6,
-        outputPrice: 2.50,
-        cacheHitPrice: 0.15
-    },
-    [SupportedAiModels[LLM_CONSTANTS.KIMI_K2_6].modelApiName]: {
+    [SupportedAiModels[LLM_CONSTANTS.KIMI].modelApiName]: {
         inputPrice: 0.95,
         outputPrice: 4.00,
         cacheHitPrice: 0.16
-    },
-    [SupportedAiModels[LLM_CONSTANTS.KIMI_K2_TURBO].modelApiName]: {
-        inputPrice: 1.15,
-        outputPrice: 8.00,
-        cacheHitPrice: 0.15
-    },
-    [SupportedAiModels[LLM_CONSTANTS.KIMI_K2_TURBO_THINKING].modelApiName]: {
-        inputPrice: 1.15,
-        outputPrice: 8.00,
-        cacheHitPrice: 0.15
     },
 
     // Anthropic models

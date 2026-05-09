@@ -29,6 +29,7 @@ describe("KimiAgent integration", () => {
       personal_story: testBot.story,
       play_style: "",
       role: testBot.role,
+      human_player_name: "Player",
       werewolf_teammates_section: "",
       players_names: "Alice, Bob, Charlie",
       dead_players_names_with_roles: "David (Werewolf)",
@@ -40,12 +41,12 @@ describe("KimiAgent integration", () => {
       instruction,
       SupportedAiModels[modelType].modelApiName,
       process.env.MOONSHOT_K!,
-      0.6
+      0
     );
   };
 
   it("should respond with a valid schema-based answer for suspicion using Kimi K2", async () => {
-    const agent = setupAgent("KimiBot", LLM_CONSTANTS.KIMI_K2);
+    const agent = setupAgent("KimiBot", LLM_CONSTANTS.KIMI);
     const messages: AIMessage[] = [
       {
         role: 'user',
@@ -71,7 +72,7 @@ describe("KimiAgent integration", () => {
   }, 30000); // 30 second timeout for API call
 
   it("should handle introduction request", async () => {
-    const agent = setupAgent("KimiBot", LLM_CONSTANTS.KIMI_K2);
+    const agent = setupAgent("KimiBot", LLM_CONSTANTS.KIMI);
     const messages: AIMessage[] = [
       {
         role: 'user',
@@ -102,7 +103,7 @@ describe("KimiAgent integration", () => {
     const describeOrSkip = hasApiKey ? describe : describe.skip;
     
     // Helper function to create a Kimi agent
-    const createAgent = (modelType: string = LLM_CONSTANTS.KIMI_K2): KimiAgent => {
+    const createAgent = (modelType: string = LLM_CONSTANTS.KIMI): KimiAgent => {
       const testBot = {
         name: "TestBot",
         story: "A clever strategist from the mountains",
@@ -119,6 +120,7 @@ describe("KimiAgent integration", () => {
         personal_story: testBot.story,
         play_style: "You are thoughtful and analytical, preferring careful observation.",
         role: testBot.role,
+        human_player_name: "Player",
         werewolf_teammates_section: "",
         players_names: "Alice, Bob, Charlie",
         dead_players_names_with_roles: "David (Werewolf)",
@@ -130,13 +132,13 @@ describe("KimiAgent integration", () => {
         instruction,
         SupportedAiModels[modelType].modelApiName,
         process.env.MOONSHOT_K!,
-        0.7
+        0
       );
     };
 
     describeOrSkip("askWithZodSchema with real API", () => {
       it("should work with Zod schema for bot answers using Kimi K2", async () => {
-        const agent = createAgent(LLM_CONSTANTS.KIMI_K2);
+        const agent = createAgent(LLM_CONSTANTS.KIMI);
         const messages: AIMessage[] = [{
           role: 'user',
           content: 'What are your thoughts about the current situation in the village after David was revealed as a werewolf?'
@@ -173,9 +175,9 @@ describe("KimiAgent integration", () => {
         const gmAgent = new KimiAgent(
           GAME_MASTER,
           STORY_SYSTEM_PROMPT,
-          SupportedAiModels[LLM_CONSTANTS.KIMI_K2].modelApiName,
+          SupportedAiModels[LLM_CONSTANTS.KIMI].modelApiName,
           process.env.MOONSHOT_K!,
-          0.7
+          0
         );
 
         // Prepare game configuration
@@ -213,7 +215,8 @@ describe("KimiAgent integration", () => {
           number_of_players: botCount,
           game_roles: gameRolesText,
           werewolf_count: gamePreview.werewolfCount,
-          play_styles: playStylesText
+          play_styles: playStylesText,
+          available_voices: "alloy, echo, fable, onyx, nova, shimmer"
         });
 
         const messages: AIMessage[] = [{
@@ -224,7 +227,7 @@ describe("KimiAgent integration", () => {
         console.log("📝 Requesting game story and characters...");
         console.log("Theme:", gamePreview.theme);
         console.log("Players to generate:", botCount);
-        console.log("Model:", "moonshot-v1-8k");
+        console.log("Model:", "kimi-k2.6");
         
         // Call askWithZodSchema with GameSetupZodSchema
         const [gameSetup, thinking, tokenUsage] = await gmAgent.askWithZodSchema(
@@ -307,7 +310,7 @@ describe("KimiAgent integration", () => {
     
     it("should demonstrate adaptive JSON mode behavior", () => {
       // Test that Kimi agent has the correct configuration
-      const agent = createAgent(LLM_CONSTANTS.KIMI_K2);
+      const agent = createAgent(LLM_CONSTANTS.KIMI);
       
       // Verify the agent is properly configured
       expect((agent as any).client).toBeDefined();

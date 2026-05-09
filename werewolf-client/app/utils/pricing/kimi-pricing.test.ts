@@ -64,74 +64,61 @@ describe('Kimi Pricing Utils', () => {
     });
 
     describe('calculateKimiCost', () => {
-        it('should calculate cost for kimi-k2-0905-preview model', () => {
-            // kimi-k2-0905-preview: $0.6/M input, $2.50/M output
-            const cost = calculateKimiCost('kimi-k2-0905-preview', 1000, 500);
-            
-            // 1K input tokens * $0.6/M + 0.5K output tokens * $2.50/M
-            expect(cost).toBeCloseTo((1000 * 0.6 / 1000000) + (500 * 2.50 / 1000000), 5);
+        it('should calculate cost for kimi-k2.6 model', () => {
+            // kimi-k2.6: $0.95/M input, $4.00/M output
+            const cost = calculateKimiCost('kimi-k2.6', 1000, 500);
+
+            // 1K input tokens * $0.95/M + 0.5K output tokens * $4.00/M
+            expect(cost).toBeCloseTo((1000 * 0.95 / 1000000) + (500 * 4.00 / 1000000), 5);
         });
 
         it('should handle large token counts', () => {
-            const cost = calculateKimiCost('kimi-k2-0905-preview', 100000, 50000);
-            
-            // 100K input * $0.6/M + 50K output * $2.50/M
-            expect(cost).toBeCloseTo((100000 * 0.6 / 1000000) + (50000 * 2.50 / 1000000), 5);
+            const cost = calculateKimiCost('kimi-k2.6', 100000, 50000);
+
+            // 100K input * $0.95/M + 50K output * $4.00/M
+            expect(cost).toBeCloseTo((100000 * 0.95 / 1000000) + (50000 * 4.00 / 1000000), 5);
         });
 
         it('should handle unknown model gracefully', () => {
             const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
-            
+
             const cost = calculateKimiCost('unknown-model', 1000, 500);
-            
+
             // Should return 0 for unknown model
             expect(cost).toBe(0);
             expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('No pricing information available'));
-            
+
             consoleSpy.mockRestore();
         });
 
         it('should handle zero tokens', () => {
-            const cost = calculateKimiCost('kimi-k2-0905-preview', 0, 0);
+            const cost = calculateKimiCost('kimi-k2.6', 0, 0);
             expect(cost).toBe(0);
         });
 
-        it('should calculate cost for kimi-k2-thinking model', () => {
-            // kimi-k2-thinking shares pricing with kimi-k2-0905-preview per Moonshot docs
-            const cost = calculateKimiCost('kimi-k2-thinking', 2500, 1000);
-            const expected = (2500 * 0.6 / 1_000_000) + (1000 * 2.50 / 1_000_000);
-            expect(cost).toBeCloseTo(expected, 5);
-        });
-
         it('should calculate fractional token costs correctly', () => {
-            const cost = calculateKimiCost('kimi-k2-0905-preview', 333, 777);
-            
-            // 333 input * $0.6/M + 777 output * $2.50/M
-            const expectedCost = (333 * 0.6 / 1000000) + (777 * 2.50 / 1000000);
+            const cost = calculateKimiCost('kimi-k2.6', 333, 777);
+
+            // 333 input * $0.95/M + 777 output * $4.00/M
+            const expectedCost = (333 * 0.95 / 1000000) + (777 * 4.00 / 1000000);
             expect(cost).toBeCloseTo(expectedCost, 5);
         });
 
         it('should calculate cost with cache hits (when supported)', () => {
             // Note: Current Kimi agent doesn't extract cache info, but pricing supports it
-            // This test shows how it would work if cache info was available
-            const cost = calculateKimiCost('kimi-k2-0905-preview', 1000000, 500000);
-            
-            // 1M input * $0.6/M + 0.5M output * $2.50/M (no cache)
-            expect(cost).toBeCloseTo(0.6 + 1.25, 5);
+            const cost = calculateKimiCost('kimi-k2.6', 1000000, 500000);
+
+            // 1M input * $0.95/M + 0.5M output * $4.00/M (no cache)
+            expect(cost).toBeCloseTo(0.95 + 2.0, 5);
         });
     });
 
     describe('MODEL_PRICING integration', () => {
         it('should have pricing for Kimi models', () => {
-            expect(MODEL_PRICING['kimi-k2-0905-preview']).toBeDefined();
-            expect(MODEL_PRICING['kimi-k2-0905-preview'].inputPrice).toBe(0.6);
-            expect(MODEL_PRICING['kimi-k2-0905-preview'].outputPrice).toBe(2.50);
-            expect(MODEL_PRICING['kimi-k2-0905-preview'].cacheHitPrice).toBe(0.15);
-
-            expect(MODEL_PRICING['kimi-k2-thinking']).toBeDefined();
-            expect(MODEL_PRICING['kimi-k2-thinking'].inputPrice).toBe(0.6);
-            expect(MODEL_PRICING['kimi-k2-thinking'].outputPrice).toBe(2.50);
-            expect(MODEL_PRICING['kimi-k2-thinking'].cacheHitPrice).toBe(0.15);
+            expect(MODEL_PRICING['kimi-k2.6']).toBeDefined();
+            expect(MODEL_PRICING['kimi-k2.6'].inputPrice).toBe(0.95);
+            expect(MODEL_PRICING['kimi-k2.6'].outputPrice).toBe(4.00);
+            expect(MODEL_PRICING['kimi-k2.6'].cacheHitPrice).toBe(0.16);
         });
     });
 });

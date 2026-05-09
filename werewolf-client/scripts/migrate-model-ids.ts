@@ -23,10 +23,16 @@ const OLD_TO_NEW: Record<string, string> = {
     'Magistral Medium 1.2 (Thinking)': 'mistral-magistral',
     'Grok 4': 'grok',
     'Grok 4.1 Fast Reasoning': 'grok-fast',
+    // All Kimi K2-family models collapsed onto kimi-k2.6 (the only remaining model),
+    // exposed via the stable IDs 'kimi' and 'kimi-thinking'.
     'Kimi K2': 'kimi',
     'Kimi K2 (Thinking)': 'kimi-thinking',
-    'Kimi K2.5': 'kimi-k2.6',
-    'Kimi K2.5 (Thinking)': 'kimi-k2.6-thinking',
+    'Kimi K2.5': 'kimi',
+    'Kimi K2.5 (Thinking)': 'kimi-thinking',
+    'kimi-k2.6': 'kimi',
+    'kimi-k2.6-thinking': 'kimi-thinking',
+    'kimi-turbo': 'kimi',
+    'kimi-turbo-thinking': 'kimi-thinking',
     'Random': 'random',
 };
 

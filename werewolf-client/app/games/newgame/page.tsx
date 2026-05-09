@@ -33,7 +33,7 @@ export default function CreateNewGamePage() {
     const [werewolfCount, setWerewolfCount] = useState(3);
     const [specialRoles, setSpecialRoles] = useState([GAME_ROLES.DOCTOR, GAME_ROLES.DETECTIVE, GAME_ROLES.MANIAC]);
     const [gameMasterAiType, setGameMasterAiType] = useState<string>(() => {
-        const fastModels = Object.values(LLM_CONSTANTS).filter(m => m !== LLM_CONSTANTS.RANDOM && modelHasTag(m, 'fast'));
+        const fastModels = Object.values(LLM_CONSTANTS).filter(m => m !== LLM_CONSTANTS.RANDOM && (modelHasTag(m, 'fast') || modelHasTag(m, 'very-fast')));
         return fastModels.length > 0 ? fastModels[Math.floor(Math.random() * fastModels.length)] : LLM_CONSTANTS.RANDOM;
     });
     const [selectedPlayerAiTypes, setSelectedPlayerAiTypes] = useState<string[]>(Object.values(LLM_CONSTANTS).filter(model => model !== LLM_CONSTANTS.RANDOM));
@@ -349,17 +349,25 @@ export default function CreateNewGamePage() {
         setError(null);
         try {
             const game: GamePreviewWithGeneratedBots = await previewGame(gamePreviewData);
-            
+
+            // Transliterate non-ASCII characters so old previews don't trip the validator.
+            const sanitizeName = (raw: string): string => {
+                // Strip combining marks after NFKD decomposition, then drop anything non-ASCII-alphanumeric.
+                const cleaned = raw.normalize('NFKD').replace(/\p{M}/gu, '').replace(/[^a-zA-Z0-9]/g, '');
+                return cleaned || raw;
+            };
+
             // Set all thinking modes to false by default
             const updatedGame: GamePreviewWithGeneratedBots = {
                 ...game,
                 gameMasterThinking: false,
                 bots: game.bots.map(bot => ({
                     ...bot,
+                    name: sanitizeName(bot.name),
                     enableThinking: false
                 }))
             };
-            
+
             // Validate initial bot names
             const initialBotNameErrors: {[key: number]: string} = {};
             updatedGame.bots.forEach((bot, index) => {

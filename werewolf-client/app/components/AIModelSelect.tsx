@@ -21,6 +21,7 @@ interface AIModelSelectProps {
 }
 
 const TAG_STYLES: Record<ModelTag, { text: string; border: string; bg: string; label: string }> = {
+    'very-fast': { text: 'var(--tag-fast-text)', border: 'var(--tag-fast-border)', bg: 'var(--tag-fast-bg)', label: 'very fast' },
     fast: { text: 'var(--tag-fast-text)', border: 'var(--tag-fast-border)', bg: 'var(--tag-fast-bg)', label: 'fast' },
     slow: { text: 'var(--tag-std-text)', border: 'var(--tag-std-border)', bg: 'var(--tag-std-bg)', label: 'slow' },
     'very-slow': { text: 'var(--danger)', border: 'oklch(70% 0.13 25 / 0.3)', bg: 'oklch(70% 0.13 25 / 0.08)', label: 'very slow' },
@@ -77,6 +78,7 @@ export default function AIModelSelect({
     const [isOpen, setIsOpen] = useState(false);
     const [search, setSearch] = useState('');
     const [fastOnly, setFastOnly] = useState(false);
+    const [selectedProviders, setSelectedProviders] = useState<Set<string>>(new Set());
     const panelRef = useRef<HTMLDivElement>(null);
     const searchRef = useRef<HTMLInputElement>(null);
 
@@ -116,11 +118,14 @@ export default function AIModelSelect({
         return sorted;
     }, [options]);
 
-    // Filter by search and fast-only
+    // Filter by search and selected providers (fast-only is applied per-row as a disabled state)
     const filteredGroups = useMemo(() => {
         const q = search.toLowerCase();
         return groupedModels
             .map(([provider, models]) => {
+                if (selectedProviders.size > 0 && !selectedProviders.has(provider)) {
+                    return [provider, []] as [string, string[]];
+                }
                 const filtered = models.filter(m => {
                     const name = getModelDisplayName(m).toLowerCase();
                     const prov = provider.toLowerCase();
@@ -130,7 +135,18 @@ export default function AIModelSelect({
                 return [provider, filtered] as [string, string[]];
             })
             .filter(([, models]) => models.length > 0);
-    }, [groupedModels, search]);
+    }, [groupedModels, search, selectedProviders]);
+
+    const availableProviders = useMemo(() => groupedModels.map(([p]) => p), [groupedModels]);
+
+    const toggleProvider = (provider: string) => {
+        setSelectedProviders(prev => {
+            const next = new Set(prev);
+            if (next.has(provider)) next.delete(provider);
+            else next.add(provider);
+            return next;
+        });
+    };
 
     const visibleCount = filteredGroups.reduce((sum, [, m]) => sum + m.length, 0);
 
@@ -159,13 +175,15 @@ export default function AIModelSelect({
         onChange([]);
     };
 
+    const isFastOrFaster = (modelId: string) => modelHasTag(modelId, 'fast') || modelHasTag(modelId, 'very-fast');
+
     const handleFastOnlyToggle = () => {
         const next = !fastOnly;
         setFastOnly(next);
         onFastOnlyChange?.(next);
         if (next) {
-            // Auto-select all fast models, deselect non-fast
-            onChange(options.filter(m => modelHasTag(m, 'fast')));
+            // Auto-select all fast (or faster) models, deselect the rest
+            onChange(options.filter(isFastOrFaster));
         }
     };
 
@@ -237,28 +255,50 @@ export default function AIModelSelect({
                     </div>
 
                     {/* Toolbar */}
-                    <div className="flex items-center gap-2 px-3 py-1.5 border-b border-[var(--line-1)]">
-                        {/* Fast-only toggle */}
-                        <button
-                            type="button"
-                            onClick={handleFastOnlyToggle}
-                            aria-pressed={fastOnly}
-                            className={`flex items-center gap-1.5 text-[11px] font-medium px-2 py-1 rounded-full border transition-all duration-[120ms] ${
-                                fastOnly
-                                    ? 'bg-[var(--accent-soft)] border-[var(--accent-line)] text-[var(--accent)]'
-                                    : 'bg-transparent border-[var(--line-2)] text-[var(--fg-2)] hover:border-[var(--line-3)] hover:text-[var(--fg-1)]'
-                            }`}
-                        >
-                            <span className={`w-1.5 h-1.5 rounded-full ${fastOnly ? 'bg-[var(--accent)]' : 'bg-[var(--fg-3)]'}`} />
-                            Fast only
-                        </button>
-                        <span className="flex-1" />
-                        <button type="button" onClick={handleSelectVisible} className="text-[11px] text-[var(--fg-2)] hover:text-[var(--fg-0)] transition-colors duration-[120ms]">
-                            Select visible
-                        </button>
-                        <button type="button" onClick={handleClear} className="text-[11px] text-[var(--fg-2)] hover:text-[var(--fg-0)] transition-colors duration-[120ms]">
-                            Clear
-                        </button>
+                    <div className="px-3 py-1.5 border-b border-[var(--line-1)] space-y-1.5">
+                        {/* Filter chips: Fast only + provider chips */}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                            <button
+                                type="button"
+                                onClick={handleFastOnlyToggle}
+                                aria-pressed={fastOnly}
+                                className={`flex items-center gap-1.5 text-[11px] font-medium px-2 py-1 rounded-full border transition-all duration-[120ms] ${
+                                    fastOnly
+                                        ? 'bg-[var(--accent-soft)] border-[var(--accent-line)] text-[var(--accent)]'
+                                        : 'bg-transparent border-[var(--line-2)] text-[var(--fg-2)] hover:border-[var(--line-3)] hover:text-[var(--fg-1)]'
+                                }`}
+                            >
+                                <span className={`w-1.5 h-1.5 rounded-full ${fastOnly ? 'bg-[var(--accent)]' : 'bg-[var(--fg-3)]'}`} />
+                                Fast only
+                            </button>
+                            {availableProviders.map(provider => {
+                                const active = selectedProviders.has(provider);
+                                return (
+                                    <button
+                                        key={provider}
+                                        type="button"
+                                        onClick={() => toggleProvider(provider)}
+                                        aria-pressed={active}
+                                        className={`text-[11px] font-medium px-2 py-1 rounded-full border transition-all duration-[120ms] ${
+                                            active
+                                                ? 'bg-[var(--accent-soft)] border-[var(--accent-line)] text-[var(--accent)]'
+                                                : 'bg-transparent border-[var(--line-2)] text-[var(--fg-2)] hover:border-[var(--line-3)] hover:text-[var(--fg-1)]'
+                                        }`}
+                                    >
+                                        {provider}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        {/* Action buttons */}
+                        <div className="flex items-center justify-end gap-2">
+                            <button type="button" onClick={handleSelectVisible} className="text-[11px] text-[var(--fg-2)] hover:text-[var(--fg-0)] transition-colors duration-[120ms]">
+                                Select visible
+                            </button>
+                            <button type="button" onClick={handleClear} className="text-[11px] text-[var(--fg-2)] hover:text-[var(--fg-0)] transition-colors duration-[120ms]">
+                                Clear
+                            </button>
+                        </div>
                     </div>
 
                     {/* Model list */}
@@ -272,7 +312,7 @@ export default function AIModelSelect({
                                 {models.map(modelId => {
                                     const checked = selectedOptions.includes(modelId);
                                     const meta = optionMetaFn?.(modelId);
-                                    const isDisabled = (fastOnly && !modelHasTag(modelId, 'fast')) || (meta?.disabled && !checked);
+                                    const isDisabled = (fastOnly && !isFastOrFaster(modelId)) || (meta?.disabled && !checked);
                                     const tags = getModelTags(modelId);
                                     const config = SupportedAiModels[modelId];
 

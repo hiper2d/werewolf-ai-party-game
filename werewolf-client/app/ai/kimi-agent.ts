@@ -9,9 +9,9 @@ import { safeValidateResponse } from './prompts/zod-schemas';
 
 export class KimiAgent extends AbstractAgent {
     private readonly client: OpenAI;
+    // Kimi K2.6 enforces a fixed default temperature; do not send the field per Moonshot docs.
     private readonly defaultParams: Omit<Parameters<OpenAI['chat']['completions']['create']>[0], 'messages'> = {
         model: this.model,
-        temperature: this.temperature,
         stream: false,
         max_tokens: 16384,  // Set to 16k to handle longer JSON responses
     };
@@ -127,13 +127,10 @@ export class KimiAgent extends AbstractAgent {
                         response_format: {
                             type: 'json_schema',
                             json_schema: kimiSchema
-                        }
+                        },
+                        // Kimi K2.6 enables thinking by default; pass explicit type each way.
+                        thinking: { type: this.enableThinking ? 'enabled' : 'disabled' }
                     };
-
-                    // Models that support a thinking toggle (e.g. Kimi K2.6)
-                    if (this.enableThinking) {
-                        params.thinking = { type: 'enabled' };
-                    }
 
                     completion = await this.client.chat.completions.create(params) as OpenAI.Chat.Completions.ChatCompletion;
                 } catch (apiError) {
@@ -188,13 +185,10 @@ export class KimiAgent extends AbstractAgent {
                 try {
                     const params: any = {
                         ...this.defaultParams,
-                        messages: openAIMessages
+                        messages: openAIMessages,
+                        // Kimi K2.6 enables thinking by default; pass explicit type each way.
+                        thinking: { type: this.enableThinking ? 'enabled' : 'disabled' }
                     };
-
-                    // Models that support a thinking toggle (e.g. Kimi K2.6)
-                    if (this.enableThinking) {
-                        params.thinking = { type: 'enabled' };
-                    }
 
                     completion = await this.client.chat.completions.create(params) as OpenAI.Chat.Completions.ChatCompletion;
                 } catch (apiError) {

@@ -93,7 +93,7 @@ You are an AI agent tasked with generating a game scene and character descriptio
       For each player (total of <NumberOfPlayers>NumberOfPlayers</NumberOfPlayers>), generate:
 
       <CharacterDetails>
-        - A unique, single-word <Name>name</Name> appropriate to the theme, following the Character Sourcing Rule above. Do not use the <ExcludedName>ExcludedName</ExcludedName> or any similar names.
+        - A unique, single-word <Name>name</Name> appropriate to the theme, following the Character Sourcing Rule above. Do not use the <ExcludedName>ExcludedName</ExcludedName> or any similar names. **The name MUST contain only English ASCII letters (A-Z, a-z) and digits (0-9) — no spaces, accents, diacritics, apostrophes, hyphens, or non-Latin characters. Transliterate any names with non-ASCII characters (e.g., "Zoë" → "Zoe", "François" → "Francois", "Müller" → "Muller").**
         - A <Gender>gender</Gender> (male or female) that fits the character
         - A brief <Story>story</Story> (3-5 sentences) that:
           * Fits within the context of the scene and theme
@@ -180,7 +180,7 @@ You are an AI agent tasked with generating a game scene and character descriptio
   Important requirements:
   - Return ONLY the JSON object, no additional text
   - Ensure valid JSON syntax with proper escaping of special characters
-  - Make all character names unique single words
+  - Make all character names unique single words using ONLY English ASCII letters (A-Z, a-z) and digits (0-9) — transliterate any non-ASCII names
   - Keep character stories to 3-5 sentences
   - Never use or reference the excluded name
   - Include exactly the number of players specified

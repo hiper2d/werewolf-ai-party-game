@@ -60,13 +60,10 @@ export class AgentFactory {
             case LLM_CONSTANTS.MISTRAL_3_LARGE:
             case LLM_CONSTANTS.MISTRAL_MAGISTRAL:
                 return new MistralAgent(name, instruction, model.modelApiName, key, shouldEnableThinking);
-            case LLM_CONSTANTS.KIMI_K2_6:
-            case LLM_CONSTANTS.KIMI_K2_6_THINKING:
-            case LLM_CONSTANTS.KIMI_K2:
-            case LLM_CONSTANTS.KIMI_K2_THINKING:
-            case LLM_CONSTANTS.KIMI_K2_TURBO:
-            case LLM_CONSTANTS.KIMI_K2_TURBO_THINKING:
-                return new KimiAgent(name, instruction, model.modelApiName, key, model.temperature!, shouldEnableThinking);
+            case LLM_CONSTANTS.KIMI:
+            case LLM_CONSTANTS.KIMI_THINKING:
+                // Kimi K2.6 ignores client temperature and uses its fixed default.
+                return new KimiAgent(name, instruction, model.modelApiName, key, 0, shouldEnableThinking);
             default:
                 throw new Error(`Unknown Key: ${modelName}`);
         }
