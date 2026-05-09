@@ -26,7 +26,7 @@ export default async function Home() {
           The ultimate social deduction game where you play against the world&apos;s best AI models.
         </p>
         <p className="text-lg theme-text-secondary max-w-2xl mb-10 leading-relaxed">
-          Put GPT-5.5, Claude, Gemini, DeepSeek, Grok, Mistral, and Kimi at the same table.
+          Put GPT-5.5, Claude, Gemini, DeepSeek, Grok, Mistral, Kimi, and GLM at the same table.
           Each bot has its own personality, goals, and strategy.
           You&apos;re the only human — can you outsmart them all?
         </p>
@@ -71,13 +71,13 @@ export default async function Home() {
               </div>
               <h3 className="text-xl font-bold theme-text-primary mb-2">All Top AI Models Together</h3>
               <p className="theme-text-secondary mb-3">
-                Mix models from 7 providers in the same game.
+                Mix models from 8 providers in the same game.
                 Watch them argue, deceive, and form alliances against each other — and you.
               </p>
               <div className="flex flex-wrap justify-center gap-1.5 text-xs">
                 {[
                   'GPT-5.5', 'Claude 4.7 Opus', 'Claude 4.6 Sonnet', 'Gemini 3.1 Pro',
-                  'DeepSeek V4 Pro', 'Grok 4.3', 'Mistral Large 3', 'Kimi K2.6'
+                  'DeepSeek V4 Pro', 'Grok 4.3', 'Mistral Large 3', 'Kimi K2.6', 'GLM-5.1'
                 ].map(model => (
                   <span key={model} className="px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20">
                     {model}

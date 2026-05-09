@@ -28,6 +28,7 @@ const ENV_KEY_MAP: Record<string, string> = {
     [API_KEY_CONSTANTS.DEEPSEEK]: 'DEEP_SEEK_K',
     [API_KEY_CONSTANTS.GROK]: 'GROK_K',
     [API_KEY_CONSTANTS.MOONSHOT]: 'MOONSHOT_K',
+    [API_KEY_CONSTANTS.Z_AI]: 'Z_K',
 };
 
 // Build ApiKeyMap from environment

@@ -2,7 +2,6 @@ import dotenv from "dotenv";
 dotenv.config();
 import { GoogleAgent } from "./google-agent";
 import { AIMessage } from "@/app/api/game-models";
-import { parseResponseToObj } from "@/app/utils/message-utils";
 import { LLM_CONSTANTS, SupportedAiModels } from "@/app/ai/ai-models";
 import { BOT_SYSTEM_PROMPT } from "@/app/ai/prompts/bot-prompts";
 import { format } from "@/app/ai/prompts/utils";

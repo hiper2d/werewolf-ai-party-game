@@ -38,8 +38,7 @@ import {
     convertToAIMessages,
     formatMessagesForBotSelection,
     generateEliminationMessage,
-    generateVotingResultsMessage,
-    parseResponseToObj
+    generateVotingResultsMessage
 } from "@/app/utils/message-utils";
 import {ModelError} from "@/app/ai/errors";
 import {

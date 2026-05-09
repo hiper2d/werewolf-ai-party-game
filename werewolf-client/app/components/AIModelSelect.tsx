@@ -62,7 +62,7 @@ function getProviderName(modelId: string): string {
 }
 
 // Provider display order
-const PROVIDER_ORDER = ['OpenAI', 'Anthropic', 'Google', 'DeepSeek', 'Grok', 'Mistral', 'Moonshot'];
+const PROVIDER_ORDER = ['OpenAI', 'Anthropic', 'Google', 'DeepSeek', 'Grok', 'Mistral', 'Moonshot', 'Z.AI'];
 
 export default function AIModelSelect({
     options,
@@ -118,14 +118,11 @@ export default function AIModelSelect({
         return sorted;
     }, [options]);
 
-    // Filter by search and selected providers (fast-only is applied per-row as a disabled state)
+    // Search-only group filter. Filter chips no longer hide rows — they only drive selection.
     const filteredGroups = useMemo(() => {
         const q = search.toLowerCase();
         return groupedModels
             .map(([provider, models]) => {
-                if (selectedProviders.size > 0 && !selectedProviders.has(provider)) {
-                    return [provider, []] as [string, string[]];
-                }
                 const filtered = models.filter(m => {
                     const name = getModelDisplayName(m).toLowerCase();
                     const prov = provider.toLowerCase();
@@ -135,17 +132,39 @@ export default function AIModelSelect({
                 return [provider, filtered] as [string, string[]];
             })
             .filter(([, models]) => models.length > 0);
-    }, [groupedModels, search, selectedProviders]);
+    }, [groupedModels, search]);
 
     const availableProviders = useMemo(() => groupedModels.map(([p]) => p), [groupedModels]);
 
-    const toggleProvider = (provider: string) => {
-        setSelectedProviders(prev => {
-            const next = new Set(prev);
-            if (next.has(provider)) next.delete(provider);
-            else next.add(provider);
-            return next;
+    const isFastOrFaster = (modelId: string) =>
+        modelHasTag(modelId, 'fast') || modelHasTag(modelId, 'very-fast');
+
+    // Recompute selection from the active filter set.
+    // - No active filters → empty selection.
+    // - One filter → just that subset.
+    // - Multiple filters → intersection (e.g. fast ∩ OpenAI).
+    // Skips models that are explicitly disabled by `optionMetaFn` (e.g. tier policy).
+    const applyFiltersToSelection = (nextFastOnly: boolean, nextProviders: Set<string>) => {
+        if (!nextFastOnly && nextProviders.size === 0) {
+            onChange([]);
+            return;
+        }
+        const matches = options.filter(modelId => {
+            const meta = optionMetaFn?.(modelId);
+            if (meta?.disabled) return false;
+            if (nextFastOnly && !isFastOrFaster(modelId)) return false;
+            if (nextProviders.size > 0 && !nextProviders.has(getProviderName(modelId))) return false;
+            return true;
         });
+        onChange(matches);
+    };
+
+    const toggleProvider = (provider: string) => {
+        const next = new Set(selectedProviders);
+        if (next.has(provider)) next.delete(provider);
+        else next.add(provider);
+        setSelectedProviders(next);
+        applyFiltersToSelection(fastOnly, next);
     };
 
     const visibleCount = filteredGroups.reduce((sum, [, m]) => sum + m.length, 0);
@@ -172,19 +191,22 @@ export default function AIModelSelect({
     };
 
     const handleClear = () => {
+        // Reset both the selection AND the active filter chips.
         onChange([]);
+        if (fastOnly) {
+            setFastOnly(false);
+            onFastOnlyChange?.(false);
+        }
+        if (selectedProviders.size > 0) {
+            setSelectedProviders(new Set());
+        }
     };
-
-    const isFastOrFaster = (modelId: string) => modelHasTag(modelId, 'fast') || modelHasTag(modelId, 'very-fast');
 
     const handleFastOnlyToggle = () => {
         const next = !fastOnly;
         setFastOnly(next);
         onFastOnlyChange?.(next);
-        if (next) {
-            // Auto-select all fast (or faster) models, deselect the rest
-            onChange(options.filter(isFastOrFaster));
-        }
+        applyFiltersToSelection(next, selectedProviders);
     };
 
     // Summary text for trigger
@@ -312,7 +334,8 @@ export default function AIModelSelect({
                                 {models.map(modelId => {
                                     const checked = selectedOptions.includes(modelId);
                                     const meta = optionMetaFn?.(modelId);
-                                    const isDisabled = (fastOnly && !isFastOrFaster(modelId)) || (meta?.disabled && !checked);
+                                    // Filters no longer block rows — only `optionMetaFn` (tier policy) does.
+                                    const isDisabled = !!(meta?.disabled && !checked);
                                     const tags = getModelTags(modelId);
                                     const config = SupportedAiModels[modelId];
 

@@ -15,7 +15,8 @@ export const API_KEY_CONSTANTS = {
     MISTRAL: 'MISTRAL_API_KEY',
     DEEPSEEK: 'DEEPSEEK_API_KEY',
     GROK: 'GROK_API_KEY',
-    MOONSHOT: 'MOONSHOT_API_KEY'
+    MOONSHOT: 'MOONSHOT_API_KEY',
+    Z_AI: 'Z_AI_API_KEY'
 } as const;
 
 export const SupportedAiKeyNames: Record<string, string> = {
@@ -25,7 +26,8 @@ export const SupportedAiKeyNames: Record<string, string> = {
     [API_KEY_CONSTANTS.MISTRAL]: 'Mistral',
     [API_KEY_CONSTANTS.DEEPSEEK]: 'DeepSeek',
     [API_KEY_CONSTANTS.GROK]: 'Grok',
-    [API_KEY_CONSTANTS.MOONSHOT]: 'Moonshot'
+    [API_KEY_CONSTANTS.MOONSHOT]: 'Moonshot',
+    [API_KEY_CONSTANTS.Z_AI]: 'Z.AI'
 };
 
 export const LLM_CONSTANTS = {
@@ -51,6 +53,8 @@ export const LLM_CONSTANTS = {
     GROK_4_1_FAST_REASONING: 'grok-fast',
     KIMI: 'kimi',
     KIMI_THINKING: 'kimi-thinking',
+    GLM: 'glm',
+    GLM_THINKING: 'glm-thinking',
     RANDOM: 'random',
 }
 
@@ -352,6 +356,31 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
             maxBotsPerGame: 1
         }
     },
+
+    // Z.AI models
+    [LLM_CONSTANTS.GLM]: {
+        displayName: 'GLM-5.1',
+        modelApiName: 'glm-5.1',
+        apiKeyName: API_KEY_CONSTANTS.Z_AI,
+        hasThinking: false,
+        temperature: 0.7,
+        freeTier: {
+            available: true,
+            maxBotsPerGame: 1
+        }
+    },
+    [LLM_CONSTANTS.GLM_THINKING]: {
+        displayName: 'GLM-5.1 (Thinking)',
+        modelApiName: 'glm-5.1',
+        apiKeyName: API_KEY_CONSTANTS.Z_AI,
+        hasThinking: true,
+        temperature: 0.7,
+        tags: ['slow'],
+        freeTier: {
+            available: true,
+            maxBotsPerGame: 1
+        }
+    },
 };
 
 export type LLMModel = keyof typeof SupportedAiModels;
@@ -421,6 +450,13 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
         inputPrice: 0.95,
         outputPrice: 4.00,
         cacheHitPrice: 0.16
+    },
+
+    // Z.AI models
+    [SupportedAiModels[LLM_CONSTANTS.GLM].modelApiName]: {
+        inputPrice: 1.4,
+        outputPrice: 4.4,
+        cacheHitPrice: 0.26
     },
 
     // Anthropic models

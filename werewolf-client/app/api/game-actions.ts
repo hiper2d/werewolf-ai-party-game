@@ -382,7 +382,7 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
         };
     });
 
-    validateModelUsageForTier(tier, resolvedGmAiType, bots.map(bot => bot.playerAiType));
+    validateModelUsageForTier(tier, resolvedGmAiType, bots.map(bot => bot.playerAiType), apiKeys);
 
     // Game Master voice selection (AI-selected or fallback)
     let gameMasterVoice = aiResponse.gameMasterVoice;
@@ -416,8 +416,8 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
         throw new Error('Firestore is not initialized');
     }
     try {
-        const tier = await getUserTier(session.user.email);
-        validateModelUsageForTier(tier, gamePreview.gameMasterAiType, gamePreview.bots.map(bot => bot.playerAiType));
+        const { tier, apiKeys } = await getUserTierAndApiKeys(session.user.email);
+        validateModelUsageForTier(tier, gamePreview.gameMasterAiType, gamePreview.bots.map(bot => bot.playerAiType), apiKeys);
 
         const totalPlayers = gamePreview.playerCount;
         const werewolfCount = gamePreview.werewolfCount;
@@ -617,7 +617,8 @@ export async function updateBotModel(gameId: string, botName: string, newAiType:
             return bot;
         });
 
-        validateModelUsageForTier(gameTier, gameMasterAiType, updatedBots.map((bot: Bot) => bot.aiType));
+        const { apiKeys: currentApiKeys } = await getUserTierAndApiKeys(session.user.email);
+        validateModelUsageForTier(gameTier, gameMasterAiType, updatedBots.map((bot: Bot) => bot.aiType), currentApiKeys);
         
         // Update the game in Firestore
         await gameRef.update({ bots: updatedBots });
@@ -651,7 +652,8 @@ export async function updateGameMasterModel(gameId: string, newAiType: string): 
         const {gameTier} = await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: (gameData?.createdWithTier ?? 'free') });
 
         const bots = (gameData?.bots || []) as Bot[];
-        validateModelUsageForTier(gameTier, newAiType, bots.map((bot: Bot) => bot.aiType));
+        const { apiKeys: currentApiKeys } = await getUserTierAndApiKeys(session.user.email);
+        validateModelUsageForTier(gameTier, newAiType, bots.map((bot: Bot) => bot.aiType), currentApiKeys);
 
         // Update the Game Master AI type in Firestore
         await gameRef.update({ gameMasterAiType: newAiType });

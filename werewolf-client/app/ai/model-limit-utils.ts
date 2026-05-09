@@ -1,5 +1,5 @@
 import {LLM_CONSTANTS, SupportedAiModels} from '@/app/ai/ai-models';
-import {UserTier, USER_TIERS} from '@/app/api/game-models';
+import {ApiKeyMap, UserTier, USER_TIERS} from '@/app/api/game-models';
 
 export const FREE_TIER_UNLIMITED = Number.POSITIVE_INFINITY;
 
@@ -86,7 +86,83 @@ export function getCandidateModelsForTier(tier: UserTier): string[] {
         .map(([modelName]) => modelName);
 }
 
-export function validateModelUsageForTier(tier: UserTier, gameMasterModel: string, botModels: string[]): void {
+/**
+ * Returns the set of apiKeyName values for which the user has provided a non-empty key.
+ * Empty/whitespace-only values are treated as "not provided".
+ */
+export function getProvidedApiKeyNames(apiKeys: ApiKeyMap | undefined | null): Set<string> {
+    if (!apiKeys) return new Set();
+    const provided = new Set<string>();
+    for (const [name, value] of Object.entries(apiKeys)) {
+        if (typeof value === 'string' && value.trim() !== '') {
+            provided.add(name);
+        }
+    }
+    return provided;
+}
+
+/**
+ * Returns the models a user is allowed to select given their tier and (for API tier) the
+ * set of API key names they have actually provided.
+ *
+ * - FREE / PAID tiers: keyed off platform-managed credentials, so the apiKeys arg is ignored.
+ * - API tier: only models whose `apiKeyName` is present (with a non-empty value) in the user's keys.
+ */
+export function getAvailableModelsForUser(tier: UserTier, apiKeys?: ApiKeyMap | null): string[] {
+    const candidates = getCandidateModelsForTier(tier);
+    if (tier !== USER_TIERS.API) {
+        return candidates;
+    }
+    const provided = getProvidedApiKeyNames(apiKeys);
+    return candidates.filter(modelId => {
+        const config = SupportedAiModels[modelId];
+        return !!config && provided.has(config.apiKeyName);
+    });
+}
+
+/**
+ * Throws a descriptive error if the API-tier user has not provided the API key required
+ * by `modelName`. No-op for FREE / PAID tiers (those use platform-managed keys).
+ */
+export function assertModelAllowedForApiTier(
+    modelName: string,
+    tier: UserTier,
+    apiKeys: ApiKeyMap | undefined | null,
+    context: string
+): void {
+    if (tier !== USER_TIERS.API) {
+        return;
+    }
+    if (modelName === LLM_CONSTANTS.RANDOM) {
+        // Random selections must be resolved before this point; treat as a programming error.
+        throw new Error('Random AI model selections must be resolved before validating API tier access.');
+    }
+    const config = SupportedAiModels[modelName];
+    if (!config) {
+        throw new Error(`Unsupported AI model: ${modelName}.`);
+    }
+    const provided = getProvidedApiKeyNames(apiKeys);
+    if (!provided.has(config.apiKeyName)) {
+        throw new Error(
+            `The AI model ${modelName} requires the ${config.apiKeyName} API key ${context}. Please add it on your Profile page.`
+        );
+    }
+}
+
+export function validateModelUsageForTier(
+    tier: UserTier,
+    gameMasterModel: string,
+    botModels: string[],
+    apiKeys?: ApiKeyMap | null
+): void {
+    if (tier === USER_TIERS.API) {
+        assertModelAllowedForApiTier(gameMasterModel, tier, apiKeys, 'as the game master');
+        for (const botModel of botModels) {
+            assertModelAllowedForApiTier(botModel, tier, apiKeys, 'for bots');
+        }
+        return;
+    }
+
     if (tier !== USER_TIERS.FREE) {
         return;
     }

@@ -68,7 +68,7 @@ export default function AboutPage() {
       <section className="mb-12">
         <h2 className="text-2xl font-bold mb-6 underline decoration-btn decoration-4 underline-offset-8">What We Found</h2>
         <p className="mb-4 text-lg">
-          The best models from OpenAI, Anthropic, Google, DeepSeek, Mistral, xAI, and Moonshot can genuinely play Werewolf.
+          The best models from OpenAI, Anthropic, Google, DeepSeek, Mistral, xAI, Moonshot, and Z.AI can genuinely play Werewolf.
           They form alliances, make strategic accusations, defend themselves under pressure, and sometimes pull off surprisingly
           convincing bluffs. The game is challenging for human players — and that was the goal.
         </p>

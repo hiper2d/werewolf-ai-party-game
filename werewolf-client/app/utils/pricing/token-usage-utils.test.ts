@@ -285,6 +285,7 @@ describe('Token Usage Utils', () => {
                 SupportedAiModels[LLM_CONSTANTS.MISTRAL_4_SMALL].modelApiName,
                 SupportedAiModels[LLM_CONSTANTS.MISTRAL_MAGISTRAL].modelApiName,
                 SupportedAiModels[LLM_CONSTANTS.GROK_4_3].modelApiName,
+                SupportedAiModels[LLM_CONSTANTS.GLM].modelApiName,
             ];
 
             expectedModels.forEach(model => {

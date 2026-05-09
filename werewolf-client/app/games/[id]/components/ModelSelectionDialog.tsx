@@ -37,6 +37,24 @@ export default function ModelSelectionDialog({
     const { isModalOpen } = useUIControls();
     const isOpen = isModalOpen('modelSelection');
     const [search, setSearch] = useState('');
+    const [providedKeyNames, setProvidedKeyNames] = useState<Set<string> | null>(null);
+
+    // Load API-tier user's provided key names (only relevant when gameTier === API).
+    useEffect(() => {
+        if (gameTier !== USER_TIERS.API || !isOpen || providedKeyNames !== null) return;
+        let cancelled = false;
+        fetch('/api/user-key-names')
+            .then(r => r.ok ? r.json() : { providedKeys: [] })
+            .then(data => {
+                if (cancelled) return;
+                const list = Array.isArray(data?.providedKeys) ? data.providedKeys as string[] : [];
+                setProvidedKeyNames(new Set(list));
+            })
+            .catch(() => {
+                if (!cancelled) setProvidedKeyNames(new Set());
+            });
+        return () => { cancelled = true; };
+    }, [gameTier, isOpen, providedKeyNames]);
 
     const tierFilteredModels = useMemo(() => {
         if (gameTier === USER_TIERS.FREE) {
@@ -46,8 +64,23 @@ export default function ModelSelectionDialog({
             }
             return Array.from(models);
         }
-        return Object.values(LLM_CONSTANTS).filter(model => model !== LLM_CONSTANTS.RANDOM);
-    }, [gameTier, currentModel]);
+        const all = Object.values(LLM_CONSTANTS).filter(model => model !== LLM_CONSTANTS.RANDOM);
+        if (gameTier !== USER_TIERS.API) return all;
+        // API tier: filter to vendors the user has keys for. Always allow the currently-selected
+        // model so the user can see what they're switching from even if it's now unsupported.
+        if (providedKeyNames === null) {
+            // Keys not yet loaded — show only the current model to avoid flashing the full list.
+            return currentModel ? [currentModel] : [];
+        }
+        const filtered = all.filter(modelId => {
+            const config = SupportedAiModels[modelId];
+            return !!config && providedKeyNames.has(config.apiKeyName);
+        });
+        if (currentModel && currentModel !== LLM_CONSTANTS.RANDOM && !filtered.includes(currentModel)) {
+            filtered.push(currentModel);
+        }
+        return filtered;
+    }, [gameTier, currentModel, providedKeyNames]);
 
     const modelOptions = useMemo(() => {
         return tierFilteredModels
@@ -80,7 +113,8 @@ export default function ModelSelectionDialog({
         const groups: Record<string, typeof modelOptions> = {};
         const providerNames: Record<string, string> = {
             ANTHROPIC_API_KEY: 'Anthropic', OPENAI_API_KEY: 'OpenAI', GOOGLE_API_KEY: 'Google',
-            DEEPSEEK_API_KEY: 'DeepSeek', GROK_API_KEY: 'Grok', MISTRAL_API_KEY: 'Mistral', MOONSHOT_API_KEY: 'Moonshot'
+            DEEPSEEK_API_KEY: 'DeepSeek', GROK_API_KEY: 'Grok', MISTRAL_API_KEY: 'Mistral', MOONSHOT_API_KEY: 'Moonshot',
+            Z_AI_API_KEY: 'Z.AI'
         };
         for (const opt of modelOptions) {
             const config = SupportedAiModels[opt.model];

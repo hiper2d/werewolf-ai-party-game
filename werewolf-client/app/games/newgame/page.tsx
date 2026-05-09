@@ -6,7 +6,7 @@ import {useSession} from 'next-auth/react';
 import {createGame, previewGame} from '@/app/api/game-actions';
 import {GAME_ROLES, GamePreview, GamePreviewWithGeneratedBots, GENDER_OPTIONS, getVoicesForGender, getRandomVoiceForGender, PLAY_STYLES, PLAY_STYLE_CONFIGS, UserTier, USER_TIERS} from "@/app/api/game-models";
 import {LLM_CONSTANTS, SupportedAiModels, getModelDisplayName, modelHasTag} from "@/app/ai/ai-models";
-import {FREE_TIER_UNLIMITED, getCandidateModelsForTier, getPerGameModelLimit} from "@/app/ai/model-limit-utils";
+import {FREE_TIER_UNLIMITED, getAvailableModelsForUser, getCandidateModelsForTier, getPerGameModelLimit} from "@/app/ai/model-limit-utils";
 import AIModelSelect from '@/app/components/AIModelSelect';
 import ModelSelectDropdown from '@/app/components/ModelSelectDropdown';
 import SelectDropdown from '@/app/components/SelectDropdown';
@@ -33,8 +33,13 @@ export default function CreateNewGamePage() {
     const [werewolfCount, setWerewolfCount] = useState(3);
     const [specialRoles, setSpecialRoles] = useState([GAME_ROLES.DOCTOR, GAME_ROLES.DETECTIVE, GAME_ROLES.MANIAC]);
     const [gameMasterAiType, setGameMasterAiType] = useState<string>(() => {
-        const fastModels = Object.values(LLM_CONSTANTS).filter(m => m !== LLM_CONSTANTS.RANDOM && (modelHasTag(m, 'fast') || modelHasTag(m, 'very-fast')));
-        return fastModels.length > 0 ? fastModels[Math.floor(Math.random() * fastModels.length)] : LLM_CONSTANTS.RANDOM;
+        // Initial seed: random cheap/very-cheap model from the full catalog.
+        // Tier/key data isn't loaded yet on first render — a reconciliation effect below
+        // re-picks from the user's actually-allowed pool once that data is in.
+        const cheap = Object.values(LLM_CONSTANTS).filter(
+            m => m !== LLM_CONSTANTS.RANDOM && (modelHasTag(m, 'cheap') || modelHasTag(m, 'very-cheap'))
+        );
+        return cheap.length > 0 ? cheap[Math.floor(Math.random() * cheap.length)] : LLM_CONSTANTS.RANDOM;
     });
     const [selectedPlayerAiTypes, setSelectedPlayerAiTypes] = useState<string[]>(Object.values(LLM_CONSTANTS).filter(model => model !== LLM_CONSTANTS.RANDOM));
     const [isFormValid, setIsFormValid] = useState(false);
@@ -51,6 +56,8 @@ export default function CreateNewGamePage() {
     const [botNameErrors, setBotNameErrors] = useState<{[key: number]: string}>({});
     const [userTier, setUserTier] = useState<UserTier>('free');
     const [isTierLoaded, setIsTierLoaded] = useState(false);
+    const [providedKeyNames, setProvidedKeyNames] = useState<Set<string>>(new Set());
+    const [isKeysLoaded, setIsKeysLoaded] = useState(false);
     const hasInitializedPlayerModels = useRef(false);
     const playerOptions = useMemo(() => {
         const maxPlayers = userTier === USER_TIERS.API ? 16 : 12;
@@ -61,18 +68,32 @@ export default function CreateNewGamePage() {
     const FAST_MODELS = useMemo(() => new Set(
         Object.values(LLM_CONSTANTS).filter(m => modelHasTag(m, 'fast'))
     ), []);
+    // For API tier, restrict to models the user has provided keys for.
+    const apiTierAllowed = useMemo(() => {
+        if (userTier !== USER_TIERS.API) return null;
+        return new Set(allModels.filter(modelId => {
+            const config = SupportedAiModels[modelId];
+            return !!config && providedKeyNames.has(config.apiKeyName);
+        }));
+    }, [userTier, allModels, providedKeyNames]);
+
     const gmModelOptions = useMemo(() => {
-        return allModels.filter(model => model !== LLM_CONSTANTS.RANDOM).map(model => {
-            const name = getModelDisplayName(model);
-            return { model, disabled: false, label: name, displayLabel: name };
-        });
-    }, [allModels]);
+        return allModels.filter(model => model !== LLM_CONSTANTS.RANDOM)
+            .filter(model => apiTierAllowed ? apiTierAllowed.has(model) : true)
+            .map(model => {
+                const name = getModelDisplayName(model);
+                return { model, disabled: false, label: name, displayLabel: name };
+            });
+    }, [allModels, apiTierAllowed]);
 
     const playerModelOptions = useMemo(() => {
         // For free tier, show ALL models (available ones selectable, unavailable greyed out)
-        const base = allModels;
+        // For API tier, only show models whose keys the user has provided.
+        const base = apiTierAllowed
+            ? allModels.filter(model => apiTierAllowed.has(model))
+            : allModels;
         return base.filter(model => model !== LLM_CONSTANTS.RANDOM);
-    }, [allModels]);
+    }, [allModels, apiTierAllowed]);
 
     // For the multi-select: provide meta (disabled + counter suffix) for each model option
     const playerModelOptionMeta = useMemo(() => {
@@ -127,6 +148,34 @@ export default function CreateNewGamePage() {
             cancelled = true;
         };
     }, [status, isTierLoaded]);
+
+    useEffect(() => {
+        if (status !== 'authenticated' || isKeysLoaded) {
+            return;
+        }
+        let cancelled = false;
+        const loadKeys = async () => {
+            try {
+                const response = await fetch('/api/user-key-names');
+                if (!cancelled && response?.ok) {
+                    const data = await response.json();
+                    if (Array.isArray(data?.providedKeys)) {
+                        setProvidedKeyNames(new Set(data.providedKeys as string[]));
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to load user API key names for model selection', err);
+            } finally {
+                if (!cancelled) {
+                    setIsKeysLoaded(true);
+                }
+            }
+        };
+        loadKeys();
+        return () => {
+            cancelled = true;
+        };
+    }, [status, isKeysLoaded]);
 
     useEffect(() => {
         if (werewolfCount >= playerCount) {
@@ -209,22 +258,26 @@ export default function CreateNewGamePage() {
     // GM defaults to RANDOM, resolved during preview generation
 
     useEffect(() => {
-        if (!isTierLoaded) {
+        if (!isTierLoaded || (userTier === USER_TIERS.API && !isKeysLoaded)) {
             return;
         }
 
         // Only candidate (available) models should be auto-selected
         const availablePlayerModels = candidateModels.filter(m => m !== LLM_CONSTANTS.RANDOM);
+        // Gated set actually shown in the UI (API-tier-aware).
+        const visiblePlayerModels = playerModelOptions;
 
         setSelectedPlayerAiTypes(prev => {
-            const filtered = prev.filter(model => playerModelOptions.includes(model) && availablePlayerModels.includes(model));
+            const filtered = prev.filter(model => visiblePlayerModels.includes(model) && availablePlayerModels.includes(model));
 
             if (!hasInitializedPlayerModels.current) {
                 hasInitializedPlayerModels.current = true;
                 if (filtered.length > 0) {
                     return filtered;
                 }
-                return availablePlayerModels;
+                // Fall back to whatever is actually visible — not the full candidate set,
+                // which may include models the API-tier user has no key for.
+                return visiblePlayerModels;
             }
 
             if (filtered.length !== prev.length) {
@@ -233,7 +286,39 @@ export default function CreateNewGamePage() {
 
             return prev;
         });
-    }, [isTierLoaded, playerModelOptions, candidateModels]);
+    }, [isTierLoaded, isKeysLoaded, userTier, playerModelOptions, candidateModels]);
+
+    // If the auto-picked GM model isn't allowed for the current tier+keys, re-pick from
+    // the user's actually-allowed cheap/very-cheap models (random), regardless of tier.
+    useEffect(() => {
+        if (!isTierLoaded) return;
+        if (userTier === USER_TIERS.API && !isKeysLoaded) return;
+        if (gameMasterAiType === LLM_CONSTANTS.RANDOM) return;
+
+        // Build the allowed-for-this-user set.
+        let allowed: Set<string>;
+        if (userTier === USER_TIERS.API) {
+            if (!apiTierAllowed) return;
+            allowed = apiTierAllowed;
+        } else if (userTier === USER_TIERS.FREE) {
+            allowed = new Set(candidateModels);
+        } else {
+            allowed = new Set(allModels);
+        }
+
+        if (allowed.has(gameMasterAiType)) return;
+
+        // Re-pick: prefer cheap / very-cheap from the allowed set; if none, any allowed model.
+        const allowedArr = Array.from(allowed).filter(m => m !== LLM_CONSTANTS.RANDOM);
+        const cheapAllowed = allowedArr.filter(
+            m => modelHasTag(m, 'cheap') || modelHasTag(m, 'very-cheap')
+        );
+        const pool = cheapAllowed.length > 0 ? cheapAllowed : allowedArr;
+        const replacement = pool.length > 0
+            ? pool[Math.floor(Math.random() * pool.length)]
+            : LLM_CONSTANTS.RANDOM;
+        setGameMasterAiType(replacement);
+    }, [isTierLoaded, isKeysLoaded, userTier, apiTierAllowed, candidateModels, allModels, gameMasterAiType]);
 
     // Compute per-model usage counts from preview data (GM + all bots)
     const previewUsageCounts = useMemo(() => {
@@ -413,8 +498,12 @@ export default function CreateNewGamePage() {
         setIsLoading(true);
         setError(null);
         try {
-            await createGame(gameData);
-            router.push("/games");
+            const newGameId = await createGame(gameData);
+            if (newGameId) {
+                router.push(`/games/${newGameId}`);
+            } else {
+                router.push("/games");
+            }
         } catch (err: any) {
             setError(err.message);
             console.error("Error creating game:", err);

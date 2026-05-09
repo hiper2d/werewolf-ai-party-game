@@ -8,6 +8,7 @@ import { MistralAgent } from "@/app/ai/mistral-agent";
 import { DeepSeekV2Agent } from "@/app/ai/deepseek-v2-agent";
 import { GrokAgent } from "@/app/ai/grok-agent";
 import { KimiAgent } from "@/app/ai/kimi-agent";
+import { GlmAgent } from "@/app/ai/glm-agent";
 
 export class AgentFactory {
 
@@ -64,6 +65,11 @@ export class AgentFactory {
             case LLM_CONSTANTS.KIMI_THINKING:
                 // Kimi K2.6 ignores client temperature and uses its fixed default.
                 return new KimiAgent(name, instruction, model.modelApiName, key, 0, shouldEnableThinking);
+
+            // Z.AI models
+            case LLM_CONSTANTS.GLM:
+            case LLM_CONSTANTS.GLM_THINKING:
+                return new GlmAgent(name, instruction, model.modelApiName, key, model.temperature!, shouldEnableThinking);
             default:
                 throw new Error(`Unknown Key: ${modelName}`);
         }
