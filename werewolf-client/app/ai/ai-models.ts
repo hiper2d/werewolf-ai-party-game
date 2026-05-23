@@ -50,7 +50,7 @@ export const LLM_CONSTANTS = {
     MISTRAL_4_SMALL: 'mistral-small',
     MISTRAL_MAGISTRAL: 'mistral-magistral',
     GROK_4_3: 'grok',
-    GROK_4_1_FAST_REASONING: 'grok-fast',
+    GROK_4_3_THINKING: 'grok-thinking',
     KIMI: 'kimi',
     KIMI_THINKING: 'kimi-thinking',
     GLM: 'glm',
@@ -253,11 +253,11 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         }
     },
     [LLM_CONSTANTS.GEMINI_3_FLASH]: {
-        displayName: 'Gemini 3 Flash Preview',
-        modelApiName: 'gemini-3-flash-preview',
+        displayName: 'Gemini 3.5 Flash',
+        modelApiName: 'gemini-3.5-flash',
         apiKeyName: API_KEY_CONSTANTS.GOOGLE,
         hasThinking: true,
-        tags: ['fast', 'cheap'],
+        tags: ['fast'],
         freeTier: {
             available: true,
             maxBotsPerGame: -1 // Unlimited
@@ -267,24 +267,24 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         displayName: 'Grok 4.3',
         modelApiName: 'grok-4.3',
         apiKeyName: API_KEY_CONSTANTS.GROK,
+        hasThinking: false,
+        temperature: 0.7,
+        tags: ['fast'],
+        freeTier: {
+            available: true,
+            maxBotsPerGame: 1
+        }
+    },
+    [LLM_CONSTANTS.GROK_4_3_THINKING]: {
+        displayName: 'Grok 4.3 (Thinking)',
+        modelApiName: 'grok-4.3',
+        apiKeyName: API_KEY_CONSTANTS.GROK,
         hasThinking: true,
         temperature: 0.7,
         tags: ['slow', 'expensive'],
         freeTier: {
             available: true,
             maxBotsPerGame: 1
-        }
-    },
-    [LLM_CONSTANTS.GROK_4_1_FAST_REASONING]: {
-        displayName: 'Grok 4.1 Fast Reasoning',
-        modelApiName: 'grok-4-1-fast-reasoning',
-        apiKeyName: API_KEY_CONSTANTS.GROK,
-        hasThinking: true,
-        temperature: 0.7,
-        tags: ['fast', 'cheap'],
-        freeTier: {
-            available: true,
-            maxBotsPerGame: -1 // Very affordable
         }
     },
 
@@ -486,9 +486,11 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
         extendedContextThresholdTokens: 200_000
     },
     [SupportedAiModels[LLM_CONSTANTS.GEMINI_3_FLASH].modelApiName]: {
-        inputPrice: 0.50,
-        outputPrice: 3.00,
-        cacheHitPrice: 0.05
+        // Cache storage cost ($1.00 / 1M tokens per hour) is not tracked here — the
+        // schema only models per-token call costs, not time-based storage.
+        inputPrice: 1.50,
+        outputPrice: 9.00,
+        cacheHitPrice: 0.15
     },
 
     // Mistral models
@@ -509,15 +511,11 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
         outputPrice: 5.0
     },
 
-    // Grok models
+    // Grok models — both grok and grok-thinking share grok-4.3
     [SupportedAiModels[LLM_CONSTANTS.GROK_4_3].modelApiName]: {
         inputPrice: 1.25,
         outputPrice: 2.50,
         cacheHitPrice: 0.20
-    },
-    [SupportedAiModels[LLM_CONSTANTS.GROK_4_1_FAST_REASONING].modelApiName]: {
-        inputPrice: 0.20,
-        outputPrice: 0.50
     }
 };
 

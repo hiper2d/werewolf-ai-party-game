@@ -22,7 +22,9 @@ const OLD_TO_NEW: Record<string, string> = {
     'Mistral Medium 3.1': 'mistral-medium',
     'Magistral Medium 1.2 (Thinking)': 'mistral-magistral',
     'Grok 4': 'grok',
-    'Grok 4.1 Fast Reasoning': 'grok-fast',
+    'Grok 4.1 Fast Reasoning': 'grok-thinking',
+    // Grok 4.1 Fast Reasoning was deprecated by xAI; collapse onto grok-4.3 with reasoning.
+    'grok-fast': 'grok-thinking',
     // All Kimi K2-family models collapsed onto kimi-k2.6 (the only remaining model),
     // exposed via the stable IDs 'kimi' and 'kimi-thinking'.
     'Kimi K2': 'kimi',

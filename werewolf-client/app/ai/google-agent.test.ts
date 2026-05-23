@@ -20,6 +20,7 @@ describe("GoogleAgent integration", () => {
       personal_story: "A sophisticated AI with deep analytical capabilities and extensive knowledge.",
       play_style: "You are thoughtful and analytical, considering multiple perspectives before making decisions.",
       role: "Strategic Advisor",
+      human_player_name: "Player",
       werewolf_teammates_section: "",
       players_names: "Alice, Bob, Charlie",
       dead_players_names_with_roles: "David (Werewolf)",
@@ -66,7 +67,7 @@ describe("GoogleAgent integration", () => {
     // Google reasoning models (like Gemini 3 Pro) include thoughtsTokenCount in totalTokenCount
     // even when thinking is not explicitly enabled, so total will be greater than input + output
     const modelName = SupportedAiModels[LLM_CONSTANTS.GEMINI_3_PRO].modelApiName;
-    const isReasoningModel = modelName.includes('2.5') || modelName.includes('3-pro') || modelName.includes('thinking');
+    const isReasoningModel = modelName.includes('2.5') || /gemini-3(\.\d+)?-pro/.test(modelName) || modelName.includes('thinking');
     
     if (isReasoningModel) {
       expect(tokenUsage!.totalTokens).toBeGreaterThan(tokenUsage!.inputTokens + tokenUsage!.outputTokens);
@@ -100,6 +101,7 @@ describe("GoogleAgent integration", () => {
       personal_story: "A fast and efficient AI assistant.",
       play_style: "You are quick-thinking and precise.",
       role: "Virtual Assistant",
+      human_player_name: "Player",
       werewolf_teammates_section: "",
       players_names: "Alice, Bob, Charlie",
       dead_players_names_with_roles: "David (Werewolf)",
@@ -145,6 +147,7 @@ describe("GoogleAgent integration", () => {
         personal_story: testBot.story,
         play_style: "",
         role: testBot.role,
+        human_player_name: "Player",
         werewolf_teammates_section: "",
         players_names: "Alice, Bob, Charlie",
         dead_players_names_with_roles: "David (Werewolf)",
@@ -243,7 +246,8 @@ describe("GoogleAgent integration", () => {
           number_of_players: botCount,
           game_roles: gameRolesText,
           werewolf_count: gamePreview.werewolfCount,
-          play_styles: playStylesText
+          play_styles: playStylesText,
+          available_voices: "alloy, echo, fable, onyx, nova, shimmer"
         });
 
         const messages: AIMessage[] = [{

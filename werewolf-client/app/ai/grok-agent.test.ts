@@ -52,7 +52,7 @@ describe("GrokAgent integration", () => {
   
   describeOrSkip("askWithZodSchema with real API", () => {
     it("should respond with valid schema-based answer using grok-4 (with reasoning)", async () => {
-      const agent = createAgent("TestBot", LLM_CONSTANTS.GROK_4_3, true);
+      const agent = createAgent("TestBot", LLM_CONSTANTS.GROK_4_3_THINKING, true);
       const messages: AIMessage[] = [{
         role: 'user',
         content: 'What do you think about the current situation in the village?'

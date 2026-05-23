@@ -88,18 +88,17 @@ export class GrokAgent extends AbstractAgent {
             this.logAsking(messages);
             this.logMessages(messages);
 
-            // Use json_object mode
-            // Note: Grok 4.1 Fast Reasoning may have issues with json_object mode producing "[object Object]" responses.
-            // We fallback to text mode for this specific model as a workaround.
-            const isFastReasoning = this.model === 'grok-4-1-fast-reasoning';
-
+            // grok-4.3 supports `reasoning_effort`: "none" disables reasoning, "low" is the
+            // xAI default for general agentic use. We expose two model variants (grok and
+            // grok-thinking) that map to these two settings on the same underlying model.
             const completion = await this.client.chat.completions.create({
                 model: this.model,
                 temperature: this.temperature,
                 messages: openAIMessages,
-                response_format: isFastReasoning ? undefined : { type: "json_object" },
-                max_tokens: 16384,  // Set to 16k to handle longer JSON responses
-            });
+                response_format: { type: "json_object" },
+                max_tokens: 16384,
+                reasoning_effort: this.enableThinking ? "low" : "none",
+            } as any);
 
             const choiceMessage = completion.choices[0]?.message;
             const { textContent, additionalReasoning } = this.extractMessageContentParts(choiceMessage?.content);
