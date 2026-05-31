@@ -76,7 +76,7 @@ export default async function Home() {
               </p>
               <div className="flex flex-wrap justify-center gap-1.5 text-xs">
                 {[
-                  'GPT-5.5', 'Claude 4.7 Opus', 'Claude 4.6 Sonnet', 'Gemini 3.1 Pro',
+                  'GPT-5.5', 'Claude 4.8 Opus', 'Claude 4.6 Sonnet', 'Gemini 3.1 Pro',
                   'DeepSeek V4 Pro', 'Grok 4.3', 'Mistral Large 3', 'Kimi K2.6', 'GLM-5.1'
                 ].map(model => (
                   <span key={model} className="px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20">

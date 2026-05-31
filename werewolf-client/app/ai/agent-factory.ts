@@ -43,6 +43,7 @@ export class AgentFactory {
                 return new Gpt5Agent(name, instruction, model.modelApiName, key, model.temperature!, shouldEnableThinking);
             case LLM_CONSTANTS.GEMINI_3_PRO:
             case LLM_CONSTANTS.GEMINI_3_FLASH:
+            case LLM_CONSTANTS.GEMINI_3_FLASH_LITE:
                 return new GoogleAgent(name, instruction, model.modelApiName, key, shouldEnableThinking);
             case LLM_CONSTANTS.GROK_4_3:
             case LLM_CONSTANTS.GROK_4_3_THINKING:

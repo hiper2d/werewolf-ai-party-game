@@ -30,6 +30,7 @@ describe("ClaudeAgent integration", () => {
       personal_story: testBot.story,
       play_style: "",
       role: testBot.role,
+      human_player_name: "Player",
       werewolf_teammates_section: "",
       players_names: "Alice, Bob, Charlie",
       dead_players_names_with_roles: "David (Werewolf)",
@@ -66,6 +67,23 @@ describe("ClaudeAgent integration", () => {
     expect(typeof response.reply).toBe('string');
     expect(response.reply.length).toBeGreaterThan(0);
   });
+
+  it("should respond with a valid schema-based answer using Claude Opus", async () => {
+    const agent = setupAgent(LLM_CONSTANTS.CLAUDE_4_OPUS);
+    const messages: AIMessage[] = [
+      {
+        role: 'user',
+        content: 'Who do you suspect might be a werewolf and why?'
+      }
+    ];
+
+    const [response] = await agent.askWithZodSchema(BotAnswerZodSchema, messages);
+
+    expect(response).not.toBeNull();
+    expect(response).toHaveProperty('reply');
+    expect(typeof response.reply).toBe('string');
+    expect(response.reply.length).toBeGreaterThan(0);
+  }, 30000); // Increase timeout for real API calls
 
   it("should handle invalid role type", async () => {
     const agent = setupAgent();

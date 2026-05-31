@@ -117,13 +117,49 @@ describe("GoogleAgent integration", () => {
 
     const messages = createTestMessages();
     const [response] = await agent.askWithZodSchema(BotAnswerZodSchema, messages);
-    
+
     expect(response).not.toBeNull();
     expect(response).toHaveProperty('reply');
     expect(typeof response.reply).toBe('string');
     expect(response.reply.length).toBeGreaterThan(0);
   }, 30000); // Increase timeout for real API calls
-  
+
+  it("should respond with a valid answer and cost using Gemini Flash Lite", async () => {
+    const botName = "Google Flash Lite";
+    const instruction = format(BOT_SYSTEM_PROMPT, {
+      name: botName,
+      personal_story: "A fast and efficient AI assistant.",
+      play_style: "You are quick-thinking and precise.",
+      role: "Virtual Assistant",
+      human_player_name: "Player",
+      werewolf_teammates_section: "",
+      players_names: "Alice, Bob, Charlie",
+      dead_players_names_with_roles: "David (Werewolf)",
+      bot_context: ""
+    });
+
+    const agent = new GoogleAgent(
+      botName,
+      instruction,
+      SupportedAiModels[LLM_CONSTANTS.GEMINI_3_FLASH_LITE].modelApiName,
+      process.env.GOOGLE_K!
+    );
+
+    const messages = createTestMessages();
+    const [response, thinking, tokenUsage] = await agent.askWithZodSchema(BotAnswerZodSchema, messages);
+
+    expect(response).not.toBeNull();
+    expect(response).toHaveProperty('reply');
+    expect(typeof response.reply).toBe('string');
+    expect(response.reply.length).toBeGreaterThan(0);
+
+    // Confirms the new model id is accepted and its pricing entry resolves
+    expect(tokenUsage).toBeDefined();
+    expect(tokenUsage!.inputTokens).toBeGreaterThan(0);
+    expect(tokenUsage!.outputTokens).toBeGreaterThan(0);
+    expect(tokenUsage!.costUSD).toBeGreaterThan(0);
+  }, 30000); // Increase timeout for real API calls
+
   describe("Zod integration with Google Type constants", () => {
     // Skip tests if no API key is provided
     const hasApiKey = process.env.GOOGLE_K;

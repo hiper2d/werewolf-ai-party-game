@@ -45,6 +45,7 @@ export const LLM_CONSTANTS = {
     GPT_5_4_MINI: 'gpt-mini',
     GEMINI_3_PRO: 'gemini-pro',
     GEMINI_3_FLASH: 'gemini-flash',
+    GEMINI_3_FLASH_LITE: 'gemini-lite',
     MISTRAL_3_LARGE: 'mistral-large',
     MISTRAL_3_5_MEDIUM: 'mistral-medium',
     MISTRAL_4_SMALL: 'mistral-small',
@@ -98,8 +99,8 @@ export interface ModelConfig {
 export const SupportedAiModels: Record<string, ModelConfig> = {
     // Claude models - separate with/without thinking versions
     [LLM_CONSTANTS.CLAUDE_4_OPUS]: {
-        displayName: 'Claude 4.7 Opus',
-        modelApiName: 'claude-opus-4-7',
+        displayName: 'Claude 4.8 Opus',
+        modelApiName: 'claude-opus-4-8',
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
         hasThinking: false,
         tags: ['slow', 'expensive'],
@@ -109,8 +110,8 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         }
     },
     [LLM_CONSTANTS.CLAUDE_4_OPUS_THINKING]: {
-        displayName: 'Claude 4.7 Opus (Thinking)',
-        modelApiName: 'claude-opus-4-7',
+        displayName: 'Claude 4.8 Opus (Thinking)',
+        modelApiName: 'claude-opus-4-8',
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
         hasThinking: true,
         tags: ['slow', 'expensive'],
@@ -258,6 +259,17 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         apiKeyName: API_KEY_CONSTANTS.GOOGLE,
         hasThinking: true,
         tags: ['fast'],
+        freeTier: {
+            available: true,
+            maxBotsPerGame: -1 // Unlimited
+        }
+    },
+    [LLM_CONSTANTS.GEMINI_3_FLASH_LITE]: {
+        displayName: 'Gemini 3.1 Flash Lite',
+        modelApiName: 'gemini-3.1-flash-lite',
+        apiKeyName: API_KEY_CONSTANTS.GOOGLE,
+        hasThinking: true,
+        tags: ['fast', 'cheap'],
         freeTier: {
             available: true,
             maxBotsPerGame: -1 // Unlimited
@@ -438,12 +450,12 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
     [SupportedAiModels[LLM_CONSTANTS.DEEPSEEK_V4_FLASH].modelApiName]: {
         inputPrice: 0.14,
         outputPrice: 0.28,
-        cacheHitPrice: 0.028
+        cacheHitPrice: 0.0028
     },
     [SupportedAiModels[LLM_CONSTANTS.DEEPSEEK_V4_PRO].modelApiName]: {
-        inputPrice: 1.74,
-        outputPrice: 3.48,
-        cacheHitPrice: 0.145
+        inputPrice: 0.435,
+        outputPrice: 0.87,
+        cacheHitPrice: 0.003625
     },
 
     // Kimi/Moonshot models
@@ -491,6 +503,13 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
         inputPrice: 1.50,
         outputPrice: 9.00,
         cacheHitPrice: 0.15
+    },
+    [SupportedAiModels[LLM_CONSTANTS.GEMINI_3_FLASH_LITE].modelApiName]: {
+        // Cache storage cost ($1.00 / 1M tokens per hour) is not tracked here — the
+        // schema only models per-token call costs, not time-based storage.
+        inputPrice: 0.025,
+        outputPrice: 1.50,
+        cacheHitPrice: 0.025
     },
 
     // Mistral models

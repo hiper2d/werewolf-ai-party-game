@@ -194,7 +194,7 @@ export class ClaudeAgent extends AbstractAgent {
             const isOpus = this.model.includes('opus');
             if (canUseThinking) {
                 if (isOpus) {
-                    // Opus 4.7+ uses adaptive thinking with effort control
+                    // Opus 4.8+ uses adaptive thinking with effort control
                     (params as any).thinking = { type: "adaptive" };
                     (params as any).output_config = { effort: "high" };
                 } else {
@@ -204,7 +204,7 @@ export class ClaudeAgent extends AbstractAgent {
                 }
                 params.max_tokens = 16384;
             } else if (!isOpus) {
-                // Temperature is deprecated for Opus 4.7+
+                // Temperature is deprecated for Opus 4.8+
                 params.temperature = this.temperature;
             }
 

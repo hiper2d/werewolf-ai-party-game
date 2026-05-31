@@ -30,8 +30,14 @@ function getPriceDisplay(pricing: ModelPricing | undefined, type: 'input' | 'out
 }
 
 export default function ModelPricingTable() {
+    const seenApiNames = new Set<string>();
     const allModels = Object.entries(SupportedAiModels)
-        .map(([modelName, config]) => {
+        .filter(([, config]) => {
+            if (seenApiNames.has(config.modelApiName)) return false;
+            seenApiNames.add(config.modelApiName);
+            return true;
+        })
+        .map(([, config]) => {
             const pricing = MODEL_PRICING[config.modelApiName];
             const baseInputPrice = pricing?.inputPrice || 0;
             const baseOutputPrice = pricing?.outputPrice || 0;
