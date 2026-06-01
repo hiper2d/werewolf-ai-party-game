@@ -28,12 +28,29 @@ const jetbrains_mono = JetBrains_Mono({
 })
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://aiwerewolf.net"),
   title: "Werewolf AI",
   description: "Play the classic Werewolf party game with top AI models from OpenAI, Anthropic, Google, Mistral, and more. Each bot has its own personality, goals, and alliances.",
   openGraph: {
     title: "Werewolf AI",
     description: "Play the classic Werewolf party game with top AI models from OpenAI, Anthropic, Google, Mistral, and more.",
     siteName: "Werewolf AI",
+    url: "https://aiwerewolf.net",
+    type: "website",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "AI models sitting around a Werewolf game table",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Werewolf AI",
+    description: "Play the classic Werewolf party game with top AI models from OpenAI, Anthropic, Google, Mistral, and more.",
+    images: ["/og-image.png"],
   },
 };
 
