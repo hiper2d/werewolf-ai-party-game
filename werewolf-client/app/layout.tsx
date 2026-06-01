@@ -39,7 +39,7 @@ export const metadata: Metadata = {
     type: "website",
     images: [
       {
-        url: "/og-image.png",
+        url: "/og-image.jpg",
         width: 1200,
         height: 630,
         alt: "AI models sitting around a Werewolf game table",
@@ -50,7 +50,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Werewolf AI",
     description: "Play the classic Werewolf party game with top AI models from OpenAI, Anthropic, Google, Mistral, and more.",
-    images: ["/og-image.png"],
+    images: ["/og-image.jpg"],
   },
 };
 
