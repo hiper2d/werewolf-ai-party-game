@@ -12,6 +12,20 @@ export default async function RulesPage() {
         <div className="flex flex-col h-full text-[var(--fg-0)] overflow-auto max-w-[900px] mx-auto w-full py-6">
             <h1 className="text-[20px] font-semibold tracking-[-0.01em] mb-6">How to Play</h1>
 
+            {/* Rules video */}
+            <section className="bg-[var(--bg-1)] border border-[var(--line-1)] rounded-[var(--radius-xl)] p-6 shadow-card mb-5">
+                <h2 className="text-[16px] font-semibold mb-3">Watch: The Rules in 2 Minutes</h2>
+                <div className="relative w-full aspect-video rounded-[var(--radius-md)] overflow-hidden border border-[var(--line-1)]">
+                    <iframe
+                        className="absolute inset-0 w-full h-full"
+                        src="https://www.youtube-nocookie.com/embed/6x5awI8HRK0"
+                        title="How to Play AI Werewolf — The Rules in 2 Minutes"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                        allowFullScreen
+                    />
+                </div>
+            </section>
+
             {/* Overview */}
             <section className="bg-[var(--bg-1)] border border-[var(--line-1)] rounded-[var(--radius-xl)] p-6 shadow-card mb-5">
                 <h2 className="text-[16px] font-semibold mb-3">Overview</h2>
