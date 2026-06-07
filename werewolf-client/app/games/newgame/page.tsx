@@ -15,7 +15,7 @@ import {getVoiceConfig, getDefaultVoiceProvider, VOICE_PROVIDER_DISPLAY_NAMES} f
 import {VoiceProvider} from "@/app/ai/voice-config/voice-config";
 
 const RANDOM_NAMES = ['Bob', 'John', 'Alex', 'Sam', 'Max', 'Leo', 'Kai', 'Finn'];
-const RANDOM_THEMES = ['Lord of the Rings', 'Harry Potter', 'Hunger Games', 'Star Wars'];
+const RANDOM_THEMES = ['Dracula', 'Sherlock Holmes', 'Cthulhu Mythos', 'Treasure Island', 'Spaceship Crew', 'Wild West Town'];
 
 function pickRandom<T>(arr: T[]): T {
     return arr[Math.floor(Math.random() * arr.length)];

@@ -62,7 +62,7 @@ export default async function Home() {
               <h3 className="text-xl font-bold theme-text-primary mb-2">Immersive Werewolf Experience</h3>
               <p className="theme-text-secondary">
                 Custom themes, unique characters, voice acting, and full role-playing.
-                Every game feels different — from Harry Potter to a submarine crew.
+                Every game feels different — from a haunted manor to a submarine crew.
               </p>
             </div>
             <div className="p-6 rounded-xl theme-bg-card theme-border border shadow-sm">

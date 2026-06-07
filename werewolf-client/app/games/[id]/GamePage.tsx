@@ -1070,6 +1070,17 @@ function GamePageContent({
                     onPendingMessagesConsumed={() => setPendingMessages([])}
                     clearNightMessages={clearNightMessages}
                     onErrorHandled={handleErrorCleared}
+                    onChangeModel={(botName: string) => {
+                        const currentModel = botName === 'Game Master'
+                            ? game.gameMasterAiType
+                            : game.bots.find(b => b.name === botName)?.aiType;
+                        const enableThinking = botName === 'Game Master'
+                            ? undefined
+                            : game.bots.find(b => b.name === botName)?.enableThinking;
+                        if (currentModel) {
+                            openModelDialog(botName, currentModel, enableThinking);
+                        }
+                    }}
                     isExternalLoading={isKeepGoingLoading}
                     gameControls={flowControlsElement}
                     chatControls={chatControlsElement}
