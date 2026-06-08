@@ -15,7 +15,7 @@ import {getVoiceConfig, getDefaultVoiceProvider, VOICE_PROVIDER_DISPLAY_NAMES} f
 import {VoiceProvider} from "@/app/ai/voice-config/voice-config";
 
 const RANDOM_NAMES = ['Bob', 'John', 'Alex', 'Sam', 'Max', 'Leo', 'Kai', 'Finn'];
-const RANDOM_THEMES = ['Lord of the Rings', 'Harry Potter', 'Hunger Games', 'Star Wars'];
+const RANDOM_THEMES = ['Dracula', 'Sherlock Holmes', 'Cthulhu Mythos', 'Treasure Island', 'Spaceship Crew', 'Wild West Town'];
 
 function pickRandom<T>(arr: T[]): T {
     return arr[Math.floor(Math.random() * arr.length)];
@@ -737,7 +737,7 @@ export default function CreateNewGamePage() {
                                 ),
                             };
                             return (
-                                <div key={role} className="relative">
+                                <div key={role} className="relative inline-flex items-center gap-1.5">
                                     <button
                                         type="button"
                                         aria-pressed={isSelected}
@@ -748,8 +748,6 @@ export default function CreateNewGamePage() {
                                                 setSpecialRoles([...specialRoles, role]);
                                             }
                                         }}
-                                        onMouseEnter={() => setShowRoleTooltip(role)}
-                                        onMouseLeave={() => setShowRoleTooltip(null)}
                                         className={`flex items-center gap-2 px-3 py-[7px] rounded-[var(--radius-md)] border text-[13px] font-medium transition-all duration-[120ms] ${
                                             isSelected
                                                 ? 'bg-[var(--accent-soft)] border-[var(--accent-line)] text-[var(--accent)]'
@@ -775,6 +773,19 @@ export default function CreateNewGamePage() {
                                                 </svg>
                                             )}
                                         </span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        aria-label={`${role.charAt(0).toUpperCase() + role.slice(1)} role info`}
+                                        className="shrink-0 w-5 h-5 rounded-full bg-[var(--bg-3)] border border-[var(--line-2)] text-[var(--fg-2)] hover:bg-[var(--bg-4)] hover:text-[var(--fg-0)] transition-all duration-[120ms] flex items-center justify-center text-[11px] font-medium leading-none"
+                                        onMouseEnter={() => setShowRoleTooltip(role)}
+                                        onMouseLeave={() => setShowRoleTooltip(null)}
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            setShowRoleTooltip(showRoleTooltip === role ? null : role);
+                                        }}
+                                    >
+                                        ?
                                     </button>
                                     {showRoleTooltip === role && (
                                         <div className="absolute z-10 w-64 p-3 bg-[var(--bg-1)] border border-[var(--line-2)] rounded-[var(--radius-lg)] shadow-pop text-[13px] text-[var(--fg-1)] top-full mt-2 left-0">

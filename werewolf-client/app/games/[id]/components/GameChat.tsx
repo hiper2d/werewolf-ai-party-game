@@ -13,6 +13,7 @@ import ConfirmModal from "./ConfirmModal";
 import { ttsService } from "@/app/services/tts-service";
 import { sttService } from "@/app/services/stt-service";
 import { getDefaultVoiceProvider } from "@/app/ai/voice-config";
+import { getModelDisplayName } from "@/app/ai/ai-models";
 import { useUIControls } from '../context/UIControlsContext';
 
 interface GameChatProps {
@@ -23,6 +24,7 @@ interface GameChatProps {
     onPendingMessagesConsumed?: () => void;
     clearNightMessages?: boolean;
     onErrorHandled?: () => void;
+    onChangeModel?: (botName: string) => void;
     isExternalLoading?: boolean;
     gameControls?: React.ReactNode;
     chatControls?: React.ReactNode;
@@ -374,7 +376,7 @@ function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcludin
     );
 }
 
-export default function GameChat({ gameId, game, onGameStateChange, pendingMessages, onPendingMessagesConsumed, clearNightMessages, onErrorHandled, isExternalLoading, gameControls, chatControls, onBeforeAction, cancelButton }: GameChatProps) {
+export default function GameChat({ gameId, game, onGameStateChange, pendingMessages, onPendingMessagesConsumed, clearNightMessages, onErrorHandled, onChangeModel, isExternalLoading, gameControls, chatControls, onBeforeAction, cancelButton }: GameChatProps) {
     const [messages, setMessages] = useState<GameMessage[]>([]);
     const [newMessage, setNewMessage] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
@@ -1474,46 +1476,59 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
                         </span>
                     </div>
                 )}
-                {!isProcessing && game.errorState && !isLoadingMessages && (
-                    <div className="mx-2 my-2 p-3 rounded-[var(--radius-lg)] border bg-[oklch(70%_0.13_25_/_0.08)] border-[oklch(70%_0.13_25_/_0.3)]">
-                        <div className="flex items-start gap-2">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0 mt-0.5 text-[var(--danger)]">
-                                <circle cx="12" cy="12" r="10"/>
-                                <line x1="15" y1="9" x2="9" y2="15"/>
-                                <line x1="9" y1="9" x2="15" y2="15"/>
-                            </svg>
-                            <div className="flex-1 min-w-0">
-                                <div className="text-[13px] font-medium text-[var(--fg-0)] break-words">
-                                    {(() => {
-                                        const failedBot = game.gameState === GAME_STATES.WELCOME
-                                            ? game.gameStateParamQueue[0]
-                                            : game.gameStateProcessQueue[0];
-                                        return failedBot ? `${failedBot} failed to respond` : 'An error occurred';
-                                    })()}
-                                </div>
-                                {game.errorState.details && (
-                                    <div className="text-[12px] mt-1 text-[var(--fg-1)] break-words">
-                                        {game.errorState.details.length > 150 ? game.errorState.details.substring(0, 150) + '...' : game.errorState.details}
+                {!isProcessing && game.errorState && !isLoadingMessages && (() => {
+                    const failedBot = game.gameState === GAME_STATES.WELCOME
+                        ? game.gameStateParamQueue[0]
+                        : game.gameStateProcessQueue[0];
+                    const who = failedBot || (game.errorState.context?.botName as string | undefined);
+                    const model = game.errorState.context?.model as string | undefined;
+                    return (
+                        <div className="mx-2 my-2 p-3 rounded-[var(--radius-lg)] border bg-[oklch(70%_0.13_25_/_0.08)] border-[oklch(70%_0.13_25_/_0.3)]">
+                            <div className="flex items-start gap-2">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0 mt-0.5 text-[var(--danger)]">
+                                    <circle cx="12" cy="12" r="10"/>
+                                    <line x1="15" y1="9" x2="9" y2="15"/>
+                                    <line x1="9" y1="9" x2="15" y2="15"/>
+                                </svg>
+                                <div className="flex-1 min-w-0">
+                                    <div className="text-[13px] font-medium text-[var(--fg-0)] break-words">
+                                        {who ? `${who}'s AI model call failed` : 'An AI model call failed'}
                                     </div>
-                                )}
-                                <div className="text-[11px] mt-1.5 text-[var(--fg-2)]">
-                                    If this keeps happening, try changing the AI model for this bot in the game settings.
+                                    <div className="text-[12px] mt-1 text-[var(--fg-1)] break-words">
+                                        {who ? `${who} couldn't generate a response` : 'The AI model couldn\'t generate a response'}
+                                        {model ? ` (${getModelDisplayName(model)})` : ''}. You can retry the same model, or switch {who ? `${who}` : 'this bot'} to a different model and try again.
+                                    </div>
+                                </div>
+                                <div className="flex-shrink-0 flex flex-col gap-1.5">
+                                    <button
+                                        onClick={handleDismissError}
+                                        className="px-3 py-1.5 rounded-[var(--radius-md)] bg-[var(--bg-3)] border border-[var(--line-3)] text-[var(--fg-0)] hover:bg-[var(--bg-4)] text-[12px] font-medium transition-all duration-[120ms] flex items-center justify-center gap-1.5"
+                                        title="Retry the same model"
+                                    >
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <polyline points="23 4 23 10 17 10"/>
+                                            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                                        </svg>
+                                        Retry
+                                    </button>
+                                    {who && onChangeModel && (
+                                        <button
+                                            onClick={() => onChangeModel(who)}
+                                            className="px-3 py-1.5 rounded-[var(--radius-md)] bg-[var(--bg-2)] border border-[var(--line-2)] text-[var(--fg-1)] hover:bg-[var(--bg-3)] hover:text-[var(--fg-0)] text-[12px] font-medium transition-all duration-[120ms] flex items-center justify-center gap-1.5"
+                                            title="Switch this bot to a different AI model"
+                                        >
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <path d="M12 20h9"/>
+                                                <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+                                            </svg>
+                                            Change model
+                                        </button>
+                                    )}
                                 </div>
                             </div>
-                            <button
-                                onClick={handleDismissError}
-                                className="flex-shrink-0 px-3 py-1.5 rounded-[var(--radius-md)] bg-[var(--bg-3)] border border-[var(--line-3)] text-[var(--fg-0)] hover:bg-[var(--bg-4)] text-[12px] font-medium transition-all duration-[120ms] flex items-center gap-1.5"
-                                title="Dismiss error and retry"
-                            >
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <polyline points="23 4 23 10 17 10"/>
-                                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
-                                </svg>
-                                Retry
-                            </button>
                         </div>
-                    </div>
-                )}
+                    );
+                })()}
                 <div ref={messagesEndRef} />
             </div>
             {showScrollToTop && (

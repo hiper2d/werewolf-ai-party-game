@@ -58,7 +58,7 @@ export default function AboutPage() {
         </p>
         <p className="mb-4 text-lg">
           But rule-following was just the foundation. The real challenge was making the game <em>fun</em>. We needed bots that
-          could combine three things at once: staying in thematic character (a pirate captain, a Hogwarts student, a submarine
+          could combine three things at once: staying in thematic character (a pirate captain, a wandering sorcerer, a submarine
           engineer), playing the Werewolf game with genuine tactics, and keeping interactions with the human player entertaining
           and unpredictable. Getting all three to work together — across multiple AI providers with different strengths and
           quirks — was the hardest part.

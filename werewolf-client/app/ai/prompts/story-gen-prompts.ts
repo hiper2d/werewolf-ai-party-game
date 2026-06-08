@@ -17,7 +17,7 @@ You are an AI agent tasked with generating a game scene and character descriptio
 
   <Theme>
     - **Definition**: The overarching theme or setting for the game.
-    - **Examples**: "Medieval Village", "Space Station", "Enchanted Forest", "Harry Potter".
+    - **Examples**: "Medieval Village", "Space Station", "Enchanted Forest", "Pirate Crew".
   </Theme>
 
   <OptionalDescription>
