@@ -5,7 +5,19 @@
       **Change model** actions (the latter opens the model-selection dialog for the failing bot).
       Raw provider details moved behind a collapsible "Technical details" disclosure.
     - [NEW] We should hide technical details from UI. I should be able to get them from logs 
-- Fix the tooltip issue on roles buttons on mobile screen - add the ? icon for it
+- [DONE] Fix the tooltip issue on roles buttons on mobile screen - add the ? icon for it
+    - Role tooltips were hover-only (`onMouseEnter`/`onMouseLeave` on the whole pill), so they
+      were unreachable on touch — and tapping the pill only toggled selection. Added a dedicated
+      circular **?** icon next to each role pill (mirroring the play-style picker): hover on desktop,
+      tap-to-toggle on mobile. Moved the hover handlers off the select button so select vs. info no
+      longer conflict on touch. Added `aria-label` per role and `preventDefault` on the ? tap.
+- [DONE] Remove copyrighted franchises (Harry Potter, LOTR, Star Wars, Hunger Games) from the
+    new-game theme presets to avoid the app *promoting* protected IP. `RANDOM_THEMES` now seeds
+    public-domain / neutral settings (Dracula, Sherlock Holmes, Cthulhu Mythos, Treasure Island,
+    Spaceship Crew, Wild West Town); marketing copy on the landing/about pages no longer name-drops
+    Harry Potter / Hogwarts. User-typed themes still generate real canonical characters on request
+    (the story-gen prompt is unchanged) — that's an intentional selling point; only the app's own
+    suggestions were neutralized.
 - Footer on all pages?
 - Bots should have better notion of day and night events ordering. Review the summary logic, it should have
     - Unified past days summary text
