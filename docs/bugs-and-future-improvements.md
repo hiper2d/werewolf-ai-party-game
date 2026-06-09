@@ -18,6 +18,7 @@
     Harry Potter / Hogwarts. User-typed themes still generate real canonical characters on request
     (the story-gen prompt is unchanged) — that's an intentional selling point; only the app's own
     suggestions were neutralized.
+- Add buy me coffee/beer/both
 - Footer on all pages?
 - Bots should have better notion of day and night events ordering. Review the summary logic, it should have
     - Unified past days summary text
