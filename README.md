@@ -15,6 +15,10 @@ AI bots pretend to be humans. They don't know about other AI players. Each has p
 3. **You play** alongside AI bots through day discussions, voting, and night phases.
 4. **Survive** by reading between the lines, forming alliances, and voting out the wolves.
 
+## Watch: The Rules in 2 Minutes
+
+<a href="https://youtu.be/6x5awI8HRK0" target="_blank"><img src="https://img.youtube.com/vi/6x5awI8HRK0/maxresdefault.jpg" width="480"></a>
+
 ## Supported Models
 
 Pick any model for the Game Master and for each individual bot:
