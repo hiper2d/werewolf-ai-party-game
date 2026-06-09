@@ -190,11 +190,12 @@ export class ClaudeAgent extends AbstractAgent {
                 messages: anthropicMessages as Anthropic.MessageParam[],
             };
 
-            // Add thinking config for Anthropic models with thinking mode
-            const isOpus = this.model.includes('opus');
+            // Add thinking config for Anthropic models with thinking mode.
+            // Opus 4.8+ and Fable 5 use adaptive thinking and have deprecated the temperature param.
+            const usesAdaptiveThinking = this.model.includes('opus') || this.model.includes('fable');
             if (canUseThinking) {
-                if (isOpus) {
-                    // Opus 4.8+ uses adaptive thinking with effort control
+                if (usesAdaptiveThinking) {
+                    // Opus 4.8+ / Fable 5 use adaptive thinking with effort control
                     (params as any).thinking = { type: "adaptive" };
                     (params as any).output_config = { effort: "high" };
                 } else {
@@ -203,8 +204,8 @@ export class ClaudeAgent extends AbstractAgent {
                     params.temperature = 1;
                 }
                 params.max_tokens = 16384;
-            } else if (!isOpus) {
-                // Temperature is deprecated for Opus 4.8+
+            } else if (!usesAdaptiveThinking) {
+                // Temperature is deprecated for Opus 4.8+ / Fable 5
                 params.temperature = this.temperature;
             }
 

@@ -31,6 +31,8 @@ export const SupportedAiKeyNames: Record<string, string> = {
 };
 
 export const LLM_CONSTANTS = {
+    CLAUDE_FABLE: 'claude-fable',
+    CLAUDE_FABLE_THINKING: 'claude-fable-thinking',
     CLAUDE_4_OPUS: 'claude-opus',
     CLAUDE_4_OPUS_THINKING: 'claude-opus-thinking',
     CLAUDE_4_SONNET: 'claude-sonnet',
@@ -97,6 +99,30 @@ export interface ModelConfig {
 }
 
 export const SupportedAiModels: Record<string, ModelConfig> = {
+    // Claude Fable - new frontier family, paid/API tier only (very expensive)
+    [LLM_CONSTANTS.CLAUDE_FABLE]: {
+        displayName: 'Claude Fable 5',
+        modelApiName: 'claude-fable-5',
+        apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
+        hasThinking: false,
+        tags: ['slow', 'expensive'],
+        freeTier: {
+            available: false,
+            maxBotsPerGame: 0 // Very expensive - API/paid tiers only
+        }
+    },
+    [LLM_CONSTANTS.CLAUDE_FABLE_THINKING]: {
+        displayName: 'Claude Fable 5 (Thinking)',
+        modelApiName: 'claude-fable-5',
+        apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
+        hasThinking: true,
+        tags: ['slow', 'expensive'],
+        freeTier: {
+            available: false,
+            maxBotsPerGame: 0 // Very expensive - API/paid tiers only
+        }
+    },
+
     // Claude models - separate with/without thinking versions
     [LLM_CONSTANTS.CLAUDE_4_OPUS]: {
         displayName: 'Claude 4.8 Opus',
@@ -473,6 +499,12 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
     },
 
     // Anthropic models
+    [SupportedAiModels[LLM_CONSTANTS.CLAUDE_FABLE].modelApiName]: {
+        // Full 1M context window at standard pricing (no extended-context premium)
+        inputPrice: 10.0,
+        outputPrice: 50.0,
+        cacheHitPrice: 1.0
+    },
     [SupportedAiModels[LLM_CONSTANTS.CLAUDE_4_OPUS].modelApiName]: {
         inputPrice: 5.0,
         outputPrice: 25.0
