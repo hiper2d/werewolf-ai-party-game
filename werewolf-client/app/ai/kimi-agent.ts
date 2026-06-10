@@ -1,11 +1,10 @@
 import { AbstractAgent } from "@/app/ai/abstract-agent";
 import { OpenAI } from "openai";
 import { AIMessage, TokenUsage, AgentLoggingConfig, DEFAULT_LOGGING_CONFIG } from "@/app/api/game-models";
-import { cleanResponse } from "@/app/utils/message-utils";
 import { extractUsageAndCalculateCost } from "@/app/utils/pricing";
 import { z } from 'zod';
 import { ZodSchemaConverter } from './zod-schema-converter';
-import { safeValidateResponse } from './prompts/zod-schemas';
+import { parseAndValidateLlmJson } from './json-response-parser';
 
 export class KimiAgent extends AbstractAgent {
     private readonly client: OpenAI;
@@ -144,31 +143,18 @@ export class KimiAgent extends AbstractAgent {
                     throw new Error(this.errorMessages.emptyResponse);
                 }
 
-                // Parse and validate using Zod
-                let parsedContent: unknown;
-                try {
-                    const cleanedResponse = cleanResponse(reply);
-                    parsedContent = JSON.parse(cleanedResponse);
-                } catch (parseError) {
-                    throw new Error(`Failed to parse JSON response: ${parseError}`);
-                }
-
-                // Validate using Zod schema
-                const validationResult = safeValidateResponse(zodSchema, parsedContent);
-                if (!validationResult.success) {
-                    this.logger(`Zod validation failed: ${JSON.stringify(validationResult.error.errors)}`);
-                    throw new Error(`Response validation failed: ${validationResult.error.message}`);
-                }
+                // Parse and validate the response using the shared lenient parser
+                const parsedData = parseAndValidateLlmJson(reply, zodSchema, (m) => this.logger(m));
 
                 this.logger(`✅ Response validated successfully with Zod schema (JSON mode)`);
 
                 const { thinkingContent, tokenUsage } = this.extractThinkingAndUsage(completion);
 
-                if (validationResult.data) {
-                    this.logReply(validationResult.data, thinkingContent, tokenUsage);
+                if (parsedData) {
+                    this.logReply(parsedData, thinkingContent, tokenUsage);
                 }
 
-                return [validationResult.data, thinkingContent, tokenUsage];
+                return [parsedData, thinkingContent, tokenUsage];
 
             } catch (jsonModeError) {
                 // If JSON mode fails, fall back to prompt-based schema
@@ -202,31 +188,18 @@ export class KimiAgent extends AbstractAgent {
                     throw new Error(this.errorMessages.emptyResponse);
                 }
 
-                // Parse and validate using Zod
-                let parsedContent: unknown;
-                try {
-                    const cleanedResponse = cleanResponse(reply);
-                    parsedContent = JSON.parse(cleanedResponse);
-                } catch (parseError) {
-                    throw new Error(`Failed to parse JSON response: ${parseError}`);
-                }
-
-                // Validate using Zod schema
-                const validationResult = safeValidateResponse(zodSchema, parsedContent);
-                if (!validationResult.success) {
-                    this.logger(`Zod validation failed: ${JSON.stringify(validationResult.error.errors)}`);
-                    throw new Error(`Response validation failed: ${validationResult.error.message}`);
-                }
+                // Parse and validate the response using the shared lenient parser
+                const parsedData = parseAndValidateLlmJson(reply, zodSchema, (m) => this.logger(m));
 
                 this.logger(`✅ Response validated successfully with Zod schema (prompt mode)`);
 
                 const { thinkingContent, tokenUsage } = this.extractThinkingAndUsage(completion);
 
-                if (validationResult.data) {
-                    this.logReply(validationResult.data, thinkingContent, tokenUsage);
+                if (parsedData) {
+                    this.logReply(parsedData, thinkingContent, tokenUsage);
                 }
 
-                return [validationResult.data, thinkingContent, tokenUsage];
+                return [parsedData, thinkingContent, tokenUsage];
             }
 
         } catch (error) {

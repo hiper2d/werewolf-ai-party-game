@@ -1,11 +1,10 @@
 import { AbstractAgent } from "@/app/ai/abstract-agent";
 import { AIMessage, BotResponseError, TokenUsage, AgentLoggingConfig, DEFAULT_LOGGING_CONFIG } from "@/app/api/game-models";
 import { Anthropic } from '@anthropic-ai/sdk';
-import { cleanResponse } from "@/app/utils/message-utils";
 import { calculateAnthropicCost } from "@/app/utils/pricing";
 import { z } from 'zod';
 import { ZodSchemaConverter } from './zod-schema-converter';
-import { safeValidateResponse } from './prompts/zod-schemas';
+import { parseAndValidateLlmJson } from './json-response-parser';
 
 type AnthropicRole = 'user' | 'assistant';
 
@@ -247,21 +246,8 @@ export class ClaudeAgent extends AbstractAgent {
                 throw new Error(this.errorMessages.invalidFormat);
             }
 
-            // Parse and validate the response using Zod
-            let parsedContent: unknown;
-            try {
-                const cleanedResponse = cleanResponse(textContent);
-                parsedContent = JSON.parse(cleanedResponse);
-            } catch (parseError) {
-                throw new Error(`Failed to parse JSON response: ${parseError}`);
-            }
-
-            // Validate using Zod schema
-            const validationResult = safeValidateResponse(zodSchema, parsedContent);
-            if (!validationResult.success) {
-                this.logger(`Zod validation failed: ${JSON.stringify(validationResult.error.errors)}`);
-                throw new Error(`Response validation failed: ${validationResult.error.message}`);
-            }
+            // Parse and validate the response using the shared lenient parser
+            const parsedData = parseAndValidateLlmJson(textContent, zodSchema, (m) => this.logger(m));
 
             this.logger(`✅ Response validated successfully with Zod schema`);
 
@@ -288,11 +274,11 @@ export class ClaudeAgent extends AbstractAgent {
                 }
             }
 
-            if (validationResult.data) {
-                this.logReply(validationResult.data, thinkingContent || undefined, tokenUsage);
+            if (parsedData) {
+                this.logReply(parsedData, thinkingContent || undefined, tokenUsage);
             }
 
-            return [validationResult.data, thinkingContent, tokenUsage, anthropicThinkingSignature || undefined];
+            return [parsedData, thinkingContent, tokenUsage, anthropicThinkingSignature || undefined];
 
         } catch (error) {
             const errorDetails = error instanceof Error ? error.message : String(error);

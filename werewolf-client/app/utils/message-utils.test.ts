@@ -100,11 +100,13 @@ describe('convertToAIMessages', () => {
 
 Welcome to the game! Please introduce yourself to the group.
 
-Below are messages from the other players you haven't yet seen. Each message with it's own tag with the player name attribute:
-<NewMessagesFromOtherPlayers>
-  <Player name="Bot B">Hello everyone! I am the village doctor. I have been treating the sick and injured in this village for many years.</Player>
-  <Player name="Human Player">Hi all! I am the tavern keeper. My tavern is the center of gossip in this village.</Player>
-</NewMessagesFromOtherPlayers>
+## Messages from Other Players
+
+Below are messages from the other players you haven't yet seen, listed in order:
+
+**1. Bot B:** Hello everyone! I am the village doctor. I have been treating the sick and injured in this village for many years.
+
+**2. Human Player:** Hi all! I am the tavern keeper. My tavern is the center of gossip in this village.
       `.trim());
       expect(result[1].role).toContain('assistant');
       expect(result[1].content).toContain('Hi, I am bot C.');
@@ -218,10 +220,11 @@ Below are messages from the other players you haven't yet seen. Each message wit
 
 Part 2 of the story...
 
-Below are messages from the other players you haven't yet seen. Each message with it's own tag with the player name attribute:
-<NewMessagesFromOtherPlayers>
-  <Player name="Bot A">Bot A introduction</Player>
-</NewMessagesFromOtherPlayers>`);
+## Messages from Other Players
+
+Below are messages from the other players you haven't yet seen, listed in order:
+
+**1. Bot A:** Bot A introduction`);
 
       expect(result[1].role).toBe(MESSAGE_ROLE.ASSISTANT);
       expect(result[1].content).toBe('Bot C first message');
@@ -231,11 +234,13 @@ Below are messages from the other players you haven't yet seen. Each message wit
 
 A question for Bot C
 
-Below are messages from the other players you haven't yet seen. Each message with it's own tag with the player name attribute:
-<NewMessagesFromOtherPlayers>
-  <Player name="Bot B">Bot B response</Player>
-  <Player name="Human Player">Human player response</Player>
-</NewMessagesFromOtherPlayers>`);
+## Messages from Other Players
+
+Below are messages from the other players you haven't yet seen, listed in order:
+
+**1. Bot B:** Bot B response
+
+**2. Human Player:** Human player response`);
     });
   });
 });

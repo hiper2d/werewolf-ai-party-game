@@ -1,11 +1,10 @@
 import {AbstractAgent} from "@/app/ai/abstract-agent";
 import {OpenAI} from "openai";
 import {AIMessage, TokenUsage, AgentLoggingConfig, DEFAULT_LOGGING_CONFIG} from "@/app/api/game-models";
-import {cleanResponse} from "@/app/utils/message-utils";
+import {parseAndValidateLlmJson} from './json-response-parser';
 import {calculateGrokCost} from "@/app/utils/pricing";
 import {z} from 'zod';
 import {ZodSchemaConverter} from './zod-schema-converter';
-import {safeValidateResponse} from './prompts/zod-schemas';
 
 export class GrokAgent extends AbstractAgent {
     private readonly client: OpenAI;
@@ -120,21 +119,8 @@ export class GrokAgent extends AbstractAgent {
 
             this.logger(`Grok Agent - Found reasoning_content: ${!!reasoningContent}, length: ${reasoningContent.length}`);
 
-            // Parse and validate the response using Zod
-            let parsedContent: unknown;
-            try {
-                const cleanedResponse = cleanResponse(reply);
-                parsedContent = JSON.parse(cleanedResponse);
-            } catch (parseError) {
-                throw new Error(`Failed to parse JSON response: ${parseError}`);
-            }
-
-            // Validate using Zod schema
-            const validationResult = safeValidateResponse(zodSchema, parsedContent);
-            if (!validationResult.success) {
-                this.logger(`Zod validation failed: ${JSON.stringify(validationResult.error.errors)}`);
-                throw new Error(`Response validation failed: ${validationResult.error.message}`);
-            }
+            // Parse and validate the response using the shared lenient parser
+            const parsedData = parseAndValidateLlmJson(reply, zodSchema, (m) => this.logger(m));
 
             this.logger(`✅ Response validated successfully with Zod schema`);
 
@@ -166,11 +152,11 @@ export class GrokAgent extends AbstractAgent {
                 }
             }
 
-            if (validationResult.data) {
-                this.logReply(validationResult.data, reasoningContent, tokenUsage);
+            if (parsedData) {
+                this.logReply(parsedData, reasoningContent, tokenUsage);
             }
 
-            return [validationResult.data, reasoningContent, tokenUsage];
+            return [parsedData, reasoningContent, tokenUsage];
 
         } catch (error) {
             this.logger(this.logTemplates.error(this.name, error));

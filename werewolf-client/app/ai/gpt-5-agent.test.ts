@@ -2,7 +2,8 @@ import dotenv from "dotenv";
 dotenv.config();
 import { Gpt5Agent } from "./gpt-5-agent";
 import { AIMessage, BotAnswer, PLAY_STYLES, GAME_ROLES, TokenUsage, GAME_MASTER } from "@/app/api/game-models";
-import { LLM_CONSTANTS, SupportedAiModels } from "@/app/ai/ai-models";
+import { LLM_CONSTANTS, SupportedAiModels, MODEL_PRICING } from "@/app/ai/ai-models";
+import { getDefaultVoiceProvider, getVoiceConfig } from "@/app/ai/voice-config";
 import { calculateOpenAICost } from "@/app/utils/pricing/openai-pricing";
 import { BotAnswerZodSchema, GameSetupZodSchema, validateResponse } from "@/app/ai/prompts/zod-schemas";
 import { BOT_SYSTEM_PROMPT } from "@/app/ai/prompts/bot-prompts";
@@ -28,6 +29,7 @@ const createAgent = (botName: string, modelType: string = LLM_CONSTANTS.GPT_5_4_
     personal_story: testBot.story,
     play_style: "",
     role: testBot.role,
+    human_player_name: "Player",
     werewolf_teammates_section: "",
     players_names: "Alice, Bob, Charlie",
     dead_players_names_with_roles: "David (Werewolf)",
@@ -139,7 +141,8 @@ describe("Gpt5Agent integration", () => {
         number_of_players: botCount,
         game_roles: gameRolesText,
         werewolf_count: gamePreview.werewolfCount,
-        play_styles: playStylesText
+        play_styles: playStylesText,
+        available_voices: getVoiceConfig(getDefaultVoiceProvider()).getPromptDescription()
       });
 
       const messages: AIMessage[] = [{
@@ -223,10 +226,15 @@ describe("Gpt5Agent integration", () => {
   
   describe("token usage calculation", () => {
     it("should calculate correct costs for GPT-5-mini", () => {
-      // Test the external pricing function that GPT-5 agent uses
-      const cost = calculateOpenAICost("gpt-5-mini", 1000000, 1000000);
-      // Based on ai-models.ts pricing: $0.25 per 1M input, $2 per 1M output
-      expect(cost).toBeCloseTo(2.25, 2);
+      // Use the canonical model id and pricing from ai-models.ts so this test
+      // doesn't silently break when the model is renamed or repriced.
+      const apiName = SupportedAiModels[LLM_CONSTANTS.GPT_5_4_MINI].modelApiName;
+      const pricing = MODEL_PRICING[apiName];
+      expect(pricing).toBeDefined();
+
+      const cost = calculateOpenAICost(apiName, 1000000, 1000000);
+      expect(cost).toBeGreaterThan(0);
+      expect(cost).toBeCloseTo(pricing.inputPrice + pricing.outputPrice, 2);
     });
   });
 

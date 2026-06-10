@@ -10,6 +10,7 @@ import { ResponseSchema, createBotAnswerSchema } from "@/app/ai/prompts/ai-schem
 import { BotAnswerZodSchema, GameSetupZodSchema, validateResponse } from "@/app/ai/prompts/zod-schemas";
 import { STORY_SYSTEM_PROMPT, STORY_USER_PROMPT } from "@/app/ai/prompts/story-gen-prompts";
 import { ROLE_CONFIGS, PLAY_STYLE_CONFIGS, GAME_MASTER } from "@/app/api/game-models";
+import { getDefaultVoiceProvider, getVoiceConfig } from "@/app/ai/voice-config";
 
 describe("ClaudeAgent integration", () => {
   const setupAgent = (modelConstant: string = LLM_CONSTANTS.CLAUDE_4_SONNET) => {
@@ -95,9 +96,11 @@ describe("ClaudeAgent integration", () => {
     ];
 
     const schema = BotAnswerZodSchema;
+    // The agent wraps all errors (including role-conversion failures) in a
+    // BotResponseError with a generic message; the original cause is in details.
     await expect(agent.askWithZodSchema(schema, messages))
       .rejects
-      .toThrow('Unsupported role type: invalid_role');
+      .toThrow('Failed to get response from Anthropic API with Zod schema');
   });
 
   it("should handle API errors", async () => {
@@ -145,6 +148,7 @@ describe("ClaudeAgent integration", () => {
         personal_story: testBot.story,
         play_style: "You are observant and methodical, preferring careful analysis.",
         role: testBot.role,
+        human_player_name: "Player",
         werewolf_teammates_section: "",
         players_names: "Alice, Bob, Charlie",
         dead_players_names_with_roles: "David (Werewolf)",
@@ -239,7 +243,8 @@ describe("ClaudeAgent integration", () => {
           number_of_players: botCount,
           game_roles: gameRolesText,
           werewolf_count: gamePreview.werewolfCount,
-          play_styles: playStylesText
+          play_styles: playStylesText,
+          available_voices: getVoiceConfig(getDefaultVoiceProvider()).getPromptDescription()
         });
 
         const messages: AIMessage[] = [{

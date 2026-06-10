@@ -919,7 +919,7 @@ export default function CreateNewGamePage() {
                                     <div className="flex-1 min-w-0">
                                         <input
                                             type="text"
-                                            className={`text-[14px] font-semibold text-[var(--fg-0)] bg-transparent border-none p-0 focus:outline-none w-full ${botNameErrors[index] ? 'text-[var(--danger)]' : ''}`}
+                                            className={`text-[14px] font-semibold text-[var(--fg-0)] bg-transparent px-1.5 -mx-1.5 rounded-[var(--radius-md)] border border-transparent hover:border-[var(--line-2)] focus:outline-none focus:border-[var(--accent-line)] focus:shadow-[0_0_0_3px_var(--accent-soft)] transition-all duration-[120ms] w-full ${botNameErrors[index] ? 'text-[var(--danger)]' : ''}`}
                                             value={player.name}
                                             onChange={(e) => handlePlayerChange(index, 'name', e.target.value)}
                                             placeholder="Player Name"

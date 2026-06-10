@@ -5,7 +5,7 @@ import { AIMessage, MESSAGE_ROLE, TokenUsage, AgentLoggingConfig, DEFAULT_LOGGIN
 import { cleanResponse } from "@/app/utils/message-utils";
 import { z } from 'zod';
 import { ZodSchemaConverter } from './zod-schema-converter';
-import { safeValidateResponse } from './prompts/zod-schemas';
+import { parseAndValidateLlmJson } from './json-response-parser';
 import { extractMistralTokenUsage, calculateCost } from '@/app/utils/pricing/token-usage-utils';
 
 export class MistralAgent extends AbstractAgent {
@@ -215,43 +215,20 @@ export class MistralAgent extends AbstractAgent {
                 responseText = JSON.stringify(content);
             }
 
-            // Parse and validate the response using Zod
-            let parsedContent: unknown;
-            try {
-                const cleanedResponse = cleanResponse(responseText);
-                parsedContent = JSON.parse(cleanedResponse);
-
-                // Fix for Mistral sometimes returning nested objects when a string is expected
-                // (e.g., { reply: { field1: "...", field2: "..." } } instead of { reply: "..." })
-                // This can happen with complex prompts that have structured sections
-                if (parsedContent && typeof parsedContent === 'object' && 'reply' in parsedContent) {
-                    const reply = (parsedContent as any).reply;
-                    if (reply && typeof reply === 'object') {
-                        this.logger(`🔧 Converting nested reply object to string`);
-                        (parsedContent as any).reply = JSON.stringify(reply, null, 2);
-                    }
-                }
-            } catch (parseError) {
-                throw new Error(`Failed to parse JSON response: ${parseError}`);
-            }
-
-            // Validate using Zod schema
-            const validationResult = safeValidateResponse(zodSchema, parsedContent);
-            if (!validationResult.success) {
-                this.logger(`Zod validation failed: ${JSON.stringify(validationResult.error.errors)}`);
-                throw new Error(`Response validation failed: ${validationResult.error.message}`);
-            }
+            // Parse and validate the response using the shared lenient parser
+            // (handles Mistral's nested-reply-object quirk internally)
+            const parsedData = parseAndValidateLlmJson(responseText, zodSchema, (m) => this.logger(m));
 
             this.logger(`✅ Response validated successfully with Zod schema`);
 
             // Extract token usage
             const tokenUsage = this.extractTokenUsage(response);
 
-            if (validationResult.data) {
-                this.logReply(validationResult.data, thinkingContent || undefined, tokenUsage);
+            if (parsedData) {
+                this.logReply(parsedData, thinkingContent || undefined, tokenUsage);
             }
 
-            return [validationResult.data, thinkingContent, tokenUsage];
+            return [parsedData, thinkingContent, tokenUsage];
 
         } catch (error) {
             this.logger(this.logTemplates.error(this.name, error));

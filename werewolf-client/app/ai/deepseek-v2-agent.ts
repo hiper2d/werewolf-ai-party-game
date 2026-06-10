@@ -1,12 +1,11 @@
 import { AbstractAgent } from "@/app/ai/abstract-agent";
 import OpenAI from "openai";
 import { AIMessage, TokenUsage, AgentLoggingConfig, DEFAULT_LOGGING_CONFIG } from "@/app/api/game-models";
-import { cleanResponse } from "@/app/utils/message-utils";
 import { extractUsageAndCalculateCost } from "@/app/utils/pricing";
 import { getModelConfigByApiName } from "@/app/ai/ai-models";
 import { z } from 'zod';
 import { ZodSchemaConverter } from './zod-schema-converter';
-import { safeValidateResponse } from './prompts/zod-schemas';
+import { parseAndValidateLlmJson } from './json-response-parser';
 
 export class DeepSeekV2Agent extends AbstractAgent {
     private readonly client: OpenAI;
@@ -143,21 +142,8 @@ export class DeepSeekV2Agent extends AbstractAgent {
                 throw new Error(this.errorMessages.emptyResponse);
             }
 
-            // Parse and validate the response using Zod
-            let parsedContent: unknown;
-            try {
-                const cleanedResponse = cleanResponse(content);
-                parsedContent = JSON.parse(cleanedResponse);
-            } catch (parseError) {
-                throw new Error(`Failed to parse JSON response: ${parseError}`);
-            }
-
-            // Validate using Zod schema
-            const validationResult = safeValidateResponse(zodSchema, parsedContent);
-            if (!validationResult.success) {
-                this.logger(`Zod validation failed: ${JSON.stringify(validationResult.error.errors)}`);
-                throw new Error(`Response validation failed: ${validationResult.error.message}`);
-            }
+            // Parse and validate the response using the shared lenient parser
+            const parsedData = parseAndValidateLlmJson(content, zodSchema, (m) => this.logger(m));
 
             this.logger(`✅ Response validated successfully with Zod schema`);
 
@@ -174,11 +160,11 @@ export class DeepSeekV2Agent extends AbstractAgent {
                 };
             }
 
-            if (validationResult.data) {
-                this.logReply(validationResult.data, thinkingContent || undefined, tokenUsage);
+            if (parsedData) {
+                this.logReply(parsedData, thinkingContent || undefined, tokenUsage);
             }
 
-            return [validationResult.data, thinkingContent, tokenUsage];
+            return [parsedData, thinkingContent, tokenUsage];
 
         } catch (error) {
             this.logger(this.logTemplates.error(this.name, error));

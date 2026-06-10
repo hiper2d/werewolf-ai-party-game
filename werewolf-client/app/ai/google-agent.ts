@@ -1,11 +1,10 @@
 import { AbstractAgent } from "@/app/ai/abstract-agent";
 import { AIMessage, TokenUsage, AgentLoggingConfig, DEFAULT_LOGGING_CONFIG } from "@/app/api/game-models";
 import { GoogleGenAI, Type } from "@google/genai";
-import { cleanResponse } from "@/app/utils/message-utils";
+import { parseAndValidateLlmJson } from './json-response-parser';
 import { ModelOverloadError, ModelRateLimitError, ModelUnavailableError, ModelAuthenticationError, ModelQuotaExceededError } from "@/app/ai/errors";
 import { z } from 'zod';
 import { ZodSchemaConverter } from './zod-schema-converter';
-import { safeValidateResponse } from './prompts/zod-schemas';
 import { calculateGoogleCost } from '@/app/utils/pricing/google-pricing';
 
 type GoogleRole = 'model' | 'user';
@@ -270,37 +269,17 @@ export class GoogleAgent extends AbstractAgent {
                 throw new Error(this.errorMessages.emptyResponse);
             }
 
-            // Parse and validate the response using Zod
-            let parsedContent: unknown;
-            try {
-                let cleanedResponse = cleanResponse(response.text);
+            // Parse and validate the response using the shared lenient parser
+            // (handles Gemini's quoted-JSON-string quirk internally)
+            const parsedData = parseAndValidateLlmJson(response.text, zodSchema, (m) => this.logger(m));
 
-                // Fix: Gemini sometimes returns the JSON string wrapped in quotes
-                if (cleanedResponse.startsWith('"') && cleanedResponse.endsWith('"')) {
-                    cleanedResponse = cleanedResponse.slice(1, -1);
-                    // Also unescape escaped quotes if necessary
-                    cleanedResponse = cleanedResponse.replace(/\\"/g, '"');
-                }
-
-                parsedContent = JSON.parse(cleanedResponse);
-            } catch (parseError) {
-                throw new Error(`Failed to parse JSON response: ${parseError}`);
-            }
-
-            // Validate using Zod schema
-            const validationResult = safeValidateResponse(zodSchema, parsedContent);
-            if (!validationResult.success) {
-                this.logger(`Zod validation failed: ${JSON.stringify(validationResult.error.errors)}`);
-                throw new Error(`Response validation failed: ${validationResult.error.message}`);
-            }
-
-            if (validationResult.data) {
-                this.logReply(validationResult.data, thinkingContent || undefined, tokenUsage);
+            if (parsedData) {
+                this.logReply(parsedData, thinkingContent || undefined, tokenUsage);
             }
 
             this.logger(`✅ Response validated successfully with Zod schema`);
 
-            return [validationResult.data, thinkingContent, tokenUsage, googleThoughtSignature || undefined];
+            return [parsedData, thinkingContent, tokenUsage, googleThoughtSignature || undefined];
 
         } catch (error) {
             this.logger(this.logTemplates.error(this.name, error));

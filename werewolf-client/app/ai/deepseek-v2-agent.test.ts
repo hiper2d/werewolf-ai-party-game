@@ -8,6 +8,7 @@ import { format } from "@/app/ai/prompts/utils";
 import { BotAnswerZodSchema, GameSetupZodSchema, validateResponse } from "@/app/ai/prompts/zod-schemas";
 import { STORY_SYSTEM_PROMPT, STORY_USER_PROMPT } from "@/app/ai/prompts/story-gen-prompts";
 import { ROLE_CONFIGS, PLAY_STYLE_CONFIGS, GAME_MASTER, GAME_ROLES } from "@/app/api/game-models";
+import { getDefaultVoiceProvider, getVoiceConfig } from "@/app/ai/voice-config";
 
 describe("DeepSeekV2Agent integration", () => {
   // Skip tests if no API key is provided
@@ -32,6 +33,7 @@ describe("DeepSeekV2Agent integration", () => {
       personal_story: testBot.story,
       play_style: "You think deeply and reason through problems step by step.",
       role: testBot.role,
+      human_player_name: "Player",
       werewolf_teammates_section: "",
       players_names: "Alice, Bob, Charlie",
       dead_players_names_with_roles: "David (Werewolf)",
@@ -134,7 +136,8 @@ describe("DeepSeekV2Agent integration", () => {
           number_of_players: botCount,
           game_roles: gameRolesText,
           werewolf_count: gamePreview.werewolfCount,
-          play_styles: playStylesText
+          play_styles: playStylesText,
+          available_voices: getVoiceConfig(getDefaultVoiceProvider()).getPromptDescription()
         });
 
         const messages: AIMessage[] = [{

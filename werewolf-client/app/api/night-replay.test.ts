@@ -98,7 +98,9 @@ describe('replayNight', () => {
             get: jest.fn()
         });
 
-        (db.collection as jest.Mock).mockReturnValue({
+        // db is module-mocked above, so it is always defined here; the non-null
+        // assertion only silences the `Firestore | undefined` static type.
+        (db!.collection as jest.Mock).mockReturnValue({
             doc: mockDoc
         });
 

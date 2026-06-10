@@ -56,14 +56,14 @@ export const WerewolfActionZodSchema = z.object({
 export const DoctorActionZodSchema = z.object({
   target: z.string().describe("The name of the player to protect from werewolf attacks (or kill if using Doctor's Mistake)"),
   reasoning: z.string().describe("Reasoning for the protection or kill choice"),
-  action_type: z.enum(['protect', 'kill']).optional().describe("The type of action: 'protect' (default) or 'kill' (one-time ability)")
+  action_type: z.enum(['protect', 'kill']).nullable().optional().describe("The type of action: 'protect' (default) or 'kill' (one-time ability)")
 });
 
 // Detective action schema
 export const DetectiveActionZodSchema = z.object({
   target: z.string().describe("The name of the player to investigate or kill"),
   reasoning: z.string().describe("Reasoning for the action choice"),
-  action_type: z.enum(['investigate', 'kill']).optional().describe("The type of action: 'investigate' (default) to learn their role, or 'kill' (one-time ability) to eliminate them")
+  action_type: z.enum(['investigate', 'kill']).nullable().optional().describe("The type of action: 'investigate' (default) to learn their role, or 'kill' (one-time ability) to eliminate them")
 });
 
 // Maniac action schema

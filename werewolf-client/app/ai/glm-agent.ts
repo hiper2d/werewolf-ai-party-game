@@ -1,11 +1,10 @@
 import { AbstractAgent } from "@/app/ai/abstract-agent";
 import { OpenAI } from "openai";
 import { AIMessage, TokenUsage, AgentLoggingConfig, DEFAULT_LOGGING_CONFIG } from "@/app/api/game-models";
-import { cleanResponse } from "@/app/utils/message-utils";
 import { extractUsageAndCalculateCost } from "@/app/utils/pricing";
 import { z } from 'zod';
 import { ZodSchemaConverter } from './zod-schema-converter';
-import { safeValidateResponse } from './prompts/zod-schemas';
+import { parseAndValidateLlmJson } from './json-response-parser';
 
 // Z.AI / GLM-5.1 agent. The API is OpenAI-compatible (https://api.z.ai/api/paas/v4/),
 // so we use the OpenAI SDK with a custom baseURL. GLM-5.1 supports a thinking toggle
@@ -88,62 +87,12 @@ export class GlmAgent extends AbstractAgent {
     }
 
     /**
-     * Try to extract the first balanced JSON object embedded in `text`.
-     * Naive brace-depth scanner — good enough when the model wraps JSON in prose.
-     * Returns null when no parseable object is found.
-     */
-    private extractEmbeddedJson(text: string): unknown | null {
-        const start = text.indexOf('{');
-        if (start < 0) return null;
-        let depth = 0;
-        for (let i = start; i < text.length; i++) {
-            const ch = text[i];
-            if (ch === '{') depth++;
-            else if (ch === '}') {
-                depth--;
-                if (depth === 0) {
-                    const slice = text.slice(start, i + 1);
-                    try { return JSON.parse(slice); } catch { return null; }
-                }
-            }
-        }
-        return null;
-    }
-
-    /**
      * Robust schema-aware coercion of a model reply.
      * Order: strict JSON parse → embedded {…} extraction → wrap-as-reply (BotAnswer-shaped schemas).
      * Returns the validated value or throws.
      */
     private parseAndValidate<T>(rawReply: string, zodSchema: z.ZodSchema<T>): T {
-        const cleaned = cleanResponse(rawReply);
-
-        // 1. Strict JSON parse
-        try {
-            const parsed = JSON.parse(cleaned);
-            const result = safeValidateResponse(zodSchema, parsed);
-            if (result.success) return result.data;
-        } catch { /* fall through to extraction */ }
-
-        // 2. Extract first balanced {...} from prose
-        const extracted = this.extractEmbeddedJson(cleaned);
-        if (extracted !== null) {
-            const result = safeValidateResponse(zodSchema, extracted);
-            if (result.success) {
-                this.logger(`Recovered JSON from prose-wrapped response (${cleaned.length} chars)`);
-                return result.data;
-            }
-        }
-
-        // 3. Last resort: wrap raw prose as `{reply: ...}` if the schema accepts it.
-        // This rescues bot dialogue when the model "speaks in character" instead of returning JSON.
-        const wrapped = safeValidateResponse(zodSchema, { reply: cleaned });
-        if (wrapped.success) {
-            this.logger(`Wrapped prose as BotAnswer reply (${cleaned.length} chars)`);
-            return wrapped.data;
-        }
-
-        throw new Error(`Failed to parse JSON response: model did not return valid JSON or BotAnswer-compatible prose. First 200 chars: ${cleaned.slice(0, 200)}`);
+        return parseAndValidateLlmJson(rawReply, zodSchema, (m) => this.logger(m));
     }
 
     async askWithZodSchema<T>(zodSchema: z.ZodSchema<T>, messages: AIMessage[]): Promise<[T, string, TokenUsage?, string?]> {

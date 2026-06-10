@@ -15,10 +15,12 @@
     `HTMLAudioElement` `onError` handler calls `cleanup()` without logging anything, so
     playback failures (autoplay policy, codec) are fully silent. Add a `console.error` +
     surface the same alert path the fetch errors use.
-- Fix outdated/broken tests (pre-existing, surfaced 2026-06-10):
-    - `app/utils/message-utils.test.ts` — 2 tests expect a `<NewMessagesFromOtherPlayers>`
-      message format the code no longer produces; update expectations to the current format.
-    - `app/api/night-replay.test.ts` — tsc error `'db' is possibly 'undefined'`.
+- ~~Fix outdated/broken tests~~ — **done (2026-06-10)**: full suite green (23 suites,
+    252 tests) and `tsc --noEmit` clean. Fixed: `message-utils.test.ts` (markdown format),
+    `night-replay.test.ts` (db non-null assertion), agent tests missing
+    `human_player_name`/`available_voices` template params, Anthropic invalid-role
+    expectation (errors are wrapped in `BotResponseError`), GPT-5 pricing test
+    (now derives model id + pricing from `ai-models.ts` instead of hardcoding).
 - `npm run lint` is broken: `next lint` was removed in the current Next version
     ("Invalid project directory provided: .../lint"). Migrate to the ESLint CLI.
 - We should hide technical details of bot errors from UI (the collapsible "Technical
@@ -113,12 +115,24 @@ on a DeepSeek bot returning JSON truncated at position 727; player never got pas
 the intro.
 
 **Suggested fixes:**
-- Retry-on-parse-failure: on a Zod/JSON parse error, retry the call 1–2x
-  (optionally with a "return ONLY valid JSON matching the schema" nudge) before
-  writing `errorState`. Most of these look like one-off bad generations.
-- More lenient/repair parse (e.g. extract the first balanced JSON object, strip
-  prose preamble) before giving up — handles the "model wrapped JSON in chat" case.
-- Fix the OpenAI Zod schema: `.optional()` fields that can be null must also be
-  `.nullable()` (provider-side strict-schema requirement).
-- The OpenAI/structured-output path should validate the *schema* at build time so
-  the `.optional()`-without-`.nullable()` class can't ship.
+- ~~Retry-on-parse-failure~~ — **rejected (2026-06-10)**: no automatic retries on the
+  backend; AI API errors surface in the UI and the user triggers the retry from there.
+- ~~More lenient/repair parse~~ — **done (2026-06-10)**: all text-parsing agents now share
+  `app/ai/json-response-parser.ts` (`parseAndValidateLlmJson`): strict parse → quote-unwrap
+  (Gemini quirk) → first-balanced-`{...}` extraction from prose (string/escape-aware) →
+  nested-`reply`-object flattening (Mistral quirk) → wrap-prose-as-`reply` for
+  BotAnswer-shaped schemas. Promoted from the GLM agent's private implementation;
+  covered by `json-response-parser.test.ts`.
+- ~~Fix the OpenAI Zod schema~~ — **done (2026-06-10)**: `action_type` in
+  `DoctorActionZodSchema` / `DetectiveActionZodSchema` is now `.nullable().optional()`.
+  This was deterministic, not flaky: `zodTextFormat` threw at request build time, so
+  *every* Doctor/Detective night action on a GPT-5 bot failed. Processors already
+  treat `null` like `undefined` (`|| 'protect'` / `|| 'investigate'`).
+- ~~Validate the schema at build time~~ — **done (2026-06-10)**:
+  `app/ai/prompts/zod-schemas.test.ts` runs every `ZodSchemaRegistry` schema (and its
+  GPT-5 thinking-mode `.extend({thinking})` variant) through `zodTextFormat` and
+  `ZodSchemaConverter.forProvider` for all providers, so an incompatible schema fails CI.
+
+**Remaining:** the `"Bot {\"Cato\":5} not found in game"` case — a *validated* but
+semantically wrong bot-selection response can still error downstream; could clamp
+GM-selected bot names against the live bot list instead of erroring.
