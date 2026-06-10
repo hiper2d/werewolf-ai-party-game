@@ -61,6 +61,10 @@ Required environment variables:
 - `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY` (Firebase Admin SDK)
 - Users provide their own AI API keys via the profile page
 
+## Production Debugging
+
+To investigate user bug reports, stuck games, or production errors, use the `debugging` skill (`.claude/skills/debugging/SKILL.md`). It covers querying BetterStack app logs via the ClickHouse SQL API and reading production Firestore (find games by theme, dump game docs/messages/errorState) with the scripts in `werewolf-client/scripts/`. Credentials live in `werewolf-client/.env`.
+
 ## Testing
 
 - Jest configuration in `jest.config.js`

@@ -109,14 +109,23 @@ export function getProvidedApiKeyNames(apiKeys: ApiKeyMap | undefined | null): S
  * - API tier: only models whose `apiKeyName` is present (with a non-empty value) in the user's keys.
  */
 export function getAvailableModelsForUser(tier: UserTier, apiKeys?: ApiKeyMap | null): string[] {
+    return getSelectableModelsForUser(tier, getProvidedApiKeyNames(apiKeys));
+}
+
+/**
+ * Same as getAvailableModelsForUser but takes the already-extracted set of provided
+ * key names — the shape client components hold (they never see key values).
+ * This is the single source of truth for which models a user may select in any
+ * model picker (GM dropdown, bot list, preview dialogs).
+ */
+export function getSelectableModelsForUser(tier: UserTier, providedKeyNames: Set<string>): string[] {
     const candidates = getCandidateModelsForTier(tier);
     if (tier !== USER_TIERS.API) {
         return candidates;
     }
-    const provided = getProvidedApiKeyNames(apiKeys);
     return candidates.filter(modelId => {
         const config = SupportedAiModels[modelId];
-        return !!config && provided.has(config.apiKeyName);
+        return !!config && providedKeyNames.has(config.apiKeyName);
     });
 }
 

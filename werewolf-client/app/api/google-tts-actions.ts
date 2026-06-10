@@ -1,9 +1,9 @@
 'use server';
 
 import { auth } from "@/auth";
-import { getUserApiKeys } from "@/app/api/user-actions";
-import { GoogleGenAI } from "@google/genai";
+import { getUserTierAndApiKeys } from "@/app/utils/tier-utils";
 import { API_KEY_CONSTANTS } from "@/app/ai/ai-models";
+import { generateGoogleTtsAudio } from "@/app/ai/tts/google-tts";
 import { updateUserMonthlySpending, deductBalance } from "@/app/api/user-actions";
 import { recordGameCost, getGameTier } from "@/app/api/cost-tracking";
 import { USER_TIERS } from "@/app/api/game-models";
@@ -24,56 +24,6 @@ function calculateGoogleTtsCost(characterCount: number): number {
   return (characterCount / 1_000_000) * GOOGLE_TTS_COST_PER_MILLION_CHARS;
 }
 
-/**
- * Converts PCM audio data to WAV format
- * PCM format from Google: 24kHz, mono, 16-bit
- */
-function pcmToWav(pcmData: Uint8Array): ArrayBuffer {
-  const sampleRate = 24000;
-  const numChannels = 1;
-  const bitsPerSample = 16;
-  const bytesPerSample = bitsPerSample / 8;
-  const blockAlign = numChannels * bytesPerSample;
-  const byteRate = sampleRate * blockAlign;
-  const dataSize = pcmData.length;
-  const headerSize = 44;
-  const totalSize = headerSize + dataSize;
-
-  const buffer = new ArrayBuffer(totalSize);
-  const view = new DataView(buffer);
-
-  // RIFF header
-  writeString(view, 0, 'RIFF');
-  view.setUint32(4, totalSize - 8, true);
-  writeString(view, 8, 'WAVE');
-
-  // fmt subchunk
-  writeString(view, 12, 'fmt ');
-  view.setUint32(16, 16, true); // Subchunk1Size (16 for PCM)
-  view.setUint16(20, 1, true);  // AudioFormat (1 for PCM)
-  view.setUint16(22, numChannels, true);
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, byteRate, true);
-  view.setUint16(32, blockAlign, true);
-  view.setUint16(34, bitsPerSample, true);
-
-  // data subchunk
-  writeString(view, 36, 'data');
-  view.setUint32(40, dataSize, true);
-
-  // Copy PCM data
-  const uint8View = new Uint8Array(buffer, headerSize);
-  uint8View.set(pcmData);
-
-  return buffer;
-}
-
-function writeString(view: DataView, offset: number, str: string): void {
-  for (let i = 0; i < str.length; i++) {
-    view.setUint8(offset + i, str.charCodeAt(i));
-  }
-}
-
 export async function generateGoogleSpeech(
   text: string,
   options: GoogleTTSOptions
@@ -88,85 +38,36 @@ export async function generateGoogleSpeech(
   }
 
   try {
-    // Get user's API keys
-    const apiKeys = await getUserApiKeys(session.user.email);
+    // Resolve keys by tier: 'api' → user's personal keys, 'free'/'paid' → platform keys
+    const { tier, apiKeys } = await getUserTierAndApiKeys(session.user.email);
     const googleApiKey = apiKeys[API_KEY_CONSTANTS.GOOGLE];
 
     if (!googleApiKey) {
-      throw new Error('Google API key not found. Please add your Google API key in your profile.');
-    }
-
-    // Initialize Google GenAI client
-    const client = new GoogleGenAI({
-      apiKey: googleApiKey
-    });
-
-    // Prepare the text with style instruction if provided
-    let inputText = text;
-    if (options.voiceStyle) {
-      inputText = `Say ${options.voiceStyle}: ${text}`;
-    }
-
-    // Generate speech using Gemini TTS model
-    const response = await client.models.generateContent({
-      model: "gemini-2.5-flash-preview-tts",
-      contents: [{ parts: [{ text: inputText }] }],
-      config: {
-        responseModalities: ['AUDIO'],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: options.voiceName },
-          },
-        },
-      } as any, // Type assertion needed for TTS-specific config
-    });
-
-    // Extract audio data from response
-    const candidates = (response as any).candidates;
-    if (!candidates || candidates.length === 0) {
-      throw new Error('No audio response from Google TTS');
-    }
-
-    const content = candidates[0].content;
-    if (!content || !content.parts || content.parts.length === 0) {
-      throw new Error('No audio content in response');
-    }
-
-    // Find the audio part (inline_data with audio MIME type)
-    let audioData: string | null = null;
-    for (const part of content.parts) {
-      if (part.inlineData && part.inlineData.mimeType?.startsWith('audio/')) {
-        audioData = part.inlineData.data;
-        break;
+      if (tier === USER_TIERS.API) {
+        throw new Error('Google API key not found. Please add your Google API key in your profile.');
       }
+      // Free/paid users rely on platform keys (config/freeTierApiKeys) — a missing key is our misconfiguration, not theirs
+      console.error(`Google TTS: platform Google API key is missing for ${tier}-tier user ${session.user.email}`);
+      throw new Error('Voice generation is temporarily unavailable. Please try again later.');
     }
 
-    if (!audioData) {
-      throw new Error('No audio data found in response');
-    }
-
-    // Decode base64 audio data
-    const binaryString = atob(audioData);
-    const pcmData = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      pcmData[i] = binaryString.charCodeAt(i);
-    }
-
-    // Convert PCM to WAV
-    const wavBuffer = pcmToWav(pcmData);
+    const wavBuffer = await generateGoogleTtsAudio(text, googleApiKey, {
+      voiceName: options.voiceName,
+      voiceStyle: options.voiceStyle,
+    });
 
     // Track costs
     const cost = calculateGoogleTtsCost(text.length);
     if (cost > 0) {
-      const tier = await getGameTier(options.gameId);
-      if (tier === USER_TIERS.PAID) {
+      const gameTier = await getGameTier(options.gameId);
+      if (gameTier === USER_TIERS.PAID) {
         const chargedAmount = parseFloat((cost * (1 + PAID_TIER_MARKUP)).toFixed(6));
         const success = await deductBalance(session.user.email, chargedAmount);
         if (!success) {
           throw new Error('Insufficient balance. Please add funds on your profile page to continue playing.');
         }
       }
-      await updateUserMonthlySpending(session.user.email, cost, tier);
+      await updateUserMonthlySpending(session.user.email, cost, gameTier);
       if (options.gameId) {
         await recordGameCost(options.gameId, cost);
       }

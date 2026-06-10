@@ -1,23 +1,29 @@
 # Bugs and improvements
 
-- [DONE] Hide error messages and show a better instruction to the user of what to do with them (retry, update model, etc)
-    - Error banner now shows a friendly "<bot>'s AI model call failed" message with **Retry** and
-      **Change model** actions (the latter opens the model-selection dialog for the failing bot).
-      Raw provider details moved behind a collapsible "Technical details" disclosure.
-    - [NEW] We should hide technical details from UI. I should be able to get them from logs 
-- [DONE] Fix the tooltip issue on roles buttons on mobile screen - add the ? icon for it
-    - Role tooltips were hover-only (`onMouseEnter`/`onMouseLeave` on the whole pill), so they
-      were unreachable on touch — and tapping the pill only toggled selection. Added a dedicated
-      circular **?** icon next to each role pill (mirroring the play-style picker): hover on desktop,
-      tap-to-toggle on mobile. Moved the hover handlers off the select button so select vs. info no
-      longer conflict on touch. Added `aria-label` per role and `preventDefault` on the ? tap.
-- [DONE] Remove copyrighted franchises (Harry Potter, LOTR, Star Wars, Hunger Games) from the
-    new-game theme presets to avoid the app *promoting* protected IP. `RANDOM_THEMES` now seeds
-    public-domain / neutral settings (Dracula, Sherlock Holmes, Cthulhu Mythos, Treasure Island,
-    Spaceship Crew, Wild West Town); marketing copy on the landing/about pages no longer name-drops
-    Harry Potter / Hogwarts. User-typed themes still generate real canonical characters on request
-    (the story-gen prompt is unchanged) — that's an intentional selling point; only the app's own
-    suggestions were neutralized.
+- Switch user tier to `paid` automatically when balance is added. Today a Stripe top-up
+    only increases `balance`; `tier` stays whatever it was (e.g. `free`), so the user keeps
+    playing free-tier games until they manually flip the tier on the profile page. Auto-switch
+    on payment success (Stripe webhook / `addBalance`), or at least prompt after top-up.
+- Free-tier spend guard for voice. TTS/STT now run on platform keys for free/paid tiers
+    (tier-aware key fix, 2026-06-10), but there is no per-dollar spend check anywhere —
+    `FREE_TIER_LIMITS` only has count-based limits (games/day, chat resets/game-day).
+    Spending is *recorded* (`updateUserMonthlySpending`) but never *checked* for free tier,
+    so unbounded speaker-button clicking charges the platform key (~$0.0002 per short
+    message; low risk but unbounded). Consider a monthly free-tier dollar cap checked
+    where spending is recorded.
+- Silent browser-side voice playback failures: in `app/services/tts-service.ts` the
+    `HTMLAudioElement` `onError` handler calls `cleanup()` without logging anything, so
+    playback failures (autoplay policy, codec) are fully silent. Add a `console.error` +
+    surface the same alert path the fetch errors use.
+- Fix outdated/broken tests (pre-existing, surfaced 2026-06-10):
+    - `app/utils/message-utils.test.ts` — 2 tests expect a `<NewMessagesFromOtherPlayers>`
+      message format the code no longer produces; update expectations to the current format.
+    - `app/api/night-replay.test.ts` — tsc error `'db' is possibly 'undefined'`.
+- `npm run lint` is broken: `next lint` was removed in the current Next version
+    ("Invalid project directory provided: .../lint"). Migrate to the ESLint CLI.
+- We should hide technical details of bot errors from UI (the collapsible "Technical
+    details" disclosure in the error banner). I should be able to get them from logs.
+- When a new day starts, right now noghting happens - the user should type something. This is not intuitive. We should ask a GAme paster to pick few bots to reply
 - Add buy me coffee/beer/both
 - Add Updates page
 - Footer on all pages?
@@ -30,6 +36,58 @@
 - When night starts, the Game Master's messages should tell the human player what to do then it's their turn
 - Change bots prompting to explain that random voting is not something suspicious. People do this. Maybe add it to
   personalities
+- Migrate all model pickers onto the tested `getSelectableModelsForUser` helper — see
+  the plan in the section below.
+
+## Migration plan: one tested source of truth for every model picker
+
+**Why.** The free-tier GM dropdown bug (Claude Fable selectable, fixed 2026-06-10) happened
+because each model picker builds its list with its own inline logic that no test touches,
+while the tested functions (`getAvailableModelsForUser`, `validateModelUsageForTier`) sit
+unused by the UI. The GM dropdown on the new-game form is migrated; the rest still have
+hand-rolled copies of the same rules.
+
+**Target.** Every picker derives its option list from `app/ai/model-limit-utils.ts` and only
+maps the result to its display shape. Tier rules live in exactly one tested place.
+
+**Step 1 — extend the shared module** (`app/ai/model-limit-utils.ts`):
+- `getSelectableModelsForUser(tier, providedKeyNames)` — done (2026-06-10), used by the GM
+  dropdown, covered by `model-limit-utils.test.ts`.
+- Add `getModelPickerOptions(tier, providedKeyNames, opts?)` returning display-ready entries
+  `{model, disabled, suffix}` so the per-picker decoration logic is also shared and tested:
+  - `opts.usageCounts` — per-game usage so free-tier entries get `(N left)` / disabled at 0,
+    including the "don't count the currently-selected model against itself"
+    adjustment (`Math.max(0, used - 1)`) that `getPreviewModelOptions` and
+    `ModelSelectionDialog` each implement today.
+  - `opts.currentModel` — always include the current selection even if no longer allowed
+    (the "see what you're switching from" escape hatch in `ModelSelectionDialog`).
+  - `opts.showUnavailableDisabled` — free tier bot list shows unavailable models greyed out
+    with `(not available)` instead of hiding them; GM-style pickers hide them.
+
+**Step 2 — migrate call sites** (each is a small, independent PR-sized change):
+1. ~~`newgame/page.tsx` `gmModelOptions`~~ — done.
+2. `newgame/page.tsx` `playerModelOptions` + `playerModelOptionMeta` (~line 89) — free tier
+   shows all models greyed out; keep that UX via `showUnavailableDisabled`.
+3. `newgame/page.tsx` `getPreviewModelOptions` (~line 337) — `(N left)` labels from
+   `previewUsageCounts`.
+4. `newgame/page.tsx` GM reconciliation effect (~line 293) — builds its own `allowed` set;
+   should call `getSelectableModelsForUser` instead.
+5. `games/[id]/components/ModelSelectionDialog.tsx` `tierFilteredModels` + `modelOptions`
+   (~lines 57–107) — usage counts + current-model escape hatch.
+
+**Step 3 — tests** (extend `model-limit-utils.test.ts`):
+- `(N left)` math incl. the current-model self-exclusion; disabled at 0 remaining.
+- `currentModel` always present even when disallowed; still marked disabled.
+- Free tier with `showUnavailableDisabled`: premium models present but disabled; without it:
+  absent. API tier: only uploaded-key vendors in both modes.
+
+**Risks / notes.**
+- `RANDOM` is a UI-only pseudo-model (not in `SupportedAiModels`); pickers that offer it
+  (bot multi-select) must add it themselves, the helper never returns it.
+- Thinking variants are separate model ids with their own free-tier limits — no special
+  handling needed, but tests should pin one (`CLAUDE_4_HAIKU` vs `CLAUDE_4_HAIKU_THINKING`).
+- Server-side enforcement (`validateModelUsageForTier` at preview/create/update) stays as is —
+  it is the backstop; this migration is about the UI never showing what the server rejects.
 
 ## Provider structured-response parse failures kill games (recoverable but fatal in practice)
 
@@ -64,15 +122,3 @@ the intro.
   `.nullable()` (provider-side strict-schema requirement).
 - The OpenAI/structured-output path should validate the *schema* at build time so
   the `.optional()`-without-`.nullable()` class can't ship.
-
-**Observability gap:** ~~`errorState.context` records only `{gameId, timestamp,
-function}` — not which **bot/model** made the failing call.~~ [DONE]
-`withErrorHandling` now resolves the failing **bot/model/gameState** (from the
-agent-thrown `BotResponseError.context`, falling back to the head of the game's
-turn queue + a lookup of the bot's `aiType`) and writes `botName`, `model` and
-`gameState` into `errorState.context`. It also emits a structured
-`logger.error('Game action failed: <fn>', {gameId, function, botName, model,
-gameState, apiProvider, recoverable, error, details})` to Better Stack, so
-failures can be attributed per-model without grepping the stack trace.
-(Consumed by Marlow's `monitor_health` broken-game watch, which can then alert
-per-model.)

@@ -321,7 +321,7 @@ export async function addBalance(userId: string, amountUSD: number): Promise<voi
             throw new Error('User not found');
         }
         const currentBalance = userSnap.data()?.balance || 0;
-        const newBalance = parseFloat((currentBalance + amountUSD).toFixed(2));
+        const newBalance = parseFloat((currentBalance + amountUSD).toFixed(6));
         transaction.update(userRef, { balance: newBalance });
     });
 }
@@ -346,7 +346,9 @@ export async function deductBalance(userId: string, amountUSD: number): Promise<
         if (currentBalance < amountUSD) {
             return;
         }
-        const newBalance = parseFloat((currentBalance - amountUSD).toFixed(2));
+        // 6dp to match charge amounts — 2dp rounding silently swallowed every
+        // sub-cent charge (TTS clicks, single bot calls), so paid usage was free
+        const newBalance = parseFloat((currentBalance - amountUSD).toFixed(6));
         transaction.update(userRef, { balance: newBalance });
         success = true;
     });

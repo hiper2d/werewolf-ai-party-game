@@ -1,9 +1,9 @@
 'use server';
 
 import { auth } from "@/auth";
-import { getUserApiKeys } from "@/app/api/user-actions";
-import { OpenAI } from "openai";
-import { API_KEY_CONSTANTS, AUDIO_MODEL_CONSTANTS } from "@/app/ai/ai-models";
+import { getUserTierAndApiKeys } from "@/app/utils/tier-utils";
+import { API_KEY_CONSTANTS } from "@/app/ai/ai-models";
+import { generateOpenAiTtsAudio, OpenAiTtsVoice } from "@/app/ai/tts/openai-tts";
 import { calculateOpenAITtsCost } from "@/app/utils/pricing";
 import { updateUserMonthlySpending, deductBalance } from "@/app/api/user-actions";
 import { recordGameCost, getGameTier } from "@/app/api/cost-tracking";
@@ -13,7 +13,7 @@ import { VoiceProvider } from "@/app/ai/voice-config";
 import { generateGoogleSpeech, GoogleTTSOptions } from "@/app/api/google-tts-actions";
 
 export interface TTSOptions {
-  voice?: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer' | 'ash' | 'ballad' | 'coral' | 'sage';
+  voice?: OpenAiTtsVoice;
   instructions?: string;
   speed?: number;
   format?: 'mp3' | 'wav' | 'opus' | 'aac' | 'flac' | 'pcm';
@@ -75,53 +75,43 @@ export async function generateSpeech(
   }
 
   try {
-    // Get user's API keys
-    const apiKeys = await getUserApiKeys(session.user.email);
+    // Resolve keys by tier: 'api' → user's personal keys, 'free'/'paid' → platform keys
+    const { tier, apiKeys } = await getUserTierAndApiKeys(session.user.email);
     const openaiApiKey = apiKeys[API_KEY_CONSTANTS.OPENAI];
-    
+
     if (!openaiApiKey) {
-      throw new Error('OpenAI API key not found. Please add your OpenAI API key in your profile.');
+      if (tier === USER_TIERS.API) {
+        throw new Error('OpenAI API key not found. Please add your OpenAI API key in your profile.');
+      }
+      // Free/paid users rely on platform keys (config/freeTierApiKeys) — a missing key is our misconfiguration, not theirs
+      console.error(`TTS: platform OpenAI API key is missing for ${tier}-tier user ${session.user.email}`);
+      throw new Error('Voice generation is temporarily unavailable. Please try again later.');
     }
 
-    // Initialize OpenAI client
-    const client = new OpenAI({ 
-      apiKey: openaiApiKey
+    const audioBuffer = await generateOpenAiTtsAudio(text, openaiApiKey, {
+      voice: options.voice,
+      instructions: options.instructions,
+      speed: options.speed,
+      format: options.format,
     });
-
-    // Generate speech
-    const speechOptions: any = {
-      model: AUDIO_MODEL_CONSTANTS.TTS,
-      voice: options.voice || 'alloy',
-      input: text,
-      speed: options.speed || 1.0,
-      response_format: options.format || 'wav', // Default to WAV for faster playback
-    };
-
-    // Add instructions if provided (only supported in gpt-4o-mini-tts model)
-    if (options.instructions) {
-      speechOptions.instructions = options.instructions;
-    }
-
-    const response = await client.audio.speech.create(speechOptions);
 
     const cost = calculateOpenAITtsCost(text.length);
     if (cost > 0) {
-      const tier = await getGameTier(options.gameId);
-      if (tier === USER_TIERS.PAID) {
+      const gameTier = await getGameTier(options.gameId);
+      if (gameTier === USER_TIERS.PAID) {
         const chargedAmount = parseFloat((cost * (1 + PAID_TIER_MARKUP)).toFixed(6));
         const success = await deductBalance(session.user.email, chargedAmount);
         if (!success) {
           throw new Error('Insufficient balance. Please add funds on your profile page to continue playing.');
         }
       }
-      await updateUserMonthlySpending(session.user.email, cost, tier);
+      await updateUserMonthlySpending(session.user.email, cost, gameTier);
       if (options.gameId) {
         await recordGameCost(options.gameId, cost);
       }
     }
 
-    // Return the audio data as ArrayBuffer
-    return await response.arrayBuffer();
+    return audioBuffer;
   } catch (error) {
     console.error('TTS Error:', error);
     if (error instanceof Error) {

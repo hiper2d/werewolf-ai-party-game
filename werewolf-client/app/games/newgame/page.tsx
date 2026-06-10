@@ -6,7 +6,7 @@ import {useSession} from 'next-auth/react';
 import {createGame, previewGame} from '@/app/api/game-actions';
 import {GAME_ROLES, GamePreview, GamePreviewWithGeneratedBots, GENDER_OPTIONS, getVoicesForGender, getRandomVoiceForGender, PLAY_STYLES, PLAY_STYLE_CONFIGS, UserTier, USER_TIERS} from "@/app/api/game-models";
 import {LLM_CONSTANTS, SupportedAiModels, getModelDisplayName, modelHasTag} from "@/app/ai/ai-models";
-import {FREE_TIER_UNLIMITED, getAvailableModelsForUser, getCandidateModelsForTier, getPerGameModelLimit} from "@/app/ai/model-limit-utils";
+import {FREE_TIER_UNLIMITED, getAvailableModelsForUser, getCandidateModelsForTier, getPerGameModelLimit, getSelectableModelsForUser} from "@/app/ai/model-limit-utils";
 import AIModelSelect from '@/app/components/AIModelSelect';
 import ModelSelectDropdown from '@/app/components/ModelSelectDropdown';
 import SelectDropdown from '@/app/components/SelectDropdown';
@@ -21,6 +21,15 @@ function pickRandom<T>(arr: T[]): T {
     return arr[Math.floor(Math.random() * arr.length)];
 }
 
+// Default GM pick: the GM narrates every turn, so speed matters most.
+// Prefer fast+cheap, then any fast, then whatever the pool allows.
+function pickDefaultGmModel(pool: string[]): string {
+    const fastCheap = pool.filter(m => modelHasTag(m, 'fast') && modelHasTag(m, 'cheap'));
+    const fast = fastCheap.length > 0 ? fastCheap : pool.filter(m => modelHasTag(m, 'fast'));
+    const candidates = fast.length > 0 ? fast : pool;
+    return candidates.length > 0 ? pickRandom(candidates) : LLM_CONSTANTS.RANDOM;
+}
+
 export default function CreateNewGamePage() {
     const { data: session, status } = useSession();
     const router = useRouter();
@@ -33,13 +42,12 @@ export default function CreateNewGamePage() {
     const [werewolfCount, setWerewolfCount] = useState(3);
     const [specialRoles, setSpecialRoles] = useState([GAME_ROLES.DOCTOR, GAME_ROLES.DETECTIVE, GAME_ROLES.MANIAC]);
     const [gameMasterAiType, setGameMasterAiType] = useState<string>(() => {
-        // Initial seed: random cheap model from the full catalog.
-        // Tier/key data isn't loaded yet on first render — a reconciliation effect below
-        // re-picks from the user's actually-allowed pool once that data is in.
-        const cheap = Object.values(LLM_CONSTANTS).filter(
-            m => m !== LLM_CONSTANTS.RANDOM && modelHasTag(m, 'cheap')
+        // Initial seed from the full catalog. Tier/key data isn't loaded yet on first
+        // render — a reconciliation effect below re-picks from the user's actually-allowed
+        // pool once that data is in.
+        return pickDefaultGmModel(
+            Object.values(LLM_CONSTANTS).filter(m => m !== LLM_CONSTANTS.RANDOM)
         );
-        return cheap.length > 0 ? cheap[Math.floor(Math.random() * cheap.length)] : LLM_CONSTANTS.RANDOM;
     });
     const [selectedPlayerAiTypes, setSelectedPlayerAiTypes] = useState<string[]>(Object.values(LLM_CONSTANTS).filter(model => model !== LLM_CONSTANTS.RANDOM));
     const [isFormValid, setIsFormValid] = useState(false);
@@ -78,13 +86,14 @@ export default function CreateNewGamePage() {
     }, [userTier, allModels, providedKeyNames]);
 
     const gmModelOptions = useMemo(() => {
-        return allModels.filter(model => model !== LLM_CONSTANTS.RANDOM)
-            .filter(model => apiTierAllowed ? apiTierAllowed.has(model) : true)
+        // Tested single source of truth: free tier → free-tier catalog,
+        // API tier → vendors with provided keys, paid → all models.
+        return getSelectableModelsForUser(userTier, providedKeyNames)
             .map(model => {
                 const name = getModelDisplayName(model);
                 return { model, disabled: false, label: name, displayLabel: name };
             });
-    }, [allModels, apiTierAllowed]);
+    }, [userTier, providedKeyNames]);
 
     const playerModelOptions = useMemo(() => {
         // For free tier, show ALL models (available ones selectable, unavailable greyed out)
@@ -289,7 +298,7 @@ export default function CreateNewGamePage() {
     }, [isTierLoaded, isKeysLoaded, userTier, playerModelOptions, candidateModels]);
 
     // If the auto-picked GM model isn't allowed for the current tier+keys, re-pick from
-    // the user's actually-allowed cheap models (random), regardless of tier.
+    // the user's actually-allowed models (fast preferred), regardless of tier.
     useEffect(() => {
         if (!isTierLoaded) return;
         if (userTier === USER_TIERS.API && !isKeysLoaded) return;
@@ -308,14 +317,8 @@ export default function CreateNewGamePage() {
 
         if (allowed.has(gameMasterAiType)) return;
 
-        // Re-pick: prefer cheap from the allowed set; if none, any allowed model.
         const allowedArr = Array.from(allowed).filter(m => m !== LLM_CONSTANTS.RANDOM);
-        const cheapAllowed = allowedArr.filter(m => modelHasTag(m, 'cheap'));
-        const pool = cheapAllowed.length > 0 ? cheapAllowed : allowedArr;
-        const replacement = pool.length > 0
-            ? pool[Math.floor(Math.random() * pool.length)]
-            : LLM_CONSTANTS.RANDOM;
-        setGameMasterAiType(replacement);
+        setGameMasterAiType(pickDefaultGmModel(allowedArr));
     }, [isTierLoaded, isKeysLoaded, userTier, apiTierAllowed, candidateModels, allModels, gameMasterAiType]);
 
     // Compute per-model usage counts from preview data (GM + all bots)

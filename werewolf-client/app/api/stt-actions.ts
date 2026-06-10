@@ -1,9 +1,9 @@
 'use server';
 
 import { auth } from "@/auth";
-import { getUserApiKeys } from "@/app/api/user-actions";
-import { OpenAI } from "openai";
-import { API_KEY_CONSTANTS, AUDIO_MODEL_CONSTANTS } from "@/app/ai/ai-models";
+import { getUserTierAndApiKeys } from "@/app/utils/tier-utils";
+import { API_KEY_CONSTANTS } from "@/app/ai/ai-models";
+import { transcribeWithOpenAi } from "@/app/ai/tts/openai-stt";
 import { calculateOpenAISttCost } from "@/app/utils/pricing";
 import { updateUserMonthlySpending, deductBalance } from "@/app/api/user-actions";
 import { recordGameCost, getGameTier } from "@/app/api/cost-tracking";
@@ -31,63 +31,42 @@ export async function transcribeAudio(
   }
 
   try {
-    // Get user's API keys
-    const apiKeys = await getUserApiKeys(session.user.email);
+    // Resolve keys by tier: 'api' → user's personal keys, 'free'/'paid' → platform keys
+    const { tier, apiKeys } = await getUserTierAndApiKeys(session.user.email);
     const openaiApiKey = apiKeys[API_KEY_CONSTANTS.OPENAI];
-    
+
     if (!openaiApiKey) {
-      throw new Error('OpenAI API key not found. Please add your OpenAI API key in your profile.');
+      if (tier === USER_TIERS.API) {
+        throw new Error('OpenAI API key not found. Please add your OpenAI API key in your profile.');
+      }
+      // Free/paid users rely on platform keys (config/freeTierApiKeys) — a missing key is our misconfiguration, not theirs
+      console.error(`STT: platform OpenAI API key is missing for ${tier}-tier user ${session.user.email}`);
+      throw new Error('Voice transcription is temporarily unavailable. Please try again later.');
     }
 
-    // Initialize OpenAI client
-    const client = new OpenAI({ 
-      apiKey: openaiApiKey
-    });
-
-    // Convert ArrayBuffer to File for OpenAI API
-    const audioFile = new File([audioBuffer], 'audio.webm', { type: 'audio/webm' });
-
-    // Transcribe audio
-    const transcription: any = await client.audio.transcriptions.create({
-      file: audioFile,
-      model: AUDIO_MODEL_CONSTANTS.STT,
-      language: options.language || 'en',
+    const { text, durationSeconds } = await transcribeWithOpenAi(audioBuffer, openaiApiKey, {
+      language: options.language,
       prompt: options.prompt,
-      temperature: options.temperature || 0,
-      response_format: 'verbose_json'
+      temperature: options.temperature,
     });
-
-    const explicitDuration = Number(transcription?.duration) || 0;
-    const segments = Array.isArray(transcription?.segments) ? transcription.segments : [];
-    const segmentsDuration = segments.reduce((max: number, segment: any) => {
-      const end = Number(segment?.end);
-      return end > max ? end : max;
-    }, 0);
-    const durationSeconds = explicitDuration || segmentsDuration;
 
     const cost = calculateOpenAISttCost(durationSeconds);
     if (cost > 0) {
-      const tier = await getGameTier(options.gameId);
-      if (tier === USER_TIERS.PAID) {
+      const gameTier = await getGameTier(options.gameId);
+      if (gameTier === USER_TIERS.PAID) {
         const chargedAmount = parseFloat((cost * (1 + PAID_TIER_MARKUP)).toFixed(6));
         const success = await deductBalance(session.user.email, chargedAmount);
         if (!success) {
           throw new Error('Insufficient balance. Please add funds on your profile page to continue playing.');
         }
       }
-      await updateUserMonthlySpending(session.user.email, cost, tier);
+      await updateUserMonthlySpending(session.user.email, cost, gameTier);
       if (options.gameId) {
         await recordGameCost(options.gameId, cost);
       }
     }
 
-    const textOutput = typeof transcription?.text === 'string'
-      ? transcription.text
-      : Array.isArray(transcription?.segments)
-        ? transcription.segments.map((segment: any) => segment?.text || '').join(' ')
-        : '';
-
-    return textOutput.trim();
+    return text;
   } catch (error) {
     console.error('STT Error:', error);
     if (error instanceof Error) {

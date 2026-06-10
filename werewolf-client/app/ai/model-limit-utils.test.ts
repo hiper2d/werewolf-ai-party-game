@@ -9,6 +9,7 @@ import {
     getAvailableModelsForUser,
     getCandidateModelsForTier,
     getProvidedApiKeyNames,
+    getSelectableModelsForUser,
     validateModelUsageForTier,
 } from './model-limit-utils';
 
@@ -197,5 +198,57 @@ describe('validateModelUsageForTier - API tier integration', () => {
         expect(() =>
             validateModelUsageForTier(USER_TIERS.FREE, freeModelId, [freeModelId])
         ).not.toThrow();
+    });
+});
+
+describe('getSelectableModelsForUser (model picker contract: GM dropdown, bot lists)', () => {
+    it('FREE tier lists only free-tier-available models — premium models like Claude Fable are hidden', () => {
+        const models = getSelectableModelsForUser(USER_TIERS.FREE, new Set());
+        expect(models).not.toContain(LLM_CONSTANTS.CLAUDE_FABLE);
+        expect(models).not.toContain(LLM_CONSTANTS.CLAUDE_FABLE_THINKING);
+        expect(models).not.toContain(LLM_CONSTANTS.CLAUDE_4_OPUS);
+        expect(models).toContain(LLM_CONSTANTS.CLAUDE_4_SONNET);
+        // exactly the models whose config allows free-tier use
+        for (const model of models) {
+            const cfg = SupportedAiModels[model];
+            expect(cfg.freeTier?.available).toBe(true);
+            expect(cfg.freeTier?.maxBotsPerGame).not.toBe(0);
+        }
+    });
+
+    it('API tier lists only models for vendors whose keys were uploaded', () => {
+        const models = getSelectableModelsForUser(
+            USER_TIERS.API,
+            new Set([API_KEY_CONSTANTS.ANTHROPIC])
+        );
+        expect(models.length).toBeGreaterThan(0);
+        for (const model of models) {
+            expect(SupportedAiModels[model].apiKeyName).toBe(API_KEY_CONSTANTS.ANTHROPIC);
+        }
+        // premium models ARE selectable on API tier when the key is there
+        expect(models).toContain(LLM_CONSTANTS.CLAUDE_FABLE);
+    });
+
+    it('API tier with no uploaded keys lists nothing', () => {
+        expect(getSelectableModelsForUser(USER_TIERS.API, new Set())).toEqual([]);
+    });
+
+    it('PAID tier lists the full catalog', () => {
+        const models = getSelectableModelsForUser(USER_TIERS.PAID, new Set());
+        expect(models.sort()).toEqual(Object.keys(SupportedAiModels).sort());
+    });
+
+    it('never lists the RANDOM placeholder on any tier', () => {
+        for (const tier of [USER_TIERS.FREE, USER_TIERS.PAID, USER_TIERS.API] as const) {
+            const models = getSelectableModelsForUser(tier, new Set(Object.values(API_KEY_CONSTANTS)));
+            expect(models).not.toContain(LLM_CONSTANTS.RANDOM);
+        }
+    });
+
+    it('matches getAvailableModelsForUser given the equivalent key map', () => {
+        const keyMap = { [API_KEY_CONSTANTS.OPENAI]: 'sk-x', [API_KEY_CONSTANTS.GOOGLE]: 'g-x' };
+        expect(
+            getSelectableModelsForUser(USER_TIERS.API, new Set([API_KEY_CONSTANTS.OPENAI, API_KEY_CONSTANTS.GOOGLE]))
+        ).toEqual(getAvailableModelsForUser(USER_TIERS.API, keyMap));
     });
 });
