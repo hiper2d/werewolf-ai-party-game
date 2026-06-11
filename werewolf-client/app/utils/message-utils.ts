@@ -42,6 +42,7 @@ export function convertMessageContent(message: GameMessage): string {
             return `Investigated ${detectiveMsg.target}. Reasoning: ${detectiveMsg.reasoning}`;
 
         case MessageType.GAME_STORY:
+        case MessageType.NIGHT_SUMMARY:
             const storyMsg = message.msg as { story: string };
             return storyMsg.story;
         
@@ -131,7 +132,11 @@ export function convertToAIMessages(currentBotName: string, messages: GameMessag
         let content: string;
 
         if (message.authorName === GAME_MASTER) {
-            if (message.messageType === MessageType.GAME_STORY) {
+            // GAME_STORY and NIGHT_SUMMARY are both persisted with msg as an object
+            // ({ story, thinking, ...signature }), so extract the story text. Without
+            // this, NIGHT_SUMMARY fell through to `msg as string` and replayed as
+            // the literal "[object Object]".
+            if (message.messageType === MessageType.GAME_STORY || message.messageType === MessageType.NIGHT_SUMMARY) {
                 content = (message.msg as { story: string }).story;
             } else {
                 content = message.msg as string;

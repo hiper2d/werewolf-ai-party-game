@@ -3,111 +3,160 @@ import Image from 'next/image';
 import { auth } from "@/auth";
 import PlayNowButton from "@/app/components/PlayNowButton";
 
+const MODELS = [
+  'Claude Fable 5', 'GPT-5.5', 'Claude 4.8 Opus', 'Claude 4.6 Sonnet', 'Gemini 3.1 Pro',
+  'DeepSeek V4 Pro', 'Grok 4.3', 'Mistral Large 3', 'Kimi K2.6', 'GLM-5.1',
+];
+
+function PlayersIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <circle cx="9" cy="8" r="3.2" />
+      <path d="M3.5 19a5.5 5.5 0 0 1 11 0" />
+      <path d="M16 6.2a3 3 0 0 1 0 5.6M17.5 19a5.5 5.5 0 0 0-3.2-5" />
+    </svg>
+  );
+}
+
+function StackIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M12 3 21 8l-9 5-9-5 9-5Z" />
+      <path d="M3 13l9 5 9-5" />
+      <path d="M3 18l9 5 9-5" opacity="0.55" />
+    </svg>
+  );
+}
+
+function GaugeIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="12" cy="12" r="5" opacity="0.7" />
+      <circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
 export default async function Home() {
   const session = await auth();
 
   return (
-    <div className="flex flex-col min-h-[calc(100vh-8rem)]">
-      {/* Hero Section */}
-      <section className="flex flex-col items-center justify-center py-12 px-4 text-center sm:py-20 lg:py-32">
-        <div className="mb-8 relative w-36 h-36 sm:w-52 sm:h-52 rounded-full logo-backdrop">
-          <Image
-            src="/werewolf-ai-logo-2.png"
-            alt="Werewolf AI Logo"
-            fill
-            className="object-contain drop-shadow-2xl"
-            priority
-          />
-        </div>
-        <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight theme-text-primary mb-6">
-          Werewolf <span className="text-btn">AI</span>
-        </h1>
-        <p className="text-xl sm:text-2xl theme-text-secondary max-w-2xl mb-4 leading-relaxed">
-          The ultimate social deduction game where you play against the world&apos;s best AI models.
-        </p>
-        <p className="text-lg theme-text-secondary max-w-2xl mb-10 leading-relaxed">
-          Put GPT-5.5, Claude, Gemini, DeepSeek, Grok, Mistral, Kimi, and GLM at the same table.
-          Each bot has its own personality, goals, and strategy.
-          You&apos;re the only human — can you outsmart them all?
-        </p>
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          {session ? (
-            <Link
-              href="/games"
-              className="px-8 py-4 bg-btn text-btn-text rounded-lg font-bold text-xl hover:bg-btn-hover transition-all transform hover:scale-105 shadow-lg"
-            >
-              Go to Game Lobby
-            </Link>
-          ) : (
-            <PlayNowButton />
-          )}
-          <Link
-            href="/rules"
-            className="px-8 py-4 bg-transparent border-2 border-btn text-btn rounded-lg font-bold text-xl hover:bg-btn/10 transition-all shadow-md"
-          >
-            How to Play
-          </Link>
-        </div>
-      </section>
+    <div className="w-full max-w-[1040px] mx-auto px-7 flex flex-col">
+      {/* Hero */}
+      <section className="pt-[92px] pb-[84px]">
+        <div className="flex flex-col items-center text-center gap-[30px]">
+          <div className="logo-backdrop relative w-[200px] h-[200px] rounded-full flex-shrink-0">
+            <Image
+              src="/werewolf-ai-logo-2.png"
+              alt="Werewolf AI"
+              fill
+              priority
+              className="object-contain drop-shadow-2xl"
+            />
+          </div>
 
-      {/* Features Section */}
-      <section className="py-16 px-4 bg-black/5 dark:bg-white/5 rounded-3xl mb-16">
-        <div className="max-w-5xl mx-auto">
-          <h2 className="text-3xl font-bold text-center theme-text-primary mb-12">Why Play Werewolf AI?</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
-            <div className="p-6 rounded-xl theme-bg-card theme-border border shadow-sm">
-              <div className="w-12 h-12 bg-blue-500/20 text-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-              </div>
-              <h3 className="text-xl font-bold theme-text-primary mb-2">Immersive Werewolf Experience</h3>
-              <p className="theme-text-secondary">
-                Custom themes, unique characters, voice acting, and full role-playing.
-                Every game feels different — from a haunted manor to a submarine crew.
-              </p>
-            </div>
-            <div className="p-6 rounded-xl theme-bg-card theme-border border shadow-sm">
-              <div className="w-12 h-12 bg-purple-500/20 text-purple-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-              </div>
-              <h3 className="text-xl font-bold theme-text-primary mb-2">All Top AI Models Together</h3>
-              <p className="theme-text-secondary mb-3">
-                Mix models from 8 providers in the same game.
-                Watch them argue, deceive, and form alliances against each other — and you.
-              </p>
-              <div className="flex flex-wrap justify-center gap-1.5 text-xs">
-                {[
-                  'GPT-5.5', 'Claude 4.8 Opus', 'Claude 4.6 Sonnet', 'Gemini 3.1 Pro',
-                  'DeepSeek V4 Pro', 'Grok 4.3', 'Mistral Large 3', 'Kimi K2.6', 'GLM-5.1'
-                ].map(model => (
-                  <span key={model} className="px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20">
-                    {model}
-                  </span>
-                ))}
-              </div>
-            </div>
-            <div className="p-6 rounded-xl theme-bg-card theme-border border shadow-sm">
-              <div className="w-12 h-12 bg-red-500/20 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
-              </div>
-              <h3 className="text-xl font-bold theme-text-primary mb-2">AI Intelligence Benchmark</h3>
-              <p className="theme-text-secondary">
-                Test how well the latest models handle deduction, bluffing, and social reasoning.
-                See which AI is the best liar — and which one you can fool.
-              </p>
+          <div className="flex flex-col items-center gap-[22px]">
+            <span className="font-mono text-[11px] tracking-[0.16em] uppercase text-[var(--fg-2)] inline-flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] shadow-[0_0_8px_var(--accent-line)]" />
+              Social deduction · vs. AI
+            </span>
+
+            <h1 className="m-0 font-bold tracking-[-0.035em] leading-none text-[clamp(52px,8vw,92px)] text-[var(--fg-0)]">
+              Werewolf <span className="text-[var(--fg-3)]">AI</span>
+            </h1>
+
+            <p className="m-0 text-[clamp(19px,2.4vw,24px)] font-normal text-[var(--fg-1)] leading-[1.4] tracking-[-0.01em] max-w-[30ch] [text-wrap:balance]">
+              The ultimate social deduction game where you play against the world&apos;s best AI models.
+            </p>
+
+            <p className="m-0 text-[15px] text-[var(--fg-2)] leading-[1.65] max-w-[62ch] [text-wrap:pretty]">
+              Put <strong className="text-[var(--fg-1)] font-medium">GPT</strong>, <strong className="text-[var(--fg-1)] font-medium">Claude</strong>, <strong className="text-[var(--fg-1)] font-medium">Gemini</strong>, <strong className="text-[var(--fg-1)] font-medium">DeepSeek</strong>, <strong className="text-[var(--fg-1)] font-medium">Grok</strong>, <strong className="text-[var(--fg-1)] font-medium">Mistral</strong>, <strong className="text-[var(--fg-1)] font-medium">Kimi</strong>, and <strong className="text-[var(--fg-1)] font-medium">GLM</strong> at the same table. Each bot has its own personality, goals, and strategy. You&apos;re the only human — can you outsmart them all?
+            </p>
+
+            <div className="flex gap-3 flex-wrap justify-center">
+              {session ? (
+                <Link
+                  href="/games"
+                  className="inline-flex items-center justify-center font-semibold text-[15px] px-6 py-[13px] rounded-[var(--radius-md)] bg-[var(--accent)] text-[var(--accent-fg)] border border-transparent shadow-[var(--shadow-1)] hover:bg-[var(--accent-strong)] transition-all duration-[120ms]"
+                >
+                  Go to Game Lobby
+                </Link>
+              ) : (
+                <PlayNowButton />
+              )}
+              <Link
+                href="/rules"
+                className="inline-flex items-center justify-center font-semibold text-[15px] px-6 py-[13px] rounded-[var(--radius-md)] bg-transparent text-[var(--fg-1)] border border-[var(--line-2)] hover:bg-[var(--bg-1)] hover:border-[var(--line-3)] hover:text-[var(--fg-0)] transition-all duration-[120ms]"
+              >
+                How to Play
+              </Link>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Trust Footer (to satisfy Google Scanners) */}
-      <footer className="mt-auto py-12 border-t theme-border flex flex-col items-center">
-        <div className="flex flex-wrap justify-center gap-x-8 gap-y-4 mb-8">
-          <Link href="/about" className="theme-text-secondary hover:theme-text-primary text-sm transition-colors">About the Project</Link>
-          <Link href="/privacy" className="theme-text-secondary hover:theme-text-primary text-sm transition-colors">Privacy Policy</Link>
-          <Link href="/terms" className="theme-text-secondary hover:theme-text-primary text-sm transition-colors">Terms of Service</Link>
-          <Link href="https://github.com/hiper2d/werewolf-ai-party-game" className="theme-text-secondary hover:theme-text-primary text-sm transition-colors">GitHub</Link>
+      {/* Why Play */}
+      <section className="bg-[var(--bg-1)] border border-[var(--line-1)] rounded-[var(--radius-2xl)] pt-16 px-12 pb-14 mb-[72px]">
+        <div className="text-center max-w-[56ch] mx-auto mb-11">
+          <div className="font-mono text-[11px] tracking-[0.14em] uppercase text-[var(--fg-2)] mb-3">Why play</div>
+          <h2 className="m-0 text-[clamp(28px,4vw,38px)] font-bold tracking-[-0.025em] text-[var(--fg-0)]">
+            Why Play Werewolf AI?
+          </h2>
         </div>
-        <p className="theme-text-secondary opacity-60 text-xs">
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+          <article className="border border-[var(--line-1)] rounded-[var(--radius-lg)] bg-[var(--bg-0)] px-[26px] pt-7 pb-[30px] flex flex-col gap-3.5 transition-[border-color,transform,box-shadow] duration-[140ms] hover:border-[var(--line-3)] hover:-translate-y-0.5 hover:shadow-[var(--shadow-2)]">
+            <div className="w-11 h-11 rounded-[var(--radius-lg)] bg-[var(--accent-soft)] border border-[var(--accent-line)] text-[var(--accent-text)] grid place-items-center">
+              <PlayersIcon className="w-[22px] h-[22px]" />
+            </div>
+            <h3 className="mt-0.5 m-0 text-[17px] font-semibold tracking-[-0.01em] text-[var(--fg-0)]">Immersive Werewolf Experience</h3>
+            <p className="m-0 text-[14px] text-[var(--fg-2)] leading-[1.6] [text-wrap:pretty]">
+              Custom themes, unique characters, voice acting, and full role-playing. Every game feels different — from a haunted manor to a submarine crew.
+            </p>
+          </article>
+
+          <article className="border border-[var(--line-1)] rounded-[var(--radius-lg)] bg-[var(--bg-0)] px-[26px] pt-7 pb-[30px] flex flex-col gap-3.5 transition-[border-color,transform,box-shadow] duration-[140ms] hover:border-[var(--line-3)] hover:-translate-y-0.5 hover:shadow-[var(--shadow-2)]">
+            <div className="w-11 h-11 rounded-[var(--radius-lg)] bg-[var(--accent-soft)] border border-[var(--accent-line)] text-[var(--accent-text)] grid place-items-center">
+              <StackIcon className="w-[22px] h-[22px]" />
+            </div>
+            <h3 className="mt-0.5 m-0 text-[17px] font-semibold tracking-[-0.01em] text-[var(--fg-0)]">All Top AI Models Together</h3>
+            <p className="m-0 text-[14px] text-[var(--fg-2)] leading-[1.6] [text-wrap:pretty]">
+              Mix models from 8 providers in the same game. Watch them argue, deceive, and form alliances against each other — and you.
+            </p>
+            <div className="flex flex-wrap gap-[7px] mt-1">
+              {MODELS.map((m) => (
+                <span
+                  key={m}
+                  className="font-mono text-[11.5px] tracking-[0.01em] px-2.5 py-1 rounded-full bg-[var(--accent-soft)] border border-[var(--accent-line)] text-[var(--accent-text)] whitespace-nowrap"
+                >
+                  {m}
+                </span>
+              ))}
+            </div>
+          </article>
+
+          <article className="border border-[var(--line-1)] rounded-[var(--radius-lg)] bg-[var(--bg-0)] px-[26px] pt-7 pb-[30px] flex flex-col gap-3.5 transition-[border-color,transform,box-shadow] duration-[140ms] hover:border-[var(--line-3)] hover:-translate-y-0.5 hover:shadow-[var(--shadow-2)]">
+            <div className="w-11 h-11 rounded-[var(--radius-lg)] bg-[var(--accent-soft)] border border-[var(--accent-line)] text-[var(--accent-text)] grid place-items-center">
+              <GaugeIcon className="w-[22px] h-[22px]" />
+            </div>
+            <h3 className="mt-0.5 m-0 text-[17px] font-semibold tracking-[-0.01em] text-[var(--fg-0)]">AI Intelligence Benchmark</h3>
+            <p className="m-0 text-[14px] text-[var(--fg-2)] leading-[1.6] [text-wrap:pretty]">
+              Test how well the latest models handle deduction, bluffing, and social reasoning. See which AI is the best liar — and which one you can fool.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="border-t border-[var(--line-1)] pt-9 pb-12 flex flex-col items-center gap-[18px]">
+        <div className="flex flex-wrap justify-center gap-7">
+          <Link href="/about" className="text-[13px] text-[var(--fg-1)] hover:text-[var(--fg-0)] transition-colors duration-[120ms]">About the Project</Link>
+          <Link href="/privacy" className="text-[13px] text-[var(--fg-1)] hover:text-[var(--fg-0)] transition-colors duration-[120ms]">Privacy Policy</Link>
+          <Link href="/terms" className="text-[13px] text-[var(--fg-1)] hover:text-[var(--fg-0)] transition-colors duration-[120ms]">Terms of Service</Link>
+          <Link href="https://github.com/hiper2d/werewolf-ai-party-game" className="text-[13px] text-[var(--fg-1)] hover:text-[var(--fg-0)] transition-colors duration-[120ms]">GitHub</Link>
+        </div>
+        <p className="m-0 font-mono text-[11px] text-[var(--fg-3)] tracking-[0.04em]">
           © {new Date().getFullYear()} AIWerewolf.net
         </p>
       </footer>

@@ -31,12 +31,12 @@ const NavBar = () => {
             {/* Left cluster: logo + name */}
             <div className="flex items-center gap-4">
                 <Link href="/" className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-[var(--radius-sm)] overflow-hidden flex-none">
+                    <div className="rounded-full logo-backdrop-sm flex-none">
                         <Image
                             src="/werewolf-ai-logo-2.png"
                             alt="Werewolf AI Logo"
-                            width={28}
-                            height={28}
+                            width={40}
+                            height={40}
                             className="object-contain"
                         />
                     </div>

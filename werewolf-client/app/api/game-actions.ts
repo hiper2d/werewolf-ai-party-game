@@ -37,6 +37,7 @@ import {PAID_TIER_MARKUP} from "@/app/config/credit-packages";
 import {getDefaultVoiceProvider, getVoiceConfig} from "@/app/ai/voice-config";
 import {normalizeSpendings} from "@/app/utils/spending-utils";
 import {convertToAIMessage} from "@/app/utils/message-utils";
+import {serializeMessageForFirestore} from "@/app/api/message-serialization";
 import {LLM_CONSTANTS} from "@/app/ai/ai-models";
 import {
     consumeModelUsage,
@@ -999,23 +1000,6 @@ export async function getUserFromFirestore(email: string): Promise<User | null> 
 /* -----------------------------------------
     Private / helper functions
 ----------------------------------------- */
-
-function serializeMessageForFirestore(gameMessage: GameMessage) {
-    return {
-        ...gameMessage,
-        msg: gameMessage.messageType === MessageType.BOT_ANSWER ||
-             gameMessage.messageType === MessageType.BOT_WELCOME ||
-             gameMessage.messageType === MessageType.GAME_STORY ||
-             gameMessage.messageType === MessageType.VOTE_MESSAGE ||
-             gameMessage.messageType === MessageType.WEREWOLF_ACTION ||
-             gameMessage.messageType === MessageType.DOCTOR_ACTION ||
-             gameMessage.messageType === MessageType.MANIAC_ACTION ||
-             gameMessage.messageType === MessageType.NIGHT_SUMMARY
-            ? gameMessage.msg  // keep as object
-            : gameMessage.msg as string,  // it's a string for most other message types
-        cost: gameMessage.cost || 0 // Ensure cost is never undefined
-    };
-}
 
 /**
  * Extracts timestamp from game ID for backward compatibility

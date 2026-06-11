@@ -198,7 +198,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         apiKeyName: API_KEY_CONSTANTS.DEEPSEEK,
         hasThinking: false,
         temperature: 0.6,
-        maxOutputTokens: 8192,
+        maxOutputTokens: 16384,
         tags: ['fast', 'cheap'],
         freeTier: {
             available: true,
@@ -211,7 +211,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         apiKeyName: API_KEY_CONSTANTS.DEEPSEEK,
         hasThinking: true,
         // Reasoning tokens share the output budget, so leave room for both CoT and answer.
-        maxOutputTokens: 32768,
+        maxOutputTokens: 65536,
         tags: ['fast', 'cheap'],
         freeTier: {
             available: true,
@@ -224,7 +224,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         apiKeyName: API_KEY_CONSTANTS.DEEPSEEK,
         hasThinking: false,
         temperature: 0.6,
-        maxOutputTokens: 8192,
+        maxOutputTokens: 16384,
         tags: ['slow', 'cheap'],
         freeTier: {
             available: true,
@@ -237,7 +237,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         apiKeyName: API_KEY_CONSTANTS.DEEPSEEK,
         hasThinking: true,
         // Reasoning tokens share the output budget, so leave room for both CoT and answer.
-        maxOutputTokens: 32768,
+        maxOutputTokens: 65536,
         tags: ['slow', 'cheap'],
         freeTier: {
             available: true,
