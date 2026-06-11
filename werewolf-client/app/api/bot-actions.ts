@@ -59,6 +59,7 @@ import {checkGameEndConditions} from "@/app/utils/game-utils";
 import {getProviderSignatureFields} from "@/app/ai/ai-models";
 import {recordBotTokenUsage, recordGameMasterTokenUsage} from "@/app/api/cost-tracking";
 import {ensureUserCanAccessGame} from "@/app/api/tier-guards";
+import {selectEliminatedPlayer} from "@/app/api/vote-utils";
 import { RoleProcessorFactory } from "./roles";
 import {logger} from "@/app/utils/logger";
 
@@ -1048,30 +1049,10 @@ async function voteImpl(gameId: string): Promise<GameActionResponse> {
                 
                 // ELIMINATION LOGIC: Process elimination after everyone has voted
                 if (Object.keys(votingResults).length > 0) {
-                    const maxVotes = Math.max(...Object.values(votingResults));
-                    const topPlayers = Object.entries(votingResults)
-                        .filter(([_, count]) => count === maxVotes)
-                        .map(([name]) => name);
-                    
-                    let eliminatedPlayer: string;
+                    const eliminatedPlayer = selectEliminatedPlayer(votingResults, updatedGame.humanPlayerName)!;
                     let eliminatedRole: string;
                     let isHumanEliminated = false;
-                    
-                    if (topPlayers.length === 1) {
-                        // Single player with most votes
-                        eliminatedPlayer = topPlayers[0];
-                    } else {
-                        // Handle tie: randomly select from tied players, but exclude human if they're tied
-                        const nonHumanTiedPlayers = topPlayers.filter(name => name !== updatedGame.humanPlayerName);
-                        if (nonHumanTiedPlayers.length > 0) {
-                            // Select randomly from non-human tied players
-                            eliminatedPlayer = nonHumanTiedPlayers[Math.floor(Math.random() * nonHumanTiedPlayers.length)];
-                        } else {
-                            // All tied players are human (shouldn't happen with multiple players, but handle edge case)
-                            eliminatedPlayer = topPlayers[0];
-                        }
-                    }
-                    
+
                     // Determine if eliminated player is human
                     if (eliminatedPlayer === updatedGame.humanPlayerName) {
                         isHumanEliminated = true;

@@ -1,5 +1,58 @@
 # Bugs and improvements
 
+## Bugs surfaced by the test push (2026-06-10) — pinned in tests, NOT yet fixed
+
+> Each bug below is pinned by a test (marked `PINNED` in the suites listed in
+> `test-coverage-gaps.md`). When fixing one, flip its pinned test from
+> "documents the bug" to "verifies the fix" as part of the same change —
+> the test failing on your fix is expected and is the starting point.
+
+Game-breaking:
+- **Detective investigating the abducted player likely crashes**: the compute step
+    returns early without setting `detectiveResult` (`detective-processor.ts:50-58`),
+    then `processNightAction` dereferences `detectiveResult!.success`
+    (`detective-processor.ts:268,275`) → TypeError. The "investigation failed —
+    abducted" message is unreachable.
+- **Doctor saving the Maniac doesn't undo the abductee's collateral death**: the
+    cascade death is added at werewolf-kill time (`werewolf-processor.ts:61-65`) and a
+    doctor save only removes the `werewolf_attack` death (`doctor-processor.ts:46-57`).
+- **`HumanEliminatedChecker` can never fire**: it looks the human up in `game.bots`,
+    but the human is not mirrored there. Day-vote elimination is handled directly in
+    `voteImpl`, but night kills of the human may go undetected as game-over. The other
+    two win checkers also hardcode the human as alive in counts and role-reveal lists.
+- **`welcomeImpl` leaves an unknown bot name stuck at the queue head** — retries error
+    forever (`bot-actions.ts:324-327`); no game-state validation in welcome either.
+
+Money/tier:
+- **Paid tier skips model validation entirely** (`validateModelUsageForTier` no-ops),
+    so `createGame` persists an unresolved `RANDOM` GM model into the game doc.
+- **`previewGame` validates some tier/key rules after the LLM call and after charging**
+    (`game-actions.ts` ~290, ~385) — invalid selections still cost (and bill) a preview.
+- **Spending history understates paid-tier billing**: balance is charged
+    cost × (1 + markup) but `updateUserMonthlySpending` records the raw cost.
+- **Charging is gated on `game.createdWithTier`, not the user's current tier** —
+    compounds the Stripe top-up tier bug: paid users with free-created games are
+    never billed for them.
+- **Non-atomic charge ordering**: game cost commits before `deductBalance`; either
+    side can fail leaving cost-without-charge or charge-without-record.
+
+Robustness:
+- **GM bot selection never enforces `BOT_SELECTION_CONFIG.MIN`** — an empty
+    `selected_bots` silently sets an empty queue (`bot-actions.ts:618,804`).
+- **The human's chat message is lost when GM selection fails** (only saved after
+    validation, `bot-actions.ts:801`) — user must retype on error.
+- **`setGameErrorState` failure masks the original error** in
+    `server-action-wrapper.ts` (the write in the catch block is unguarded).
+- Cancellation guard only handles a fully-cleared queue (`bot-actions.ts:935`);
+    night compute layer has no aliveness checks on targets; error-log `function`
+    name is empty for anonymous wrapped actions.
+- **Malformed vote-tally JSON is silently reset** — a corrupt
+    `gameStateParamQueue[0]` blob discards all earlier votes without an error,
+    both when accumulating and at VOTE_RESULTS (degrades to the no-votes path).
+- `humanPlayerVote` returns the game with only the tally in `gameStateParamQueue`
+    (drops the individual-votes blob it just wrote to Firestore) — harmless today
+    but inconsistent with the persisted state.
+
 - Switch user tier to `paid` automatically when balance is added. Today a Stripe top-up
     only increases `balance`; `tier` stays whatever it was (e.g. `free`), so the user keeps
     playing free-tier games until they manually flip the tier on the profile page. Auto-switch
@@ -15,12 +68,6 @@
     `HTMLAudioElement` `onError` handler calls `cleanup()` without logging anything, so
     playback failures (autoplay policy, codec) are fully silent. Add a `console.error` +
     surface the same alert path the fetch errors use.
-- ~~Fix outdated/broken tests~~ — **done (2026-06-10)**: full suite green (23 suites,
-    252 tests) and `tsc --noEmit` clean. Fixed: `message-utils.test.ts` (markdown format),
-    `night-replay.test.ts` (db non-null assertion), agent tests missing
-    `human_player_name`/`available_voices` template params, Anthropic invalid-role
-    expectation (errors are wrapped in `BotResponseError`), GPT-5 pricing test
-    (now derives model id + pricing from `ai-models.ts` instead of hardcoding).
 - `npm run lint` is broken: `next lint` was removed in the current Next version
     ("Invalid project directory provided: .../lint"). Migrate to the ESLint CLI.
 - We should hide technical details of bot errors from UI (the collapsible "Technical
@@ -40,6 +87,9 @@
   personalities
 - Migrate all model pickers onto the tested `getSelectableModelsForUser` helper — see
   the plan in the section below.
+- Consider clamping GM-selected bot names against the live bot list instead of erroring
+  (the `Bot {"Cato":5} not found in game` class — a validated but semantically wrong
+  bot-selection response currently puts the game into an error state).
 
 ## Migration plan: one tested source of truth for every model picker
 
@@ -53,8 +103,6 @@ hand-rolled copies of the same rules.
 maps the result to its display shape. Tier rules live in exactly one tested place.
 
 **Step 1 — extend the shared module** (`app/ai/model-limit-utils.ts`):
-- `getSelectableModelsForUser(tier, providedKeyNames)` — done (2026-06-10), used by the GM
-  dropdown, covered by `model-limit-utils.test.ts`.
 - Add `getModelPickerOptions(tier, providedKeyNames, opts?)` returning display-ready entries
   `{model, disabled, suffix}` so the per-picker decoration logic is also shared and tested:
   - `opts.usageCounts` — per-game usage so free-tier entries get `(N left)` / disabled at 0,
@@ -66,15 +114,15 @@ maps the result to its display shape. Tier rules live in exactly one tested plac
   - `opts.showUnavailableDisabled` — free tier bot list shows unavailable models greyed out
     with `(not available)` instead of hiding them; GM-style pickers hide them.
 
-**Step 2 — migrate call sites** (each is a small, independent PR-sized change):
-1. ~~`newgame/page.tsx` `gmModelOptions`~~ — done.
-2. `newgame/page.tsx` `playerModelOptions` + `playerModelOptionMeta` (~line 89) — free tier
+**Step 2 — migrate call sites** (each is a small, independent PR-sized change;
+`gmModelOptions` on the new-game form is already migrated):
+1. `newgame/page.tsx` `playerModelOptions` + `playerModelOptionMeta` (~line 89) — free tier
    shows all models greyed out; keep that UX via `showUnavailableDisabled`.
-3. `newgame/page.tsx` `getPreviewModelOptions` (~line 337) — `(N left)` labels from
+2. `newgame/page.tsx` `getPreviewModelOptions` (~line 337) — `(N left)` labels from
    `previewUsageCounts`.
-4. `newgame/page.tsx` GM reconciliation effect (~line 293) — builds its own `allowed` set;
+3. `newgame/page.tsx` GM reconciliation effect (~line 293) — builds its own `allowed` set;
    should call `getSelectableModelsForUser` instead.
-5. `games/[id]/components/ModelSelectionDialog.tsx` `tierFilteredModels` + `modelOptions`
+4. `games/[id]/components/ModelSelectionDialog.tsx` `tierFilteredModels` + `modelOptions`
    (~lines 57–107) — usage counts + current-model escape hatch.
 
 **Step 3 — tests** (extend `model-limit-utils.test.ts`):
@@ -90,49 +138,3 @@ maps the result to its display shape. Tier rules live in exactly one tested plac
   handling needed, but tests should pin one (`CLAUDE_4_HAIKU` vs `CLAUDE_4_HAIKU_THINKING`).
 - Server-side enforcement (`validateModelUsageForTier` at preview/create/update) stays as is —
   it is the backstop; this migration is about the UI never showing what the server rejects.
-
-## Provider structured-response parse failures kill games (recoverable but fatal in practice)
-
-When a provider returns slightly-malformed or truncated JSON, `askWithZodSchema`
-throws and the game is left with a persistent `errorState`. The game is marked
-`recoverable: true`, but in practice the player has already bailed — the game
-sits dead until the 30-day TTL sweeps it.
-
-**Evidence** (from a Firestore scan of the live `games` collection, 2026-06-02):
-**5 of 32 live games** were carrying such an error. Every one was a structured-
-response parse failure, across multiple providers:
-
-- DeepSeek — `Failed to parse JSON response: SyntaxError: Expected ',' or '}' ... at position 727` (JSON truncated mid-object)
-- Grok — `Failed to parse JSON response: Unexpected token 'M', "Max, calli"... is not valid JSON` (model returned prose, not JSON)
-- Mistral — `Response validation failed: [...]`
-- OpenAI — `Zod field ... uses .optional() without .nullable()` (schema-definition bug, not the model)
-- "Bot {\"Cato\":5} not found in game" — downstream of a malformed bot-selection response
-
-**Where it bites:** 4 of the 5 died at `WELCOME` / early `DAY_DISCUSSION` — i.e.
-on the **first** LLM call (bot welcome generation). The opening turn is the most
-fragile. Concrete case: `star-wars-1780191192418` (GM `gpt-mini`) died at WELCOME
-on a DeepSeek bot returning JSON truncated at position 727; player never got past
-the intro.
-
-**Suggested fixes:**
-- ~~Retry-on-parse-failure~~ — **rejected (2026-06-10)**: no automatic retries on the
-  backend; AI API errors surface in the UI and the user triggers the retry from there.
-- ~~More lenient/repair parse~~ — **done (2026-06-10)**: all text-parsing agents now share
-  `app/ai/json-response-parser.ts` (`parseAndValidateLlmJson`): strict parse → quote-unwrap
-  (Gemini quirk) → first-balanced-`{...}` extraction from prose (string/escape-aware) →
-  nested-`reply`-object flattening (Mistral quirk) → wrap-prose-as-`reply` for
-  BotAnswer-shaped schemas. Promoted from the GLM agent's private implementation;
-  covered by `json-response-parser.test.ts`.
-- ~~Fix the OpenAI Zod schema~~ — **done (2026-06-10)**: `action_type` in
-  `DoctorActionZodSchema` / `DetectiveActionZodSchema` is now `.nullable().optional()`.
-  This was deterministic, not flaky: `zodTextFormat` threw at request build time, so
-  *every* Doctor/Detective night action on a GPT-5 bot failed. Processors already
-  treat `null` like `undefined` (`|| 'protect'` / `|| 'investigate'`).
-- ~~Validate the schema at build time~~ — **done (2026-06-10)**:
-  `app/ai/prompts/zod-schemas.test.ts` runs every `ZodSchemaRegistry` schema (and its
-  GPT-5 thinking-mode `.extend({thinking})` variant) through `zodTextFormat` and
-  `ZodSchemaConverter.forProvider` for all providers, so an incompatible schema fails CI.
-
-**Remaining:** the `"Bot {\"Cato\":5} not found in game"` case — a *validated* but
-semantically wrong bot-selection response can still error downstream; could clamp
-GM-selected bot names against the live bot list instead of erroring.

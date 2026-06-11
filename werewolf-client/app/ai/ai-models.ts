@@ -210,7 +210,8 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         modelApiName: 'deepseek-v4-flash',
         apiKeyName: API_KEY_CONSTANTS.DEEPSEEK,
         hasThinking: true,
-        maxOutputTokens: 8192,
+        // Reasoning tokens share the output budget, so leave room for both CoT and answer.
+        maxOutputTokens: 32768,
         tags: ['fast', 'cheap'],
         freeTier: {
             available: true,
@@ -235,7 +236,8 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         modelApiName: 'deepseek-v4-pro',
         apiKeyName: API_KEY_CONSTANTS.DEEPSEEK,
         hasThinking: true,
-        maxOutputTokens: 8192,
+        // Reasoning tokens share the output budget, so leave room for both CoT and answer.
+        maxOutputTokens: 32768,
         tags: ['slow', 'cheap'],
         freeTier: {
             available: true,

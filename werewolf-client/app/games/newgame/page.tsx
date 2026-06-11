@@ -17,6 +17,15 @@ import {VoiceProvider} from "@/app/ai/voice-config/voice-config";
 const RANDOM_NAMES = ['Bob', 'John', 'Alex', 'Sam', 'Max', 'Leo', 'Kai', 'Finn'];
 const RANDOM_THEMES = ['Dracula', 'Sherlock Holmes', 'Cthulhu Mythos', 'Treasure Island', 'Spaceship Crew', 'Wild West Town'];
 
+// 12 evenly spaced hues skipping the banned 270°–345° purple/magenta arc
+const AVATAR_HUES = [350, 14, 38, 62, 86, 110, 134, 158, 182, 206, 230, 254];
+
+function avatarHue(name: string): number {
+    let h = 0;
+    for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+    return AVATAR_HUES[h % AVATAR_HUES.length];
+}
+
 function pickRandom<T>(arr: T[]): T {
     return arr[Math.floor(Math.random() * arr.length)];
 }
@@ -910,25 +919,28 @@ export default function CreateNewGamePage() {
                         <div className="space-y-3">
                         {gameData.bots.map((player, index) => (
                             <div key={index} className="p-4 bg-[var(--bg-1)] border border-[var(--line-1)] rounded-[var(--radius-lg)] space-y-3">
-                                {/* Player head row */}
-                                <div className="flex items-center gap-3">
-                                    {/* Avatar */}
-                                    <div className="w-9 h-9 rounded-full bg-[var(--bg-3)] text-[var(--fg-1)] flex items-center justify-center text-[14px] font-semibold">
-                                        {player.name.charAt(0).toUpperCase()}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
+                                {/* Player head: identity capsule */}
+                                <div className="pb-4 border-b border-[var(--line-1)]">
+                                    <label className={`group flex items-center gap-2.5 bg-[var(--bg-2)] border rounded-full py-1.5 pl-1.5 pr-2 transition-[border-color,box-shadow] duration-[120ms] focus-within:border-[var(--accent-line)] focus-within:shadow-[0_0_0_3px_var(--accent-soft)] ${botNameErrors[index] ? 'border-[var(--danger)]' : 'border-[var(--line-2)]'}`}>
+                                        <div
+                                            style={{'--h': avatarHue(player.name)} as React.CSSProperties}
+                                            className="w-[34px] h-[34px] shrink-0 rounded-full grid place-items-center text-[14px] font-semibold bg-[linear-gradient(150deg,oklch(42%_0.075_var(--h)),oklch(31%_0.055_var(--h)))] text-[oklch(88%_0.06_var(--h))]"
+                                        >
+                                            {player.name.charAt(0).toUpperCase()}
+                                        </div>
                                         <input
                                             type="text"
-                                            className={`text-[14px] font-semibold text-[var(--fg-0)] bg-transparent px-1.5 -mx-1.5 rounded-[var(--radius-md)] border border-transparent hover:border-[var(--line-2)] focus:outline-none focus:border-[var(--accent-line)] focus:shadow-[0_0_0_3px_var(--accent-soft)] transition-all duration-[120ms] w-full ${botNameErrors[index] ? 'text-[var(--danger)]' : ''}`}
+                                            className="flex-1 min-w-0 bg-transparent border-none outline-none text-[var(--fg-0)] text-[16px] font-semibold tracking-[-0.01em] placeholder:text-[var(--fg-3)]"
                                             value={player.name}
                                             onChange={(e) => handlePlayerChange(index, 'name', e.target.value)}
                                             placeholder="Player Name"
+                                            aria-label="Player name"
                                         />
-                                        {botNameErrors[index] && <p className="text-[var(--danger)] text-[11px]">{botNameErrors[index]}</p>}
-                                        <div className="text-[11px] font-mono text-[var(--fg-2)]">
-                                            {player.gender} &middot; {player.voice}
-                                        </div>
-                                    </div>
+                                        <span className="grid place-items-center pr-2 text-[var(--fg-3)] opacity-0 transition-opacity duration-[120ms] group-hover:opacity-100 group-focus-within:opacity-100">
+                                            <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M9.2 2.3l2.5 2.5-6.4 6.4-2.8.3.3-2.8 6.4-6.4z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/></svg>
+                                        </span>
+                                    </label>
+                                    {botNameErrors[index] && <p className="text-[var(--danger)] text-[11px] mt-1.5 px-2">{botNameErrors[index]}</p>}
                                 </div>
 
                                 {/* AI Model + Play Style */}
@@ -1011,7 +1023,7 @@ export default function CreateNewGamePage() {
                                         <div className="flex-1">
                                             <label className={`${labelStyle} block mb-1.5`}>Voice</label>
                                             <SelectDropdown
-                                                options={getVoiceConfig(gameData.voiceProvider).getVoicesByGender(player.gender).map(voice => ({ value: voice.id, label: voice.id }))}
+                                                options={getVoiceConfig(gameData.voiceProvider).getVoices().map(voice => ({ value: voice.id, label: `${voice.id} (${voice.gender})` }))}
                                                 value={player.voice}
                                                 onChange={(val) => handlePlayerChange(index, 'voice', val)}
                                             />

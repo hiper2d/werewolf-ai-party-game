@@ -74,9 +74,9 @@ export class DeepSeekV2Agent extends AbstractAgent {
      * New method using Zod with DeepSeek API
      * This provides better schema handling and runtime validation
      * 
-     * DeepSeek V4 uses thinking toggle via extra_body.
-     * Non-thinking: response_format json_object + schema in prompt
-     * Thinking: schema in prompt only, reasoning via reasoning_content
+     * DeepSeek V4 uses thinking toggle via extra_body. JSON mode (response_format
+     * json_object) is supported with or without thinking, so we always request it.
+     * Thinking additionally surfaces reasoning via reasoning_content.
      */
     async askWithZodSchema<T>(zodSchema: z.ZodSchema<T>, messages: AIMessage[]): Promise<[T, string, TokenUsage?, string?]> {
         try {
@@ -88,8 +88,11 @@ export class DeepSeekV2Agent extends AbstractAgent {
             // For reasoning models, add schema description to prompt
             // For non-reasoning models, use JSON schema format
             let modifiedInput = [...input];
+            // Respect the model's configured output budget. The previous hard cap of 8192
+            // truncated long replies mid-JSON on thinking models, where reasoning_content
+            // shares this budget with the answer.
             const modelConfig = getModelConfigByApiName(this.model);
-            const maxOutputTokens = Math.max(1, Math.min(modelConfig?.maxOutputTokens ?? 8192, 8192));
+            const maxOutputTokens = Math.max(1, modelConfig?.maxOutputTokens ?? 8192);
 
             let requestParams: any = {
                 model: this.model,
@@ -109,14 +112,15 @@ export class DeepSeekV2Agent extends AbstractAgent {
                 requestParams.messages = this.addSystemInstruction(modifiedInput);
             }
 
+            // JSON mode is supported by both thinking and non-thinking models, so always
+            // request it for structural enforcement. Thinking is an orthogonal toggle.
+            requestParams.response_format = {
+                type: 'json_object'
+            };
+
             if (this.enableThinking) {
                 // DeepSeek V4: enable thinking via extra_body
                 requestParams.extra_body = { thinking: { type: 'enabled' } };
-            } else {
-                // Non-thinking: use JSON object response format
-                requestParams.response_format = {
-                    type: 'json_object'
-                };
             }
 
             let response;
