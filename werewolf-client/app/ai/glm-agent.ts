@@ -158,4 +158,56 @@ export class GlmAgent extends AbstractAgent {
             throw new Error(this.errorMessages.apiError(error));
         }
     }
+
+    /**
+     * Plain-text ask: no JSON mode and no schema appended to the prompt.
+     * Thinking toggle and reasoning_content extraction are identical to askWithZodSchema.
+     */
+    async askText(messages: AIMessage[]): Promise<[string, string, TokenUsage?, string?]> {
+        try {
+            const preparedMessages = this.prepareMessages(messages);
+            const openAIMessages = this.convertToOpenAIMessages(preparedMessages);
+
+            // Add system instruction if needed
+            if (openAIMessages.length > 0 && openAIMessages[0].role !== 'system') {
+                openAIMessages.unshift({
+                    role: 'system',
+                    content: this.instruction
+                });
+            } else if (openAIMessages.length > 0 && openAIMessages[0].role === 'system') {
+                openAIMessages[0].content = `${this.instruction}\n\n${openAIMessages[0].content}`;
+            }
+
+            this.logAsking(messages);
+            this.logMessages(messages);
+
+            let completion;
+            try {
+                const params: any = {
+                    ...this.defaultParams,
+                    messages: openAIMessages,
+                    thinking: { type: this.enableThinking ? 'enabled' : 'disabled' }
+                };
+                completion = await this.client.chat.completions.create(params) as OpenAI.Chat.Completions.ChatCompletion;
+            } catch (apiError) {
+                this.logger(this.logTemplates.error(this.name, apiError));
+                throw new Error(this.errorMessages.apiError(apiError));
+            }
+
+            const reply = completion.choices[0]?.message?.content;
+            if (!reply) {
+                throw new Error(this.errorMessages.emptyResponse);
+            }
+
+            const { thinkingContent, tokenUsage } = this.extractThinkingAndUsage(completion);
+
+            this.logReply(reply, thinkingContent, tokenUsage);
+
+            return [reply, thinkingContent, tokenUsage];
+
+        } catch (error) {
+            this.logger(this.logTemplates.error(this.name, error));
+            throw new Error(this.errorMessages.apiError(error));
+        }
+    }
 }

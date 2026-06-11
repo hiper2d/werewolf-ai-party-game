@@ -121,4 +121,65 @@ export class Gpt5Agent extends AbstractAgent {
         }
     }
 
+    /**
+     * Plain-text ask via the Responses API: no structured-output format, raw output_text.
+     * Note: askWithZodSchema surfaces "thinking" via a schema-injected field; that trick
+     * doesn't apply to plain text, so thinking content is empty here (OpenAI does not
+     * expose chain-of-thought directly).
+     */
+    async askText(messages: AIMessage[]): Promise<[string, string, TokenUsage?, string?]> {
+        try {
+            this.logAsking(messages);
+            this.logMessages(messages);
+
+            // Combine system instruction with messages for the input
+            const input = [
+                `System: ${this.instruction}`,
+                ...messages.map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
+            ].join('\n\n');
+
+            const response = await this.client.responses.create({
+                model: this.model,
+                instructions: this.instruction,
+                input: input,
+                max_output_tokens: 16384,
+            });
+
+            const content = response.output_text;
+            if (!content) {
+                throw new Error(this.errorMessages.emptyResponse);
+            }
+
+            // Extract token usage
+            let tokenUsage: TokenUsage | undefined;
+            if (response.usage) {
+                const cost = calculateOpenAICost(
+                    this.model,
+                    response.usage.input_tokens,
+                    response.usage.output_tokens
+                );
+
+                tokenUsage = {
+                    inputTokens: response.usage.input_tokens,
+                    outputTokens: response.usage.output_tokens,
+                    totalTokens: response.usage.total_tokens || 0,
+                    costUSD: cost
+                };
+
+                if (response.usage.output_tokens_details?.reasoning_tokens) {
+                    const reasoningTokens = response.usage.output_tokens_details.reasoning_tokens;
+                    const finalAnswerTokens = tokenUsage.outputTokens - reasoningTokens;
+                    this.logger(`Output breakdown: ${reasoningTokens} reasoning tokens, ${finalAnswerTokens} final answer tokens`);
+                }
+            }
+
+            this.logReply(content, "", tokenUsage);
+
+            return [content, "", tokenUsage];
+        } catch (error) {
+            this.logger(this.logTemplates.error(this.name, error));
+            throw new Error(this.errorMessages.apiError(error));
+        }
+    }
+
 }

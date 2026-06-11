@@ -30,7 +30,7 @@ import {
 } from "@/app/ai/prompts/gm-commands";
 import {BOT_REMINDER_POSTFIX, BOT_SYSTEM_PROMPT, BOT_VOTE_PROMPT, BOT_AFTER_GAME_SYSTEM_PROMPT_ADDITION} from "@/app/ai/prompts/bot-prompts";
 import {GM_ROUTER_SYSTEM_PROMPT, HUMAN_SUGGESTION_PROMPT} from "@/app/ai/prompts/gm-prompts";
-import {BotAnswerZodSchema, BotVoteZodSchema, GmBotSelectionZodSchema} from "@/app/ai/prompts/zod-schemas";
+import {BotVoteZodSchema, GmBotSelectionZodSchema} from "@/app/ai/prompts/zod-schemas";
 import {AgentFactory} from "@/app/ai/agent-factory";
 import {format} from "@/app/ai/prompts/utils";
 import {auth} from "@/auth";
@@ -356,8 +356,8 @@ function shouldTriggerAutoVote(game: Game): boolean {
                 msg: gmMessage.msg + playStyleReminder
             }];
             const history = convertToAIMessages(bot.name, messagesWithPlaystyle);
-            const [answer, thinking, tokenUsage, thinkingSignature] = await agent.askWithZodSchema(BotAnswerZodSchema, history);
-    
+            const [answer, thinking, tokenUsage, thinkingSignature] = await agent.askText(history);
+
             if (!answer) {
                 throw new BotResponseError(
                     'Bot failed to provide introduction',
@@ -366,12 +366,12 @@ function shouldTriggerAutoVote(game: Game): boolean {
                     true
                 );
             }
-    
+
             const botMessage: GameMessage = {
                 id: null,
                 recipientName: RECIPIENT_ALL,
                 authorName: bot.name,
-                msg: { reply: answer.reply, thinking: thinking || "", ...getProviderSignatureFields(bot.aiType, thinkingSignature) },
+                msg: { reply: answer, thinking: thinking || "", ...getProviderSignatureFields(bot.aiType, thinkingSignature) },
                 messageType: MessageType.BOT_WELCOME,
                 day: game.currentDay,
                 timestamp: Date.now(),
@@ -894,7 +894,7 @@ async function processNextBotInQueue(
         msg: gmMessage.msg + playStyleReminder
     }];
     const history = convertToAIMessages(bot.name, messagesWithPlaystyle);
-    const [botReply, thinking, tokenUsage, thinkingSignature] = await agent.askWithZodSchema(BotAnswerZodSchema, history);
+    const [botReply, thinking, tokenUsage, thinkingSignature] = await agent.askText(history);
     if (!botReply) {
         throw new BotResponseError(
             'Bot failed to respond to discussion',
@@ -907,7 +907,7 @@ async function processNextBotInQueue(
         id: null,
         recipientName: RECIPIENT_ALL,
         authorName: bot.name,
-        msg: { reply: botReply.reply, thinking: thinking || "", ...getProviderSignatureFields(bot.aiType, thinkingSignature) },
+        msg: { reply: botReply, thinking: thinking || "", ...getProviderSignatureFields(bot.aiType, thinkingSignature) },
         messageType: MessageType.BOT_ANSWER,
         day: game.currentDay,
         timestamp: Date.now(),
@@ -1777,9 +1777,9 @@ async function getSuggestionImpl(gameId: string): Promise<string> {
         // Convert public day messages to AI format for context
         const history = convertToAIMessages('SuggestionBot', publicDayMessages);
         
-        // Get suggestion from AI using schema to ensure consistent format
-        const [suggestionResponse, , tokenUsage] = await agent.askWithZodSchema(BotAnswerZodSchema, history);
-        
+        // Get suggestion from AI as plain text
+        const [suggestionResponse, , tokenUsage] = await agent.askText(history);
+
         if (!suggestionResponse) {
             throw new Error('Failed to generate suggestion');
         }
@@ -1789,8 +1789,7 @@ async function getSuggestionImpl(gameId: string): Promise<string> {
             await recordGameMasterTokenUsage(gameId, tokenUsage, session.user.email);
         }
 
-        // Extract the reply text
-        return suggestionResponse.reply.trim();
+        return suggestionResponse.trim();
     } catch (error) {
         logger.error('Error in getSuggestion function:', { error, gameId });
         throw error;

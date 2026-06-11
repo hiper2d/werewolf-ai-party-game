@@ -301,4 +301,124 @@ export class ClaudeAgent extends AbstractAgent {
             );
         }
     }
+
+    /**
+     * Plain-text ask: same request as askWithZodSchema but without a schema description
+     * appended to the prompt and without JSON parsing. Thinking blocks and signatures
+     * are extracted identically.
+     */
+    async askText(messages: AIMessage[]): Promise<[string, string, TokenUsage?, string?]> {
+        const aiMessages = this.prepareMessages(messages);
+
+        this.logAsking(messages);
+        this.logMessages(messages);
+
+        try {
+            const canUseThinking = this.enableThinking;
+
+            const anthropicMessages = canUseThinking
+                ? this.convertToAnthropicMessagesWithThinking(aiMessages)
+                : this.convertToAnthropicMessages(aiMessages);
+
+            const params: Anthropic.MessageCreateParams = {
+                ...this.defaultParams,
+                messages: anthropicMessages as Anthropic.MessageParam[],
+            };
+
+            // Add thinking config for Anthropic models with thinking mode.
+            // Opus 4.8+ and Fable 5 use adaptive thinking and have deprecated the temperature param.
+            const usesAdaptiveThinking = this.model.includes('opus') || this.model.includes('fable');
+            if (canUseThinking) {
+                if (usesAdaptiveThinking) {
+                    (params as any).thinking = { type: "adaptive" };
+                    (params as any).output_config = { effort: "high" };
+                } else {
+                    (params as any).thinking = { type: "enabled", budget_tokens: 1024 };
+                    params.temperature = 1;
+                }
+                params.max_tokens = 16384;
+            } else if (!usesAdaptiveThinking) {
+                params.temperature = this.temperature;
+            }
+
+            let response;
+            try {
+                response = await this.client.messages.create(params);
+            } catch (apiError) {
+                this.logger(this.logTemplates.error(this.name, apiError));
+                throw new Error(this.errorMessages.apiError(apiError));
+            }
+
+            if (!('content' in response) || !Array.isArray(response.content) || response.content.length === 0) {
+                throw new Error(this.errorMessages.emptyResponse);
+            }
+
+            // Extract thinking and concatenate all text blocks
+            const textParts: string[] = [];
+            let thinkingContent = "";
+            let anthropicThinkingSignature = "";
+
+            for (const block of response.content) {
+                if (this.enableThinking && (block as any).type === 'thinking' && 'thinking' in block) {
+                    thinkingContent = (block as any).thinking;
+                    if ('signature' in block) {
+                        anthropicThinkingSignature = (block as any).signature;
+                    }
+                }
+
+                if ('text' in block) {
+                    textParts.push(block.text);
+                }
+            }
+
+            const textContent = textParts.join('');
+            if (!textContent) {
+                throw new Error(this.errorMessages.emptyResponse);
+            }
+
+            let tokenUsage: TokenUsage | undefined;
+            if (response.usage) {
+                const cost = calculateAnthropicCost(
+                    this.model,
+                    response.usage.input_tokens || 0,
+                    response.usage.output_tokens || 0
+                );
+
+                tokenUsage = {
+                    inputTokens: response.usage.input_tokens || 0,
+                    outputTokens: response.usage.output_tokens || 0,
+                    totalTokens: (response.usage.input_tokens || 0) + (response.usage.output_tokens || 0),
+                    costUSD: cost
+                };
+
+                if (this.enableThinking && thinkingContent) {
+                    this.logger(`Thinking enabled: ${thinkingContent.length} characters of thinking content`);
+                    this.logger(`Note: Thinking tokens are included in output token count and cost`);
+                }
+            }
+
+            this.logReply(textContent, thinkingContent || undefined, tokenUsage);
+
+            return [textContent, thinkingContent, tokenUsage, anthropicThinkingSignature || undefined];
+
+        } catch (error) {
+            const errorDetails = error instanceof Error ? error.message : String(error);
+
+            const isRecoverable = errorDetails.includes('overloaded_error') ||
+                errorDetails.includes('529') ||
+                errorDetails.includes('rate_limit');
+
+            throw new BotResponseError(
+                'Failed to get response from Anthropic API',
+                errorDetails,
+                {
+                    model: this.model,
+                    agentName: this.name,
+                    apiProvider: 'Anthropic',
+                    schemaType: 'text'
+                },
+                isRecoverable
+            );
+        }
+    }
 }

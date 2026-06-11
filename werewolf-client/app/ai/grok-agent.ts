@@ -164,6 +164,91 @@ export class GrokAgent extends AbstractAgent {
         }
     }
 
+    /**
+     * Plain-text ask: no JSON mode and no schema appended to the prompt.
+     * Reasoning extraction and token accounting are identical to askWithZodSchema.
+     */
+    async askText(messages: AIMessage[]): Promise<[string, string, TokenUsage?, string?]> {
+        try {
+            const preparedMessages = this.prepareMessages(messages);
+            const openAIMessages = this.convertToOpenAIMessages(preparedMessages);
+
+            // Add system instruction if needed
+            if (openAIMessages.length > 0 && openAIMessages[0].role !== 'system') {
+                openAIMessages.unshift({
+                    role: 'system',
+                    content: this.instruction
+                });
+            } else if (openAIMessages.length > 0 && openAIMessages[0].role === 'system') {
+                openAIMessages[0].content = `${this.instruction}\n\n${openAIMessages[0].content}`;
+            }
+
+            this.logAsking(messages);
+            this.logMessages(messages);
+
+            const completion = await this.client.chat.completions.create({
+                model: this.model,
+                temperature: this.temperature,
+                messages: openAIMessages,
+                max_tokens: 16384,
+                reasoning_effort: this.enableThinking ? "low" : "none",
+            } as any);
+
+            const choiceMessage = completion.choices[0]?.message;
+            const { textContent, additionalReasoning } = this.extractMessageContentParts(choiceMessage?.content);
+            const reply = textContent;
+            if (!reply) {
+                throw new Error(this.errorMessages.emptyResponse);
+            }
+
+            const reasoningContentParts: string[] = [];
+            const reasoningContentFromMessage: string = (choiceMessage as any)?.reasoning_content || "";
+            if (reasoningContentFromMessage) {
+                reasoningContentParts.push(reasoningContentFromMessage);
+            }
+            if (additionalReasoning) {
+                reasoningContentParts.push(additionalReasoning);
+            }
+            const reasoningContent = reasoningContentParts.join('\n').trim();
+
+            // Extract token usage information
+            let tokenUsage: TokenUsage | undefined;
+            if (completion.usage) {
+                const promptTokens = completion.usage.prompt_tokens || 0;
+                const completionTokens = completion.usage.completion_tokens || 0;
+                const reasoningTokens = (completion.usage as any).completion_tokens_details?.reasoning_tokens || 0;
+
+                // For Grok reasoning models: completion_tokens = final answer only, reasoning_tokens = thinking
+                const totalOutputTokens = completionTokens + reasoningTokens;
+
+                const cost = calculateGrokCost(
+                    this.model,
+                    promptTokens,
+                    totalOutputTokens
+                );
+
+                tokenUsage = {
+                    inputTokens: promptTokens,
+                    outputTokens: totalOutputTokens,
+                    totalTokens: promptTokens + totalOutputTokens,
+                    costUSD: cost
+                };
+
+                if (this.enableThinking && reasoningTokens > 0) {
+                    this.logger(`Output breakdown: ${reasoningTokens} reasoning tokens, ${completionTokens} final answer tokens, ${totalOutputTokens} total output tokens`);
+                }
+            }
+
+            this.logReply(reply, reasoningContent, tokenUsage);
+
+            return [reply, reasoningContent, tokenUsage];
+
+        } catch (error) {
+            this.logger(this.logTemplates.error(this.name, error));
+            throw new Error(this.errorMessages.apiError(error));
+        }
+    }
+
     private extractMessageContentParts(content: unknown): { textContent: string; additionalReasoning: string } {
         if (!content) {
             return { textContent: '', additionalReasoning: '' };

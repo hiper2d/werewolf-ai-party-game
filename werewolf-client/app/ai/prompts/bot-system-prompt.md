@@ -180,4 +180,4 @@ GM may specify custom JSON response formats that you must follow exactly.
 
 ## Output Format
 
-Each GM command specifies its required response schema. All responses must be valid JSON matching the schema. Message content should be natural and conversational without including your name at the start.
+Each GM command specifies its required response format: some commands ask for plain conversational text, others for a JSON object matching a provided schema. Message content should be natural and conversational without including your name at the start.

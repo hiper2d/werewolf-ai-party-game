@@ -30,6 +30,15 @@ export abstract class AbstractAgent {
 
     abstract askWithZodSchema<T>(zodSchema: z.ZodSchema<T>, messages: AIMessage[]): Promise<[T, string, TokenUsage?, string?]>;
 
+    /**
+     * Plain-text ask: no schema appended to the prompt, no JSON mode, no parsing.
+     * Returns [content, thinkingContent, tokenUsage?, thinkingSignature?] — same tuple
+     * shape as askWithZodSchema but with the raw response string as content.
+     * Implementations must throw on empty content so the recoverable-error/retry UX
+     * is preserved (errors surface in the UI; the user triggers retries).
+     */
+    abstract askText(messages: AIMessage[]): Promise<[string, string, TokenUsage?, string?]>;
+
     protected logger(message: string): void {
         console.log(`[${this.name} ${this.model}]: ${message}`);
     }

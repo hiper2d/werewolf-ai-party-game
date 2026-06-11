@@ -34,9 +34,11 @@ html {
   --accent-soft: oklch(72% 0.09 230 / 0.14);
   --accent-line: oklch(72% 0.09 230 / 0.45);
   --accent-fg: #0b0c0f;
+  --accent-text: oklch(96% 0.02 230);
 
   /* Danger */
   --danger: oklch(70% 0.13 25);
+  --danger-line: oklch(70% 0.13 25 / 0.42);
 
   /* Shadows */
   --shadow-1: 0 1px 0 rgba(255,255,255,0.02) inset, 0 1px 2px rgba(0,0,0,0.4);
@@ -107,9 +109,11 @@ html {
   --accent-soft: oklch(55% 0.12 235 / 0.10);
   --accent-line: oklch(55% 0.12 235 / 0.40);
   --accent-fg: #ffffff;
+  --accent-text: oklch(35% 0.08 235);
 
   /* Danger */
   --danger: oklch(55% 0.18 25);
+  --danger-line: oklch(55% 0.18 25 / 0.42);
 
   /* Shadows */
   --shadow-1: 0 1px 0 rgba(0,0,0,0.03) inset, 0 1px 2px rgba(0,0,0,0.06);

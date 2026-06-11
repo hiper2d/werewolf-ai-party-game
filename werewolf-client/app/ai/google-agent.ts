@@ -292,6 +292,111 @@ export class GoogleAgent extends AbstractAgent {
     }
 
     /**
+     * Plain-text ask: same request as askWithZodSchema but without responseSchema /
+     * responseMimeType, returning the raw text. Thinking parts and thought signatures
+     * are extracted identically.
+     */
+    async askText(messages: AIMessage[]): Promise<[string, string, TokenUsage?, string?]> {
+        const contents = this.convertToContents(messages);
+
+        try {
+            const config: any = {
+                temperature: this.temperature,
+                maxOutputTokens: 16384,
+                systemInstruction: this.instruction
+            };
+
+            // Add thinking config for Google models with thinking mode
+            if (this.enableThinking) {
+                config.thinkingConfig = {
+                    includeThoughts: true,
+                    thinkingBudget: 1024
+                };
+            }
+
+            this.logAsking(messages);
+            this.logMessages(messages);
+
+            let response;
+            try {
+                response = await this.client.models.generateContent({
+                    model: this.model,
+                    contents: contents,
+                    config: config
+                });
+            } catch (apiError) {
+                this.logger(this.logTemplates.error(this.name, apiError));
+                throw new Error(this.errorMessages.apiError(apiError));
+            }
+
+            // Handle thinking content and signature if present
+            let thinkingContent = "";
+            let googleThoughtSignature = "";
+            if (this.enableThinking && (response as any).candidates?.[0]?.content?.parts) {
+                const parts = (response as any).candidates[0].content.parts;
+                const thinkingParts: string[] = [];
+
+                for (const part of parts) {
+                    if (part.thought && part.text) {
+                        thinkingParts.push(part.text);
+                    }
+
+                    // Check for thoughtSignature in ANY part (it often comes with the final response, not the thought part)
+                    if (part.thoughtSignature) {
+                        googleThoughtSignature = part.thoughtSignature;
+                    } else if (part.thought_signature) {
+                        googleThoughtSignature = part.thought_signature;
+                    } else if (part.signature) {
+                        googleThoughtSignature = part.signature;
+                    }
+                }
+                thinkingContent = thinkingParts.join('\n');
+
+                if (thinkingContent && !googleThoughtSignature) {
+                    this.logger(`⚠️ Thinking content received but no signature found in response`);
+                }
+            }
+
+            // Extract token usage from response metadata
+            const usageMetadata = (response as any).usageMetadata;
+            let tokenUsage: TokenUsage | undefined;
+            if (usageMetadata) {
+                const inputTokens = usageMetadata.promptTokenCount || 0;
+                const outputTokens = usageMetadata.candidatesTokenCount || 0;
+                const totalTokens = usageMetadata.totalTokenCount || 0;
+                const cacheHitTokens = usageMetadata.cachedContentTokenCount || 0;
+
+                const costUSD = this.calculateCostWithCacheHits(inputTokens, outputTokens, totalTokens, cacheHitTokens);
+
+                tokenUsage = {
+                    inputTokens,
+                    outputTokens,
+                    totalTokens,
+                    costUSD
+                };
+            }
+
+            this.logger(`Plain text response received - hasText: ${!!response.text}, textLength: ${response.text ? response.text.length : 0}`);
+
+            if (!response.text) {
+                throw new Error(this.errorMessages.emptyResponse);
+            }
+
+            this.logReply(response.text, thinkingContent || undefined, tokenUsage);
+
+            return [response.text, thinkingContent, tokenUsage, googleThoughtSignature || undefined];
+
+        } catch (error) {
+            this.logger(this.logTemplates.error(this.name, error));
+
+            // Check for specific Gemini API errors
+            this.handleGeminiError(error);
+
+            throw error;
+        }
+    }
+
+    /**
      * Handles Gemini API errors and throws appropriate specific exceptions
      * @param error - The error to handle
      */

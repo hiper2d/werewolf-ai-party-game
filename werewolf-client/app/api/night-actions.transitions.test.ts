@@ -136,6 +136,7 @@ function makeGame(overrides: Partial<Game> = {}): Game {
 
 let mockUpdate: jest.Mock;
 let mockAskWithZodSchema: jest.Mock;
+let mockAskText: jest.Mock;
 
 function updatesWith(field: string): any[] {
     return mockUpdate.mock.calls
@@ -179,14 +180,17 @@ beforeEach(() => {
     }));
     (db!.collection as jest.Mock).mockReturnValue({ doc: mockDoc });
 
-    mockAskWithZodSchema = jest.fn().mockResolvedValue([
-        { story: 'The night passes quietly.' },
+    mockAskWithZodSchema = jest.fn();
+    // GM night story and day summaries are plain-text asks now.
+    mockAskText = jest.fn().mockResolvedValue([
+        'The night passes quietly.',
         '',
         undefined,
         undefined,
     ]);
     (AgentFactory.createAgent as jest.Mock).mockReturnValue({
         askWithZodSchema: mockAskWithZodSchema,
+        askText: mockAskText,
         gameId: '',
         userId: '',
     });
@@ -328,7 +332,7 @@ describe('night queue advancement', () => {
         const result = await performNightAction(GAME_ID);
 
         // GM story agent was asked once and the night ends.
-        expect(mockAskWithZodSchema).toHaveBeenCalledTimes(1);
+        expect(mockAskText).toHaveBeenCalledTimes(1);
         const endUpdate = updatesWith('gameState')[0];
         expect(endUpdate.gameState).toBe(GAME_STATES.NIGHT_RESULTS);
         expect(result.messages.length).toBeGreaterThan(0);

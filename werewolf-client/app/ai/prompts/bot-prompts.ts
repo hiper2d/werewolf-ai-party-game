@@ -198,7 +198,7 @@ All inputs come from the Game Master (GM) as specific commands requiring action.
 
 ## Output Format
 
-All responses must be valid JSON. The specific schema will be provided by the API. Message content should be natural and conversational without including your name at the start.`;
+Follow the response format specified by each command: some commands ask for plain conversational text, others for a JSON object matching a provided schema. Message content should be natural and conversational without including your name at the start.`;
 
 export const BOT_VOTE_PROMPT: string = `%bot_name%, it's time to vote for someone to eliminate from the game. \
 You must choose one player who you believe should be voted out.
@@ -251,7 +251,7 @@ export const BOT_REMINDER_POSTFIX: string = `
 - Consider how relationships and alliances affect voting patterns\
 
 **COMPACT REPLIES:**
-- Keep output lean—2 to 4 complete sentences per response JSON field.
+- Keep output lean—2 to 4 complete sentences per response.
 - Merge related points and skip filler while staying natural-sounding.
 `;
 

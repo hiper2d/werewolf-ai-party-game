@@ -175,4 +175,77 @@ export class DeepSeekV2Agent extends AbstractAgent {
             throw new Error(this.errorMessages.apiError(error));
         }
     }
+
+    /**
+     * Plain-text ask: same request structure as askWithZodSchema but without JSON mode
+     * or a schema appended to the prompt. The raw response string is returned as-is.
+     */
+    async askText(messages: AIMessage[]): Promise<[string, string, TokenUsage?, string?]> {
+        try {
+            const input = this.convertToOpenAIMessages(messages);
+
+            this.logAsking(messages);
+            this.logMessages(messages);
+
+            // Respect the model's configured output budget: reasoning_content shares
+            // this budget with the answer on thinking models.
+            const modelConfig = getModelConfigByApiName(this.model);
+            const maxOutputTokens = Math.max(1, modelConfig?.maxOutputTokens ?? 8192);
+
+            const requestParams: any = {
+                model: this.model,
+                messages: this.addSystemInstruction(input),
+                max_tokens: maxOutputTokens,
+                ...(this.enableThinking ? {} : { temperature: this.temperature }),
+            };
+
+            if (this.enableThinking) {
+                // DeepSeek V4: enable thinking via extra_body
+                requestParams.extra_body = { thinking: { type: 'enabled' } };
+            }
+
+            let response;
+            try {
+                response = await this.client.chat.completions.create(requestParams);
+            } catch (apiError) {
+                this.logger(this.logTemplates.error(this.name, apiError));
+                throw new Error(this.errorMessages.apiError(apiError));
+            }
+
+            // Extract reasoning content if available (from thinking mode)
+            let thinkingContent = "";
+            if (this.enableThinking && response.choices[0]?.message) {
+                const reasoning = (response.choices[0].message as any).reasoning_content;
+                if (reasoning) {
+                    thinkingContent = reasoning;
+                }
+            }
+
+            const content = response.choices[0]?.message?.content;
+            if (!content) {
+                throw new Error(this.errorMessages.emptyResponse);
+            }
+
+            // Extract token usage and calculate cost
+            const usageResult = extractUsageAndCalculateCost(this.model, response);
+            let tokenUsage: TokenUsage | undefined;
+
+            if (usageResult) {
+                tokenUsage = {
+                    inputTokens: usageResult.usage.promptTokens,
+                    outputTokens: usageResult.usage.completionTokens,
+                    totalTokens: usageResult.usage.totalTokens,
+                    costUSD: usageResult.cost
+                };
+            }
+
+            this.logReply(content, thinkingContent || undefined, tokenUsage);
+
+            return [content, thinkingContent, tokenUsage];
+
+        } catch (error) {
+            this.logger(this.logTemplates.error(this.name, error));
+            throw new Error(this.errorMessages.apiError(error));
+        }
+    }
 }

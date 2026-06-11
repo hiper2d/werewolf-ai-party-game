@@ -235,4 +235,51 @@ export class MistralAgent extends AbstractAgent {
             throw new Error(this.errorMessages.apiError(error));
         }
     }
+
+    /**
+     * Plain-text ask: no schema appended, no responseFormat. Note that Magistral
+     * reasoning models only return thinking traces when responseFormat is NOT
+     * json_object, so unlike askWithZodSchema this path can surface thinking content.
+     */
+    async askText(messages: AIMessage[]): Promise<[string, string, TokenUsage?, string?]> {
+        try {
+            const convertedMessages = this.convertToMistralMessages(messages);
+
+            const systemMessage = {
+                role: MESSAGE_ROLE.SYSTEM,
+                content: this.instruction
+            };
+
+            const requestParams = {
+                ...this.defaultParams,
+                messages: [systemMessage, ...convertedMessages],
+            };
+
+            this.logAsking(messages);
+            this.logMessages(messages);
+
+            let response;
+            try {
+                response = await this.client.chat.complete(requestParams);
+            } catch (apiError) {
+                this.logger(this.logTemplates.error(this.name, apiError));
+                throw new Error(this.errorMessages.apiError(apiError));
+            }
+
+            // processReply throws on empty content and handles structured (thinking) replies
+            const [content, thinkingContent, tokenUsage] = this.processReply(response);
+
+            if (!content) {
+                throw new Error(this.errorMessages.emptyResponse);
+            }
+
+            this.logReply(content, thinkingContent || undefined, tokenUsage);
+
+            return [content, thinkingContent, tokenUsage];
+
+        } catch (error) {
+            this.logger(this.logTemplates.error(this.name, error));
+            throw new Error(this.errorMessages.apiError(error));
+        }
+    }
 }

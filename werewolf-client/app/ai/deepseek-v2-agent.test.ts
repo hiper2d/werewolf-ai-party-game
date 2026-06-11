@@ -217,7 +217,72 @@ describe("DeepSeekV2Agent integration", () => {
         console.log("ℹ️  Note: Reasoning model provides internal thought process via thinking content");
       }, 90000); // Extended timeout for complex reasoning + story generation
     });
-    
+
+    describeOrSkip("askText with real API", () => {
+      it("should return plain text (no JSON wrapper) with thinking model", async () => {
+        const agent = createAgent(LLM_CONSTANTS.DEEPSEEK_V4_PRO_THINKING);
+        const messages: AIMessage[] = [{
+          role: 'user',
+          content: 'In 3-4 sentences, what do you think about the current situation in the village after David was revealed as a werewolf?'
+        }];
+
+        const [reply, thinking, tokenUsage] = await agent.askText(messages);
+
+        console.log("\n=== DeepSeek Reasoner askText Test ===");
+        console.log("Reply length:", reply.length);
+        console.log("Thinking length:", thinking.length);
+        console.log("First 200 chars of reply:", reply.substring(0, 200));
+
+        expect(typeof reply).toBe('string');
+        expect(reply.length).toBeGreaterThan(0);
+        // Must be plain prose, not a JSON envelope
+        expect(reply.trim().startsWith('{')).toBe(false);
+
+        // Reasoner model should surface reasoning content
+        expect(thinking.length).toBeGreaterThan(0);
+
+        expect(tokenUsage).toBeDefined();
+        expect(tokenUsage!.inputTokens).toBeGreaterThan(0);
+        expect(tokenUsage!.outputTokens).toBeGreaterThan(0);
+
+        console.log("✅ DeepSeek Reasoner askText passed");
+      }, 90000);
+
+      it("should return plain text (no JSON wrapper) with non-thinking model", async () => {
+        const agent = new DeepSeekV2Agent(
+          "TestBot",
+          "You are a helpful villager in a Werewolf party game. Answer in plain conversational text.",
+          SupportedAiModels[LLM_CONSTANTS.DEEPSEEK_V4_PRO].modelApiName,
+          process.env.DEEP_SEEK_K!,
+          0.7,
+          false // thinking disabled
+        );
+        const messages: AIMessage[] = [{
+          role: 'user',
+          content: 'In 2-3 sentences, introduce yourself to the other villagers.'
+        }];
+
+        const [reply, thinking, tokenUsage] = await agent.askText(messages);
+
+        console.log("\n=== DeepSeek askText (non-thinking) Test ===");
+        console.log("Reply length:", reply.length);
+        console.log("First 200 chars of reply:", reply.substring(0, 200));
+
+        expect(typeof reply).toBe('string');
+        expect(reply.length).toBeGreaterThan(0);
+        expect(reply.trim().startsWith('{')).toBe(false);
+
+        // Non-thinking model returns no reasoning content
+        expect(thinking).toBe("");
+
+        expect(tokenUsage).toBeDefined();
+        expect(tokenUsage!.inputTokens).toBeGreaterThan(0);
+        expect(tokenUsage!.outputTokens).toBeGreaterThan(0);
+
+        console.log("✅ DeepSeek askText (non-thinking) passed");
+      }, 90000);
+    });
+
     it("should handle validation errors gracefully", () => {
       // Test the validation helper functions
       const validData = { reply: "The situation is concerning after David's revelation as a werewolf." };

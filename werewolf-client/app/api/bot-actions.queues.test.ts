@@ -144,6 +144,7 @@ function makeGame(overrides: Partial<Game> = {}): Game {
 
 let mockUpdate: jest.Mock;
 let mockAskWithZodSchema: jest.Mock;
+let mockAskText: jest.Mock;
 // Game returned by db.collection('games').doc(id).get() (used by the
 // day-activity-counter helpers, which read the doc directly).
 let dbDocGame: Game;
@@ -190,10 +191,12 @@ beforeEach(() => {
     }));
     (db!.collection as jest.Mock).mockReturnValue({ doc: mockDoc });
 
-    // Stub agent: every created agent shares one askWithZodSchema mock.
+    // Stub agent: every created agent shares one askWithZodSchema/askText mock pair.
     mockAskWithZodSchema = jest.fn();
+    mockAskText = jest.fn();
     (AgentFactory.createAgent as jest.Mock).mockReturnValue({
         askWithZodSchema: mockAskWithZodSchema,
+        askText: mockAskText,
         gameId: '',
         userId: '',
     });
@@ -205,7 +208,7 @@ afterEach(() => {
 
 /** Convenience: agent resolves a bot discussion/welcome answer. */
 function agentRepliesWith(reply: string) {
-    mockAskWithZodSchema.mockResolvedValue([{ reply }, 'some thinking', undefined, undefined]);
+    mockAskText.mockResolvedValue([reply, 'some thinking', undefined, undefined]);
 }
 
 /** Convenience: GM agent resolves a bot-selection answer. */
@@ -251,7 +254,7 @@ describe('welcome (WELCOME state, gameStateParamQueue)', () => {
         // Only Alice's agent was created and asked once.
         expect(AgentFactory.createAgent).toHaveBeenCalledTimes(1);
         expect((AgentFactory.createAgent as jest.Mock).mock.calls[0][0]).toBe('Alice');
-        expect(mockAskWithZodSchema).toHaveBeenCalledTimes(1);
+        expect(mockAskText).toHaveBeenCalledTimes(1);
 
         // Queue advanced by exactly one; game stays in WELCOME (no gameState in update).
         expect(mockUpdate).toHaveBeenCalledWith({ gameStateParamQueue: ['Bob'] });
@@ -367,7 +370,7 @@ describe('talkToAll (DAY_DISCUSSION, processing the bot queue)', () => {
         await talkToAll(GAME_ID, '');
 
         // Bot was processed (messages saved), but the cleared queue was NOT overwritten.
-        expect(mockAskWithZodSchema).toHaveBeenCalledTimes(1);
+        expect(mockAskText).toHaveBeenCalledTimes(1);
         expect(updatesWith('gameStateProcessQueue')).toHaveLength(0);
         expect(setGameErrorState).not.toHaveBeenCalled();
     });
