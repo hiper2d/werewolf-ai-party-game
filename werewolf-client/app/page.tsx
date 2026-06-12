@@ -43,9 +43,9 @@ export default async function Home() {
   const session = await auth();
 
   return (
-    <div className="w-full max-w-[1040px] mx-auto px-7 flex flex-col">
+    <div className="w-full max-w-[1040px] mx-auto px-4 sm:px-7 flex flex-col">
       {/* Hero */}
-      <section className="pt-[92px] pb-[84px]">
+      <section className="pt-14 pb-16 sm:pt-[92px] sm:pb-[84px]">
         <div className="flex flex-col items-center text-center gap-[30px]">
           <div className="logo-backdrop relative w-[200px] h-[200px] rounded-full flex-shrink-0">
             <Image
@@ -98,8 +98,8 @@ export default async function Home() {
       </section>
 
       {/* Why Play */}
-      <section className="bg-[var(--bg-1)] border border-[var(--line-1)] rounded-[var(--radius-2xl)] pt-16 px-12 pb-14 mb-[72px]">
-        <div className="text-center max-w-[56ch] mx-auto mb-11">
+      <section className="bg-[var(--bg-1)] border border-[var(--line-1)] rounded-[var(--radius-2xl)] pt-10 px-5 pb-10 sm:pt-16 sm:px-12 sm:pb-14 mb-14 sm:mb-[72px]">
+        <div className="text-center max-w-[56ch] mx-auto mb-8 sm:mb-11">
           <div className="font-mono text-[11px] tracking-[0.14em] uppercase text-[var(--fg-2)] mb-3">Why play</div>
           <h2 className="m-0 text-[clamp(28px,4vw,38px)] font-bold tracking-[-0.025em] text-[var(--fg-0)]">
             Why Play Werewolf AI?
