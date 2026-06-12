@@ -54,6 +54,15 @@ export class DetectiveProcessor extends BaseRoleProcessor {
                 reason: 'abduction',
                 player: null
             });
+            // Record a failed result (success: false) rather than leaving it null.
+            // Downstream code (processNightAction result message, night narrative,
+            // detective roleKnowledge) all key off detectiveResult.success — a null
+            // here caused "Cannot read properties of null (reading 'success')".
+            state.detectiveResult = {
+                target: detectiveTarget,
+                isEvil: false, // unknown — ignored by consumers when success is false
+                success: false
+            };
             return state;
         }
 

@@ -5,8 +5,8 @@ import PlayNowButton from "@/app/components/PlayNowButton";
 import BuyMeACoffee from "@/app/components/BuyMeACoffee";
 
 const MODELS = [
-  'Claude Fable 5', 'GPT-5.5', 'Claude 4.8 Opus', 'Claude 4.6 Sonnet', 'Gemini 3.1 Pro',
-  'DeepSeek V4 Pro', 'Grok 4.3', 'Mistral Large 3', 'Kimi K2.6', 'GLM-5.1',
+  'Claude Fable 5', 'GPT-5.5', 'Gemini Flash 3.5', 'DeepSeek V4 Pro',
+  'Mistral 3.5 Medium', 'GLM 5.1', 'Kimi K2.6', 'Grok 4.3',
 ];
 
 function PlayersIcon({ className }: { className?: string }) {

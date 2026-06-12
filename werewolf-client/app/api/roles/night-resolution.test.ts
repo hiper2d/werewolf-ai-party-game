@@ -348,17 +348,44 @@ describe("Maniac abduction", () => {
         ]);
     });
 
-    it("blocks the detective's investigation of an abducted player (pins: detectiveResult stays null)", () => {
-        // NOTE: the DetectiveResult interface documents `success: false if
-        // blocked by abduction`, but the implementation never produces such a
-        // result — it simply leaves detectiveResult null. Pinned here.
+    it("blocks the detective's investigation of an abducted player (records success: false)", () => {
+        // Regression: previously detectiveResult was left null when the target was
+        // abducted, but downstream code reads detectiveResult.success — causing
+        // "Cannot read properties of null (reading 'success')". The DetectiveResult
+        // interface documents `success: false if blocked by abduction`, so the
+        // resolver must produce that, not null.
         const state = resolve(makeGame({
             nightResults: {
                 [GAME_ROLES.MANIAC]: { target: "Wolfgang" },
                 [GAME_ROLES.DETECTIVE]: { target: "Wolfgang", actionType: "investigate" }
             }
         }));
-        expect(state.detectiveResult).toBeNull();
+        expect(state.detectiveResult).toEqual({
+            target: "Wolfgang",
+            isEvil: false,
+            success: false
+        });
+        expect(state.actionsPrevented).toEqual([
+            { role: GAME_ROLES.DETECTIVE, reason: "abduction", player: null }
+        ]);
+    });
+
+    it("blocks the detective's KILL on an abducted player (records success: false, no death)", () => {
+        // The same null-deref path also fires for the one-time kill action when
+        // the target was abducted that night.
+        const state = resolve(makeGame({
+            nightResults: {
+                [GAME_ROLES.MANIAC]: { target: "Wolfgang" },
+                [GAME_ROLES.DETECTIVE]: { target: "Wolfgang", actionType: "kill" }
+            }
+        }));
+        expect(state.detectiveResult).toEqual({
+            target: "Wolfgang",
+            isEvil: false,
+            success: false
+        });
+        // abducted target must not be killed
+        expect(state.deaths.some(d => d.player === "Wolfgang")).toBe(false);
         expect(state.actionsPrevented).toEqual([
             { role: GAME_ROLES.DETECTIVE, reason: "abduction", player: null }
         ]);
@@ -511,6 +538,168 @@ describe("Death cascade (maniac dies while holding an abductee)", () => {
         expect(state.actionsPrevented).toEqual([
             { role: GAME_ROLES.WEREWOLF, reason: "doctor_save", player: null }
         ]);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Combined night-action scenarios (multiple roles interacting in one night)
+// ---------------------------------------------------------------------------
+
+describe("Combined night-action scenarios", () => {
+    // Cast: Wolfgang=werewolf, Dora=doctor, Sherlock=detective, Mandy=maniac,
+    //       Vicky=villager, Hero=human villager.
+
+    it("maniac abducts A, doctor heals A, werewolves kill the maniac, detective investigates the maniac", () => {
+        // Order: Maniac → Werewolf → Doctor → Detective.
+        //  - Maniac abducts Vicky (A).
+        //  - Werewolves kill Mandy (the maniac, M); since M was holding an
+        //    abductee, Vicky dies too as maniac_collateral. So BOTH M and A die.
+        //  - Doctor's heal of Vicky is blocked because she was abducted (and even
+        //    unblocked it could only undo a werewolf_attack, not a collateral death).
+        //  - Detective investigates the maniac and reads "evil" — but it's moot:
+        //    Mandy is already dead.
+        const state = resolve(makeGame({
+            nightResults: {
+                [GAME_ROLES.MANIAC]:    { target: "Vicky" },
+                [GAME_ROLES.WEREWOLF]:  { target: "Mandy" },
+                [GAME_ROLES.DOCTOR]:    { target: "Vicky", actionType: "protect" },
+                [GAME_ROLES.DETECTIVE]: { target: "Mandy", actionType: "investigate" }
+            }
+        }));
+
+        // Both the maniac and the abducted player die.
+        expect(state.deaths).toEqual([
+            { player: "Mandy", role: GAME_ROLES.MANIAC,   cause: "werewolf_attack" },
+            { player: "Vicky", role: GAME_ROLES.VILLAGER, cause: "maniac_collateral" }
+        ]);
+        expect(state.abductedPlayer).toBe("Vicky");
+
+        // Doctor could not protect Vicky — her abduction blocked the save.
+        expect(state.actionsPrevented).toEqual([
+            { role: GAME_ROLES.DOCTOR, reason: "abduction", player: null }
+        ]);
+
+        // Detective got a result on the (now-dead) maniac. It reads evil but is moot.
+        expect(state.detectiveResult).toEqual({ target: "Mandy", isEvil: true, success: true });
+    });
+
+    it("same night, but the detective investigates the abducted player instead — investigation is blocked", () => {
+        // Identical to above except the detective targets the abducted victim
+        // (Vicky/A) rather than the maniac. This exercises the abduction-blocked
+        // detective path inside the full pipeline: the result must be
+        // success: false (not null), while the death cascade is unchanged.
+        const state = resolve(makeGame({
+            nightResults: {
+                [GAME_ROLES.MANIAC]:    { target: "Vicky" },
+                [GAME_ROLES.WEREWOLF]:  { target: "Mandy" },
+                [GAME_ROLES.DOCTOR]:    { target: "Vicky", actionType: "protect" },
+                [GAME_ROLES.DETECTIVE]: { target: "Vicky", actionType: "investigate" }
+            }
+        }));
+
+        expect(state.deaths).toEqual([
+            { player: "Mandy", role: GAME_ROLES.MANIAC,   cause: "werewolf_attack" },
+            { player: "Vicky", role: GAME_ROLES.VILLAGER, cause: "maniac_collateral" }
+        ]);
+        expect(state.abductedPlayer).toBe("Vicky");
+
+        // The detective's investigation of the abducted player fails (not null).
+        expect(state.detectiveResult).toEqual({ target: "Vicky", isEvil: false, success: false });
+
+        // Both the doctor and the detective were blocked by the abduction.
+        expect(state.actionsPrevented).toEqual([
+            { role: GAME_ROLES.DOCTOR,    reason: "abduction", player: null },
+            { role: GAME_ROLES.DETECTIVE, reason: "abduction", player: null }
+        ]);
+    });
+
+    it("the maniac inadvertently shields the werewolves' victim by abducting that same player", () => {
+        // Maniac abducts Hero; the pack also targets Hero. Abduction runs first
+        // and protects the abductee, so the werewolf attack is prevented — nobody
+        // dies. The doctor's protection of an unrelated player is simply wasted.
+        const state = resolve(makeGame({
+            nightResults: {
+                [GAME_ROLES.MANIAC]:    { target: "Hero" },
+                [GAME_ROLES.WEREWOLF]:  { target: "Hero" },
+                [GAME_ROLES.DOCTOR]:    { target: "Vicky", actionType: "protect" },
+                [GAME_ROLES.DETECTIVE]: { target: "Wolfgang", actionType: "investigate" }
+            }
+        }));
+
+        expect(state.deaths).toEqual([]);
+        expect(state.abductedPlayer).toBe("Hero");
+        // The attack was blocked by the abduction, NOT by a doctor save.
+        expect(state.actionsPrevented).toEqual([
+            { role: GAME_ROLES.WEREWOLF, reason: "abduction", player: null }
+        ]);
+        // Detective still reads the werewolf as evil.
+        expect(state.detectiveResult).toEqual({ target: "Wolfgang", isEvil: true, success: true });
+    });
+
+    it("pile-on: maniac, werewolves, doctor and detective all target the one abducted player → every action blocked", () => {
+        // Vicky is abducted, and the pack/doctor/detective all act on Vicky too.
+        // Abduction neutralizes all three: no death, no save, no investigation.
+        const state = resolve(makeGame({
+            nightResults: {
+                [GAME_ROLES.MANIAC]:    { target: "Vicky" },
+                [GAME_ROLES.WEREWOLF]:  { target: "Vicky" },
+                [GAME_ROLES.DOCTOR]:    { target: "Vicky", actionType: "protect" },
+                [GAME_ROLES.DETECTIVE]: { target: "Vicky", actionType: "investigate" }
+            }
+        }));
+
+        expect(state.deaths).toEqual([]);
+        expect(state.abductedPlayer).toBe("Vicky");
+        expect(state.detectiveResult).toEqual({ target: "Vicky", isEvil: false, success: false });
+        // One prevented entry per blocked role, in resolution order.
+        expect(state.actionsPrevented).toEqual([
+            { role: GAME_ROLES.WEREWOLF,  reason: "abduction", player: null },
+            { role: GAME_ROLES.DOCTOR,    reason: "abduction", player: null },
+            { role: GAME_ROLES.DETECTIVE, reason: "abduction", player: null }
+        ]);
+    });
+
+    it("doctor self-saves while under werewolf attack (maniac and detective act elsewhere)", () => {
+        // Werewolves target the doctor; the doctor protects herself the same night.
+        // Self-protection is allowed, so the werewolf_attack death is undone.
+        const state = resolve(makeGame({
+            nightResults: {
+                [GAME_ROLES.MANIAC]:    { target: "Vicky" },
+                [GAME_ROLES.WEREWOLF]:  { target: "Dora" },
+                [GAME_ROLES.DOCTOR]:    { target: "Dora", actionType: "protect" },
+                [GAME_ROLES.DETECTIVE]: { target: "Mandy", actionType: "investigate" }
+            }
+        }));
+
+        // Doctor survives her own save.
+        expect(state.deaths).toEqual([]);
+        expect(state.actionsPrevented).toEqual([
+            { role: GAME_ROLES.WEREWOLF, reason: "doctor_save", player: null }
+        ]);
+        // Detective reads the maniac as evil.
+        expect(state.detectiveResult).toEqual({ target: "Mandy", isEvil: true, success: true });
+    });
+
+    it("detective's one-time kill removes a werewolf the same night the pack kills a villager → two deaths", () => {
+        // Two independent killers resolve in one night: the werewolf attack stands
+        // (werewolves act before the detective), and the detective's kill adds a
+        // second death. The maniac's abduction of an uninvolved player changes
+        // nothing here.
+        const state = resolve(makeGame({
+            nightResults: {
+                [GAME_ROLES.MANIAC]:    { target: "Hero" },
+                [GAME_ROLES.WEREWOLF]:  { target: "Vicky" },
+                [GAME_ROLES.DETECTIVE]: { target: "Wolfgang", actionType: "kill" }
+            }
+        }));
+
+        expect(state.deaths).toEqual([
+            { player: "Vicky",    role: GAME_ROLES.VILLAGER, cause: "werewolf_attack" },
+            { player: "Wolfgang", role: GAME_ROLES.WEREWOLF, cause: "detective_kill" }
+        ]);
+        expect(state.abductedPlayer).toBe("Hero");
+        // The kill still yields a detective result (the slain wolf reads evil).
+        expect(state.detectiveResult).toEqual({ target: "Wolfgang", isEvil: true, success: true });
     });
 });
 
