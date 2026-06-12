@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 function ArrowLeftIcon() {
   return (
@@ -8,14 +9,19 @@ function ArrowLeftIcon() {
   );
 }
 
-export default function DocFooter({ credit = false }: { credit?: boolean }) {
+export default function DocFooter({ credit = false, action }: { credit?: boolean; action?: ReactNode }) {
   return (
     <div className="doc-foot">
       <Link href="/" className="back-home">
         <ArrowLeftIcon />
         Back to Home
       </Link>
-      {credit && <span className="credit">Created by hiper2d</span>}
+      {(credit || action) && (
+        <div className="flex items-center gap-4 flex-wrap justify-end">
+          {credit && <span className="credit">Created by hiper2d</span>}
+          {action}
+        </div>
+      )}
     </div>
   );
 }

@@ -65,6 +65,10 @@ const NavBar = () => {
                         Rules
                     </Link>
                     <span className="w-px h-4 bg-[var(--line-2)]"></span>
+                    <Link href="/news" className="text-[13px] text-[var(--fg-1)] hover:text-[var(--fg-0)] px-2.5 py-1.5 rounded-[var(--radius-sm)] hover:bg-[var(--bg-3)] transition-all duration-[120ms]">
+                        News
+                    </Link>
+                    <span className="w-px h-4 bg-[var(--line-2)]"></span>
                     <Link href="/profile" className="text-[13px] text-[var(--fg-1)] hover:text-[var(--fg-0)] px-2.5 py-1.5 rounded-[var(--radius-sm)] hover:bg-[var(--bg-3)] transition-all duration-[120ms]">
                         Profile
                     </Link>
@@ -99,6 +103,7 @@ const NavBar = () => {
                     <ul className="flex flex-col space-y-1">
                         <li><Link href="/games" className="text-[13px] text-[var(--fg-1)] hover:text-[var(--fg-0)] block py-2 px-2 rounded-[var(--radius-sm)] hover:bg-[var(--bg-3)] transition-all duration-[120ms]" onClick={() => setMobileMenuOpen(false)}>All games</Link></li>
                         <li><Link href="/rules" className="text-[13px] text-[var(--fg-1)] hover:text-[var(--fg-0)] block py-2 px-2 rounded-[var(--radius-sm)] hover:bg-[var(--bg-3)] transition-all duration-[120ms]" onClick={() => setMobileMenuOpen(false)}>Rules</Link></li>
+                        <li><Link href="/news" className="text-[13px] text-[var(--fg-1)] hover:text-[var(--fg-0)] block py-2 px-2 rounded-[var(--radius-sm)] hover:bg-[var(--bg-3)] transition-all duration-[120ms]" onClick={() => setMobileMenuOpen(false)}>News</Link></li>
                         <li><Link href="/profile" className="text-[13px] text-[var(--fg-1)] hover:text-[var(--fg-0)] block py-2 px-2 rounded-[var(--radius-sm)] hover:bg-[var(--bg-3)] transition-all duration-[120ms]" onClick={() => setMobileMenuOpen(false)}>Profile</Link></li>
                     </ul>
                 </nav>

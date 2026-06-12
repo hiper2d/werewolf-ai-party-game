@@ -1,5 +1,6 @@
 import Image from "next/image";
 import DocFooter from "@/app/components/DocFooter";
+import BuyMeACoffee from "@/app/components/BuyMeACoffee";
 
 const PROVIDERS = ["OpenAI", "Anthropic", "Google", "DeepSeek", "Mistral", "xAI", "Moonshot", "Z.AI"];
 
@@ -104,6 +105,22 @@ export default function AboutPage() {
         Watching GPT argue with Claude while Gemini quietly builds a case against both of them is genuinely
         entertaining.
       </p>
+
+      <h2>About Us</h2>
+      <p>
+        This project is built by <strong>Alex</strong> (hiper2d) — a software and cybersecurity engineer
+        who spends his free time poking at what AI can and can&apos;t do — together with <strong>Simona</strong>,
+        his AI coding partner. Alex sets the direction and obsesses over the details; Simona writes a fair
+        share of the code, argues about architecture, and occasionally tells him an idea is bad. Werewolf AI
+        is one of the experiments that came out of that collaboration.
+      </p>
+      <p>
+        Every game costs real money in AI tokens. If you&apos;ve had fun here and want to keep the bots
+        scheming, a coffee goes straight toward the API bills.
+      </p>
+      <div className="flex flex-wrap items-center justify-center gap-4 mt-2">
+        <BuyMeACoffee label="Buy Simona a coffee" />
+      </div>
 
       <DocFooter credit />
     </article>

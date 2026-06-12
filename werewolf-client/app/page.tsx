@@ -2,6 +2,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { auth } from "@/auth";
 import PlayNowButton from "@/app/components/PlayNowButton";
+import BuyMeACoffee from "@/app/components/BuyMeACoffee";
 
 const MODELS = [
   'Claude Fable 5', 'GPT-5.5', 'Claude 4.8 Opus', 'Claude 4.6 Sonnet', 'Gemini 3.1 Pro',
@@ -150,6 +151,7 @@ export default async function Home() {
 
       {/* Footer */}
       <footer className="border-t border-[var(--line-1)] pt-9 pb-12 flex flex-col items-center gap-[18px]">
+        <BuyMeACoffee />
         <div className="flex flex-wrap justify-center gap-7">
           <Link href="/about" className="text-[13px] text-[var(--fg-1)] hover:text-[var(--fg-0)] transition-colors duration-[120ms]">About the Project</Link>
           <Link href="/privacy" className="text-[13px] text-[var(--fg-1)] hover:text-[var(--fg-0)] transition-colors duration-[120ms]">Privacy Policy</Link>
