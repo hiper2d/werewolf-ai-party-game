@@ -33,6 +33,15 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
     {
+        id: "fable-5-shutdown", date: "Jun 2026", tags: ["Models"],
+        title: "Claude Fable 5 has been shut down",
+        body: (<>Anthropic has shut down <strong>Claude Fable 5</strong> for good, so it&apos;s gone from the
+            model picker for bots and the Game Master. Every other model is unaffected — pick any of them when
+            you set up a lobby.</>),
+        media: null,
+        links: [{label: "Anthropic's announcement", href: "https://www.anthropic.com/news/fable-mythos-access"}],
+    },
+    {
         id: "fable-5", date: "Jun 2026", tags: ["Models"],
         title: "Claude Fable 5 joins the table",
         body: (<>Anthropic&apos;s newest model, <strong>Claude Fable 5</strong>, is now selectable for any bot
@@ -151,9 +160,16 @@ export default function NewsTimeline() {
                             {e.links.length > 0 && (
                                 <div className="tl-actions">
                                     {e.links.map((l, i) => (
-                                        <Link className="news-link" href={l.href} key={i}>
-                                            {l.label}<ArrowRightIcon/>
-                                        </Link>
+                                        l.href.startsWith("http") ? (
+                                            <a className="news-link" href={l.href} key={i}
+                                               target="_blank" rel="noopener noreferrer">
+                                                {l.label}<ArrowRightIcon/>
+                                            </a>
+                                        ) : (
+                                            <Link className="news-link" href={l.href} key={i}>
+                                                {l.label}<ArrowRightIcon/>
+                                            </Link>
+                                        )
                                     ))}
                                 </div>
                             )}

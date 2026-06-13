@@ -202,11 +202,10 @@ describe('validateModelUsageForTier - API tier integration', () => {
 });
 
 describe('getSelectableModelsForUser (model picker contract: GM dropdown, bot lists)', () => {
-    it('FREE tier lists only free-tier-available models — premium models like Claude Fable are hidden', () => {
+    it('FREE tier lists only free-tier-available models — premium models like Claude Opus are hidden', () => {
         const models = getSelectableModelsForUser(USER_TIERS.FREE, new Set());
-        expect(models).not.toContain(LLM_CONSTANTS.CLAUDE_FABLE);
-        expect(models).not.toContain(LLM_CONSTANTS.CLAUDE_FABLE_THINKING);
         expect(models).not.toContain(LLM_CONSTANTS.CLAUDE_4_OPUS);
+        expect(models).not.toContain(LLM_CONSTANTS.CLAUDE_4_OPUS_THINKING);
         expect(models).toContain(LLM_CONSTANTS.CLAUDE_4_SONNET);
         // exactly the models whose config allows free-tier use
         for (const model of models) {
@@ -226,7 +225,7 @@ describe('getSelectableModelsForUser (model picker contract: GM dropdown, bot li
             expect(SupportedAiModels[model].apiKeyName).toBe(API_KEY_CONSTANTS.ANTHROPIC);
         }
         // premium models ARE selectable on API tier when the key is there
-        expect(models).toContain(LLM_CONSTANTS.CLAUDE_FABLE);
+        expect(models).toContain(LLM_CONSTANTS.CLAUDE_4_OPUS);
     });
 
     it('API tier with no uploaded keys lists nothing', () => {

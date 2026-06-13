@@ -6,6 +6,7 @@ import AuthButtons from '@/components/auth-buttons';
 import ThemeSwitcher from '@/app/components/ThemeSwitcher';
 import Link from "next/link";
 import {useSession} from "next-auth/react";
+import { usePathname } from "next/navigation";
 import { getUserTier } from '@/app/api/user-actions';
 import type { UserTier } from '@/app/api/game-models';
 
@@ -15,10 +16,21 @@ const tierConfig: Record<UserTier, { label: string; className: string }> = {
     paid: { label: 'Paid', className: 'border border-[var(--accent-line)] text-[var(--accent)]' },
 };
 
+const NAV_LINKS: { href: string; label: string }[] = [
+    { href: '/games', label: 'All games' },
+    { href: '/rules', label: 'Rules' },
+    { href: '/news', label: 'News' },
+    { href: '/models', label: 'Models' },
+    { href: '/profile', label: 'Profile' },
+];
+
 const NavBar = () => {
     const { data: session, status } = useSession();
+    const pathname = usePathname();
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [userTier, setUserTier] = useState<UserTier | null>(null);
+
+    const isActive = (href: string) => pathname === href || pathname?.startsWith(href + '/');
 
     useEffect(() => {
         if (status === 'authenticated' && session?.user?.email) {
@@ -42,14 +54,20 @@ const NavBar = () => {
                     </div>
                 </Link>
                 {status === 'authenticated' && (
-                    <Link href="/" className="text-[13px] font-medium text-[var(--fg-0)] hover:text-[var(--fg-1)] transition-colors duration-[120ms] hidden sm:flex items-center gap-2">
-                        {session.user?.name}
+                    <div className="hidden sm:flex items-center gap-2">
+                        <Link href="/" className="text-[13px] font-medium text-[var(--fg-0)] hover:text-[var(--fg-1)] transition-colors duration-[120ms]">
+                            {session.user?.name}
+                        </Link>
                         {userTier && (
-                            <span className={`text-[10px] font-mono uppercase tracking-[0.06em] px-1.5 py-0.5 rounded ${tierConfig[userTier].className}`}>
+                            <Link
+                                href="/profile#tier"
+                                title="Manage your tier"
+                                className={`text-[10px] font-mono uppercase tracking-[0.06em] px-1.5 py-0.5 rounded hover:bg-[var(--bg-3)] transition-colors duration-[120ms] ${tierConfig[userTier].className}`}
+                            >
                                 {tierConfig[userTier].label}
-                            </span>
+                            </Link>
                         )}
-                    </Link>
+                    </div>
                 )}
             </div>
 
@@ -57,21 +75,21 @@ const NavBar = () => {
             <div className="flex items-center gap-3">
                 {/* Desktop nav */}
                 <nav className="hidden md:flex items-center gap-1 mr-2">
-                    <Link href="/games" className="text-[13px] text-[var(--fg-1)] hover:text-[var(--fg-0)] px-2.5 py-1.5 rounded-[var(--radius-sm)] hover:bg-[var(--bg-3)] transition-all duration-[120ms]">
-                        All games
-                    </Link>
-                    <span className="w-px h-4 bg-[var(--line-2)]"></span>
-                    <Link href="/rules" className="text-[13px] text-[var(--fg-1)] hover:text-[var(--fg-0)] px-2.5 py-1.5 rounded-[var(--radius-sm)] hover:bg-[var(--bg-3)] transition-all duration-[120ms]">
-                        Rules
-                    </Link>
-                    <span className="w-px h-4 bg-[var(--line-2)]"></span>
-                    <Link href="/news" className="text-[13px] text-[var(--fg-1)] hover:text-[var(--fg-0)] px-2.5 py-1.5 rounded-[var(--radius-sm)] hover:bg-[var(--bg-3)] transition-all duration-[120ms]">
-                        News
-                    </Link>
-                    <span className="w-px h-4 bg-[var(--line-2)]"></span>
-                    <Link href="/profile" className="text-[13px] text-[var(--fg-1)] hover:text-[var(--fg-0)] px-2.5 py-1.5 rounded-[var(--radius-sm)] hover:bg-[var(--bg-3)] transition-all duration-[120ms]">
-                        Profile
-                    </Link>
+                    {NAV_LINKS.map((item, i) => (
+                        <React.Fragment key={item.href}>
+                            {i > 0 && <span className="w-px h-4 bg-[var(--line-2)]"></span>}
+                            <Link
+                                href={item.href}
+                                className={`text-[13px] px-2.5 py-1.5 rounded-[var(--radius-sm)] hover:bg-[var(--bg-3)] transition-all duration-[120ms] ${
+                                    isActive(item.href)
+                                        ? 'text-[var(--fg-0)] bg-[var(--bg-3)]'
+                                        : 'text-[var(--fg-1)] hover:text-[var(--fg-0)]'
+                                }`}
+                            >
+                                {item.label}
+                            </Link>
+                        </React.Fragment>
+                    ))}
                 </nav>
                 <ThemeSwitcher />
                 <AuthButtons />
@@ -101,10 +119,21 @@ const NavBar = () => {
             {mobileMenuOpen && (
                 <nav className="absolute top-full left-0 right-0 bg-[var(--bg-1)] border-t border-[var(--line-1)] px-6 py-3 md:hidden z-50 shadow-subtle">
                     <ul className="flex flex-col space-y-1">
-                        <li><Link href="/games" className="text-[13px] text-[var(--fg-1)] hover:text-[var(--fg-0)] block py-2 px-2 rounded-[var(--radius-sm)] hover:bg-[var(--bg-3)] transition-all duration-[120ms]" onClick={() => setMobileMenuOpen(false)}>All games</Link></li>
-                        <li><Link href="/rules" className="text-[13px] text-[var(--fg-1)] hover:text-[var(--fg-0)] block py-2 px-2 rounded-[var(--radius-sm)] hover:bg-[var(--bg-3)] transition-all duration-[120ms]" onClick={() => setMobileMenuOpen(false)}>Rules</Link></li>
-                        <li><Link href="/news" className="text-[13px] text-[var(--fg-1)] hover:text-[var(--fg-0)] block py-2 px-2 rounded-[var(--radius-sm)] hover:bg-[var(--bg-3)] transition-all duration-[120ms]" onClick={() => setMobileMenuOpen(false)}>News</Link></li>
-                        <li><Link href="/profile" className="text-[13px] text-[var(--fg-1)] hover:text-[var(--fg-0)] block py-2 px-2 rounded-[var(--radius-sm)] hover:bg-[var(--bg-3)] transition-all duration-[120ms]" onClick={() => setMobileMenuOpen(false)}>Profile</Link></li>
+                        {NAV_LINKS.map((item) => (
+                            <li key={item.href}>
+                                <Link
+                                    href={item.href}
+                                    className={`text-[13px] block py-2 px-2 rounded-[var(--radius-sm)] hover:bg-[var(--bg-3)] transition-all duration-[120ms] ${
+                                        isActive(item.href)
+                                            ? 'text-[var(--fg-0)] bg-[var(--bg-3)]'
+                                            : 'text-[var(--fg-1)] hover:text-[var(--fg-0)]'
+                                    }`}
+                                    onClick={() => setMobileMenuOpen(false)}
+                                >
+                                    {item.label}
+                                </Link>
+                            </li>
+                        ))}
                     </ul>
                 </nav>
             )}

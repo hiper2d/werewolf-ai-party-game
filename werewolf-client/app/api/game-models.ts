@@ -94,6 +94,7 @@ export interface GamePreview {
     playerCount: number;
     werewolfCount: number;
     specialRoles: string[];
+    humanPlayerRole?: string; // Desired role for the human player ('random' or a GAME_ROLES value)
     gameMasterAiType: string;
     playersAiType: string | string[];
 }
@@ -260,6 +261,9 @@ export const GAME_ROLES = {
     VILLAGER: 'villager',
     MANIAC: 'maniac'
 } as const;
+
+// Sentinel for "let the backend pick the human player's role at random".
+export const RANDOM_ROLE = 'random';
 
 /**
  * Coefficient used to calculate the message threshold for automatic voting

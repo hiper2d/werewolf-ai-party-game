@@ -31,8 +31,6 @@ export const SupportedAiKeyNames: Record<string, string> = {
 };
 
 export const LLM_CONSTANTS = {
-    CLAUDE_FABLE: 'claude-fable',
-    CLAUDE_FABLE_THINKING: 'claude-fable-thinking',
     CLAUDE_4_OPUS: 'claude-opus',
     CLAUDE_4_OPUS_THINKING: 'claude-opus-thinking',
     CLAUDE_4_SONNET: 'claude-sonnet',
@@ -99,30 +97,6 @@ export interface ModelConfig {
 }
 
 export const SupportedAiModels: Record<string, ModelConfig> = {
-    // Claude Fable - new frontier family, paid/API tier only (very expensive)
-    [LLM_CONSTANTS.CLAUDE_FABLE]: {
-        displayName: 'Claude Fable 5',
-        modelApiName: 'claude-fable-5',
-        apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
-        hasThinking: false,
-        tags: ['slow', 'expensive'],
-        freeTier: {
-            available: false,
-            maxBotsPerGame: 0 // Very expensive - API/paid tiers only
-        }
-    },
-    [LLM_CONSTANTS.CLAUDE_FABLE_THINKING]: {
-        displayName: 'Claude Fable 5 (Thinking)',
-        modelApiName: 'claude-fable-5',
-        apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
-        hasThinking: true,
-        tags: ['slow', 'expensive'],
-        freeTier: {
-            available: false,
-            maxBotsPerGame: 0 // Very expensive - API/paid tiers only
-        }
-    },
-
     // Claude models - separate with/without thinking versions
     [LLM_CONSTANTS.CLAUDE_4_OPUS]: {
         displayName: 'Claude 4.8 Opus',
@@ -130,10 +104,6 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
         hasThinking: false,
         tags: ['slow', 'expensive'],
-        freeTier: {
-            available: false,
-            maxBotsPerGame: 0 // Too expensive - not available
-        }
     },
     [LLM_CONSTANTS.CLAUDE_4_OPUS_THINKING]: {
         displayName: 'Claude 4.8 Opus (Thinking)',
@@ -141,10 +111,6 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
         hasThinking: true,
         tags: ['slow', 'expensive'],
-        freeTier: {
-            available: false,
-            maxBotsPerGame: 0 // Too expensive - not available
-        }
     },
     [LLM_CONSTANTS.CLAUDE_4_SONNET]: {
         displayName: 'Claude 4.6 Sonnet',
@@ -152,10 +118,6 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
         hasThinking: false,
         tags: ['slow', 'expensive'],
-        freeTier: {
-            available: true,
-            maxBotsPerGame: 1
-        }
     },
     [LLM_CONSTANTS.CLAUDE_4_SONNET_THINKING]: {
         displayName: 'Claude 4.6 Sonnet (Thinking)',
@@ -163,10 +125,6 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
         hasThinking: true,
         tags: ['slow', 'expensive'],
-        freeTier: {
-            available: false,
-            maxBotsPerGame: 0 // Thinking version is expensive - not available
-        }
     },
     [LLM_CONSTANTS.CLAUDE_4_HAIKU]: {
         displayName: 'Claude 4.5 Haiku',
@@ -174,10 +132,6 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
         hasThinking: false,
         tags: ['fast', 'cheap'],
-        freeTier: {
-            available: true,
-            maxBotsPerGame: 3
-        }
     },
     [LLM_CONSTANTS.CLAUDE_4_HAIKU_THINKING]: {
         displayName: 'Claude 4.5 Haiku (Thinking)',
@@ -185,10 +139,6 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
         hasThinking: true,
         tags: ['fast', 'cheap'],
-        freeTier: {
-            available: true,
-            maxBotsPerGame: 1
-        }
     },
 
     // DeepSeek V4 models - Flash and Pro, each with thinking toggle
@@ -200,10 +150,6 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         temperature: 0.6,
         maxOutputTokens: 16384,
         tags: ['fast', 'cheap'],
-        freeTier: {
-            available: true,
-            maxBotsPerGame: -1 // Unlimited - very affordable
-        }
     },
     [LLM_CONSTANTS.DEEPSEEK_V4_FLASH_THINKING]: {
         displayName: 'DeepSeek V4 Flash (Thinking)',
@@ -213,10 +159,6 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         // Reasoning tokens share the output budget, so leave room for both CoT and answer.
         maxOutputTokens: 65536,
         tags: ['fast', 'cheap'],
-        freeTier: {
-            available: true,
-            maxBotsPerGame: -1
-        }
     },
     [LLM_CONSTANTS.DEEPSEEK_V4_PRO]: {
         displayName: 'DeepSeek V4 Pro',
@@ -226,10 +168,6 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         temperature: 0.6,
         maxOutputTokens: 16384,
         tags: ['slow', 'cheap'],
-        freeTier: {
-            available: true,
-            maxBotsPerGame: 1
-        }
     },
     [LLM_CONSTANTS.DEEPSEEK_V4_PRO_THINKING]: {
         displayName: 'DeepSeek V4 Pro (Thinking)',
@@ -239,10 +177,6 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         // Reasoning tokens share the output budget, so leave room for both CoT and answer.
         maxOutputTokens: 65536,
         tags: ['slow', 'cheap'],
-        freeTier: {
-            available: true,
-            maxBotsPerGame: 1
-        }
     },
 
     // Models with always-on reasoning
@@ -253,10 +187,6 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         hasThinking: true,
         temperature: 1,
         tags: ['slow', 'expensive'],
-        freeTier: {
-            available: true,
-            maxBotsPerGame: 1
-        }
     },
     [LLM_CONSTANTS.GPT_5_4_MINI]: {
         displayName: 'GPT-5.4-mini',
@@ -265,10 +195,6 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         hasThinking: true,
         temperature: 1,
         tags: ['fast', 'cheap'],
-        freeTier: {
-            available: true,
-            maxBotsPerGame: 3
-        }
     },
     [LLM_CONSTANTS.GEMINI_3_PRO]: {
         displayName: 'Gemini 3.1 Pro Preview',
@@ -276,10 +202,6 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         apiKeyName: API_KEY_CONSTANTS.GOOGLE,
         hasThinking: true,
         tags: ['slow', 'expensive'],
-        freeTier: {
-            available: false,
-            maxBotsPerGame: 0 // Not available in free tier
-        }
     },
     [LLM_CONSTANTS.GEMINI_3_FLASH]: {
         displayName: 'Gemini 3.5 Flash',
@@ -287,10 +209,6 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         apiKeyName: API_KEY_CONSTANTS.GOOGLE,
         hasThinking: true,
         tags: ['fast'],
-        freeTier: {
-            available: true,
-            maxBotsPerGame: -1 // Unlimited
-        }
     },
     [LLM_CONSTANTS.GEMINI_3_FLASH_LITE]: {
         displayName: 'Gemini 3.1 Flash Lite',
@@ -298,10 +216,6 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         apiKeyName: API_KEY_CONSTANTS.GOOGLE,
         hasThinking: true,
         tags: ['fast', 'cheap'],
-        freeTier: {
-            available: true,
-            maxBotsPerGame: -1 // Unlimited
-        }
     },
     [LLM_CONSTANTS.GROK_4_3]: {
         displayName: 'Grok 4.3',
@@ -310,10 +224,6 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         hasThinking: false,
         temperature: 0.7,
         tags: ['fast'],
-        freeTier: {
-            available: true,
-            maxBotsPerGame: 1
-        }
     },
     [LLM_CONSTANTS.GROK_4_3_THINKING]: {
         displayName: 'Grok 4.3 (Thinking)',
@@ -322,10 +232,6 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         hasThinking: true,
         temperature: 0.7,
         tags: ['slow', 'expensive'],
-        freeTier: {
-            available: true,
-            maxBotsPerGame: 1
-        }
     },
 
     // Mistral models
@@ -334,10 +240,6 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         modelApiName: 'mistral-large-latest',
         apiKeyName: API_KEY_CONSTANTS.MISTRAL,
         hasThinking: false,
-        freeTier: {
-            available: true,
-            maxBotsPerGame: -1 // Unlimited - very affordable
-        }
     },
     [LLM_CONSTANTS.MISTRAL_3_5_MEDIUM]: {
         displayName: 'Mistral Medium 3.5',
@@ -345,10 +247,6 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         apiKeyName: API_KEY_CONSTANTS.MISTRAL,
         hasThinking: false,
         tags: ['fast', 'expensive'],
-        freeTier: {
-            available: false,
-            maxBotsPerGame: 0
-        }
     },
     [LLM_CONSTANTS.MISTRAL_4_SMALL]: {
         displayName: 'Mistral 4 Small',
@@ -356,20 +254,12 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         apiKeyName: API_KEY_CONSTANTS.MISTRAL,
         hasThinking: false,
         tags: ['fast', 'cheap'],
-        freeTier: {
-            available: true,
-            maxBotsPerGame: -1
-        }
     },
     [LLM_CONSTANTS.MISTRAL_MAGISTRAL]: {
         displayName: 'Magistral Medium 1.2 (Thinking)',
         modelApiName: 'magistral-medium-latest',
         apiKeyName: API_KEY_CONSTANTS.MISTRAL,
         hasThinking: true,
-        freeTier: {
-            available: true,
-            maxBotsPerGame: 1
-        }
     },
 
     // Kimi models
@@ -379,10 +269,6 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         apiKeyName: API_KEY_CONSTANTS.MOONSHOT,
         hasThinking: false,
         // Temperature is omitted from the request: Kimi K2.6 uses a fixed default per Moonshot docs.
-        freeTier: {
-            available: true,
-            maxBotsPerGame: 1
-        }
     },
     [LLM_CONSTANTS.KIMI_THINKING]: {
         displayName: 'Kimi K2.6 (Thinking)',
@@ -391,10 +277,6 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         hasThinking: true,
         // Temperature is omitted from the request: Kimi K2.6 uses a fixed default per Moonshot docs.
         tags: ['very-slow'],
-        freeTier: {
-            available: true,
-            maxBotsPerGame: 1
-        }
     },
 
     // Z.AI models
@@ -404,10 +286,6 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         apiKeyName: API_KEY_CONSTANTS.Z_AI,
         hasThinking: false,
         temperature: 0.7,
-        freeTier: {
-            available: true,
-            maxBotsPerGame: 1
-        }
     },
     [LLM_CONSTANTS.GLM_THINKING]: {
         displayName: 'GLM-5.1 (Thinking)',
@@ -416,11 +294,6 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         hasThinking: true,
         temperature: 0.7,
         tags: ['slow'],
-        // Thinking variant is paid/API-tier only — reasoning tokens make it too expensive for free tier.
-        freeTier: {
-            available: false,
-            maxBotsPerGame: 0
-        }
     },
 };
 
@@ -501,12 +374,6 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
     },
 
     // Anthropic models
-    [SupportedAiModels[LLM_CONSTANTS.CLAUDE_FABLE].modelApiName]: {
-        // Full 1M context window at standard pricing (no extended-context premium)
-        inputPrice: 10.0,
-        outputPrice: 50.0,
-        cacheHitPrice: 1.0
-    },
     [SupportedAiModels[LLM_CONSTANTS.CLAUDE_4_OPUS].modelApiName]: {
         inputPrice: 5.0,
         outputPrice: 25.0
@@ -571,6 +438,70 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
         cacheHitPrice: 0.20
     }
 };
+
+/**
+ * Free-tier availability and the per-game bot cap are DERIVED FROM PRICE — not hand-tuned per
+ * model — so the two stay consistent. The metric is a model's output price ($/1M tokens), which
+ * dominates generation cost. Bands:
+ *   <= $2  → unlimited bots
+ *   <= $5  → up to 3 bots
+ *   <= $15 → 1 bot
+ *   > $15  → not available on the free tier
+ *
+ * Optional "(Thinking)" variants — a thinking model that shares its `modelApiName` with a cheaper
+ * non-thinking sibling — burn extra reasoning tokens at the same per-token price, so their
+ * effective output price is multiplied by THINKING_COST_FACTOR before banding. Always-on reasoning
+ * models (GPT-5, Gemini 3, Magistral) have no non-thinking sibling and are priced as listed.
+ */
+export const FREE_TIER_OUTPUT_PRICE_BANDS = {
+    UNLIMITED_MAX: 2,   // <= $2/1M output → unlimited bots
+    LIMITED_MAX: 5,     // <= $5 → up to LIMITED_MAX_BOTS bots
+    SINGLE_MAX: 15,     // <= $15 → 1 bot; above → not available on free tier
+} as const;
+export const FREE_TIER_LIMITED_MAX_BOTS = 3;
+export const FREE_TIER_THINKING_COST_FACTOR = 2.5;
+
+/** modelApiNames that have at least one non-thinking config — i.e. a thinking entry on one of
+ *  these is an optional "(Thinking)" variant that should pay the reasoning-cost multiplier. */
+const NON_THINKING_API_NAMES = new Set(
+    Object.values(SupportedAiModels)
+        .filter(c => !c.hasThinking)
+        .map(c => c.modelApiName)
+);
+
+/**
+ * Derives a model's free-tier policy ({ available, maxBotsPerGame }) from its price.
+ * Returns "not available" (available: false, maxBotsPerGame: 0) when there's no pricing.
+ */
+export function getFreeTierPolicy(
+    modelApiName: string,
+    hasThinking: boolean
+): { available: boolean; maxBotsPerGame: number } {
+    const pricing = MODEL_PRICING[modelApiName];
+    if (!pricing) {
+        return { available: false, maxBotsPerGame: 0 };
+    }
+    const isOptionalThinkingVariant = hasThinking && NON_THINKING_API_NAMES.has(modelApiName);
+    const effectiveOutputPrice = isOptionalThinkingVariant
+        ? pricing.outputPrice * FREE_TIER_THINKING_COST_FACTOR
+        : pricing.outputPrice;
+
+    if (effectiveOutputPrice <= FREE_TIER_OUTPUT_PRICE_BANDS.UNLIMITED_MAX) {
+        return { available: true, maxBotsPerGame: -1 };
+    }
+    if (effectiveOutputPrice <= FREE_TIER_OUTPUT_PRICE_BANDS.LIMITED_MAX) {
+        return { available: true, maxBotsPerGame: FREE_TIER_LIMITED_MAX_BOTS };
+    }
+    if (effectiveOutputPrice <= FREE_TIER_OUTPUT_PRICE_BANDS.SINGLE_MAX) {
+        return { available: true, maxBotsPerGame: 1 };
+    }
+    return { available: false, maxBotsPerGame: 0 };
+}
+
+// Populate each model's freeTier field from price — the single source of truth for free-tier caps.
+for (const config of Object.values(SupportedAiModels)) {
+    config.freeTier = getFreeTierPolicy(config.modelApiName, config.hasThinking);
+}
 
 export interface CostCalculationOptions {
     cacheHitTokens?: number;

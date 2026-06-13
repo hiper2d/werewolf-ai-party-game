@@ -13,6 +13,7 @@ import {
     GameMessage,
     GamePreview,
     GamePreviewWithGeneratedBots,
+    RANDOM_ROLE,
     getRandomVoiceForGender,
     MessageType,
     PLAY_STYLE_CONFIGS,
@@ -51,6 +52,30 @@ import {format} from "@/app/ai/prompts/utils";
 import {GameSetupZodSchema} from "@/app/ai/prompts/zod-schemas";
 import {ensureUserCanAccessGame} from "@/app/api/tier-guards";
 import {logger} from "@/app/utils/logger";
+
+/**
+ * Counts how many games the user has created since 00:00 UTC today — mirrors the free-tier
+ * daily-limit check used at game creation, exposed for the profile "Games today" tile.
+ */
+export async function getGamesCreatedTodayCount(): Promise<number> {
+    const session = await auth();
+    if (!session || !session.user?.email) {
+        throw new Error('Not authenticated');
+    }
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+
+    const startOfTodayUTC = new Date();
+    startOfTodayUTC.setUTCHours(0, 0, 0, 0);
+
+    const todaysGamesSnapshot = await db.collection('games')
+        .where('ownerEmail', '==', session.user.email)
+        .where('createdAt', '>=', startOfTodayUTC.getTime())
+        .get();
+
+    return todaysGamesSnapshot.size;
+}
 
 export async function getAllGames(ownerEmail?: string): Promise<Game[]> {
     if (!db) {
@@ -442,6 +467,17 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
         for (let i = roleDistribution.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [roleDistribution[i], roleDistribution[j]] = [roleDistribution[j], roleDistribution[i]];
+        }
+
+        // Honor the human player's role choice (slot 0 belongs to the human). When a
+        // specific role is requested and present in the distribution, swap it into slot 0;
+        // otherwise the human keeps the random role from the shuffle above.
+        const desiredHumanRole = gamePreview.humanPlayerRole;
+        if (desiredHumanRole && desiredHumanRole !== RANDOM_ROLE && roleDistribution[0] !== desiredHumanRole) {
+            const swapIdx = roleDistribution.indexOf(desiredHumanRole);
+            if (swapIdx > 0) {
+                [roleDistribution[0], roleDistribution[swapIdx]] = [roleDistribution[swapIdx], roleDistribution[0]];
+            }
         }
 
         // Get all player names (bots + human)

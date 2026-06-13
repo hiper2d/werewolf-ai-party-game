@@ -2,7 +2,7 @@
 
 import {db} from "@/firebase/server";
 import {firestore} from "firebase-admin";
-import {ApiKeyMap, User, UserMonthlySpending, UserTier} from "@/app/api/game-models";
+import {ApiKeyMap, User, UserMonthlySpending, UserTier, USER_TIERS} from "@/app/api/game-models";
 import {VoiceProvider, getDefaultVoiceProvider} from "@/app/ai/voice-config";
 import {normalizeSpendings} from "@/app/utils/spending-utils";
 import FieldValue = firestore.FieldValue;
@@ -16,7 +16,11 @@ function formatPeriod(timestamp: number): string {
     return `${year}-${month}`;
 }
 
-export async function upsertUser(user: any) {
+/**
+ * Creates or updates the user's Firestore record on sign-in.
+ * @returns true when the user did not exist before (i.e. this is their first sign-in).
+ */
+export async function upsertUser(user: any): Promise<boolean> {
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
@@ -34,23 +38,26 @@ export async function upsertUser(user: any) {
                 spendings: [...ZERO_SPENDINGS]
             });
             console.log(`New user created for ${user.name}`);
-        } else {
-            const existingUser = doc.data() as User;
-            const updatedUser = {
-                ...existingUser,
-                ...user,
-                apiKeys: {
-                    ...existingUser.apiKeys,
-                    ...user.apiKeys
-                },
-                last_login_timestamp: FieldValue.serverTimestamp(),
-                spendings: normalizeSpendings(existingUser.spendings)
-            };
-            await userRef.update(updatedUser);
-            console.log(`Updated last_login_timestamp for existing user ${user.name}`);
+            return true;
         }
+
+        const existingUser = doc.data() as User;
+        const updatedUser = {
+            ...existingUser,
+            ...user,
+            apiKeys: {
+                ...existingUser.apiKeys,
+                ...user.apiKeys
+            },
+            last_login_timestamp: FieldValue.serverTimestamp(),
+            spendings: normalizeSpendings(existingUser.spendings)
+        };
+        await userRef.update(updatedUser);
+        console.log(`Updated last_login_timestamp for existing user ${user.name}`);
+        return false;
     } catch (error) {
         console.error("Error processing user:", error);
+        return false;
     }
 }
 
@@ -218,6 +225,11 @@ export async function getUserTier(userId: string): Promise<UserTier> {
 export async function updateUserTier(userId: string, tier: UserTier): Promise<void> {
     if (!db) {
         throw new Error('Firestore is not initialized');
+    }
+    // The 'api' tier is no longer offered. Existing api-tier accounts keep working,
+    // but no one can switch into it.
+    if (tier === USER_TIERS.API) {
+        throw new Error('The API tier is no longer available.');
     }
     try {
         const userRef = db.collection('users').doc(userId);

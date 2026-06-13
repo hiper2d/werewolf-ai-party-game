@@ -4,7 +4,7 @@ import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {useRouter} from 'next/navigation';
 import {useSession} from 'next-auth/react';
 import {createGame, previewGame} from '@/app/api/game-actions';
-import {GAME_ROLES, GamePreview, GamePreviewWithGeneratedBots, GENDER_OPTIONS, getVoicesForGender, getRandomVoiceForGender, PLAY_STYLES, PLAY_STYLE_CONFIGS, UserTier, USER_TIERS} from "@/app/api/game-models";
+import {GAME_ROLES, GamePreview, GamePreviewWithGeneratedBots, GENDER_OPTIONS, getVoicesForGender, getRandomVoiceForGender, PLAY_STYLES, PLAY_STYLE_CONFIGS, RANDOM_ROLE, UserTier, USER_TIERS} from "@/app/api/game-models";
 import {LLM_CONSTANTS, SupportedAiModels, getModelDisplayName, modelHasTag} from "@/app/ai/ai-models";
 import {FREE_TIER_UNLIMITED, getAvailableModelsForUser, getCandidateModelsForTier, getPerGameModelLimit, getSelectableModelsForUser} from "@/app/ai/model-limit-utils";
 import AIModelSelect from '@/app/components/AIModelSelect';
@@ -50,6 +50,7 @@ export default function CreateNewGamePage() {
     const [playerCount, setPlayerCount] = useState(12);
     const [werewolfCount, setWerewolfCount] = useState(3);
     const [specialRoles, setSpecialRoles] = useState([GAME_ROLES.DOCTOR, GAME_ROLES.DETECTIVE, GAME_ROLES.MANIAC]);
+    const [humanPlayerRole, setHumanPlayerRole] = useState<string>(RANDOM_ROLE);
     const [gameMasterAiType, setGameMasterAiType] = useState<string>(() => {
         // Initial seed from the full catalog. Tier/key data isn't loaded yet on first
         // render — a reconciliation effect below re-picks from the user's actually-allowed
@@ -66,6 +67,7 @@ export default function CreateNewGamePage() {
     const [isSpeaking, setIsSpeaking] = useState(false);
     const [showPlayStyleTooltip, setShowPlayStyleTooltip] = useState<number | null>(null);
     const [showRoleTooltip, setShowRoleTooltip] = useState<string | null>(null);
+    const [showWerewolfHint, setShowWerewolfHint] = useState(false);
     const [nameError, setNameError] = useState<string | null>(null);
     const [themeError, setThemeError] = useState<string | null>(null);
     const [playersAiError, setPlayersAiError] = useState<string | null>(null);
@@ -379,6 +381,15 @@ export default function CreateNewGamePage() {
         };
     }, [userTier, playerModelOptions, previewUsageCounts]);
 
+    // If the selected role becomes unavailable (its special role was unchecked), fall back to Random.
+    // Must run before any conditional returns to keep hook order stable.
+    useEffect(() => {
+        const specialRoleValues: string[] = [GAME_ROLES.MANIAC, GAME_ROLES.DOCTOR, GAME_ROLES.DETECTIVE];
+        if (specialRoleValues.includes(humanPlayerRole) && !specialRoles.includes(humanPlayerRole)) {
+            setHumanPlayerRole(RANDOM_ROLE);
+        }
+    }, [specialRoles, humanPlayerRole]);
+
     // Show loading while checking auth
     if (status === 'loading') {
         return (
@@ -427,6 +438,16 @@ export default function CreateNewGamePage() {
         [GAME_ROLES.MANIAC]: 'Each night, abducts one player — blocking all their actions and any actions targeting them. Abductions are secret. If the maniac dies at night, the abducted victim dies too. Aligned with villagers.',
     };
 
+    // "Your Role" options. Villager and Werewolf are always available; the special roles
+    // are only selectable when their corresponding special role is enabled above.
+    const humanRoleOptions = [
+        { value: RANDOM_ROLE, label: 'Random' },
+        { value: GAME_ROLES.VILLAGER, label: 'Villager' },
+        { value: GAME_ROLES.WEREWOLF, label: 'Werewolf' },
+        { value: GAME_ROLES.MANIAC, label: 'Maniac', disabled: !specialRoles.includes(GAME_ROLES.MANIAC) },
+        { value: GAME_ROLES.DOCTOR, label: 'Doctor', disabled: !specialRoles.includes(GAME_ROLES.DOCTOR) },
+        { value: GAME_ROLES.DETECTIVE, label: 'Detective', disabled: !specialRoles.includes(GAME_ROLES.DETECTIVE) },
+    ];
 
     const handleGeneratePreview = async () => {
         const gamePreviewData: GamePreview = {
@@ -436,6 +457,7 @@ export default function CreateNewGamePage() {
             playerCount,
             werewolfCount,
             specialRoles,
+            humanPlayerRole,
             gameMasterAiType,
             playersAiType: selectedPlayerAiTypes.length > 0 ? selectedPlayerAiTypes : [LLM_CONSTANTS.RANDOM]
         };
@@ -637,7 +659,7 @@ export default function CreateNewGamePage() {
                 {/* Row 1: Name + Theme */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                        <label className={`${labelStyle} block mb-1.5`}>Host Name</label>
+                        <label className={`${labelStyle} block mb-1.5`}>Your name</label>
                         <input
                             className={`${inputStyle} ${nameError ? '!border-[var(--danger)]' : ''}`}
                             type="text"
@@ -674,37 +696,7 @@ export default function CreateNewGamePage() {
                     />
                 </div>
 
-                {/* Row 3: Counts */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="grid grid-cols-[140px_1fr] items-center gap-4">
-                        <label className={labelStyle}>Player Count</label>
-                        <SelectDropdown
-                            options={playerOptions.map(count => ({ value: String(count), label: `${count} players` }))}
-                            value={String(playerCount)}
-                            onChange={(val) => setPlayerCount(Number(val))}
-                        />
-                    </div>
-                    <div className="grid grid-cols-[140px_1fr] items-center gap-4">
-                        <label className={labelStyle}>Werewolf Count</label>
-                        <SelectDropdown
-                            options={Array.from({length: playerCount - 1}, (_, i) => ({ value: String(i), label: `${i} werewolves` }))}
-                            value={String(werewolfCount)}
-                            onChange={(val) => setWerewolfCount(Number(val))}
-                        />
-                    </div>
-                </div>
-
-                {/* Row 3.5: Game Master AI */}
-                <div className="grid grid-cols-[140px_1fr] items-center gap-4">
-                    <label className={labelStyle}>Game Master</label>
-                    <ModelSelectDropdown
-                        options={gmModelOptions}
-                        value={gameMasterAiType}
-                        onChange={setGameMasterAiType}
-                    />
-                </div>
-
-                {/* Row 4: Players AI */}
+                {/* Row 3: Players AI */}
                 <div className="grid grid-cols-[140px_1fr] items-start gap-4">
                     <label className={`${labelStyle} pt-2.5`}>Players AI</label>
                     <div>
@@ -720,6 +712,59 @@ export default function CreateNewGamePage() {
                             onFastOnlyChange={setFastModelsOnly}
                         />
                         {playersAiError && <p className="text-[var(--danger)] text-[12px] mt-1">{playersAiError}</p>}
+                    </div>
+                </div>
+
+                {/* Row 3.5: Game Master AI */}
+                <div className="grid grid-cols-[140px_1fr] items-center gap-4">
+                    <label className={labelStyle}>Game Master AI</label>
+                    <ModelSelectDropdown
+                        options={gmModelOptions}
+                        value={gameMasterAiType}
+                        onChange={setGameMasterAiType}
+                    />
+                </div>
+
+                {/* Row 4: Counts */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-[140px_1fr] items-center gap-4">
+                        <label className={labelStyle}>Player Count</label>
+                        <SelectDropdown
+                            options={playerOptions.map(count => ({ value: String(count), label: `${count} players` }))}
+                            value={String(playerCount)}
+                            onChange={(val) => setPlayerCount(Number(val))}
+                        />
+                    </div>
+                    <div className="grid grid-cols-[140px_1fr] items-center gap-4">
+                        <label className={labelStyle}>Werewolf Count</label>
+                        <div className="flex items-center gap-2">
+                            <SelectDropdown
+                                className="flex-1"
+                                options={Array.from({length: playerCount - 1}, (_, i) => ({ value: String(i), label: `${i} werewolves` }))}
+                                value={String(werewolfCount)}
+                                onChange={(val) => setWerewolfCount(Number(val))}
+                            />
+                            <div className="relative inline-flex items-center">
+                                <button
+                                    type="button"
+                                    aria-label="Werewolf count hint"
+                                    className="shrink-0 w-5 h-5 rounded-full bg-[var(--bg-3)] border border-[var(--line-2)] text-[var(--fg-2)] hover:bg-[var(--bg-4)] hover:text-[var(--fg-0)] transition-all duration-[120ms] flex items-center justify-center text-[11px] font-medium leading-none"
+                                    onMouseEnter={() => setShowWerewolfHint(true)}
+                                    onMouseLeave={() => setShowWerewolfHint(false)}
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        setShowWerewolfHint(!showWerewolfHint);
+                                    }}
+                                >
+                                    ?
+                                </button>
+                                {showWerewolfHint && (
+                                    <div className="absolute z-10 w-64 p-3 bg-[var(--bg-1)] border border-[var(--line-2)] rounded-[var(--radius-lg)] shadow-pop text-[13px] text-[var(--fg-1)] top-full mt-2 left-0">
+                                        For a balanced game, werewolves should be about 20–30% of all players.
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -809,6 +854,16 @@ export default function CreateNewGamePage() {
                         })}
                     </div>
                 </div>
+
+                {/* Row 6: Your Role */}
+                <div className="grid grid-cols-[140px_1fr] items-center gap-4">
+                    <label className={labelStyle}>Your Role</label>
+                    <SelectDropdown
+                        options={humanRoleOptions}
+                        value={humanPlayerRole}
+                        onChange={setHumanPlayerRole}
+                    />
+                </div>
             </form>
 
                 </div>{/* end card body */}
@@ -879,7 +934,7 @@ export default function CreateNewGamePage() {
                                     <div className="flex-1">
                                         <label className={`${labelStyle} block mb-1.5`}>Voice</label>
                                         <SelectDropdown
-                                            options={getVoiceConfig(gameData.voiceProvider).getVoicesByGender('male').map(voice => ({ value: voice.id, label: voice.id }))}
+                                            options={getVoiceConfig(gameData.voiceProvider).getVoicesByGender('male').map(voice => ({ value: voice.id, label: voice.id, secondaryLabel: voice.gender }))}
                                             value={gameData.gameMasterVoice || getVoiceConfig(gameData.voiceProvider).getVoicesByGender('male')[0]?.id || ''}
                                             onChange={(val) => setGameData({ ...gameData, gameMasterVoice: val })}
                                         />
@@ -1023,7 +1078,7 @@ export default function CreateNewGamePage() {
                                         <div className="flex-1">
                                             <label className={`${labelStyle} block mb-1.5`}>Voice</label>
                                             <SelectDropdown
-                                                options={getVoiceConfig(gameData.voiceProvider).getVoices().map(voice => ({ value: voice.id, label: `${voice.id} (${voice.gender})` }))}
+                                                options={getVoiceConfig(gameData.voiceProvider).getVoices().map(voice => ({ value: voice.id, label: voice.id, secondaryLabel: voice.gender }))}
                                                 value={player.voice}
                                                 onChange={(val) => handlePlayerChange(index, 'voice', val)}
                                             />

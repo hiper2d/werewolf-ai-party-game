@@ -29,8 +29,6 @@ export class AgentFactory {
 
         switch (modelName) {
             // Claude models - both regular and thinking versions
-            case LLM_CONSTANTS.CLAUDE_FABLE:
-            case LLM_CONSTANTS.CLAUDE_FABLE_THINKING:
             case LLM_CONSTANTS.CLAUDE_4_OPUS:
             case LLM_CONSTANTS.CLAUDE_4_OPUS_THINKING:
             case LLM_CONSTANTS.CLAUDE_4_SONNET:

@@ -6,6 +6,7 @@ export interface SelectOption {
     value: string;
     label: string;
     displayLabel?: string; // shown when selected (defaults to label)
+    secondaryLabel?: string; // muted text shown on the right (e.g. male/female)
     disabled?: boolean;
 }
 
@@ -59,8 +60,11 @@ export default function SelectDropdown({
                         : 'border-[var(--line-2)] hover:border-[var(--line-3)]'
                 } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
             >
-                <span className={`truncate ${selected ? 'text-[var(--fg-0)]' : 'text-[var(--fg-3)]'}`}>
-                    {displayText}
+                <span className={`flex-1 min-w-0 flex items-baseline justify-between gap-2 ${selected ? 'text-[var(--fg-0)]' : 'text-[var(--fg-3)]'}`}>
+                    <span className="truncate">{displayText}</span>
+                    {selected?.secondaryLabel && (
+                        <span className="flex-none text-[var(--fg-3)]">{selected.secondaryLabel}</span>
+                    )}
                 </span>
                 <svg
                     className={`flex-none w-3.5 h-3.5 text-[var(--fg-2)] transition-transform duration-[160ms] ml-2 ${isOpen ? 'rotate-180' : ''}`}
@@ -78,7 +82,7 @@ export default function SelectDropdown({
                             type="button"
                             onClick={() => !opt.disabled && handleSelect(opt.value)}
                             disabled={opt.disabled}
-                            className={`w-full px-3 py-2 text-[13px] text-left transition-colors duration-[120ms] ${
+                            className={`w-full px-3 py-2 text-[13px] text-left flex items-baseline justify-between gap-2 transition-colors duration-[120ms] ${
                                 opt.disabled
                                     ? 'opacity-40 cursor-not-allowed text-[var(--fg-3)]'
                                     : opt.value === value
@@ -86,7 +90,10 @@ export default function SelectDropdown({
                                         : 'text-[var(--fg-1)] cursor-pointer hover:bg-[var(--bg-3)] hover:text-[var(--fg-0)]'
                             }`}
                         >
-                            {opt.label}
+                            <span className="truncate">{opt.label}</span>
+                            {opt.secondaryLabel && (
+                                <span className="flex-none text-[var(--fg-3)]">{opt.secondaryLabel}</span>
+                            )}
                         </button>
                     ))}
                 </div>

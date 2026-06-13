@@ -1,5 +1,12 @@
 # Bugs and improvements
 
+## Todo
+
+Revising model availability per tier
+Add better pricing into to landing page
+A new user should be redirected to Rules after login. And show some info
+Make "FREE" in menu a link to tier update
+
 ## Bugs surfaced by the test push (2026-06-10) — pinned in tests, NOT yet fixed
 
 > Each bug below is pinned by a test (marked `PINNED` in the suites listed in
@@ -7,7 +14,7 @@
 > "documents the bug" to "verifies the fix" as part of the same change —
 > the test failing on your fix is expected and is the starting point.
 
-Game-breaking:
+Game-breaking (Probably fixed already):
 - **Detective investigating the abducted player likely crashes**: the compute step
     returns early without setting `detectiveResult` (`detective-processor.ts:50-58`),
     then `processNightAction` dereferences `detectiveResult!.success`

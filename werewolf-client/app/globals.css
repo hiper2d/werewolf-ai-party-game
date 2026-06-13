@@ -40,6 +40,14 @@ html {
   --danger: oklch(70% 0.13 25);
   --danger-line: oklch(70% 0.13 25 / 0.42);
 
+  /* Positive / warning accents — same chroma family, shifted hue */
+  --good-fg: oklch(78% 0.11 155);
+  --good-soft: oklch(78% 0.11 155 / 0.13);
+  --good-line: oklch(78% 0.11 155 / 0.4);
+  --warn-fg: oklch(80% 0.11 70);
+  --warn-soft: oklch(80% 0.11 70 / 0.13);
+  --warn-line: oklch(80% 0.11 70 / 0.4);
+
   /* Shadows */
   --shadow-1: 0 1px 0 rgba(255,255,255,0.02) inset, 0 1px 2px rgba(0,0,0,0.4);
   --shadow-2: 0 8px 24px rgba(0,0,0,0.4), 0 2px 6px rgba(0,0,0,0.3);
@@ -114,6 +122,14 @@ html {
   /* Danger */
   --danger: oklch(55% 0.18 25);
   --danger-line: oklch(55% 0.18 25 / 0.42);
+
+  /* Positive / warning accents — same chroma family, shifted hue */
+  --good-fg: oklch(48% 0.13 155);
+  --good-soft: oklch(48% 0.13 155 / 0.1);
+  --good-line: oklch(48% 0.13 155 / 0.32);
+  --warn-fg: oklch(52% 0.12 65);
+  --warn-soft: oklch(52% 0.12 65 / 0.1);
+  --warn-line: oklch(52% 0.12 65 / 0.32);
 
   /* Shadows */
   --shadow-1: 0 1px 0 rgba(0,0,0,0.03) inset, 0 1px 2px rgba(0,0,0,0.06);

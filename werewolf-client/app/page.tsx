@@ -2,11 +2,54 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { auth } from "@/auth";
 import PlayNowButton from "@/app/components/PlayNowButton";
+import LoginCta from "@/app/components/LoginCta";
 import BuyMeACoffee from "@/app/components/BuyMeACoffee";
+import { CheckIcon } from "@/app/components/ui-icons";
 
 const MODELS = [
-  'Claude Fable 5', 'GPT-5.5', 'Gemini Flash 3.5', 'DeepSeek V4 Pro',
+  'Claude 4.8 Opus', 'GPT-5.5', 'Gemini Flash 3.5', 'DeepSeek V4 Pro',
   'Mistral 3.5 Medium', 'GLM 5.1', 'Kimi K2.6', 'Grok 4.3',
+];
+
+// Real plans: Free (platform-paid, capped) vs Paid (pay-as-you-go, no subscription).
+const TIERS = [
+  {
+    name: 'Free',
+    amt: '$0',
+    amtSmall: false,
+    per: 'forever',
+    billed: 'No card — the platform pays',
+    blurb: 'Everything you need to start outsmarting the bots — on the house.',
+    cta: 'Start playing free',
+    ctaUrl: '/games',
+    featured: false,
+    features: [
+      'Up to 5 games per day',
+      'A curated, price-banded model set',
+      'Per-game bot caps — unlimited, 3, or 1 by model',
+      'Voice acting (TTS & STT) included',
+      'Usage logged but never charged',
+    ],
+  },
+  {
+    name: 'Paid',
+    amt: 'Pay as you go',
+    amtSmall: true,
+    per: '',
+    billed: 'Prepaid balance · only pay for what you use',
+    blurb: 'The whole table — every model, no per-game limits.',
+    cta: 'Add a balance',
+    ctaUrl: '/profile#add-balance',
+    featured: true,
+    badge: 'No subscription',
+    features: [
+      'The full model catalog — every model & Thinking variant',
+      'No per-game bot caps — mix freely',
+      'No daily game limit',
+      'Prepaid balance — top up anytime',
+      'Pay only for what you use',
+    ],
+  },
 ];
 
 function PlayersIcon({ className }: { className?: string }) {
@@ -146,6 +189,71 @@ export default async function Home() {
               Test how well the latest models handle deduction, bluffing, and social reasoning. See which AI is the best liar — and which one you can fool.
             </p>
           </article>
+        </div>
+      </section>
+
+      {/* Pricing */}
+      <section className="mb-14 sm:mb-[72px]">
+        <div className="text-center max-w-[54ch] mx-auto mb-[34px]">
+          <div className="font-mono text-[11px] tracking-[0.14em] uppercase text-[var(--fg-2)] mb-3">Pricing</div>
+          <h2 className="m-0 mb-3 text-[clamp(28px,4vw,38px)] font-bold tracking-[-0.025em] text-[var(--fg-0)]">
+            Play free. Go Paid for the whole table.
+          </h2>
+          <p className="m-0 text-[15px] text-[var(--fg-2)] leading-[1.6] [text-wrap:pretty]">
+            Start with five games a day on a curated set of models — no card, never charged. Switch to pay-as-you-go for the
+            full catalog with no per-game limits. No subscription: pre-load a balance and pay only for what you use.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-[18px] max-w-[760px] mx-auto items-start">
+          {TIERS.map((tier) => {
+            const btnClass = `inline-flex items-center justify-center gap-2 w-full font-semibold text-[15px] px-6 py-[13px] rounded-[var(--radius-md)] transition-all duration-[120ms] ${
+              tier.featured
+                ? 'bg-[var(--accent)] text-[var(--accent-fg)] border border-transparent shadow-[var(--shadow-1)] hover:bg-[var(--accent-strong)]'
+                : 'bg-transparent text-[var(--fg-1)] border border-[var(--line-2)] hover:bg-[var(--bg-1)] hover:border-[var(--line-3)] hover:text-[var(--fg-0)]'
+            }`;
+            return (
+              <article
+                key={tier.name}
+                className={`relative flex flex-col gap-[18px] border rounded-[var(--radius-xl)] pt-[30px] px-7 pb-8 ${
+                  tier.featured
+                    ? 'border-[var(--accent-line)] shadow-[var(--shadow-2)] bg-[linear-gradient(168deg,color-mix(in_oklch,var(--accent-soft)_60%,var(--bg-1))_0%,var(--bg-1)_46%)]'
+                    : 'border-[var(--line-1)] bg-[var(--bg-1)]'
+                }`}
+              >
+                {tier.badge && (
+                  <span className="absolute -top-[11px] left-7 font-mono text-[10px] tracking-[0.08em] uppercase px-[11px] py-1 rounded-full bg-[var(--accent)] text-[var(--accent-fg)] shadow-[var(--shadow-1)] whitespace-nowrap">
+                    {tier.badge}
+                  </span>
+                )}
+                <div className="font-mono text-[13px] font-semibold tracking-[0.02em] uppercase text-[var(--fg-1)]">{tier.name}</div>
+                <div>
+                  <div className="flex items-baseline gap-1.5 flex-wrap">
+                    <span className={`${tier.amtSmall ? 'text-[30px]' : 'text-[48px]'} font-bold tracking-[-0.03em] leading-none text-[var(--fg-0)]`}>{tier.amt}</span>
+                    {tier.per && <span className="text-[14px] text-[var(--fg-2)]">{tier.per}</span>}
+                  </div>
+                  <div className="text-[12px] text-[var(--fg-3)] mt-1.5">{tier.billed}</div>
+                </div>
+                <p className="m-0 text-[13.5px] text-[var(--fg-2)] leading-[1.55] [text-wrap:pretty]">{tier.blurb}</p>
+                {session ? (
+                  <Link href={tier.ctaUrl} className={btnClass}>{tier.cta}</Link>
+                ) : (
+                  <LoginCta label={tier.cta} callbackUrl={tier.ctaUrl} className={btnClass} />
+                )}
+                <div className="h-px bg-[var(--line-1)] my-0.5" />
+                <ul className="list-none m-0 p-0 flex flex-col gap-[11px]">
+                  {tier.features.map((f) => (
+                    <li key={f} className="flex items-start gap-2.5 text-[13.5px] text-[var(--fg-1)] leading-[1.45]">
+                      <span className="flex-shrink-0 w-[18px] h-[18px] mt-px rounded-full grid place-items-center bg-[var(--accent-soft)] border border-[var(--accent-line)] text-[var(--accent-text)]">
+                        <CheckIcon className="w-[11px] h-[11px]" />
+                      </span>
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+              </article>
+            );
+          })}
         </div>
       </section>
 

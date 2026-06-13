@@ -63,6 +63,36 @@ const GamePages = async ({searchParams}: {searchParams?: Promise<{error?: string
                 </div>
             )}
 
+            {games.length === 0 ? (
+                <div className="flex-grow flex items-start justify-center pt-[16vh]">
+                    <div className="text-center max-w-[420px] mx-auto px-6">
+                        <div className="mx-auto w-14 h-14 rounded-full grid place-items-center border border-[var(--line-2)] bg-[var(--bg-2)] shadow-[var(--shadow-1)] mb-5">
+                            <svg className="w-6 h-6 text-[var(--fg-1)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" />
+                            </svg>
+                        </div>
+                        <h2 className="text-[18px] font-semibold text-[var(--fg-0)] mb-2">No games yet</h2>
+                        <p className="text-[13.5px] text-[var(--fg-2)] leading-[1.55] mb-6">
+                            Start your first match — pick a theme, choose your models, and drop into a table full of AI players
+                            who think they&apos;re human. Can you spot the werewolves before they get you?
+                        </p>
+                        <div className="flex items-center justify-center gap-3 flex-wrap">
+                            <Link
+                                href="/games/newgame"
+                                className="px-5 py-2.5 text-[14px] font-semibold rounded-[var(--radius-md)] bg-[var(--accent)] text-[var(--accent-fg)] shadow-[var(--shadow-1)] hover:brightness-110 transition-all duration-[120ms]"
+                            >
+                                Create your first game
+                            </Link>
+                            <Link
+                                href="/rules"
+                                className="px-5 py-2.5 text-[14px] font-medium rounded-[var(--radius-md)] bg-transparent text-[var(--fg-1)] border border-[var(--line-2)] hover:bg-[var(--bg-1)] hover:border-[var(--line-3)] hover:text-[var(--fg-0)] transition-all duration-[120ms]"
+                            >
+                                Read the rules
+                            </Link>
+                        </div>
+                    </div>
+                </div>
+            ) : (
             <div className="flex-grow overflow-auto">
                 <ul className="space-y-3">
                     {games.map((game) => {
@@ -94,6 +124,7 @@ const GamePages = async ({searchParams}: {searchParams?: Promise<{error?: string
                     })}
                 </ul>
             </div>
+            )}
         </div>
     );
 }
