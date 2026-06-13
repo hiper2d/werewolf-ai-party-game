@@ -49,7 +49,7 @@ export default function CreateNewGamePage() {
     const [description, setDescription] = useState('');
     const [playerCount, setPlayerCount] = useState(12);
     const [werewolfCount, setWerewolfCount] = useState(3);
-    const [specialRoles, setSpecialRoles] = useState([GAME_ROLES.DOCTOR, GAME_ROLES.DETECTIVE, GAME_ROLES.MANIAC]);
+    const [specialRoles, setSpecialRoles] = useState<string[]>([GAME_ROLES.DOCTOR, GAME_ROLES.DETECTIVE, GAME_ROLES.MANIAC]);
     const [humanPlayerRole, setHumanPlayerRole] = useState<string>(RANDOM_ROLE);
     const [gameMasterAiType, setGameMasterAiType] = useState<string>(() => {
         // Initial seed from the full catalog. Tier/key data isn't loaded yet on first
