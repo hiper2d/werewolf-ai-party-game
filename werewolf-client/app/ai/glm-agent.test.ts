@@ -49,7 +49,7 @@ describe("GlmAgent integration", () => {
     const describeOrSkip = hasApiKey ? describe : describe.skip;
 
     describeOrSkip("askWithZodSchema with real API", () => {
-        it("should respond with valid schema-based answer using GLM-5.1 (no thinking)", async () => {
+        it("should respond with valid schema-based answer using GLM-5.2 (no thinking)", async () => {
             const agent = createAgent("TestBot", LLM_CONSTANTS.GLM, false);
             const messages: AIMessage[] = [{
                 role: 'user',
@@ -75,7 +75,7 @@ describe("GlmAgent integration", () => {
             expect(tokenUsage!.costUSD).toBeGreaterThan(0);
         }, 60000);
 
-        it("should respond with valid schema-based answer using GLM-5.1 (thinking enabled)", async () => {
+        it("should respond with valid schema-based answer using GLM-5.2 (thinking enabled)", async () => {
             const agent = createAgent("TestBot", LLM_CONSTANTS.GLM_THINKING, true);
             const messages: AIMessage[] = [{
                 role: 'user',
@@ -97,7 +97,7 @@ describe("GlmAgent integration", () => {
             expect(tokenUsage!.outputTokens).toBeGreaterThan(0);
         }, 60000);
 
-        it("should generate a game preview using Zod schema with GLM-5.1", async () => {
+        it("should generate a game preview using Zod schema with GLM-5.2", async () => {
             const gmAgent = new GlmAgent(
                 GAME_MASTER,
                 STORY_SYSTEM_PROMPT,
