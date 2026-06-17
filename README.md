@@ -32,7 +32,7 @@ Pick any model for the Game Master and for each individual bot:
 | **Mistral** | Mistral Large 3, Mistral Medium 3.5, Mistral 4 Small, Magistral Medium 1.2 (Thinking) |
 | **xAI** | Grok 4.3 (with or without Thinking)                                             |
 | **Moonshot AI** | Kimi K2.6 (with or without Thinking)                                           |
-| **Z.AI** | GLM-5.1 (with or without Thinking)                                              |
+| **Z.AI** | GLM-5.2 (with or without Thinking)                                              |
 
 Most models support reasoning, which is stored in the database with every message — even though it's not visible in the UI.
 

@@ -126,7 +126,6 @@ function makeGeneratedPreview(
         name: 'Human',
         theme: 'Test Theme',
         description: 'A test game',
-        playerCount,
         werewolfCount: 1,
         specialRoles: [],
         gameMasterAiType: LLM_CONSTANTS.DEEPSEEK_V4_FLASH,

@@ -1,12 +1,5 @@
 # Bugs and improvements
 
-## Todo
-
-Revising model availability per tier
-Add better pricing into to landing page
-A new user should be redirected to Rules after login. And show some info
-Make "FREE" in menu a link to tier update
-
 ## Bugs surfaced by the test push (2026-06-10) — pinned in tests, NOT yet fixed
 
 > Each bug below is pinned by a test (marked `PINNED` in the suites listed in

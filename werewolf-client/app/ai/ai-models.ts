@@ -281,15 +281,15 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
 
     // Z.AI models
     [LLM_CONSTANTS.GLM]: {
-        displayName: 'GLM-5.1',
-        modelApiName: 'glm-5.1',
+        displayName: 'GLM-5.2',
+        modelApiName: 'glm-5.2',
         apiKeyName: API_KEY_CONSTANTS.Z_AI,
         hasThinking: false,
         temperature: 0.7,
     },
     [LLM_CONSTANTS.GLM_THINKING]: {
-        displayName: 'GLM-5.1 (Thinking)',
-        modelApiName: 'glm-5.1',
+        displayName: 'GLM-5.2 (Thinking)',
+        modelApiName: 'glm-5.2',
         apiKeyName: API_KEY_CONSTANTS.Z_AI,
         hasThinking: true,
         temperature: 0.7,

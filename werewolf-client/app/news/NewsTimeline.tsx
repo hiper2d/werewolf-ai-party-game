@@ -33,6 +33,15 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
     {
+        id: "glm-5-2", date: "Jun 2026", tags: ["Models"],
+        title: "GLM-5.2 replaces GLM-5.1",
+        body: (<>Z.AI&apos;s <strong>GLM-5.2</strong> takes over the GLM slot in the model picker, with or
+            without Thinking. Same price as before — just a newer, sharper model behind the same option. Pick it
+            for any bot or the Game Master when you set up a lobby.</>),
+        media: null,
+        links: [{label: "Create a game", href: "/games"}],
+    },
+    {
         id: "fable-5-shutdown", date: "Jun 2026", tags: ["Models"],
         title: "Claude Fable 5 has been shut down",
         body: (<>Anthropic has shut down <strong>Claude Fable 5</strong> for good, so it&apos;s gone from the

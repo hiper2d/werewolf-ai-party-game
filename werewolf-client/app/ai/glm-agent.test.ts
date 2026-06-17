@@ -222,9 +222,9 @@ describe("GlmAgent integration", () => {
     });
 
     describe("token usage calculation", () => {
-        it("should calculate correct costs for glm-5.1", () => {
+        it("should calculate correct costs for glm-5.2", () => {
             // Pricing in ai-models.ts: $1.4/M input, $4.4/M output
-            const cost = calculateCost("glm-5.1", 1_000_000, 1_000_000);
+            const cost = calculateCost("glm-5.2", 1_000_000, 1_000_000);
             expect(cost).toBeCloseTo(5.8, 2);
         });
     });

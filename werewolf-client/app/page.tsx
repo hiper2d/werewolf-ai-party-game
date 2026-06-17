@@ -8,7 +8,7 @@ import { CheckIcon } from "@/app/components/ui-icons";
 
 const MODELS = [
   'Claude 4.8 Opus', 'GPT-5.5', 'Gemini Flash 3.5', 'DeepSeek V4 Pro',
-  'Mistral 3.5 Medium', 'GLM 5.1', 'Kimi K2.6', 'Grok 4.3',
+  'Mistral 3.5 Medium', 'GLM 5.2', 'Kimi K2.6', 'Grok 4.3',
 ];
 
 // Real plans: Free (platform-paid, capped) vs Paid (pay-as-you-go, no subscription).
