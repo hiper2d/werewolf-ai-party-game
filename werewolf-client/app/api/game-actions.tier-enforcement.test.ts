@@ -256,7 +256,7 @@ describe('previewGame tier enforcement', () => {
             expect(deductBalance).not.toHaveBeenCalled();
         });
 
-        it('rejects a premium bot model selection (but only after the story agent already ran)', async () => {
+        it('rejects a premium bot model selection BEFORE the story agent runs (no charge)', async () => {
             mockTier(USER_TIERS.FREE);
             setupDbForPreview(0);
             const agent = stubAgentReturning(3);
@@ -267,15 +267,9 @@ describe('previewGame tier enforcement', () => {
                 `The AI model ${LLM_CONSTANTS.CLAUDE_4_OPUS} is not available on the free tier for bots. Please update your bot AI selection.`
             );
 
-            // Pins current behavior: bot model validation happens AFTER the
-            // story-generation call, so the LLM cost is incurred for a
-            // selection that was never valid. (Suspected bug — see report.)
-            expect(agent.askWithZodSchema).toHaveBeenCalledTimes(1);
-            expect(updateUserMonthlySpending).toHaveBeenCalledWith(
-                USER_EMAIL,
-                DEFAULT_TOKEN_USAGE.costUSD,
-                USER_TIERS.FREE
-            );
+            // Validation now runs up front, so the LLM is never called and nothing is billed.
+            expect(agent.askWithZodSchema).not.toHaveBeenCalled();
+            expect(updateUserMonthlySpending).not.toHaveBeenCalled();
         });
 
         it('rejects when a single-use model is consumed by the GM and requested for a bot', async () => {
@@ -348,7 +342,7 @@ describe('previewGame tier enforcement', () => {
     });
 
     describe('API tier key restrictions', () => {
-        it('rejects a GM model whose vendor key was not uploaded (after story generation)', async () => {
+        it('rejects a GM model whose vendor key was not uploaded BEFORE story generation (no charge)', async () => {
             mockTier(USER_TIERS.API, {}); // no keys at all
             const agent = stubAgentReturning(3);
 
@@ -363,15 +357,9 @@ describe('previewGame tier enforcement', () => {
                 `The AI model ${LLM_CONSTANTS.CLAUDE_4_OPUS} requires the ${API_KEY_CONSTANTS.ANTHROPIC} API key as the game master. Please add it on your Profile page.`
             );
 
-            // Pins current behavior: the missing-key check only runs at the end
-            // of previewGame, after the (mocked) story agent was invoked and
-            // spending was recorded. (Suspected bug — see report.)
-            expect(agent.askWithZodSchema).toHaveBeenCalledTimes(1);
-            expect(updateUserMonthlySpending).toHaveBeenCalledWith(
-                USER_EMAIL,
-                DEFAULT_TOKEN_USAGE.costUSD,
-                USER_TIERS.API
-            );
+            // The missing-key check now runs up front: no LLM call, no spending recorded.
+            expect(agent.askWithZodSchema).not.toHaveBeenCalled();
+            expect(updateUserMonthlySpending).not.toHaveBeenCalled();
         });
 
         it('rejects bot models whose vendor key was not uploaded', async () => {
@@ -604,20 +592,19 @@ describe('createGame tier enforcement', () => {
         );
     });
 
-    it('PINNED BUG: paid tier accepts an unresolved RANDOM GM model and saves it as-is', async () => {
-        // validateModelUsageForTier no-ops for the paid tier, so the
-        // RANDOM placeholder sails straight into the persisted game doc.
+    it('paid tier rejects an unresolved RANDOM GM model instead of saving it (#5)', async () => {
+        // validateModelUsageForTier now rejects the RANDOM placeholder (and unknown
+        // model ids) on the paid tier too, so it can never be persisted.
         mockTier(USER_TIERS.PAID);
         const { setGame } = setupDbForCreate();
 
-        const gameId = await createGame(
-            makeGeneratedPreview({ gameMasterAiType: LLM_CONSTANTS.RANDOM })
+        await expect(
+            createGame(makeGeneratedPreview({ gameMasterAiType: LLM_CONSTANTS.RANDOM }))
+        ).rejects.toThrow(
+            'Failed to create game: Random AI model selections must be resolved before generating or saving a game.'
         );
 
-        expect(gameId).toBe(`test-theme-${FIXED_NOW}`);
-        expect(setGame).toHaveBeenCalledWith(
-            expect.objectContaining({ gameMasterAiType: LLM_CONSTANTS.RANDOM })
-        );
+        expect(setGame).not.toHaveBeenCalled();
     });
 
     it('creates a valid free-tier game and never touches the balance', async () => {

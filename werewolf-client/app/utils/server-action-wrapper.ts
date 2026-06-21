@@ -61,6 +61,9 @@ export function withErrorHandling<T extends any[]>(
         throw error;
       }
       const gameId = gameIdExtractor(...args);
+      // Anonymous arrow actions have an empty fn.name; fall back so the error
+      // log / context always carries a usable function name.
+      const fnName = fn.name || 'anonymousAction';
 
       const baseContext: Record<string, any> = error instanceof BotResponseError
         ? { ...error.context }
@@ -68,7 +71,7 @@ export function withErrorHandling<T extends any[]>(
 
       // Attribute the failure to a specific bot/model/state so it can be
       // diagnosed without parsing the stack trace or details string.
-      const { botName, model, gameState } = await resolveErrorAttribution(gameId, baseContext);
+      const { game, botName, model, gameState } = await resolveErrorAttribution(gameId, baseContext);
 
       const errorMessage = error instanceof Error ? error.message : 'Unknown system error occurred';
       const errorDetails = error instanceof BotResponseError
@@ -80,7 +83,7 @@ export function withErrorHandling<T extends any[]>(
 
       const context: Record<string, any> = {
         ...baseContext,
-        function: fn.name,
+        function: fnName,
         gameId,
         ...(botName ? { botName } : {}),
         ...(model ? { model } : {}),
@@ -89,9 +92,9 @@ export function withErrorHandling<T extends any[]>(
       };
 
       // Structured, attributable log (shipped to Better Stack), not just a bare console dump.
-      logger.error(`Game action failed: ${fn.name}`, {
+      logger.error(`Game action failed: ${fnName}`, {
         gameId,
-        function: fn.name,
+        function: fnName,
         botName,
         model,
         gameState,
@@ -101,7 +104,7 @@ export function withErrorHandling<T extends any[]>(
         details: errorDetails,
       });
       console.error(
-        `Error in ${fn.name} [game=${gameId}${botName ? ` bot=${botName}` : ''}${model ? ` model=${model}` : ''}${gameState ? ` state=${gameState}` : ''}]:`,
+        `Error in ${fnName} [game=${gameId}${botName ? ` bot=${botName}` : ''}${model ? ` model=${model}` : ''}${gameState ? ` state=${gameState}` : ''}]:`,
         error
       );
 
@@ -114,9 +117,26 @@ export function withErrorHandling<T extends any[]>(
         timestamp: Date.now()
       };
 
-      // Update game with error state and return it wrapped in GameActionResponse
-      const errorGame = await setGameErrorState(gameId, systemError);
-      return { game: errorGame, messages: [] };
+      // Update game with error state and return it wrapped in GameActionResponse.
+      // Persisting the error state must never mask the original failure: if the
+      // write itself throws (e.g. Firestore down), fall back to the game we
+      // already loaded for attribution (or a minimal stub) carrying the error,
+      // so the UI still surfaces the real error instead of a write error.
+      try {
+        const errorGame = await setGameErrorState(gameId, systemError);
+        return { game: errorGame, messages: [] };
+      } catch (persistError) {
+        logger.error(`Failed to persist error state for ${fnName}`, {
+          gameId,
+          function: fnName,
+          originalError: errorMessage,
+          persistError: persistError instanceof Error ? persistError.message : String(persistError),
+        });
+        const fallbackGame = (game
+          ? { ...game, errorState: systemError }
+          : { id: gameId, errorState: systemError }) as Game;
+        return { game: fallbackGame, messages: [] };
+      }
     }
   };
 }

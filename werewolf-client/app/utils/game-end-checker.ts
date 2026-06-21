@@ -32,8 +32,10 @@ interface WinConditionChecker {
  */
 class HumanEliminatedChecker implements WinConditionChecker {
     check(game: Game): WinConditionResult | null {
-        const humanBot = game.bots.find(bot => bot.name === game.humanPlayerName);
-        const humanIsAlive = !humanBot || humanBot.isAlive;
+        // The human is not mirrored into game.bots — their alive status lives on the
+        // game itself (set on day-vote and night-kill). Legacy games without the
+        // field default to alive.
+        const humanIsAlive = game.humanPlayerIsAlive ?? true;
 
         if (!humanIsAlive) {
             return {
@@ -89,7 +91,9 @@ class HumanEliminatedChecker implements WinConditionChecker {
 class VillagersWinChecker implements WinConditionChecker {
     check(game: Game): WinConditionResult | null {
         const alivePlayers = [
-            { name: game.humanPlayerName, role: game.humanPlayerRole, isAlive: true },
+            ...((game.humanPlayerIsAlive ?? true)
+                ? [{ name: game.humanPlayerName, role: game.humanPlayerRole, isAlive: true }]
+                : []),
             ...game.bots.filter(bot => bot.isAlive)
         ];
 
@@ -120,7 +124,7 @@ class VillagersWinChecker implements WinConditionChecker {
 
     private generateRoleRevealList(game: Game): string {
         const allPlayers = [
-            { name: game.humanPlayerName, role: game.humanPlayerRole, isAlive: true },
+            { name: game.humanPlayerName, role: game.humanPlayerRole, isAlive: game.humanPlayerIsAlive ?? true },
             ...game.bots.map(bot => ({
                 name: bot.name,
                 role: bot.role,
@@ -155,7 +159,9 @@ class VillagersWinChecker implements WinConditionChecker {
 class WerewolvesWinChecker implements WinConditionChecker {
     check(game: Game): WinConditionResult | null {
         const alivePlayers = [
-            { name: game.humanPlayerName, role: game.humanPlayerRole, isAlive: true },
+            ...((game.humanPlayerIsAlive ?? true)
+                ? [{ name: game.humanPlayerName, role: game.humanPlayerRole, isAlive: true }]
+                : []),
             ...game.bots.filter(bot => bot.isAlive)
         ];
 
@@ -186,7 +192,7 @@ class WerewolvesWinChecker implements WinConditionChecker {
 
     private generateRoleRevealList(game: Game): string {
         const allPlayers = [
-            { name: game.humanPlayerName, role: game.humanPlayerRole, isAlive: true },
+            { name: game.humanPlayerName, role: game.humanPlayerRole, isAlive: game.humanPlayerIsAlive ?? true },
             ...game.bots.map(bot => ({
                 name: bot.name,
                 role: bot.role,

@@ -5,20 +5,16 @@ import {
     getGameTier
 } from './cost-tracking';
 import { db } from "@/firebase/server";
-import { updateUserMonthlySpending, deductBalance } from "@/app/api/user-actions";
 import { PAID_TIER_MARKUP } from "@/app/config/credit-packages";
 
-// Mock dependencies (same pattern as night-replay.test.ts)
+// Mock Firestore. Charging is now done INSIDE the same transaction as the game
+// cost commit (atomic), so there is no longer any delegation to user-actions to
+// mock — we assert the writes the transaction makes directly.
 jest.mock("@/firebase/server", () => ({
     db: {
         collection: jest.fn(),
         runTransaction: jest.fn()
     }
-}));
-
-jest.mock("@/app/api/user-actions", () => ({
-    updateUserMonthlySpending: jest.fn(),
-    deductBalance: jest.fn()
 }));
 
 type FakeTransaction = {
@@ -28,31 +24,43 @@ type FakeTransaction = {
 };
 
 /**
- * Wires db.collection('games').doc(id) to a stable doc ref and makes
- * db.runTransaction invoke its callback with a fake transaction whose
- * get() resolves to the provided game data (or a missing snapshot).
+ * Wires db.collection('games').doc(id) and db.collection('users').doc(email) to
+ * stable refs, and makes db.runTransaction invoke its callback with a fake
+ * transaction whose get(ref) resolves to the right snapshot (game vs user).
+ * Pass `userData` (or undefined) to model the charging user's current doc.
  */
-function setupTransaction(gameData: any | null): { txn: FakeTransaction; docRef: any } {
-    const snapshot = {
-        exists: gameData !== null,
-        data: () => gameData
-    };
-    // docRef.get() backs the up-front tier/bot pre-read; the transaction's own
-    // get() backs the atomic accumulate. Both resolve to the same snapshot.
-    const docRef = { id: 'fake-game-ref', get: jest.fn().mockResolvedValue(snapshot) };
+function setupTransaction(
+    gameData: any | null,
+    userData: any | null | undefined = undefined
+): { txn: FakeTransaction; gameRef: any; userRef: any } {
+    const gameSnapshot = { exists: gameData !== null, data: () => gameData };
+    const userSnapshot = { exists: userData !== null && userData !== undefined, data: () => userData };
+
+    const gameRef = { id: 'games/fake', get: jest.fn().mockResolvedValue(gameSnapshot) };
+    const userRef = { id: 'users/fake', get: jest.fn().mockResolvedValue(userSnapshot) };
+
+    (db!.collection as jest.Mock).mockImplementation((name: string) => ({
+        doc: jest.fn().mockReturnValue(name === 'users' ? userRef : gameRef)
+    }));
 
     const txn: FakeTransaction = {
-        get: jest.fn().mockResolvedValue(snapshot),
+        get: jest.fn().mockImplementation((ref: any) =>
+            Promise.resolve(ref === userRef ? userSnapshot : gameSnapshot)
+        ),
         set: jest.fn(),
         update: jest.fn()
     };
-
-    (db!.collection as jest.Mock).mockReturnValue({
-        doc: jest.fn().mockReturnValue(docRef)
-    });
     (db!.runTransaction as jest.Mock).mockImplementation(async (cb: any) => cb(txn));
 
-    return { txn, docRef };
+    return { txn, gameRef, userRef };
+}
+
+/** Find the transaction write (update or set) made against the user doc. */
+function userWrite(txn: FakeTransaction, userRef: any): any | undefined {
+    const fromUpdate = txn.update.mock.calls.find(call => call[0] === userRef);
+    if (fromUpdate) return fromUpdate[1];
+    const fromSet = txn.set.mock.calls.find(call => call[0] === userRef);
+    return fromSet ? fromSet[1] : undefined;
 }
 
 describe('cost-tracking', () => {
@@ -61,17 +69,14 @@ describe('cost-tracking', () => {
 
     beforeEach(() => {
         jest.clearAllMocks();
-        (deductBalance as jest.Mock).mockResolvedValue(true);
-        (updateUserMonthlySpending as jest.Mock).mockResolvedValue(undefined);
     });
 
     describe('recordGameMasterTokenUsage', () => {
         it('accumulates token usage and total game cost, computing totalTokens when not supplied', async () => {
-            const { txn, docRef } = setupTransaction({
-                createdWithTier: 'free',
+            const { txn, gameRef } = setupTransaction({
                 gameMasterTokenUsage: { inputTokens: 100, outputTokens: 50, totalTokens: 150, costUSD: 0.5 },
                 totalGameCost: 1.25
-            });
+            }, { tier: 'free' });
 
             await recordGameMasterTokenUsage(gameId, {
                 inputTokens: 10,
@@ -79,7 +84,7 @@ describe('cost-tracking', () => {
                 costUSD: 0.0001
             }, userEmail);
 
-            expect(txn.update).toHaveBeenCalledWith(docRef, {
+            expect(txn.update).toHaveBeenCalledWith(gameRef, {
                 gameMasterTokenUsage: {
                     inputTokens: 110,
                     outputTokens: 55,
@@ -91,10 +96,7 @@ describe('cost-tracking', () => {
         });
 
         it('prefers a supplied positive totalTokens over the computed sum', async () => {
-            const { txn, docRef } = setupTransaction({
-                createdWithTier: 'free',
-                totalGameCost: 0
-            });
+            const { txn, gameRef } = setupTransaction({ totalGameCost: 0 }, { tier: 'free' });
 
             await recordGameMasterTokenUsage(gameId, {
                 inputTokens: 10,
@@ -103,13 +105,13 @@ describe('cost-tracking', () => {
                 costUSD: 0.01
             }, userEmail);
 
-            expect(txn.update).toHaveBeenCalledWith(docRef, expect.objectContaining({
+            expect(txn.update).toHaveBeenCalledWith(gameRef, expect.objectContaining({
                 gameMasterTokenUsage: expect.objectContaining({ totalTokens: 999 })
             }));
         });
 
         it('normalizes malformed token fields to 0 and rounds cost to 6 decimal places', async () => {
-            const { txn, docRef } = setupTransaction({ createdWithTier: 'free' });
+            const { txn, gameRef } = setupTransaction({}, { tier: 'free' });
 
             await recordGameMasterTokenUsage(gameId, {
                 inputTokens: 'garbage' as any,
@@ -117,7 +119,7 @@ describe('cost-tracking', () => {
                 costUSD: 0.1234567891
             }, userEmail);
 
-            expect(txn.update).toHaveBeenCalledWith(docRef, {
+            expect(txn.update).toHaveBeenCalledWith(gameRef, {
                 gameMasterTokenUsage: {
                     inputTokens: 0,
                     outputTokens: 0,
@@ -129,109 +131,128 @@ describe('cost-tracking', () => {
         });
 
         it('does nothing when tokenUsage is null', async () => {
-            setupTransaction({ createdWithTier: 'free' });
+            setupTransaction({}, { tier: 'free' });
 
             await recordGameMasterTokenUsage(gameId, null, userEmail);
 
             expect(db!.runTransaction).not.toHaveBeenCalled();
-            expect(deductBalance).not.toHaveBeenCalled();
-            expect(updateUserMonthlySpending).not.toHaveBeenCalled();
         });
 
-        it('does not update or apply spending when the game does not exist', async () => {
-            const { txn } = setupTransaction(null);
+        it('does not update or charge when the game does not exist', async () => {
+            const { txn, userRef } = setupTransaction(null, { tier: 'paid', balance: 100 });
 
             await recordGameMasterTokenUsage(gameId, { inputTokens: 1, outputTokens: 1, costUSD: 1 }, userEmail);
 
             expect(txn.update).not.toHaveBeenCalled();
-            expect(deductBalance).not.toHaveBeenCalled();
-            expect(updateUserMonthlySpending).not.toHaveBeenCalled();
+            expect(userWrite(txn, userRef)).toBeUndefined();
         });
 
         describe('paid tier charging (markup math)', () => {
-            it('deducts cost * (1 + PAID_TIER_MARKUP) from balance and records the marked-up amount as monthly spending', async () => {
-                setupTransaction({ createdWithTier: 'paid', totalGameCost: 0 });
+            it('deducts cost * (1 + PAID_TIER_MARKUP) from balance and records the marked-up amount in the SAME transaction as the game cost', async () => {
+                const { txn, gameRef, userRef } = setupTransaction(
+                    { totalGameCost: 0 },
+                    { tier: 'paid', balance: 100 }
+                );
 
                 await recordGameMasterTokenUsage(gameId, { inputTokens: 1, outputTokens: 1, costUSD: 2 }, userEmail);
 
                 // 2 * (1 + 0.15) = 2.3
                 expect(PAID_TIER_MARKUP).toBe(0.15);
-                expect(deductBalance).toHaveBeenCalledWith(userEmail, 2.3);
-                // Monthly spending records what the user was actually billed (2.3), matching
-                // the amount deducted — not the raw model cost.
-                expect(updateUserMonthlySpending).toHaveBeenCalledWith(userEmail, 2.3, 'paid');
+                const write = userWrite(txn, userRef);
+                expect(write.balance).toBe(97.7); // 100 - 2.3
+                // Monthly spending records what the user was actually billed (2.3).
+                expect(write.spendings).toEqual(
+                    expect.arrayContaining([expect.objectContaining({ amountUSD: 2.3, paidAmountUSD: 2.3 })])
+                );
+                // The game cost commit happens in the same transaction.
+                expect(txn.update).toHaveBeenCalledWith(gameRef, expect.objectContaining({ totalGameCost: 2 }));
             });
 
             it('rounds the charged amount to 6 decimal places', async () => {
-                setupTransaction({ createdWithTier: 'paid', totalGameCost: 0 });
+                const { txn, userRef } = setupTransaction({ totalGameCost: 0 }, { tier: 'paid', balance: 100 });
 
                 await recordGameMasterTokenUsage(gameId, { inputTokens: 1, outputTokens: 1, costUSD: 0.012345 }, userEmail);
 
                 // 0.012345 * 1.15 = 0.01419675 -> 0.014197 at 6dp
-                expect(deductBalance).toHaveBeenCalledWith(userEmail, 0.014197);
+                expect(userWrite(txn, userRef).balance).toBe(parseFloat((100 - 0.014197).toFixed(6)));
             });
 
-            it('throws when balance deduction fails (insufficient balance)', async () => {
-                setupTransaction({ createdWithTier: 'paid', totalGameCost: 0 });
-                (deductBalance as jest.Mock).mockResolvedValue(false);
+            it('throws on insufficient balance WITHOUT committing the game cost (atomic)', async () => {
+                const { txn, gameRef } = setupTransaction({ totalGameCost: 0 }, { tier: 'paid', balance: 1 });
 
                 await expect(
                     recordGameMasterTokenUsage(gameId, { inputTokens: 1, outputTokens: 1, costUSD: 1 }, userEmail)
                 ).rejects.toThrow(/Insufficient balance/);
 
-                expect(updateUserMonthlySpending).not.toHaveBeenCalled();
+                // Nothing is written — not the charge, not the game cost.
+                expect(txn.update).not.toHaveBeenCalledWith(gameRef, expect.anything());
             });
         });
 
         it('free tier: never deducts balance but still records monthly spending', async () => {
-            setupTransaction({ createdWithTier: 'free', totalGameCost: 0 });
+            const { txn, userRef } = setupTransaction({ totalGameCost: 0 }, { tier: 'free' });
 
             await recordGameMasterTokenUsage(gameId, { inputTokens: 1, outputTokens: 1, costUSD: 0.5 }, userEmail);
 
-            expect(deductBalance).not.toHaveBeenCalled();
-            expect(updateUserMonthlySpending).toHaveBeenCalledWith(userEmail, 0.5, 'free');
+            const write = userWrite(txn, userRef);
+            expect(write).not.toHaveProperty('balance');
+            expect(write.spendings).toEqual(
+                expect.arrayContaining([expect.objectContaining({ amountUSD: 0.5, freeAmountUSD: 0.5 })])
+            );
         });
 
         it('api tier: never deducts balance but still records monthly spending', async () => {
-            setupTransaction({ createdWithTier: 'api', totalGameCost: 0 });
+            const { txn, userRef } = setupTransaction({ totalGameCost: 0 }, { tier: 'api' });
 
             await recordGameMasterTokenUsage(gameId, { inputTokens: 1, outputTokens: 1, costUSD: 0.5 }, userEmail);
 
-            expect(deductBalance).not.toHaveBeenCalled();
-            expect(updateUserMonthlySpending).toHaveBeenCalledWith(userEmail, 0.5, 'api');
+            const write = userWrite(txn, userRef);
+            expect(write).not.toHaveProperty('balance');
+            expect(write.spendings).toEqual(
+                expect.arrayContaining([expect.objectContaining({ amountUSD: 0.5, apiAmountUSD: 0.5 })])
+            );
         });
 
-        it('paid tier game with no createdWithTier (legacy game): pinned behavior — user is NOT charged', async () => {
-            // NOTE (pinned current behavior): charging keys off game.createdWithTier, not the
-            // user's current tier. A legacy/undefined-tier game played by a paid user incurs
-            // no balance deduction. Related to the open Stripe top-up/tier bug: any path where
-            // the tier is not 'paid' (e.g. tier never flipped after a top-up) goes unbilled.
-            setupTransaction({ totalGameCost: 0 });
+        it('keys off the user CURRENT tier, not the game tier: a now-paid user IS charged for a legacy/free game (#8)', async () => {
+            // Charging reads the user's tier inside the transaction. A game with no
+            // createdWithTier played by a now-paid user is billed with markup.
+            const { txn, userRef } = setupTransaction({ totalGameCost: 0 }, { tier: 'paid', balance: 100 });
 
             await recordGameMasterTokenUsage(gameId, { inputTokens: 1, outputTokens: 1, costUSD: 0.5 }, userEmail);
 
-            expect(deductBalance).not.toHaveBeenCalled();
-            expect(updateUserMonthlySpending).toHaveBeenCalledWith(userEmail, 0.5, undefined);
+            // 0.5 * 1.15 = 0.575
+            expect(userWrite(txn, userRef).balance).toBe(99.425); // 100 - 0.575
+        });
+
+        it('free user is NOT charged, but the same user IS once upgraded to paid (#8)', async () => {
+            // user still free → no balance change
+            let setup = setupTransaction({ totalGameCost: 0 }, { tier: 'free' });
+            await recordGameMasterTokenUsage(gameId, { inputTokens: 1, outputTokens: 1, costUSD: 0.5 }, userEmail);
+            expect(userWrite(setup.txn, setup.userRef)).not.toHaveProperty('balance');
+
+            // same game, user has since upgraded to paid → now charged
+            jest.clearAllMocks();
+            setup = setupTransaction({ totalGameCost: 0 }, { tier: 'paid', balance: 100 });
+            await recordGameMasterTokenUsage(gameId, { inputTokens: 1, outputTokens: 1, costUSD: 0.5 }, userEmail);
+            expect(userWrite(setup.txn, setup.userRef).balance).toBe(99.425);
         });
 
         it('zero-cost usage: game tokens recorded but no balance deduction or spending entry', async () => {
-            const { txn } = setupTransaction({ createdWithTier: 'paid', totalGameCost: 0 });
+            const { txn, gameRef, userRef } = setupTransaction({ totalGameCost: 0 }, { tier: 'paid', balance: 100 });
 
             await recordGameMasterTokenUsage(gameId, { inputTokens: 10, outputTokens: 10, costUSD: 0 }, userEmail);
 
-            expect(txn.update).toHaveBeenCalled(); // token counts still accumulate
-            expect(deductBalance).not.toHaveBeenCalled();
-            expect(updateUserMonthlySpending).not.toHaveBeenCalled();
+            expect(txn.update).toHaveBeenCalledWith(gameRef, expect.anything()); // token counts still accumulate
+            expect(userWrite(txn, userRef)).toBeUndefined();
         });
 
-        it('missing userEmail: game cost recorded but no user spending applied', async () => {
-            const { txn } = setupTransaction({ createdWithTier: 'paid', totalGameCost: 0 });
+        it('missing userEmail: game cost recorded but no user doc touched', async () => {
+            const { txn, gameRef, userRef } = setupTransaction({ totalGameCost: 0 }, { tier: 'paid', balance: 100 });
 
             await recordGameMasterTokenUsage(gameId, { inputTokens: 1, outputTokens: 1, costUSD: 1 }, undefined);
 
-            expect(txn.update).toHaveBeenCalled();
-            expect(deductBalance).not.toHaveBeenCalled();
-            expect(updateUserMonthlySpending).not.toHaveBeenCalled();
+            expect(txn.update).toHaveBeenCalledWith(gameRef, expect.anything());
+            expect(userWrite(txn, userRef)).toBeUndefined();
         });
     });
 
@@ -241,16 +262,18 @@ describe('cost-tracking', () => {
             { name: 'Bob' } // no usage yet
         ];
 
-        it('accumulates usage on the matching bot only and bumps totalGameCost', async () => {
-            const { txn, docRef } = setupTransaction({
-                createdWithTier: 'paid',
-                bots: JSON.parse(JSON.stringify(bots)),
-                totalGameCost: 0.1
-            });
+        it('accumulates usage on the matching bot only, bumps totalGameCost, and charges in the same transaction', async () => {
+            const { txn, gameRef, userRef } = setupTransaction(
+                {
+                    bots: JSON.parse(JSON.stringify(bots)),
+                    totalGameCost: 0.1
+                },
+                { tier: 'paid', balance: 100 }
+            );
 
             await recordBotTokenUsage(gameId, 'Bob', { inputTokens: 5, outputTokens: 5, costUSD: 0.2 }, userEmail);
 
-            expect(txn.update).toHaveBeenCalledWith(docRef, {
+            expect(txn.update).toHaveBeenCalledWith(gameRef, {
                 bots: [
                     bots[0], // Alice untouched
                     {
@@ -260,42 +283,46 @@ describe('cost-tracking', () => {
                 ],
                 totalGameCost: 0.3
             });
-            // Paid tier: charged with markup, and the marked-up amount is recorded
-            expect(deductBalance).toHaveBeenCalledWith(userEmail, 0.23);
-            expect(updateUserMonthlySpending).toHaveBeenCalledWith(userEmail, 0.23, 'paid');
+            // Paid tier: charged with markup in the same transaction (0.2 * 1.15 = 0.23)
+            const write = userWrite(txn, userRef);
+            expect(write.balance).toBe(99.77); // 100 - 0.23
+            expect(write.spendings).toEqual(
+                expect.arrayContaining([expect.objectContaining({ amountUSD: 0.23, paidAmountUSD: 0.23 })])
+            );
         });
 
-        it('does not update or apply spending when the bot is not found', async () => {
-            const { txn } = setupTransaction({
-                createdWithTier: 'paid',
-                bots: JSON.parse(JSON.stringify(bots)),
-                totalGameCost: 0.1
-            });
+        it('does not update or charge when the bot is not found', async () => {
+            const { txn, userRef } = setupTransaction(
+                {
+                    bots: JSON.parse(JSON.stringify(bots)),
+                    totalGameCost: 0.1
+                },
+                { tier: 'paid', balance: 100 }
+            );
 
             await recordBotTokenUsage(gameId, 'Nobody', { inputTokens: 5, outputTokens: 5, costUSD: 0.2 }, userEmail);
 
             expect(txn.update).not.toHaveBeenCalled();
-            expect(deductBalance).not.toHaveBeenCalled();
-            expect(updateUserMonthlySpending).not.toHaveBeenCalled();
+            expect(userWrite(txn, userRef)).toBeUndefined();
         });
 
-        it('does not apply spending when the game does not exist', async () => {
-            const { txn } = setupTransaction(null);
+        it('does not update or charge when the game does not exist', async () => {
+            const { txn, userRef } = setupTransaction(null, { tier: 'paid', balance: 100 });
 
             await recordBotTokenUsage(gameId, 'Alice', { inputTokens: 5, outputTokens: 5, costUSD: 0.2 }, userEmail);
 
             expect(txn.update).not.toHaveBeenCalled();
-            expect(updateUserMonthlySpending).not.toHaveBeenCalled();
+            expect(userWrite(txn, userRef)).toBeUndefined();
         });
     });
 
     describe('recordGameCost', () => {
         it('adds a normalized positive amount to totalGameCost', async () => {
-            const { txn, docRef } = setupTransaction({ totalGameCost: 0.1 });
+            const { txn, gameRef } = setupTransaction({ totalGameCost: 0.1 });
 
             await recordGameCost(gameId, 0.2);
 
-            expect(txn.update).toHaveBeenCalledWith(docRef, { totalGameCost: 0.3 });
+            expect(txn.update).toHaveBeenCalledWith(gameRef, { totalGameCost: 0.3 });
         });
 
         it('ignores zero, negative and NaN amounts', async () => {

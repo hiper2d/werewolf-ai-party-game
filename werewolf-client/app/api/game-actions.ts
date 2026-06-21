@@ -39,8 +39,9 @@ import {getDefaultVoiceProvider, getVoiceConfig} from "@/app/ai/voice-config";
 import {normalizeSpendings} from "@/app/utils/spending-utils";
 import {convertToAIMessage} from "@/app/utils/message-utils";
 import {serializeMessageForFirestore} from "@/app/api/message-serialization";
-import {LLM_CONSTANTS} from "@/app/ai/ai-models";
+import {LLM_CONSTANTS, SupportedAiModels} from "@/app/ai/ai-models";
 import {
+    assertModelAllowedForApiTier,
     consumeModelUsage,
     getCandidateModelsForTier,
     getPerGameModelLimit,
@@ -223,6 +224,33 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
 
     consumeModelUsage(resolvedGmAiType, tier, usageCounts, 'as the game master');
 
+    // Validate ALL model selections up front — BEFORE the LLM call and any charge —
+    // so an invalid selection never incurs preview cost (#6). The per-bot model
+    // distribution below only ever picks from these selected candidates, so this is
+    // the authoritative check; the post-distribution validateModelUsageForTier call
+    // remains as a backstop. For API tier this checks the user uploaded the vendor
+    // key; for free tier, model availability; for paid, that the model id is real.
+    if (tier === USER_TIERS.API) {
+        assertModelAllowedForApiTier(resolvedGmAiType, tier, apiKeys, 'as the game master');
+    }
+    const selectedBotModels: string[] = Array.isArray(gamePreview.playersAiType)
+        ? (gamePreview.playersAiType.length > 0 ? gamePreview.playersAiType : [LLM_CONSTANTS.RANDOM])
+        : [gamePreview.playersAiType];
+    for (const model of selectedBotModels) {
+        if (model === LLM_CONSTANTS.RANDOM) {
+            continue; // resolved per-bot later from tier candidates
+        }
+        if (tier === USER_TIERS.API) {
+            assertModelAllowedForApiTier(model, tier, apiKeys, 'for bots');
+        } else if (tier === USER_TIERS.FREE) {
+            if (getPerGameModelLimit(model, tier) === 0) {
+                throw new Error(`The AI model ${model} is not available on the free tier for bots. Please update your bot AI selection.`);
+            }
+        } else if (!SupportedAiModels[model]) {
+            throw new Error(`Unsupported AI model: ${model}.`);
+        }
+    }
+
     const storyTellAgent: AbstractAgent = AgentFactory.createAgent(
         GAME_MASTER, STORY_SYSTEM_PROMPT, resolvedGmAiType, apiKeys, false
     );
@@ -315,19 +343,7 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
             ? gamePreview.playersAiType
             : [LLM_CONSTANTS.RANDOM];
 
-        // Free tier validation
-        if (tier === USER_TIERS.FREE) {
-            const disallowedModel = selectedModels.find(model => {
-                if (model === LLM_CONSTANTS.RANDOM) {
-                    return false;
-                }
-                return getPerGameModelLimit(model, tier) === 0;
-            });
-
-            if (disallowedModel) {
-                throw new Error(`The AI model ${disallowedModel} is not available on the free tier for bots. Please update your bot AI selection.`);
-            }
-        }
+        // Selected bot models were already validated up front (before the LLM call).
 
         baseCandidates = selectedModels.flatMap(model => {
             if (model === LLM_CONSTANTS.RANDOM) {
@@ -520,6 +536,7 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
             bots: bots,
             humanPlayerName: gamePreview.name,
             humanPlayerRole: roleDistribution[0],
+            humanPlayerIsAlive: true,
             currentDay: 1,
             gameState: GAME_STATES.WELCOME,
             gameStateParamQueue: bots.map(bot => bot.name),
@@ -1082,6 +1099,7 @@ function gameFromFirestore(id: string, data: any): Game {
         bots: data.bots,
         humanPlayerName: data.humanPlayerName,
         humanPlayerRole: data.humanPlayerRole,
+        humanPlayerIsAlive: data.humanPlayerIsAlive ?? true, // Legacy games without the field default to alive
         currentDay: data.currentDay,
         gameState: data.gameState,
         gameStateParamQueue: data.gameStateParamQueue,

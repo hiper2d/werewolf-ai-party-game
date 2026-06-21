@@ -223,6 +223,7 @@ export interface Game {
     bots: Bot[];
     humanPlayerName: string;
     humanPlayerRole: string;
+    humanPlayerIsAlive?: boolean; // Whether the human is still alive. Optional for legacy games (treated as alive when absent)
     currentDay: number;
     gameState: string;
     gameStateParamQueue: Array<string>; // some states require a queue of params, usually bot names

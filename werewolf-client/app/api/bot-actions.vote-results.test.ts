@@ -257,7 +257,7 @@ describe('vote: bot vote accumulation', () => {
         });
     });
 
-    test('PINNED: malformed tally JSON in the param queue is silently reset, prior votes lost', async () => {
+    test('malformed tally JSON in the param queue surfaces an error state instead of discarding votes', async () => {
         const game = makeGame({
             gameStateProcessQueue: ['Alice'],
             gameStateParamQueue: ['{not json', '[broken'],
@@ -265,17 +265,12 @@ describe('vote: bot vote accumulation', () => {
         (getGame as jest.Mock).mockResolvedValue(game);
         botVotes('Bob');
 
-        await vote(GAME_ID);
+        const result = await vote(GAME_ID);
 
-        // Both blobs reset from scratch — earlier votes are silently discarded.
-        expect(mockUpdate).toHaveBeenCalledWith({
-            gameStateProcessQueue: [],
-            gameStateParamQueue: [
-                JSON.stringify({ Bob: 1 }),
-                JSON.stringify([{ voter: 'Alice', target: 'Bob', reason: 'suspicious', order: 1 }]),
-            ],
-        });
-        expect(setGameErrorState).not.toHaveBeenCalled();
+        // A corrupt tally is surfaced rather than silently reset to an empty tally.
+        expectErrorState('Corrupted vote tally');
+        expect(result.game.errorState).toBeTruthy();
+        expect(updatesWith('gameStateProcessQueue')).toHaveLength(0);
     });
 
     test('vote for a dead or unknown target produces an error state and does not advance the queue', async () => {
@@ -326,9 +321,14 @@ describe('humanPlayerVote: accumulation and guards', () => {
             messageType: MessageType.VOTE_MESSAGE,
             msg: { who: 'Wolf', why: 'I saw fangs' },
         });
-        // PINNED: the returned game's param queue drops the individual-votes blob
-        // (only the tally is echoed back), although both were written to Firestore.
-        expect(result.game.gameStateParamQueue).toEqual([JSON.stringify({ Wolf: 2 })]);
+        // The returned game's param queue echoes BOTH blobs exactly as persisted.
+        expect(result.game.gameStateParamQueue).toEqual([
+            JSON.stringify({ Wolf: 2 }),
+            JSON.stringify([
+                { voter: 'Alice', target: 'Wolf', reason: 'r', order: 1 },
+                { voter: HUMAN_NAME, target: 'Wolf', reason: 'I saw fangs', order: 2 },
+            ]),
+        ]);
         expect(setGameErrorState).not.toHaveBeenCalled();
     });
 
@@ -427,6 +427,7 @@ describe('vote: VOTE_RESULTS transition and elimination', () => {
         expect(mockUpdate.mock.calls[0][0]).toEqual({ gameState: GAME_STATES.VOTE_RESULTS });
         expect(mockUpdate).toHaveBeenCalledWith({
             gameState: GAME_STATES.GAME_OVER,
+            humanPlayerIsAlive: false,
             votingHistory: [
                 expect.objectContaining({
                     eliminatedPlayer: HUMAN_NAME,
@@ -473,14 +474,15 @@ describe('vote: VOTE_RESULTS transition and elimination', () => {
         expect(setGameErrorState).not.toHaveBeenCalled();
     });
 
-    test('PINNED: unparseable tally JSON degrades to the no-votes path instead of erroring', async () => {
+    test('unparseable tally JSON surfaces an error state before transitioning to VOTE_RESULTS', async () => {
         setupDrainedVote(['{definitely not json']);
 
-        await vote(GAME_ID);
+        const result = await vote(GAME_ID);
 
-        expect(mockUpdate).toHaveBeenCalledTimes(1);
-        expect(mockUpdate).toHaveBeenCalledWith({ gameState: GAME_STATES.VOTE_RESULTS });
-        expect(updatesWith('bots')).toHaveLength(0);
-        expect(setGameErrorState).not.toHaveBeenCalled();
+        // The corrupt tally is caught before any state change — no VOTE_RESULTS
+        // transition, no elimination, just a visible error.
+        expectErrorState('Corrupted vote tally');
+        expect(result.game.errorState).toBeTruthy();
+        expect(mockUpdate).not.toHaveBeenCalled();
     });
 });

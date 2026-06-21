@@ -162,7 +162,14 @@ async function endNightWithResults(gameId: string, game: Game): Promise<GameActi
             return bot;
         });
     }
-    const tempGame = { ...game, bots: tempBots };
+    // The human is not in game.bots — fold their death into the simulated state so
+    // a night kill of the human is detected as game-over.
+    const humanDiedTonight = nightState.deaths.some(d => d.player === game.humanPlayerName);
+    const tempGame = {
+        ...game,
+        bots: tempBots,
+        humanPlayerIsAlive: humanDiedTonight ? false : (game.humanPlayerIsAlive ?? true)
+    };
 
     const gameEndChecker = new GameEndChecker();
     const endGameCheck = gameEndChecker.check(tempGame);
@@ -1030,8 +1037,13 @@ async function startNewDayImpl(gameId: string): Promise<GameActionResponse> {
         // Get all alive bot names for the processing queue
         const aliveBotNames = updatedBots.filter(bot => bot.isAlive).map(bot => bot.name);
 
+        // The human is not in game.bots — fold their night death into the persisted
+        // alive flag so the game ends if the human was killed.
+        const humanDiedTonight = (nightState?.deaths || []).some(d => d.player === currentGame.humanPlayerName);
+        const humanPlayerIsAlive = humanDiedTonight ? false : (currentGame.humanPlayerIsAlive ?? true);
+
         // Check for game end conditions after applying night results
-        const tempGame = { ...currentGame, bots: updatedBots };
+        const tempGame = { ...currentGame, bots: updatedBots, humanPlayerIsAlive };
         const endCheck = checkGameEndConditions(tempGame);
 
         if (endCheck.isEnded) {
@@ -1055,6 +1067,7 @@ async function startNewDayImpl(gameId: string): Promise<GameActionResponse> {
                 gameStateParamQueue: [],
                 gameStateProcessQueue: [],
                 bots: updatedBots,
+                humanPlayerIsAlive,
                 previousNightResults: previousNightResults,
                 nightResults: {},
                 resolvedNightState: null
@@ -1072,6 +1085,7 @@ async function startNewDayImpl(gameId: string): Promise<GameActionResponse> {
             gameStateParamQueue: [],
             gameStateProcessQueue: ['__GM_DAY_SUMMARY__', ...aliveBotNames],
             bots: updatedBots,
+            humanPlayerIsAlive,
             previousNightResults: previousNightResults,
             nightResults: {}, // Clear night results for the next night phase
             resolvedNightState: null

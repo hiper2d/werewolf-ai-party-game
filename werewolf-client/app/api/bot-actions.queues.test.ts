@@ -294,21 +294,37 @@ describe('welcome (WELCOME state, gameStateParamQueue)', () => {
         });
     });
 
-    test('unknown bot name at queue head puts the game into error state (error swallowed by wrapper)', async () => {
+    test('unknown bot name at queue head surfaces an error but advances past the bad entry', async () => {
         const game = makeGame({
             gameState: GAME_STATES.WELCOME,
             gameStateParamQueue: ['Ghost', 'Alice'],
         });
         (getGame as jest.Mock).mockResolvedValue(game);
+        dbDocGame = game;
 
         const result = await welcome(GAME_ID);
 
         expectErrorState('Bot Ghost not found in game');
         expect(AgentFactory.createAgent).not.toHaveBeenCalled();
-        // Queue is NOT advanced past the broken entry (pinned behavior).
-        expect(updatesWith('gameStateParamQueue')).toHaveLength(0);
-        // Wrapper converts the throw into a returned error-state game.
+        // Queue is advanced past the broken entry so a retry doesn't loop on it forever.
+        expect(mockUpdate).toHaveBeenCalledWith({ gameStateParamQueue: ['Alice'] });
+        // Wrapper still surfaces the error.
         expect(result.game.errorState).toBeTruthy();
+        expect(result.messages).toEqual([]);
+    });
+
+    test('welcome is a no-op when the game is not in WELCOME state', async () => {
+        const game = makeGame({
+            gameState: GAME_STATES.DAY_DISCUSSION,
+            gameStateParamQueue: ['Alice'],
+        });
+        (getGame as jest.Mock).mockResolvedValue(game);
+
+        const result = await welcome(GAME_ID);
+
+        expect(mockUpdate).not.toHaveBeenCalled();
+        expect(AgentFactory.createAgent).not.toHaveBeenCalled();
+        expect(setGameErrorState).not.toHaveBeenCalled();
         expect(result.messages).toEqual([]);
     });
 });
@@ -370,6 +386,26 @@ describe('talkToAll (DAY_DISCUSSION, processing the bot queue)', () => {
         await talkToAll(GAME_ID, '');
 
         // Bot was processed (messages saved), but the cleared queue was NOT overwritten.
+        expect(mockAskText).toHaveBeenCalledTimes(1);
+        expect(updatesWith('gameStateProcessQueue')).toHaveLength(0);
+        expect(setGameErrorState).not.toHaveBeenCalled();
+    });
+
+    test('does not clobber a queue that a new round repopulated mid-processing', async () => {
+        // While Alice was being processed, the queue was cancelled AND a fresh
+        // round started with different bots at the head. The stale newQueue
+        // (['Bob']) must NOT overwrite the new round's queue.
+        const initial = makeGame({ gameStateProcessQueue: ['Alice', 'Bob'] });
+        const newRound = makeGame({ gameStateProcessQueue: ['Charlie', 'Dave'] });
+        (getGame as jest.Mock)
+            .mockResolvedValueOnce(initial) // talkToAll initial read
+            .mockResolvedValueOnce(newRound) // fresh re-read sees a different head
+            .mockResolvedValue(newRound);
+        dbDocGame = initial;
+        agentRepliesWith('Alice reply');
+
+        await talkToAll(GAME_ID, '');
+
         expect(mockAskText).toHaveBeenCalledTimes(1);
         expect(updatesWith('gameStateProcessQueue')).toHaveLength(0);
         expect(setGameErrorState).not.toHaveBeenCalled();

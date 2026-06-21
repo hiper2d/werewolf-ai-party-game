@@ -1,7 +1,7 @@
 import {db} from "@/firebase/server";
 import {Game, TokenUsage, UserTier, USER_TIERS} from "@/app/api/game-models";
-import {updateUserMonthlySpending, deductBalance} from "@/app/api/user-actions";
 import {PAID_TIER_MARKUP} from "@/app/config/credit-packages";
+import {applySpending, formatPeriod} from "@/app/utils/spending-utils";
 
 type TokenUsageInput = Partial<TokenUsage> | null | undefined;
 
@@ -21,32 +21,85 @@ function normalizeTokenUsage(usage: TokenUsageInput): TokenUsage {
     };
 }
 
-async function applyUserSpending(
+/**
+ * Charge the user AND commit the game cost in a SINGLE Firestore transaction.
+ *
+ * `buildGameUpdate` inspects the freshly-read game doc and returns the field map
+ * to write, or `null` to abort cleanly (game missing / bot not found) without
+ * charging anything.
+ *
+ * Doing both writes in one transaction closes the last money-consistency gap:
+ * - Charging keys off the user's CURRENT tier read in the same transaction (#8),
+ *   so an upgrade-to-paid bills even games created on the free tier.
+ * - For paid tier an insufficient balance throws BEFORE any write, so we never
+ *   record a cost we didn't charge.
+ * - Because the balance deduction, the monthly-spending record and the game cost
+ *   all commit together (or not at all), there is no charge-without-commit or
+ *   commit-without-charge window, and the user doc itself can't end up with a
+ *   deducted balance but no matching spending entry.
+ */
+async function commitUsageAtomically(
+    gameId: string,
     userEmail: string | undefined,
-    amountUSD: number,
-    tier?: UserTier
+    costUSD: number,
+    buildGameUpdate: (game: Game) => Record<string, any> | null,
+    timestamp: number = Date.now()
 ): Promise<void> {
-    if (!userEmail) {
-        return;
-    }
-    if (!(amountUSD > 0)) {
+    if (!db) {
         return;
     }
 
-    // For paid tier, deduct model cost + markup from user balance
-    if (tier === USER_TIERS.PAID) {
-        const chargedAmount = parseFloat((amountUSD * (1 + PAID_TIER_MARKUP)).toFixed(6));
-        const success = await deductBalance(userEmail, chargedAmount);
-        if (!success) {
-            throw new Error('Insufficient balance. Please add funds on your profile page to continue playing.');
+    const gameRef = db.collection('games').doc(gameId);
+    const userRef = userEmail ? db.collection('users').doc(userEmail) : null;
+    const shouldCharge = !!userRef && costUSD > 0;
+
+    await db.runTransaction(async (transaction) => {
+        // ---- all reads first (Firestore requires reads before writes) ----
+        const gameSnap = await transaction.get(gameRef);
+        if (!gameSnap.exists) {
+            return;
         }
-        // Record what the user was actually billed (cost + markup), not the raw
-        // model cost — otherwise the paid-tier spending history understates billing.
-        await updateUserMonthlySpending(userEmail, chargedAmount, tier);
-        return;
-    }
+        const game = gameSnap.data() as Game;
 
-    await updateUserMonthlySpending(userEmail, amountUSD, tier);
+        // Pure computation; returns null to abort without charging.
+        const gameUpdate = buildGameUpdate(game);
+        if (!gameUpdate) {
+            return;
+        }
+
+        const userSnap = shouldCharge ? await transaction.get(userRef!) : null;
+
+        // ---- charge the user (writes deferred until after all reads) ----
+        if (userSnap) {
+            const userData = userSnap.data() || {};
+            const tier = (userData.tier as UserTier) || USER_TIERS.FREE;
+
+            let recordedAmount = costUSD;
+            const userUpdate: Record<string, any> = {};
+
+            if (tier === USER_TIERS.PAID) {
+                // Paid tier pays model cost + markup; record what was actually billed.
+                const chargedAmount = parseFloat((costUSD * (1 + PAID_TIER_MARKUP)).toFixed(6));
+                const balance = Number(userData.balance) || 0;
+                if (balance < chargedAmount) {
+                    throw new Error('Insufficient balance. Please add funds on your profile page to continue playing.');
+                }
+                userUpdate.balance = parseFloat((balance - chargedAmount).toFixed(6));
+                recordedAmount = chargedAmount;
+            }
+
+            userUpdate.spendings = applySpending(userData.spendings, formatPeriod(timestamp), recordedAmount, tier);
+
+            if (userSnap.exists) {
+                transaction.update(userRef!, userUpdate);
+            } else {
+                transaction.set(userRef!, userUpdate, { merge: true });
+            }
+        }
+
+        // ---- commit the game cost ----
+        transaction.update(gameRef, gameUpdate);
+    });
 }
 
 export async function recordGameMasterTokenUsage(
@@ -59,28 +112,8 @@ export async function recordGameMasterTokenUsage(
     }
 
     const usage = normalizeTokenUsage(tokenUsage);
-    const gameRef = db.collection('games').doc(gameId);
 
-    // Read the tier up front so we can charge the user BEFORE committing the game
-    // cost. Charging first means an insufficient balance throws here and nothing
-    // is persisted — eliminating the cost-recorded-but-never-charged window. The
-    // only residual gap is the rare charge-succeeds-then-commit-fails case, which
-    // costs the platform nothing (the user paid; we just under-record our own cost).
-    const preSnap = await gameRef.get();
-    if (!preSnap.exists) {
-        return;
-    }
-    const gameTier = (preSnap.data() as Game).createdWithTier;
-
-    await applyUserSpending(userEmail, usage.costUSD, gameTier);
-
-    await db.runTransaction(async (transaction) => {
-        const gameSnap = await transaction.get(gameRef);
-        if (!gameSnap.exists) {
-            return;
-        }
-
-        const game = gameSnap.data() as Game;
+    await commitUsageAtomically(gameId, userEmail, usage.costUSD, (game) => {
         const currentUsage = game.gameMasterTokenUsage || {
             inputTokens: 0,
             outputTokens: 0,
@@ -97,10 +130,10 @@ export async function recordGameMasterTokenUsage(
 
         const updatedTotalCost = parseFloat(((game.totalGameCost || 0) + usage.costUSD).toFixed(6));
 
-        transaction.update(gameRef, {
+        return {
             gameMasterTokenUsage: updatedUsage,
             totalGameCost: updatedTotalCost
-        });
+        };
     });
 }
 
@@ -115,31 +148,8 @@ export async function recordBotTokenUsage(
     }
 
     const usage = normalizeTokenUsage(tokenUsage);
-    const gameRef = db.collection('games').doc(gameId);
 
-    // Read the tier (and confirm the bot exists) up front so we can charge the
-    // user BEFORE committing the game cost — see recordGameMasterTokenUsage for
-    // the rationale. We skip charging entirely if the bot isn't in the game.
-    const preSnap = await gameRef.get();
-    if (!preSnap.exists) {
-        return;
-    }
-    const preGame = preSnap.data() as Game;
-    const gameTier = preGame.createdWithTier;
-    const botExists = (Array.isArray(preGame.bots) ? preGame.bots : []).some(bot => bot.name === botName);
-    if (!botExists) {
-        return;
-    }
-
-    await applyUserSpending(userEmail, usage.costUSD, gameTier);
-
-    await db.runTransaction(async (transaction) => {
-        const gameSnap = await transaction.get(gameRef);
-        if (!gameSnap.exists) {
-            return;
-        }
-
-        const game = gameSnap.data() as Game;
+    await commitUsageAtomically(gameId, userEmail, usage.costUSD, (game) => {
         const bots = Array.isArray(game.bots) ? game.bots : [];
         let botFound = false;
 
@@ -167,16 +177,17 @@ export async function recordBotTokenUsage(
             };
         });
 
+        // Bot not in the game — abort without charging.
         if (!botFound) {
-            return;
+            return null;
         }
 
         const updatedTotalCost = parseFloat(((game.totalGameCost || 0) + usage.costUSD).toFixed(6));
 
-        transaction.update(gameRef, {
+        return {
             bots: updatedBots,
             totalGameCost: updatedTotalCost
-        });
+        };
     });
 }
 

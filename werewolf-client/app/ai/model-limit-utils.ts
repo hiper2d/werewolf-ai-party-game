@@ -173,6 +173,17 @@ export function validateModelUsageForTier(
     }
 
     if (tier !== USER_TIERS.FREE) {
+        // Paid tier runs on platform keys, so any *real* model is allowed — but a
+        // RANDOM placeholder or unknown model id must never slip through to a
+        // persisted game (it would break agent creation later).
+        for (const model of [gameMasterModel, ...botModels]) {
+            if (model === LLM_CONSTANTS.RANDOM) {
+                throw new Error('Random AI model selections must be resolved before generating or saving a game.');
+            }
+            if (!SupportedAiModels[model]) {
+                throw new Error(`Unsupported AI model: ${model}.`);
+            }
+        }
         return;
     }
 

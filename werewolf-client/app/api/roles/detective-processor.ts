@@ -67,16 +67,24 @@ export class DetectiveProcessor extends BaseRoleProcessor {
         }
 
         if (actionType === 'kill') {
-            // Detective's one-time kill ability
+            // The detective runs LAST in the night order, so the target may already
+            // be dead (e.g. the werewolves killed them this same night). Don't add a
+            // second death for the same player — it would double-count and report the
+            // victim dying twice. The detective still "acted", so record the result.
             const victimRole = this.resolvePlayerRole(detectiveTarget);
-            state.deaths.push({ player: detectiveTarget, role: victimRole, cause: 'detective_kill' });
-            this.logNightAction(`Detective used one-time kill on ${detectiveTarget} (${victimRole})`);
+            const alreadyDead = state.deaths.some(d => d.player === detectiveTarget);
+            if (alreadyDead) {
+                this.logNightAction(`Detective kill target ${detectiveTarget} is already dead — not recording a duplicate death`);
+            } else {
+                state.deaths.push({ player: detectiveTarget, role: victimRole, cause: 'detective_kill' });
+                this.logNightAction(`Detective used one-time kill on ${detectiveTarget} (${victimRole})`);
 
-            // If killed target is the maniac, their abducted victim also dies
-            if (victimRole === GAME_ROLES.MANIAC && state.abductedPlayer) {
-                const collateralRole = this.resolvePlayerRole(state.abductedPlayer);
-                state.deaths.push({ player: state.abductedPlayer, role: collateralRole, cause: 'maniac_collateral' });
-                this.logNightAction(`Maniac killed by detective - abducted victim ${state.abductedPlayer} also dies`);
+                // If killed target is the maniac, their abducted victim also dies
+                if (victimRole === GAME_ROLES.MANIAC && state.abductedPlayer) {
+                    const collateralRole = this.resolvePlayerRole(state.abductedPlayer);
+                    state.deaths.push({ player: state.abductedPlayer, role: collateralRole, cause: 'maniac_collateral' });
+                    this.logNightAction(`Maniac killed by detective - abducted victim ${state.abductedPlayer} also dies`);
+                }
             }
 
             // Still set detectiveResult so the system knows detective acted (but no investigation result)

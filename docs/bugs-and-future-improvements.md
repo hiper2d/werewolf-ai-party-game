@@ -21,51 +21,52 @@
     failure, so the user never has to retype.
 - **A new day auto-opens with a few bots** — `selectDayRespondersImpl` calls
     `selectRandomDayOpeningBots`, so the day no longer sits idle waiting for the human to type.
+- **`welcomeImpl` no longer loops forever on an unknown bot name** — it advances the queue
+    past the bad entry before surfacing the error, and is now a no-op outside the `WELCOME` state.
+- **Malformed vote-tally JSON now surfaces an error state** instead of silently resetting to an
+    empty tally — `parseVoteTally` / `parseIndividualVotes` throw on a corrupt blob, and the
+    VOTE_RESULTS path validates the tally before transitioning state (`bot-actions.ts`).
+- **`humanPlayerVote` echoes back both blobs** (tally + individual votes) exactly as persisted,
+    matching Firestore.
+- **A night kill of the human now ends the game** — added a persistent `humanPlayerIsAlive`
+    field on the Game model (set on day-vote and night-kill, defaulting legacy games to alive).
+    All three win-checkers in `game-end-checker.ts` consult it instead of looking the human up
+    in `game.bots` (where they never appear).
+- **Paid-tier model selections are now validated** — `validateModelUsageForTier` rejects the
+    `RANDOM` placeholder and unknown model ids on the paid tier too (it previously no-opped),
+    so an unresolved `RANDOM` can never be persisted into a game.
+- **`previewGame` validates all model/key selections up front** — before the LLM call and any
+    charge — so an invalid selection no longer costs a (billed) preview.
+- **Token-usage charging keys off the user's current tier**, not `game.createdWithTier`
+    (`cost-tracking.ts`), so a user who upgrades to paid is billed even for games started on the
+    free tier. (Still depends on the tier actually being flipped — see the Stripe auto-switch
+    wishlist item.)
+- **Charging the user and committing the game cost is now fully atomic** — the balance
+    deduction, the monthly-spending record and the game-cost update all happen in a SINGLE
+    Firestore transaction (`cost-tracking.ts` `commitUsageAtomically`). An insufficient paid
+    balance throws before any write, and the user doc can no longer end up with a deducted
+    balance but no matching spending entry. The monthly-spending merge logic moved to a shared,
+    tested pure helper (`spending-utils.ts` `applySpending` / `formatPeriod`), reused by
+    `updateUserMonthlySpending`. (Closes the last Money/tier item from the test push.)
+- **`setGameErrorState` failure no longer masks the original error** — the persist call in
+    `server-action-wrapper.ts` is wrapped; a write failure logs and returns a fallback game
+    carrying the real error (reusing the game already loaded for attribution) instead of
+    throwing the write error over the original.
+- **Wrapped server actions always log a function name** — `withErrorHandling` falls back to
+    `anonymousAction` when `fn.name` is empty, so anonymous arrow actions no longer produce
+    blank `function` fields in error logs/context.
+- **Night resolution never records a duplicate death** — the detective (which runs last) and,
+    defensively, the werewolf skip adding a second death for a player already in
+    `state.deaths`, so a detective kill on a player the werewolves already killed can't
+    double-count or report two deaths.
+- **The day-discussion cancellation guard now requires the queue head to still be the bot
+    being processed** (`bot-actions.ts`), not merely a non-empty queue — so a cancel that is
+    immediately followed by a new round repopulating the queue can no longer be clobbered by a
+    stale queue write.
 - Verified already implemented (removed from the wishlist): buy-me-a-coffee, news/updates
     page (`/news`), standalone rules page (`/rules`).
 
-## Bugs surfaced by the test push (2026-06-10) — pinned in tests, NOT yet fixed
-
-> Each bug below is pinned by a test (marked `PINNED` in the suites listed in
-> `test-coverage-gaps.md`). When fixing one, flip its pinned test from
-> "documents the bug" to "verifies the fix" as part of the same change —
-> the test failing on your fix is expected and is the starting point.
-
-Game-breaking:
-- **`HumanEliminatedChecker` can never fire**: it looks the human up in `game.bots`,
-    but the human is not mirrored there. Day-vote elimination is handled directly in
-    `voteImpl`, but night kills of the human may go undetected as game-over. The other
-    two win checkers also hardcode the human as alive in counts and role-reveal lists.
-- **`welcomeImpl` leaves an unknown bot name stuck at the queue head** — retries error
-    forever (`bot-actions.ts:324-327`); no game-state validation in welcome either.
-
-Money/tier:
-- **Paid tier skips model validation entirely** (`validateModelUsageForTier` no-ops for
-    any non-free tier). `RANDOM` is now resolved in `previewGame` before persistence, so the
-    "unresolved `RANDOM` in the game doc" symptom is gone — but paid selections are still
-    never validated against key availability.
-- **`previewGame` validates some tier/key rules after the LLM call and after charging**
-    (`game-actions.ts` ~290, ~385) — invalid selections still cost (and bill) a preview.
-- **Charging is gated on `game.createdWithTier`, not the user's current tier** —
-    compounds the Stripe top-up tier bug: paid users with free-created games are
-    never billed for them.
-- Charge ordering is no longer money-losing (the user is now charged before the game
-    cost commits, in `cost-tracking.ts`), but it is still not fully atomic across the
-    game doc and the user doc — a single transaction spanning both would close the
-    remaining charge-succeeds-then-commit-fails window.
-
-Robustness:
-- **`setGameErrorState` failure masks the original error** in
-    `server-action-wrapper.ts` (the write in the catch block is unguarded).
-- Cancellation guard only handles a fully-cleared queue (`bot-actions.ts:935`);
-    night compute layer has no aliveness checks on targets; error-log `function`
-    name is empty for anonymous wrapped actions.
-- **Malformed vote-tally JSON is silently reset** — a corrupt
-    `gameStateParamQueue[0]` blob discards all earlier votes without an error,
-    both when accumulating and at VOTE_RESULTS (degrades to the no-votes path).
-- `humanPlayerVote` returns the game with only the tally in `gameStateParamQueue`
-    (drops the individual-votes blob it just wrote to Firestore) — harmless today
-    but inconsistent with the persisted state.
+## Other improvements / wishlist (not from the test push, not test-pinned)
 
 - Switch user tier to `paid` automatically when balance is added. Today a Stripe top-up
     only increases `balance`; `tier` stays whatever it was (e.g. `free`), so the user keeps

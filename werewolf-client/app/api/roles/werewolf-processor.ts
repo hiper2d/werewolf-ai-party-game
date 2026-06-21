@@ -53,6 +53,15 @@ export class WerewolfProcessor extends BaseRoleProcessor {
             return state;
         }
 
+        // Defensive: never record a second death for a player who already died
+        // earlier in resolution. Werewolves run before the other killers in the
+        // normal order, so this won't trigger today, but the guard keeps the
+        // deaths list free of duplicates if resolution order ever changes.
+        if (state.deaths.some(d => d.player === werewolfTarget)) {
+            this.logNightAction(`Werewolf target ${werewolfTarget} is already dead — not recording a duplicate death`);
+            return state;
+        }
+
         // Add werewolf kill to deaths (doctor may remove it later)
         const victimRole = this.resolvePlayerRole(werewolfTarget);
         state.deaths.push({ player: werewolfTarget, role: victimRole, cause: 'werewolf_attack' });

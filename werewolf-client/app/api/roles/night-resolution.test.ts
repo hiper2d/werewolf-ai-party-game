@@ -390,6 +390,27 @@ describe("Maniac abduction", () => {
             { role: GAME_ROLES.DETECTIVE, reason: "abduction", player: null }
         ]);
     });
+
+    it("does not record a duplicate death when the detective kills a player already killed by the werewolf (#13b)", () => {
+        // The detective runs LAST. If they target the same player the werewolves
+        // already killed this night, the deaths list must not get a second entry
+        // for that player (which would double-count and report two deaths).
+        const state = resolve(makeGame({
+            nightResults: {
+                [GAME_ROLES.WEREWOLF]: { target: "Vicky" },
+                [GAME_ROLES.DETECTIVE]: { target: "Vicky", actionType: "kill" }
+            }
+        }));
+        expect(state.deaths).toEqual([
+            { player: "Vicky", role: GAME_ROLES.VILLAGER, cause: "werewolf_attack" }
+        ]);
+        // The detective still acted; their result is recorded.
+        expect(state.detectiveResult).toEqual({
+            target: "Vicky",
+            isEvil: false,
+            success: true
+        });
+    });
 });
 
 // ---------------------------------------------------------------------------

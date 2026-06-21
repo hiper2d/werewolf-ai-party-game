@@ -306,6 +306,65 @@ describe('withErrorHandling', () => {
     });
   });
 
+  describe('error-state persistence failures (#12)', () => {
+    it('does not mask the original error when setGameErrorState throws — returns a fallback game carrying the error', async () => {
+      const game = makeGame();
+      mockGetGame.mockResolvedValue(game);
+      mockSetGameErrorState.mockRejectedValue(new Error('firestore write failed'));
+      const wrapped = withErrorHandling(async () => { throw new Error('original failure'); }, () => GAME_ID);
+
+      const response = await wrapped();
+
+      // The original error still surfaces via the returned game's errorState,
+      // built from the game we already loaded for attribution.
+      expect(response.messages).toEqual([]);
+      expect((response.game as any).errorState.error).toBe('original failure');
+      expect((response.game as any).id).toBe(GAME_ID);
+      // The persist failure is logged, not thrown.
+      expect(logger.error).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to persist error state'),
+        expect.objectContaining({ originalError: 'original failure' })
+      );
+    });
+
+    it('falls back to a minimal error game when both attribution and persistence fail', async () => {
+      mockGetGame.mockRejectedValue(new Error('firestore down'));
+      mockSetGameErrorState.mockRejectedValue(new Error('firestore write failed'));
+      const wrapped = withErrorHandling(async () => { throw new Error('original failure'); }, () => GAME_ID);
+
+      const response = await wrapped();
+
+      expect((response.game as any).id).toBe(GAME_ID);
+      expect((response.game as any).errorState.error).toBe('original failure');
+    });
+  });
+
+  describe('function name attribution (#13a)', () => {
+    it('falls back to "anonymousAction" when the wrapped function has no name', async () => {
+      const wrapped = withErrorHandling(async () => { throw new Error('boom'); }, () => GAME_ID);
+
+      await wrapped();
+
+      const { systemError } = lastErrorStateCall();
+      expect(systemError.context.function).toBe('anonymousAction');
+      expect(logger.error).toHaveBeenCalledWith(
+        'Game action failed: anonymousAction',
+        expect.objectContaining({ function: 'anonymousAction' })
+      );
+    });
+
+    it('uses the real function name when present', async () => {
+      async function namedImpl(_gameId: string): Promise<GameActionResponse> {
+        throw new Error('boom');
+      }
+      const wrapped = withErrorHandling(namedImpl, () => GAME_ID);
+
+      await wrapped(GAME_ID);
+
+      expect(lastErrorStateCall().systemError.context.function).toBe('namedImpl');
+    });
+  });
+
   describe('gameId extraction', () => {
     it('uses the gameIdExtractor to pick the gameId from arbitrary argument shapes', async () => {
       const wrapped = withErrorHandling(

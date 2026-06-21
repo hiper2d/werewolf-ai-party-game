@@ -4,17 +4,10 @@ import {db} from "@/firebase/server";
 import {firestore} from "firebase-admin";
 import {ApiKeyMap, User, UserMonthlySpending, UserTier, USER_TIERS} from "@/app/api/game-models";
 import {VoiceProvider, getDefaultVoiceProvider} from "@/app/ai/voice-config";
-import {normalizeSpendings} from "@/app/utils/spending-utils";
+import {applySpending, formatPeriod, normalizeSpendings} from "@/app/utils/spending-utils";
 import FieldValue = firestore.FieldValue;
 
 const ZERO_SPENDINGS: UserMonthlySpending[] = [];
-
-function formatPeriod(timestamp: number): string {
-    const date = new Date(timestamp);
-    const year = date.getUTCFullYear();
-    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-    return `${year}-${month}`;
-}
 
 /**
  * Creates or updates the user's Firestore record on sign-in.
@@ -149,53 +142,7 @@ export async function updateUserMonthlySpending(
     await db.runTransaction(async (transaction) => {
         const userSnap = await transaction.get(userRef);
         const currentData = userSnap.exists ? userSnap.data() : {};
-        const currentSpendings = normalizeSpendings(currentData?.spendings);
-
-        let periodUpdated = false;
-        const updatedSpendings = currentSpendings.map(record => {
-            if (record.period === period) {
-                periodUpdated = true;
-
-                // Update total amount
-                const newTotal = parseFloat((record.amountUSD + normalizedAmount).toFixed(6));
-
-                // Update tier-specific amount if tier is provided
-                let freeAmount = record.freeAmountUSD || 0;
-                let apiAmount = record.apiAmountUSD || 0;
-
-                let paidAmount = record.paidAmountUSD || 0;
-
-                if (tier === 'free') {
-                    freeAmount = parseFloat((freeAmount + normalizedAmount).toFixed(6));
-                } else if (tier === 'api') {
-                    apiAmount = parseFloat((apiAmount + normalizedAmount).toFixed(6));
-                } else if (tier === 'paid') {
-                    paidAmount = parseFloat((paidAmount + normalizedAmount).toFixed(6));
-                }
-
-                return {
-                    period: record.period,
-                    amountUSD: newTotal,
-                    freeAmountUSD: freeAmount,
-                    apiAmountUSD: apiAmount,
-                    paidAmountUSD: paidAmount
-                } as UserMonthlySpending;
-            }
-            return record;
-        });
-
-        if (!periodUpdated) {
-            const newRecord: UserMonthlySpending = {
-                period,
-                amountUSD: normalizedAmount,
-                freeAmountUSD: tier === 'free' ? normalizedAmount : 0,
-                apiAmountUSD: tier === 'api' ? normalizedAmount : 0,
-                paidAmountUSD: tier === 'paid' ? normalizedAmount : 0
-            };
-            updatedSpendings.push(newRecord);
-        }
-
-        updatedSpendings.sort((a, b) => b.period.localeCompare(a.period));
+        const updatedSpendings = applySpending(currentData?.spendings, period, normalizedAmount, tier);
 
         if (userSnap.exists) {
             transaction.update(userRef, { spendings: updatedSpendings });

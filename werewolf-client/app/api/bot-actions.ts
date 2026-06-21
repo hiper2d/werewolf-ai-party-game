@@ -62,6 +62,31 @@ import { RoleProcessorFactory } from "./roles";
 import {logger} from "@/app/utils/logger";
 
 /**
+ * Parse a vote-tally / individual-votes blob from gameStateParamQueue.
+ *
+ * These blobs are accumulated across a voting round, so a corrupt entry means the
+ * round's votes so far are unrecoverable. Rather than silently resetting to an
+ * empty tally (which discards every prior vote and degrades to the no-votes path),
+ * we throw — the server-action wrapper turns this into a visible error state the
+ * user can retry from, instead of a silently wrong elimination.
+ */
+function parseVoteTally(raw: string): Record<string, number> {
+    try {
+        return JSON.parse(raw);
+    } catch (e) {
+        throw new Error(`Corrupted vote tally in game state — cannot parse voting results: ${String(raw).slice(0, 100)}`);
+    }
+}
+
+function parseIndividualVotes(raw: string): IndividualVote[] {
+    try {
+        return JSON.parse(raw);
+    } catch (e) {
+        throw new Error(`Corrupted vote data in game state — cannot parse individual votes: ${String(raw).slice(0, 100)}`);
+    }
+}
+
+/**
  * Helper function to generate bot system prompt with after-game addition if needed
  */
 function generateBotSystemPrompt(bot: Bot, game: Game): string {
@@ -273,7 +298,13 @@ function shouldTriggerAutoVote(game: Game): boolean {
         }
     
         await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: game.createdWithTier });
-    
+
+        // Tolerant of double-fire / stale calls: only do work while actually in WELCOME.
+        if (game.gameState !== GAME_STATES.WELCOME) {
+            logger.info(`🎭 WELCOME: game ${gameId} is in ${game.gameState}, nothing to do`);
+            return { game, messages: [] };
+        }
+
         try {
             // If queue is empty, move to DAY_DISCUSSION state
             if (game.gameStateParamQueue.length === 0) {
@@ -292,6 +323,11 @@ function shouldTriggerAutoVote(game: Game): boolean {
             // Find the bot in the game's bots array
             const bot: Bot | undefined = game.bots.find(b => b.name === botName);
             if (!bot) {
+                // Advance past the bad entry first so a retry doesn't loop on the same
+                // unknown name forever, then surface the error.
+                await db.collection('games').doc(gameId).update({
+                    gameStateParamQueue: newQueue
+                });
                 throw new Error(`Bot ${botName} not found in game`);
             }
     
@@ -737,13 +773,18 @@ async function processNextBotInQueue(
         throw new Error('Firestore is not initialized');
     }
     const freshGame = await getGame(gameId);
-    if (freshGame && freshGame.gameStateProcessQueue.length === 0) {
-        // Queue was cleared (e.g. by cancel) — don't overwrite it
-        logger.info(`Queue was cleared while processing bot ${botName}, not overwriting`, { gameId });
-    } else {
+    // Only advance the queue if it is still OUR turn at the head. A bare
+    // length-0 check missed the case where the queue was cancelled AND a new
+    // round repopulated it with different bots — writing our stale newQueue
+    // would then clobber the fresh round. Requiring the head to still equal
+    // botName covers both: an empty queue (cancel) and a queue that has since
+    // moved on to a different player.
+    if (freshGame && freshGame.gameStateProcessQueue[0] === botName) {
         await db.collection('games').doc(gameId).update({
             gameStateProcessQueue: newQueue
         });
+    } else {
+        logger.info(`Queue changed while processing bot ${botName} (no longer at head), not overwriting`, { gameId });
     }
 
     return [savedGmMessage, savedBotMessage];
@@ -811,26 +852,22 @@ async function voteImpl(gameId: string): Promise<GameActionResponse> {
                     timestamp: new Date().toISOString()
                 });
                 
+                // Validate the accumulated tally BEFORE transitioning, so a corrupt
+                // blob surfaces an error without leaving the game stuck in VOTE_RESULTS.
+                const votingResults: Record<string, number> = game.gameStateParamQueue.length > 0
+                    ? parseVoteTally(game.gameStateParamQueue[0])
+                    : {};
+
                 // Transition to VOTE_RESULTS state
                 await db.collection('games').doc(gameId).update({
                     gameState: GAME_STATES.VOTE_RESULTS
                 });
-                
+
                 console.log('✅ VOTE FUNCTION: Successfully updated game state to VOTE_RESULTS');
-                
+                console.log('📊 VOTE FUNCTION: Parsed voting results:', votingResults);
+
                 // Get updated game state
                 const updatedGame = await getGame(gameId) as Game;
-                
-                // Parse voting results
-                let votingResults: Record<string, number> = {};
-                if (updatedGame.gameStateParamQueue.length > 0) {
-                    try {
-                        votingResults = JSON.parse(updatedGame.gameStateParamQueue[0]);
-                        console.log('📊 VOTE FUNCTION: Parsed voting results:', votingResults);
-                    } catch (e) {
-                        console.error("Failed to parse voting results", e);
-                    }
-                }
                 
                 // Generate GM message with voting results
                 const resultsMessage = generateVotingResultsMessage(votingResults);
@@ -878,11 +915,7 @@ async function voteImpl(gameId: string): Promise<GameActionResponse> {
                     // Parse individual votes from gameStateParamQueue[1]
                     let savedIndividualVotes: IndividualVote[] = [];
                     if (updatedGame.gameStateParamQueue.length > 1) {
-                        try {
-                            savedIndividualVotes = JSON.parse(updatedGame.gameStateParamQueue[1]);
-                        } catch (e) {
-                            savedIndividualVotes = [];
-                        }
+                        savedIndividualVotes = parseIndividualVotes(updatedGame.gameStateParamQueue[1]);
                     }
 
                     // Create voting history entry
@@ -910,9 +943,10 @@ async function voteImpl(gameId: string): Promise<GameActionResponse> {
 
                     // Update game state based on elimination
                     if (isHumanEliminated) {
-                        // Human eliminated: set game state to GAME_OVER
+                        // Human eliminated: record the death and set game state to GAME_OVER
                         await db.collection('games').doc(gameId).update({
                             gameState: GAME_STATES.GAME_OVER,
+                            humanPlayerIsAlive: false,
                             votingHistory: updatedVotingHistory
                         });
                         console.log('🎮 ELIMINATION: Human player eliminated, game over');
@@ -1104,21 +1138,13 @@ async function voteImpl(gameId: string): Promise<GameActionResponse> {
             // Update voting results in gameStateParamQueue (as a map of names to vote counts)
             let votingResults: Record<string, number> = {};
             if (currentGame.gameStateParamQueue.length > 0) {
-                try {
-                    votingResults = JSON.parse(currentGame.gameStateParamQueue[0]);
-                } catch (e) {
-                    votingResults = {};
-                }
+                votingResults = parseVoteTally(currentGame.gameStateParamQueue[0]);
             }
 
             // Track individual votes in gameStateParamQueue[1]
             let individualVotes: IndividualVote[] = [];
             if (currentGame.gameStateParamQueue.length > 1) {
-                try {
-                    individualVotes = JSON.parse(currentGame.gameStateParamQueue[1]);
-                } catch (e) {
-                    individualVotes = [];
-                }
+                individualVotes = parseIndividualVotes(currentGame.gameStateParamQueue[1]);
             }
 
             // Add this vote
@@ -1240,21 +1266,13 @@ async function humanPlayerVoteImpl(gameId: string, targetPlayer: string, reason:
         // Update voting results in gameStateParamQueue
         let votingResults: Record<string, number> = {};
         if (currentGame.gameStateParamQueue.length > 0) {
-            try {
-                votingResults = JSON.parse(currentGame.gameStateParamQueue[0]);
-            } catch (e) {
-                votingResults = {};
-            }
+            votingResults = parseVoteTally(currentGame.gameStateParamQueue[0]);
         }
 
         // Track individual votes in gameStateParamQueue[1]
         let individualVotes: IndividualVote[] = [];
         if (currentGame.gameStateParamQueue.length > 1) {
-            try {
-                individualVotes = JSON.parse(currentGame.gameStateParamQueue[1]);
-            } catch (e) {
-                individualVotes = [];
-            }
+            individualVotes = parseIndividualVotes(currentGame.gameStateParamQueue[1]);
         }
 
         // Add this vote
@@ -1294,12 +1312,13 @@ async function humanPlayerVoteImpl(gameId: string, targetPlayer: string, reason:
         
         logger.info(`Successfully processed vote for human player ${currentGame.humanPlayerName}, removed from queue`, { gameId });
         
-        // Return updated game state
+        // Return updated game state. Echo back BOTH blobs exactly as persisted to
+        // Firestore (tally + individual votes) so the returned game matches storage.
         return {
             game: {
                 ...currentGame,
                 gameStateProcessQueue: newQueue,
-                gameStateParamQueue: [JSON.stringify(votingResults)]
+                gameStateParamQueue: [JSON.stringify(votingResults), JSON.stringify(individualVotes)]
             },
             messages: [savedVoteMessage]
         };

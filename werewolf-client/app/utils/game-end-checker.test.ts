@@ -25,12 +25,14 @@ interface GameSetup {
     bots?: Bot[];
     humanPlayerName?: string;
     humanPlayerRole?: string;
+    humanPlayerIsAlive?: boolean;
 }
 
 function makeGame({
     bots = [],
     humanPlayerName = 'Human',
-    humanPlayerRole = GAME_ROLES.VILLAGER
+    humanPlayerRole = GAME_ROLES.VILLAGER,
+    humanPlayerIsAlive = true
 }: GameSetup = {}): Game {
     return {
         id: 'test-game-id',
@@ -44,6 +46,7 @@ function makeGame({
         bots,
         humanPlayerName,
         humanPlayerRole,
+        humanPlayerIsAlive,
         currentDay: 1,
         gameState: 'DAY_DISCUSSION',
         gameStateParamQueue: [],
@@ -198,8 +201,8 @@ describe('GameEndChecker', () => {
         it('should end the game immediately when the human player is dead', () => {
             const game = makeGame({
                 humanPlayerName: 'Human',
+                humanPlayerIsAlive: false,
                 bots: [
-                    makeBot('Human', GAME_ROLES.VILLAGER, false),
                     makeBot('Wolfgang', GAME_ROLES.WEREWOLF),
                     makeBot('Alice', GAME_ROLES.VILLAGER),
                     makeBot('Bob', GAME_ROLES.VILLAGER)
@@ -218,8 +221,8 @@ describe('GameEndChecker', () => {
             // not a villagers win.
             const game = makeGame({
                 humanPlayerName: 'Human',
+                humanPlayerIsAlive: false,
                 bots: [
-                    makeBot('Human', GAME_ROLES.VILLAGER, false),
                     makeBot('Wolfgang', GAME_ROLES.WEREWOLF, false),
                     makeBot('Alice', GAME_ROLES.VILLAGER)
                 ]
@@ -236,8 +239,8 @@ describe('GameEndChecker', () => {
             // Human dead AND werewolves outnumber everyone.
             const game = makeGame({
                 humanPlayerName: 'Human',
+                humanPlayerIsAlive: false,
                 bots: [
-                    makeBot('Human', GAME_ROLES.VILLAGER, false),
                     makeBot('Wolfgang', GAME_ROLES.WEREWOLF),
                     makeBot('Fang', GAME_ROLES.WEREWOLF)
                 ]
@@ -250,11 +253,27 @@ describe('GameEndChecker', () => {
             expect(result.reason).toBe('The human player has been eliminated');
         });
 
-        it('should treat the human as alive when no bot entry matches the human name', () => {
-            // Pins CURRENT behavior: HumanEliminatedChecker looks the human up in
-            // game.bots. If the human has no bot entry, they can never be detected
-            // as eliminated, regardless of game state. Suspected gap if the human
-            // is not mirrored into the bots array elsewhere in the app.
+        it('detects human death via humanPlayerIsAlive (the human is not a bot entry)', () => {
+            // The human is never mirrored into game.bots; their alive status lives on
+            // game.humanPlayerIsAlive. With it false, the game ends even though no bot
+            // matches the human name.
+            const game = makeGame({
+                humanPlayerName: 'Human',
+                humanPlayerIsAlive: false,
+                bots: [
+                    makeBot('Wolfgang', GAME_ROLES.WEREWOLF),
+                    makeBot('Alice', GAME_ROLES.VILLAGER),
+                    makeBot('Bob', GAME_ROLES.VILLAGER)
+                ]
+            });
+
+            const result = checker.check(game);
+
+            expect(result.isEnded).toBe(true);
+            expect(result.reason).toBe('The human player has been eliminated');
+        });
+
+        it('treats the human as alive when humanPlayerIsAlive is absent (legacy games)', () => {
             const game = makeGame({
                 humanPlayerName: 'Human',
                 bots: [
@@ -263,6 +282,7 @@ describe('GameEndChecker', () => {
                     makeBot('Bob', GAME_ROLES.VILLAGER)
                 ]
             });
+            delete (game as { humanPlayerIsAlive?: boolean }).humanPlayerIsAlive;
 
             const result = checker.check(game);
 
@@ -353,8 +373,8 @@ describe('GameEndChecker', () => {
             const game = makeGame({
                 humanPlayerName: 'Human',
                 humanPlayerRole: GAME_ROLES.VILLAGER,
+                humanPlayerIsAlive: false,
                 bots: [
-                    makeBot('Human', GAME_ROLES.VILLAGER, false),
                     makeBot('Wolfgang', GAME_ROLES.WEREWOLF),
                     makeBot('Alice', GAME_ROLES.VILLAGER)
                 ]
