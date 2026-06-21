@@ -11,7 +11,7 @@
  * Math.random and Date.now are pinned for determinism.
  */
 
-import { performNightAction } from './night-actions';
+import { performNightAction, summarizePastDay, selectDayResponders } from './night-actions';
 import { db } from '@/firebase/server';
 import { auth } from '@/auth';
 import { AgentFactory } from '@/app/ai/agent-factory';
@@ -388,6 +388,81 @@ describe('human player night turns', () => {
         expect(mockUpdate).toHaveBeenCalledWith({
             gameStateParamQueue: ['Doc'],
         });
+        expect(setGameErrorState).not.toHaveBeenCalled();
+    });
+});
+
+// ---------------------------------------------------------------------------
+// summarizePastDay: NEW_DAY_BOT_SUMMARIES -> NIGHT_IMPRESSION
+// ---------------------------------------------------------------------------
+
+describe('summarizePastDay: starting a new day', () => {
+    // summarizePastDayImpl reads game state from the Firestore doc snapshot (not getGame),
+    // so point the db doc's get() at the desired state for these tests.
+    function withDocData(gameData: Game) {
+        const get = jest.fn(async () => ({ exists: true, data: () => gameData }));
+        const doc = jest.fn(() => ({ update: mockUpdate, get, collection: jest.fn() }));
+        (db!.collection as jest.Mock).mockReturnValue({ doc });
+    }
+
+    test('empty summary queue increments the day and moves to NIGHT_IMPRESSION', async () => {
+        withDocData(makeGame({
+            gameState: GAME_STATES.NEW_DAY_BOT_SUMMARIES,
+            gameStateProcessQueue: [],
+            currentDay: 1,
+        }));
+        (getGame as jest.Mock).mockResolvedValue(
+            makeGame({ gameState: GAME_STATES.NIGHT_IMPRESSION, currentDay: 2 })
+        );
+
+        await summarizePastDay(GAME_ID);
+
+        const update = updatesWith('gameState')[0];
+        expect(update.gameState).toBe(GAME_STATES.NIGHT_IMPRESSION);
+        expect(update.currentDay).toBe(2);
+        expect(update.gameStateProcessQueue).toEqual([]);
+        expect(update.dayActivityCounter).toEqual({});
+        // The "Day N begins" story is posted for the new day.
+        expect(savedMessages().some(
+            (m) => m.messageType === MessageType.GAME_STORY && m.day === 2
+        )).toBe(true);
+        expect(setGameErrorState).not.toHaveBeenCalled();
+    });
+});
+
+// ---------------------------------------------------------------------------
+// selectDayResponders: NIGHT_IMPRESSION -> DAY_DISCUSSION
+// ---------------------------------------------------------------------------
+
+describe('selectDayResponders', () => {
+    test('seeds a few random alive bots and transitions to DAY_DISCUSSION', async () => {
+        const game = makeGame({ gameState: GAME_STATES.NIGHT_IMPRESSION, currentDay: 2 });
+        (getGame as jest.Mock).mockResolvedValue(game);
+
+        await selectDayResponders(GAME_ID);
+
+        const update = updatesWith('gameState')[0];
+        expect(update.gameState).toBe(GAME_STATES.DAY_DISCUSSION);
+        // 3 alive bots; with Math.random pinned at 0.5 the count is 3 (all of them).
+        expect(update.gameStateProcessQueue).toEqual(
+            expect.arrayContaining(['Wolf', 'Doc', 'Vil'])
+        );
+        expect(update.gameStateProcessQueue.length).toBeGreaterThanOrEqual(2);
+        // Selection is recorded as a hidden debug message.
+        expect(savedMessages().some(
+            (m) => m.messageType === MessageType.GM_BOT_SELECTION
+        )).toBe(true);
+        expect(setGameErrorState).not.toHaveBeenCalled();
+    });
+
+    test('is a no-op when not in NIGHT_IMPRESSION (tolerant of double-fire)', async () => {
+        const game = makeGame({ gameState: GAME_STATES.DAY_DISCUSSION });
+        (getGame as jest.Mock).mockResolvedValue(game);
+
+        const result = await selectDayResponders(GAME_ID);
+
+        expect(result.game).toBe(game);
+        expect(mockUpdate).not.toHaveBeenCalled();
         expect(setGameErrorState).not.toHaveBeenCalled();
     });
 });

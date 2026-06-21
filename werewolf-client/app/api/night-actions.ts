@@ -29,6 +29,7 @@ import { withGameErrorHandling } from "@/app/utils/server-action-wrapper";
 import { AgentFactory } from "@/app/ai/agent-factory";
 import { getUserFromFirestore, getBotMessages, getGameMessages } from "@/app/api/game-actions";
 import { getApiKeysForUser } from "@/app/utils/tier-utils";
+import { selectRandomDayOpeningBots } from "@/app/api/bot-selection";
 import { GM_NIGHT_RESULTS_SYSTEM_PROMPT, GM_DAY_SUMMARY_SYSTEM_PROMPT, GM_DAY_SUMMARY_COMMAND } from "@/app/ai/prompts/gm-prompts";
 import { GM_COMMAND_GENERATE_NIGHT_RESULTS } from "@/app/ai/prompts/gm-commands";
 import { NightResultsStory } from "@/app/ai/prompts/ai-schemas";
@@ -1114,7 +1115,9 @@ async function summarizePastDayImpl(gameId: string): Promise<GameActionResponse>
         // Get the first bot from the processing queue
         const processQueue = [...(gameData.gameStateProcessQueue || [])];
         if (processQueue.length === 0) {
-            // No more bots to process, transition to DAY_DISCUSSION and increment day
+            // No more bots to summarize. Increment the day, post the day-begins story, and
+            // move to NIGHT_IMPRESSION. That state (driven by the client, like WELCOME)
+            // picks a few bots to open the discussion so the game doesn't look stuck.
             const nextDay = (currentGame.currentDay || 1) + 1;
 
             // Create Game Master message for new day
@@ -1134,13 +1137,14 @@ async function summarizePastDayImpl(gameId: string): Promise<GameActionResponse>
             const savedDayBeginsMsg = await addMessageToChatAndSaveToDb(gameMessage, gameId);
 
             await gameRef.update({
-                gameState: GAME_STATES.DAY_DISCUSSION,
+                gameState: GAME_STATES.NIGHT_IMPRESSION,
                 gameStateProcessQueue: [],
                 gameStateParamQueue: [],
                 currentDay: nextDay,
                 dayActivityCounter: {} // Reset activity counter for new day
             });
-            logger.info(`💭 All bot summaries completed, starting Day ${nextDay}`, { gameId, nextDay });
+            logger.info(`💭 All bot summaries completed, selecting responders for Day ${nextDay}`, { gameId, nextDay });
+
             const dayBeginsGame = await getGame(gameId) as Game;
             return { game: dayBeginsGame, messages: [savedDayBeginsMsg] };
         }
@@ -1390,8 +1394,56 @@ function gameFromFirestore(id: string, data: any): Game {
     };
 }
 
+/**
+ * Process the NIGHT_IMPRESSION state: pick a few random alive bots to open the
+ * new day's discussion, seed the process queue, and move to DAY_DISCUSSION. Driven
+ * by the client the same way WELCOME is. Tolerant of double-fire (no-op if already
+ * past this state) and best-effort on selection (always reaches DAY_DISCUSSION).
+ */
+async function selectDayRespondersImpl(gameId: string): Promise<GameActionResponse> {
+    const session = await auth();
+    if (!session || !session.user?.email) {
+        throw new Error('Not authenticated');
+    }
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+
+    const game = await getGame(gameId);
+    if (!game) {
+        throw new Error('Game not found');
+    }
+
+    await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: game.createdWithTier });
+
+    // Tolerant of double-fire: if we're no longer in NIGHT_IMPRESSION, the work was
+    // already done by a prior call — just return the current game unchanged.
+    if (game.gameState !== GAME_STATES.NIGHT_IMPRESSION) {
+        return { game, messages: [] };
+    }
+
+    // Pick a few random alive bots to open the day. Best-effort: even if selection
+    // fails, still move to DAY_DISCUSSION so the day starts (human can use "Go on").
+    let selectedBots: string[] = [];
+    try {
+        selectedBots = await selectRandomDayOpeningBots(game);
+    } catch (error) {
+        logger.warn(`🌅 Failed to select day-opening bots, starting Day ${game.currentDay} paused`, { gameId, error });
+    }
+
+    await db.collection('games').doc(gameId).update({
+        gameState: GAME_STATES.DAY_DISCUSSION,
+        gameStateProcessQueue: selectedBots,
+        gameStateParamQueue: []
+    });
+    logger.info(`🌅 Day ${game.currentDay} opens with ${selectedBots.length} responders`, { gameId, selectedBots });
+
+    return { game: await getGame(gameId) as Game, messages: [] };
+}
+
 // Wrapped exports with error handling
 export const performNightAction = withGameErrorHandling(performNightActionImpl);
+export const selectDayResponders = withGameErrorHandling(selectDayRespondersImpl);
 export const beginNight = withGameErrorHandling(beginNightImpl);
 export const replayNight = withGameErrorHandling(replayNightImpl);
 export const humanPlayerTalkWerewolves = withGameErrorHandling(humanPlayerTalkWerewolvesImpl);

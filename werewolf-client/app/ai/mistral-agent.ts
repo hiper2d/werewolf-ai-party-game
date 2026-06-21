@@ -132,10 +132,11 @@ export class MistralAgent extends AbstractAgent {
     /**
      * New method using Zod with Mistral API
      * This provides better schema handling and runtime validation
-     * 
-     * According to Mistral documentation, we should:
-     * 1. Set responseFormat to { type: 'json_object' }
-     * 2. Add the schema description to the last message content
+     *
+     * Uses Mistral Custom Structured Outputs (responseFormat json_schema), which
+     * enforces the response shape server-side and is more reliable than plain JSON
+     * mode. The human-readable schema description is still appended to the last
+     * message because the enforced schema omits field descriptions/semantics.
      */
     async askWithZodSchema<T>(zodSchema: z.ZodSchema<T>, messages: AIMessage[]): Promise<[T, string, TokenUsage?, string?]> {
         try {
@@ -167,12 +168,19 @@ export class MistralAgent extends AbstractAgent {
 
             const allMessages = [systemMessage, ...convertedMessages];
 
-            // Build request parameters with JSON format (no jsonSchema parameter)
+            // Build request parameters using Mistral Custom Structured Outputs.
+            // json_schema enforces the response shape server-side; parseAndValidateLlmJson
+            // below remains as a backstop for the rare case the model still drifts.
             const requestParams = {
                 ...this.defaultParams,
                 messages: allMessages,
                 responseFormat: {
-                    type: 'json_object' as const
+                    type: 'json_schema' as const,
+                    jsonSchema: {
+                        name: 'response_schema',
+                        schemaDefinition: ZodSchemaConverter.toMistralSchema(zodSchema),
+                        strict: true
+                    }
                 }
             };
 

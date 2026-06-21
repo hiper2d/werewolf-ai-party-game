@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getGame, updateBotModel, updateGameMasterModel, clearGameErrorState, setGameErrorState, afterGameDiscussion } from "@/app/api/game-actions";
-import { startNewDay, summarizePastDay } from "@/app/api/night-actions";
+import { startNewDay, summarizePastDay, selectDayResponders } from "@/app/api/night-actions";
 import GameChat from "@/app/games/[id]/components/GameChat";
 import ModelSelectionDialog from "@/app/games/[id]/components/ModelSelectionDialog";
 const btnGhost = "px-3 py-1.5 text-[13px] font-medium rounded-[var(--radius-md)] bg-[var(--bg-3)] border border-[var(--line-3)] text-[var(--fg-0)] hover:bg-[var(--bg-4)] transition-all duration-[120ms]";
@@ -396,6 +396,54 @@ function GamePageContent({
         handleSummaryGeneration();
     }, [game.gameState, game.gameStateProcessQueue.length, game.gameStateProcessQueue.join(','), game.id, game.errorState]);
 
+    // Handle NIGHT_IMPRESSION state: auto-select a few bots to open the new day,
+    // then transition to DAY_DISCUSSION (mirrors the WELCOME auto-processing pattern).
+    useEffect(() => {
+        const handleSelectDayResponders = async () => {
+            if (game.gameState === GAME_STATES.NIGHT_IMPRESSION && !game.errorState) {
+                console.log('🌅 GAMEPAGE: AUTO-PROCESS DAY RESPONDERS:', {
+                    gameId: game.id,
+                    timestamp: new Date().toISOString()
+                });
+
+                try {
+                    const result = await runGameAction(() => selectDayResponders(game.id));
+                    console.log('✅ GAMEPAGE: SelectDayResponders API completed');
+                    if (result) {
+                        applyActionResult(result);
+                    }
+                } catch (error: any) {
+                    if (handleGameActionError(error)) {
+                        return;
+                    }
+                    console.error('🌅 GAMEPAGE: SelectDayResponders failed:', error);
+
+                    const errorState = {
+                        error: `Failed to start the day: ${error.message}`,
+                        details: error.details || 'Day responder selection encountered an error',
+                        context: error.context || {},
+                        recoverable: error.recoverable !== false,
+                        timestamp: Date.now()
+                    };
+
+                    try {
+                        const gameWithError = await runGameAction(() => setGameErrorState(game.id, errorState));
+                        if (gameWithError) {
+                            setGame(gameWithError);
+                        }
+                    } catch (setErrorError) {
+                        if (handleGameActionError(setErrorError)) {
+                            return;
+                        }
+                        console.error('🌅 GAMEPAGE: Failed to set error state:', setErrorError);
+                    }
+                }
+            }
+        };
+
+        handleSelectDayResponders();
+    }, [game.gameState, game.id, game.errorState]);
+
 
     // Handle state changes logging
     useEffect(() => {
@@ -544,6 +592,14 @@ function GamePageContent({
                     items: processQueue,
                     currentItem: processQueue[0] || null,
                     showProgress: processQueue.length > 0
+                };
+            case GAME_STATES.NIGHT_IMPRESSION:
+                return {
+                    title: "🌅 Starting the Day",
+                    description: "Choosing who speaks first...",
+                    items: [],
+                    currentItem: null,
+                    showProgress: false
                 };
             case GAME_STATES.DAY_DISCUSSION:
                 return {

@@ -1359,6 +1359,9 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
             }
             return "Night phase in progress...";
         }
+        if (game.gameState === GAME_STATES.NIGHT_IMPRESSION) {
+            return "Starting the day...";
+        }
         if (game.gameState !== GAME_STATES.DAY_DISCUSSION) {
             return "Waiting for game to start...";
         }
@@ -1458,7 +1461,7 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
                         Deleting messages...
                     </div>
                 )}
-                {(isProcessing || isExternalLoading || (game.gameState === GAME_STATES.VOTE && game.gameStateProcessQueue.length > 0 && !game.errorState) || (game.gameState === GAME_STATES.WELCOME && game.gameStateParamQueue.length > 0 && !game.errorState)) && !isLoadingMessages && (
+                {(isProcessing || isExternalLoading || (game.gameState === GAME_STATES.VOTE && game.gameStateProcessQueue.length > 0 && !game.errorState) || (game.gameState === GAME_STATES.WELCOME && game.gameStateParamQueue.length > 0 && !game.errorState) || (game.gameState === GAME_STATES.NIGHT_IMPRESSION && !game.errorState)) && !isLoadingMessages && (
                     <div className="flex items-center gap-2 py-2 px-3">
                         <div className="flex gap-1">
                             <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-bounce" style={{ animationDelay: '0ms' }}></span>
@@ -1470,9 +1473,11 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
                                 ? `${game.gameStateProcessQueue[0]} is voting...`
                                 : game.gameState === GAME_STATES.WELCOME && game.gameStateParamQueue.length > 0
                                     ? `${game.gameStateParamQueue[0]} is thinking...`
-                                    : game.gameStateProcessQueue.length > 0
-                                        ? `${game.gameStateProcessQueue[0]} is thinking...`
-                                        : 'Processing...'}
+                                    : game.gameState === GAME_STATES.NIGHT_IMPRESSION
+                                        ? 'Starting the day...'
+                                        : game.gameStateProcessQueue.length > 0
+                                            ? `${game.gameStateProcessQueue[0]} is thinking...`
+                                            : 'Processing...'}
                         </span>
                     </div>
                 )}

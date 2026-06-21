@@ -49,6 +49,7 @@ import {
     getUserFromFirestore
 } from "./game-actions";
 import {getApiKeysForUser} from "@/app/utils/tier-utils";
+import {formatDayActivityData, selectRespondingBots} from "@/app/api/bot-selection";
 import {withGameErrorHandling} from "@/app/utils/server-action-wrapper";
 import {
     generateBotContextSection,
@@ -216,36 +217,6 @@ async function ensureDayActivityCounter(gameId: string): Promise<void> {
         logger.error(`Failed to ensure day activity counter for game ${gameId}:`, { error, gameId });
         // Don't throw - this is a best-effort initialization
     }
-}
-
-/**
- * Format day activity data for the GM prompt
- * Returns a human-readable string showing activity levels for each alive bot
- * Highlights the 3 least active bots to encourage their inclusion
- */
-function formatDayActivityData(game: Game): string {
-    const activityCounter = game.dayActivityCounter || {};
-    const aliveBots = game.bots.filter(bot => bot.isAlive);
-
-    if (aliveBots.length === 0) {
-        return "No alive bots to track activity.";
-    }
-
-    // Sort bots by message count (ascending) to identify least active
-    const sortedBots = aliveBots
-        .map(bot => ({ name: bot.name, count: activityCounter[bot.name] || 0 }))
-        .sort((a, b) => a.count - b.count);
-
-    // Get top 3 least active bot names
-    const leastActiveNames = new Set(sortedBots.slice(0, 3).map(b => b.name));
-
-    // Format with highlighting for least active
-    const activityData = sortedBots.map(bot => {
-        const highlight = leastActiveNames.has(bot.name) ? " ⚠️NEEDS TURN" : "";
-        return `${bot.name}: ${bot.count} msgs${highlight}`;
-    }).join(", ");
-
-    return `Today's activity (sorted by participation) - ${activityData}`;
 }
 
 /**
@@ -536,99 +507,13 @@ async function keepBotsGoingImpl(gameId: string): Promise<GameActionResponse> {
     }
 
     try {
-        // Get all messages for the current day to provide context to GM
-        const messages = await getGameMessages(gameId);
-        const dayMessages = messages.filter(m => m.day === game.currentDay);
-
-        // Ask GM which bots should continue the conversation (without human input)
         const apiKeys = await getApiKeysForUser(session.user.email);
 
         // Ensure day activity counter is initialized for backward compatibility
         await ensureDayActivityCounter(gameId);
 
-        // For after-game discussion, include ALL bots (dead + alive)
-        // For regular discussion, only include alive bots
-        const availableBots = isAfterGameDiscussion ? game.bots : game.bots.filter(b => b.isAlive);
-
-        // Use existing activity counter - it's maintained incrementally and only recalculated after resets
-        const gmPrompt = format(GM_ROUTER_SYSTEM_PROMPT, {
-            alive_players_with_roles: [
-                ...availableBots.map(b => `${b.name} (${b.role})`),
-                `${game.humanPlayerName} (${game.humanPlayerRole})`
-            ].join(", "),
-            dead_players_names_with_roles: game.bots
-                .filter(b => !b.isAlive)
-                .map(b => `${b.name} (${b.role})`)
-                .join(", "),
-            humanPlayerName: game.humanPlayerName,
-            day_activity_data: formatDayActivityData(game)
-        });
-
-        // Prepare candidate list for the command - alive bots only (human excluded)
-        const candidateNames = availableBots
-            .filter(b => b.name !== game.humanPlayerName)
-            .map(b => b.name)
-            .join(", ");
-
-        const gmAgent = AgentFactory.createAgent(GAME_MASTER, gmPrompt, game.gameMasterAiType, apiKeys, false);
-        gmAgent.gameId = gameId;
-        gmAgent.userId = session.user.email;
-        const selectionCommand = format(GM_COMMAND_SELECT_RESPONDERS, { candidate_names: candidateNames });
-
-        // Include recent conversation in the GM's history for bot selection
-        const history = formatMessagesForBotSelection(dayMessages, selectionCommand);
-        const [gmResponse, , tokenUsage] = await gmAgent.askWithZodSchema(GmBotSelectionZodSchema, history);
-        if (!gmResponse) {
-            throw new BotResponseError(
-                'Game Master failed to select responding bots',
-                'GM did not respond to bot selection request',
-                { gmAiType: game.gameMasterAiType, action: 'bot_selection' },
-                true
-            );
-        }
-        
-        // Update game master's token usage
-        if (tokenUsage) {
-            await recordGameMasterTokenUsage(gameId, tokenUsage, session.user.email);
-        }
-        if (!gmResponse.selected_bots || !Array.isArray(gmResponse.selected_bots)) {
-            throw new BotResponseError(
-                'Game Master provided invalid bot selection',
-                'GM response format was invalid or missing selected_bots array',
-                { gmAiType: game.gameMasterAiType, response: gmResponse },
-                true
-            );
-        }
-
-        // Validate that all selected names are valid alive bots (and not the human player)
-        // availableBots contains all bots (or only alive ones depending on context)
-        // candidateNames string was constructed from availableBots filtering out human player
-        const validNames = availableBots.map(b => b.name);
-        for (const name of gmResponse.selected_bots) {
-            if (!validNames.includes(name)) {
-                throw new BotResponseError(
-                    `Game Master selected invalid bot: ${name}`,
-                    `The GM attempted to select a player that is not available or does not exist: "${name}". Valid candidates: ${validNames.join(', ')}`,
-                    { gmAiType: game.gameMasterAiType, invalidName: name, validNames },
-                    true
-                );
-            }
-        }
-
-        // Update game state with selected bots queue (limit to configured max)
-        const selectedBots = gmResponse.selected_bots.slice(0, BOT_SELECTION_CONFIG.MAX);
-
-        // Save GM bot selection as a hidden debug message
-        const selectionMessage: GameMessage = {
-            id: null,
-            recipientName: RECIPIENT_NONE,
-            authorName: GAME_MASTER,
-            msg: `Selected: [${selectedBots.join(', ')}]. Reasoning: ${gmResponse.reasoning || 'none'}`,
-            messageType: MessageType.GM_BOT_SELECTION,
-            day: game.currentDay,
-            timestamp: null
-        };
-        await addMessageToChatAndSaveToDb(selectionMessage, gameId);
+        // Ask the GM which bots should continue the conversation (without human input)
+        const selectedBots = await selectRespondingBots(game, apiKeys, session.user.email);
 
         await db.collection('games').doc(gameId).update({
             gameStateProcessQueue: selectedBots
