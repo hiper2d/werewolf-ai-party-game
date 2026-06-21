@@ -467,40 +467,74 @@ describe('GM bot selection via talkToAll (human message, empty queue)', () => {
         expect(setGameErrorState).not.toHaveBeenCalled();
     });
 
-    test('GM selecting a dead bot is rejected with an error state (not silently filtered)', async () => {
+    test('GM selecting a dead bot drops it and tops the selection up to MIN (no error)', async () => {
         const game = makeGame();
         (getGame as jest.Mock).mockResolvedValue(game);
+        dbDocGame = game;
         gmSelects(['Dead']);
 
-        const result = await talkToAll(GAME_ID, 'Hello bots');
+        await talkToAll(GAME_ID, 'Hello bots');
 
-        expectErrorState('Game Master selected invalid bot: Dead');
-        expect(result.game.errorState).toBeTruthy();
-        expect(updatesWith('gameStateProcessQueue')).toHaveLength(0);
-        // Pinned behavior: the human's message is NOT persisted when GM selection fails.
-        expect(addMessageToChatAndSaveToDb).not.toHaveBeenCalled();
+        // 'Dead' is clamped out; the selection is topped up to MIN with an alive bot.
+        expect(setGameErrorState).not.toHaveBeenCalled();
+        const queues = updatesWith('gameStateProcessQueue');
+        expect(queues).toHaveLength(1);
+        const queue = queues[0].gameStateProcessQueue;
+        expect(queue.length).toBe(BOT_SELECTION_CONFIG.MIN);
+        expect(queue).not.toContain('Dead');
+        expect(['Alice', 'Bob']).toEqual(expect.arrayContaining(queue));
+        // The human message is persisted regardless.
+        const savedMessages = (addMessageToChatAndSaveToDb as jest.Mock).mock.calls.map(([m]) => m);
+        expect(savedMessages[0]).toMatchObject({ messageType: MessageType.HUMAN_PLAYER_MESSAGE });
     });
 
-    test('GM selecting the human player is rejected with an error state', async () => {
+    test('GM selecting the human player drops it and tops up to MIN (no error)', async () => {
         const game = makeGame();
         (getGame as jest.Mock).mockResolvedValue(game);
+        dbDocGame = game;
         gmSelects([HUMAN_NAME]);
 
-        const result = await talkToAll(GAME_ID, 'Hello bots');
+        await talkToAll(GAME_ID, 'Hello bots');
 
-        expectErrorState(`Game Master selected invalid bot: ${HUMAN_NAME}`);
-        expect(result.game.errorState).toBeTruthy();
-        expect(updatesWith('gameStateProcessQueue')).toHaveLength(0);
+        expect(setGameErrorState).not.toHaveBeenCalled();
+        const queue = updatesWith('gameStateProcessQueue')[0].gameStateProcessQueue;
+        expect(queue.length).toBe(BOT_SELECTION_CONFIG.MIN);
+        expect(queue).not.toContain(HUMAN_NAME);
     });
 
-    test('GM selecting an unknown name is rejected with an error state', async () => {
+    test('GM selecting an unknown name drops it and tops up to MIN (no error)', async () => {
         const game = makeGame();
         (getGame as jest.Mock).mockResolvedValue(game);
+        dbDocGame = game;
         gmSelects(['Nobody']);
 
         await talkToAll(GAME_ID, 'Hello bots');
 
-        expectErrorState('Game Master selected invalid bot: Nobody');
+        expect(setGameErrorState).not.toHaveBeenCalled();
+        const queue = updatesWith('gameStateProcessQueue')[0].gameStateProcessQueue;
+        expect(queue.length).toBe(BOT_SELECTION_CONFIG.MIN);
+        expect(queue).not.toContain('Nobody');
+    });
+
+    test('a genuine GM selection failure still persists the human message', async () => {
+        const game = makeGame();
+        (getGame as jest.Mock).mockResolvedValue(game);
+        dbDocGame = game;
+        // GM returns no usable response — selectRespondingBots throws.
+        mockAskWithZodSchema.mockResolvedValue([null, '', undefined, undefined]);
+
+        const result = await talkToAll(GAME_ID, 'Hello bots');
+
+        // The selection failed and surfaced as an error state...
+        expect(result.game.errorState).toBeTruthy();
+        // ...but the human's message was already saved (no retype required).
+        const savedMessages = (addMessageToChatAndSaveToDb as jest.Mock).mock.calls.map(([m]) => m);
+        expect(savedMessages[0]).toMatchObject({
+            authorName: HUMAN_NAME,
+            messageType: MessageType.HUMAN_PLAYER_MESSAGE,
+            msg: 'Hello bots',
+        });
+        expect(updatesWith('gameStateProcessQueue')).toHaveLength(0);
     });
 
     test('GM selection larger than BOT_SELECTION_CONFIG.MAX is clamped to the first MAX names', async () => {
@@ -519,9 +553,7 @@ describe('GM bot selection via talkToAll (human message, empty queue)', () => {
         expect(setGameErrorState).not.toHaveBeenCalled();
     });
 
-    test('PINNED: empty GM selection is accepted — BOT_SELECTION_CONFIG.MIN is not enforced here', async () => {
-        // The Zod schema (GmBotSelectionZodSchema) enforces MIN at parse time in real
-        // agents, but bot-actions itself accepts an empty array without error.
+    test('empty GM selection is topped up to MIN — never sets an empty queue', async () => {
         const game = makeGame();
         (getGame as jest.Mock).mockResolvedValue(game);
         dbDocGame = game;
@@ -529,7 +561,9 @@ describe('GM bot selection via talkToAll (human message, empty queue)', () => {
 
         await talkToAll(GAME_ID, 'Hello bots');
 
-        expect(mockUpdate).toHaveBeenCalledWith({ gameStateProcessQueue: [] });
+        const queue = updatesWith('gameStateProcessQueue')[0].gameStateProcessQueue;
+        expect(queue.length).toBe(BOT_SELECTION_CONFIG.MIN);
+        expect(['Alice', 'Bob']).toEqual(expect.arrayContaining(queue));
         expect(setGameErrorState).not.toHaveBeenCalled();
     });
 });
@@ -568,15 +602,19 @@ describe('keepBotsGoing (DAY_DISCUSSION, empty queue)', () => {
         expect(setGameErrorState).not.toHaveBeenCalled();
     });
 
-    test('GM selecting a dead bot is rejected with an error state', async () => {
+    test('GM selecting a dead bot drops it and tops up to MIN (no error)', async () => {
         const game = makeGame();
         (getGame as jest.Mock).mockResolvedValue(game);
+        dbDocGame = game;
         gmSelects(['Dead']);
 
         await keepBotsGoing(GAME_ID);
 
-        expectErrorState('Game Master selected invalid bot: Dead');
-        expect(updatesWith('gameStateProcessQueue')).toHaveLength(0);
+        expect(setGameErrorState).not.toHaveBeenCalled();
+        const queue = updatesWith('gameStateProcessQueue')[0].gameStateProcessQueue;
+        expect(queue.length).toBe(BOT_SELECTION_CONFIG.MIN);
+        expect(queue).not.toContain('Dead');
+        expect(['Alice', 'Bob']).toEqual(expect.arrayContaining(queue));
     });
 
     test('transitions straight to VOTE (no GM call) when the message threshold is already reached', async () => {

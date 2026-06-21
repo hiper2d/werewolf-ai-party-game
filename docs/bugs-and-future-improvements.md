@@ -1,5 +1,29 @@
 # Bugs and improvements
 
+## Recently fixed (2026-06-21)
+
+- **Detective investigating an abducted player no longer crashes** — `detective-processor.ts`
+    now records a failed result (`success: false`) on the abducted path instead of leaving
+    `detectiveResult` null for downstream code to dereference.
+- **Doctor saving the Maniac now undoes the abductee's collateral death** — the `protect`
+    branch in `doctor-processor.ts` removes the linked `maniac_collateral` death when it
+    removes the Maniac's `werewolf_attack` death.
+- **Paid-tier spending history records the marked-up amount actually charged** (not the raw
+    model cost) in both `cost-tracking.ts` and the `previewGame` charge path.
+- **Token-usage charging now charges the user before committing the game cost**
+    (`cost-tracking.ts`) — an insufficient balance aborts before anything is persisted, so
+    there is no more cost-recorded-but-never-charged window. (Not yet fully atomic — see below.)
+- **GM bot selection clamps invalid/duplicate/human names instead of erroring**, and enforces
+    `BOT_SELECTION_CONFIG.MIN` by topping up with random alive bots, so it never sets an empty
+    responder queue (`bot-selection.ts`). `handleHumanPlayerMessage` now delegates to the same
+    `selectRespondingBots` helper instead of a duplicated inline copy.
+- **The human's chat message is persisted before GM selection runs** — it survives a selection
+    failure, so the user never has to retype.
+- **A new day auto-opens with a few bots** — `selectDayRespondersImpl` calls
+    `selectRandomDayOpeningBots`, so the day no longer sits idle waiting for the human to type.
+- Verified already implemented (removed from the wishlist): buy-me-a-coffee, news/updates
+    page (`/news`), standalone rules page (`/rules`).
+
 ## Bugs surfaced by the test push (2026-06-10) — pinned in tests, NOT yet fixed
 
 > Each bug below is pinned by a test (marked `PINNED` in the suites listed in
@@ -7,15 +31,7 @@
 > "documents the bug" to "verifies the fix" as part of the same change —
 > the test failing on your fix is expected and is the starting point.
 
-Game-breaking (Probably fixed already):
-- **Detective investigating the abducted player likely crashes**: the compute step
-    returns early without setting `detectiveResult` (`detective-processor.ts:50-58`),
-    then `processNightAction` dereferences `detectiveResult!.success`
-    (`detective-processor.ts:268,275`) → TypeError. The "investigation failed —
-    abducted" message is unreachable.
-- **Doctor saving the Maniac doesn't undo the abductee's collateral death**: the
-    cascade death is added at werewolf-kill time (`werewolf-processor.ts:61-65`) and a
-    doctor save only removes the `werewolf_attack` death (`doctor-processor.ts:46-57`).
+Game-breaking:
 - **`HumanEliminatedChecker` can never fire**: it looks the human up in `game.bots`,
     but the human is not mirrored there. Day-vote elimination is handled directly in
     `voteImpl`, but night kills of the human may go undetected as game-over. The other
@@ -24,23 +40,21 @@ Game-breaking (Probably fixed already):
     forever (`bot-actions.ts:324-327`); no game-state validation in welcome either.
 
 Money/tier:
-- **Paid tier skips model validation entirely** (`validateModelUsageForTier` no-ops),
-    so `createGame` persists an unresolved `RANDOM` GM model into the game doc.
+- **Paid tier skips model validation entirely** (`validateModelUsageForTier` no-ops for
+    any non-free tier). `RANDOM` is now resolved in `previewGame` before persistence, so the
+    "unresolved `RANDOM` in the game doc" symptom is gone — but paid selections are still
+    never validated against key availability.
 - **`previewGame` validates some tier/key rules after the LLM call and after charging**
     (`game-actions.ts` ~290, ~385) — invalid selections still cost (and bill) a preview.
-- **Spending history understates paid-tier billing**: balance is charged
-    cost × (1 + markup) but `updateUserMonthlySpending` records the raw cost.
 - **Charging is gated on `game.createdWithTier`, not the user's current tier** —
     compounds the Stripe top-up tier bug: paid users with free-created games are
     never billed for them.
-- **Non-atomic charge ordering**: game cost commits before `deductBalance`; either
-    side can fail leaving cost-without-charge or charge-without-record.
+- Charge ordering is no longer money-losing (the user is now charged before the game
+    cost commits, in `cost-tracking.ts`), but it is still not fully atomic across the
+    game doc and the user doc — a single transaction spanning both would close the
+    remaining charge-succeeds-then-commit-fails window.
 
 Robustness:
-- **GM bot selection never enforces `BOT_SELECTION_CONFIG.MIN`** — an empty
-    `selected_bots` silently sets an empty queue (`bot-actions.ts:618,804`).
-- **The human's chat message is lost when GM selection fails** (only saved after
-    validation, `bot-actions.ts:801`) — user must retype on error.
 - **`setGameErrorState` failure masks the original error** in
     `server-action-wrapper.ts` (the write in the catch block is unguarded).
 - Cancellation guard only handles a fully-cleared queue (`bot-actions.ts:935`);
@@ -70,26 +84,22 @@ Robustness:
     surface the same alert path the fetch errors use.
 - `npm run lint` is broken: `next lint` was removed in the current Next version
     ("Invalid project directory provided: .../lint"). Migrate to the ESLint CLI.
-- We should hide technical details of bot errors from UI (the collapsible "Technical
-    details" disclosure in the error banner). I should be able to get them from logs.
-- When a new day starts, right now noghting happens - the user should type something. This is not intuitive. We should ask a GAme paster to pick few bots to reply
-- Add buy me coffee/beer/both
-- Add Updates page
-- Footer on all pages?
+- We should hide technical details of bot errors from UI. The collapsible "Technical details"
+    disclosure is gone, but the error banner still renders `error.details` inline (truncated to
+    ~150 chars in `GameChat.tsx`). Consider dropping it entirely and reading details from logs.
+- Footer on all pages? (`DocFooter` is on the doc pages — privacy/terms/about — and the home
+    page has its own; in-game pages still have none.)
 - Bots should have better notion of day and night events ordering. Review the summary logic, it should have
     - Unified past days summary text
     - Past days voting results (who voted for whom, in what order; the reasons can be omitted)
     - Past nights results (who died and how, what else happened)
-- Add game rules page. Add hints to roles on the game prev
+- Add hints to roles on the game preview (the standalone rules page now exists at `/rules`).
 - Resolve vote tie by asking Detective to choose
 - When night starts, the Game Master's messages should tell the human player what to do then it's their turn
 - Change bots prompting to explain that random voting is not something suspicious. People do this. Maybe add it to
   personalities
 - Migrate all model pickers onto the tested `getSelectableModelsForUser` helper — see
   the plan in the section below.
-- Consider clamping GM-selected bot names against the live bot list instead of erroring
-  (the `Bot {"Cato":5} not found in game` class — a validated but semantically wrong
-  bot-selection response currently puts the game into an error state).
 
 ## Migration plan: one tested source of truth for every model picker
 

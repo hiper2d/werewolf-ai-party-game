@@ -296,8 +296,12 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
             if (!success) {
                 throw new Error('Insufficient balance. Please add funds on your profile page before starting a game.');
             }
+            // Record the billed amount (cost + markup), not the raw model cost, so
+            // paid-tier spending history matches what was actually charged.
+            await updateUserMonthlySpending(session.user.email, chargedAmount, tier);
+        } else {
+            await updateUserMonthlySpending(session.user.email, tokenUsage.costUSD, tier);
         }
-        await updateUserMonthlySpending(session.user.email, tokenUsage.costUSD, tier);
     }
     const defaultPlayerCandidates = getCandidateModelsForTier(tier);
 

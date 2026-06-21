@@ -40,6 +40,10 @@ async function applyUserSpending(
         if (!success) {
             throw new Error('Insufficient balance. Please add funds on your profile page to continue playing.');
         }
+        // Record what the user was actually billed (cost + markup), not the raw
+        // model cost — otherwise the paid-tier spending history understates billing.
+        await updateUserMonthlySpending(userEmail, chargedAmount, tier);
+        return;
     }
 
     await updateUserMonthlySpending(userEmail, amountUSD, tier);
@@ -56,8 +60,19 @@ export async function recordGameMasterTokenUsage(
 
     const usage = normalizeTokenUsage(tokenUsage);
     const gameRef = db.collection('games').doc(gameId);
-    let usageApplied = false;
-    let gameTier: UserTier | undefined;
+
+    // Read the tier up front so we can charge the user BEFORE committing the game
+    // cost. Charging first means an insufficient balance throws here and nothing
+    // is persisted — eliminating the cost-recorded-but-never-charged window. The
+    // only residual gap is the rare charge-succeeds-then-commit-fails case, which
+    // costs the platform nothing (the user paid; we just under-record our own cost).
+    const preSnap = await gameRef.get();
+    if (!preSnap.exists) {
+        return;
+    }
+    const gameTier = (preSnap.data() as Game).createdWithTier;
+
+    await applyUserSpending(userEmail, usage.costUSD, gameTier);
 
     await db.runTransaction(async (transaction) => {
         const gameSnap = await transaction.get(gameRef);
@@ -66,7 +81,6 @@ export async function recordGameMasterTokenUsage(
         }
 
         const game = gameSnap.data() as Game;
-        gameTier = game.createdWithTier;
         const currentUsage = game.gameMasterTokenUsage || {
             inputTokens: 0,
             outputTokens: 0,
@@ -87,13 +101,7 @@ export async function recordGameMasterTokenUsage(
             gameMasterTokenUsage: updatedUsage,
             totalGameCost: updatedTotalCost
         });
-
-        usageApplied = true;
     });
-
-    if (usageApplied) {
-        await applyUserSpending(userEmail, usage.costUSD, gameTier);
-    }
 }
 
 export async function recordBotTokenUsage(
@@ -109,8 +117,21 @@ export async function recordBotTokenUsage(
     const usage = normalizeTokenUsage(tokenUsage);
     const gameRef = db.collection('games').doc(gameId);
 
-    let usageApplied = false;
-    let gameTier: UserTier | undefined;
+    // Read the tier (and confirm the bot exists) up front so we can charge the
+    // user BEFORE committing the game cost — see recordGameMasterTokenUsage for
+    // the rationale. We skip charging entirely if the bot isn't in the game.
+    const preSnap = await gameRef.get();
+    if (!preSnap.exists) {
+        return;
+    }
+    const preGame = preSnap.data() as Game;
+    const gameTier = preGame.createdWithTier;
+    const botExists = (Array.isArray(preGame.bots) ? preGame.bots : []).some(bot => bot.name === botName);
+    if (!botExists) {
+        return;
+    }
+
+    await applyUserSpending(userEmail, usage.costUSD, gameTier);
 
     await db.runTransaction(async (transaction) => {
         const gameSnap = await transaction.get(gameRef);
@@ -119,7 +140,6 @@ export async function recordBotTokenUsage(
         }
 
         const game = gameSnap.data() as Game;
-        gameTier = game.createdWithTier;
         const bots = Array.isArray(game.bots) ? game.bots : [];
         let botFound = false;
 
@@ -157,13 +177,7 @@ export async function recordBotTokenUsage(
             bots: updatedBots,
             totalGameCost: updatedTotalCost
         });
-
-        usageApplied = true;
     });
-
-    if (usageApplied) {
-        await applyUserSpending(userEmail, usage.costUSD, gameTier);
-    }
 }
 
 /**

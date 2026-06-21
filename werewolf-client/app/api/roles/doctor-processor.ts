@@ -47,6 +47,7 @@ export class DoctorProcessor extends BaseRoleProcessor {
                 d => d.player === doctorTarget && d.cause === 'werewolf_attack'
             );
             if (deathIndex !== -1) {
+                const savedRole = this.resolvePlayerRole(doctorTarget);
                 state.deaths.splice(deathIndex, 1);
                 state.actionsPrevented.push({
                     role: GAME_ROLES.WEREWOLF,
@@ -54,6 +55,20 @@ export class DoctorProcessor extends BaseRoleProcessor {
                     player: null // Pack action blocked by doctor
                 });
                 this.logNightAction(`Doctor saved ${doctorTarget} from werewolf attack`);
+
+                // The werewolf processor adds the abductee's maniac_collateral death
+                // together with the maniac's werewolf_attack death. If the doctor just
+                // saved the maniac, the maniac survives the night, so the cascade no
+                // longer applies — undo the abductee's collateral death too.
+                if (savedRole === GAME_ROLES.MANIAC && state.abductedPlayer) {
+                    const collateralIndex = state.deaths.findIndex(
+                        d => d.player === state.abductedPlayer && d.cause === 'maniac_collateral'
+                    );
+                    if (collateralIndex !== -1) {
+                        state.deaths.splice(collateralIndex, 1);
+                        this.logNightAction(`Maniac saved by doctor - abducted victim ${state.abductedPlayer} no longer dies`);
+                    }
+                }
             }
         } else if (actionType === 'kill') {
             // Doctor's one-time kill ability

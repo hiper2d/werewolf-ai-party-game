@@ -517,11 +517,11 @@ describe("Death cascade (maniac dies while holding an abductee)", () => {
         expect(state.detectiveResult).toEqual({ target: "Mandy", isEvil: true, success: true });
     });
 
-    it("pins current behavior: doctor saving the maniac does NOT undo the abductee's collateral death", () => {
-        // SUSPECTED BUG: the werewolf processor adds the collateral death
-        // together with the maniac's death, but the doctor's save only removes
-        // the werewolf_attack death — the abductee stays dead even though the
-        // maniac survives the night.
+    it("doctor saving the maniac also undoes the abductee's collateral death", () => {
+        // The werewolf processor adds the collateral death together with the
+        // maniac's death. When the doctor's save removes the maniac's
+        // werewolf_attack death, the maniac survives the night, so the abductee's
+        // cascade death must be undone too (no maniac death → no collateral).
         const state = resolve(makeGame({
             nightResults: {
                 [GAME_ROLES.MANIAC]: { target: "Vicky" },
@@ -531,10 +531,8 @@ describe("Death cascade (maniac dies while holding an abductee)", () => {
         }));
         // Maniac survives...
         expect(state.deaths.some(d => d.player === "Mandy")).toBe(false);
-        // ...but the abductee's collateral death is still there.
-        expect(state.deaths).toEqual([
-            { player: "Vicky", role: GAME_ROLES.VILLAGER, cause: "maniac_collateral" }
-        ]);
+        // ...and so does the abductee — the collateral death is undone.
+        expect(state.deaths).toEqual([]);
         expect(state.actionsPrevented).toEqual([
             { role: GAME_ROLES.WEREWOLF, reason: "doctor_save", player: null }
         ]);

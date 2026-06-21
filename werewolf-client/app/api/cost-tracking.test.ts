@@ -33,13 +33,16 @@ type FakeTransaction = {
  * get() resolves to the provided game data (or a missing snapshot).
  */
 function setupTransaction(gameData: any | null): { txn: FakeTransaction; docRef: any } {
-    const docRef = { id: 'fake-game-ref' };
+    const snapshot = {
+        exists: gameData !== null,
+        data: () => gameData
+    };
+    // docRef.get() backs the up-front tier/bot pre-read; the transaction's own
+    // get() backs the atomic accumulate. Both resolve to the same snapshot.
+    const docRef = { id: 'fake-game-ref', get: jest.fn().mockResolvedValue(snapshot) };
 
     const txn: FakeTransaction = {
-        get: jest.fn().mockResolvedValue({
-            exists: gameData !== null,
-            data: () => gameData
-        }),
+        get: jest.fn().mockResolvedValue(snapshot),
         set: jest.fn(),
         update: jest.fn()
     };
@@ -146,7 +149,7 @@ describe('cost-tracking', () => {
         });
 
         describe('paid tier charging (markup math)', () => {
-            it('deducts cost * (1 + PAID_TIER_MARKUP) from balance and records the RAW cost as monthly spending', async () => {
+            it('deducts cost * (1 + PAID_TIER_MARKUP) from balance and records the marked-up amount as monthly spending', async () => {
                 setupTransaction({ createdWithTier: 'paid', totalGameCost: 0 });
 
                 await recordGameMasterTokenUsage(gameId, { inputTokens: 1, outputTokens: 1, costUSD: 2 }, userEmail);
@@ -154,10 +157,9 @@ describe('cost-tracking', () => {
                 // 2 * (1 + 0.15) = 2.3
                 expect(PAID_TIER_MARKUP).toBe(0.15);
                 expect(deductBalance).toHaveBeenCalledWith(userEmail, 2.3);
-                // NOTE (pinned current behavior): the monthly spending record stores the raw
-                // model cost (2), not the marked-up amount actually charged (2.3). Spendings
-                // therefore understate what the paid user was billed by the markup factor.
-                expect(updateUserMonthlySpending).toHaveBeenCalledWith(userEmail, 2, 'paid');
+                // Monthly spending records what the user was actually billed (2.3), matching
+                // the amount deducted — not the raw model cost.
+                expect(updateUserMonthlySpending).toHaveBeenCalledWith(userEmail, 2.3, 'paid');
             });
 
             it('rounds the charged amount to 6 decimal places', async () => {
@@ -258,9 +260,9 @@ describe('cost-tracking', () => {
                 ],
                 totalGameCost: 0.3
             });
-            // Paid tier: charged with markup, raw cost recorded
+            // Paid tier: charged with markup, and the marked-up amount is recorded
             expect(deductBalance).toHaveBeenCalledWith(userEmail, 0.23);
-            expect(updateUserMonthlySpending).toHaveBeenCalledWith(userEmail, 0.2, 'paid');
+            expect(updateUserMonthlySpending).toHaveBeenCalledWith(userEmail, 0.23, 'paid');
         });
 
         it('does not update or apply spending when the bot is not found', async () => {

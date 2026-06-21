@@ -418,10 +418,10 @@ describe('previewGame tier enforcement', () => {
                 USER_EMAIL,
                 expect.closeTo(0.575, 6)
             );
-            // Monthly spending is recorded at raw cost (no markup).
+            // Monthly spending records the marked-up amount actually charged (0.575).
             expect(updateUserMonthlySpending).toHaveBeenCalledWith(
                 USER_EMAIL,
-                0.5,
+                expect.closeTo(0.575, 6),
                 USER_TIERS.PAID
             );
             expect(result.tokenUsage.costUSD).toBe(0.5);

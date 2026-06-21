@@ -165,21 +165,40 @@ export async function selectRespondingBots(
         );
     }
 
-    // Validate that all selected names are valid bots (and not the human player)
-    const validNames = availableBots.map(b => b.name);
+    // Clamp GM-selected names against the live candidate list instead of erroring.
+    // A validated-but-semantically-wrong response (e.g. a hallucinated or dead bot
+    // name, or the human) used to drop the whole game into an error state; here we
+    // just drop the bad names and keep going.
+    const validNames = new Set(availableBots.map(b => b.name).filter(n => n !== game.humanPlayerName));
+    const selectedBots: string[] = [];
+    const dropped: string[] = [];
     for (const name of gmResponse.selected_bots) {
-        if (!validNames.includes(name)) {
-            throw new BotResponseError(
-                `Game Master selected invalid bot: ${name}`,
-                `The GM attempted to select a player that is not available or does not exist: "${name}". Valid candidates: ${validNames.join(', ')}`,
-                { gmAiType: game.gameMasterAiType, invalidName: name, validNames },
-                true
-            );
+        if (validNames.has(name) && !selectedBots.includes(name)) {
+            selectedBots.push(name);
+        } else {
+            dropped.push(name);
         }
+    }
+    if (dropped.length > 0) {
+        logger.warn(`Ignoring invalid/duplicate GM-selected bots: [${dropped.join(', ')}]`, { gameId: game.id, dropped });
     }
 
     // Limit to configured max
-    const selectedBots = gmResponse.selected_bots.slice(0, BOT_SELECTION_CONFIG.MAX);
+    selectedBots.splice(BOT_SELECTION_CONFIG.MAX);
+
+    // Enforce BOT_SELECTION_CONFIG.MIN: if the GM under-selected (or every name was
+    // invalid), top up with random alive candidates so we never set an empty queue.
+    if (selectedBots.length < BOT_SELECTION_CONFIG.MIN) {
+        const pool = [...validNames].filter(name => !selectedBots.includes(name));
+        for (let i = pool.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [pool[i], pool[j]] = [pool[j], pool[i]];
+        }
+        while (selectedBots.length < BOT_SELECTION_CONFIG.MIN && pool.length > 0) {
+            selectedBots.push(pool.shift()!);
+        }
+        logger.info(`Topped up GM selection to MIN (${BOT_SELECTION_CONFIG.MIN})`, { gameId: game.id, selectedBots });
+    }
 
     // Save GM bot selection as a hidden debug message
     const selectionMessage: GameMessage = {
