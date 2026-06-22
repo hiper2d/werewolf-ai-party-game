@@ -287,6 +287,10 @@ export const BOT_SELECTION_CONFIG = {
 export const FREE_TIER_LIMITS = {
     CHAT_RESETS_PER_GAME_DAY: 5,
     GAMES_PER_CALENDAR_DAY: 5,
+    // Monthly platform-key spend cap (USD). Voice/STT on free tier runs on our
+    // platform keys with no per-call limit; once a calendar month's free-tier
+    // spend reaches this, further platform-key voice calls are refused.
+    MONTHLY_SPEND_USD: 5,
 } as const;
 
 export interface RoleConfig {

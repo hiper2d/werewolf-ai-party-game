@@ -5,7 +5,7 @@ import { getUserTierAndApiKeys } from "@/app/utils/tier-utils";
 import { API_KEY_CONSTANTS } from "@/app/ai/ai-models";
 import { transcribeWithOpenAi } from "@/app/ai/tts/openai-stt";
 import { calculateOpenAISttCost } from "@/app/utils/pricing";
-import { updateUserMonthlySpending, deductBalance } from "@/app/api/user-actions";
+import { updateUserMonthlySpending, deductBalance, assertFreeTierSpendWithinLimit } from "@/app/api/user-actions";
 import { recordGameCost, getGameTier } from "@/app/api/cost-tracking";
 import { USER_TIERS } from "@/app/api/game-models";
 import { PAID_TIER_MARKUP } from "@/app/config/credit-packages";
@@ -44,6 +44,11 @@ export async function transcribeAudio(
       throw new Error('Voice transcription is temporarily unavailable. Please try again later.');
     }
 
+    const gameTier = await getGameTier(options.gameId);
+    if (gameTier === USER_TIERS.FREE) {
+      await assertFreeTierSpendWithinLimit(session.user.email);
+    }
+
     const { text, durationSeconds } = await transcribeWithOpenAi(audioBuffer, openaiApiKey, {
       language: options.language,
       prompt: options.prompt,
@@ -52,7 +57,6 @@ export async function transcribeAudio(
 
     const cost = calculateOpenAISttCost(durationSeconds);
     if (cost > 0) {
-      const gameTier = await getGameTier(options.gameId);
       if (gameTier === USER_TIERS.PAID) {
         const chargedAmount = parseFloat((cost * (1 + PAID_TIER_MARKUP)).toFixed(6));
         const success = await deductBalance(session.user.email, chargedAmount);

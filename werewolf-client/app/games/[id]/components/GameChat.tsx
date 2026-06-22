@@ -84,10 +84,9 @@ function ErrorBanner({ error, onDismiss }: ErrorBannerProps) {
                         )}
                     </div>
                     <div className="flex-1 min-w-0">
+                        {/* Only the user-facing summary is shown; technical `error.details`
+                            is intentionally not rendered — read it from the logs instead. */}
                         <div className="font-medium text-sm break-words">{truncateText(error.error)}</div>
-                        {error.details && (
-                            <div className="text-xs mt-1 opacity-80 break-words">{truncateText(error.details, 150)}</div>
-                        )}
                     </div>
                 </div>
                 <button
@@ -1145,7 +1144,17 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
             // Show loading state
             setLoadingMessageId(messageId);
 
-            await ttsService.speakText(text, { voice, voiceStyle, voiceProvider, gameId });
+            await ttsService.speakText(text, {
+                voice, voiceStyle, voiceProvider, gameId,
+                // Playback failures (autoplay policy, codec) fire after this await
+                // resolves, so surface them through the same alert + reset path.
+                onPlaybackError: (error) => {
+                    alert(`Failed to play audio: ${error.message}`);
+                    setLoadingMessageId(null);
+                    setSpeakingMessageId(null);
+                    setPausedMessageId(null);
+                },
+            });
 
             // Audio started playing
             setLoadingMessageId(null);

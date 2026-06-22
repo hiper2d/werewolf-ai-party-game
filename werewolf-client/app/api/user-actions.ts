@@ -2,9 +2,9 @@
 
 import {db} from "@/firebase/server";
 import {firestore} from "firebase-admin";
-import {ApiKeyMap, User, UserMonthlySpending, UserTier, USER_TIERS} from "@/app/api/game-models";
+import {ApiKeyMap, FREE_TIER_LIMITS, User, UserMonthlySpending, UserTier, USER_TIERS} from "@/app/api/game-models";
 import {VoiceProvider, getDefaultVoiceProvider} from "@/app/ai/voice-config";
-import {applySpending, formatPeriod, normalizeSpendings} from "@/app/utils/spending-utils";
+import {applySpending, formatPeriod, getFreeSpendForPeriod, normalizeSpendings} from "@/app/utils/spending-utils";
 import FieldValue = firestore.FieldValue;
 
 const ZERO_SPENDINGS: UserMonthlySpending[] = [];
@@ -279,10 +279,37 @@ export async function addBalance(userId: string, amountUSD: number): Promise<voi
         if (!userSnap.exists) {
             throw new Error('User not found');
         }
-        const currentBalance = userSnap.data()?.balance || 0;
+        const data = userSnap.data();
+        const currentBalance = data?.balance || 0;
         const newBalance = parseFloat((currentBalance + amountUSD).toFixed(6));
-        transaction.update(userRef, { balance: newBalance });
+        const update: { balance: number; tier?: UserTier } = { balance: newBalance };
+        // Adding funds is an explicit opt-in to paid usage. Without this a free-tier
+        // top-up only raises the balance while the user keeps playing under free-tier
+        // rules. Legacy 'api'-tier accounts (own keys) are left untouched.
+        if ((data?.tier || 'free') === USER_TIERS.FREE) {
+            update.tier = USER_TIERS.PAID;
+        }
+        transaction.update(userRef, update);
     });
+}
+
+/**
+ * Throws when the user's free-tier (platform-key) spend for the current month has
+ * reached FREE_TIER_LIMITS.MONTHLY_SPEND_USD. Free/voice features run on our keys
+ * with no per-call limit, so this caps unbounded platform-key spend per month.
+ */
+export async function assertFreeTierSpendWithinLimit(userId: string, timestamp: number = Date.now()): Promise<void> {
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+    const userDoc = await db.collection('users').doc(userId).get();
+    if (!userDoc.exists) {
+        return;
+    }
+    const spent = getFreeSpendForPeriod(userDoc.data()?.spendings, formatPeriod(timestamp));
+    if (spent >= FREE_TIER_LIMITS.MONTHLY_SPEND_USD) {
+        throw new Error('Monthly free-tier voice limit reached. Add funds on your profile page to keep using voice features.');
+    }
 }
 
 export async function deductBalance(userId: string, amountUSD: number): Promise<boolean> {

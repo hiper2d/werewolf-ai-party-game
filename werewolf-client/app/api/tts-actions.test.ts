@@ -15,6 +15,7 @@ jest.mock("@/app/ai/tts/google-tts", () => ({ generateGoogleTtsAudio: jest.fn() 
 jest.mock("@/app/api/user-actions", () => ({
   updateUserMonthlySpending: jest.fn(),
   deductBalance: jest.fn(),
+  assertFreeTierSpendWithinLimit: jest.fn(),
 }));
 jest.mock("@/app/api/cost-tracking", () => ({
   recordGameCost: jest.fn(),
@@ -25,7 +26,7 @@ import { auth } from "@/auth";
 import { getUserTierAndApiKeys } from "@/app/utils/tier-utils";
 import { generateOpenAiTtsAudio } from "@/app/ai/tts/openai-tts";
 import { generateGoogleTtsAudio } from "@/app/ai/tts/google-tts";
-import { updateUserMonthlySpending, deductBalance } from "@/app/api/user-actions";
+import { updateUserMonthlySpending, deductBalance, assertFreeTierSpendWithinLimit } from "@/app/api/user-actions";
 import { recordGameCost, getGameTier } from "@/app/api/cost-tracking";
 import { generateSpeech } from "@/app/api/tts-actions";
 import { generateGoogleSpeech } from "@/app/api/google-tts-actions";
@@ -40,6 +41,7 @@ const mockOpenAiTts = generateOpenAiTtsAudio as jest.Mock;
 const mockGoogleTts = generateGoogleTtsAudio as jest.Mock;
 const mockGetGameTier = getGameTier as jest.Mock;
 const mockDeductBalance = deductBalance as jest.Mock;
+const mockAssertFreeTierSpend = assertFreeTierSpendWithinLimit as jest.Mock;
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -48,6 +50,7 @@ beforeEach(() => {
   mockGoogleTts.mockResolvedValue(FAKE_AUDIO);
   mockGetGameTier.mockResolvedValue(USER_TIERS.FREE);
   mockDeductBalance.mockResolvedValue(true);
+  mockAssertFreeTierSpend.mockResolvedValue(undefined);
 });
 
 describe('generateSpeech tier-aware key resolution', () => {
@@ -110,6 +113,31 @@ describe('generateSpeech tier-aware key resolution', () => {
 
     await expect(generateSpeech(TEXT)).rejects.toThrow('Insufficient balance');
     expect(updateUserMonthlySpending).not.toHaveBeenCalled();
+  });
+
+  it('free game over the monthly spend cap: refuses before generating audio', async () => {
+    mockTierKeys.mockResolvedValue({
+      tier: USER_TIERS.FREE,
+      apiKeys: { [API_KEY_CONSTANTS.OPENAI]: 'platform-openai-key' },
+    });
+    mockGetGameTier.mockResolvedValue(USER_TIERS.FREE);
+    mockAssertFreeTierSpend.mockRejectedValue(new Error('Monthly free-tier voice limit reached. Add funds on your profile page to keep using voice features.'));
+
+    await expect(generateSpeech(TEXT, { gameId: 'game-1' })).rejects.toThrow('Monthly free-tier voice limit reached');
+    expect(mockOpenAiTts).not.toHaveBeenCalled();
+    expect(updateUserMonthlySpending).not.toHaveBeenCalled();
+  });
+
+  it('paid game: does not apply the free-tier spend guard', async () => {
+    mockTierKeys.mockResolvedValue({
+      tier: USER_TIERS.PAID,
+      apiKeys: { [API_KEY_CONSTANTS.OPENAI]: 'platform-openai-key' },
+    });
+    mockGetGameTier.mockResolvedValue(USER_TIERS.PAID);
+
+    await generateSpeech(TEXT, { gameId: 'game-1' });
+
+    expect(mockAssertFreeTierSpend).not.toHaveBeenCalled();
   });
 });
 

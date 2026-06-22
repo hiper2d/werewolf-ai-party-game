@@ -7,6 +7,26 @@ export interface TTSOptions {
   voiceStyle?: string;            // Style instruction (e.g., "mysteriously", "excitedly")
   voiceProvider?: VoiceProvider;  // TTS provider (defaults to user's preference)
   gameId?: string;
+  // Called when the <audio> element fails *during* playback (autoplay policy,
+  // codec/decode failure). These fire after speakText() has already resolved, so
+  // the caller's await/catch can't see them — surface them here instead.
+  onPlaybackError?: (error: Error) => void;
+}
+
+// Maps an HTMLMediaElement error to a readable message.
+function describeMediaError(mediaError: MediaError | null): string {
+  switch (mediaError?.code) {
+    case MediaError.MEDIA_ERR_ABORTED:
+      return 'Playback was aborted.';
+    case MediaError.MEDIA_ERR_NETWORK:
+      return 'A network error interrupted audio playback.';
+    case MediaError.MEDIA_ERR_DECODE:
+      return 'The audio could not be decoded.';
+    case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
+      return 'This audio format is not supported by your browser.';
+    default:
+      return mediaError?.message || 'Unknown audio playback error.';
+  }
 }
 
 export class TTSService {
@@ -77,7 +97,12 @@ export class TTSService {
       };
 
       const onEnded = () => cleanup();
-      const onError = () => cleanup();
+      const onError = () => {
+        const message = describeMediaError(audioElement.error);
+        console.error('TTS playback error:', message, audioElement.error);
+        cleanup();
+        options.onPlaybackError?.(new Error(message));
+      };
 
       audioElement.addEventListener('ended', onEnded);
       audioElement.addEventListener('error', onError);

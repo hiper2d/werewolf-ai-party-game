@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "test": "jest",
     "test:live": "jest --config jest.live.config.js --watchman=false --runInBand",
     "fix-stuck-welcome": "npx tsx scripts/fix-stuck-welcome.ts"

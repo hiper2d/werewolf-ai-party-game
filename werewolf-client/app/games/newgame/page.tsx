@@ -599,7 +599,8 @@ export default function CreateNewGamePage() {
             await ttsService.speakText(story, {
                 voice: voice,
                 voiceStyle: voiceStyle,
-                voiceProvider: voiceProvider
+                voiceProvider: voiceProvider,
+                onPlaybackError: () => setIsSpeaking(false)
             });
             setIsSpeaking(false);
         } catch (error) {

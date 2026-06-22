@@ -4,7 +4,7 @@ import { auth } from "@/auth";
 import { getUserTierAndApiKeys } from "@/app/utils/tier-utils";
 import { API_KEY_CONSTANTS } from "@/app/ai/ai-models";
 import { generateGoogleTtsAudio } from "@/app/ai/tts/google-tts";
-import { updateUserMonthlySpending, deductBalance } from "@/app/api/user-actions";
+import { updateUserMonthlySpending, deductBalance, assertFreeTierSpendWithinLimit } from "@/app/api/user-actions";
 import { recordGameCost, getGameTier } from "@/app/api/cost-tracking";
 import { USER_TIERS } from "@/app/api/game-models";
 import { PAID_TIER_MARKUP } from "@/app/config/credit-packages";
@@ -51,6 +51,11 @@ export async function generateGoogleSpeech(
       throw new Error('Voice generation is temporarily unavailable. Please try again later.');
     }
 
+    const gameTier = await getGameTier(options.gameId);
+    if (gameTier === USER_TIERS.FREE) {
+      await assertFreeTierSpendWithinLimit(session.user.email);
+    }
+
     const wavBuffer = await generateGoogleTtsAudio(text, googleApiKey, {
       voiceName: options.voiceName,
       voiceStyle: options.voiceStyle,
@@ -59,7 +64,6 @@ export async function generateGoogleSpeech(
     // Track costs
     const cost = calculateGoogleTtsCost(text.length);
     if (cost > 0) {
-      const gameTier = await getGameTier(options.gameId);
       if (gameTier === USER_TIERS.PAID) {
         const chargedAmount = parseFloat((cost * (1 + PAID_TIER_MARKUP)).toFixed(6));
         const success = await deductBalance(session.user.email, chargedAmount);

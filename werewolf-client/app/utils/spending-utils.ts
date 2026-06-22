@@ -71,6 +71,15 @@ export function applySpending(
     return updated;
 }
 
+/**
+ * Free-tier (platform-key) spend recorded for `period` (YYYY-MM), or 0 if none.
+ * Used by the free-tier monthly spend guard.
+ */
+export function getFreeSpendForPeriod(spendings: any[] | undefined, period: string): number {
+    const record = normalizeSpendings(spendings).find(r => r.period === period);
+    return record ? (record.freeAmountUSD || 0) : 0;
+}
+
 export function normalizeSpendings(spendings: any[] | undefined): UserMonthlySpending[] {
     if (!Array.isArray(spendings)) {
         return [];

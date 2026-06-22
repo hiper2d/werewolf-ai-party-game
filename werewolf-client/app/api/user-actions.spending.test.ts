@@ -1,6 +1,6 @@
-import { updateUserMonthlySpending, deductBalance } from './user-actions';
+import { updateUserMonthlySpending, deductBalance, addBalance, assertFreeTierSpendWithinLimit } from './user-actions';
 import { db } from "@/firebase/server";
-import { UserMonthlySpending } from "@/app/api/game-models";
+import { FREE_TIER_LIMITS, UserMonthlySpending } from "@/app/api/game-models";
 
 // Mock dependencies (same pattern as night-replay.test.ts)
 jest.mock("@/firebase/server", () => ({
@@ -280,5 +280,133 @@ describe('deductBalance', () => {
         await expect(deductBalance(userId, 0.000001)).resolves.toBe(false);
 
         expect(txn.update).not.toHaveBeenCalled();
+    });
+});
+
+describe('addBalance', () => {
+    const userId = 'player@example.com';
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+    });
+
+    it('rejects non-positive amounts before touching the database', async () => {
+        setupTransaction({ balance: 1, tier: 'free' });
+
+        await expect(addBalance(userId, 0)).rejects.toThrow(/must be positive/);
+        await expect(addBalance(userId, -5)).rejects.toThrow(/must be positive/);
+        expect(db!.runTransaction).not.toHaveBeenCalled();
+    });
+
+    it('throws when the user does not exist', async () => {
+        setupTransaction(null);
+
+        await expect(addBalance(userId, 5)).rejects.toThrow(/User not found/);
+    });
+
+    it('adds to the balance and auto-switches a free-tier user to paid', async () => {
+        const { txn, userRef } = setupTransaction({ balance: 2, tier: 'free' });
+
+        await addBalance(userId, 3);
+
+        expect(txn.update).toHaveBeenCalledWith(userRef, { balance: 5, tier: 'paid' });
+    });
+
+    it('treats a missing tier as free and switches it to paid', async () => {
+        const { txn, userRef } = setupTransaction({ balance: 0 });
+
+        await addBalance(userId, 1.5);
+
+        expect(txn.update).toHaveBeenCalledWith(userRef, { balance: 1.5, tier: 'paid' });
+    });
+
+    it('leaves a paid-tier user on paid (only updates the balance)', async () => {
+        const { txn, userRef } = setupTransaction({ balance: 4, tier: 'paid' });
+
+        await addBalance(userId, 1);
+
+        expect(txn.update).toHaveBeenCalledWith(userRef, { balance: 5 });
+    });
+
+    it('leaves a legacy api-tier account untouched (own keys)', async () => {
+        const { txn, userRef } = setupTransaction({ balance: 0, tier: 'api' });
+
+        await addBalance(userId, 10);
+
+        expect(txn.update).toHaveBeenCalledWith(userRef, { balance: 10 });
+    });
+
+    it('rounds the new balance to 6 decimal places', async () => {
+        const { txn, userRef } = setupTransaction({ balance: 0.1, tier: 'paid' });
+
+        await addBalance(userId, 0.2);
+
+        expect(txn.update).toHaveBeenCalledWith(userRef, { balance: 0.3 });
+    });
+});
+
+describe('assertFreeTierSpendWithinLimit', () => {
+    const userId = 'player@example.com';
+    const JUNE_2026 = Date.UTC(2026, 5, 10, 12, 0, 0);
+
+    // Wires db.collection('users').doc(id).get() to resolve with the given data.
+    function setupDocGet(userData: any | null) {
+        (db!.collection as jest.Mock).mockReturnValue({
+            doc: jest.fn().mockReturnValue({
+                get: jest.fn().mockResolvedValue({
+                    exists: userData !== null,
+                    data: () => userData
+                })
+            })
+        });
+    }
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+    });
+
+    it('passes when there is no spending for the current month', async () => {
+        setupDocGet({ spendings: [] });
+        await expect(assertFreeTierSpendWithinLimit(userId, JUNE_2026)).resolves.toBeUndefined();
+    });
+
+    it('passes when free-tier spend is below the cap', async () => {
+        setupDocGet({ spendings: [{ period: '2026-06', amountUSD: 1, freeAmountUSD: 1 }] });
+        await expect(assertFreeTierSpendWithinLimit(userId, JUNE_2026)).resolves.toBeUndefined();
+    });
+
+    it('throws once free-tier spend reaches the monthly cap', async () => {
+        setupDocGet({
+            spendings: [{
+                period: '2026-06',
+                amountUSD: FREE_TIER_LIMITS.MONTHLY_SPEND_USD,
+                freeAmountUSD: FREE_TIER_LIMITS.MONTHLY_SPEND_USD
+            }]
+        });
+        await expect(assertFreeTierSpendWithinLimit(userId, JUNE_2026)).rejects.toThrow(/free-tier voice limit/);
+    });
+
+    it('only counts the free bucket, not paid/api spend in the same month', async () => {
+        setupDocGet({
+            spendings: [{
+                period: '2026-06',
+                amountUSD: 100,
+                freeAmountUSD: 0.5,
+                paidAmountUSD: 99.5
+            }]
+        });
+        await expect(assertFreeTierSpendWithinLimit(userId, JUNE_2026)).resolves.toBeUndefined();
+    });
+
+    it('ignores spend from other months', async () => {
+        setupDocGet({
+            spendings: [{ period: '2026-05', amountUSD: 100, freeAmountUSD: 100 }]
+        });
+        await expect(assertFreeTierSpendWithinLimit(userId, JUNE_2026)).resolves.toBeUndefined();
+    });
+
+    it('passes when the user doc does not exist', async () => {
+        setupDocGet(null);
+        await expect(assertFreeTierSpendWithinLimit(userId, JUNE_2026)).resolves.toBeUndefined();
     });
 });
