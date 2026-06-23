@@ -61,6 +61,12 @@ function GamePageContent({
     const [showCancel, setShowCancel] = useState(false);
     const preActionGameRef = useRef<Game | null>(null);
     const cancelledRef = useRef(false);
+    // Guards against dispatching a second game action while one is still in flight.
+    // The auto-processing effects re-fire on every state/render change and the manual
+    // control buttons can be double-clicked, so without this the same state-machine
+    // action ran concurrently and raced (e.g. triple `startNewDay`, overlapping
+    // `summarizePastDay` calls that left a recoverable error mid-summary).
+    const inFlightRef = useRef(false);
 
     const applyActionResult = useCallback((result: GameActionResponse) => {
         setGame(prev => {
@@ -202,6 +208,12 @@ function GamePageContent({
     };
 
     const runGameAction = async <T,>(action: () => Promise<T>): Promise<T | undefined> => {
+        // Skip duplicate/concurrent dispatch — only one game action runs at a time.
+        if (inFlightRef.current) {
+            console.warn('⏭️ GAMEPAGE: skipping game action — one is already in flight');
+            return undefined;
+        }
+        inFlightRef.current = true;
         try {
             return await action();
         } catch (error) {
@@ -209,6 +221,8 @@ function GamePageContent({
                 return undefined;
             }
             throw error;
+        } finally {
+            inFlightRef.current = false;
         }
     };
 

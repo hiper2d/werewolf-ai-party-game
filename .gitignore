@@ -13,3 +13,4 @@ venv.bak/
 
 **/*.code-workspace
 node_modules/
+images/old
