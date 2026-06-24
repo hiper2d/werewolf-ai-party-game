@@ -12,13 +12,14 @@ import {
 import {AgentFactory} from "@/app/ai/agent-factory";
 import {addMessageToChatAndSaveToDb, getBotMessages} from "@/app/api/game-actions";
 import {getApiKeysForUser} from "@/app/utils/tier-utils";
-import {generateBotContextSection, generateWerewolfTeammatesSection} from "@/app/utils/bot-utils";
+import {generateBotContextSection, generateWerewolfTeammatesSection, getAlivePlayerNames} from "@/app/utils/bot-utils";
 import {auth} from "@/auth";
 import {convertToAIMessages} from "@/app/utils/message-utils";
 import {
     BOT_SYSTEM_PROMPT,
     BOT_WEREWOLF_ACTION_PROMPT,
-    BOT_WEREWOLF_DISCUSSION_PROMPT
+    BOT_WEREWOLF_DISCUSSION_PROMPT,
+    STRICT_TARGET_NAME_INSTRUCTION
 } from "@/app/ai/prompts/bot-prompts";
 import {format} from "@/app/ai/prompts/utils";
 import {BotAnswerZodSchema, WerewolfActionZod, WerewolfActionZodSchema} from "@/app/ai/prompts/zod-schemas";
@@ -191,12 +192,7 @@ export class WerewolfProcessor extends BaseRoleProcessor {
                 role: werewolfBot.role,
                 human_player_name: this.game.humanPlayerName,
                 werewolf_teammates_section: generateWerewolfTeammatesSection(werewolfBot, this.game),
-                players_names: [
-                    ...this.game.bots
-                        .filter(b => b.name !== werewolfBot.name)
-                        .map(b => b.name),
-                    this.game.humanPlayerName
-                ].join(", "),
+                players_names: getAlivePlayerNames(this.game, werewolfBot.name),
                 dead_players_names_with_roles: this.game.bots
                     .filter(b => !b.isAlive)
                     .map(b => `${b.name} (${b.role})`)
@@ -221,7 +217,7 @@ export class WerewolfProcessor extends BaseRoleProcessor {
                 const targetablePlayers = this.getTargetablePlayers(true); // Exclude werewolves
                 const targetNames = targetablePlayers.map(p => p.name).join(', ');
 
-                const werewolfActionPrompt = `${format(BOT_WEREWOLF_ACTION_PROMPT, { bot_name: werewolfBot.name })}\n\n**Available targets:** ${targetNames}`;
+                const werewolfActionPrompt = `${format(BOT_WEREWOLF_ACTION_PROMPT, { bot_name: werewolfBot.name })}\n\n**Available targets:** ${targetNames}${STRICT_TARGET_NAME_INSTRUCTION}`;
 
                 gmMessage = {
                     id: null,

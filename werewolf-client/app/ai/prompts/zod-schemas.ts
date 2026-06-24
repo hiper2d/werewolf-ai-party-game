@@ -42,33 +42,33 @@ export const GmBotSelectionZodSchema = z.object({
 
 // Bot vote schema
 export const BotVoteZodSchema = z.object({
-  who: z.string().describe("The name of the player you are voting to eliminate"),
+  who: z.string().describe("The exact name of the player you are voting to eliminate. Must be a SINGLE name copied verbatim from the eligible candidates list — no titles, surnames, or any extra words (e.g. 'Pansy', never 'Pansy Parkinson')"),
   why: z.string().describe("Your reasoning for voting for this player (keep it brief but convincing)")
 });
 
 // Werewolf action schema
 export const WerewolfActionZodSchema = z.object({
-  target: z.string().describe("The name of the player to eliminate"),
+  target: z.string().describe("The exact name of the player to eliminate. Must be a SINGLE name copied verbatim from the available targets list — no titles, surnames, or extra words (e.g. 'Pansy', never 'Pansy Parkinson')"),
   reasoning: z.string().describe("Reasoning for the target selection")
 });
 
 // Doctor action schema
 export const DoctorActionZodSchema = z.object({
-  target: z.string().describe("The name of the player to protect from werewolf attacks (or kill if using Doctor's Mistake)"),
+  target: z.string().describe("The exact name of the player to protect from werewolf attacks (or kill if using Doctor's Mistake). Must be a SINGLE name copied verbatim from the available targets list — no titles, surnames, or extra words (e.g. 'Pansy', never 'Pansy Parkinson')"),
   reasoning: z.string().describe("Reasoning for the protection or kill choice"),
   action_type: z.enum(['protect', 'kill']).nullable().optional().describe("The type of action: 'protect' (default) or 'kill' (one-time ability)")
 });
 
 // Detective action schema
 export const DetectiveActionZodSchema = z.object({
-  target: z.string().describe("The name of the player to investigate or kill"),
+  target: z.string().describe("The exact name of the player to investigate or kill. Must be a SINGLE name copied verbatim from the available targets list — no titles, surnames, or extra words (e.g. 'Pansy', never 'Pansy Parkinson')"),
   reasoning: z.string().describe("Reasoning for the action choice"),
   action_type: z.enum(['investigate', 'kill']).nullable().optional().describe("The type of action: 'investigate' (default) to learn their role, or 'kill' (one-time ability) to eliminate them")
 });
 
 // Maniac action schema
 export const ManiacActionZodSchema = z.object({
-  target: z.string().describe("The name of the player to abduct for the night"),
+  target: z.string().describe("The exact name of the player to abduct for the night. Must be a SINGLE name copied verbatim from the available targets list — no titles, surnames, or extra words (e.g. 'Pansy', never 'Pansy Parkinson')"),
   reasoning: z.string().describe("Reasoning for the abduction choice")
 });
 

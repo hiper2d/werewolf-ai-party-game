@@ -6,9 +6,9 @@ import { addMessageToChatAndSaveToDb, getBotMessages, getUserFromFirestore } fro
 import { getApiKeysForUser } from "@/app/utils/tier-utils";
 import { auth } from "@/auth";
 import { convertToAIMessages } from "@/app/utils/message-utils";
-import { BOT_SYSTEM_PROMPT, BOT_DOCTOR_ACTION_PROMPT } from "@/app/ai/prompts/bot-prompts";
+import { BOT_SYSTEM_PROMPT, BOT_DOCTOR_ACTION_PROMPT, STRICT_TARGET_NAME_INSTRUCTION } from "@/app/ai/prompts/bot-prompts";
 import { format } from "@/app/ai/prompts/utils";
-import { generateBotContextSection } from "@/app/utils/bot-utils";
+import { generateBotContextSection, getAlivePlayerNames } from "@/app/utils/bot-utils";
 import { DoctorActionZodSchema } from "@/app/ai/prompts/zod-schemas";
 import { DoctorAction } from "@/app/ai/prompts/ai-schemas";
 import { recordBotTokenUsage } from "@/app/api/cost-tracking";
@@ -158,12 +158,7 @@ export class DoctorProcessor extends BaseRoleProcessor {
                 role: doctorBot.role,
                 human_player_name: this.game.humanPlayerName,
                 werewolf_teammates_section: '',
-                players_names: [
-                    ...this.game.bots
-                        .filter(b => b.name !== doctorBot.name)
-                        .map(b => b.name),
-                    this.game.humanPlayerName
-                ].join(", "),
+                players_names: getAlivePlayerNames(this.game, doctorBot.name),
                 dead_players_names_with_roles: this.game.bots
                     .filter(b => !b.isAlive)
                     .map(b => `${b.name} (${b.role})`)
@@ -209,6 +204,7 @@ export class DoctorProcessor extends BaseRoleProcessor {
             }
 
             doctorActionPrompt += `\n\n**Available targets for protection${killAbilityAvailable ? ' or kill' : ''}:** ${targetNames}`;
+            doctorActionPrompt += STRICT_TARGET_NAME_INSTRUCTION;
 
             const gmMessage: GameMessage = {
                 id: null,

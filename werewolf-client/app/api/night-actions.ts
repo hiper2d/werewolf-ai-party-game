@@ -34,7 +34,7 @@ import { GM_NIGHT_RESULTS_SYSTEM_PROMPT, GM_DAY_SUMMARY_SYSTEM_PROMPT, GM_DAY_SU
 import { GM_COMMAND_GENERATE_NIGHT_RESULTS } from "@/app/ai/prompts/gm-commands";
 import { NightResultsStory } from "@/app/ai/prompts/ai-schemas";
 import { BOT_DAY_SUMMARY_PROMPT, BOT_SYSTEM_PROMPT } from "@/app/ai/prompts/bot-prompts";
-import { generateBotContextSection, generateWerewolfTeammatesSection } from "@/app/utils/bot-utils";
+import { generateBotContextSection, generateWerewolfTeammatesSection, getAlivePlayerNames } from "@/app/utils/bot-utils";
 import { format } from "@/app/ai/prompts/utils";
 import { convertToAIMessages, convertMessageContent, formatMessagesForNightSummary } from "@/app/utils/message-utils";
 import { checkGameEndConditions } from "@/app/utils/game-utils";
@@ -1284,12 +1284,7 @@ async function summarizePastDayImpl(gameId: string): Promise<GameActionResponse>
             role: bot.role,
             human_player_name: currentGame.humanPlayerName,
             werewolf_teammates_section: generateWerewolfTeammatesSection(bot, currentGame),
-            players_names: [
-                ...currentGame.bots
-                    .filter(b => b.name !== bot.name)
-                    .map(b => b.name),
-                currentGame.humanPlayerName
-            ].join(", "),
+            players_names: getAlivePlayerNames(currentGame, bot.name),
             dead_players_names_with_roles: currentGame.bots
                 .filter(b => !b.isAlive)
                 .map(b => `${b.name} (${b.role})`)

@@ -1,6 +1,26 @@
 import { Bot, Game, GAME_ROLES, PLAY_STYLES, PLAY_STYLE_CONFIGS, RoleKnowledge } from "@/app/api/game-models";
 
 /**
+ * Builds the comma-separated list of ALIVE players for the "Alive Players" line of
+ * the bot system prompt. Excludes dead players, an optional self name, and a dead
+ * human (humanPlayerIsAlive is treated as alive when absent, for legacy games).
+ *
+ * @param game The game state
+ * @param excludeName Optional name to omit (typically the bot whose prompt this is)
+ * @returns Comma-separated alive player names
+ */
+export function getAlivePlayerNames(game: Game, excludeName?: string): string {
+    return [
+        ...game.bots
+            .filter(b => b.isAlive && b.name !== excludeName)
+            .map(b => b.name),
+        ...(game.humanPlayerIsAlive !== false && game.humanPlayerName !== excludeName
+            ? [game.humanPlayerName]
+            : [])
+    ].join(", ");
+}
+
+/**
  * Generates a random play style description for a bot
  */
 export function generatePlayStyleDescription(bot: Bot): string {

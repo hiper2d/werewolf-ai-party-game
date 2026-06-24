@@ -51,7 +51,8 @@ import {withGameErrorHandling} from "@/app/utils/server-action-wrapper";
 import {
     generateBotContextSection,
     generatePlayStyleDescription,
-    generateWerewolfTeammatesSection
+    generateWerewolfTeammatesSection,
+    getAlivePlayerNames
 } from "@/app/utils/bot-utils";
 import {checkGameEndConditions} from "@/app/utils/game-utils";
 import {getProviderSignatureFields} from "@/app/ai/ai-models";
@@ -97,12 +98,7 @@ function generateBotSystemPrompt(bot: Bot, game: Game): string {
         role: bot.role,
         human_player_name: game.humanPlayerName,
         werewolf_teammates_section: generateWerewolfTeammatesSection(bot, game),
-        players_names: [
-            ...game.bots
-                .filter(b => b.name !== bot.name)
-                .map(b => b.name),
-            game.humanPlayerName
-        ].join(", "),
+        players_names: getAlivePlayerNames(game, bot.name),
         dead_players_names_with_roles: game.bots
             .filter(b => !b.isAlive)
             .map(b => `${b.name} (${b.role})`)
@@ -1052,12 +1048,7 @@ async function voteImpl(gameId: string): Promise<GameActionResponse> {
                     role: bot.role,
                     human_player_name: currentGame.humanPlayerName,
                     werewolf_teammates_section: generateWerewolfTeammatesSection(bot, currentGame),
-                    players_names: [
-                        ...currentGame.bots
-                            .filter(b => b.name !== bot.name)
-                            .map(b => b.name),
-                        currentGame.humanPlayerName
-                    ].join(", "),
+                    players_names: alivePlayerNames.join(", "),
                     dead_players_names_with_roles: currentGame.bots
                         .filter(b => !b.isAlive)
                         .map(b => `${b.name} (${b.role})`)
@@ -1065,6 +1056,23 @@ async function voteImpl(gameId: string): Promise<GameActionResponse> {
                     bot_context: generateBotContextSection(bot, currentGame)
                 }
             );
+
+            // Build the strict candidate list and (for werewolves) a teammate reminder
+            // injected directly into the vote command so the bot copies a name verbatim.
+            const validTargetsList = alivePlayerNames.map(n => `- ${n}`).join("\n");
+            const aliveWerewolfTeammates = bot.role === GAME_ROLES.WEREWOLF
+                ? [
+                    ...currentGame.bots
+                        .filter(b => b.role === GAME_ROLES.WEREWOLF && b.isAlive && b.name !== bot.name)
+                        .map(b => b.name),
+                    ...(currentGame.humanPlayerRole === GAME_ROLES.WEREWOLF && currentGame.humanPlayerIsAlive !== false
+                        ? [currentGame.humanPlayerName]
+                        : [])
+                ]
+                : [];
+            const werewolfVoteNote = aliveWerewolfTeammates.length > 0
+                ? `\n**WEREWOLF NOTE — your fellow Werewolves still alive:** ${aliveWerewolfTeammates.join(', ')}. Voting for a teammate is allowed ONLY when it is clearly strategic (e.g., to blend in when the table is already piling on them). Otherwise, do NOT vote for them.`
+                : "";
             
             const agent = AgentFactory.createAgent(bot.name, botPrompt, bot.aiType, apiKeys, false);
             agent.gameId = gameId;
@@ -1079,7 +1087,7 @@ async function voteImpl(gameId: string): Promise<GameActionResponse> {
                 id: null,
                 recipientName: bot.name,
                 authorName: GAME_MASTER,
-                msg: format(BOT_VOTE_PROMPT, { bot_name: bot.name, vote_position: String(votePosition), total_voters: String(totalVoters) }),
+                msg: format(BOT_VOTE_PROMPT, { bot_name: bot.name, vote_position: String(votePosition), total_voters: String(totalVoters), valid_targets: validTargetsList, werewolf_vote_note: werewolfVoteNote }),
                 messageType: MessageType.GM_COMMAND,
                 day: currentGame.currentDay,
                 timestamp: Date.now()
@@ -1582,10 +1590,7 @@ async function getSuggestionImpl(gameId: string): Promise<string> {
         // Create prompt with game context
         const suggestionPrompt = format(HUMAN_SUGGESTION_PROMPT, {
             player_name: game.humanPlayerName,
-            players_names: [
-                ...game.bots.map(b => b.name),
-                game.humanPlayerName
-            ].join(", "),
+            players_names: getAlivePlayerNames(game),
             dead_players_names_with_roles: game.bots
                 .filter(b => !b.isAlive)
                 .map(b => `${b.name} (${b.role})`)

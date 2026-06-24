@@ -13,9 +13,9 @@ import {addMessageToChatAndSaveToDb, getBotMessages} from "@/app/api/game-action
 import {getApiKeysForUser} from "@/app/utils/tier-utils";
 import {auth} from "@/auth";
 import {convertToAIMessages} from "@/app/utils/message-utils";
-import {BOT_DETECTIVE_ACTION_PROMPT, BOT_SYSTEM_PROMPT} from "@/app/ai/prompts/bot-prompts";
+import {BOT_DETECTIVE_ACTION_PROMPT, BOT_SYSTEM_PROMPT, STRICT_TARGET_NAME_INSTRUCTION} from "@/app/ai/prompts/bot-prompts";
 import {format} from "@/app/ai/prompts/utils";
-import {generateBotContextSection} from "@/app/utils/bot-utils";
+import {generateBotContextSection, getAlivePlayerNames} from "@/app/utils/bot-utils";
 import {DetectiveActionZodSchema} from "@/app/ai/prompts/zod-schemas";
 import {recordBotTokenUsage} from "@/app/api/cost-tracking";
 import {getProviderSignatureFields} from "@/app/ai/ai-models";
@@ -194,12 +194,7 @@ export class DetectiveProcessor extends BaseRoleProcessor {
                 role: detectiveBot.role,
                 human_player_name: this.game.humanPlayerName,
                 werewolf_teammates_section: '',
-                players_names: [
-                    ...this.game.bots
-                        .filter(b => b.name !== detectiveBot.name)
-                        .map(b => b.name),
-                    this.game.humanPlayerName
-                ].join(", "),
+                players_names: getAlivePlayerNames(this.game, detectiveBot.name),
                 dead_players_names_with_roles: this.game.bots
                     .filter(b => !b.isAlive)
                     .map(b => `${b.name} (${b.role})`)
@@ -226,6 +221,7 @@ export class DetectiveProcessor extends BaseRoleProcessor {
             if (!killAbilityAvailable) {
                 detectiveActionPrompt += `\n\n⚠️ **Your one-time kill ability has already been used.** You can only investigate tonight.`;
             }
+            detectiveActionPrompt += STRICT_TARGET_NAME_INSTRUCTION;
 
             const gmMessage: GameMessage = {
                 id: null,

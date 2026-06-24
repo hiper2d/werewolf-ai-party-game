@@ -59,6 +59,9 @@ function GamePageContent({
     const [clearNightMessages, setClearNightMessages] = useState(false);
     const [isKeepGoingLoading, setIsKeepGoingLoading] = useState(false);
     const [showCancel, setShowCancel] = useState(false);
+    const [descExpanded, setDescExpanded] = useState(false);
+    const [descClamps, setDescClamps] = useState(false);
+    const descRef = useRef<HTMLParagraphElement>(null);
     const preActionGameRef = useRef<Game | null>(null);
     const cancelledRef = useRef(false);
     // Guards against dispatching a second game action while one is still in flight.
@@ -167,6 +170,14 @@ function GamePageContent({
             preActionGameRef.current = null;
         }
     }, [game.gameState, game.gameStateProcessQueue.length, isKeepGoingLoading]);
+
+    // Collapse a long game description to a few lines; only surface the toggle when
+    // the text actually overflows the clamp (measured while collapsed).
+    useEffect(() => {
+        const el = descRef.current;
+        if (!el || descExpanded) return;
+        setDescClamps(el.scrollHeight > el.clientHeight + 1);
+    }, [game.description, descExpanded]);
 
     // Handle cancel: restore pre-action state, clear server queue
     const handleCancelBotResponses = useCallback(async () => {
@@ -919,11 +930,43 @@ function GamePageContent({
             {/* Game info */}
             <div className="mb-3 flex-shrink-0">
                 <h1 className="text-[18px] font-semibold text-[var(--fg-0)] mb-1">{game.theme}</h1>
-                <p className="text-[12px] text-[var(--fg-2)] mb-2 leading-relaxed">{game.description}</p>
-                {game.totalGameCost !== undefined && game.totalGameCost > 0 && (
-                    <div className="flex items-center gap-1.5 text-[11px] font-mono text-[var(--fg-2)]">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[var(--tag-fast-text)]"></span>
-                        ${game.totalGameCost.toFixed(4)}
+                <p
+                    ref={descRef}
+                    className="text-[12px] text-[var(--fg-2)] mb-1 leading-relaxed"
+                    style={descExpanded ? undefined : {
+                        display: '-webkit-box',
+                        WebkitLineClamp: 3,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                    } as React.CSSProperties}
+                >
+                    {game.description}
+                </p>
+                {(descClamps || (game.totalGameCost !== undefined && game.totalGameCost > 0)) && (
+                    <div className="flex items-center justify-between gap-2">
+                        {game.totalGameCost !== undefined && game.totalGameCost > 0 ? (
+                            <div className="flex items-center gap-1.5 text-[11px] font-mono text-[var(--fg-2)]">
+                                <span className="w-1.5 h-1.5 rounded-full bg-[var(--tag-fast-text)]"></span>
+                                ${game.totalGameCost.toFixed(4)}
+                            </div>
+                        ) : <span />}
+                        {descClamps && (
+                            <button
+                                type="button"
+                                onClick={() => setDescExpanded(v => !v)}
+                                aria-label={descExpanded ? 'Show less' : 'Show more'}
+                                title={descExpanded ? 'Show less' : 'Show more'}
+                                className="flex items-center justify-center w-5 h-5 rounded-full border border-[var(--line-2)] bg-[var(--bg-1)] text-[var(--fg-2)] hover:bg-[var(--bg-3)] hover:text-[var(--fg-0)] hover:border-[var(--line-3)] transition-all duration-[120ms]"
+                            >
+                                <svg
+                                    width="11" height="11" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                                    className={`transition-transform duration-[140ms] ${descExpanded ? 'rotate-180' : ''}`}
+                                >
+                                    <polyline points="6 9 12 15 18 9" />
+                                </svg>
+                            </button>
+                        )}
                     </div>
                 )}
             </div>

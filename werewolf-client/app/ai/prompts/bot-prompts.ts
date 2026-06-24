@@ -226,6 +226,15 @@ Consider:
 - If you are NOT a Werewolf: Focus on identifying and eliminating suspected Werewolves
 - Always prioritize your team's victory over individual survival
 - Consider how your vote will be perceived by other players
+%werewolf_vote_note%
+**ELIGIBLE CANDIDATES — you may vote for exactly ONE of these:**
+%valid_targets%
+
+**HOW TO WRITE YOUR VOTE (STRICT):**
+- The "who" field MUST be ONE name copied EXACTLY from the candidate list above, character-for-character.
+- Do NOT add surnames, titles, house names, or any other words. For example, write "Pansy", never "Pansy Parkinson".
+- Do NOT invent names or vote for anyone not on the list — dead players and yourself are already excluded.
+- If the player you have in mind is not on the list verbatim, pick the closest matching entry exactly as written.
 
 Your response must be a valid JSON object with your vote choice and reasoning.`;
 
@@ -358,6 +367,18 @@ Consider:
 **Remember:** Keep your role as Detective completely secret. Never directly reveal your investigation results or role to other players during day discussions. Use the information strategically to guide voting and discussions.
 
 Your response must be a valid JSON object with your target choice, action_type, and reasoning.`;
+
+/**
+ * Appended (in the role processors) right after the "Available targets" list so the
+ * target name is chosen verbatim. Prevents weaker models from embellishing a handle
+ * (e.g. "Pansy" -> "Pansy Parkinson") and failing target validation.
+ */
+export const STRICT_TARGET_NAME_INSTRUCTION: string = `
+
+**HOW TO WRITE YOUR TARGET (STRICT):**
+- The "target" field MUST be ONE name copied EXACTLY from the available targets list above, character-for-character.
+- Do NOT add surnames, titles, house names, or any other words. For example, write "Pansy", never "Pansy Parkinson".
+- Do NOT invent names or pick anyone who is not on the list above.`;
 
 export const BOT_DAY_SUMMARY_PROMPT: string = `**End of Day %day_number% - Update Your Personal Summary**
 
