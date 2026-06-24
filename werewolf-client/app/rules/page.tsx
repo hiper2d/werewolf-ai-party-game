@@ -1,14 +1,13 @@
 import {Suspense} from "react";
-import {redirect} from "next/navigation";
-import {auth} from "@/auth";
+import type {Metadata} from "next";
 import RulesTutorials from "@/app/rules/RulesTutorials";
 
-export default async function RulesPage() {
-    const session = await auth();
-    if (!session) {
-        redirect('/?login=true&callbackUrl=%2Frules');
-    }
+export const metadata: Metadata = {
+    title: "Rules — Werewolf AI",
+    description: "How to play Werewolf AI — roles, night actions, phases, and strategy.",
+};
 
+export default function RulesPage() {
     return (
         <Suspense>
             <RulesTutorials/>
