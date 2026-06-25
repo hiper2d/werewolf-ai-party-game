@@ -66,6 +66,25 @@ async function endNightWithResults(gameId: string, game: Game): Promise<GameActi
     await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: game.createdWithTier });
     const apiKeys = await getApiKeysForUser(session.user.email);
 
+    // Determine which night-acting roles were still alive during this night and may
+    // therefore be featured in the narrative. Deaths from THIS night are applied later
+    // (in startNewDay), so a role-holder who dies tonight is still alive here and their
+    // action is correctly narrated; a role-holder killed on an earlier night is already
+    // isAlive=false and must be excluded. The maniac is intentionally omitted — its
+    // activity is always secret and never narrated.
+    const aliveRoles = new Set<string>(game.bots.filter(bot => bot.isAlive).map(bot => bot.role));
+    if (game.humanPlayerIsAlive ?? true) {
+        aliveRoles.add(game.humanPlayerRole);
+    }
+    const activeNightRoles = [
+        { role: GAME_ROLES.WEREWOLF, label: 'werewolves' },
+        { role: GAME_ROLES.DOCTOR, label: 'doctor' },
+        { role: GAME_ROLES.DETECTIVE, label: 'detective' }
+    ]
+        .filter(({ role }) => aliveRoles.has(role))
+        .map(({ label }) => label)
+        .join(", ") || 'NONE';
+
     // Create GM system prompt with game context
     const gmSystemPrompt = format(GM_NIGHT_RESULTS_SYSTEM_PROMPT, {
         players_names: [
@@ -76,6 +95,7 @@ async function endNightWithResults(gameId: string, game: Game): Promise<GameActi
             .filter(bot => !bot.isAlive)
             .map(bot => `${bot.name} (${bot.role})`)
             .join(", "),
+        active_night_roles: activeNightRoles,
         humanPlayerName: game.humanPlayerName,
         currentDay: game.currentDay,
         theme: game.theme || 'Werewolf Village'
