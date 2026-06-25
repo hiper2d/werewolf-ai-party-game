@@ -29,6 +29,7 @@ const ENV_KEY_MAP: Record<string, string> = {
     [API_KEY_CONSTANTS.GROK]: 'GROK_K',
     [API_KEY_CONSTANTS.MOONSHOT]: 'MOONSHOT_K',
     [API_KEY_CONSTANTS.Z_AI]: 'Z_K',
+    [API_KEY_CONSTANTS.FUGU]: 'FUGU_K',
 };
 
 // Build ApiKeyMap from environment
@@ -158,6 +159,7 @@ const TEXT_SWEEP_MODELS = new Set<string>([
     LLM_CONSTANTS.KIMI_THINKING,
     LLM_CONSTANTS.GLM,
     LLM_CONSTANTS.GLM_THINKING,
+    LLM_CONSTANTS.FUGU,                      // one representative for the Fugu askText code path
 ]);
 
 describe("All models - plain text welcome via askText", () => {

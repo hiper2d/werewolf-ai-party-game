@@ -33,6 +33,16 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
     {
+        id: "sakana-fugu", date: "Jun 2026", tags: ["Models"],
+        title: "Sakana Fugu — a new model family",
+        body: (<><strong>Sakana AI</strong> joins the table with two new models. <strong>Fugu</strong> is the
+            lighter, everyday option — light enough to play on the free tier — and <strong>Fugu Ultra</strong> is
+            the heavyweight. Both reason before they answer, which helps when a bot has to hold a story and a
+            bluff at the same time. Pick either for any bot or the Game Master when you set up a lobby.</>),
+        media: null,
+        links: [{label: "Create a game", href: "/games"}],
+    },
+    {
         id: "glm-5-2", date: "Jun 2026", tags: ["Models"],
         title: "GLM-5.2 replaces GLM-5.1",
         body: (<>Z.AI&apos;s <strong>GLM-5.2</strong> takes over the GLM slot in the model picker, with or

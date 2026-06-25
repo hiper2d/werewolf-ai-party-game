@@ -30,6 +30,7 @@ interface Participant {
     aiType?: string;
     enableThinking?: boolean;
     isGameMaster?: boolean;
+    cost?: number;
 }
 
 export default function GamePage({
@@ -61,6 +62,7 @@ function GamePageContent({
     const [showCancel, setShowCancel] = useState(false);
     const [descExpanded, setDescExpanded] = useState(false);
     const [descClamps, setDescClamps] = useState(false);
+    const [showCosts, setShowCosts] = useState(true);
     const descRef = useRef<HTMLParagraphElement>(null);
     const preActionGameRef = useRef<Game | null>(null);
     const cancelledRef = useRef(false);
@@ -550,6 +552,7 @@ function GamePageContent({
             isAlive: true,
             aiType: game.gameMasterAiType,
             isGameMaster: true,
+            cost: game.gameMasterTokenUsage?.costUSD,
         },
         {
             name: game.humanPlayerName,
@@ -563,7 +566,8 @@ function GamePageContent({
             isHuman: false,
             isAlive: bot.isAlive,
             aiType: bot.aiType,
-            enableThinking: bot.enableThinking
+            enableThinking: bot.enableThinking,
+            cost: bot.tokenUsage?.costUSD,
         }))
     ];
 
@@ -975,6 +979,14 @@ function GamePageContent({
             <div className="flex-grow overflow-auto hide-scrollbar border-t border-[var(--line-1)] pt-3">
                 <div className="flex items-center justify-between mb-2">
                     <h2 className="text-[10px] font-mono font-medium uppercase tracking-[0.08em] text-[var(--fg-3)]">Participants</h2>
+                    <button
+                        type="button"
+                        onClick={() => setShowCosts(v => !v)}
+                        title={showCosts ? 'Hide per-player cost' : 'Show per-player cost'}
+                        className="text-[10px] font-mono font-medium uppercase tracking-[0.08em] px-1.5 py-0.5 rounded border border-[var(--line-2)] text-[var(--fg-3)] hover:text-[var(--fg-0)] hover:border-[var(--line-3)] transition-all duration-[120ms]"
+                    >
+                        $ {showCosts ? 'on' : 'off'}
+                    </button>
                 </div>
                 <ul className="space-y-1">
                     {participants.map((participant, index) => {
@@ -1038,6 +1050,11 @@ function GamePageContent({
                                 ) : null}
                             </div>
                             </div>{/* end flex-1 column */}
+                            {showCosts && participant.cost !== undefined && participant.cost > 0 && (
+                                <span className="text-[11px] font-mono text-[var(--fg-3)] flex-shrink-0 self-center tabular-nums">
+                                    ${participant.cost.toFixed(4)}
+                                </span>
+                            )}
                             </div>{/* end avatar row */}
                         </li>
                         );

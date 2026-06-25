@@ -79,7 +79,7 @@ export default function ModelSelectionDialog({
         const providerNames: Record<string, string> = {
             ANTHROPIC_API_KEY: 'Anthropic', OPENAI_API_KEY: 'OpenAI', GOOGLE_API_KEY: 'Google',
             DEEPSEEK_API_KEY: 'DeepSeek', GROK_API_KEY: 'Grok', MISTRAL_API_KEY: 'Mistral', MOONSHOT_API_KEY: 'Moonshot',
-            Z_AI_API_KEY: 'Z.AI'
+            Z_AI_API_KEY: 'Z.AI', FUGU_API_KEY: 'Sakana Fugu'
         };
         for (const opt of modelOptions) {
             const config = SupportedAiModels[opt.model];

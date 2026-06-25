@@ -23,7 +23,8 @@ async function migrateKeysToFirestore() {
         'DEEPSEEK_API_KEY': process.env.DEEP_SEEK_K,
         'MISTRAL_API_KEY': process.env.MISTRAL_K,
         'GROK_API_KEY': process.env.GROK_K,
-        'MOONSHOT_API_KEY': process.env.MOONSHOT_K
+        'MOONSHOT_API_KEY': process.env.MOONSHOT_K,
+        'FUGU_API_KEY': process.env.FUGU_K
     };
 
     console.log('🔄 Migrating API keys from .env to Firestore...\n');

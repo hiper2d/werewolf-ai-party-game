@@ -60,7 +60,7 @@ function getProviderName(modelId: string): string {
 }
 
 // Provider display order
-const PROVIDER_ORDER = ['OpenAI', 'Anthropic', 'Google', 'DeepSeek', 'Grok', 'Mistral', 'Moonshot', 'Z.AI'];
+const PROVIDER_ORDER = ['OpenAI', 'Anthropic', 'Google', 'DeepSeek', 'Grok', 'Mistral', 'Moonshot', 'Z.AI', 'Sakana Fugu'];
 
 export default function AIModelSelect({
     options,

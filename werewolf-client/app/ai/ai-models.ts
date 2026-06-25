@@ -16,7 +16,8 @@ export const API_KEY_CONSTANTS = {
     DEEPSEEK: 'DEEPSEEK_API_KEY',
     GROK: 'GROK_API_KEY',
     MOONSHOT: 'MOONSHOT_API_KEY',
-    Z_AI: 'Z_AI_API_KEY'
+    Z_AI: 'Z_AI_API_KEY',
+    FUGU: 'FUGU_API_KEY'
 } as const;
 
 export const SupportedAiKeyNames: Record<string, string> = {
@@ -27,7 +28,8 @@ export const SupportedAiKeyNames: Record<string, string> = {
     [API_KEY_CONSTANTS.DEEPSEEK]: 'DeepSeek',
     [API_KEY_CONSTANTS.GROK]: 'Grok',
     [API_KEY_CONSTANTS.MOONSHOT]: 'Moonshot',
-    [API_KEY_CONSTANTS.Z_AI]: 'Z.AI'
+    [API_KEY_CONSTANTS.Z_AI]: 'Z.AI',
+    [API_KEY_CONSTANTS.FUGU]: 'Sakana Fugu'
 };
 
 export const LLM_CONSTANTS = {
@@ -56,6 +58,8 @@ export const LLM_CONSTANTS = {
     KIMI_THINKING: 'kimi-thinking',
     GLM: 'glm',
     GLM_THINKING: 'glm-thinking',
+    FUGU: 'fugu',
+    FUGU_ULTRA: 'fugu-ultra',
     RANDOM: 'random',
 }
 
@@ -295,6 +299,25 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         temperature: 0.7,
         tags: ['slow'],
     },
+
+    // Sakana Fugu models — OpenAI-compatible. They reason internally (and bill it as
+    // "orchestration" tokens), but never surface reasoning to us: responses come back with
+    // reasoning_tokens: 0 and no reasoning_content. So hasThinking is false — there's no
+    // thinking content to show and no user-facing thinking toggle. Single picker entry per model.
+    [LLM_CONSTANTS.FUGU]: {
+        displayName: 'Sakana Fugu',
+        modelApiName: 'fugu',
+        apiKeyName: API_KEY_CONSTANTS.FUGU,
+        hasThinking: false,
+        tags: ['slow'],
+    },
+    [LLM_CONSTANTS.FUGU_ULTRA]: {
+        displayName: 'Sakana Fugu Ultra',
+        modelApiName: 'fugu-ultra',
+        apiKeyName: API_KEY_CONSTANTS.FUGU,
+        hasThinking: false,
+        tags: ['slow', 'expensive'],
+    },
 };
 
 export type LLMModel = keyof typeof SupportedAiModels;
@@ -436,6 +459,28 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
         inputPrice: 1.25,
         outputPrice: 2.50,
         cacheHitPrice: 0.20
+    },
+
+    // Sakana Fugu models
+    // base `fugu` is a dynamic router — Sakana publishes no fixed per-token price ("you pay the
+    // underlying model's rate"). We've set a working rate of $1 in / $3 out: the $3 output lands
+    // it in the "<= $5 output → 3 bots" free-tier band (see FREE_TIER_OUTPUT_PRICE_BANDS), which
+    // is the intended cap. NOTE this rate is input-blind on purpose for now — `fugu` is actually
+    // input-heavy and barely cacheable (~2% cache hits, it's a router), so output-price banding
+    // understates its real cost. Revisit with real Sakana dashboard numbers if it proves too cheap.
+    [SupportedAiModels[LLM_CONSTANTS.FUGU].modelApiName]: {
+        inputPrice: 1.0,
+        outputPrice: 3.0
+    },
+    // fugu-ultra has published pricing. Above 272K context the rates roughly double.
+    [SupportedAiModels[LLM_CONSTANTS.FUGU_ULTRA].modelApiName]: {
+        inputPrice: 5.0,
+        outputPrice: 30.0,
+        cacheHitPrice: 0.50,
+        extendedContextInputPrice: 10.0,
+        extendedContextOutputPrice: 45.0,
+        extendedContextCacheHitPrice: 1.00,
+        extendedContextThresholdTokens: 272_000
     }
 };
 

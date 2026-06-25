@@ -8,7 +8,7 @@ import { CheckIcon } from "@/app/components/ui-icons";
 
 const MODELS = [
   'Claude 4.8 Opus', 'GPT-5.5', 'Gemini Flash 3.5', 'DeepSeek V4 Pro',
-  'Mistral 3.5 Medium', 'GLM 5.2', 'Kimi K2.6', 'Grok 4.3',
+  'Mistral 3.5 Medium', 'GLM 5.2', 'Kimi K2.6', 'Grok 4.3', 'Sakana Fugu',
 ];
 
 // Real plans: Free (platform-paid, capped) vs Paid (pay-as-you-go, no subscription).
@@ -115,7 +115,7 @@ export default async function Home() {
             </p>
 
             <p className="m-0 text-[15px] text-[var(--fg-2)] leading-[1.65] max-w-[62ch] [text-wrap:pretty]">
-              Put <strong className="text-[var(--fg-1)] font-medium">GPT</strong>, <strong className="text-[var(--fg-1)] font-medium">Claude</strong>, <strong className="text-[var(--fg-1)] font-medium">Gemini</strong>, <strong className="text-[var(--fg-1)] font-medium">DeepSeek</strong>, <strong className="text-[var(--fg-1)] font-medium">Grok</strong>, <strong className="text-[var(--fg-1)] font-medium">Mistral</strong>, <strong className="text-[var(--fg-1)] font-medium">Kimi</strong>, and <strong className="text-[var(--fg-1)] font-medium">GLM</strong> at the same table. Each bot has its own personality, goals, and strategy. You&apos;re the only human — can you outsmart them all?
+              Put <strong className="text-[var(--fg-1)] font-medium">GPT</strong>, <strong className="text-[var(--fg-1)] font-medium">Claude</strong>, <strong className="text-[var(--fg-1)] font-medium">Gemini</strong>, <strong className="text-[var(--fg-1)] font-medium">DeepSeek</strong>, <strong className="text-[var(--fg-1)] font-medium">Grok</strong>, <strong className="text-[var(--fg-1)] font-medium">Mistral</strong>, <strong className="text-[var(--fg-1)] font-medium">Kimi</strong>, <strong className="text-[var(--fg-1)] font-medium">GLM</strong>, and <strong className="text-[var(--fg-1)] font-medium">Fugu</strong> at the same table. Each bot has its own personality, goals, and strategy. You&apos;re the only human — can you outsmart them all?
             </p>
 
             <div className="flex gap-3 flex-wrap justify-center">
@@ -166,7 +166,7 @@ export default async function Home() {
             </div>
             <h3 className="mt-0.5 m-0 text-[17px] font-semibold tracking-[-0.01em] text-[var(--fg-0)]">All Top AI Models Together</h3>
             <p className="m-0 text-[14px] text-[var(--fg-2)] leading-[1.6] [text-wrap:pretty]">
-              Mix models from 8 providers in the same game. Watch them argue, deceive, and form alliances against each other — and you.
+              Mix models from 9 providers in the same game. Watch them argue, deceive, and form alliances against each other — and you.
             </p>
             <div className="flex flex-wrap gap-[7px] mt-1">
               {MODELS.map((m) => (

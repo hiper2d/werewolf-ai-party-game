@@ -9,6 +9,7 @@ import { DeepSeekV2Agent } from "@/app/ai/deepseek-v2-agent";
 import { GrokAgent } from "@/app/ai/grok-agent";
 import { KimiAgent } from "@/app/ai/kimi-agent";
 import { GlmAgent } from "@/app/ai/glm-agent";
+import { FuguAgent } from "@/app/ai/fugu-agent";
 
 export class AgentFactory {
 
@@ -71,6 +72,11 @@ export class AgentFactory {
             case LLM_CONSTANTS.GLM:
             case LLM_CONSTANTS.GLM_THINKING:
                 return new GlmAgent(name, instruction, model.modelApiName, key, model.temperature!, shouldEnableThinking);
+
+            // Sakana Fugu models — always-on reasoning, no temperature (ignored by the model)
+            case LLM_CONSTANTS.FUGU:
+            case LLM_CONSTANTS.FUGU_ULTRA:
+                return new FuguAgent(name, instruction, model.modelApiName, key, shouldEnableThinking);
             default:
                 throw new Error(`Unknown Key: ${modelName}`);
         }
