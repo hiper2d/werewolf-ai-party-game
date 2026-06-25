@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { LLM_CONSTANTS, SupportedAiModels, getModelDisplayName, getModelTags, type ModelTag } from '@/app/ai/ai-models';
-import { getCandidateModelsForTier, getPerGameModelLimit, FREE_TIER_UNLIMITED } from '@/app/ai/model-limit-utils';
+import { getModelPickerOptions } from '@/app/ai/model-limit-utils';
 import { UserTier, USER_TIERS } from '@/app/api/game-models';
 import { useUIControls } from '../context/UIControlsContext';
 
@@ -54,57 +54,24 @@ export default function ModelSelectionDialog({
         return () => { cancelled = true; };
     }, [gameTier, isOpen, providedKeyNames]);
 
-    const tierFilteredModels = useMemo(() => {
-        if (gameTier === USER_TIERS.FREE) {
-            const models = new Set(getCandidateModelsForTier(USER_TIERS.FREE));
-            if (currentModel && currentModel !== '' && currentModel !== LLM_CONSTANTS.RANDOM) {
-                models.add(currentModel);
-            }
-            return Array.from(models);
-        }
-        const all = Object.values(LLM_CONSTANTS).filter(model => model !== LLM_CONSTANTS.RANDOM);
-        if (gameTier !== USER_TIERS.API) return all;
-        // API tier: filter to vendors the user has keys for. Always allow the currently-selected
-        // model so the user can see what they're switching from even if it's now unsupported.
-        if (providedKeyNames === null) {
-            // Keys not yet loaded — show only the current model to avoid flashing the full list.
-            return currentModel ? [currentModel] : [];
-        }
-        const filtered = all.filter(modelId => {
-            const config = SupportedAiModels[modelId];
-            return !!config && providedKeyNames.has(config.apiKeyName);
-        });
-        if (currentModel && currentModel !== LLM_CONSTANTS.RANDOM && !filtered.includes(currentModel)) {
-            filtered.push(currentModel);
-        }
-        return filtered;
-    }, [gameTier, currentModel, providedKeyNames]);
-
     const modelOptions = useMemo(() => {
-        return tierFilteredModels
-            .map(model => {
-                if (gameTier !== USER_TIERS.FREE) {
-                    return { model, disabled: false };
-                }
-                if (model === LLM_CONSTANTS.RANDOM) {
-                    return { model, disabled: true };
-                }
-                let disabled = false;
-                try {
-                    const limit = getPerGameModelLimit(model, USER_TIERS.FREE);
-                    if (limit !== FREE_TIER_UNLIMITED) {
-                        const used = usageCounts[model] ?? 0;
-                        const adjustedUsage = model === currentModel ? Math.max(0, used - 1) : used;
-                        const remaining = Math.max(0, limit - adjustedUsage);
-                        disabled = remaining === 0;
-                    }
-                } catch {
-                    disabled = model !== currentModel;
-                }
-                return { model, disabled };
-            })
+        // API tier with keys not yet loaded — show only the current model to avoid
+        // flashing the full list before gating data arrives.
+        if (gameTier === USER_TIERS.API && providedKeyNames === null) {
+            return currentModel && currentModel !== LLM_CONSTANTS.RANDOM
+                ? [{ model: currentModel, disabled: false }]
+                : [];
+        }
+        // Tested single source of truth for tier rules, usage counts, and the
+        // current-model escape hatch. We only strip the suffix (this dialog renders its
+        // own labels) and hide disabled non-current models (they can't be selected here).
+        return getModelPickerOptions(gameTier, providedKeyNames ?? new Set(), {
+            usageCounts,
+            currentModel,
+        })
+            .map(({ model, disabled }) => ({ model, disabled }))
             .filter(option => !(option.disabled && option.model !== currentModel));
-    }, [tierFilteredModels, usageCounts, gameTier, currentModel]);
+    }, [gameTier, providedKeyNames, usageCounts, currentModel]);
 
     // Group by provider
     const groupedModels = useMemo(() => {

@@ -8,9 +8,11 @@ import {
     assertModelAllowedForApiTier,
     getAvailableModelsForUser,
     getCandidateModelsForTier,
+    getModelPickerOptions,
     getProvidedApiKeyNames,
     getSelectableModelsForUser,
     validateModelUsageForTier,
+    type ModelPickerOption,
 } from './model-limit-utils';
 
 const modelsByApiKey = (apiKeyName: string): string[] =>
@@ -249,5 +251,159 @@ describe('getSelectableModelsForUser (model picker contract: GM dropdown, bot li
         expect(
             getSelectableModelsForUser(USER_TIERS.API, new Set([API_KEY_CONSTANTS.OPENAI, API_KEY_CONSTANTS.GOOGLE]))
         ).toEqual(getAvailableModelsForUser(USER_TIERS.API, keyMap));
+    });
+});
+
+describe('getModelPickerOptions (single source of truth for every picker)', () => {
+    const byModel = (opts: ModelPickerOption[]) =>
+        new Map(opts.map(o => [o.model, o]));
+
+    // Pin concrete models with distinct free-tier policies, and self-validate the
+    // pricing-derived policy so this test fails loudly (rather than silently drifting)
+    // if a band ever changes.
+    const UNLIMITED = LLM_CONSTANTS.DEEPSEEK_V4_FLASH;   // <= $2 output → unlimited
+    const LIMITED_3 = LLM_CONSTANTS.CLAUDE_4_HAIKU;      // <= $5 output → 3 bots
+    const SINGLE_1 = LLM_CONSTANTS.CLAUDE_4_SONNET;      // <= $15 output → 1 bot
+    const UNAVAILABLE = LLM_CONSTANTS.CLAUDE_4_OPUS;     // > $15 output → not available
+
+    it('pins the assumed free-tier policies (guards against pricing drift)', () => {
+        expect(SupportedAiModels[UNLIMITED].freeTier).toMatchObject({ available: true, maxBotsPerGame: -1 });
+        expect(SupportedAiModels[LIMITED_3].freeTier).toMatchObject({ available: true, maxBotsPerGame: 3 });
+        expect(SupportedAiModels[SINGLE_1].freeTier).toMatchObject({ available: true, maxBotsPerGame: 1 });
+        expect(SupportedAiModels[UNAVAILABLE].freeTier).toMatchObject({ available: false, maxBotsPerGame: 0 });
+        // A thinking variant is a separate model id with its own free-tier limit.
+        expect(SupportedAiModels[LLM_CONSTANTS.CLAUDE_4_HAIKU_THINKING].freeTier?.maxBotsPerGame).toBe(1);
+    });
+
+    it('never returns the RANDOM pseudo-model on any tier', () => {
+        for (const tier of [USER_TIERS.FREE, USER_TIERS.PAID, USER_TIERS.API] as const) {
+            const opts = getModelPickerOptions(tier, new Set(Object.values(API_KEY_CONSTANTS)), {
+                showUnavailableDisabled: true,
+            });
+            expect(opts.find(o => o.model === LLM_CONSTANTS.RANDOM)).toBeUndefined();
+        }
+        // RANDOM as currentModel is ignored, not added as an escape hatch.
+        const opts = getModelPickerOptions(USER_TIERS.FREE, new Set(), { currentModel: LLM_CONSTANTS.RANDOM });
+        expect(opts.find(o => o.model === LLM_CONSTANTS.RANDOM)).toBeUndefined();
+    });
+
+    describe('FREE tier — static capacity mode (no usageCounts)', () => {
+        it('with showUnavailableDisabled: lists ALL models, premium present but disabled', () => {
+            const opts = getModelPickerOptions(USER_TIERS.FREE, new Set(), { showUnavailableDisabled: true });
+            const m = byModel(opts);
+            // Every catalog model is present.
+            for (const id of Object.keys(SupportedAiModels)) {
+                expect(m.has(id)).toBe(true);
+            }
+            expect(m.get(UNAVAILABLE)).toEqual({ model: UNAVAILABLE, disabled: true, suffix: '(not available)' });
+            expect(m.get(UNLIMITED)).toEqual({ model: UNLIMITED, disabled: false, suffix: '(unlimited)' });
+            expect(m.get(LIMITED_3)).toEqual({ model: LIMITED_3, disabled: false, suffix: '(3x per game)' });
+            expect(m.get(SINGLE_1)).toEqual({ model: SINGLE_1, disabled: false, suffix: '(1x per game)' });
+        });
+
+        it('without showUnavailableDisabled: premium/unavailable models are hidden', () => {
+            const opts = getModelPickerOptions(USER_TIERS.FREE, new Set());
+            const m = byModel(opts);
+            expect(m.has(UNAVAILABLE)).toBe(false);
+            expect(m.has(LLM_CONSTANTS.GPT_5_5)).toBe(false);
+            expect(m.has(UNLIMITED)).toBe(true);
+            expect(m.has(LIMITED_3)).toBe(true);
+        });
+    });
+
+    describe('FREE tier — usage mode ((N left) math)', () => {
+        it('shows remaining capacity and disables at 0', () => {
+            const opts = getModelPickerOptions(USER_TIERS.FREE, new Set(), {
+                usageCounts: { [LIMITED_3]: 1, [SINGLE_1]: 1 },
+            });
+            const m = byModel(opts);
+            expect(m.get(LIMITED_3)).toEqual({ model: LIMITED_3, disabled: false, suffix: '(2 left)' });
+            // limit 1, used 1, not current → 0 remaining → disabled
+            expect(m.get(SINGLE_1)).toEqual({ model: SINGLE_1, disabled: true, suffix: '(0 left)' });
+        });
+
+        it('does not count the currently-selected model against itself', () => {
+            // LIMITED_3 used once but it IS the current selection → counts as 0 used → (3 left)
+            const limited = getModelPickerOptions(USER_TIERS.FREE, new Set(), {
+                usageCounts: { [LIMITED_3]: 1 },
+                currentModel: LIMITED_3,
+            });
+            expect(byModel(limited).get(LIMITED_3)).toEqual({ model: LIMITED_3, disabled: false, suffix: '(3 left)' });
+
+            // The single-use model stays selectable while it is the current selection.
+            const single = getModelPickerOptions(USER_TIERS.FREE, new Set(), {
+                usageCounts: { [SINGLE_1]: 1 },
+                currentModel: SINGLE_1,
+            });
+            expect(byModel(single).get(SINGLE_1)).toEqual({ model: SINGLE_1, disabled: false, suffix: '(1 left)' });
+        });
+
+        it('unlimited models are never disabled regardless of usage', () => {
+            const opts = getModelPickerOptions(USER_TIERS.FREE, new Set(), {
+                usageCounts: { [UNLIMITED]: 99 },
+            });
+            expect(byModel(opts).get(UNLIMITED)).toEqual({ model: UNLIMITED, disabled: false, suffix: '(unlimited)' });
+        });
+    });
+
+    describe('currentModel escape hatch', () => {
+        it('FREE: a now-disallowed current model is present but disabled', () => {
+            const opts = getModelPickerOptions(USER_TIERS.FREE, new Set(), {
+                usageCounts: {},
+                currentModel: UNAVAILABLE,
+            });
+            const entry = byModel(opts).get(UNAVAILABLE);
+            expect(entry).toBeDefined();
+            expect(entry!.disabled).toBe(true);
+        });
+
+        it('API: a current model whose key is missing is present and selectable', () => {
+            // Only Anthropic key uploaded, but the current model is an OpenAI one.
+            const opts = getModelPickerOptions(USER_TIERS.API, new Set([API_KEY_CONSTANTS.ANTHROPIC]), {
+                currentModel: anOpenAiModel,
+            });
+            const entry = byModel(opts).get(anOpenAiModel);
+            expect(entry).toEqual({ model: anOpenAiModel, disabled: false });
+        });
+
+        it('includes an unknown/legacy current model id as an enabled entry', () => {
+            const opts = getModelPickerOptions(USER_TIERS.FREE, new Set(), {
+                usageCounts: {},
+                currentModel: 'legacy-model-no-longer-in-catalog',
+            });
+            expect(byModel(opts).get('legacy-model-no-longer-in-catalog'))
+                .toEqual({ model: 'legacy-model-no-longer-in-catalog', disabled: false });
+        });
+    });
+
+    describe('API / PAID tiers', () => {
+        it('API tier lists only uploaded-key vendors, in both showUnavailableDisabled modes', () => {
+            for (const showUnavailableDisabled of [false, true]) {
+                const opts = getModelPickerOptions(USER_TIERS.API, new Set([API_KEY_CONSTANTS.ANTHROPIC]), {
+                    showUnavailableDisabled,
+                });
+                expect(opts.length).toBeGreaterThan(0);
+                for (const o of opts) {
+                    expect(SupportedAiModels[o.model].apiKeyName).toBe(API_KEY_CONSTANTS.ANTHROPIC);
+                    expect(o.disabled).toBe(false);
+                    expect(o.suffix).toBeUndefined();
+                }
+                // Premium models ARE selectable on API tier when the key is present.
+                expect(byModel(opts).has(LLM_CONSTANTS.CLAUDE_4_OPUS)).toBe(true);
+            }
+        });
+
+        it('API tier with no keys lists nothing', () => {
+            expect(getModelPickerOptions(USER_TIERS.API, new Set())).toEqual([]);
+        });
+
+        it('PAID tier lists the full catalog, all enabled, no suffixes', () => {
+            const opts = getModelPickerOptions(USER_TIERS.PAID, new Set());
+            expect(opts.map(o => o.model).sort()).toEqual(Object.keys(SupportedAiModels).sort());
+            for (const o of opts) {
+                expect(o.disabled).toBe(false);
+                expect(o.suffix).toBeUndefined();
+            }
+        });
     });
 });

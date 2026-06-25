@@ -129,6 +129,104 @@ export function getSelectableModelsForUser(tier: UserTier, providedKeyNames: Set
     });
 }
 
+/** Display-ready entry for a model picker. `suffix` is an optional label decoration
+ *  (e.g. "(unlimited)", "(3 left)", "(not available)"); pickers that don't show a
+ *  suffix simply ignore it. */
+export interface ModelPickerOption {
+    model: string;
+    disabled: boolean;
+    suffix?: string;
+}
+
+export interface ModelPickerOptionsOpts {
+    /**
+     * Per-game usage counts (free tier only). When provided, free-tier entries get
+     * remaining-capacity suffixes ("(N left)" / "(unlimited)") and are disabled at 0
+     * remaining. The currently-selected model does not count against itself
+     * (Math.max(0, used - 1)). When omitted, free-tier entries get static capacity
+     * suffixes ("(Nx per game)" / "(unlimited)" / "(not available)").
+     */
+    usageCounts?: Record<string, number>;
+    /**
+     * The currently-selected model. Always included in the result even if no longer
+     * allowed (the "see what you're switching from" escape hatch), marked disabled
+     * when it is not actually selectable.
+     */
+    currentModel?: string;
+    /**
+     * Free tier only: include premium/unavailable models in the list, disabled and
+     * suffixed "(not available)", instead of hiding them. GM-style pickers leave this
+     * off (hide unavailable); the bot multi-select turns it on.
+     */
+    showUnavailableDisabled?: boolean;
+}
+
+/**
+ * The single tested source of truth for what every model picker shows. Returns
+ * display-ready entries; each picker maps the result to its own display shape and
+ * never re-implements tier/usage rules. Never returns RANDOM (a UI-only pseudo-model
+ * that pickers offering it must add themselves).
+ */
+export function getModelPickerOptions(
+    tier: UserTier,
+    providedKeyNames: Set<string>,
+    opts: ModelPickerOptionsOpts = {}
+): ModelPickerOption[] {
+    const { usageCounts, currentModel, showUnavailableDisabled } = opts;
+    const hasCurrent = !!currentModel
+        && currentModel !== ''
+        && currentModel !== LLM_CONSTANTS.RANDOM;
+
+    if (tier !== USER_TIERS.FREE) {
+        // API / PAID: no per-game limits. Selectable set + current escape hatch.
+        const models = getSelectableModelsForUser(tier, providedKeyNames);
+        const result = models.map(model => ({ model, disabled: false }));
+        if (hasCurrent && !models.includes(currentModel!)) {
+            result.push({ model: currentModel!, disabled: false });
+        }
+        return result;
+    }
+
+    // FREE tier.
+    const options: ModelPickerOption[] = [];
+    for (const [model, config] of Object.entries(SupportedAiModels)) {
+        const available = !!config.freeTier?.available && config.freeTier.maxBotsPerGame !== 0;
+        const isCurrent = model === currentModel;
+        if (!(showUnavailableDisabled || available || isCurrent)) {
+            continue;
+        }
+
+        if (usageCounts) {
+            const limit = getPerGameModelLimit(model, USER_TIERS.FREE);
+            if (limit === FREE_TIER_UNLIMITED) {
+                options.push({ model, disabled: false, suffix: '(unlimited)' });
+                continue;
+            }
+            const used = usageCounts[model] ?? 0;
+            const adjustedUsed = isCurrent ? Math.max(0, used - 1) : used;
+            const remaining = Math.max(0, limit - adjustedUsed);
+            options.push({ model, disabled: remaining === 0, suffix: `(${remaining} left)` });
+            continue;
+        }
+
+        if (!available) {
+            options.push({ model, disabled: true, suffix: '(not available)' });
+            continue;
+        }
+        const limit = config.freeTier!.maxBotsPerGame;
+        options.push(limit === -1
+            ? { model, disabled: false, suffix: '(unlimited)' }
+            : { model, disabled: false, suffix: `(${limit}x per game)` });
+    }
+
+    // Current model not in the catalog (legacy/unknown id): include as an enabled
+    // escape hatch so the user can still see what they're switching from.
+    if (hasCurrent && !SupportedAiModels[currentModel!]) {
+        options.push({ model: currentModel!, disabled: false });
+    }
+    return options;
+}
+
 /**
  * Throws a descriptive error if the API-tier user has not provided the API key required
  * by `modelName`. No-op for FREE / PAID tiers (those use platform-managed keys).

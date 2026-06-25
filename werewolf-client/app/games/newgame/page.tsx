@@ -6,7 +6,7 @@ import {useSession} from 'next-auth/react';
 import {createGame, previewGame} from '@/app/api/game-actions';
 import {GAME_ROLES, GamePreview, GamePreviewWithGeneratedBots, GENDER_OPTIONS, getVoicesForGender, getRandomVoiceForGender, PLAY_STYLES, PLAY_STYLE_CONFIGS, RANDOM_ROLE, UserTier, USER_TIERS} from "@/app/api/game-models";
 import {LLM_CONSTANTS, SupportedAiModels, getModelDisplayName, modelHasTag} from "@/app/ai/ai-models";
-import {FREE_TIER_UNLIMITED, getAvailableModelsForUser, getCandidateModelsForTier, getPerGameModelLimit, getSelectableModelsForUser} from "@/app/ai/model-limit-utils";
+import {FREE_TIER_UNLIMITED, getCandidateModelsForTier, getModelPickerOptions, getPerGameModelLimit, getSelectableModelsForUser} from "@/app/ai/model-limit-utils";
 import AIModelSelect from '@/app/components/AIModelSelect';
 import ModelSelectDropdown from '@/app/components/ModelSelectDropdown';
 import SelectDropdown from '@/app/components/SelectDropdown';
@@ -82,19 +82,10 @@ export default function CreateNewGamePage() {
         const maxPlayers = userTier === USER_TIERS.API ? 16 : 12;
         return Array.from({ length: maxPlayers - 5 }, (_, i) => i + 6);
     }, [userTier]);
-    const allModels = useMemo(() => Object.values(LLM_CONSTANTS), []);
     const candidateModels = useMemo(() => getCandidateModelsForTier(userTier), [userTier]);
     const FAST_MODELS = useMemo(() => new Set(
         Object.values(LLM_CONSTANTS).filter(m => modelHasTag(m, 'fast'))
     ), []);
-    // For API tier, restrict to models the user has provided keys for.
-    const apiTierAllowed = useMemo(() => {
-        if (userTier !== USER_TIERS.API) return null;
-        return new Set(allModels.filter(modelId => {
-            const config = SupportedAiModels[modelId];
-            return !!config && providedKeyNames.has(config.apiKeyName);
-        }));
-    }, [userTier, allModels, providedKeyNames]);
 
     const gmModelOptions = useMemo(() => {
         // Tested single source of truth: free tier → free-tier catalog,
@@ -106,30 +97,27 @@ export default function CreateNewGamePage() {
             });
     }, [userTier, providedKeyNames]);
 
-    const playerModelOptions = useMemo(() => {
-        // For free tier, show ALL models (available ones selectable, unavailable greyed out)
-        // For API tier, only show models whose keys the user has provided.
-        const base = apiTierAllowed
-            ? allModels.filter(model => apiTierAllowed.has(model))
-            : allModels;
-        return base.filter(model => model !== LLM_CONSTANTS.RANDOM);
-    }, [allModels, apiTierAllowed]);
+    // Free tier shows ALL models (available selectable, unavailable greyed out via
+    // showUnavailableDisabled); API tier shows only models whose keys the user provided.
+    // Single tested source of truth — no inline tier rules here.
+    const playerPickerOptions = useMemo(
+        () => getModelPickerOptions(userTier, providedKeyNames, { showUnavailableDisabled: true }),
+        [userTier, providedKeyNames]
+    );
+    const playerModelOptions = useMemo(
+        () => playerPickerOptions.map(o => o.model),
+        [playerPickerOptions]
+    );
 
-    // For the multi-select: provide meta (disabled + counter suffix) for each model option
+    // For the multi-select: provide meta (disabled + counter suffix) for each model option.
     const playerModelOptionMeta = useMemo(() => {
         if (userTier !== USER_TIERS.FREE) return undefined;
+        const metaByModel = new Map(playerPickerOptions.map(o => [o.model, o]));
         return (model: string) => {
-            const config = SupportedAiModels[model];
-            if (!config?.freeTier?.available || config.freeTier.maxBotsPerGame === 0) {
-                return { disabled: true, suffix: '(not available)' };
-            }
-            const limit = config.freeTier.maxBotsPerGame;
-            if (limit === -1) {
-                return { suffix: '(unlimited)' };
-            }
-            return { suffix: `(${limit}x per game)` };
+            const o = metaByModel.get(model);
+            return o ? { disabled: o.disabled, suffix: o.suffix } : undefined;
         };
-    }, [userTier]);
+    }, [userTier, playerPickerOptions]);
 
     // Redirect to login if not authenticated
     useEffect(() => {
@@ -315,22 +303,12 @@ export default function CreateNewGamePage() {
         if (userTier === USER_TIERS.API && !isKeysLoaded) return;
         if (gameMasterAiType === LLM_CONSTANTS.RANDOM) return;
 
-        // Build the allowed-for-this-user set.
-        let allowed: Set<string>;
-        if (userTier === USER_TIERS.API) {
-            if (!apiTierAllowed) return;
-            allowed = apiTierAllowed;
-        } else if (userTier === USER_TIERS.FREE) {
-            allowed = new Set(candidateModels);
-        } else {
-            allowed = new Set(allModels);
-        }
+        // Tested single source of truth for the allowed-for-this-user set.
+        const allowed = getSelectableModelsForUser(userTier, providedKeyNames);
+        if (allowed.includes(gameMasterAiType)) return;
 
-        if (allowed.has(gameMasterAiType)) return;
-
-        const allowedArr = Array.from(allowed).filter(m => m !== LLM_CONSTANTS.RANDOM);
-        setGameMasterAiType(pickDefaultGmModel(allowedArr));
-    }, [isTierLoaded, isKeysLoaded, userTier, apiTierAllowed, candidateModels, allModels, gameMasterAiType]);
+        setGameMasterAiType(pickDefaultGmModel(allowed.filter(m => m !== LLM_CONSTANTS.RANDOM)));
+    }, [isTierLoaded, isKeysLoaded, userTier, providedKeyNames, gameMasterAiType]);
 
     // Compute per-model usage counts from preview data (GM + all bots)
     const previewUsageCounts = useMemo(() => {
@@ -347,39 +325,18 @@ export default function CreateNewGamePage() {
         return counts;
     }, [gameData]);
 
-    // Build option list with remaining capacity for preview model dropdowns
+    // Build option list with remaining capacity for preview model dropdowns. Tier/usage
+    // rules come from the shared helper; here we only decorate to the dropdown's shape.
     const getPreviewModelOptions = useMemo(() => {
-        if (userTier !== USER_TIERS.FREE) {
-            // API tier: all models, no limits
-            return (currentModel: string) =>
-                playerModelOptions.map(model => {
-                    const name = getModelDisplayName(model);
-                    return { model, disabled: false, label: name, displayLabel: name };
-                });
-        }
-        return (currentModel: string) => {
-            return playerModelOptions
-                .filter(model => {
-                    const config = SupportedAiModels[model];
-                    return model === currentModel || (config?.freeTier?.available && config.freeTier.maxBotsPerGame !== 0);
-                })
-                .map(model => {
-                    const config = SupportedAiModels[model];
-                    const limit = config?.freeTier?.maxBotsPerGame ?? 0;
-                    const used = previewUsageCounts[model] ?? 0;
-                    const displayLabel = getModelDisplayName(model);
-
-                    if (limit === -1) {
-                        return { model, disabled: false, label: `${displayLabel} (unlimited)`, displayLabel };
-                    }
-
-                    const adjustedUsed = model === currentModel ? Math.max(0, used - 1) : used;
-                    const remaining = Math.max(0, limit - adjustedUsed);
-                    const disabled = remaining === 0;
-                    return { model, disabled, label: `${displayLabel} (${remaining} left)`, displayLabel };
-                });
-        };
-    }, [userTier, playerModelOptions, previewUsageCounts]);
+        return (currentModel: string) =>
+            getModelPickerOptions(userTier, providedKeyNames, {
+                usageCounts: userTier === USER_TIERS.FREE ? previewUsageCounts : undefined,
+                currentModel,
+            }).map(({ model, disabled, suffix }) => {
+                const displayLabel = getModelDisplayName(model);
+                return { model, disabled, label: suffix ? `${displayLabel} ${suffix}` : displayLabel, displayLabel };
+            });
+    }, [userTier, providedKeyNames, previewUsageCounts]);
 
     // If the selected role becomes unavailable (its special role was unchecked), fall back to Random.
     // Must run before any conditional returns to keep hook order stable.

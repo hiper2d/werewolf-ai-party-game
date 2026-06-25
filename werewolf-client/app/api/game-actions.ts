@@ -33,6 +33,7 @@ import {auth} from "@/auth";
 import {AgentFactory} from "@/app/ai/agent-factory";
 import {STORY_SYSTEM_PROMPT, STORY_USER_PROMPT} from "@/app/ai/prompts/story-gen-prompts";
 import {getUserTierAndApiKeys} from "@/app/utils/tier-utils";
+import {sanitizePlayerName} from "@/app/utils/name-utils";
 import {getUserTier, getUserBalance, getVoiceProvider, updateUserMonthlySpending, deductBalance} from "@/app/api/user-actions";
 import {PAID_TIER_MARKUP} from "@/app/config/credit-packages";
 import {getDefaultVoiceProvider, getVoiceConfig} from "@/app/ai/voice-config";
@@ -418,7 +419,13 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
         }
 
         return {
-            name: bot.name,
+            // Names act as identifiers throughout the game (vote targets, GM bot
+            // selection, message routing). Sanitize the GM-generated name to the
+            // canonical [a-zA-Z0-9] form so a stray space or non-ASCII character
+            // can't poison every later exact-name match. Fall back to the raw
+            // name if sanitization leaves nothing — the user can still edit it in
+            // the preview, and createGame enforces non-empty before persisting.
+            name: sanitizePlayerName(bot.name) || bot.name,
             story: bot.story,
             playerAiType: aiType,
             gender: gender,
@@ -503,10 +510,22 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
         // Get all player names (bots + human)
         const allPlayerNames = [gamePreview.name, ...gamePreview.bots.map(bot => bot.name)];
 
+        // Persist gate: names are identifiers, so enforce the canonical
+        // [a-zA-Z0-9] form here regardless of what the (untrusted) client sent.
+        // A name that sanitizes to empty has no valid id and must be rejected.
+        const humanPlayerName = sanitizePlayerName(gamePreview.name);
+        if (!humanPlayerName) {
+            throw new Error('Your name must contain at least one letter or number.');
+        }
+
         // Convert BotPreviews to Bots with roles
         const bots: Bot[] = gamePreview.bots.map((bot, index) => {
+            const name = sanitizePlayerName(bot.name);
+            if (!name) {
+                throw new Error(`Bot name "${bot.name}" must contain at least one letter or number.`);
+            }
             return {
-                name: bot.name,
+                name,
                 story: bot.story,
                 role: roleDistribution[index + 1],
                 isAlive: true,
@@ -534,7 +553,7 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
             gameMasterVoiceStyle: gamePreview.gameMasterVoiceStyle,
             story: gamePreview.scene,
             bots: bots,
-            humanPlayerName: gamePreview.name,
+            humanPlayerName: humanPlayerName,
             humanPlayerRole: roleDistribution[0],
             humanPlayerIsAlive: true,
             currentDay: 1,
