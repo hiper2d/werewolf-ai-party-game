@@ -2,6 +2,7 @@
 
 import {useState, type ReactNode} from "react";
 import Link from "next/link";
+import {DISCORD_URL} from "@/app/config/external-links";
 
 // ── Icons ────────────────────────────────────────────────────────────────────
 function ArrowRightIcon() {
@@ -32,6 +33,16 @@ interface ChangelogEntry {
 }
 
 const CHANGELOG: ChangelogEntry[] = [
+    {
+        id: "discord-server", date: "Jun 2026", tags: ["Community"],
+        title: "We're on Discord",
+        body: (<>Werewolf AI now has a <strong>Discord server</strong> — a place to share stories from your best
+            games, swap strategies, send feedback and bug reports, and follow the news as the project grows.
+            You&apos;ll find a <strong>Join the Discord</strong> link on the home page and pinned in the sidebar of
+            every game. Come meet the other humans at the table.</>),
+        media: null,
+        links: [{label: "Join the Discord", href: DISCORD_URL}],
+    },
     {
         id: "sakana-fugu", date: "Jun 2026", tags: ["Models"],
         title: "Sakana Fugu — a new model family",

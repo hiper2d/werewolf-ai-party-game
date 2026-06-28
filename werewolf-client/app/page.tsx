@@ -4,7 +4,8 @@ import { auth } from "@/auth";
 import PlayNowButton from "@/app/components/PlayNowButton";
 import LoginCta from "@/app/components/LoginCta";
 import BuyMeACoffee from "@/app/components/BuyMeACoffee";
-import { CheckIcon } from "@/app/components/ui-icons";
+import { CheckIcon, DiscordIcon } from "@/app/components/ui-icons";
+import { DISCORD_URL } from "@/app/config/external-links";
 
 const MODELS = [
   'Claude 4.8 Opus', 'GPT-5.5', 'Gemini Flash 3.5', 'DeepSeek V4 Pro',
@@ -135,6 +136,15 @@ export default async function Home() {
               >
                 How to Play
               </Link>
+              <a
+                href={DISCORD_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-[9px] whitespace-nowrap font-semibold text-[15px] px-6 py-[13px] rounded-[var(--radius-md)] bg-transparent text-[var(--fg-1)] border border-[var(--line-2)] hover:bg-[var(--bg-1)] hover:border-[var(--line-3)] hover:text-[var(--fg-0)] transition-all duration-[120ms]"
+              >
+                <DiscordIcon className="w-[18px] h-[18px]" />
+                Join the Discord
+              </a>
             </div>
           </div>
         </div>
@@ -257,11 +267,39 @@ export default async function Home() {
         </div>
       </section>
 
+      {/* Community band — Join the Discord */}
+      <section className="community-cta bg-[var(--bg-1)] border border-[var(--line-1)] rounded-[var(--radius-2xl)] px-6 py-9 sm:px-12 sm:py-11 mb-14 sm:mb-[72px] flex flex-col gap-7 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-5">
+          <span className="flex-shrink-0 grid place-items-center w-16 h-16 rounded-[var(--radius-xl)] bg-[var(--accent-soft)] border border-[var(--accent-line)] text-[var(--accent)]">
+            <DiscordIcon className="w-8 h-8" />
+          </span>
+          <div>
+            <div className="font-mono text-[11px] tracking-[0.14em] uppercase text-[var(--fg-2)] mb-2">Community</div>
+            <h2 className="m-0 text-[clamp(22px,3vw,30px)] font-bold tracking-[-0.02em] text-[var(--fg-0)]">
+              Join the Werewolf AI Discord
+            </h2>
+            <p className="m-0 mt-2 text-[15px] text-[var(--fg-2)] leading-[1.6] max-w-[52ch]">
+              Share feedback, swap stories from your best games, and follow the news as the project grows. Come meet the other humans at the table.
+            </p>
+          </div>
+        </div>
+        <a
+          href={DISCORD_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="btn-discord inline-flex items-center justify-center gap-[9px] whitespace-nowrap flex-shrink-0 w-full sm:w-auto font-semibold text-[15px] px-6 py-[13px] rounded-[var(--radius-md)] bg-[var(--accent)] text-[var(--accent-fg)] border border-transparent shadow-[var(--shadow-1)] hover:bg-[var(--accent-strong)] transition-all duration-[120ms]"
+        >
+          <DiscordIcon className="w-[18px] h-[18px]" />
+          Join the Discord
+        </a>
+      </section>
+
       {/* Footer */}
       <footer className="border-t border-[var(--line-1)] pt-9 pb-12 flex flex-col items-center gap-[18px]">
         <BuyMeACoffee />
         <div className="flex flex-wrap justify-center gap-7">
           <Link href="/about" className="text-[13px] text-[var(--fg-1)] hover:text-[var(--fg-0)] transition-colors duration-[120ms]">About the Project</Link>
+          <a href={DISCORD_URL} target="_blank" rel="noopener noreferrer" className="text-[13px] text-[var(--fg-1)] hover:text-[var(--fg-0)] transition-colors duration-[120ms]">Discord</a>
           <Link href="/privacy" className="text-[13px] text-[var(--fg-1)] hover:text-[var(--fg-0)] transition-colors duration-[120ms]">Privacy Policy</Link>
           <Link href="/terms" className="text-[13px] text-[var(--fg-1)] hover:text-[var(--fg-0)] transition-colors duration-[120ms]">Terms of Service</Link>
           <Link href="https://github.com/hiper2d/werewolf-ai-party-game" className="text-[13px] text-[var(--fg-1)] hover:text-[var(--fg-0)] transition-colors duration-[120ms]">GitHub</Link>

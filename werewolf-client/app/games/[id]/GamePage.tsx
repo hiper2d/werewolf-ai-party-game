@@ -17,6 +17,8 @@ import { welcome, vote, keepBotsGoing, manualSelectBots, cancelBotResponses } fr
 import BotSelectionDialog from '@/app/games/[id]/components/BotSelectionDialog';
 import { replayNight, performNightAction } from '@/app/api/night-actions';
 import PlayerAvatar from "@/app/components/PlayerAvatar";
+import { DiscordIcon } from "@/app/components/ui-icons";
+import { DISCORD_URL } from "@/app/config/external-links";
 import { checkGameEndConditions } from "@/app/utils/game-utils";
 import { isTierMismatchError } from '@/app/api/errors';
 import { UIControlsProvider, useUIControls } from './context/UIControlsContext';
@@ -1061,6 +1063,18 @@ function GamePageContent({
                     })}
                 </ul>
             </div>
+
+            {/* Join the Discord — pinned at the bottom of the sidebar */}
+            <a
+                href={DISCORD_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Join the Werewolf AI Discord"
+                className="flex-shrink-0 flex items-center gap-[9px] mt-3 px-3 py-[9px] rounded-[var(--radius-md)] border border-[var(--line-2)] bg-[var(--bg-1)] text-[var(--fg-1)] text-[12.5px] font-medium hover:bg-[var(--accent-soft)] hover:border-[var(--accent-line)] hover:text-[var(--fg-0)] transition-all duration-[130ms]"
+            >
+                <DiscordIcon className="w-[17px] h-[17px] flex-shrink-0 text-[var(--accent)]" />
+                <span>Join the Discord</span>
+            </a>
         </>
     );
 
