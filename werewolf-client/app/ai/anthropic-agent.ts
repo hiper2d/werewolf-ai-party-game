@@ -190,21 +190,29 @@ export class ClaudeAgent extends AbstractAgent {
             };
 
             // Add thinking config for Anthropic models with thinking mode.
-            // Opus 4.8+ uses adaptive thinking and has deprecated the temperature param.
-            const usesAdaptiveThinking = this.model.includes('opus');
+            // Opus 4.8 and Sonnet 5 use adaptive thinking and reject the temperature param
+            // (and budget_tokens) — Haiku 4.5 still uses enabled thinking with a budget.
+            const usesAdaptiveThinking = this.model.includes('opus') || this.model.includes('sonnet');
             if (canUseThinking) {
                 if (usesAdaptiveThinking) {
-                    // Opus 4.8+ uses adaptive thinking with effort control
-                    (params as any).thinking = { type: "adaptive" };
+                    // Opus 4.8 / Sonnet 5: adaptive thinking with effort control.
+                    // display: "summarized" is required to surface the reasoning — both models
+                    // default to "omitted", which returns thinking blocks with an empty field.
+                    (params as any).thinking = { type: "adaptive", display: "summarized" };
                     (params as any).output_config = { effort: "high" };
                 } else {
-                    // Sonnet 4.6, Haiku 4.5 use enabled thinking with budget
+                    // Haiku 4.5 uses enabled thinking with budget
                     (params as any).thinking = { type: "enabled", budget_tokens: 1024 };
                     params.temperature = 1;
                 }
                 params.max_tokens = 16384;
-            } else if (!usesAdaptiveThinking) {
-                // Temperature is deprecated for Opus 4.8+
+            } else if (usesAdaptiveThinking) {
+                // Opus 4.8 / Sonnet 5 reject a non-default temperature. Sonnet 5 also defaults to
+                // adaptive thinking when `thinking` is omitted, so disable it explicitly to keep the
+                // non-thinking variant from reasoning (avoiding extra thinking cost and latency).
+                (params as any).thinking = { type: "disabled" };
+            } else {
+                // Older models (Haiku 4.5): no adaptive thinking; pass the configured temperature.
                 params.temperature = this.temperature;
             }
 

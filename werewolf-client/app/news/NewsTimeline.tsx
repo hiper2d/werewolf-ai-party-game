@@ -34,6 +34,16 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
     {
+        id: "sonnet-5", date: "Jun 2026", tags: ["Models"],
+        title: "Claude Sonnet 5 replaces Claude 4.6 Sonnet",
+        body: (<>Anthropic&apos;s <strong>Claude Sonnet 5</strong> takes over the Sonnet slot in the model picker,
+            with or without Thinking. It&apos;s a clear step up for staying in character and reading the table over
+            a long game — and it&apos;s the <strong>same price</strong> as the 4.6 Sonnet it replaces. Pick it for
+            any bot or the Game Master when you set up a lobby.</>),
+        media: null,
+        links: [{label: "Create a game", href: "/games"}],
+    },
+    {
         id: "discord-server", date: "Jun 2026", tags: ["Community"],
         title: "We're on Discord",
         body: (<>Werewolf AI now has a <strong>Discord server</strong> — a place to share stories from your best

@@ -120,11 +120,11 @@ describe("All models - welcome request via AgentFactory", () => {
 });
 
 // Models whose askText is expected to return thinking content reliably.
-// NOT guaranteed: adaptive-thinking Claude models (Opus 4.8) decide per-request
+// NOT guaranteed: adaptive-thinking Claude models (Opus 4.8, Sonnet 5) decide per-request
 // and skip thinking on trivial prompts; Grok returns encrypted reasoning; Gemini thought
 // summaries and Magistral traces vary. Those are logged instead of asserted.
+// Haiku 4.5 still uses budget thinking, so its reasoning is always surfaced.
 const THINKING_GUARANTEED = new Set<string>([
-    LLM_CONSTANTS.CLAUDE_4_SONNET_THINKING,
     LLM_CONSTANTS.CLAUDE_4_HAIKU_THINKING,
     LLM_CONSTANTS.DEEPSEEK_V4_FLASH_THINKING,
     LLM_CONSTANTS.DEEPSEEK_V4_PRO_THINKING,
