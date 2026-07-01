@@ -190,13 +190,16 @@ export class ClaudeAgent extends AbstractAgent {
             };
 
             // Add thinking config for Anthropic models with thinking mode.
-            // Opus 4.8 and Sonnet 5 use adaptive thinking and reject the temperature param
+            // Fable 5, Opus 4.8 and Sonnet 5 use adaptive thinking and reject the temperature param
             // (and budget_tokens) — Haiku 4.5 still uses enabled thinking with a budget.
-            const usesAdaptiveThinking = this.model.includes('opus') || this.model.includes('sonnet');
+            // Fable 5's thinking is always on: it has no non-thinking variant and rejects
+            // thinking:{type:"disabled"}, so it only ever hits the adaptive branch below.
+            const usesAdaptiveThinking = this.model.includes('fable')
+                || this.model.includes('opus') || this.model.includes('sonnet');
             if (canUseThinking) {
                 if (usesAdaptiveThinking) {
-                    // Opus 4.8 / Sonnet 5: adaptive thinking with effort control.
-                    // display: "summarized" is required to surface the reasoning — both models
+                    // Fable 5 / Opus 4.8 / Sonnet 5: adaptive thinking with effort control.
+                    // display: "summarized" is required to surface the reasoning — these models
                     // default to "omitted", which returns thinking blocks with an empty field.
                     (params as any).thinking = { type: "adaptive", display: "summarized" };
                     (params as any).output_config = { effort: "high" };
@@ -334,8 +337,11 @@ export class ClaudeAgent extends AbstractAgent {
             };
 
             // Add thinking config for Anthropic models with thinking mode.
-            // Opus 4.8 and Sonnet 5 use adaptive thinking and have deprecated the temperature param.
-            const usesAdaptiveThinking = this.model.includes('opus') || this.model.includes('sonnet');
+            // Fable 5, Opus 4.8 and Sonnet 5 use adaptive thinking and have deprecated the temperature
+            // param (and budget_tokens). Fable 5's thinking is always on: it rejects
+            // thinking:{type:"disabled"}, so it only ever hits the adaptive branch below.
+            const usesAdaptiveThinking = this.model.includes('fable')
+                || this.model.includes('opus') || this.model.includes('sonnet');
             if (canUseThinking) {
                 if (usesAdaptiveThinking) {
                     (params as any).thinking = { type: "adaptive", display: "summarized" };

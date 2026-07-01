@@ -33,6 +33,8 @@ export const SupportedAiKeyNames: Record<string, string> = {
 };
 
 export const LLM_CONSTANTS = {
+    // Fable 5 always reasons — its thinking cannot be disabled — so there's no non-thinking variant.
+    CLAUDE_FABLE: 'claude-fable',
     CLAUDE_4_OPUS: 'claude-opus',
     CLAUDE_4_OPUS_THINKING: 'claude-opus-thinking',
     CLAUDE_4_SONNET: 'claude-sonnet',
@@ -101,6 +103,16 @@ export interface ModelConfig {
 }
 
 export const SupportedAiModels: Record<string, ModelConfig> = {
+    // Claude Fable - frontier reasoning model. Thinking is always on (no non-thinking variant),
+    // paid/API tier only (very expensive).
+    [LLM_CONSTANTS.CLAUDE_FABLE]: {
+        displayName: 'Claude Fable 5',
+        modelApiName: 'claude-fable-5',
+        apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
+        hasThinking: true,
+        tags: ['slow', 'expensive'],
+    },
+
     // Claude models - separate with/without thinking versions
     [LLM_CONSTANTS.CLAUDE_4_OPUS]: {
         displayName: 'Claude 4.8 Opus',
@@ -397,13 +409,21 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
     },
 
     // Anthropic models
+    [SupportedAiModels[LLM_CONSTANTS.CLAUDE_FABLE].modelApiName]: {
+        // Full 1M context window at standard pricing (no extended-context premium)
+        inputPrice: 10.0,
+        outputPrice: 50.0,
+        cacheHitPrice: 1.0
+    },
     [SupportedAiModels[LLM_CONSTANTS.CLAUDE_4_OPUS].modelApiName]: {
         inputPrice: 5.0,
-        outputPrice: 25.0
+        outputPrice: 25.0,
+        cacheHitPrice: 0.50
     },
     [SupportedAiModels[LLM_CONSTANTS.CLAUDE_4_SONNET].modelApiName]: {
         inputPrice: 3.0,
-        outputPrice: 15.0
+        outputPrice: 15.0,
+        cacheHitPrice: 0.20
     },
     [SupportedAiModels[LLM_CONSTANTS.CLAUDE_4_HAIKU].modelApiName]: {
         inputPrice: 1.0,

@@ -8,12 +8,14 @@ import {
     FREE_TIER_THINKING_COST_FACTOR,
     FREE_TIER_LIMITED_MAX_BOTS,
     getFreeTierPolicy,
+    LLM_CONSTANTS,
 } from '@/app/ai/ai-models';
 
 type BandId = 'unlim' | 'three' | 'one' | 'paid';
 type Filter = 'all' | 'free' | 'paid';
 
 interface CatalogModel {
+    id: string;               // SupportedAiModels key (LLM_CONSTANTS value)
     name: string;
     provider: string;
     inputPrice: number;       // input $/1M (cache-miss)
@@ -61,6 +63,23 @@ const BAND_META: Record<BandId, BandMeta> = {
 
 const BAND_ORDER: BandId[] = ['unlim', 'three', 'one', 'paid'];
 
+// The paid-only band is ordered by hand (most → least powerful) rather than by price.
+// Keys are SupportedAiModels ids (LLM_CONSTANTS values). Any paid model not listed here
+// falls to the end, price-sorted — so a new paid model still shows up, just append it here
+// to place it deliberately.
+const PAID_BAND_ORDER: string[] = [
+    LLM_CONSTANTS.CLAUDE_FABLE,
+    LLM_CONSTANTS.CLAUDE_4_OPUS_THINKING,
+    LLM_CONSTANTS.CLAUDE_4_OPUS,
+    LLM_CONSTANTS.FUGU_ULTRA,
+    LLM_CONSTANTS.GPT_5_5,
+    LLM_CONSTANTS.CLAUDE_4_SONNET_THINKING,
+];
+const paidRank = (id: string): number => {
+    const i = PAID_BAND_ORDER.indexOf(id);
+    return i === -1 ? PAID_BAND_ORDER.length : i;
+};
+
 // modelApiNames that have at least one non-thinking config — a thinking entry on one of these is an
 // optional "(Thinking)" variant that pays the reasoning-cost multiplier before banding.
 const NON_THINKING_API_NAMES = new Set(
@@ -76,13 +95,14 @@ function policyToBand(maxBots: number, available: boolean): BandId {
 
 function buildBands(): Record<BandId, CatalogModel[]> {
     const out: Record<BandId, CatalogModel[]> = { unlim: [], three: [], one: [], paid: [] };
-    for (const config of Object.values(SupportedAiModels)) {
+    for (const [id, config] of Object.entries(SupportedAiModels)) {
         const pricing = MODEL_PRICING[config.modelApiName];
         if (!pricing) continue;
         const isOptionalThinking = config.hasThinking && NON_THINKING_API_NAMES.has(config.modelApiName);
         const policy = getFreeTierPolicy(config.modelApiName, config.hasThinking);
         const band = policyToBand(policy.maxBotsPerGame, policy.available);
         out[band].push({
+            id,
             name: config.displayName,
             provider: SupportedAiKeyNames[config.apiKeyName] ?? config.apiKeyName,
             inputPrice: pricing.inputPrice,
@@ -94,8 +114,16 @@ function buildBands(): Record<BandId, CatalogModel[]> {
             eff: isOptionalThinking ? pricing.outputPrice * FREE_TIER_THINKING_COST_FACTOR : null,
         });
     }
-    // Cheapest first within each band.
-    for (const id of BAND_ORDER) out[id].sort((a, b) => (a.eff ?? a.price) - (b.eff ?? b.price));
+    // Within each band, order by output token price, most expensive first (eff breaks ties).
+    // The paid-only band instead uses a hand-set most→least-powerful order; any paid model not
+    // in that list falls to the end by the same output-price-desc rule.
+    for (const id of BAND_ORDER) {
+        if (id === 'paid') {
+            out[id].sort((a, b) => paidRank(a.id) - paidRank(b.id) || b.price - a.price);
+        } else {
+            out[id].sort((a, b) => b.price - a.price || (b.eff ?? b.price) - (a.eff ?? a.price));
+        }
+    }
     return out;
 }
 

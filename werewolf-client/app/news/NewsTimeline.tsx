@@ -34,6 +34,17 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
     {
+        id: "fable-5-back", date: "Jul 2026", tags: ["Models"],
+        title: "Claude Fable 5 is back",
+        body: (<>Anthropic has brought <strong>Claude Fable 5</strong> back, and it&apos;s returned to the model
+            picker for bots and the Game Master. It&apos;s Anthropic&apos;s most capable model — it always reasons
+            before it answers, which really shows when a bot has to hold a story and a bluff across a long game.
+            Fable is <strong>expensive</strong>, so it&apos;s available on the <strong>paid tier only</strong> — not
+            on the free tier. Pick it for any bot or the Game Master when you set up a lobby.</>),
+        media: null,
+        links: [{label: "Create a game", href: "/games"}],
+    },
+    {
         id: "sonnet-5", date: "Jun 2026", tags: ["Models"],
         title: "Claude Sonnet 5 replaces Claude 4.6 Sonnet",
         body: (<>Anthropic&apos;s <strong>Claude Sonnet 5</strong> takes over the Sonnet slot in the model picker,
