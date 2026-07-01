@@ -14,6 +14,7 @@ import { ttsService } from "@/app/services/tts-service";
 import { sttService } from "@/app/services/stt-service";
 import { getDefaultVoiceProvider } from "@/app/ai/voice-config";
 import { getModelDisplayName } from "@/app/ai/ai-models";
+import { DISCORD_URL } from "@/app/config/external-links";
 import { useUIControls } from '../context/UIControlsContext';
 
 interface GameChatProps {
@@ -1511,6 +1512,18 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
                                     <div className="text-[12px] mt-1 text-[var(--fg-1)] break-words">
                                         {who ? `${who} couldn't generate a response` : 'The AI model couldn\'t generate a response'}
                                         {model ? ` (${getModelDisplayName(model)})` : ''}. You can retry the same model, or switch {who ? `${who}` : 'this bot'} to a different model and try again.
+                                    </div>
+                                    <div className="text-[12px] mt-1 text-[var(--fg-2)] break-words">
+                                        Keeps happening? Let us know on{' '}
+                                        <a
+                                            href={DISCORD_URL}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-[var(--accent)] hover:underline"
+                                        >
+                                            Discord
+                                        </a>
+                                        {' '}and we'll take a look.
                                     </div>
                                 </div>
                                 <div className="flex-shrink-0 flex flex-col gap-1.5">

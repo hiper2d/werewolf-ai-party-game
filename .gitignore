@@ -14,3 +14,6 @@ venv.bak/
 **/*.code-workspace
 node_modules/
 images/old
+
+# Personal Claude Code automation (contains local paths / private sibling-project details)
+.claude/skills/news/
