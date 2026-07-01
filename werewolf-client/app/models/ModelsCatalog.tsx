@@ -88,6 +88,9 @@ function buildBands(): Record<BandId, CatalogModel[]> {
             inputPrice: pricing.inputPrice,
             cachedPrice: pricing.cacheHitPrice ?? null,
             price: pricing.outputPrice,
+            // "eff" = effective output price: the raw output rate scaled up to include the reasoning
+            // (thinking) tokens a reasoning model emits on average. It's the real extra cost of running
+            // the model in thinking mode. Only shown for models where thinking is optional.
             eff: isOptionalThinking ? pricing.outputPrice * FREE_TIER_THINKING_COST_FACTOR : null,
         });
     }
@@ -184,6 +187,15 @@ export default function ModelsCatalog() {
                 <span className="text-[12.5px] text-[var(--fg-3)] font-mono whitespace-nowrap">{count} models</span>
             </div>
             {shownIds.map((id) => <Band key={id} meta={BAND_META[id]} models={bands[id]} />)}
+            <p className="mt-6 text-[12.5px] leading-[1.6] text-[var(--fg-3)]">
+                <span className="font-mono text-[10px] tracking-[0.02em] px-[7px] py-[2px] rounded-full bg-[var(--bg-3)] border border-[var(--line-2)] text-[var(--fg-2)] align-middle">×{FREE_TIER_THINKING_COST_FACTOR}</span>
+                {' '}and the <span className="font-mono text-[var(--fg-2)]">eff</span> figure mark reasoning models. A reasoning
+                model &ldquo;thinks&rdquo; before it answers, and those hidden thinking tokens are billed at the output rate
+                on top of the visible reply — so a turn costs more than the listed output price. The{' '}
+                <span className="font-mono text-[var(--fg-2)]">eff</span> (effective) price is the output rate scaled by
+                ×{FREE_TIER_THINKING_COST_FACTOR} to include that reasoning overhead on average. It&apos;s the real extra cost
+                of running a model in thinking mode.
+            </p>
         </div>
     );
 }

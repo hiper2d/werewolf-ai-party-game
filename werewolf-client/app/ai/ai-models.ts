@@ -504,6 +504,10 @@ export const FREE_TIER_OUTPUT_PRICE_BANDS = {
     SINGLE_MAX: 15,     // <= $15 → 1 bot; above → not available on free tier
 } as const;
 export const FREE_TIER_LIMITED_MAX_BOTS = 3;
+// A reasoning model bills its (hidden) thinking tokens at the output rate on top of the visible
+// answer, so a turn costs more than the sticker output price implies. This multiplier approximates
+// that overhead — a model's "effective" output cost ≈ outputPrice × factor on average. It's the
+// extra cost of running a model in reasoning mode, and it's what free-tier budgeting is based on.
 export const FREE_TIER_THINKING_COST_FACTOR = 2.5;
 
 /** modelApiNames that have at least one non-thinking config — i.e. a thinking entry on one of
