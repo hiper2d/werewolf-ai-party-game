@@ -334,18 +334,23 @@ export class ClaudeAgent extends AbstractAgent {
             };
 
             // Add thinking config for Anthropic models with thinking mode.
-            // Opus 4.8+ uses adaptive thinking and has deprecated the temperature param.
-            const usesAdaptiveThinking = this.model.includes('opus');
+            // Opus 4.8 and Sonnet 5 use adaptive thinking and have deprecated the temperature param.
+            const usesAdaptiveThinking = this.model.includes('opus') || this.model.includes('sonnet');
             if (canUseThinking) {
                 if (usesAdaptiveThinking) {
-                    (params as any).thinking = { type: "adaptive" };
+                    (params as any).thinking = { type: "adaptive", display: "summarized" };
                     (params as any).output_config = { effort: "high" };
                 } else {
                     (params as any).thinking = { type: "enabled", budget_tokens: 1024 };
                     params.temperature = 1;
                 }
                 params.max_tokens = 16384;
-            } else if (!usesAdaptiveThinking) {
+            } else if (usesAdaptiveThinking) {
+                // Opus 4.8 / Sonnet 5 reject a non-default temperature and default to adaptive
+                // thinking when `thinking` is omitted; disable it explicitly for the non-thinking variant.
+                (params as any).thinking = { type: "disabled" };
+            } else {
+                // Older models (Haiku 4.5): no adaptive thinking; pass the configured temperature.
                 params.temperature = this.temperature;
             }
 
