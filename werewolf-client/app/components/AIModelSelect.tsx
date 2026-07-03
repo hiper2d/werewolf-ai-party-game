@@ -286,11 +286,16 @@ export default function AIModelSelect({
                     }
                     style={isMobile ? undefined : { animation: 'pop 140ms ease-out' }}
                 >
-                    {/* Drag affordance (mobile only) */}
+                    {/* Drag affordance (mobile only) — tapping it closes the sheet */}
                     {isMobile && (
-                        <div className="flex-none flex justify-center pt-2 pb-1">
+                        <button
+                            type="button"
+                            aria-label="Close"
+                            onClick={() => setIsOpen(false)}
+                            className="flex-none flex justify-center pt-2 pb-3 -mb-2 cursor-pointer"
+                        >
                             <span className="w-9 h-1 rounded-full bg-[var(--line-3)]" />
-                        </div>
+                        </button>
                     )}
                     {/* Search */}
                     <div className="p-2 border-b border-[var(--line-1)]">

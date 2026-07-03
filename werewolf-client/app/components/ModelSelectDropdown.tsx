@@ -34,7 +34,16 @@ export default function ModelSelectDropdown({
     disabled = false,
 }: ModelSelectDropdownProps) {
     const [isOpen, setIsOpen] = useState(false);
+    const [isMobile, setIsMobile] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const mq = window.matchMedia('(max-width: 639px)');
+        const update = () => setIsMobile(mq.matches);
+        update();
+        mq.addEventListener('change', update);
+        return () => mq.removeEventListener('change', update);
+    }, []);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -45,6 +54,16 @@ export default function ModelSelectDropdown({
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
+
+    // Lock background scroll while the mobile bottom sheet is open.
+    useEffect(() => {
+        if (!isOpen || !isMobile) return;
+        const prev = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => {
+            document.body.style.overflow = prev;
+        };
+    }, [isOpen, isMobile]);
 
     const selectedOption = options.find(o => o.model === value);
     const displayText = selectedOption?.displayLabel ?? value;
@@ -75,8 +94,33 @@ export default function ModelSelectDropdown({
                 </svg>
             </button>
 
+            {/* Panel — full-width bottom sheet on mobile, anchored dropdown on desktop */}
+            {isOpen && isMobile && (
+                <div
+                    className="fixed inset-0 z-40 bg-black/50"
+                    onMouseDown={() => setIsOpen(false)}
+                />
+            )}
             {isOpen && (
-                <div className="absolute z-50 w-full mt-1.5 bg-[var(--bg-1)] border border-[var(--line-2)] rounded-[var(--radius-lg)] shadow-pop max-h-60 overflow-y-auto">
+                <div
+                    className={
+                        isMobile
+                            ? 'fixed inset-x-0 bottom-0 z-50 flex flex-col max-h-[85vh] bg-[var(--bg-1)] border-t border-[var(--line-2)] rounded-t-[var(--radius-xl)] shadow-pop'
+                            : 'absolute z-50 w-full mt-1.5 bg-[var(--bg-1)] border border-[var(--line-2)] rounded-[var(--radius-lg)] shadow-pop max-h-60 overflow-y-auto'
+                    }
+                >
+                    {/* Drag affordance (mobile only) — tapping it closes the sheet */}
+                    {isMobile && (
+                        <button
+                            type="button"
+                            aria-label="Close"
+                            onClick={() => setIsOpen(false)}
+                            className="flex-none flex justify-center pt-2 pb-3 -mb-2 cursor-pointer"
+                        >
+                            <span className="w-9 h-1 rounded-full bg-[var(--line-3)]" />
+                        </button>
+                    )}
+                    <div className={isMobile ? 'flex-1 min-h-0 overflow-y-auto pb-[env(safe-area-inset-bottom)]' : undefined}>
                     {options.map(({ model, disabled: optDisabled, displayLabel }) => {
                         const tags = getModelTags(model);
                         const isSelected = model === value;
@@ -110,6 +154,7 @@ export default function ModelSelectDropdown({
                             </button>
                         );
                     })}
+                    </div>
                 </div>
             )}
         </div>
