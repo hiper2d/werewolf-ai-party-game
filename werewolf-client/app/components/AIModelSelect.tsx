@@ -77,8 +77,17 @@ export default function AIModelSelect({
     const [search, setSearch] = useState('');
     const [fastOnly, setFastOnly] = useState(false);
     const [selectedProviders, setSelectedProviders] = useState<Set<string>>(new Set());
+    const [isMobile, setIsMobile] = useState(false);
     const panelRef = useRef<HTMLDivElement>(null);
     const searchRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        const mq = window.matchMedia('(max-width: 639px)');
+        const update = () => setIsMobile(mq.matches);
+        update();
+        mq.addEventListener('change', update);
+        return () => mq.removeEventListener('change', update);
+    }, []);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -91,10 +100,22 @@ export default function AIModelSelect({
     }, []);
 
     useEffect(() => {
-        if (isOpen && searchRef.current) {
+        // Desktop only: on mobile, auto-focus pops the keyboard over the bottom
+        // sheet and triggers iOS Safari's focus-zoom, which shifts the layout.
+        if (isOpen && !isMobile && searchRef.current) {
             searchRef.current.focus();
         }
-    }, [isOpen]);
+    }, [isOpen, isMobile]);
+
+    // Lock background scroll while the mobile bottom sheet is open.
+    useEffect(() => {
+        if (!isOpen || !isMobile) return;
+        const prev = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => {
+            document.body.style.overflow = prev;
+        };
+    }, [isOpen, isMobile]);
 
     // Group models by provider
     const groupedModels = useMemo(() => {
@@ -249,11 +270,28 @@ export default function AIModelSelect({
                 <CaretIcon className={`flex-none text-[var(--fg-2)] transition-transform duration-[160ms] ${isOpen ? 'rotate-180' : ''}`} />
             </button>
 
-            {/* Popover panel */}
+            {/* Popover panel — full-width bottom sheet on mobile, anchored dropdown on desktop */}
+            {isOpen && isMobile && (
+                <div
+                    className="fixed inset-0 z-40 bg-black/50"
+                    onMouseDown={() => setIsOpen(false)}
+                />
+            )}
             {isOpen && (
-                <div className="absolute z-20 w-full mt-1.5 bg-[var(--bg-1)] border border-[var(--line-2)] rounded-[var(--radius-lg)] shadow-pop animate-in fade-in slide-in-from-top-1 duration-[140ms]"
-                    style={{ animation: 'pop 140ms ease-out' }}
+                <div
+                    className={
+                        isMobile
+                            ? 'fixed inset-x-0 bottom-0 z-50 flex flex-col max-h-[85vh] bg-[var(--bg-1)] border-t border-[var(--line-2)] rounded-t-[var(--radius-xl)] shadow-pop'
+                            : 'absolute z-20 w-full mt-1.5 bg-[var(--bg-1)] border border-[var(--line-2)] rounded-[var(--radius-lg)] shadow-pop animate-in fade-in slide-in-from-top-1 duration-[140ms]'
+                    }
+                    style={isMobile ? undefined : { animation: 'pop 140ms ease-out' }}
                 >
+                    {/* Drag affordance (mobile only) */}
+                    {isMobile && (
+                        <div className="flex-none flex justify-center pt-2 pb-1">
+                            <span className="w-9 h-1 rounded-full bg-[var(--line-3)]" />
+                        </div>
+                    )}
                     {/* Search */}
                     <div className="p-2 border-b border-[var(--line-1)]">
                         <div className="relative">
@@ -266,7 +304,7 @@ export default function AIModelSelect({
                                 value={search}
                                 onChange={e => setSearch(e.target.value)}
                                 placeholder="Search models or providers..."
-                                className="w-full pl-8 pr-3 py-1.5 text-[13px] bg-[var(--bg-2)] border border-[var(--line-2)] rounded-[var(--radius-sm)] text-[var(--fg-0)] placeholder:text-[var(--fg-3)] focus:outline-none focus:border-[var(--accent-line)] focus:shadow-[0_0_0_3px_var(--accent-soft)] transition-all duration-[120ms]"
+                                className="w-full pl-8 pr-3 py-1.5 text-[16px] sm:text-[13px] bg-[var(--bg-2)] border border-[var(--line-2)] rounded-[var(--radius-sm)] text-[var(--fg-0)] placeholder:text-[var(--fg-3)] focus:outline-none focus:border-[var(--accent-line)] focus:shadow-[0_0_0_3px_var(--accent-soft)] transition-all duration-[120ms]"
                             />
                         </div>
                     </div>
@@ -319,7 +357,7 @@ export default function AIModelSelect({
                     </div>
 
                     {/* Model list */}
-                    <div className="max-h-[280px] overflow-y-auto">
+                    <div className="flex-1 min-h-0 overflow-y-auto sm:flex-none sm:max-h-[280px]">
                         {filteredGroups.map(([provider, models]) => (
                             <div key={provider}>
                                 {/* Provider header */}
@@ -357,8 +395,8 @@ export default function AIModelSelect({
 
                                             {/* Info */}
                                             <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-2">
-                                                    <span className={`text-[13px] font-medium ${checked ? 'text-[var(--fg-0)]' : 'text-[var(--fg-1)]'}`}>
+                                                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                                    <span className={`text-[13px] font-medium break-words ${checked ? 'text-[var(--fg-0)]' : 'text-[var(--fg-1)]'}`}>
                                                         {getModelDisplayName(modelId)}
                                                     </span>
                                                     {/* Tags */}
@@ -375,7 +413,7 @@ export default function AIModelSelect({
                                                         );
                                                     })}
                                                 </div>
-                                                <div className="text-[11px] font-mono text-[var(--fg-2)]">
+                                                <div className="text-[11px] font-mono text-[var(--fg-2)] truncate">
                                                     {config?.modelApiName}
                                                     {meta?.suffix && <span className="ml-1.5 text-[var(--fg-3)]">{meta.suffix}</span>}
                                                 </div>

@@ -8,6 +8,7 @@ import {GAME_ROLES, GamePreview, GamePreviewWithGeneratedBots, GENDER_OPTIONS, g
 import {LLM_CONSTANTS, SupportedAiModels, getModelDisplayName, modelHasTag} from "@/app/ai/ai-models";
 import {FREE_TIER_UNLIMITED, getCandidateModelsForTier, getModelPickerOptions, getPerGameModelLimit, getSelectableModelsForUser} from "@/app/ai/model-limit-utils";
 import AIModelSelect from '@/app/components/AIModelSelect';
+import ExpandableTextarea from '@/app/components/ExpandableTextarea';
 import ModelSelectDropdown from '@/app/components/ModelSelectDropdown';
 import SelectDropdown from '@/app/components/SelectDropdown';
 import {ttsService} from "@/app/services/tts-service";
@@ -503,7 +504,7 @@ export default function CreateNewGamePage() {
 
     const handleStoryChange = (story: string) => {
         if (gameData) {
-            setGameData(gameData);
+            setGameData({ ...gameData, scene: story });
         }
     };
 
@@ -861,10 +862,10 @@ export default function CreateNewGamePage() {
                     {/* Game Story */}
                     <div>
                         <label htmlFor="gameStory" className={`${labelStyle} block mb-1.5`}>Game Story</label>
-                        <textarea
+                        <ExpandableTextarea
                             id="gameStory"
-                            className={`${inputStyle} min-h-[130px] resize-y`}
-                            rows={5}
+                            className={inputStyle}
+                            minHeight={130}
                             value={gameData.scene}
                             onChange={(e) => handleStoryChange(e.target.value)}
                         />
@@ -1009,9 +1010,9 @@ export default function CreateNewGamePage() {
                                 {/* Story */}
                                 <div>
                                     <label className={`${labelStyle} block mb-1.5`}>Story</label>
-                                    <textarea
-                                        className={`${inputStyle} min-h-[70px] resize-y`}
-                                        rows={3}
+                                    <ExpandableTextarea
+                                        className={inputStyle}
+                                        minHeight={70}
                                         value={player.story}
                                         onChange={(e) => handlePlayerChange(index, 'story', e.target.value)}
                                         placeholder="Player's story"

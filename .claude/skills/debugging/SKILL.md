@@ -85,6 +85,7 @@ Available debugging scripts (`scripts/`):
 - `find-games.ts <searchText> [limit]` — find recent games by theme/story/description text (Firestore has no full-text search; this fetches recent games ordered by `createdAt` and filters locally). Prints id, state, owner, errorState.
 - `get-game.ts <gameId>` — full game doc: `gameState`, `currentDay`, `errorState`, `gameStateProcessQueue`, bots (alive/dead, models, voices), `voiceProvider`, `createdWithTier`, voting history, night narratives.
 - `get-messages.ts <gameId>` — dumps the full message log to `logs/game-messages-<id>-<ts>.json` (chat, GM commands, bot answers, votes — the player's-eye view).
+- `stats-today.ts [hoursBack=24]` — daily activity snapshot over a UTC window: games created, distinct owners (`ownerEmail`), count with `errorState`, and breakdowns by `gameState` and `createdWithTier`, then a per-game line (created-at, state, tier, err flag, id). Scans the 500 most recent games by `createdAt`, so widen `hoursBack` only within that window. Use for "how many games/users today".
 - Also: `delete-message.ts`, `delete-messages-after.ts`, `update-message.ts`, `fix-stuck-welcome.ts`, `view-free-tier-keys.ts` (see each script's header).
 
 New one-off queries: copy the pattern from `scripts/get-game.ts` — import `db` from `../firebase/server`, write a small script, run with `npx tsx --env-file=.env`.
