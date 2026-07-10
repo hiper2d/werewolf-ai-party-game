@@ -34,8 +34,8 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
     {
-        id: "grok-4-3", date: "Jul 2026", tags: ["Models"],
-        title: "Grok 4.5 replaces Grok 4.2",
+        id: "grok-4-5", date: "Jul 2026", tags: ["Models"],
+        title: "Grok 4.5 replaces Grok 4.3",
         body: (<>xAI&apos;s <strong>Grok 4.5</strong> takes over the Grok slot in the model picker. The separate
             &ldquo;Thinking&rdquo; variant is gone — Grok now <strong>always reasons</strong> before it answers.
             Even better, it keeps its <strong>private train of thought between turns</strong>: a Grok bot remembers
