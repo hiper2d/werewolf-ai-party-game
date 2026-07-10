@@ -1,6 +1,10 @@
 import { db } from '../firebase/server';
 
 async function main() {
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+
   const hoursBack = 24;
   const cutoff = Date.now() - hoursBack * 3600 * 1000;
 
