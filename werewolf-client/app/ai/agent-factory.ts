@@ -47,8 +47,7 @@ export class AgentFactory {
             case LLM_CONSTANTS.GEMINI_3_FLASH:
             case LLM_CONSTANTS.GEMINI_3_FLASH_LITE:
                 return new GoogleAgent(name, instruction, model.modelApiName, key, shouldEnableThinking);
-            case LLM_CONSTANTS.GROK_4_3:
-            case LLM_CONSTANTS.GROK_4_3_THINKING:
+            case LLM_CONSTANTS.GROK_4_5:
                 return new GrokAgent(name, instruction, model.modelApiName, key, model.temperature!, shouldEnableThinking);
 
             // DeepSeek V4 models - flash and pro, with thinking toggle
@@ -88,7 +87,8 @@ export class AgentFactory {
         'gpt-5.4': LLM_CONSTANTS.GPT_5_5,
         'deepseek-chat': LLM_CONSTANTS.DEEPSEEK_V4_FLASH,
         'deepseek-reasoner': LLM_CONSTANTS.DEEPSEEK_V4_FLASH_THINKING,
-        'grok-fast': LLM_CONSTANTS.GROK_4_3_THINKING,
+        'grok-fast': LLM_CONSTANTS.GROK_4_5,
+        'grok-thinking': LLM_CONSTANTS.GROK_4_5,
     };
 
     private static validateLlmTypeAndGet(llmType: string): string {

@@ -26,16 +26,16 @@ Pick any model for the Game Master and for each individual bot:
 | Provider | Models                                                                         |
 |----------|--------------------------------------------------------------------------------|
 | **OpenAI** | GPT-5.5, GPT-5.4-mini                                                          |
-| **Anthropic** | Claude 4.8 Opus, Claude 4.6 Sonnet, Claude 4.5 Haiku (with or without Thinking) |
+| **Anthropic** | Claude Fable 5 (always-on reasoning), Claude 4.8 Opus, Claude 5 Sonnet, Claude 4.5 Haiku (with or without Thinking) |
 | **Google** | Gemini 3.1 Pro Preview, Gemini 3.5 Flash, Gemini 3.1 Flash Lite                |
 | **DeepSeek** | DeepSeek V4 Flash, DeepSeek V4 Pro (with or without Thinking)                  |
 | **Mistral** | Mistral Large 3, Mistral Medium 3.5, Mistral 4 Small, Magistral Medium 1.2 (Thinking) |
-| **xAI** | Grok 4.3 (with or without Thinking)                                             |
+| **xAI** | Grok 4.5 (always-on reasoning)                                                  |
 | **Moonshot AI** | Kimi K2.6 (with or without Thinking)                                           |
 | **Z.AI** | GLM-5.2 (with or without Thinking)                                              |
 | **Sakana** | Fugu, Fugu Ultra (always-on reasoning)                                          |
 
-Most models support reasoning, which is stored in the database with every message — even though it's not visible in the UI.
+Most models support reasoning, which is stored in the database with every message — even though it's not visible in the UI. For Claude, Gemini, and Grok, the reasoning trace (a signature or an encrypted blob) is also replayed on later turns, so a bot keeps its private train of thought across the whole game.
 
 ## Game List
 

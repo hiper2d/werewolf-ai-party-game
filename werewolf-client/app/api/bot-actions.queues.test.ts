@@ -8,11 +8,14 @@
  * Explicitly OUT of scope (covered elsewhere, concurrently being edited):
  * vote tallying, tie-breaking and elimination (voteImpl Mode 2 with empty queue).
  *
- * These tests pin CURRENT behavior. All Firestore / auth / AI calls are mocked;
- * Math.random and Date.now are pinned for determinism.
+ * These tests pin CURRENT behavior. Stale/duplicate calls (wrong game state,
+ * non-empty queue, consumed turn) are benign no-ops — they return the current
+ * game with no errorState and log a STALE_ACTION warning; only genuine
+ * validation and system failures produce an errorState. All Firestore / auth /
+ * AI calls are mocked; Math.random and Date.now are pinned for determinism.
  */
 
-import { welcome, talkToAll, keepBotsGoing, manualSelectBots, vote } from './bot-actions';
+import { welcome, talkToAll, keepBotsGoing, manualSelectBots, vote, humanPlayerVote } from './bot-actions';
 import { db } from '@/firebase/server';
 import { auth } from '@/auth';
 import { AgentFactory } from '@/app/ai/agent-factory';
@@ -90,6 +93,7 @@ import {
     setGameErrorState,
 } from '@/app/api/game-actions';
 import { getApiKeysForUser } from '@/app/utils/tier-utils';
+import { logger } from '@/app/utils/logger';
 
 // ---------------------------------------------------------------------------
 // Test fixtures and helpers
@@ -458,15 +462,21 @@ describe('talkToAll (DAY_DISCUSSION, processing the bot queue)', () => {
         expect(updatesWith('gameState')).toHaveLength(0);
     });
 
-    test('rejects when game is not in DAY_DISCUSSION or AFTER_GAME_DISCUSSION', async () => {
+    test('stale call in another state is a benign no-op (no errorState)', async () => {
         const game = makeGame({ gameState: GAME_STATES.VOTE, gameStateProcessQueue: ['Alice'] });
         (getGame as jest.Mock).mockResolvedValue(game);
 
         const result = await talkToAll(GAME_ID, '');
 
-        expectErrorState('Game is not in DAY_DISCUSSION or AFTER_GAME_DISCUSSION state');
-        expect(result.game.errorState).toBeTruthy();
+        expect(setGameErrorState).not.toHaveBeenCalled();
+        expect(result.game.errorState).toBeFalsy();
+        expect(result.game.gameState).toBe(GAME_STATES.VOTE);
+        expect(result.messages).toEqual([]);
         expect(mockUpdate).not.toHaveBeenCalled();
+        expect(logger.warn).toHaveBeenCalledWith(
+            expect.stringContaining('STALE_ACTION talkToAll'),
+            expect.objectContaining({ gameId: GAME_ID })
+        );
     });
 });
 
@@ -609,15 +619,21 @@ describe('GM bot selection via talkToAll (human message, empty queue)', () => {
 // ---------------------------------------------------------------------------
 
 describe('keepBotsGoing (DAY_DISCUSSION, empty queue)', () => {
-    test('rejects when bots are already in the conversation queue', async () => {
+    test('no-ops when bots are already in the conversation queue (double-click)', async () => {
         const game = makeGame({ gameStateProcessQueue: ['Alice'] });
         (getGame as jest.Mock).mockResolvedValue(game);
 
         const result = await keepBotsGoing(GAME_ID);
 
-        expectErrorState('Bots are already in conversation queue');
-        expect(result.game.errorState).toBeTruthy();
+        expect(setGameErrorState).not.toHaveBeenCalled();
+        expect(result.game.errorState).toBeFalsy();
+        expect(result.game.gameStateProcessQueue).toEqual(['Alice']);
+        expect(result.messages).toEqual([]);
         expect(AgentFactory.createAgent).not.toHaveBeenCalled();
+        expect(logger.warn).toHaveBeenCalledWith(
+            expect.stringContaining('STALE_ACTION keepBotsGoing'),
+            expect.objectContaining({ gameId: GAME_ID })
+        );
     });
 
     test('valid GM selection populates the process queue', async () => {
@@ -729,13 +745,19 @@ describe('manualSelectBots (selection validation)', () => {
         expect(updatesWith('gameStateProcessQueue')).toHaveLength(0);
     });
 
-    test('rejected while other bots are still responding (non-empty queue)', async () => {
+    test('no-ops while other bots are still responding (non-empty queue)', async () => {
         const game = makeGame({ gameStateProcessQueue: ['Alice'] });
         (getGame as jest.Mock).mockResolvedValue(game);
 
-        await manualSelectBots(GAME_ID, ['Bob']);
+        const result = await manualSelectBots(GAME_ID, ['Bob']);
 
-        expectErrorState('Cannot select bots while others are still responding');
+        expect(setGameErrorState).not.toHaveBeenCalled();
+        expect(result.game.errorState).toBeFalsy();
+        expect(updatesWith('gameStateProcessQueue')).toHaveLength(0);
+        expect(logger.warn).toHaveBeenCalledWith(
+            expect.stringContaining('STALE_ACTION manualSelectBots'),
+            expect.objectContaining({ gameId: GAME_ID })
+        );
     });
 });
 
@@ -783,7 +805,7 @@ describe('vote (queue mechanics only)', () => {
         expect(setGameErrorState).not.toHaveBeenCalled();
     });
 
-    test('state-changed-mid-processing guard produces an error state', async () => {
+    test('state-changed-mid-processing guard is a benign no-op with the re-read game', async () => {
         const initial = makeGame({
             gameState: GAME_STATES.VOTE,
             gameStateProcessQueue: ['Alice', 'Bob'],
@@ -799,9 +821,15 @@ describe('vote (queue mechanics only)', () => {
 
         const result = await vote(GAME_ID);
 
-        expectErrorState('Game state changed during processing: DAY_DISCUSSION');
-        expect(result.game.errorState).toBeTruthy();
+        expect(setGameErrorState).not.toHaveBeenCalled();
+        expect(result.game.errorState).toBeFalsy();
+        expect(result.game.gameState).toBe(GAME_STATES.DAY_DISCUSSION);
+        expect(result.messages).toEqual([]);
         expect(AgentFactory.createAgent).not.toHaveBeenCalled();
+        expect(logger.warn).toHaveBeenCalledWith(
+            expect.stringContaining('STALE_ACTION vote'),
+            expect.objectContaining({ gameId: GAME_ID })
+        );
     });
 
     test('human player at queue head returns to UI without touching the queue', async () => {
@@ -819,13 +847,104 @@ describe('vote (queue mechanics only)', () => {
         expect(result.game.gameStateProcessQueue).toEqual([HUMAN_NAME, 'Alice']);
     });
 
-    test('invalid game state for voting produces an error state', async () => {
+    test('vote in a non-voting state is a benign no-op (no errorState)', async () => {
         const game = makeGame({ gameState: GAME_STATES.NIGHT });
         (getGame as jest.Mock).mockResolvedValue(game);
 
         const result = await vote(GAME_ID);
 
-        expectErrorState('Invalid game state for voting: NIGHT');
+        expect(setGameErrorState).not.toHaveBeenCalled();
+        expect(result.game.errorState).toBeFalsy();
+        expect(result.game.gameState).toBe(GAME_STATES.NIGHT);
+        expect(result.messages).toEqual([]);
+        expect(logger.warn).toHaveBeenCalledWith(
+            expect.stringContaining('STALE_ACTION vote'),
+            expect.objectContaining({ gameId: GAME_ID })
+        );
+    });
+
+    test('DAY_DISCUSSION with bots still speaking does not start the vote (queue guard)', async () => {
+        const game = makeGame({
+            gameState: GAME_STATES.DAY_DISCUSSION,
+            gameStateProcessQueue: ['Alice'],
+        });
+        (getGame as jest.Mock).mockResolvedValue(game);
+
+        const result = await vote(GAME_ID);
+
+        expect(mockUpdate).not.toHaveBeenCalled();
+        expect(setGameErrorState).not.toHaveBeenCalled();
+        expect(result.game.gameState).toBe(GAME_STATES.DAY_DISCUSSION);
+        expect(result.game.gameStateProcessQueue).toEqual(['Alice']);
+        expect(logger.warn).toHaveBeenCalledWith(
+            expect.stringContaining('STALE_ACTION vote'),
+            expect.objectContaining({ gameId: GAME_ID })
+        );
+    });
+});
+
+// ---------------------------------------------------------------------------
+// humanPlayerVote: stale/duplicate submissions are benign no-ops
+// ---------------------------------------------------------------------------
+
+describe('humanPlayerVote (stale-call guards)', () => {
+    test('vote outside the VOTE state is a benign no-op', async () => {
+        const game = makeGame({ gameState: GAME_STATES.VOTE_RESULTS });
+        (getGame as jest.Mock).mockResolvedValue(game);
+
+        const result = await humanPlayerVote(GAME_ID, 'Alice', 'sus');
+
+        expect(setGameErrorState).not.toHaveBeenCalled();
+        expect(result.game.errorState).toBeFalsy();
+        expect(mockUpdate).not.toHaveBeenCalled();
+        expect(addMessageToChatAndSaveToDb).not.toHaveBeenCalled();
+    });
+
+    test('vote when not at the queue head is a benign no-op', async () => {
+        const game = makeGame({
+            gameState: GAME_STATES.VOTE,
+            gameStateProcessQueue: ['Alice', HUMAN_NAME],
+        });
+        (getGame as jest.Mock).mockResolvedValue(game);
+
+        const result = await humanPlayerVote(GAME_ID, 'Alice', 'sus');
+
+        expect(setGameErrorState).not.toHaveBeenCalled();
+        expect(result.game.errorState).toBeFalsy();
+        expect(addMessageToChatAndSaveToDb).not.toHaveBeenCalled();
+    });
+
+    test('double-submit (already removed from re-read queue) is a benign no-op', async () => {
+        const initial = makeGame({
+            gameState: GAME_STATES.VOTE,
+            gameStateProcessQueue: [HUMAN_NAME, 'Alice'],
+        });
+        // Re-read: the first submit already consumed the human's turn.
+        const reread = makeGame({
+            gameState: GAME_STATES.VOTE,
+            gameStateProcessQueue: ['Alice'],
+        });
+        (getGame as jest.Mock)
+            .mockResolvedValueOnce(initial)
+            .mockResolvedValue(reread);
+
+        const result = await humanPlayerVote(GAME_ID, 'Alice', 'sus');
+
+        expect(setGameErrorState).not.toHaveBeenCalled();
+        expect(result.game.gameStateProcessQueue).toEqual(['Alice']);
+        expect(addMessageToChatAndSaveToDb).not.toHaveBeenCalled();
+    });
+
+    test('invalid target player still produces an error state', async () => {
+        const game = makeGame({
+            gameState: GAME_STATES.VOTE,
+            gameStateProcessQueue: [HUMAN_NAME, 'Alice'],
+        });
+        (getGame as jest.Mock).mockResolvedValue(game);
+
+        const result = await humanPlayerVote(GAME_ID, 'Nobody', 'sus');
+
+        expectErrorState('Invalid target player');
         expect(result.game.errorState).toBeTruthy();
     });
 });

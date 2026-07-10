@@ -26,6 +26,7 @@ import { auth } from "@/auth";
 import { getGame, addMessageToChatAndSaveToDb } from "./game-actions";
 import { RoleProcessorFactory } from "./roles";
 import { withGameErrorHandling } from "@/app/utils/server-action-wrapper";
+import { staleActionNoOp } from "@/app/api/action-guards";
 import { AgentFactory } from "@/app/ai/agent-factory";
 import { getUserFromFirestore, getBotMessages, getGameMessages } from "@/app/api/game-actions";
 import { getApiKeysForUser } from "@/app/utils/tier-utils";
@@ -359,16 +360,9 @@ async function performNightActionImpl(gameId: string): Promise<GameActionRespons
         console.log('🌅 Night actions already completed, returning current game state');
         return { game, messages: [] };
     } else {
-        throw new BotResponseError(
-            'Invalid game state for night action',
-            `Game must be in VOTE_RESULTS, NIGHT, or NIGHT_RESULTS state. Current state: ${game.gameState}`,
-            {
-                currentState: game.gameState,
-                expectedStates: [GAME_STATES.VOTE_RESULTS, GAME_STATES.NIGHT, GAME_STATES.NIGHT_RESULTS],
-                gameId
-            },
-            true
-        );
+        // Stale call: the game advanced past the night flow while this request
+        // was in flight — re-sync the client, don't error.
+        return staleActionNoOp('performNightAction', `game is in ${game.gameState}, not a night state`, game);
     }
 }
 
@@ -396,18 +390,10 @@ async function beginNightImpl(gameId: string): Promise<GameActionResponse> {
 
     await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: game.createdWithTier });
 
-    // Validate game state
+    // Stale call (e.g. double-clicked "Start Night" — the first click already
+    // moved VOTE_RESULTS → NIGHT): re-sync the client, don't error.
     if (game.gameState !== GAME_STATES.VOTE_RESULTS) {
-        throw new BotResponseError(
-            'Invalid game state for beginning night',
-            `Game must be in VOTE_RESULTS state to begin night. Current state: ${game.gameState}`,
-            {
-                currentState: game.gameState,
-                expectedState: GAME_STATES.VOTE_RESULTS,
-                gameId
-            },
-            true
-        );
+        return staleActionNoOp('beginNight', `game is in ${game.gameState}, not VOTE_RESULTS`, game);
     }
 
     try {
@@ -527,18 +513,10 @@ async function replayNightImpl(gameId: string): Promise<GameActionResponse> {
         throw new Error('Game not found');
     }
 
-    // Validate game state (should be in a night phase)
+    // Stale call (e.g. double-clicked "Replay Night" — the first click already
+    // reset the night): re-sync the client, don't error.
     if (game.gameState !== GAME_STATES.NIGHT && game.gameState !== GAME_STATES.NIGHT_RESULTS) {
-        throw new BotResponseError(
-            'Invalid game state for replaying night',
-            `Game must be in NIGHT or NIGHT_RESULTS state to replay night. Current state: ${game.gameState}`,
-            {
-                currentState: game.gameState,
-                expectedStates: [GAME_STATES.NIGHT, GAME_STATES.NIGHT_RESULTS],
-                gameId
-            },
-            true
-        );
+        return staleActionNoOp('replayNight', `game is in ${game.gameState}, not NIGHT or NIGHT_RESULTS`, game);
     }
 
     try {
@@ -821,30 +799,34 @@ async function humanPlayerTalkWerewolvesImpl(gameId: string, message: string): P
         throw new Error('Game not found');
     }
 
-    // Validate game state
+    // Tolerant of stale calls: a coordination message sent as the werewolf
+    // phase advanced is moot — re-sync the client (the draft is preserved
+    // client-side), don't error.
     if (game.gameState !== GAME_STATES.NIGHT) {
-        throw new Error('Game is not in night phase');
+        return staleActionNoOp('humanPlayerTalkWerewolves', `game is in ${game.gameState}, not NIGHT`, game);
     }
 
-    // Check if it's werewolf phase and human player's turn
     if (game.gameStateProcessQueue.length === 0 || game.gameStateParamQueue.length === 0) {
-        throw new Error('No night actions in progress');
+        return staleActionNoOp('humanPlayerTalkWerewolves', 'no night actions in progress', game);
     }
 
     const currentRole = game.gameStateProcessQueue[0];
     const currentPlayer = game.gameStateParamQueue[0];
 
     if (currentRole !== GAME_ROLES.WEREWOLF) {
-        throw new Error('Not currently werewolf phase');
+        return staleActionNoOp('humanPlayerTalkWerewolves', 'not currently the werewolf phase', game);
     }
 
     if (game.humanPlayerRole !== GAME_ROLES.WEREWOLF || currentPlayer !== game.humanPlayerName) {
-        throw new Error('Not your turn for werewolf discussion');
+        return staleActionNoOp('humanPlayerTalkWerewolves', 'not the human player\'s werewolf turn', game);
     }
 
-    // Ensure this is NOT the last player in queue (coordination phase only)
+    // Coordination phase only: with one player left in the param queue the
+    // client should use performHumanPlayerNightAction. The queue can shrink
+    // between the client's check and this read, so treat it as a stale call —
+    // the re-synced state opens the final-action modal.
     if (game.gameStateParamQueue.length === 1) {
-        throw new Error('Use performHumanPlayerNightAction for final werewolf action');
+        return staleActionNoOp('humanPlayerTalkWerewolves', 'werewolf coordination is over; final action expected', game);
     }
 
     try {
@@ -936,9 +918,10 @@ async function startNewDayImpl(gameId: string): Promise<GameActionResponse> {
 
         await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: currentGame.createdWithTier });
 
-        // Validate that we're in NIGHT_RESULTS state
+        // Stale call (e.g. double-clicked "Next Day" — the first click already
+        // advanced the state): re-sync the client, don't error.
         if (gameData?.gameState !== GAME_STATES.NIGHT_RESULTS) {
-            throw new Error(`Cannot start new day from state: ${gameData?.gameState}. Expected: ${GAME_STATES.NIGHT_RESULTS}`);
+            return staleActionNoOp('startNewDay', `game is in ${gameData?.gameState}, not NIGHT_RESULTS`, currentGame);
         }
 
         console.log(`🌅 Starting new day by applying night results and transitioning to NEW_DAY_BOT_SUMMARIES`);
@@ -1141,9 +1124,10 @@ async function summarizePastDayImpl(gameId: string): Promise<GameActionResponse>
         const gameData = gameSnap.data();
         const currentGame = gameFromFirestore(gameId, gameData);
 
-        // Validate that we're in NEW_DAY_BOT_SUMMARIES state
+        // Stale call (double-fire of the summaries effect, or a second tab):
+        // re-sync the client, don't error.
         if (gameData?.gameState !== GAME_STATES.NEW_DAY_BOT_SUMMARIES) {
-            throw new Error(`Cannot summarize day from state: ${gameData?.gameState}. Expected: ${GAME_STATES.NEW_DAY_BOT_SUMMARIES}`);
+            return staleActionNoOp('summarizePastDay', `game is in ${gameData?.gameState}, not NEW_DAY_BOT_SUMMARIES`, currentGame);
         }
 
         // Get the first bot from the processing queue

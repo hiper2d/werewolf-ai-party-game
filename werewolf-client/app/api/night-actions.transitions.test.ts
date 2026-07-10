@@ -205,14 +205,16 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 describe('performNightAction dispatch', () => {
-    test('invalid state (DAY_DISCUSSION) produces an error state', async () => {
+    test('invalid state (DAY_DISCUSSION) is a benign no-op (no errorState)', async () => {
         const game = makeGame({ gameState: GAME_STATES.DAY_DISCUSSION });
         (getGame as jest.Mock).mockResolvedValue(game);
 
         const result = await performNightAction(GAME_ID);
 
-        expectErrorState('Invalid game state for night action');
-        expect(result.game.errorState).toBeTruthy();
+        expect(setGameErrorState).not.toHaveBeenCalled();
+        expect(result.game.errorState).toBeFalsy();
+        expect(result.game.gameState).toBe(GAME_STATES.DAY_DISCUSSION);
+        expect(result.messages).toEqual([]);
         expect(mockUpdate).not.toHaveBeenCalled();
     });
 

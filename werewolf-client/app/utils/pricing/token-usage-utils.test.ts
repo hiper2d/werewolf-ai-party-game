@@ -284,7 +284,7 @@ describe('Token Usage Utils', () => {
                 SupportedAiModels[LLM_CONSTANTS.MISTRAL_3_5_MEDIUM].modelApiName,
                 SupportedAiModels[LLM_CONSTANTS.MISTRAL_4_SMALL].modelApiName,
                 SupportedAiModels[LLM_CONSTANTS.MISTRAL_MAGISTRAL].modelApiName,
-                SupportedAiModels[LLM_CONSTANTS.GROK_4_3].modelApiName,
+                SupportedAiModels[LLM_CONSTANTS.GROK_4_5].modelApiName,
                 SupportedAiModels[LLM_CONSTANTS.GLM].modelApiName,
             ];
 

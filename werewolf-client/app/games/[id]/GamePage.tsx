@@ -222,7 +222,9 @@ function GamePageContent({
         return false;
     };
 
-    const runGameAction = async <T,>(action: () => Promise<T>): Promise<T | undefined> => {
+    // Shared with GameChat via prop so chat sends and page buttons (Vote,
+    // Go on, night flow) can never dispatch concurrently from this tab.
+    const runGameAction = useCallback(async <T,>(action: () => Promise<T>): Promise<T | undefined> => {
         // Skip duplicate/concurrent dispatch — only one game action runs at a time.
         if (inFlightRef.current) {
             console.warn('⏭️ GAMEPAGE: skipping game action — one is already in flight');
@@ -232,14 +234,15 @@ function GamePageContent({
         try {
             return await action();
         } catch (error) {
-            if (handleGameActionError(error)) {
+            if (isTierMismatchError(error) || (error instanceof Error && error.message === 'TIER_MISMATCH')) {
+                window.location.href = `/games?error=tier_mismatch&blocked=${encodeURIComponent(initialGame.id)}`;
                 return undefined;
             }
             throw error;
         } finally {
             inFlightRef.current = false;
         }
-    };
+    }, [initialGame.id]);
 
     // Handle welcome state
     useEffect(() => {
@@ -1209,6 +1212,7 @@ function GamePageContent({
                 <GameChat
                     gameId={game.id}
                     game={game}
+                    runGameAction={runGameAction}
                     onGameStateChange={applyActionResult}
                     pendingMessages={pendingMessages}
                     onPendingMessagesConsumed={() => setPendingMessages([])}

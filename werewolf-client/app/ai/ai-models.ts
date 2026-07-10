@@ -54,8 +54,7 @@ export const LLM_CONSTANTS = {
     MISTRAL_3_5_MEDIUM: 'mistral-medium',
     MISTRAL_4_SMALL: 'mistral-small',
     MISTRAL_MAGISTRAL: 'mistral-magistral',
-    GROK_4_3: 'grok',
-    GROK_4_3_THINKING: 'grok-thinking',
+    GROK_4_5: 'grok',
     KIMI: 'kimi',
     KIMI_THINKING: 'kimi-thinking',
     GLM: 'glm',
@@ -233,21 +232,14 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         hasThinking: true,
         tags: ['fast', 'cheap'],
     },
-    [LLM_CONSTANTS.GROK_4_3]: {
-        displayName: 'Grok 4.3',
-        modelApiName: 'grok-4.3',
-        apiKeyName: API_KEY_CONSTANTS.GROK,
-        hasThinking: false,
-        temperature: 0.7,
-        tags: ['fast'],
-    },
-    [LLM_CONSTANTS.GROK_4_3_THINKING]: {
-        displayName: 'Grok 4.3 (Thinking)',
-        modelApiName: 'grok-4.3',
+    // Always-on reasoning (xAI default effort "high", cannot be disabled) — no non-thinking sibling
+    [LLM_CONSTANTS.GROK_4_5]: {
+        displayName: 'Grok 4.5',
+        modelApiName: 'grok-4.5',
         apiKeyName: API_KEY_CONSTANTS.GROK,
         hasThinking: true,
         temperature: 0.7,
-        tags: ['slow', 'expensive'],
+        tags: ['slow'],
     },
 
     // Mistral models
@@ -332,6 +324,23 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
     },
 };
 
+/**
+ * STAGED: GPT-5.6 family (sol / terra / luna) — limited API preview.
+ *
+ * As of July 2026 these ids 404 on our account ("limited preview ... broader API
+ * availability in the coming weeks. Until then, use gpt-5.5"). They are deliberately
+ * NOT in SupportedAiModels so they can't be picked in games. The live probe suite
+ * `gpt-5-6-availability.test.ts` checks these ids; when it goes green, promote them:
+ *   - Repoint 'gpt' at gpt-5.6-terra and 'gpt-mini' at gpt-5.6-luna (or introduce
+ *     new stable ids), add gpt-5.6-sol as the paid-only flagship in PAID_BAND_ORDER
+ *     (ModelsCatalog.tsx), and move the pricing below into MODEL_PRICING.
+ *   - Planned pricing ($/1M in, cached, out): sol 5 / 0.5 / 30; terra 2.5 / 0.25 / 15;
+ *     luna 1 / 0.1 / 6.
+ *   - Luna at $6 output needs FREE_TIER_OUTPUT_PRICE_BANDS.LIMITED_MAX bumped 5 → 6
+ *     to keep the 3-bot cap gpt-5.4-mini has (note: Grok 4.5 at $6 would ride along).
+ */
+export const UPCOMING_GPT_5_6_MODELS = ['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'] as const;
+
 export type LLMModel = keyof typeof SupportedAiModels;
 
 export function getModelTags(modelId: string): ModelTag[] {
@@ -374,7 +383,9 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
     [SupportedAiModels[LLM_CONSTANTS.GPT_5_5].modelApiName]: {
         inputPrice: 5.000,
         outputPrice: 30.000,
-        cacheHitPrice: 2.500
+        // Cached input is $0.50/1M on the current OpenAI pricing page (was listed
+        // here as $2.50 before — that overcharged cache hits 5×).
+        cacheHitPrice: 0.500
     },
     [SupportedAiModels[LLM_CONSTANTS.GPT_5_4_MINI].modelApiName]: {
         inputPrice: 0.750,
@@ -474,11 +485,11 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
         outputPrice: 5.0
     },
 
-    // Grok models — both grok and grok-thinking share grok-4.3
-    [SupportedAiModels[LLM_CONSTANTS.GROK_4_3].modelApiName]: {
-        inputPrice: 1.25,
-        outputPrice: 2.50,
-        cacheHitPrice: 0.20
+    // Grok models
+    [SupportedAiModels[LLM_CONSTANTS.GROK_4_5].modelApiName]: {
+        inputPrice: 2.0,
+        outputPrice: 6.0,
+        cacheHitPrice: 0.50
     },
 
     // Sakana Fugu models
@@ -671,6 +682,7 @@ export function getFreeTierModelLimit(modelName: string): number | null {
 export function getProviderSignatureFields(aiType: string, signature?: string): {
     anthropicThinkingSignature?: string;
     googleThoughtSignature?: string;
+    grokEncryptedReasoning?: string;
 } {
     if (!signature) {
         return {};
@@ -684,6 +696,11 @@ export function getProviderSignatureFields(aiType: string, signature?: string): 
     // Check if it's a Google (Gemini) model
     if (aiType.startsWith('gemini-')) {
         return { googleThoughtSignature: signature };
+    }
+
+    // Check if it's an xAI (Grok) model — JSON-serialized encrypted reasoning items
+    if (aiType.startsWith('grok')) {
+        return { grokEncryptedReasoning: signature };
     }
 
     // Other providers don't support signatures, return empty

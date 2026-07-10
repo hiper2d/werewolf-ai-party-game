@@ -100,7 +100,12 @@ const cases: AgentCase[] = [
     name: 'GrokAgent',
     make: () => {
       const agent = new GrokAgent('Bot', 'instruction', 'grok-test', 'key', 0.2, false, SILENT_LOGGING);
-      (agent as any).client = openAiChatEmpty;
+      // Responses API surface: message item present but its output_text is empty.
+      (agent as any).client = {
+        responses: {
+          create: async () => ({ output: [{ type: 'message', content: [{ type: 'output_text', text: '' }] }] }),
+        },
+      };
       return agent;
     },
   },

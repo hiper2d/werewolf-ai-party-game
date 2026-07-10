@@ -48,6 +48,7 @@ import {
 import {getApiKeysForUser} from "@/app/utils/tier-utils";
 import {selectRespondingBots} from "@/app/api/bot-selection";
 import {withGameErrorHandling} from "@/app/utils/server-action-wrapper";
+import {staleActionNoOp} from "@/app/api/action-guards";
 import {
     generateBotContextSection,
     generatePlayStyleDescription,
@@ -437,10 +438,11 @@ function shouldTriggerAutoVote(game: Game): boolean {
     
         await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: game.createdWithTier });
     
-        // Validate game state - allow both DAY_DISCUSSION and AFTER_GAME_DISCUSSION
+        // Tolerant of stale calls: the game may have advanced (e.g. to VOTE)
+        // while this request was in flight — re-sync the client, don't error.
         const isAfterGameDiscussion = game.gameState === GAME_STATES.AFTER_GAME_DISCUSSION;
         if (game.gameState !== GAME_STATES.DAY_DISCUSSION && !isAfterGameDiscussion) {
-            throw new Error('Game is not in DAY_DISCUSSION or AFTER_GAME_DISCUSSION state');
+            return staleActionNoOp('talkToAll', `game is in ${game.gameState}, not a discussion state`, game);
         }
     
         try {
@@ -507,15 +509,17 @@ async function keepBotsGoingImpl(gameId: string): Promise<GameActionResponse> {
 
     await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: game.createdWithTier });
 
-    // Validate game state
+    // Tolerant of stale calls: no-op and re-sync if the game advanced or bots
+    // are already talking (double-clicked "Go on").
     const isAfterGameDiscussion = game.gameState === GAME_STATES.AFTER_GAME_DISCUSSION;
     if (game.gameState !== GAME_STATES.DAY_DISCUSSION && !isAfterGameDiscussion) {
-        throw new Error('Game is not in DAY_DISCUSSION or AFTER_GAME_DISCUSSION state');
+        return staleActionNoOp('keepBotsGoing', `game is in ${game.gameState}, not a discussion state`, game);
     }
 
-    // Only allow if no bots are currently in queue (empty queue means we can start new bot conversation)
+    // Only proceed if no bots are currently in queue; a non-empty queue means the
+    // intent is already satisfied and the client's auto-processing will drain it.
     if (game.gameStateProcessQueue.length > 0) {
-        throw new Error('Bots are already in conversation queue');
+        return staleActionNoOp('keepBotsGoing', 'bots are already in the conversation queue', game);
     }
 
     // Check if we should auto-trigger voting instead of continuing discussion (only during DAY_DISCUSSION)
@@ -577,14 +581,14 @@ async function manualSelectBotsImpl(gameId: string, selectedBots: string[]): Pro
         throw new Error('Firestore is not initialized');
     }
 
-    // Validate that game is in a state where bots can be selected
+    // Tolerant of stale calls: the selection dialog may have been confirmed
+    // after the game advanced or another selection landed — re-sync, don't error.
     if (game.gameState !== GAME_STATES.DAY_DISCUSSION && game.gameState !== GAME_STATES.AFTER_GAME_DISCUSSION) {
-        throw new Error('Cannot select bots in current game state');
+        return staleActionNoOp('manualSelectBots', `game is in ${game.gameState}, not a discussion state`, game);
     }
 
-    // Validate that the queue is empty (no bots currently responding)
     if (game.gameStateProcessQueue.length > 0) {
-        throw new Error('Cannot select bots while others are still responding');
+        return staleActionNoOp('manualSelectBots', 'bots are already responding', game);
     }
 
     // Validate selected bots
@@ -814,6 +818,13 @@ async function voteImpl(gameId: string): Promise<GameActionResponse> {
     try {
         // Mode 1: DAY_DISCUSSION state - Initialize voting
         if (game.gameState === GAME_STATES.DAY_DISCUSSION) {
+            // Bots still queued to speak: starting the vote now would wipe their
+            // queue mid-conversation. Only reachable via a race/stale client —
+            // the UI hides the Vote button while the queue is non-empty.
+            if (game.gameStateProcessQueue.length > 0) {
+                return staleActionNoOp('vote', 'discussion queue is not empty yet', game);
+            }
+
             // Clean the queues
             const gameStateProcessQueue: string[] = [];
             const gameStateParamQueue: string[] = [];
@@ -1021,9 +1032,10 @@ async function voteImpl(gameId: string): Promise<GameActionResponse> {
                 return { game: currentGame, messages: [] };
             }
             
-            // Validate game state hasn't changed
+            // Voting closed while this request was queued — nothing written yet,
+            // so the un-cast vote is simply moot.
             if (currentGame.gameState !== GAME_STATES.VOTE) {
-                throw new Error(`Game state changed during processing: ${currentGame.gameState}`);
+                return staleActionNoOp('vote', `game state changed during processing: ${currentGame.gameState}`, currentGame);
             }
             
             // Get all alive players for voting options
@@ -1204,15 +1216,9 @@ async function voteImpl(gameId: string): Promise<GameActionResponse> {
         }
         
         else {
-            logger.error('🚨 INVALID GAME STATE FOR VOTING:', {
-                gameId,
-                currentGameState: game.gameState,
-                validStates: [GAME_STATES.DAY_DISCUSSION, GAME_STATES.VOTE],
-                queueLength: game.gameStateProcessQueue.length,
-                queue: game.gameStateProcessQueue,
-                userEmail: session.user.email
-            });
-            throw new Error(`Invalid game state for voting: ${game.gameState}`);
+            // Double-fire after the queue drained (e.g. state already moved to
+            // VOTE_RESULTS) — re-sync the client instead of erroring.
+            return staleActionNoOp('vote', `game is in ${game.gameState}, not DAY_DISCUSSION or VOTE`, game);
         }
     } catch (error) {
         logger.error('Error in vote function:', { error, gameId });
@@ -1236,14 +1242,15 @@ async function humanPlayerVoteImpl(gameId: string, targetPlayer: string, reason:
 
     await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: game.createdWithTier });
 
-    // Validate game state
+    // Tolerant of stale calls: a vote submitted from an outdated modal (state
+    // advanced, or turn already consumed) is moot — re-sync, don't error.
     if (game.gameState !== GAME_STATES.VOTE) {
-        throw new Error('Game is not in voting phase');
+        return staleActionNoOp('humanPlayerVote', `game is in ${game.gameState}, not VOTE`, game);
     }
 
     // Check if it's the human player's turn to vote
     if (game.gameStateProcessQueue.length === 0 || game.gameStateProcessQueue[0] !== game.humanPlayerName) {
-        throw new Error('Not your turn to vote');
+        return staleActionNoOp('humanPlayerVote', 'not the human player\'s turn to vote', game);
     }
 
     // Validate target player is alive and not the human player
@@ -1261,14 +1268,15 @@ async function humanPlayerVoteImpl(gameId: string, targetPlayer: string, reason:
             throw new Error('Game not found');
         }
         
-        // Verify human player is still in the queue
+        // Already voted (double-submit): the first request persisted the vote,
+        // so this one is an idempotent no-op.
         if (!currentGame.gameStateProcessQueue.includes(currentGame.humanPlayerName)) {
-            throw new Error('Human player already voted');
+            return staleActionNoOp('humanPlayerVote', 'human player already voted', currentGame);
         }
-        
-        // Validate game state hasn't changed
+
+        // Voting closed while this request was queued — nothing written yet.
         if (currentGame.gameState !== GAME_STATES.VOTE) {
-            throw new Error(`Game state changed during processing: ${currentGame.gameState}`);
+            return staleActionNoOp('humanPlayerVote', `game state changed during processing: ${currentGame.gameState}`, currentGame);
         }
         
         // Update voting results in gameStateParamQueue
@@ -1357,21 +1365,21 @@ async function performHumanPlayerNightActionImpl(gameId: string, targetPlayer: s
 
     await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: game.createdWithTier });
 
-    // Validate game state
+    // Tolerant of stale calls: a night action from an outdated modal (night
+    // over, or turn already consumed) is moot — re-sync, don't error.
     if (game.gameState !== GAME_STATES.NIGHT) {
-        throw new Error('Game is not in night phase');
+        return staleActionNoOp('performHumanPlayerNightAction', `game is in ${game.gameState}, not NIGHT`, game);
     }
 
-    // Check if it's the human player's turn for night action
     if (game.gameStateProcessQueue.length === 0 || game.gameStateParamQueue.length === 0) {
-        throw new Error('No night actions in progress');
+        return staleActionNoOp('performHumanPlayerNightAction', 'no night actions in progress', game);
     }
 
     const currentRole = game.gameStateProcessQueue[0];
     const currentPlayer = game.gameStateParamQueue[0];
 
     if (currentRole !== game.humanPlayerRole || currentPlayer !== game.humanPlayerName) {
-        throw new Error('Not your turn for night action');
+        return staleActionNoOp('performHumanPlayerNightAction', 'not the human player\'s turn for a night action', game);
     }
 
     // NEW LOGIC: This function should only be called when human is the last in queue (final action)
@@ -1570,9 +1578,13 @@ async function getSuggestionImpl(gameId: string): Promise<string> {
         throw new Error('Game not found');
     }
 
-    // Validate game state
+    // Tolerant of stale calls: if the game left DAY_DISCUSSION while the
+    // request was in flight, return an empty suggestion (caller ignores it).
     if (game.gameState !== GAME_STATES.DAY_DISCUSSION) {
-        throw new Error('Suggestions are only available during day discussion');
+        logger.warn(`STALE_ACTION getSuggestion: game is in ${game.gameState}, not DAY_DISCUSSION`, {
+            gameId, function: 'getSuggestion', gameState: game.gameState,
+        });
+        return '';
     }
 
     try {

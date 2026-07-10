@@ -86,6 +86,7 @@ Available debugging scripts (`scripts/`):
 - `get-game.ts <gameId>` — full game doc: `gameState`, `currentDay`, `errorState`, `gameStateProcessQueue`, bots (alive/dead, models, voices), `voiceProvider`, `createdWithTier`, voting history, night narratives.
 - `get-messages.ts <gameId>` — dumps the full message log to `logs/game-messages-<id>-<ts>.json` (chat, GM commands, bot answers, votes — the player's-eye view).
 - `stats-today.ts [hoursBack=24]` — daily activity snapshot over a UTC window: games created, distinct owners (`ownerEmail`), count with `errorState`, and breakdowns by `gameState` and `createdWithTier`, then a per-game line (created-at, state, tier, err flag, id). Scans the 500 most recent games by `createdAt`, so widen `hoursBack` only within that window. Use for "how many games/users today".
+- `stats-new-users.ts` — for each owner active in the last 24h: user doc tier, first stored game, total stored games, new-vs-returning flag. Cross-check the user doc's `created_at` (epoch seconds) for true signup time — games TTL-expire (~30 days), so first-stored-game alone can misread an old returning user as new.
 - Also: `delete-message.ts`, `delete-messages-after.ts`, `update-message.ts`, `fix-stuck-welcome.ts`, `view-free-tier-keys.ts` (see each script's header).
 
 New one-off queries: copy the pattern from `scripts/get-game.ts` — import `db` from `../firebase/server`, write a small script, run with `npx tsx --env-file=.env`.

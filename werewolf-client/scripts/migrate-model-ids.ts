@@ -1,9 +1,14 @@
 /**
  * Script to migrate AI model references from old display names to new stable IDs in Firestore.
- * Run with: npx tsx scripts/migrate-model-ids.ts
+ * Covers both model-ID fields on a game doc: gameMasterAiType and bots[].aiType.
+ *
+ * Preview:  npx tsx --env-file=.env scripts/migrate-model-ids.ts --dry-run
+ * Run:      npx tsx --env-file=.env scripts/migrate-model-ids.ts
  */
 
 import { db } from '../firebase/server';
+
+const DRY_RUN = process.argv.includes('--dry-run');
 
 const OLD_TO_NEW: Record<string, string> = {
     'Claude 4.6 Opus': 'claude-opus',
@@ -21,10 +26,11 @@ const OLD_TO_NEW: Record<string, string> = {
     'Mistral Large 3': 'mistral-large',
     'Mistral Medium 3.1': 'mistral-medium',
     'Magistral Medium 1.2 (Thinking)': 'mistral-magistral',
+    // All Grok variants collapsed onto the single always-reasoning grok-4.5 ('grok').
     'Grok 4': 'grok',
-    'Grok 4.1 Fast Reasoning': 'grok-thinking',
-    // Grok 4.1 Fast Reasoning was deprecated by xAI; collapse onto grok-4.3 with reasoning.
-    'grok-fast': 'grok-thinking',
+    'Grok 4.1 Fast Reasoning': 'grok',
+    'grok-fast': 'grok',
+    'grok-thinking': 'grok',
     // All Kimi K2-family models collapsed onto kimi-k2.6 (the only remaining model),
     // exposed via the stable IDs 'kimi' and 'kimi-thinking'.
     'Kimi K2': 'kimi',
@@ -65,7 +71,7 @@ async function migrateModelIds() {
     for (const gameDoc of gamesSnapshot.docs) {
         const data = gameDoc.data();
         const gameId = gameDoc.id;
-        let changed = false;
+        const changes: string[] = [];
 
         const update: Record<string, any> = {};
 
@@ -73,30 +79,31 @@ async function migrateModelIds() {
         const newGmType = migrateValue(data.gameMasterAiType);
         if (newGmType !== data.gameMasterAiType) {
             update.gameMasterAiType = newGmType;
-            changed = true;
+            changes.push(`GM: ${data.gameMasterAiType} -> ${newGmType}`);
         }
 
         // Migrate bots array
         if (Array.isArray(data.bots)) {
+            let botsChanged = false;
             const updatedBots = data.bots.map((bot: any) => {
                 const newAiType = migrateValue(bot.aiType);
                 if (newAiType !== bot.aiType) {
-                    changed = true;
+                    botsChanged = true;
+                    changes.push(`bot ${bot.name}: ${bot.aiType} -> ${newAiType}`);
                     return { ...bot, aiType: newAiType };
                 }
                 return bot;
             });
-            if (changed && !update.gameMasterAiType) {
-                // Only bots changed
-            }
-            if (updatedBots.some((bot: any, i: number) => bot !== data.bots[i])) {
+            if (botsChanged) {
                 update.bots = updatedBots;
             }
         }
 
-        if (changed) {
-            await gameDoc.ref.update(update);
-            console.log(`Updated ${gameId} — GM: ${data.gameMasterAiType} -> ${update.gameMasterAiType ?? '(unchanged)'}`);
+        if (changes.length > 0) {
+            if (!DRY_RUN) {
+                await gameDoc.ref.update(update);
+            }
+            console.log(`${DRY_RUN ? '[dry-run] Would update' : 'Updated'} ${gameId} (${data.theme ?? 'no theme'}) — ${changes.join(', ')}`);
             updatedCount++;
         } else {
             skippedCount++;
@@ -104,8 +111,8 @@ async function migrateModelIds() {
     }
 
     console.log('\n===================================================');
-    console.log('Migration Summary:');
-    console.log(`  Updated: ${updatedCount} games`);
+    console.log(`Migration Summary${DRY_RUN ? ' (dry run — nothing written)' : ''}:`);
+    console.log(`  ${DRY_RUN ? 'Would update' : 'Updated'}: ${updatedCount} games`);
     console.log(`  Skipped: ${skippedCount} games (already migrated or no AI types)`);
     console.log(`  Total:   ${gamesSnapshot.size} games`);
     console.log('===================================================\n');

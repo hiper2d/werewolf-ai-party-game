@@ -332,14 +332,15 @@ describe('humanPlayerVote: accumulation and guards', () => {
         expect(setGameErrorState).not.toHaveBeenCalled();
     });
 
-    test('rejected when it is not the human player turn', async () => {
+    test('no-ops when it is not the human player turn (stale submission)', async () => {
         const game = makeGame({ gameStateProcessQueue: ['Alice', HUMAN_NAME] });
         (getGame as jest.Mock).mockResolvedValue(game);
 
         const result = await humanPlayerVote(GAME_ID, 'Alice', 'r');
 
-        expectErrorState('Not your turn to vote');
-        expect(result.game.errorState).toBeTruthy();
+        expect(setGameErrorState).not.toHaveBeenCalled();
+        expect(result.game.errorState).toBeFalsy();
+        expect(result.messages).toEqual([]);
         expect(mockUpdate).not.toHaveBeenCalled();
     });
 

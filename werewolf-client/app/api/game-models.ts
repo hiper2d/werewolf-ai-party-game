@@ -728,4 +728,5 @@ export interface AIMessage {
     thinking?: string;  // Optional thinking content for models that support extended thinking
     anthropicThinkingSignature?: string;  // Signature for Anthropic/Claude thinking (required for multi-turn)
     googleThoughtSignature?: string;  // Signature for Google/Gemini thinking (required for multi-turn)
+    grokEncryptedReasoning?: string;  // JSON-serialized xAI encrypted reasoning items (replayed for multi-turn)
 }

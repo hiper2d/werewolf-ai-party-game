@@ -20,6 +20,9 @@ import { useUIControls } from '../context/UIControlsContext';
 interface GameChatProps {
     gameId: string;
     game: Game;
+    // GamePage's in-flight lock: serializes chat sends with the page's own
+    // actions (Vote, Go on, night flow). Resolves undefined when skipped.
+    runGameAction?: <T>(action: () => Promise<T>) => Promise<T | undefined>;
     onGameStateChange?: (response: GameActionResponse) => void;
     pendingMessages?: GameMessage[];
     onPendingMessagesConsumed?: () => void;
@@ -376,7 +379,12 @@ function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcludin
     );
 }
 
-export default function GameChat({ gameId, game, onGameStateChange, pendingMessages, onPendingMessagesConsumed, clearNightMessages, onErrorHandled, onChangeModel, isExternalLoading, gameControls, chatControls, onBeforeAction, cancelButton }: GameChatProps) {
+export default function GameChat({ gameId, game, runGameAction, onGameStateChange, pendingMessages, onPendingMessagesConsumed, clearNightMessages, onErrorHandled, onChangeModel, isExternalLoading, gameControls, chatControls, onBeforeAction, cancelButton }: GameChatProps) {
+    // Without a parent-provided lock, run actions directly (standalone use).
+    const runAction = useMemo(
+        () => runGameAction ?? (<T,>(action: () => Promise<T>) => action()),
+        [runGameAction]
+    );
     const [messages, setMessages] = useState<GameMessage[]>([]);
     const [newMessage, setNewMessage] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
@@ -687,7 +695,14 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
             });
             const processQueue = async () => {
                 setIsProcessing(true);
-                const { game: updatedGame, messages: newMessages } = await talkToAll(gameId, '');
+                const result = await runAction(() => talkToAll(gameId, ''));
+                if (!result) {
+                    // Another action holds the lock; its completion updates the
+                    // game state, which re-fires this effect if still needed.
+                    setIsProcessing(false);
+                    return;
+                }
+                const { game: updatedGame, messages: newMessages } = result;
                 console.log('✅ TalkToAll API completed');
                 addMessages(newMessages);
 
@@ -703,7 +718,7 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
 
         // Night processing is handled exclusively by GamePage's useEffect to avoid
         // duplicate calls. GameChat only handles human player modals for night actions.
-    }, [game.gameState, game.gameStateProcessQueue, game.gameStateParamQueue, game.humanPlayerRole, game.humanPlayerName, gameId, isProcessing, game.errorState, onGameStateChange, addMessages]);
+    }, [game.gameState, game.gameStateProcessQueue, game.gameStateParamQueue, game.humanPlayerRole, game.humanPlayerName, gameId, isProcessing, game.errorState, onGameStateChange, addMessages, runAction]);
 
     // Check if it's human player's turn to vote
     useEffect(() => {
@@ -808,7 +823,12 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
                     currentRole === GAME_ROLES.WEREWOLF) {
 
                     console.log('🐺 SENDING WEREWOLF COORDINATION MESSAGE:', { message: trimmed, gameId });
-                    const { game: updatedGame, messages: newMessages } = await humanPlayerTalkWerewolves(gameId, trimmed);
+                    const result = await runAction(() => humanPlayerTalkWerewolves(gameId, trimmed));
+                    if (!result) {
+                        // Another action holds the lock — keep the draft.
+                        return;
+                    }
+                    const { game: updatedGame, messages: newMessages } = result;
                     addMessages(newMessages);
 
                     if (onGameStateChange) {
@@ -816,7 +836,9 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
                         onGameStateChange({ game: updatedGame, messages: [] });
                     }
 
-                    if (!updatedGame.errorState) {
+                    // Clear the composer only if our message was actually persisted —
+                    // errors and stale no-ops both return without a human-authored message.
+                    if (newMessages.some(m => m.authorName === game.humanPlayerName)) {
                         setNewMessage('');
                     }
                     return;
@@ -824,7 +846,12 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
             }
 
             onBeforeAction?.();
-            const { game: updatedGame, messages: newMessages } = await talkToAll(gameId, trimmed);
+            const result = await runAction(() => talkToAll(gameId, trimmed));
+            if (!result) {
+                // Another action holds the lock — keep the draft.
+                return;
+            }
+            const { game: updatedGame, messages: newMessages } = result;
             addMessages(newMessages);
 
             if (onGameStateChange) {
@@ -832,8 +859,9 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
                 onGameStateChange({ game: updatedGame, messages: [] });
             }
 
-            // Only clear the input if the message was successfully processed (no error state)
-            if (!updatedGame.errorState) {
+            // Clear the composer only if our message was actually persisted —
+            // errors and stale no-ops both return without a human-authored message.
+            if (newMessages.some(m => m.authorName === game.humanPlayerName)) {
                 setNewMessage('');
             }
         } catch (error) {
@@ -1031,7 +1059,14 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
         setIsVoting(true);
         voteSubmittedRef.current = true;
         try {
-            const { game: updatedGame, messages: newMessages } = await humanPlayerVote(gameId, targetPlayer, reason);
+            const result = await runAction(() => humanPlayerVote(gameId, targetPlayer, reason));
+            if (!result) {
+                // Another action holds the lock: undo the submitted flag so the
+                // modal can reopen while the human is still at the queue head.
+                voteSubmittedRef.current = false;
+                return;
+            }
+            const { game: updatedGame, messages: newMessages } = result;
             console.log('✅ Human vote API completed, closing modal and updating state');
             addMessages(newMessages);
 
@@ -1068,7 +1103,13 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
         setIsPerformingNightAction(true);
         try {
             const { performHumanPlayerNightAction } = await import("@/app/api/bot-actions");
-            const { game: updatedGame, messages: newMessages } = await performHumanPlayerNightAction(gameId, targetPlayer, message, actionType);
+            const result = await runAction(() => performHumanPlayerNightAction(gameId, targetPlayer, message, actionType));
+            if (!result) {
+                // Another action holds the lock; the modal-open effect re-fires
+                // once it completes if the night turn is still pending.
+                return;
+            }
+            const { game: updatedGame, messages: newMessages } = result;
             console.log('Human night action API completed, closing modal and updating state');
             addMessages(newMessages);
 
@@ -1187,7 +1228,11 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
         setIsGettingSuggestion(true);
         try {
             const suggestion = await getSuggestion(gameId);
-            setNewMessage(suggestion);
+            // Empty suggestion means the request went stale (game left
+            // DAY_DISCUSSION) — don't wipe whatever the player has typed.
+            if (suggestion) {
+                setNewMessage(suggestion);
+            }
         } catch (error) {
             console.error('Error getting suggestion:', error);
             alert('Failed to get suggestion. Please try again.');
@@ -1523,7 +1568,7 @@ export default function GameChat({ gameId, game, onGameStateChange, pendingMessa
                                         >
                                             Discord
                                         </a>
-                                        {' '}and we'll take a look.
+                                        {' '}and we&apos;ll take a look.
                                     </div>
                                 </div>
                                 <div className="flex-shrink-0 flex flex-col gap-1.5">

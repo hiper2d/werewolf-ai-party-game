@@ -7,6 +7,7 @@ import {
     MODEL_PRICING,
     FREE_TIER_THINKING_COST_FACTOR,
     FREE_TIER_LIMITED_MAX_BOTS,
+    FREE_TIER_OUTPUT_PRICE_BANDS,
     getFreeTierPolicy,
     LLM_CONSTANTS,
 } from '@/app/ai/ai-models';
@@ -40,22 +41,22 @@ interface BandMeta {
 
 const BAND_META: Record<BandId, BandMeta> = {
     unlim: {
-        id: 'unlim', capLabel: 'Unlimited bots / game', cap: 'Unlimited', range: '≤ $2',
+        id: 'unlim', capLabel: 'Unlimited bots / game', cap: 'Unlimited', range: `≤ $${FREE_TIER_OUTPUT_PRICE_BANDS.UNLIMITED_MAX}`,
         desc: 'No per-game limit on Free.', availability: 'free',
         pill: 'text-[var(--good-fg)] border-[var(--good-line)] bg-[var(--good-soft)]', dot: 'bg-[var(--good-fg)]',
     },
     three: {
-        id: 'three', capLabel: 'Up to 3 bots / game', cap: '3 / game', range: '≤ $5',
+        id: 'three', capLabel: 'Up to 3 bots / game', cap: '3 / game', range: `≤ $${FREE_TIER_OUTPUT_PRICE_BANDS.LIMITED_MAX}`,
         desc: 'Seat up to three on Free.', availability: 'free',
         pill: 'text-[var(--accent-text)] border-[var(--accent-line)] bg-[var(--accent-soft)]', dot: 'bg-[var(--accent)]',
     },
     one: {
-        id: 'one', capLabel: '1 bot / game', cap: '1 / game', range: '≤ $15',
+        id: 'one', capLabel: '1 bot / game', cap: '1 / game', range: `≤ $${FREE_TIER_OUTPUT_PRICE_BANDS.SINGLE_MAX}`,
         desc: 'One per game on Free.', availability: 'free',
         pill: 'text-[var(--warn-fg)] border-[var(--warn-line)] bg-[var(--warn-soft)]', dot: 'bg-[var(--warn-fg)]',
     },
     paid: {
-        id: 'paid', capLabel: 'Paid tier only', cap: 'Paid only', range: '> $15',
+        id: 'paid', capLabel: 'Paid tier only', cap: 'Paid only', range: `> $${FREE_TIER_OUTPUT_PRICE_BANDS.SINGLE_MAX}`,
         desc: 'Not available on Free.', availability: 'paid',
         pill: 'text-[var(--fg-1)] border-[var(--line-3)] bg-[var(--bg-3)]', dot: 'bg-[var(--fg-2)]',
     },

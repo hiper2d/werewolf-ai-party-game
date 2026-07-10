@@ -6,13 +6,17 @@ import {calculateGrokCost} from "@/app/utils/pricing";
 import {z} from 'zod';
 import {ZodSchemaConverter} from './zod-schema-converter';
 
+/**
+ * xAI Grok agent on the Responses API.
+ *
+ * grok-4.5 is an always-on reasoning model; we do not send `reasoning_effort` and use the
+ * xAI default ("high"). Reasoning cannot be disabled. Each response's encrypted reasoning
+ * items (requested via `include: ["reasoning.encrypted_content"]`) are returned as the 4th
+ * tuple element, stored on the game message as `grokEncryptedReasoning`, and replayed into
+ * `input` on later turns so the model keeps its chain-of-thought across the conversation.
+ */
 export class GrokAgent extends AbstractAgent {
     private readonly client: OpenAI;
-    private readonly defaultParams: Omit<Parameters<OpenAI['chat']['completions']['create']>[0], 'messages'> = {
-        model: this.model,
-        temperature: this.temperature,
-        stream: false,
-    };
 
     // Log message templates
     private readonly logTemplates = {
@@ -27,13 +31,12 @@ export class GrokAgent extends AbstractAgent {
             `Failed to get response from Grok API: ${error instanceof Error ? error.message : String(error)}`,
     };
 
-
     constructor(
-        name: string, 
-        instruction: string, 
-        model: string, 
-        apiKey: string, 
-        temperature: number, 
+        name: string,
+        instruction: string,
+        model: string,
+        apiKey: string,
+        temperature: number,
         enableThinking: boolean = false,
         agentLoggingConfig: AgentLoggingConfig = DEFAULT_LOGGING_CONFIG.agents
     ) {
@@ -45,118 +48,44 @@ export class GrokAgent extends AbstractAgent {
         });
     }
 
-
-
-
-    private convertToOpenAIMessages(messages: AIMessage[]): OpenAI.Chat.Completions.ChatCompletionMessageParam[] {
-        return messages.map(msg => ({
-            role: msg.role as 'system' | 'user' | 'assistant',
-            content: msg.content
-        }));
-    }
-
     /**
-     * Structured output implementation for Grok-4 using the official xAI API
-     * Uses json_object mode with prompt augmentation for better compatibility
+     * Structured output implementation for Grok using json_object mode with prompt
+     * augmentation — more reliable than json_schema on OpenAI-compatible endpoints.
      */
     async askWithZodSchema<T>(zodSchema: z.ZodSchema<T>, messages: AIMessage[]): Promise<[T, string, TokenUsage?, string?]> {
         try {
-            // Convert Zod schema to human-readable prompt description
-            // This is more reliable than json_schema for some OpenAI-compatible endpoints
             const schemaDescription = ZodSchemaConverter.toPromptDescription(zodSchema);
-
-            const preparedMessages = this.prepareMessages(messages);
-            const openAIMessages = this.convertToOpenAIMessages(preparedMessages);
-
-            // Add system instruction if needed
-            if (openAIMessages.length > 0 && openAIMessages[0].role !== 'system') {
-                openAIMessages.unshift({
-                    role: 'system',
-                    content: this.instruction
-                });
-            } else if (openAIMessages.length > 0 && openAIMessages[0].role === 'system') {
-                openAIMessages[0].content = `${this.instruction}\n\n${openAIMessages[0].content}`;
-            }
+            const input = this.buildResponsesInput(this.prepareMessages(messages));
 
             // Add schema description to the last message to ensure the model follows it
-            const lastMessage = openAIMessages[openAIMessages.length - 1];
-            if (lastMessage) {
+            const lastMessage = input[input.length - 1];
+            if (lastMessage && typeof lastMessage.content === 'string') {
                 lastMessage.content += `\n\nYour response must be a valid JSON object matching this schema:\n${schemaDescription}`;
             }
 
             this.logAsking(messages);
             this.logMessages(messages);
 
-            // grok-4.3 supports `reasoning_effort`: "none" disables reasoning, "low" is the
-            // xAI default for general agentic use. We expose two model variants (grok and
-            // grok-thinking) that map to these two settings on the same underlying model.
-            const completion = await this.client.chat.completions.create({
-                model: this.model,
-                temperature: this.temperature,
-                messages: openAIMessages,
-                response_format: { type: "json_object" },
-                max_tokens: 16384,
-                reasoning_effort: this.enableThinking ? "low" : "none",
-            } as any);
-
-            const choiceMessage = completion.choices[0]?.message;
-            const { textContent, additionalReasoning } = this.extractMessageContentParts(choiceMessage?.content);
-            const reply = textContent;
-            if (!reply) {
+            const response = await this.createResponse(input, true);
+            const { text, reasoningSummary, encryptedReasoning } = this.extractResponseParts(response);
+            if (!text) {
                 throw new Error(this.errorMessages.emptyResponse);
             }
 
-            // Extract reasoning content if available
-            const reasoningContentParts: string[] = [];
-            const reasoningContentFromMessage: string = (choiceMessage as any)?.reasoning_content || "";
-            if (reasoningContentFromMessage) {
-                reasoningContentParts.push(reasoningContentFromMessage);
-            }
-            if (additionalReasoning) {
-                reasoningContentParts.push(additionalReasoning);
-            }
-            const reasoningContent = reasoningContentParts.join('\n').trim();
-
-            this.logger(`Grok Agent - Found reasoning_content: ${!!reasoningContent}, length: ${reasoningContent.length}`);
+            this.logger(`Grok Agent - Found reasoning summary: ${!!reasoningSummary}, encrypted reasoning: ${!!encryptedReasoning}`);
 
             // Parse and validate the response using the shared lenient parser
-            const parsedData = parseAndValidateLlmJson(reply, zodSchema, (m) => this.logger(m));
+            const parsedData = parseAndValidateLlmJson(text, zodSchema, (m) => this.logger(m));
 
             this.logger(`✅ Response validated successfully with Zod schema`);
 
-            // Extract token usage information
-            let tokenUsage: TokenUsage | undefined;
-            if (completion.usage) {
-                const promptTokens = completion.usage.prompt_tokens || 0;
-                const completionTokens = completion.usage.completion_tokens || 0;
-                const reasoningTokens = (completion.usage as any).completion_tokens_details?.reasoning_tokens || 0;
-
-                // For Grok reasoning models: completion_tokens = final answer only, reasoning_tokens = thinking
-                const totalOutputTokens = completionTokens + reasoningTokens;
-
-                const cost = calculateGrokCost(
-                    this.model,
-                    promptTokens,
-                    totalOutputTokens
-                );
-
-                tokenUsage = {
-                    inputTokens: promptTokens,
-                    outputTokens: totalOutputTokens,
-                    totalTokens: promptTokens + totalOutputTokens,
-                    costUSD: cost
-                };
-
-                if (this.enableThinking && reasoningTokens > 0) {
-                    this.logger(`Output breakdown: ${reasoningTokens} reasoning tokens, ${completionTokens} final answer tokens, ${totalOutputTokens} total output tokens`);
-                }
-            }
+            const tokenUsage = this.extractTokenUsage(response);
 
             if (parsedData) {
-                this.logReply(parsedData, reasoningContent, tokenUsage);
+                this.logReply(parsedData, reasoningSummary, tokenUsage);
             }
 
-            return [parsedData, reasoningContent, tokenUsage];
+            return [parsedData, reasoningSummary, tokenUsage, encryptedReasoning];
 
         } catch (error) {
             this.logger(this.logTemplates.error(this.name, error));
@@ -170,78 +99,22 @@ export class GrokAgent extends AbstractAgent {
      */
     async askText(messages: AIMessage[]): Promise<[string, string, TokenUsage?, string?]> {
         try {
-            const preparedMessages = this.prepareMessages(messages);
-            const openAIMessages = this.convertToOpenAIMessages(preparedMessages);
-
-            // Add system instruction if needed
-            if (openAIMessages.length > 0 && openAIMessages[0].role !== 'system') {
-                openAIMessages.unshift({
-                    role: 'system',
-                    content: this.instruction
-                });
-            } else if (openAIMessages.length > 0 && openAIMessages[0].role === 'system') {
-                openAIMessages[0].content = `${this.instruction}\n\n${openAIMessages[0].content}`;
-            }
+            const input = this.buildResponsesInput(this.prepareMessages(messages));
 
             this.logAsking(messages);
             this.logMessages(messages);
 
-            const completion = await this.client.chat.completions.create({
-                model: this.model,
-                temperature: this.temperature,
-                messages: openAIMessages,
-                max_tokens: 16384,
-                reasoning_effort: this.enableThinking ? "low" : "none",
-            } as any);
-
-            const choiceMessage = completion.choices[0]?.message;
-            const { textContent, additionalReasoning } = this.extractMessageContentParts(choiceMessage?.content);
-            const reply = textContent;
-            if (!reply) {
+            const response = await this.createResponse(input, false);
+            const { text, reasoningSummary, encryptedReasoning } = this.extractResponseParts(response);
+            if (!text) {
                 throw new Error(this.errorMessages.emptyResponse);
             }
 
-            const reasoningContentParts: string[] = [];
-            const reasoningContentFromMessage: string = (choiceMessage as any)?.reasoning_content || "";
-            if (reasoningContentFromMessage) {
-                reasoningContentParts.push(reasoningContentFromMessage);
-            }
-            if (additionalReasoning) {
-                reasoningContentParts.push(additionalReasoning);
-            }
-            const reasoningContent = reasoningContentParts.join('\n').trim();
+            const tokenUsage = this.extractTokenUsage(response);
 
-            // Extract token usage information
-            let tokenUsage: TokenUsage | undefined;
-            if (completion.usage) {
-                const promptTokens = completion.usage.prompt_tokens || 0;
-                const completionTokens = completion.usage.completion_tokens || 0;
-                const reasoningTokens = (completion.usage as any).completion_tokens_details?.reasoning_tokens || 0;
+            this.logReply(text, reasoningSummary, tokenUsage);
 
-                // For Grok reasoning models: completion_tokens = final answer only, reasoning_tokens = thinking
-                const totalOutputTokens = completionTokens + reasoningTokens;
-
-                const cost = calculateGrokCost(
-                    this.model,
-                    promptTokens,
-                    totalOutputTokens
-                );
-
-                tokenUsage = {
-                    inputTokens: promptTokens,
-                    outputTokens: totalOutputTokens,
-                    totalTokens: promptTokens + totalOutputTokens,
-                    costUSD: cost
-                };
-
-                if (this.enableThinking && reasoningTokens > 0) {
-                    this.logger(`Output breakdown: ${reasoningTokens} reasoning tokens, ${completionTokens} final answer tokens, ${totalOutputTokens} total output tokens`);
-                }
-            }
-
-            this.logReply(reply, reasoningContent, tokenUsage);
-
-            return [reply, reasoningContent, tokenUsage];
+            return [text, reasoningSummary, tokenUsage, encryptedReasoning];
 
         } catch (error) {
             this.logger(this.logTemplates.error(this.name, error));
@@ -249,102 +122,117 @@ export class GrokAgent extends AbstractAgent {
         }
     }
 
-    private extractMessageContentParts(content: unknown): { textContent: string; additionalReasoning: string } {
-        if (!content) {
-            return { textContent: '', additionalReasoning: '' };
+    private createResponse(input: any[], jsonMode: boolean): Promise<any> {
+        return this.client.responses.create({
+            model: this.model,
+            temperature: this.temperature,
+            input,
+            // Reasoning bills against the output budget on top of the visible answer,
+            // so this is larger than the old chat-completions max_tokens of 16384.
+            max_output_tokens: 32768,
+            // We manage conversation state ourselves; encrypted reasoning is only
+            // returned for unstored responses.
+            store: false,
+            include: ["reasoning.encrypted_content"],
+            ...(jsonMode ? { text: { format: { type: 'json_object' } } } : {}),
+        } as any);
+    }
+
+    /**
+     * Converts game history to Responses API input items. The system instruction is
+     * merged into the leading system message; assistant messages carrying stored
+     * encrypted reasoning get their reasoning items replayed right before them.
+     */
+    private buildResponsesInput(messages: AIMessage[]): any[] {
+        const input: any[] = [];
+
+        for (const msg of messages) {
+            if (msg.role === 'assistant' && msg.grokEncryptedReasoning) {
+                try {
+                    const reasoningItems = JSON.parse(msg.grokEncryptedReasoning);
+                    if (Array.isArray(reasoningItems)) {
+                        input.push(...reasoningItems);
+                    }
+                } catch {
+                    this.logger(`Failed to parse stored encrypted reasoning, replaying message without it`);
+                }
+            }
+            input.push({ role: msg.role, content: msg.content });
         }
 
-        if (typeof content === 'string') {
-            return { textContent: content, additionalReasoning: '' };
+        if (input.length > 0 && input[0].role !== 'system') {
+            input.unshift({ role: 'system', content: this.instruction });
+        } else if (input.length > 0 && input[0].role === 'system') {
+            input[0].content = `${this.instruction}\n\n${input[0].content}`;
         }
 
-        if (!Array.isArray(content)) {
-            return { textContent: '', additionalReasoning: this.stringifyUnknown(content) };
-        }
+        return input;
+    }
 
+    /**
+     * Walks the response output items: reasoning items yield the human-readable summary
+     * plus the encrypted items (serialized for storage/replay); message items yield text.
+     */
+    private extractResponseParts(response: any): { text: string; reasoningSummary: string; encryptedReasoning?: string } {
         const textParts: string[] = [];
-        const reasoningParts: string[] = [];
+        const summaryParts: string[] = [];
+        const encryptedItems: any[] = [];
 
-        for (const part of content) {
-            if (part == null) {
+        for (const item of response?.output ?? []) {
+            if (!item) {
                 continue;
             }
-
-            if (typeof part === 'string') {
-                textParts.push(part);
-                continue;
-            }
-
-            if (typeof part !== 'object') {
-                textParts.push(String(part));
-                continue;
-            }
-
-            const normalizedReasoning = this.extractReasoningText(part as Record<string, unknown>);
-            if (normalizedReasoning) {
-                reasoningParts.push(normalizedReasoning);
-                continue;
-            }
-
-            const maybeText = (part as { text?: unknown }).text;
-            if (typeof maybeText === 'string') {
-                textParts.push(maybeText);
-            } else {
-                reasoningParts.push(this.stringifyUnknown(part));
+            if (item.type === 'reasoning') {
+                for (const summary of item.summary ?? []) {
+                    if (typeof summary?.text === 'string' && summary.text) {
+                        summaryParts.push(summary.text);
+                    }
+                }
+                if (item.encrypted_content) {
+                    encryptedItems.push(item);
+                }
+            } else if (item.type === 'message') {
+                for (const part of item.content ?? []) {
+                    if (part?.type === 'output_text' && typeof part.text === 'string') {
+                        textParts.push(part.text);
+                    }
+                }
             }
         }
 
         return {
-            textContent: textParts.join('\n').trim(),
-            additionalReasoning: reasoningParts.join('\n').trim()
+            text: textParts.join('\n').trim(),
+            reasoningSummary: summaryParts.join('\n').trim(),
+            encryptedReasoning: encryptedItems.length > 0 ? JSON.stringify(encryptedItems) : undefined,
         };
     }
 
-    private extractReasoningText(part: Record<string, unknown>): string | undefined {
-        const partTypeValue = part['type'];
-        const partType = typeof partTypeValue === 'string' ? partTypeValue.toLowerCase() : '';
-
-        if (partType === 'text' && typeof part['text'] === 'string') {
+    private extractTokenUsage(response: any): TokenUsage | undefined {
+        const usage = response?.usage;
+        if (!usage) {
             return undefined;
         }
 
-        if (partType.includes('thought')) {
-            if (typeof part['text'] === 'string') {
-                return part['text'] as string;
-            }
-            if (typeof (part as any).thought === 'string') {
-                return (part as any).thought;
-            }
-            if (typeof (part as any).thoughtSignature === 'string') {
-                return (part as any).thoughtSignature;
-            }
+        const inputTokens = usage.input_tokens || 0;
+        // Responses API output_tokens already includes reasoning tokens
+        const outputTokens = usage.output_tokens || 0;
+        const reasoningTokens = usage.output_tokens_details?.reasoning_tokens || 0;
+        const cachedTokens = usage.input_tokens_details?.cached_tokens || 0;
+
+        const cost = calculateGrokCost(this.model, inputTokens, outputTokens, cachedTokens);
+
+        if (reasoningTokens > 0) {
+            this.logger(`Output breakdown: ${reasoningTokens} reasoning tokens, ${outputTokens - reasoningTokens} final answer tokens, ${outputTokens} total output tokens`);
+        }
+        if (cachedTokens > 0) {
+            this.logger(`Input breakdown: ${cachedTokens} cached tokens of ${inputTokens} input tokens`);
         }
 
-        const reasoningContent = (part as any).reasoning_content || (part as any).reasoning;
-        if (reasoningContent) {
-            if (typeof reasoningContent === 'string') {
-                return reasoningContent;
-            }
-
-            if (Array.isArray(reasoningContent)) {
-                return reasoningContent.map(segment => this.stringifyUnknown(segment)).join('\n');
-            }
-
-            return this.stringifyUnknown(reasoningContent);
-        }
-
-        return undefined;
-    }
-
-    private stringifyUnknown(value: unknown): string {
-        if (typeof value === 'string') {
-            return value;
-        }
-
-        try {
-            return JSON.stringify(value);
-        } catch {
-            return String(value);
-        }
+        return {
+            inputTokens,
+            outputTokens,
+            totalTokens: inputTokens + outputTokens,
+            costUSD: cost
+        };
     }
 }

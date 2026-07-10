@@ -11,7 +11,7 @@ import { format } from "@/app/ai/prompts/utils";
 import { ROLE_CONFIGS, PLAY_STYLE_CONFIGS } from "@/app/api/game-models";
 
 // Helper function to create a GrokAgent instance (defaults to GROK-4)
-const createAgent = (botName: string, modelType: string = LLM_CONSTANTS.GROK_4_3, enableThinking: boolean = true): GrokAgent => {
+const createAgent = (botName: string, modelType: string = LLM_CONSTANTS.GROK_4_5, enableThinking: boolean = true): GrokAgent => {
   const testBot = {
     name: botName,
     story: "A mysterious wanderer with a hidden past",
@@ -52,18 +52,27 @@ describe("GrokAgent integration", () => {
   
   describeOrSkip("askWithZodSchema with real API", () => {
     it("should respond with valid schema-based answer using grok-4 (with reasoning)", async () => {
-      const agent = createAgent("TestBot", LLM_CONSTANTS.GROK_4_3_THINKING, true);
+      const agent = createAgent("TestBot", LLM_CONSTANTS.GROK_4_5, true);
       const messages: AIMessage[] = [{
         role: 'user',
         content: 'What do you think about the current situation in the village?'
       }];
-      
-      const [response, thinking, tokenUsage] = await agent.askWithZodSchema(BotAnswerZodSchema, messages);
+
+      const [response, thinking, tokenUsage, encryptedReasoning] = await agent.askWithZodSchema(BotAnswerZodSchema, messages);
 
       console.log("\n=== Grok-4 Zod Integration Test (With Reasoning) ===");
       console.log("Response type:", typeof response);
       console.log("Response structure:", Object.keys(response));
       console.log("Thinking length:", thinking.length);
+      console.log("Encrypted reasoning present:", !!encryptedReasoning);
+
+      // Always-on reasoning: encrypted items must come back for multi-turn replay
+      expect(encryptedReasoning).toBeDefined();
+      const reasoningItems = JSON.parse(encryptedReasoning!);
+      expect(Array.isArray(reasoningItems)).toBe(true);
+      expect(reasoningItems.length).toBeGreaterThan(0);
+      expect(reasoningItems[0].type).toBe('reasoning');
+      expect(reasoningItems[0].encrypted_content).toBeTruthy();
       
       // Verify response is a typed object from Zod
       expect(response).toBeDefined();
@@ -90,7 +99,33 @@ describe("GrokAgent integration", () => {
       expect(tokenUsage!.costUSD).toBeGreaterThan(0);
       
       console.log("✅ Grok-4 Zod schema validation passed (with reasoning)");
-    }, 30000);
+    }, 120000);
+
+    it("should replay encrypted reasoning across turns", async () => {
+      const agent = createAgent("TestBot");
+      const firstTurn: AIMessage[] = [{
+        role: 'user',
+        content: 'Introduce yourself to the village in one sentence.'
+      }];
+
+      const [firstReply, , , encryptedReasoning] = await agent.askText(firstTurn);
+      expect(firstReply.length).toBeGreaterThan(0);
+      expect(encryptedReasoning).toBeDefined();
+
+      // Second turn: replay the assistant message together with its encrypted reasoning
+      const secondTurn: AIMessage[] = [
+        firstTurn[0],
+        { role: 'assistant', content: firstReply, grokEncryptedReasoning: encryptedReasoning },
+        { role: 'user', content: 'Now repeat your introduction word for word.' }
+      ];
+
+      const [secondReply] = await agent.askText(secondTurn);
+
+      console.log("\n=== Grok encrypted reasoning replay ===");
+      console.log("First reply:", firstReply);
+      console.log("Second reply:", secondReply);
+      expect(secondReply.length).toBeGreaterThan(0);
+    }, 240000);
 
     it("should generate a game preview using Zod schema with grok-4", async () => {
       console.log("\n=== Grok-4 Game Preview Generation with Zod (Real API) ===");
@@ -99,10 +134,10 @@ describe("GrokAgent integration", () => {
       const gmAgent = new GrokAgent(
         GAME_MASTER,
         STORY_SYSTEM_PROMPT,
-        SupportedAiModels[LLM_CONSTANTS.GROK_4_3].modelApiName,
+        SupportedAiModels[LLM_CONSTANTS.GROK_4_5].modelApiName,
         process.env.GROK_K!,
         0.7,
-        false // Disable reasoning for this test
+        true // grok-4.5 reasoning is always on (xAI default effort)
       );
 
       // Prepare game configuration
@@ -206,7 +241,7 @@ describe("GrokAgent integration", () => {
       const agent = new GrokAgent(
         "TestBot",
         "Test instruction",
-        SupportedAiModels[LLM_CONSTANTS.GROK_4_3].modelApiName,
+        SupportedAiModels[LLM_CONSTANTS.GROK_4_5].modelApiName,
         "invalid_api_key",
         0.7,
         false
@@ -224,11 +259,17 @@ describe("GrokAgent integration", () => {
   });
   
   describe("token usage calculation", () => {
-    it("should calculate correct costs for grok-4.3", () => {
+    it("should calculate correct costs for grok-4.5", () => {
       // Test the external pricing function that Grok agent uses
-      const cost = calculateGrokCost("grok-4.3", 1000000, 1000000);
-      // Based on ai-models.ts pricing: $1.25 per 1M input, $2.50 per 1M output
-      expect(cost).toBeCloseTo(3.75, 2);
+      const cost = calculateGrokCost("grok-4.5", 1000000, 1000000);
+      // Based on ai-models.ts pricing: $2.00 per 1M input, $6.00 per 1M output
+      expect(cost).toBeCloseTo(8.0, 2);
+    });
+
+    it("should discount cached input tokens", () => {
+      // Half the input cached at $0.50: 0.5M * $2 + 0.5M * $0.50 + 1M * $6
+      const cost = calculateGrokCost("grok-4.5", 1000000, 1000000, 500000);
+      expect(cost).toBeCloseTo(7.25, 2);
     });
   });
 

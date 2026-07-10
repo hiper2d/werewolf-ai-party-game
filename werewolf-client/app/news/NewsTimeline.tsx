@@ -34,6 +34,17 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
     {
+        id: "grok-4-3", date: "Jul 2026", tags: ["Models"],
+        title: "Grok 4.5 replaces Grok 4.2",
+        body: (<>xAI&apos;s <strong>Grok 4.5</strong> takes over the Grok slot in the model picker. The separate
+            &ldquo;Thinking&rdquo; variant is gone — Grok now <strong>always reasons</strong> before it answers.
+            Even better, it keeps its <strong>private train of thought between turns</strong>: a Grok bot remembers
+            not just what it said, but why — its suspicions, its cover story — across the whole game. Still on the
+            free tier at one Grok bot per game. Pick it for any bot or the Game Master when you set up a lobby.</>),
+        media: null,
+        links: [{label: "Create a game", href: "/games"}],
+    },
+    {
         id: "fable-5-back", date: "Jul 2026", tags: ["Models"],
         title: "Claude Fable 5 is back",
         body: (<>Anthropic has brought <strong>Claude Fable 5</strong> back, and it&apos;s returned to the model

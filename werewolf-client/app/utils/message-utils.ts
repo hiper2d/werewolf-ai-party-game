@@ -147,57 +147,48 @@ export function convertToAIMessages(currentBotName: string, messages: GameMessag
             flushGmMessages(currentBotName, gmMessages, otherPlayerMessages, aiMessages);
 
             // Prepare own message (assistant type)
-            let thinking: string | undefined;
-            let anthropicThinkingSignature: string | undefined;
-            let googleThoughtSignature: string | undefined;
             if (message.messageType === MessageType.BOT_ANSWER || message.messageType === MessageType.BOT_WELCOME) {
-                const botMsg = message.msg as { reply: string; thinking?: string; anthropicThinkingSignature?: string; googleThoughtSignature?: string };
-                content = botMsg.reply;
-                thinking = botMsg.thinking;
-                anthropicThinkingSignature = botMsg.anthropicThinkingSignature;
-                googleThoughtSignature = botMsg.googleThoughtSignature;
+                content = (message.msg as { reply: string }).reply;
             } else if (message.messageType === MessageType.WEREWOLF_ACTION) {
-                const werewolfMsg = message.msg as { target: string; reasoning: string; thinking?: string; anthropicThinkingSignature?: string; googleThoughtSignature?: string };
+                const werewolfMsg = message.msg as { target: string; reasoning: string };
                 content = `Selected ${werewolfMsg.target} for elimination. Reasoning: ${werewolfMsg.reasoning}`;
-                thinking = werewolfMsg.thinking;
-                anthropicThinkingSignature = werewolfMsg.anthropicThinkingSignature;
-                googleThoughtSignature = werewolfMsg.googleThoughtSignature;
             } else if (message.messageType === MessageType.DOCTOR_ACTION) {
-                const doctorMsg = message.msg as { target: string; reasoning: string; action_type?: string; thinking?: string; anthropicThinkingSignature?: string; googleThoughtSignature?: string };
+                const doctorMsg = message.msg as { target: string; reasoning: string; action_type?: string };
                 if (doctorMsg.action_type === 'kill') {
                     content = `Used Doctor's Mistake to kill ${doctorMsg.target}. Reasoning: ${doctorMsg.reasoning}`;
                 } else {
                     content = `Protected ${doctorMsg.target} from werewolf attacks. Reasoning: ${doctorMsg.reasoning}`;
                 }
-                thinking = doctorMsg.thinking;
-                anthropicThinkingSignature = doctorMsg.anthropicThinkingSignature;
-                googleThoughtSignature = doctorMsg.googleThoughtSignature;
             } else if (message.messageType === MessageType.MANIAC_ACTION) {
-                const maniacMsg = message.msg as { target: string; reasoning: string; thinking?: string; anthropicThinkingSignature?: string; googleThoughtSignature?: string };
+                const maniacMsg = message.msg as { target: string; reasoning: string };
                 content = `Abducted ${maniacMsg.target} for the night. Reasoning: ${maniacMsg.reasoning}`;
-                thinking = maniacMsg.thinking;
-                anthropicThinkingSignature = maniacMsg.anthropicThinkingSignature;
-                googleThoughtSignature = maniacMsg.googleThoughtSignature;
             } else if (message.messageType === MessageType.DETECTIVE_ACTION) {
-                const detectiveMsg = message.msg as { target: string; reasoning: string; action_type?: string; thinking?: string; anthropicThinkingSignature?: string; googleThoughtSignature?: string };
+                const detectiveMsg = message.msg as { target: string; reasoning: string; action_type?: string };
                 if (detectiveMsg.action_type === 'kill') {
                     content = `Used one-time kill on ${detectiveMsg.target}. Reasoning: ${detectiveMsg.reasoning}`;
                 } else {
                     content = `Investigated ${detectiveMsg.target}. Reasoning: ${detectiveMsg.reasoning}`;
                 }
-                thinking = detectiveMsg.thinking;
-                anthropicThinkingSignature = detectiveMsg.anthropicThinkingSignature;
-                googleThoughtSignature = detectiveMsg.googleThoughtSignature;
             } else if (message.messageType === MessageType.VOTE_MESSAGE) {
-                const voteMsg = message.msg as { who: string; why: string; thinking?: string; anthropicThinkingSignature?: string; googleThoughtSignature?: string };
+                const voteMsg = message.msg as { who: string; why: string };
                 content = `🗳️ Votes for ${voteMsg.who}: "${voteMsg.why}"`;
-                thinking = voteMsg.thinking;
-                anthropicThinkingSignature = voteMsg.anthropicThinkingSignature;
-                googleThoughtSignature = voteMsg.googleThoughtSignature;
             } else {
                 content = message.msg as string;
             }
-            const aiMessage: AIMessage = { role: MESSAGE_ROLE.ASSISTANT, content: content, thinking, anthropicThinkingSignature, googleThoughtSignature };
+            // Thinking content and provider signatures are stored uniformly on every
+            // assistant-authored msg object, whatever its message type.
+            let thinking: string | undefined;
+            let anthropicThinkingSignature: string | undefined;
+            let googleThoughtSignature: string | undefined;
+            let grokEncryptedReasoning: string | undefined;
+            if (message.msg && typeof message.msg === 'object') {
+                const signedMsg = message.msg as { thinking?: string; anthropicThinkingSignature?: string; googleThoughtSignature?: string; grokEncryptedReasoning?: string };
+                thinking = signedMsg.thinking;
+                anthropicThinkingSignature = signedMsg.anthropicThinkingSignature;
+                googleThoughtSignature = signedMsg.googleThoughtSignature;
+                grokEncryptedReasoning = signedMsg.grokEncryptedReasoning;
+            }
+            const aiMessage: AIMessage = { role: MESSAGE_ROLE.ASSISTANT, content: content, thinking, anthropicThinkingSignature, googleThoughtSignature, grokEncryptedReasoning };
             aiMessages.push(aiMessage);
         } else {
             // Use convertMessageContent to properly handle all message types
