@@ -234,7 +234,7 @@ describe('previewGame model allocation — fair distribution (paid tier)', () =>
         const threeModels = [
             LLM_CONSTANTS.DEEPSEEK_V4_FLASH,
             LLM_CONSTANTS.CLAUDE_4_HAIKU,
-            LLM_CONSTANTS.GPT_5_5,
+            LLM_CONSTANTS.GPT_5_6_TERRA,
         ];
 
         // 10 players → 9 bots, 3 models → exactly 3 each.
@@ -246,7 +246,7 @@ describe('previewGame model allocation — fair distribution (paid tier)', () =>
         expect(modelCounts(result.bots)).toEqual({
             [LLM_CONSTANTS.DEEPSEEK_V4_FLASH]: 3,
             [LLM_CONSTANTS.CLAUDE_4_HAIKU]: 3,
-            [LLM_CONSTANTS.GPT_5_5]: 3,
+            [LLM_CONSTANTS.GPT_5_6_TERRA]: 3,
         });
     });
 

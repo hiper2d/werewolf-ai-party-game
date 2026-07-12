@@ -2,6 +2,7 @@
 
 ## Other improvements / wishlist (not from the test push, not test-pinned)
 
+- Popup with the news - need some clever use of local storage
 - Resolve vote tie by asking Detective to choose
 - When night starts, the Game Master's messages should tell the human player what to do then it's their turn
 - Change bots prompting to explain that random voting is not something suspicious. People do this. Maybe add it to

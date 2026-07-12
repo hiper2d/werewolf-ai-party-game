@@ -91,7 +91,7 @@ export class DeepSeekV2Agent extends AbstractAgent {
             // Respect the model's configured output budget. The previous hard cap of 8192
             // truncated long replies mid-JSON on thinking models, where reasoning_content
             // shares this budget with the answer.
-            const modelConfig = getModelConfigByApiName(this.model);
+            const modelConfig = getModelConfigByApiName(this.model, this.enableThinking);
             const maxOutputTokens = Math.max(1, modelConfig?.maxOutputTokens ?? 8192);
 
             let requestParams: any = {
@@ -189,7 +189,7 @@ export class DeepSeekV2Agent extends AbstractAgent {
 
             // Respect the model's configured output budget: reasoning_content shares
             // this budget with the answer on thinking models.
-            const modelConfig = getModelConfigByApiName(this.model);
+            const modelConfig = getModelConfigByApiName(this.model, this.enableThinking);
             const maxOutputTokens = Math.max(1, modelConfig?.maxOutputTokens ?? 8192);
 
             const requestParams: any = {

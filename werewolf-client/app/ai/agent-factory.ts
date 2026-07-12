@@ -40,8 +40,9 @@ export class AgentFactory {
                 return new ClaudeAgent(name, instruction, model.modelApiName, key, shouldEnableThinking);
 
             // Always-on reasoning models
-            case LLM_CONSTANTS.GPT_5_5:
-            case LLM_CONSTANTS.GPT_5_4_MINI:
+            case LLM_CONSTANTS.GPT_5_6_SOL:
+            case LLM_CONSTANTS.GPT_5_6_TERRA:
+            case LLM_CONSTANTS.GPT_5_6_LUNA:
                 return new Gpt5Agent(name, instruction, model.modelApiName, key, model.temperature!, shouldEnableThinking);
             case LLM_CONSTANTS.GEMINI_3_PRO:
             case LLM_CONSTANTS.GEMINI_3_FLASH:
@@ -84,7 +85,7 @@ export class AgentFactory {
 
     // Map deprecated model identifiers to their current equivalents
     private static readonly DEPRECATED_MODEL_MAP: Record<string, string> = {
-        'gpt-5.4': LLM_CONSTANTS.GPT_5_5,
+        'gpt-5.4': LLM_CONSTANTS.GPT_5_6_TERRA,
         'deepseek-chat': LLM_CONSTANTS.DEEPSEEK_V4_FLASH,
         'deepseek-reasoner': LLM_CONSTANTS.DEEPSEEK_V4_FLASH_THINKING,
         'grok-fast': LLM_CONSTANTS.GROK_4_5,

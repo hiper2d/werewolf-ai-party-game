@@ -563,10 +563,10 @@ describe('createGame tier enforcement', () => {
         setupDbForCreate();
 
         const preview = makeGeneratedPreview();
-        preview.bots[1].playerAiType = LLM_CONSTANTS.GPT_5_5;
+        preview.bots[1].playerAiType = LLM_CONSTANTS.GPT_5_6_TERRA;
 
         await expect(createGame(preview)).rejects.toThrow(
-            `Failed to create game: The AI model ${LLM_CONSTANTS.GPT_5_5} requires the ${API_KEY_CONSTANTS.OPENAI} API key for bots. Please add it on your Profile page.`
+            `Failed to create game: The AI model ${LLM_CONSTANTS.GPT_5_6_TERRA} requires the ${API_KEY_CONSTANTS.OPENAI} API key for bots. Please add it on your Profile page.`
         );
     });
 

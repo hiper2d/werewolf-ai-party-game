@@ -6,6 +6,7 @@ import { ModelOverloadError, ModelRateLimitError, ModelUnavailableError, ModelAu
 import { z } from 'zod';
 import { ZodSchemaConverter } from './zod-schema-converter';
 import { calculateGoogleCost } from '@/app/utils/pricing/google-pricing';
+import { getModelConfigByApiName } from '@/app/ai/ai-models';
 
 type GoogleRole = 'model' | 'user';
 
@@ -194,7 +195,7 @@ export class GoogleAgent extends AbstractAgent {
             if (this.enableThinking) {
                 config.thinkingConfig = {
                     includeThoughts: true,
-                    thinkingBudget: 1024
+                    thinkingBudget: getModelConfigByApiName(this.model, this.enableThinking)?.thinkingBudgetTokens ?? 1024
                 };
             }
 
@@ -310,7 +311,7 @@ export class GoogleAgent extends AbstractAgent {
             if (this.enableThinking) {
                 config.thinkingConfig = {
                     includeThoughts: true,
-                    thinkingBudget: 1024
+                    thinkingBudget: getModelConfigByApiName(this.model, this.enableThinking)?.thinkingBudgetTokens ?? 1024
                 };
             }
 

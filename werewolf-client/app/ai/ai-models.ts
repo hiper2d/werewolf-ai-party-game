@@ -45,8 +45,11 @@ export const LLM_CONSTANTS = {
     DEEPSEEK_V4_FLASH_THINKING: 'deepseek-flash-thinking',
     DEEPSEEK_V4_PRO: 'deepseek-pro',
     DEEPSEEK_V4_PRO_THINKING: 'deepseek-pro-thinking',
-    GPT_5_5: 'gpt',
-    GPT_5_4_MINI: 'gpt-mini',
+    // GPT-5.6 family. 'gpt' and 'gpt-mini' are stable picker ids carried over from the
+    // GPT-5.5 / GPT-5.4-mini era so existing games keep working across the repoint.
+    GPT_5_6_SOL: 'gpt-sol',
+    GPT_5_6_TERRA: 'gpt',
+    GPT_5_6_LUNA: 'gpt-mini',
     GEMINI_3_PRO: 'gemini-pro',
     GEMINI_3_FLASH: 'gemini-flash',
     GEMINI_3_FLASH_LITE: 'gemini-lite',
@@ -87,12 +90,23 @@ export const AUDIO_MODEL_PRICING: Record<string, AudioModelPricing> = {
 
 export type ModelTag = 'fast' | 'slow' | 'very-slow' | 'cheap' | 'expensive';
 
+export type ReasoningEffort = 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+
 export interface ModelConfig {
     displayName: string;
     modelApiName: string;
     apiKeyName: string;
     hasThinking: boolean;
     temperature?: number; // Override agent default temperature; omit to use the agent's built-in default
+    // Reasoning-depth knobs. Providers speak two dialects, so there are two fields; a model uses
+    // at most one of them, and omitting it means "provider default" (e.g. GPT-5 runs at OpenAI's
+    // default medium effort, Fugu/Grok at their fixed "high").
+    // ReasoningEffort is the superset of provider vocabularies — each provider accepts only its
+    // own slice, and the agent passes the value through verbatim, so pick one the model's API
+    // supports: Anthropic adaptive thinking takes low|medium|high|xhigh|max, OpenAI takes
+    // minimal|low|medium|high|xhigh, Fugu takes high|xhigh.
+    reasoningEffort?: ReasoningEffort; // Effort-based APIs (Anthropic adaptive thinking)
+    thinkingBudgetTokens?: number; // Budget-based APIs (Anthropic enabled thinking, Gemini)
     maxOutputTokens?: number;
     tags?: ModelTag[];
     freeTier?: {
@@ -109,6 +123,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         modelApiName: 'claude-fable-5',
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
         hasThinking: true,
+        reasoningEffort: 'high',
         tags: ['slow', 'expensive'],
     },
 
@@ -125,6 +140,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         modelApiName: 'claude-opus-4-8',
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
         hasThinking: true,
+        reasoningEffort: 'high',
         tags: ['expensive'],
     },
     [LLM_CONSTANTS.CLAUDE_4_SONNET]: {
@@ -139,6 +155,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         modelApiName: 'claude-sonnet-5',
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
         hasThinking: true,
+        reasoningEffort: 'high',
         tags: ['expensive'],
     },
     [LLM_CONSTANTS.CLAUDE_4_HAIKU]: {
@@ -153,6 +170,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         modelApiName: 'claude-haiku-4-5',
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
         hasThinking: true,
+        thinkingBudgetTokens: 1024,
         tags: ['fast', 'cheap'],
     },
 
@@ -195,17 +213,27 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
     },
 
     // Models with always-on reasoning
-    [LLM_CONSTANTS.GPT_5_5]: {
-        displayName: 'GPT-5.5',
-        modelApiName: 'gpt-5.5',
+    // GPT-5.6 family (promoted July 2026 when the limited preview opened up):
+    // sol is the paid-only flagship, terra the mainline, luna the cheap tier.
+    [LLM_CONSTANTS.GPT_5_6_SOL]: {
+        displayName: 'GPT-5.6 Sol',
+        modelApiName: 'gpt-5.6-sol',
         apiKeyName: API_KEY_CONSTANTS.OPENAI,
         hasThinking: true,
         temperature: 1,
         tags: ['expensive'],
     },
-    [LLM_CONSTANTS.GPT_5_4_MINI]: {
-        displayName: 'GPT-5.4-mini',
-        modelApiName: 'gpt-5.4-mini',
+    [LLM_CONSTANTS.GPT_5_6_TERRA]: {
+        displayName: 'GPT-5.6 Terra',
+        modelApiName: 'gpt-5.6-terra',
+        apiKeyName: API_KEY_CONSTANTS.OPENAI,
+        hasThinking: true,
+        temperature: 1,
+        tags: ['expensive'],
+    },
+    [LLM_CONSTANTS.GPT_5_6_LUNA]: {
+        displayName: 'GPT-5.6 Luna',
+        modelApiName: 'gpt-5.6-luna',
         apiKeyName: API_KEY_CONSTANTS.OPENAI,
         hasThinking: true,
         temperature: 1,
@@ -216,6 +244,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         modelApiName: 'gemini-3.1-pro-preview',
         apiKeyName: API_KEY_CONSTANTS.GOOGLE,
         hasThinking: true,
+        thinkingBudgetTokens: 1024,
         tags: ['slow', 'expensive'],
     },
     [LLM_CONSTANTS.GEMINI_3_FLASH]: {
@@ -223,6 +252,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         modelApiName: 'gemini-3.5-flash',
         apiKeyName: API_KEY_CONSTANTS.GOOGLE,
         hasThinking: true,
+        thinkingBudgetTokens: 1024,
         tags: ['fast'],
     },
     [LLM_CONSTANTS.GEMINI_3_FLASH_LITE]: {
@@ -230,6 +260,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         modelApiName: 'gemini-3.1-flash-lite',
         apiKeyName: API_KEY_CONSTANTS.GOOGLE,
         hasThinking: true,
+        thinkingBudgetTokens: 1024,
         tags: ['fast', 'cheap'],
     },
     // Always-on reasoning (xAI default effort "high", cannot be disabled) — no non-thinking sibling
@@ -324,23 +355,6 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
     },
 };
 
-/**
- * STAGED: GPT-5.6 family (sol / terra / luna) — limited API preview.
- *
- * As of July 2026 these ids 404 on our account ("limited preview ... broader API
- * availability in the coming weeks. Until then, use gpt-5.5"). They are deliberately
- * NOT in SupportedAiModels so they can't be picked in games. The live probe suite
- * `gpt-5-6-availability.test.ts` checks these ids; when it goes green, promote them:
- *   - Repoint 'gpt' at gpt-5.6-terra and 'gpt-mini' at gpt-5.6-luna (or introduce
- *     new stable ids), add gpt-5.6-sol as the paid-only flagship in PAID_BAND_ORDER
- *     (ModelsCatalog.tsx), and move the pricing below into MODEL_PRICING.
- *   - Planned pricing ($/1M in, cached, out): sol 5 / 0.5 / 30; terra 2.5 / 0.25 / 15;
- *     luna 1 / 0.1 / 6.
- *   - Luna at $6 output needs FREE_TIER_OUTPUT_PRICE_BANDS.LIMITED_MAX bumped 5 → 6
- *     to keep the 3-bot cap gpt-5.4-mini has (note: Grok 4.5 at $6 would ride along).
- */
-export const UPCOMING_GPT_5_6_MODELS = ['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'] as const;
-
 export type LLMModel = keyof typeof SupportedAiModels;
 
 export function getModelTags(modelId: string): ModelTag[] {
@@ -355,8 +369,20 @@ export function getModelDisplayName(modelId: string): string {
     return SupportedAiModels[modelId]?.displayName ?? modelId;
 }
 
-export function getModelConfigByApiName(modelApiName: string): ModelConfig | undefined {
-    return Object.values(SupportedAiModels).find(config => config.modelApiName === modelApiName);
+/**
+ * Looks up a model's config by API name. Thinking and non-thinking picker variants share a
+ * modelApiName but can differ in config (reasoning knobs, maxOutputTokens), so pass hasThinking
+ * to select the right variant; without it (or if no variant matches) the first entry wins.
+ */
+export function getModelConfigByApiName(modelApiName: string, hasThinking?: boolean): ModelConfig | undefined {
+    const candidates = Object.values(SupportedAiModels).filter(config => config.modelApiName === modelApiName);
+    if (hasThinking !== undefined) {
+        const exact = candidates.find(config => config.hasThinking === hasThinking);
+        if (exact) {
+            return exact;
+        }
+    }
+    return candidates[0];
 }
 
 /**
@@ -379,18 +405,21 @@ export interface ModelPricing {
  * Updated as of April 2026
  */
 export const MODEL_PRICING: Record<string, ModelPricing> = {
-    // OpenAI models
-    [SupportedAiModels[LLM_CONSTANTS.GPT_5_5].modelApiName]: {
+    // OpenAI GPT-5.6 models
+    [SupportedAiModels[LLM_CONSTANTS.GPT_5_6_SOL].modelApiName]: {
         inputPrice: 5.000,
         outputPrice: 30.000,
-        // Cached input is $0.50/1M on the current OpenAI pricing page (was listed
-        // here as $2.50 before — that overcharged cache hits 5×).
         cacheHitPrice: 0.500
     },
-    [SupportedAiModels[LLM_CONSTANTS.GPT_5_4_MINI].modelApiName]: {
-        inputPrice: 0.750,
-        outputPrice: 4.500,
-        cacheHitPrice: 0.075
+    [SupportedAiModels[LLM_CONSTANTS.GPT_5_6_TERRA].modelApiName]: {
+        inputPrice: 2.500,
+        outputPrice: 15.000,
+        cacheHitPrice: 0.250
+    },
+    [SupportedAiModels[LLM_CONSTANTS.GPT_5_6_LUNA].modelApiName]: {
+        inputPrice: 1.000,
+        outputPrice: 6.000,
+        cacheHitPrice: 0.100
     },
 
     // DeepSeek V4 models
@@ -520,7 +549,7 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
  * model — so the two stay consistent. The metric is a model's output price ($/1M tokens), which
  * dominates generation cost. Bands:
  *   <= $2  → unlimited bots
- *   <= $5  → up to 3 bots
+ *   <= $6  → up to 3 bots
  *   <= $15 → 1 bot
  *   > $15  → not available on the free tier
  *
@@ -531,7 +560,9 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
  */
 export const FREE_TIER_OUTPUT_PRICE_BANDS = {
     UNLIMITED_MAX: 2,   // <= $2/1M output → unlimited bots
-    LIMITED_MAX: 5,     // <= $5 → up to LIMITED_MAX_BOTS bots
+    // Bumped 5 → 6 with the GPT-5.6 promotion so Luna ($6 output) keeps the 3-bot cap
+    // its predecessor gpt-5.4-mini had. Grok 4.5 ($6 output) rides along 1 → 3 bots.
+    LIMITED_MAX: 6,     // <= $6 → up to LIMITED_MAX_BOTS bots
     SINGLE_MAX: 15,     // <= $15 → 1 bot; above → not available on free tier
 } as const;
 export const FREE_TIER_LIMITED_MAX_BOTS = 3;

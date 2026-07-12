@@ -133,8 +133,9 @@ const THINKING_GUARANTEED = new Set<string>([
 // GPT-5's plain-text path cannot surface thinking (no schema-injected field, and
 // OpenAI does not expose chain-of-thought), so it must return an empty string.
 const THINKING_ALWAYS_EMPTY = new Set<string>([
-    LLM_CONSTANTS.GPT_5_5,
-    LLM_CONSTANTS.GPT_5_4_MINI,
+    LLM_CONSTANTS.GPT_5_6_SOL,
+    LLM_CONSTANTS.GPT_5_6_TERRA,
+    LLM_CONSTANTS.GPT_5_6_LUNA,
 ]);
 
 // Unlike JSON compliance (a per-MODEL property — each model can fail at
@@ -148,7 +149,7 @@ const TEXT_SWEEP_MODELS = new Set<string>([
     LLM_CONSTANTS.CLAUDE_4_OPUS_THINKING,    // adaptive thinking (may skip thinking)
     LLM_CONSTANTS.DEEPSEEK_V4_FLASH,
     LLM_CONSTANTS.DEEPSEEK_V4_FLASH_THINKING,
-    LLM_CONSTANTS.GPT_5_4_MINI,              // single path: thinking never surfaces
+    LLM_CONSTANTS.GPT_5_6_LUNA,              // single path: thinking never surfaces
     LLM_CONSTANTS.GEMINI_3_FLASH,
     LLM_CONSTANTS.GEMINI_3_FLASH_LITE,
     LLM_CONSTANTS.MISTRAL_4_SMALL,

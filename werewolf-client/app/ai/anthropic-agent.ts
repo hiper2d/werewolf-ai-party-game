@@ -2,6 +2,7 @@ import { AbstractAgent } from "@/app/ai/abstract-agent";
 import { AIMessage, BotResponseError, TokenUsage, AgentLoggingConfig, DEFAULT_LOGGING_CONFIG } from "@/app/api/game-models";
 import { Anthropic } from '@anthropic-ai/sdk';
 import { calculateAnthropicCost } from "@/app/utils/pricing";
+import { getModelConfigByApiName } from "@/app/ai/ai-models";
 import { z } from 'zod';
 import { ZodSchemaConverter } from './zod-schema-converter';
 import { parseAndValidateLlmJson } from './json-response-parser';
@@ -197,15 +198,16 @@ export class ClaudeAgent extends AbstractAgent {
             const usesAdaptiveThinking = this.model.includes('fable')
                 || this.model.includes('opus') || this.model.includes('sonnet');
             if (canUseThinking) {
+                const modelConfig = getModelConfigByApiName(this.model, this.enableThinking);
                 if (usesAdaptiveThinking) {
                     // Fable 5 / Opus 4.8 / Sonnet 5: adaptive thinking with effort control.
                     // display: "summarized" is required to surface the reasoning — these models
                     // default to "omitted", which returns thinking blocks with an empty field.
                     (params as any).thinking = { type: "adaptive", display: "summarized" };
-                    (params as any).output_config = { effort: "high" };
+                    (params as any).output_config = { effort: modelConfig?.reasoningEffort ?? "high" };
                 } else {
                     // Haiku 4.5 uses enabled thinking with budget
-                    (params as any).thinking = { type: "enabled", budget_tokens: 1024 };
+                    (params as any).thinking = { type: "enabled", budget_tokens: modelConfig?.thinkingBudgetTokens ?? 1024 };
                     params.temperature = 1;
                 }
                 params.max_tokens = 16384;
@@ -343,11 +345,12 @@ export class ClaudeAgent extends AbstractAgent {
             const usesAdaptiveThinking = this.model.includes('fable')
                 || this.model.includes('opus') || this.model.includes('sonnet');
             if (canUseThinking) {
+                const modelConfig = getModelConfigByApiName(this.model, this.enableThinking);
                 if (usesAdaptiveThinking) {
                     (params as any).thinking = { type: "adaptive", display: "summarized" };
-                    (params as any).output_config = { effort: "high" };
+                    (params as any).output_config = { effort: modelConfig?.reasoningEffort ?? "high" };
                 } else {
-                    (params as any).thinking = { type: "enabled", budget_tokens: 1024 };
+                    (params as any).thinking = { type: "enabled", budget_tokens: modelConfig?.thinkingBudgetTokens ?? 1024 };
                     params.temperature = 1;
                 }
                 params.max_tokens = 16384;

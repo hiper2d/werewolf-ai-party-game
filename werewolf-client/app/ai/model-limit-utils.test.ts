@@ -305,7 +305,7 @@ describe('getModelPickerOptions (single source of truth for every picker)', () =
             const opts = getModelPickerOptions(USER_TIERS.FREE, new Set());
             const m = byModel(opts);
             expect(m.has(UNAVAILABLE)).toBe(false);
-            expect(m.has(LLM_CONSTANTS.GPT_5_5)).toBe(false);
+            expect(m.has(LLM_CONSTANTS.GPT_5_6_SOL)).toBe(false);
             expect(m.has(UNLIMITED)).toBe(true);
             expect(m.has(LIMITED_3)).toBe(true);
         });

@@ -270,8 +270,8 @@ describe('Token Usage Utils', () => {
     describe('MODEL_PRICING integration', () => {
         it('should have pricing for all supported models', () => {
             const expectedModels = [
-                SupportedAiModels[LLM_CONSTANTS.GPT_5_5].modelApiName,
-                SupportedAiModels[LLM_CONSTANTS.GPT_5_4_MINI].modelApiName,
+                SupportedAiModels[LLM_CONSTANTS.GPT_5_6_TERRA].modelApiName,
+                SupportedAiModels[LLM_CONSTANTS.GPT_5_6_LUNA].modelApiName,
                 SupportedAiModels[LLM_CONSTANTS.DEEPSEEK_V4_FLASH].modelApiName,
                 SupportedAiModels[LLM_CONSTANTS.DEEPSEEK_V4_PRO].modelApiName,
                 SupportedAiModels[LLM_CONSTANTS.KIMI].modelApiName,
