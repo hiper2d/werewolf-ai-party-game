@@ -34,6 +34,20 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
     {
+        id: "gpt-5-6", date: "Jul 2026", tags: ["Models"],
+        title: "The GPT-5.6 family arrives: Sol, Terra, and Luna",
+        body: (<>OpenAI&apos;s <strong>GPT-5.6</strong> family replaces GPT-5.5 and GPT-5.4-mini.
+            <strong> Terra</strong> takes over the main GPT slot — and unlike GPT-5.5, it&apos;s no longer
+            paid-only: free-tier players can now run one Terra bot per game. <strong>Luna</strong> replaces
+            the mini slot at up to three bots per game, and <strong>Sol</strong> joins as OpenAI&apos;s new
+            flagship on the <strong>paid tier</strong>. All three always reason before they answer. As a
+            bonus, the free-tier rebalance also bumps <strong>Grok 4.5</strong> from one to
+            <strong> three bots per game</strong>. Pick them for any bot or the Game Master when you set
+            up a lobby.</>),
+        media: null,
+        links: [{label: "Create a game", href: "/games"}],
+    },
+    {
         id: "grok-4-5", date: "Jul 2026", tags: ["Models"],
         title: "Grok 4.5 replaces Grok 4.3",
         body: (<>xAI&apos;s <strong>Grok 4.5</strong> takes over the Grok slot in the model picker. The separate
