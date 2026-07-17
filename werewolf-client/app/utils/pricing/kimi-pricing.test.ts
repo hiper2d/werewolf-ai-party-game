@@ -64,19 +64,19 @@ describe('Kimi Pricing Utils', () => {
     });
 
     describe('calculateKimiCost', () => {
-        it('should calculate cost for kimi-k2.6 model', () => {
-            // kimi-k2.6: $0.95/M input, $4.00/M output
-            const cost = calculateKimiCost('kimi-k2.6', 1000, 500);
+        it('should calculate cost for kimi-k3 model', () => {
+            // kimi-k3: $3.00/M input, $15.00/M output
+            const cost = calculateKimiCost('kimi-k3', 1000, 500);
 
-            // 1K input tokens * $0.95/M + 0.5K output tokens * $4.00/M
-            expect(cost).toBeCloseTo((1000 * 0.95 / 1000000) + (500 * 4.00 / 1000000), 5);
+            // 1K input tokens * $3.00/M + 0.5K output tokens * $15.00/M
+            expect(cost).toBeCloseTo((1000 * 3.00 / 1000000) + (500 * 15.00 / 1000000), 5);
         });
 
         it('should handle large token counts', () => {
-            const cost = calculateKimiCost('kimi-k2.6', 100000, 50000);
+            const cost = calculateKimiCost('kimi-k3', 100000, 50000);
 
-            // 100K input * $0.95/M + 50K output * $4.00/M
-            expect(cost).toBeCloseTo((100000 * 0.95 / 1000000) + (50000 * 4.00 / 1000000), 5);
+            // 100K input * $3.00/M + 50K output * $15.00/M
+            expect(cost).toBeCloseTo((100000 * 3.00 / 1000000) + (50000 * 15.00 / 1000000), 5);
         });
 
         it('should handle unknown model gracefully', () => {
@@ -92,33 +92,33 @@ describe('Kimi Pricing Utils', () => {
         });
 
         it('should handle zero tokens', () => {
-            const cost = calculateKimiCost('kimi-k2.6', 0, 0);
+            const cost = calculateKimiCost('kimi-k3', 0, 0);
             expect(cost).toBe(0);
         });
 
         it('should calculate fractional token costs correctly', () => {
-            const cost = calculateKimiCost('kimi-k2.6', 333, 777);
+            const cost = calculateKimiCost('kimi-k3', 333, 777);
 
-            // 333 input * $0.95/M + 777 output * $4.00/M
-            const expectedCost = (333 * 0.95 / 1000000) + (777 * 4.00 / 1000000);
+            // 333 input * $3.00/M + 777 output * $15.00/M
+            const expectedCost = (333 * 3.00 / 1000000) + (777 * 15.00 / 1000000);
             expect(cost).toBeCloseTo(expectedCost, 5);
         });
 
         it('should calculate cost with cache hits (when supported)', () => {
-            // Note: Current Kimi agent doesn't extract cache info, but pricing supports it
-            const cost = calculateKimiCost('kimi-k2.6', 1000000, 500000);
+            // Cache hits come from usage.prompt_tokens_details.cached_tokens; none passed here.
+            const cost = calculateKimiCost('kimi-k3', 1000000, 500000);
 
-            // 1M input * $0.95/M + 0.5M output * $4.00/M (no cache)
-            expect(cost).toBeCloseTo(0.95 + 2.0, 5);
+            // 1M input * $3.00/M + 0.5M output * $15.00/M (no cache)
+            expect(cost).toBeCloseTo(3.0 + 7.5, 5);
         });
     });
 
     describe('MODEL_PRICING integration', () => {
         it('should have pricing for Kimi models', () => {
-            expect(MODEL_PRICING['kimi-k2.6']).toBeDefined();
-            expect(MODEL_PRICING['kimi-k2.6'].inputPrice).toBe(0.95);
-            expect(MODEL_PRICING['kimi-k2.6'].outputPrice).toBe(4.00);
-            expect(MODEL_PRICING['kimi-k2.6'].cacheHitPrice).toBe(0.16);
+            expect(MODEL_PRICING['kimi-k3']).toBeDefined();
+            expect(MODEL_PRICING['kimi-k3'].inputPrice).toBe(3.00);
+            expect(MODEL_PRICING['kimi-k3'].outputPrice).toBe(15.00);
+            expect(MODEL_PRICING['kimi-k3'].cacheHitPrice).toBe(0.30);
         });
     });
 });

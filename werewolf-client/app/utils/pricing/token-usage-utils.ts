@@ -42,11 +42,14 @@ export function extractTokenUsage(response: any): TokenUsage | null {
         totalTokens: usage.total_tokens || 0
     };
     
-    // Extract cache information if available (DeepSeek, OpenAI, etc.)
+    // Extract cache information if available. DeepSeek reports cache hits as a top-level
+    // prompt_cache_hit_tokens; OpenAI, Kimi, Grok and Fugu nest them under prompt_tokens_details.
     if (usage.prompt_cache_hit_tokens !== undefined) {
         result.cacheHitTokens = usage.prompt_cache_hit_tokens;
+    } else if (usage.prompt_tokens_details?.cached_tokens !== undefined) {
+        result.cacheHitTokens = usage.prompt_tokens_details.cached_tokens;
     }
-    
+
     if (usage.prompt_cache_miss_tokens !== undefined) {
         result.cacheMissTokens = usage.prompt_cache_miss_tokens;
     }

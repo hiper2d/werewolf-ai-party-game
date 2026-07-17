@@ -570,7 +570,11 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
                 inputTokens: gamePreview.tokenUsage.inputTokens || 0,
                 outputTokens: gamePreview.tokenUsage.outputTokens || 0,
                 totalTokens: gamePreview.tokenUsage.totalTokens || 0,
-                costUSD: previewCost
+                costUSD: previewCost,
+                // Present only when the preview ran on a reasoning model; never write undefined.
+                ...(gamePreview.tokenUsage.reasoningTokens
+                    ? { reasoningTokens: gamePreview.tokenUsage.reasoningTokens }
+                    : {})
             } : {
                 inputTokens: 0,
                 outputTokens: 0,

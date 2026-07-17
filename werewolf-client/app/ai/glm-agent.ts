@@ -8,7 +8,7 @@ import { parseAndValidateLlmJson } from './json-response-parser';
 
 // Z.AI / GLM-5.2 agent. The API is OpenAI-compatible (https://api.z.ai/api/paas/v4/),
 // so we use the OpenAI SDK with a custom baseURL. GLM-5.2 supports a thinking toggle
-// via `thinking: { type: 'enabled' | 'disabled' }`, identical to Kimi K2.6.
+// via `thinking: { type: 'enabled' | 'disabled' }`, identical to Kimi K3.
 export class GlmAgent extends AbstractAgent {
     private readonly client: OpenAI;
     private readonly defaultParams: Omit<Parameters<OpenAI['chat']['completions']['create']>[0], 'messages'> = {

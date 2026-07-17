@@ -12,12 +12,16 @@ function normalizeTokenUsage(usage: TokenUsageInput): TokenUsage {
     const computedTotal = inputTokens + outputTokens;
     const totalTokens = suppliedTotal > 0 ? suppliedTotal : computedTotal;
     const costUSD = parseFloat((Number(usage?.costUSD) || 0).toFixed(6));
+    const reasoningTokens = Number(usage?.reasoningTokens) || 0;
 
     return {
         inputTokens,
         outputTokens,
         totalTokens,
-        costUSD
+        costUSD,
+        // Kept out of the object unless the model actually reasoned: Firestore rejects
+        // undefined, and a 0 on every non-reasoning model is just noise.
+        ...(reasoningTokens > 0 ? { reasoningTokens } : {})
     };
 }
 
@@ -121,11 +125,14 @@ export async function recordGameMasterTokenUsage(
             costUSD: 0
         };
 
+        const reasoningTokens = (currentUsage.reasoningTokens || 0) + (usage.reasoningTokens || 0);
+
         const updatedUsage: TokenUsage = {
             inputTokens: currentUsage.inputTokens + usage.inputTokens,
             outputTokens: currentUsage.outputTokens + usage.outputTokens,
             totalTokens: currentUsage.totalTokens + usage.totalTokens,
-            costUSD: parseFloat(((currentUsage.costUSD || 0) + usage.costUSD).toFixed(6))
+            costUSD: parseFloat(((currentUsage.costUSD || 0) + usage.costUSD).toFixed(6)),
+            ...(reasoningTokens > 0 ? { reasoningTokens } : {})
         };
 
         const updatedTotalCost = parseFloat(((game.totalGameCost || 0) + usage.costUSD).toFixed(6));
@@ -166,13 +173,16 @@ export async function recordBotTokenUsage(
                 costUSD: 0
             };
 
+            const reasoningTokens = (currentUsage.reasoningTokens || 0) + (usage.reasoningTokens || 0);
+
             return {
                 ...bot,
                 tokenUsage: {
                     inputTokens: currentUsage.inputTokens + usage.inputTokens,
                     outputTokens: currentUsage.outputTokens + usage.outputTokens,
                     totalTokens: currentUsage.totalTokens + usage.totalTokens,
-                    costUSD: parseFloat(((currentUsage.costUSD || 0) + usage.costUSD).toFixed(6))
+                    costUSD: parseFloat(((currentUsage.costUSD || 0) + usage.costUSD).toFixed(6)),
+                    ...(reasoningTokens > 0 ? { reasoningTokens } : {})
                 }
             };
         });

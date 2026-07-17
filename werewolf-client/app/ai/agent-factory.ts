@@ -1,7 +1,7 @@
 import { ApiKeyMap } from '@/app/api/game-models';
 import { AbstractAgent } from "@/app/ai/abstract-agent";
 import { Gpt5Agent } from "@/app/ai/gpt-5-agent";
-import { LLM_CONSTANTS, SupportedAiModels } from "@/app/ai/ai-models";
+import { LLM_CONSTANTS, SupportedAiModels, resolveModelId } from "@/app/ai/ai-models";
 import { ClaudeAgent } from "@/app/ai/anthropic-agent";
 import { GoogleAgent } from "@/app/ai/google-agent";
 import { MistralAgent } from "@/app/ai/mistral-agent";
@@ -65,8 +65,7 @@ export class AgentFactory {
             case LLM_CONSTANTS.MISTRAL_MAGISTRAL:
                 return new MistralAgent(name, instruction, model.modelApiName, key, shouldEnableThinking);
             case LLM_CONSTANTS.KIMI:
-            case LLM_CONSTANTS.KIMI_THINKING:
-                // Kimi K2.6 ignores client temperature and uses its fixed default.
+                // Kimi K3 rejects any temperature but 1; the agent never sends the field.
                 return new KimiAgent(name, instruction, model.modelApiName, key, 0, shouldEnableThinking);
 
             // Z.AI models
@@ -83,18 +82,9 @@ export class AgentFactory {
         }
     }
 
-    // Map deprecated model identifiers to their current equivalents
-    private static readonly DEPRECATED_MODEL_MAP: Record<string, string> = {
-        'gpt-5.4': LLM_CONSTANTS.GPT_5_6_TERRA,
-        'deepseek-chat': LLM_CONSTANTS.DEEPSEEK_V4_FLASH,
-        'deepseek-reasoner': LLM_CONSTANTS.DEEPSEEK_V4_FLASH_THINKING,
-        'grok-fast': LLM_CONSTANTS.GROK_4_5,
-        'grok-thinking': LLM_CONSTANTS.GROK_4_5,
-    };
-
     private static validateLlmTypeAndGet(llmType: string): string {
-        // Migrate deprecated model types to current equivalents
-        const migratedType = this.DEPRECATED_MODEL_MAP[llmType] ?? llmType;
+        // Deprecated model IDs live on in old game docs; resolveModelId is the shared map.
+        const migratedType = resolveModelId(llmType);
 
         const llmValues = Object.values(LLM_CONSTANTS) as string[];
 

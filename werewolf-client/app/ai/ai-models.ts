@@ -59,7 +59,6 @@ export const LLM_CONSTANTS = {
     MISTRAL_MAGISTRAL: 'mistral-magistral',
     GROK_4_5: 'grok',
     KIMI: 'kimi',
-    KIMI_THINKING: 'kimi-thinking',
     GLM: 'glm',
     GLM_THINKING: 'glm-thinking',
     FUGU: 'fugu',
@@ -301,21 +300,22 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         hasThinking: true,
     },
 
-    // Kimi models
+    // Kimi models. Single always-reasoning entry: K3 reasons by default and the only way to stop
+    // it is the undocumented K2-era `thinking: disabled` toggle, which we no longer rely on.
     [LLM_CONSTANTS.KIMI]: {
-        displayName: 'Kimi K2.6',
-        modelApiName: 'kimi-k2.6',
-        apiKeyName: API_KEY_CONSTANTS.MOONSHOT,
-        hasThinking: false,
-        // Temperature is omitted from the request: Kimi K2.6 uses a fixed default per Moonshot docs.
-    },
-    [LLM_CONSTANTS.KIMI_THINKING]: {
-        displayName: 'Kimi K2.6 (Thinking)',
-        modelApiName: 'kimi-k2.6',
+        displayName: 'Kimi K3',
+        modelApiName: 'kimi-k3',
         apiKeyName: API_KEY_CONSTANTS.MOONSHOT,
         hasThinking: true,
-        // Temperature is omitted from the request: Kimi K2.6 uses a fixed default per Moonshot docs.
-        tags: ['very-slow'],
+        // Temperature is omitted from the request: kimi-k3 rejects any value other than 1.
+        tags: ['expensive'],
+        // Explicit policy, opting out of price banding. Banding on the $15 sticker output price
+        // would land K3 exactly on the SINGLE_MAX boundary (1 bot), but that price understates
+        // what a turn really costs: K3 always reasons at max effort, and ~85-90% of its output
+        // tokens are reasoning tokens billed at the output rate. It dodges the usual
+        // FREE_TIER_THINKING_COST_FACTOR only because it has no non-thinking sibling entry;
+        // with that factor it would be $37.50 effective, far past the free-tier ceiling.
+        freeTier: { available: false, maxBotsPerGame: 0 },
     },
 
     // Z.AI models
@@ -436,9 +436,9 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
 
     // Kimi/Moonshot models
     [SupportedAiModels[LLM_CONSTANTS.KIMI].modelApiName]: {
-        inputPrice: 0.95,
-        outputPrice: 4.00,
-        cacheHitPrice: 0.16
+        inputPrice: 3.00,
+        outputPrice: 15.00,
+        cacheHitPrice: 0.30
     },
 
     // Z.AI models
@@ -558,6 +558,31 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
  * effective output price is multiplied by THINKING_COST_FACTOR before banding. Always-on reasoning
  * models (GPT-5, Gemini 3, Magistral) have no non-thinking sibling and are priced as listed.
  */
+/**
+ * Model IDs that games may still hold in Firestore but that no longer exist in LLM_CONSTANTS,
+ * mapped to their current equivalent. Games persist a model ID per bot and per GM, so a retired
+ * ID lives on in old docs until `scripts/migrate-model-ids.ts` rewrites them — and even after,
+ * for any doc written before the migration ran.
+ *
+ * Every path that resolves a persisted model ID must go through `resolveModelId`, not just agent
+ * creation: tier validation re-checks *every* bot in a game, so one stale ID would otherwise make
+ * the model picker unusable for that whole game.
+ */
+const DEPRECATED_MODEL_MAP: Record<string, string> = {
+    'gpt-5.4': LLM_CONSTANTS.GPT_5_6_TERRA,
+    'deepseek-chat': LLM_CONSTANTS.DEEPSEEK_V4_FLASH,
+    'deepseek-reasoner': LLM_CONSTANTS.DEEPSEEK_V4_FLASH_THINKING,
+    'grok-fast': LLM_CONSTANTS.GROK_4_5,
+    'grok-thinking': LLM_CONSTANTS.GROK_4_5,
+    // Kimi collapsed to a single always-reasoning K3 entry.
+    'kimi-thinking': LLM_CONSTANTS.KIMI,
+};
+
+/** Maps a possibly-retired model ID to its current equivalent; unknown IDs pass through. */
+export function resolveModelId(modelId: string): string {
+    return DEPRECATED_MODEL_MAP[modelId] ?? modelId;
+}
+
 export const FREE_TIER_OUTPUT_PRICE_BANDS = {
     UNLIMITED_MAX: 2,   // <= $2/1M output → unlimited bots
     // Bumped 5 → 6 with the GPT-5.6 promotion so Luna ($6 output) keeps the 3-bot cap
@@ -610,8 +635,10 @@ export function getFreeTierPolicy(
 }
 
 // Populate each model's freeTier field from price — the single source of truth for free-tier caps.
+// A model that hard-codes `freeTier` on its own entry opts out of price banding and keeps that
+// explicit policy (used when the sticker output price misrepresents real cost — see Kimi K3).
 for (const config of Object.values(SupportedAiModels)) {
-    config.freeTier = getFreeTierPolicy(config.modelApiName, config.hasThinking);
+    config.freeTier = config.freeTier ?? getFreeTierPolicy(config.modelApiName, config.hasThinking);
 }
 
 export interface CostCalculationOptions {

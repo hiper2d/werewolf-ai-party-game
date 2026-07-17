@@ -49,6 +49,11 @@ export interface TokenUsage {
     outputTokens: number;
     totalTokens: number;
     costUSD: number;
+    // Reasoning/thinking tokens, for models that report them. Already counted inside
+    // outputTokens (and therefore in costUSD) — this is the breakdown, not an extra charge.
+    // Omitted entirely rather than set to 0/undefined: Firestore rejects undefined values,
+    // and non-reasoning models have no breakdown to record.
+    reasoningTokens?: number;
 }
 
 export interface GameTokenUsage {

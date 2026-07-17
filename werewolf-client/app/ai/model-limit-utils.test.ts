@@ -2,10 +2,12 @@ import {
     API_KEY_CONSTANTS,
     LLM_CONSTANTS,
     SupportedAiModels,
+    resolveModelId,
 } from './ai-models';
 import { USER_TIERS } from '@/app/api/game-models';
 import {
     assertModelAllowedForApiTier,
+    consumeModelUsage,
     getAvailableModelsForUser,
     getCandidateModelsForTier,
     getModelPickerOptions,
@@ -405,5 +407,89 @@ describe('getModelPickerOptions (single source of truth for every picker)', () =
                 expect(o.suffix).toBeUndefined();
             }
         });
+    });
+});
+
+// Games persist a model ID per bot and per GM, so retired IDs survive in old docs until the
+// Firestore migration runs. Tier validation re-checks EVERY bot in a game, so a single stale ID
+// used to throw "Unsupported AI model" and make the model picker unusable for that whole game —
+// including the attempt to switch the stale bot onto a current model.
+describe('deprecated model IDs in persisted games', () => {
+    const LEGACY_TO_CURRENT: Array<[string, string]> = [
+        ['kimi-thinking', LLM_CONSTANTS.KIMI],
+        ['grok-thinking', LLM_CONSTANTS.GROK_4_5],
+        ['grok-fast', LLM_CONSTANTS.GROK_4_5],
+        ['gpt-5.4', LLM_CONSTANTS.GPT_5_6_TERRA],
+        ['deepseek-chat', LLM_CONSTANTS.DEEPSEEK_V4_FLASH],
+        ['deepseek-reasoner', LLM_CONSTANTS.DEEPSEEK_V4_FLASH_THINKING],
+    ];
+
+    it.each(LEGACY_TO_CURRENT)('resolves %s to a supported model', (legacy, current) => {
+        expect(resolveModelId(legacy)).toBe(current);
+        expect(SupportedAiModels[resolveModelId(legacy)]).toBeDefined();
+    });
+
+    it('passes unknown IDs through untouched', () => {
+        expect(resolveModelId('totally-made-up')).toBe('totally-made-up');
+    });
+
+    it.each(LEGACY_TO_CURRENT)('does not throw on a paid-tier game holding %s', (legacy) => {
+        expect(() =>
+            validateModelUsageForTier(USER_TIERS.PAID, LLM_CONSTANTS.GPT_5_6_LUNA, [legacy], {})
+        ).not.toThrow();
+    });
+
+    it('lets a paid-tier user switch models in a game whose OTHER bot is still on a legacy ID', () => {
+        expect(() =>
+            validateModelUsageForTier(
+                USER_TIERS.PAID,
+                LLM_CONSTANTS.GPT_5_6_LUNA,
+                [LLM_CONSTANTS.GPT_5_6_LUNA, 'kimi-thinking'],
+                {}
+            )
+        ).not.toThrow();
+    });
+
+    it('counts a legacy ID against its replacement free-tier budget, not a separate bucket', () => {
+        // deepseek-flash is unlimited on the free tier, so use a capped model: the legacy
+        // grok IDs both resolve to grok (3 bots/game).
+        const usage: Record<string, number> = {};
+        consumeModelUsage('grok-fast', USER_TIERS.FREE, usage, 'for bots');
+        consumeModelUsage('grok-thinking', USER_TIERS.FREE, usage, 'for bots');
+        consumeModelUsage(LLM_CONSTANTS.GROK_4_5, USER_TIERS.FREE, usage, 'for bots');
+
+        expect(usage[LLM_CONSTANTS.GROK_4_5]).toBe(3);
+        // A 4th would exceed grok's 3-bot free-tier cap.
+        expect(() => consumeModelUsage('grok-fast', USER_TIERS.FREE, usage, 'for bots')).toThrow(
+            /can only be used 3 times per game/
+        );
+    });
+
+    it('still rejects a genuinely unsupported model', () => {
+        expect(() =>
+            validateModelUsageForTier(USER_TIERS.PAID, LLM_CONSTANTS.GPT_5_6_LUNA, ['not-a-model'], {})
+        ).toThrow(/Unsupported AI model/);
+    });
+});
+
+// Kimi K3 always reasons at max effort with ~85-90% of output tokens spent on reasoning, so it
+// opts out of price-derived banding rather than riding the $15 SINGLE_MAX boundary.
+describe('Kimi K3 free-tier policy', () => {
+    it('is not available on the free tier', () => {
+        expect(SupportedAiModels[LLM_CONSTANTS.KIMI].freeTier).toEqual({
+            available: false,
+            maxBotsPerGame: 0,
+        });
+        expect(getCandidateModelsForTier(USER_TIERS.FREE)).not.toContain(LLM_CONSTANTS.KIMI);
+    });
+
+    it('throws for a free-tier game trying to use it', () => {
+        expect(() =>
+            validateModelUsageForTier(USER_TIERS.FREE, LLM_CONSTANTS.KIMI, [], {})
+        ).toThrow(/not available on the free tier/);
+    });
+
+    it('remains selectable on paid tier', () => {
+        expect(getCandidateModelsForTier(USER_TIERS.PAID)).toContain(LLM_CONSTANTS.KIMI);
     });
 });

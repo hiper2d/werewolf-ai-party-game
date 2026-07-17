@@ -6,13 +6,25 @@ import { z } from 'zod';
 import { ZodSchemaConverter } from './zod-schema-converter';
 import { parseAndValidateLlmJson } from './json-response-parser';
 
+// Kimi K3 agent. The Moonshot API is OpenAI-compatible (https://api.moonshot.ai/v1).
+//
+// K3 always reasons: reasoning is on by default, and `reasoning_effort` — whose only accepted
+// value today is "max" — selects the level. We send it explicitly so the model stays pinned at
+// max should Moonshot ship lower levels with a different default. Sending it is otherwise a no-op.
+//
+// The K2-era `thinking: { type: 'disabled' }` toggle does still suppress reasoning on kimi-k3,
+// but it is undocumented for K3 and could disappear without notice, so we don't rely on it: this
+// agent has a single always-reasoning mode. Reasoning surfaces as `message.reasoning_content`,
+// counted in `usage.completion_tokens_details.reasoning_tokens` (already part of completion_tokens).
 export class KimiAgent extends AbstractAgent {
     private readonly client: OpenAI;
-    // Kimi K2.6 enforces a fixed default temperature; do not send the field per Moonshot docs.
+    // kimi-k3 rejects any temperature other than 1, so we never send the field.
     private readonly defaultParams: Omit<Parameters<OpenAI['chat']['completions']['create']>[0], 'messages'> = {
         model: this.model,
         stream: false,
         max_tokens: 16384,  // Set to 16k to handle longer JSON responses
+        // Moonshot's only accepted level; "max" is not in the OpenAI SDK's ReasoningEffort union.
+        reasoning_effort: 'max' as any,
     };
 
     // Log message templates
@@ -61,7 +73,7 @@ export class KimiAgent extends AbstractAgent {
         let thinkingContent = "";
         const message = completion.choices[0]?.message as any;
 
-        if (this.enableThinking && message?.reasoning_content) {
+        if (message?.reasoning_content) {
             thinkingContent = message.reasoning_content;
             this.logger(`Captured reasoning_content (${thinkingContent.length} characters)`);
         }
@@ -70,15 +82,19 @@ export class KimiAgent extends AbstractAgent {
         const usageResult = extractUsageAndCalculateCost(this.model, completion);
 
         if (usageResult) {
+            const reasoningTokens = usageResult.usage.reasoningTokens;
+
             tokenUsage = {
                 inputTokens: usageResult.usage.promptTokens,
                 outputTokens: usageResult.usage.completionTokens,
                 totalTokens: usageResult.usage.totalTokens,
-                costUSD: usageResult.cost
+                costUSD: usageResult.cost,
+                // Only present when reasoning ran; the key is omitted otherwise so we never
+                // hand Firestore an undefined value.
+                ...(reasoningTokens ? { reasoningTokens } : {})
             };
 
-            if (this.enableThinking && usageResult.usage.reasoningTokens) {
-                const reasoningTokens = usageResult.usage.reasoningTokens;
+            if (reasoningTokens) {
                 const finalAnswerTokens = Math.max(0, tokenUsage.outputTokens - reasoningTokens);
                 this.logger(
                     `Output breakdown: ${reasoningTokens} reasoning tokens, ${finalAnswerTokens} final answer tokens`
@@ -126,9 +142,7 @@ export class KimiAgent extends AbstractAgent {
                         response_format: {
                             type: 'json_schema',
                             json_schema: kimiSchema
-                        },
-                        // Kimi K2.6 enables thinking by default; pass explicit type each way.
-                        thinking: { type: this.enableThinking ? 'enabled' : 'disabled' }
+                        }
                     };
 
                     completion = await this.client.chat.completions.create(params) as OpenAI.Chat.Completions.ChatCompletion;
@@ -171,9 +185,7 @@ export class KimiAgent extends AbstractAgent {
                 try {
                     const params: any = {
                         ...this.defaultParams,
-                        messages: openAIMessages,
-                        // Kimi K2.6 enables thinking by default; pass explicit type each way.
-                        thinking: { type: this.enableThinking ? 'enabled' : 'disabled' }
+                        messages: openAIMessages
                     };
 
                     completion = await this.client.chat.completions.create(params) as OpenAI.Chat.Completions.ChatCompletion;
@@ -234,9 +246,7 @@ export class KimiAgent extends AbstractAgent {
             try {
                 const params: any = {
                     ...this.defaultParams,
-                    messages: openAIMessages,
-                    // Kimi K2.6 enables thinking by default; pass explicit type each way.
-                    thinking: { type: this.enableThinking ? 'enabled' : 'disabled' }
+                    messages: openAIMessages
                 };
 
                 completion = await this.client.chat.completions.create(params) as OpenAI.Chat.Completions.ChatCompletion;

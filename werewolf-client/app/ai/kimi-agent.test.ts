@@ -226,7 +226,7 @@ describe("KimiAgent integration", () => {
         console.log("📝 Requesting game story and characters...");
         console.log("Theme:", gamePreview.theme);
         console.log("Players to generate:", botCount);
-        console.log("Model:", "kimi-k2.6");
+        console.log("Model:", "kimi-k3");
         
         // Call askWithZodSchema with GameSetupZodSchema
         const [gameSetup, thinking, tokenUsage] = await gmAgent.askWithZodSchema(

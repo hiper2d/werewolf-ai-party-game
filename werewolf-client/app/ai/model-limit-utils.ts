@@ -1,4 +1,4 @@
-import {LLM_CONSTANTS, SupportedAiModels} from '@/app/ai/ai-models';
+import {LLM_CONSTANTS, SupportedAiModels, resolveModelId} from '@/app/ai/ai-models';
 import {ApiKeyMap, UserTier, USER_TIERS} from '@/app/api/game-models';
 
 export const FREE_TIER_UNLIMITED = Number.POSITIVE_INFINITY;
@@ -12,7 +12,7 @@ export function getPerGameModelLimit(modelName: string, tier: UserTier): number 
         throw new Error('Random AI model selections must be resolved before generating or saving a game.');
     }
 
-    const config = SupportedAiModels[modelName];
+    const config = SupportedAiModels[resolveModelId(modelName)];
     if (!config) {
         throw new Error(`Unsupported AI model: ${modelName}.`);
     }
@@ -35,7 +35,8 @@ export function hasCapacity(modelName: string, tier: UserTier, usageCounts: Reco
         return false;
     }
 
-    const limit = getPerGameModelLimit(modelName, tier);
+    const resolved = resolveModelId(modelName);
+    const limit = getPerGameModelLimit(resolved, tier);
     if (limit === 0) {
         return false;
     }
@@ -44,7 +45,7 @@ export function hasCapacity(modelName: string, tier: UserTier, usageCounts: Reco
         return true;
     }
 
-    const used = usageCounts[modelName] ?? 0;
+    const used = usageCounts[resolved] ?? 0;
     return used < limit;
 }
 
@@ -62,18 +63,19 @@ export function consumeModelUsage(
         throw new Error('Random AI model selections must be resolved before generating or saving a game.');
     }
 
-    const limit = getPerGameModelLimit(modelName, tier);
+    const resolved = resolveModelId(modelName);
+    const limit = getPerGameModelLimit(resolved, tier);
     if (limit === 0) {
-        throw new Error(`The AI model ${modelName} is not available on the free tier ${context}.`);
+        throw new Error(`The AI model ${resolved} is not available on the free tier ${context}.`);
     }
 
-    const used = usageCounts[modelName] ?? 0;
+    const used = usageCounts[resolved] ?? 0;
     if (limit !== FREE_TIER_UNLIMITED && used >= limit) {
         const limitText = limit === 1 ? 'once' : `${limit} times`;
-        throw new Error(`The AI model ${modelName} can only be used ${limitText} per game on the free tier.`);
+        throw new Error(`The AI model ${resolved} can only be used ${limitText} per game on the free tier.`);
     }
 
-    usageCounts[modelName] = used + 1;
+    usageCounts[resolved] = used + 1;
 }
 
 export function getCandidateModelsForTier(tier: UserTier): string[] {
@@ -244,7 +246,7 @@ export function assertModelAllowedForApiTier(
         // Random selections must be resolved before this point; treat as a programming error.
         throw new Error('Random AI model selections must be resolved before validating API tier access.');
     }
-    const config = SupportedAiModels[modelName];
+    const config = SupportedAiModels[resolveModelId(modelName)];
     if (!config) {
         throw new Error(`Unsupported AI model: ${modelName}.`);
     }
@@ -278,7 +280,7 @@ export function validateModelUsageForTier(
             if (model === LLM_CONSTANTS.RANDOM) {
                 throw new Error('Random AI model selections must be resolved before generating or saving a game.');
             }
-            if (!SupportedAiModels[model]) {
+            if (!SupportedAiModels[resolveModelId(model)]) {
                 throw new Error(`Unsupported AI model: ${model}.`);
             }
         }

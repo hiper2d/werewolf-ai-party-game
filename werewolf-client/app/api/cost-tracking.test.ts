@@ -95,6 +95,46 @@ describe('cost-tracking', () => {
             });
         });
 
+        it('accumulates reasoningTokens onto the existing breakdown', async () => {
+            const { txn, gameRef } = setupTransaction({
+                gameMasterTokenUsage: {
+                    inputTokens: 100, outputTokens: 50, totalTokens: 150, costUSD: 0.5, reasoningTokens: 30
+                },
+                totalGameCost: 0.5
+            }, { tier: 'free' });
+
+            await recordGameMasterTokenUsage(gameId, {
+                inputTokens: 10, outputTokens: 20, costUSD: 0.01, reasoningTokens: 15
+            }, userEmail);
+
+            expect(txn.update).toHaveBeenCalledWith(gameRef, expect.objectContaining({
+                gameMasterTokenUsage: expect.objectContaining({ outputTokens: 70, reasoningTokens: 45 })
+            }));
+        });
+
+        it('carries a first-ever reasoningTokens onto a doc that has no breakdown yet', async () => {
+            const { txn, gameRef } = setupTransaction({ totalGameCost: 0 }, { tier: 'free' });
+
+            await recordGameMasterTokenUsage(gameId, {
+                inputTokens: 10, outputTokens: 20, costUSD: 0.01, reasoningTokens: 12
+            }, userEmail);
+
+            expect(txn.update).toHaveBeenCalledWith(gameRef, expect.objectContaining({
+                gameMasterTokenUsage: expect.objectContaining({ reasoningTokens: 12 })
+            }));
+        });
+
+        it('omits reasoningTokens entirely for non-reasoning models (Firestore rejects undefined)', async () => {
+            const { txn, gameRef } = setupTransaction({ totalGameCost: 0 }, { tier: 'free' });
+
+            await recordGameMasterTokenUsage(gameId, {
+                inputTokens: 10, outputTokens: 5, costUSD: 0.01
+            }, userEmail);
+
+            const gameCall = txn.update.mock.calls.find(([ref]: any[]) => ref === gameRef);
+            expect('reasoningTokens' in gameCall[1].gameMasterTokenUsage).toBe(false);
+        });
+
         it('prefers a supplied positive totalTokens over the computed sum', async () => {
             const { txn, gameRef } = setupTransaction({ totalGameCost: 0 }, { tier: 'free' });
 
@@ -289,6 +329,30 @@ describe('cost-tracking', () => {
             expect(write.spendings).toEqual(
                 expect.arrayContaining([expect.objectContaining({ amountUSD: 0.23, paidAmountUSD: 0.23 })])
             );
+        });
+
+        it('accumulates reasoningTokens on the matching bot', async () => {
+            const withReasoning = [
+                {
+                    name: 'Alice',
+                    tokenUsage: { inputTokens: 10, outputTokens: 10, totalTokens: 20, costUSD: 0.1, reasoningTokens: 6 }
+                }
+            ];
+            const { txn, gameRef } = setupTransaction(
+                { bots: JSON.parse(JSON.stringify(withReasoning)), totalGameCost: 0.1 },
+                { tier: 'free' }
+            );
+
+            await recordBotTokenUsage(
+                gameId, 'Alice', { inputTokens: 5, outputTokens: 8, costUSD: 0.2, reasoningTokens: 4 }, userEmail
+            );
+
+            expect(txn.update).toHaveBeenCalledWith(gameRef, expect.objectContaining({
+                bots: [expect.objectContaining({
+                    name: 'Alice',
+                    tokenUsage: expect.objectContaining({ outputTokens: 18, reasoningTokens: 10 })
+                })]
+            }));
         });
 
         it('does not update or charge when the bot is not found', async () => {

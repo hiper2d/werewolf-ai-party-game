@@ -31,16 +31,16 @@ const OLD_TO_NEW: Record<string, string> = {
     'Grok 4.1 Fast Reasoning': 'grok',
     'grok-fast': 'grok',
     'grok-thinking': 'grok',
-    // All Kimi K2-family models collapsed onto kimi-k2.6 (the only remaining model),
-    // exposed via the stable IDs 'kimi' and 'kimi-thinking'.
+    // All Kimi variants collapsed onto the single always-reasoning kimi-k3 ('kimi').
     'Kimi K2': 'kimi',
-    'Kimi K2 (Thinking)': 'kimi-thinking',
+    'Kimi K2 (Thinking)': 'kimi',
     'Kimi K2.5': 'kimi',
-    'Kimi K2.5 (Thinking)': 'kimi-thinking',
+    'Kimi K2.5 (Thinking)': 'kimi',
     'kimi-k2.6': 'kimi',
-    'kimi-k2.6-thinking': 'kimi-thinking',
+    'kimi-k2.6-thinking': 'kimi',
     'kimi-turbo': 'kimi',
-    'kimi-turbo-thinking': 'kimi-thinking',
+    'kimi-turbo-thinking': 'kimi',
+    'kimi-thinking': 'kimi',
     'Random': 'random',
 };
 
