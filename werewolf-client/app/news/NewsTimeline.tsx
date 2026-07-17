@@ -34,6 +34,19 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
     {
+        id: "kimi-k3", date: "Jul 2026", tags: ["Models"],
+        title: "Kimi K3 replaces Kimi K2.6",
+        body: (<>Moonshot&apos;s <strong>Kimi K3</strong> takes over the Kimi slot in the model picker. The separate
+            &ldquo;Thinking&rdquo; variant is gone — K3 <strong>always reasons</strong> before it answers, at full
+            effort — and it brings a <strong>1M-token context window</strong>, so a Kimi bot can hold the whole
+            night-by-night history of a long game. It&apos;s a much pricier model than the K2.6 it replaces, so Kimi
+            is now on the <strong>paid tier only</strong> — no longer available on the free tier. Games already
+            running a Kimi bot have been switched over automatically. Pick it for any bot or the Game Master when
+            you set up a lobby.</>),
+        media: null,
+        links: [{label: "Create a game", href: "/games"}],
+    },
+    {
         id: "gpt-5-6", date: "Jul 2026", tags: ["Models"],
         title: "The GPT-5.6 family arrives: Sol, Terra, and Luna",
         body: (<>OpenAI&apos;s <strong>GPT-5.6</strong> family replaces GPT-5.5 and GPT-5.4-mini.
