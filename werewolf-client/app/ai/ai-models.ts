@@ -491,7 +491,7 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
     [SupportedAiModels[LLM_CONSTANTS.GEMINI_3_FLASH_LITE].modelApiName]: {
         // Cache storage cost ($1.00 / 1M tokens per hour) is not tracked here — the
         // schema only models per-token call costs, not time-based storage.
-        inputPrice: 0.025,
+        inputPrice: 0.25,
         outputPrice: 1.50,
         cacheHitPrice: 0.025
     },
