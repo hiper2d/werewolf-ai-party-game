@@ -7,6 +7,7 @@ import AuthProvider from "@/components/auth-provider";
 import { ThemeProvider } from "@/app/providers/ThemeProvider";
 import { LoginDialogProvider } from "@/app/providers/LoginDialogProvider";
 import LoginDialog from "@/components/login-dialog";
+import WhatsNewPopup from "@/app/news/WhatsNewPopup";
 
 const inter = Inter({
   subsets: ['latin'],
@@ -82,6 +83,7 @@ export default function RootLayout(
                   <div className="flex flex-col h-[100dvh]">
                     <NavBar />
                     <LoginDialog />
+                    <WhatsNewPopup />
                     <main className="flex-1 flex app-shell min-h-0 overflow-auto">
                       <div className="w-full max-w-7xl mx-auto p-2 sm:p-4 lg:p-6">
                         {children}
