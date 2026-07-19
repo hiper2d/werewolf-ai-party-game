@@ -9,7 +9,6 @@ import {
     FREE_TIER_LIMITED_MAX_BOTS,
     FREE_TIER_OUTPUT_PRICE_BANDS,
     getFreeTierPolicy,
-    LLM_CONSTANTS,
 } from '@/app/ai/ai-models';
 
 type BandId = 'unlim' | 'three' | 'one' | 'paid';
@@ -64,23 +63,6 @@ const BAND_META: Record<BandId, BandMeta> = {
 
 const BAND_ORDER: BandId[] = ['unlim', 'three', 'one', 'paid'];
 
-// The paid-only band is ordered by hand (most → least powerful) rather than by price.
-// Keys are SupportedAiModels ids (LLM_CONSTANTS values). Any paid model not listed here
-// falls to the end, price-sorted — so a new paid model still shows up, just append it here
-// to place it deliberately.
-const PAID_BAND_ORDER: string[] = [
-    LLM_CONSTANTS.CLAUDE_FABLE,
-    LLM_CONSTANTS.CLAUDE_4_OPUS_THINKING,
-    LLM_CONSTANTS.CLAUDE_4_OPUS,
-    LLM_CONSTANTS.FUGU_ULTRA,
-    LLM_CONSTANTS.GPT_5_6_SOL,
-    LLM_CONSTANTS.CLAUDE_4_SONNET_THINKING,
-];
-const paidRank = (id: string): number => {
-    const i = PAID_BAND_ORDER.indexOf(id);
-    return i === -1 ? PAID_BAND_ORDER.length : i;
-};
-
 // modelApiNames that have at least one non-thinking config — a thinking entry on one of these is an
 // optional "(Thinking)" variant that pays the reasoning-cost multiplier before banding.
 const NON_THINKING_API_NAMES = new Set(
@@ -115,15 +97,11 @@ function buildBands(): Record<BandId, CatalogModel[]> {
             eff: isOptionalThinking ? pricing.outputPrice * FREE_TIER_THINKING_COST_FACTOR : null,
         });
     }
-    // Within each band, order by output token price, most expensive first (eff breaks ties).
-    // The paid-only band instead uses a hand-set most→least-powerful order; any paid model not
-    // in that list falls to the end by the same output-price-desc rule.
+    // Within each band, order by price, cheapest first: input price, then output price,
+    // then effective output price as the final tiebreak.
     for (const id of BAND_ORDER) {
-        if (id === 'paid') {
-            out[id].sort((a, b) => paidRank(a.id) - paidRank(b.id) || b.price - a.price);
-        } else {
-            out[id].sort((a, b) => b.price - a.price || (b.eff ?? b.price) - (a.eff ?? a.price));
-        }
+        out[id].sort((a, b) =>
+            a.inputPrice - b.inputPrice || a.price - b.price || (a.eff ?? a.price) - (b.eff ?? b.price));
     }
     return out;
 }
