@@ -100,7 +100,7 @@ function buildBands(): Record<BandId, CatalogModel[]> {
         const pricing = MODEL_PRICING[config.modelApiName];
         if (!pricing) continue;
         const isOptionalThinking = config.hasThinking && NON_THINKING_API_NAMES.has(config.modelApiName);
-        const policy = getFreeTierPolicy(config.modelApiName, config.hasThinking);
+        const policy = config.freeTier ?? getFreeTierPolicy(config.modelApiName, config.hasThinking);
         const band = policyToBand(policy.maxBotsPerGame, policy.available);
         out[band].push({
             id,
