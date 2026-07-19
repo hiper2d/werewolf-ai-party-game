@@ -63,12 +63,6 @@ const BAND_META: Record<BandId, BandMeta> = {
 
 const BAND_ORDER: BandId[] = ['unlim', 'three', 'one', 'paid'];
 
-// modelApiNames that have at least one non-thinking config — a thinking entry on one of these is an
-// optional "(Thinking)" variant that pays the reasoning-cost multiplier before banding.
-const NON_THINKING_API_NAMES = new Set(
-    Object.values(SupportedAiModels).filter(c => !c.hasThinking).map(c => c.modelApiName)
-);
-
 function policyToBand(maxBots: number, available: boolean): BandId {
     if (!available) return 'paid';
     if (maxBots === -1) return 'unlim';
@@ -81,7 +75,6 @@ function buildBands(): Record<BandId, CatalogModel[]> {
     for (const [id, config] of Object.entries(SupportedAiModels)) {
         const pricing = MODEL_PRICING[config.modelApiName];
         if (!pricing) continue;
-        const isOptionalThinking = config.hasThinking && NON_THINKING_API_NAMES.has(config.modelApiName);
         const policy = config.freeTier ?? getFreeTierPolicy(config.modelApiName, config.hasThinking);
         const band = policyToBand(policy.maxBotsPerGame, policy.available);
         out[band].push({
@@ -92,9 +85,9 @@ function buildBands(): Record<BandId, CatalogModel[]> {
             cachedPrice: pricing.cacheHitPrice ?? null,
             price: pricing.outputPrice,
             // "eff" = effective output price: the raw output rate scaled up to include the reasoning
-            // (thinking) tokens a reasoning model emits on average. It's the real extra cost of running
-            // the model in thinking mode. Only shown for models where thinking is optional.
-            eff: isOptionalThinking ? pricing.outputPrice * FREE_TIER_THINKING_COST_FACTOR : null,
+            // (thinking) tokens a reasoning model emits on average. Shown for every model that
+            // reasons, whether thinking is optional or always on.
+            eff: config.hasThinking ? pricing.outputPrice * FREE_TIER_THINKING_COST_FACTOR : null,
         });
     }
     // Within each band, order by price, cheapest first: input price, then output price,
