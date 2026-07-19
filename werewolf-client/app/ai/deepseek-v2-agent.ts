@@ -160,7 +160,9 @@ export class DeepSeekV2Agent extends AbstractAgent {
                     inputTokens: usageResult.usage.promptTokens,
                     outputTokens: usageResult.usage.completionTokens,
                     totalTokens: usageResult.usage.totalTokens,
-                    costUSD: usageResult.cost
+                    costUSD: usageResult.cost,
+                    // Omitted when absent so we never hand Firestore an undefined value.
+                    ...(usageResult.usage.reasoningTokens ? { reasoningTokens: usageResult.usage.reasoningTokens } : {})
                 };
             }
 
@@ -235,7 +237,9 @@ export class DeepSeekV2Agent extends AbstractAgent {
                     inputTokens: usageResult.usage.promptTokens,
                     outputTokens: usageResult.usage.completionTokens,
                     totalTokens: usageResult.usage.totalTokens,
-                    costUSD: usageResult.cost
+                    costUSD: usageResult.cost,
+                    // Omitted when absent so we never hand Firestore an undefined value.
+                    ...(usageResult.usage.reasoningTokens ? { reasoningTokens: usageResult.usage.reasoningTokens } : {})
                 };
             }
 

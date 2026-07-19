@@ -232,7 +232,9 @@ export class GrokAgent extends AbstractAgent {
             inputTokens,
             outputTokens,
             totalTokens: inputTokens + outputTokens,
-            costUSD: cost
+            costUSD: cost,
+            // Omitted when zero so we never hand Firestore an undefined value.
+            ...(reasoningTokens > 0 ? { reasoningTokens } : {})
         };
     }
 }

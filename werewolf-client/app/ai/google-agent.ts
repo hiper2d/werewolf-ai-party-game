@@ -249,7 +249,12 @@ export class GoogleAgent extends AbstractAgent {
             let tokenUsage: TokenUsage | undefined;
             if (usageMetadata) {
                 const inputTokens = usageMetadata.promptTokenCount || 0;
-                const outputTokens = usageMetadata.candidatesTokenCount || 0;
+                // candidatesTokenCount is the visible reply only; Gemini bills thinking
+                // tokens at the output rate too, so fold them into outputTokens.
+                // reasoningTokens stays the breakdown inside outputTokens, per the
+                // TokenUsage contract.
+                const reasoningTokens = usageMetadata.thoughtsTokenCount || 0;
+                const outputTokens = (usageMetadata.candidatesTokenCount || 0) + reasoningTokens;
                 const totalTokens = usageMetadata.totalTokenCount || 0;
                 const cacheHitTokens = usageMetadata.cachedContentTokenCount || 0;
 
@@ -260,7 +265,8 @@ export class GoogleAgent extends AbstractAgent {
                     inputTokens,
                     outputTokens,
                     totalTokens,
-                    costUSD
+                    costUSD,
+                    ...(reasoningTokens > 0 ? { reasoningTokens } : {})
                 };
             }
 
@@ -363,7 +369,10 @@ export class GoogleAgent extends AbstractAgent {
             let tokenUsage: TokenUsage | undefined;
             if (usageMetadata) {
                 const inputTokens = usageMetadata.promptTokenCount || 0;
-                const outputTokens = usageMetadata.candidatesTokenCount || 0;
+                // See the schema-path extraction above: fold billed thinking tokens
+                // into outputTokens and keep the breakdown.
+                const reasoningTokens = usageMetadata.thoughtsTokenCount || 0;
+                const outputTokens = (usageMetadata.candidatesTokenCount || 0) + reasoningTokens;
                 const totalTokens = usageMetadata.totalTokenCount || 0;
                 const cacheHitTokens = usageMetadata.cachedContentTokenCount || 0;
 
@@ -373,7 +382,8 @@ export class GoogleAgent extends AbstractAgent {
                     inputTokens,
                     outputTokens,
                     totalTokens,
-                    costUSD
+                    costUSD,
+                    ...(reasoningTokens > 0 ? { reasoningTokens } : {})
                 };
             }
 

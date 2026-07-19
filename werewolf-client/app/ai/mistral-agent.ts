@@ -125,7 +125,9 @@ export class MistralAgent extends AbstractAgent {
             inputTokens: usage.promptTokens,
             outputTokens: usage.completionTokens,
             totalTokens: usage.totalTokens,
-            costUSD
+            costUSD,
+            // Omitted when absent so we never hand Firestore an undefined value.
+            ...(usage.reasoningTokens ? { reasoningTokens: usage.reasoningTokens } : {})
         };
     }
 
