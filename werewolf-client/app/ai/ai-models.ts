@@ -247,16 +247,16 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         tags: ['slow', 'expensive'],
     },
     [LLM_CONSTANTS.GEMINI_3_FLASH]: {
-        displayName: 'Gemini 3.5 Flash',
-        modelApiName: 'gemini-3.5-flash',
+        displayName: 'Gemini 3.6 Flash',
+        modelApiName: 'gemini-3.6-flash',
         apiKeyName: API_KEY_CONSTANTS.GOOGLE,
         hasThinking: true,
         thinkingBudgetTokens: 1024,
         tags: ['fast'],
     },
     [LLM_CONSTANTS.GEMINI_3_FLASH_LITE]: {
-        displayName: 'Gemini 3.1 Flash Lite',
-        modelApiName: 'gemini-3.1-flash-lite',
+        displayName: 'Gemini 3.5 Flash Lite',
+        modelApiName: 'gemini-3.5-flash-lite',
         apiKeyName: API_KEY_CONSTANTS.GOOGLE,
         hasThinking: true,
         thinkingBudgetTokens: 1024,
@@ -485,13 +485,13 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
         // Cache storage cost ($1.00 / 1M tokens per hour) is not tracked here — the
         // schema only models per-token call costs, not time-based storage.
         inputPrice: 1.50,
-        outputPrice: 9.00,
+        outputPrice: 7.50,
         cacheHitPrice: 0.15
     },
     [SupportedAiModels[LLM_CONSTANTS.GEMINI_3_FLASH_LITE].modelApiName]: {
         // Cache storage cost ($1.00 / 1M tokens per hour) is not tracked here — the
         // schema only models per-token call costs, not time-based storage.
-        inputPrice: 0.25,
+        inputPrice: 0.30,
         outputPrice: 1.50,
         cacheHitPrice: 0.025
     },

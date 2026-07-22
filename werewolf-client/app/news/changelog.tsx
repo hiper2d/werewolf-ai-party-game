@@ -13,6 +13,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        id: "gemini-3-6-flash", date: "Jul 2026", tags: ["Models"],
+        title: "Gemini Flash 3.6 and Flash Lite 3.5",
+        body: (<>Google&apos;s Gemini models got a refresh: <strong>Gemini 3.6 Flash</strong> takes over the Flash
+            slot, and <strong>Gemini 3.5 Flash Lite</strong> replaces 3.1 in the Lite slot. Both got
+            <strong> cheaper on output</strong> — Flash drops from $9 to $7.50 per 1M tokens, and Flash Lite from
+            $2.50 to $1.50 (with input up a touch, from $0.25 to $0.30). Same slots, same tiers — your existing
+            games pick up the new versions automatically. Pick them for any bot or the Game Master when you set up
+            a lobby.</>),
+        media: null,
+        links: [{label: "Create a game", href: "/games"}],
+    },
+    {
         id: "kimi-k3", date: "Jul 2026", tags: ["Models"],
         title: "Kimi K3 replaces Kimi K2.6",
         body: (<>Moonshot&apos;s <strong>Kimi K3</strong> takes over the Kimi slot in the model picker. The separate
