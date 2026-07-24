@@ -128,15 +128,15 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
 
     // Claude models - separate with/without thinking versions
     [LLM_CONSTANTS.CLAUDE_4_OPUS]: {
-        displayName: 'Claude 4.8 Opus',
-        modelApiName: 'claude-opus-4-8',
+        displayName: 'Claude 5 Opus',
+        modelApiName: 'claude-opus-5',
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
         hasThinking: false,
         tags: ['expensive'],
     },
     [LLM_CONSTANTS.CLAUDE_4_OPUS_THINKING]: {
-        displayName: 'Claude 4.8 Opus (Thinking)',
-        modelApiName: 'claude-opus-4-8',
+        displayName: 'Claude 5 Opus (Thinking)',
+        modelApiName: 'claude-opus-5',
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
         hasThinking: true,
         reasoningEffort: 'high',

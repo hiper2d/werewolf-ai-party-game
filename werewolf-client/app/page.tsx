@@ -8,7 +8,7 @@ import { CheckIcon, DiscordIcon } from "@/app/components/ui-icons";
 import { DISCORD_URL } from "@/app/config/external-links";
 
 const MODELS = [
-  'Claude 4.8 Opus', 'GPT-5.5', 'Gemini Flash 3.5', 'DeepSeek V4 Pro',
+  'Claude 5 Opus', 'GPT-5.5', 'Gemini Flash 3.5', 'DeepSeek V4 Pro',
   'Mistral 3.5 Medium', 'GLM 5.2', 'Kimi K3', 'Grok 4.5', 'Sakana Fugu',
 ];
 
