@@ -13,6 +13,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        id: "opus-5", date: "Jul 2026", tags: ["Models"],
+        title: "Claude 5 Opus replaces Claude 4.8 Opus",
+        body: (<>Anthropic&apos;s brand-new <strong>Claude 5 Opus</strong> takes over the Opus slot in the model
+            picker, with or without Thinking. It&apos;s the newest flagship in the Claude line — and it&apos;s the
+            <strong> same price</strong> as the 4.8 Opus it replaces, so nothing changes on the tiers. Your
+            existing games pick up the new version automatically. Pick it for any bot or the Game Master when you
+            set up a lobby.</>),
+        media: null,
+        links: [{label: "Create a game", href: "/games"}],
+    },
+    {
         id: "gemini-3-6-flash", date: "Jul 2026", tags: ["Models"],
         title: "Gemini Flash 3.6 and Flash Lite 3.5",
         body: (<>Google&apos;s Gemini models got a refresh: <strong>Gemini 3.6 Flash</strong> takes over the Flash
