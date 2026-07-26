@@ -631,13 +631,33 @@ export async function addMessageToChatAndSaveToDb(gameMessage: GameMessage, game
         const paddedCounter = newCounter.toString().padStart(6, '0'); // Zero-pad to 6 digits for proper sorting
         const customId = `${paddedCounter}-${sanitizedAuthor}-to-${sanitizedRecipient}`;
 
-        // Update game counter
-        await gameRef.update({ messageCounter: newCounter });
+        const timestamp = Date.now();
+        // Sliding TTL: every message refreshes the game's 30-day expiry window, so an
+        // ACTIVE game never ages out mid-story (a fixed creation-time TTL deleted a live
+        // 30-day-old game on 2026-07-23). Stale = 30 days of silence, not 30 days of age.
+        const expireAt = firestore.Timestamp.fromMillis(timestamp + 30 * 24 * 60 * 60 * 1000);
+
+        // Update game counter + slide the game's TTL in the same write
+        await gameRef.update({ messageCounter: newCounter, expireAt });
+
+        // Older messages carry earlier expireAt stamps and would TTL out mid-game once the
+        // game outlives its first 30 days. When the window has moved by more than a day,
+        // batch-refresh all existing messages to the new horizon (bounded: at most one
+        // batch per active day, and only for games that live long enough to need it).
+        const prevExpireMs = gameData?.expireAt?.toMillis?.() ?? 0;
+        if (prevExpireMs && expireAt.toMillis() - prevExpireMs > 24 * 60 * 60 * 1000) {
+            const messagesSnapshot = await db.collection('games').doc(gameId).collection('messages').get();
+            const docs = messagesSnapshot.docs;
+            for (let i = 0; i < docs.length; i += 400) { // Firestore batch limit is 500 ops
+                const batch = db.batch();
+                docs.slice(i, i + 400).forEach((doc: any) => batch.update(doc.ref, { expireAt }));
+                await batch.commit();
+            }
+            logger.info(`⏳ TTL: refreshed expireAt on ${docs.length} messages`, { gameId });
+        }
 
         // Add message with custom ID
         const messageRef = db.collection('games').doc(gameId).collection('messages').doc(customId);
-        const timestamp = Date.now();
-        const expireAt = gameData?.expireAt || firestore.Timestamp.fromMillis(timestamp + 30 * 24 * 60 * 60 * 1000); // Inherit game TTL or default 30 days
         const messageData = {
             ...serializeMessageForFirestore(gameMessage),
             timestamp,
