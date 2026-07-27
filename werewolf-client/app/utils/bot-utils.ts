@@ -21,6 +21,24 @@ export function getAlivePlayerNames(game: Game, excludeName?: string): string {
 }
 
 /**
+ * Resolves the model to use for a player's next AI request, honoring a pending
+ * one-shot modelOverride ("Retry with different model" on the error banner).
+ * Works for bots and the Game Master alike; falls back to the stored model.
+ */
+export function getEffectiveModel(
+    game: Game,
+    playerName: string,
+    baseModel: string,
+    baseThinking?: boolean
+): { aiType: string; enableThinking: boolean } {
+    const override = game.modelOverride;
+    if (override && override.botName === playerName && override.model) {
+        return { aiType: override.model, enableThinking: override.enableThinking ?? false };
+    }
+    return { aiType: baseModel, enableThinking: baseThinking ?? false };
+}
+
+/**
  * Generates a random play style description for a bot
  */
 export function generatePlayStyleDescription(bot: Bot): string {

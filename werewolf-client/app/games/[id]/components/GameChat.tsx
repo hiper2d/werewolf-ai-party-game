@@ -28,7 +28,10 @@ interface GameChatProps {
     onPendingMessagesConsumed?: () => void;
     clearNightMessages?: boolean;
     onErrorHandled?: () => void;
-    onChangeModel?: (botName: string) => void;
+    // One-shot retry: opens the model picker; the chosen model applies to the failed
+    // request only (never changes the bot's stored model). failedName may be a role
+    // name (night hidden roles) or undefined — the server resolves the real target.
+    onRetryWithModel?: (failedName?: string) => void;
     isExternalLoading?: boolean;
     gameControls?: React.ReactNode;
     chatControls?: React.ReactNode;
@@ -379,7 +382,7 @@ function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcludin
     );
 }
 
-export default function GameChat({ gameId, game, runGameAction, onGameStateChange, pendingMessages, onPendingMessagesConsumed, clearNightMessages, onErrorHandled, onChangeModel, isExternalLoading, gameControls, chatControls, onBeforeAction, cancelButton }: GameChatProps) {
+export default function GameChat({ gameId, game, runGameAction, onGameStateChange, pendingMessages, onPendingMessagesConsumed, clearNightMessages, onErrorHandled, onRetryWithModel, isExternalLoading, gameControls, chatControls, onBeforeAction, cancelButton }: GameChatProps) {
     // Without a parent-provided lock, run actions directly (standalone use).
     const runAction = useMemo(
         () => runGameAction ?? (<T,>(action: () => Promise<T>) => action()),
@@ -1541,7 +1544,14 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                         ? game.gameStateParamQueue[0]
                         : game.gameStateProcessQueue[0];
                     const who = failedBot || (game.errorState.context?.botName as string | undefined);
-                    const model = game.errorState.context?.model as string | undefined;
+                    // During NIGHT `who` is a lowercase role name ("doctor") — capitalize for
+                    // display only; callbacks get the raw value.
+                    const displayWho = who ? who.charAt(0).toUpperCase() + who.slice(1) : who;
+                    // During NIGHT, `who` is a role name and showing the failing model could
+                    // identify which bot holds that hidden role — keep the model hidden then.
+                    const model = game.gameState === GAME_STATES.NIGHT
+                        ? undefined
+                        : game.errorState.context?.model as string | undefined;
                     return (
                         <div className="mx-2 my-2 p-3 rounded-[var(--radius-lg)] border bg-[oklch(70%_0.13_25_/_0.08)] border-[oklch(70%_0.13_25_/_0.3)]">
                             <div className="flex items-start gap-2">
@@ -1552,11 +1562,11 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                                 </svg>
                                 <div className="flex-1 min-w-0">
                                     <div className="text-[13px] font-medium text-[var(--fg-0)] break-words">
-                                        {who ? `${who}'s AI model call failed` : 'An AI model call failed'}
+                                        {displayWho ? `${displayWho}'s AI model call failed` : 'An AI model call failed'}
                                     </div>
                                     <div className="text-[12px] mt-1 text-[var(--fg-1)] break-words">
-                                        {who ? `${who} couldn't generate a response` : 'The AI model couldn\'t generate a response'}
-                                        {model ? ` (${getModelDisplayName(model)})` : ''}. You can retry the same model, or switch {who ? `${who}` : 'this bot'} to a different model and try again.
+                                        {displayWho ? `${displayWho} couldn't generate a response` : 'The AI model couldn\'t generate a response'}
+                                        {model ? ` (${getModelDisplayName(model)})` : ''}. You can retry the same model, or retry this one action with a different model — that won&apos;t change anyone&apos;s model permanently.
                                     </div>
                                     <div className="text-[12px] mt-1 text-[var(--fg-2)] break-words">
                                         Keeps happening? Let us know on{' '}
@@ -1583,17 +1593,17 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                                         </svg>
                                         Retry
                                     </button>
-                                    {who && onChangeModel && (
+                                    {onRetryWithModel && (
                                         <button
-                                            onClick={() => onChangeModel(who)}
+                                            onClick={() => onRetryWithModel(who)}
                                             className="px-3 py-1.5 rounded-[var(--radius-md)] bg-[var(--bg-2)] border border-[var(--line-2)] text-[var(--fg-1)] hover:bg-[var(--bg-3)] hover:text-[var(--fg-0)] text-[12px] font-medium transition-all duration-[120ms] flex items-center justify-center gap-1.5"
-                                            title="Switch this bot to a different AI model"
+                                            title="Retry this action once with a different AI model (doesn't change the bot's model)"
                                         >
-                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
                                                 <path d="M12 20h9"/>
                                                 <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
                                             </svg>
-                                            Change model
+                                            <span className="text-left leading-tight">Retry with<br/>different model</span>
                                         </button>
                                     )}
                                 </div>

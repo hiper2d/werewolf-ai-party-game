@@ -15,7 +15,7 @@ import { auth } from "@/auth";
 import { convertToAIMessages } from "@/app/utils/message-utils";
 import { BOT_SYSTEM_PROMPT, BOT_MANIAC_ACTION_PROMPT, STRICT_TARGET_NAME_INSTRUCTION } from "@/app/ai/prompts/bot-prompts";
 import { format } from "@/app/ai/prompts/utils";
-import { generateBotContextSection, getAlivePlayerNames } from "@/app/utils/bot-utils";
+import { generateBotContextSection, getAlivePlayerNames, getEffectiveModel } from "@/app/utils/bot-utils";
 import { ManiacActionZodSchema } from "@/app/ai/prompts/zod-schemas";
 import { recordBotTokenUsage } from "@/app/api/cost-tracking";
 import { getProviderSignatureFields } from "@/app/ai/ai-models";
@@ -104,8 +104,9 @@ export class ManiacProcessor extends BaseRoleProcessor {
                 bot_context: generateBotContextSection(maniacBot, this.game)
             });
 
-            // Create agent
-            const agent = AgentFactory.createAgent(maniacBot.name, maniacPrompt, maniacBot.aiType, apiKeys, maniacBot.enableThinking || false);
+            // Create agent (honors a one-shot "Retry with different model" override)
+            const maniacModel = getEffectiveModel(this.game, maniacBot.name, maniacBot.aiType, maniacBot.enableThinking);
+            const agent = AgentFactory.createAgent(maniacBot.name, maniacPrompt, maniacModel.aiType, apiKeys, maniacModel.enableThinking);
             agent.gameId = this.gameId;
             agent.userId = session.user.email;
 
@@ -206,7 +207,7 @@ export class ManiacProcessor extends BaseRoleProcessor {
                 id: null,
                 recipientName: RECIPIENT_MANIAC,
                 authorName: maniacBot.name,
-                msg: { ...maniacResponse, thinking: thinking || "", ...getProviderSignatureFields(maniacBot.aiType, thinkingSignature) },
+                msg: { ...maniacResponse, thinking: thinking || "", ...getProviderSignatureFields(maniacModel.aiType, thinkingSignature) },
                 messageType: MessageType.MANIAC_ACTION,
                 day: this.game.currentDay,
                 timestamp: Date.now(),

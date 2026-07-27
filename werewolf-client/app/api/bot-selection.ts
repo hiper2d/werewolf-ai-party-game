@@ -14,6 +14,7 @@ import { GmBotSelectionZodSchema } from "@/app/ai/prompts/zod-schemas";
 import { AgentFactory } from "@/app/ai/agent-factory";
 import { format } from "@/app/ai/prompts/utils";
 import { formatMessagesForBotSelection } from "@/app/utils/message-utils";
+import { getEffectiveModel } from "@/app/utils/bot-utils";
 import { addMessageToChatAndSaveToDb, getGameMessages } from "@/app/api/game-actions";
 import { recordGameMasterTokenUsage } from "@/app/api/cost-tracking";
 import { logger } from "@/app/utils/logger";
@@ -135,7 +136,8 @@ export async function selectRespondingBots(
         .map(b => b.name)
         .join(", ");
 
-    const gmAgent = AgentFactory.createAgent(GAME_MASTER, gmPrompt, game.gameMasterAiType, apiKeys, false);
+    const gmModel = getEffectiveModel(game, GAME_MASTER, game.gameMasterAiType);
+    const gmAgent = AgentFactory.createAgent(GAME_MASTER, gmPrompt, gmModel.aiType, apiKeys, gmModel.enableThinking);
     gmAgent.gameId = game.id;
     gmAgent.userId = userEmail;
     const selectionCommand = format(GM_COMMAND_SELECT_RESPONDERS, { candidate_names: candidateNames });

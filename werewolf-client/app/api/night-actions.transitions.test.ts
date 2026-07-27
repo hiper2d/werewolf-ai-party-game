@@ -45,6 +45,7 @@ jest.mock('@/app/api/game-actions', () => ({
     getUserFromFirestore: jest.fn(),
     addMessageToChatAndSaveToDb: jest.fn(),
     setGameErrorState: jest.fn(),
+    consumeModelOverride: jest.fn(async (_gameId: string, game: any) => game),
 }));
 
 jest.mock('@/app/utils/tier-utils', () => ({

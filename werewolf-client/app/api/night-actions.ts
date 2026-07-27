@@ -23,7 +23,7 @@ import {
     ManiacAbduction
 } from "@/app/api/game-models";
 import { auth } from "@/auth";
-import { getGame, addMessageToChatAndSaveToDb } from "./game-actions";
+import { getGame, addMessageToChatAndSaveToDb, consumeModelOverride } from "./game-actions";
 import { RoleProcessorFactory } from "./roles";
 import { withGameErrorHandling } from "@/app/utils/server-action-wrapper";
 import { staleActionNoOp } from "@/app/api/action-guards";
@@ -35,7 +35,7 @@ import { GM_NIGHT_RESULTS_SYSTEM_PROMPT, GM_DAY_SUMMARY_SYSTEM_PROMPT, GM_DAY_SU
 import { GM_COMMAND_GENERATE_NIGHT_RESULTS } from "@/app/ai/prompts/gm-commands";
 import { NightResultsStory } from "@/app/ai/prompts/ai-schemas";
 import { BOT_DAY_SUMMARY_PROMPT, BOT_SYSTEM_PROMPT } from "@/app/ai/prompts/bot-prompts";
-import { generateBotContextSection, generateWerewolfTeammatesSection, getAlivePlayerNames } from "@/app/utils/bot-utils";
+import { generateBotContextSection, generateWerewolfTeammatesSection, getAlivePlayerNames, getEffectiveModel } from "@/app/utils/bot-utils";
 import { format } from "@/app/ai/prompts/utils";
 import { convertToAIMessages, convertMessageContent, formatMessagesForNightSummary } from "@/app/utils/message-utils";
 import { checkGameEndConditions } from "@/app/utils/game-utils";
@@ -144,7 +144,8 @@ async function endNightWithResults(gameId: string, game: Game): Promise<GameActi
        + `\n\n**Narrative Hints:** ${narrativeHintsSummary}`;
 
     // Create Game Master agent with system prompt
-    const gmAgent = AgentFactory.createAgent(GAME_MASTER, gmSystemPrompt, game.gameMasterAiType, apiKeys, false);
+    const gmModel = getEffectiveModel(game, GAME_MASTER, game.gameMasterAiType);
+    const gmAgent = AgentFactory.createAgent(GAME_MASTER, gmSystemPrompt, gmModel.aiType, apiKeys, gmModel.enableThinking);
     gmAgent.gameId = gameId;
     gmAgent.userId = session.user.email;
 
@@ -208,7 +209,7 @@ async function endNightWithResults(gameId: string, game: Game): Promise<GameActi
         id: null,
         recipientName: RECIPIENT_ALL,
         authorName: GAME_MASTER,
-        msg: { story: finalNightResultsMessage, thinking: thinking || "", ...getProviderSignatureFields(game.gameMasterAiType, thinkingSignature) },
+        msg: { story: finalNightResultsMessage, thinking: thinking || "", ...getProviderSignatureFields(gmModel.aiType, thinkingSignature) },
         messageType: MessageType.NIGHT_SUMMARY,
         day: game.currentDay,
         timestamp: Date.now(),
@@ -347,6 +348,11 @@ async function performNightActionImpl(gameId: string): Promise<GameActionRespons
     }
 
     await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: game.createdWithTier });
+
+    // Consume any pending one-shot "Retry with different model" override up front: it is
+    // deleted from the DB now but stays on this in-memory game object, so it applies to
+    // exactly the request being retried and nothing after it.
+    await consumeModelOverride(gameId, game);
 
     // Handle different game states
     if (game.gameState === GAME_STATES.VOTE_RESULTS) {
@@ -1130,6 +1136,10 @@ async function summarizePastDayImpl(gameId: string): Promise<GameActionResponse>
             return staleActionNoOp('summarizePastDay', `game is in ${gameData?.gameState}, not NEW_DAY_BOT_SUMMARIES`, currentGame);
         }
 
+        // One-shot "Retry with different model" override: consume it now so it applies
+        // to exactly this request (it stays on the in-memory currentGame).
+        await consumeModelOverride(gameId, currentGame);
+
         // Get the first bot from the processing queue
         const processQueue = [...(gameData.gameStateProcessQueue || [])];
         if (processQueue.length === 0) {
@@ -1205,9 +1215,10 @@ async function summarizePastDayImpl(gameId: string): Promise<GameActionResponse>
                         day_number: String(currentGame.currentDay)
                     });
 
+                    const gmSummaryModel = getEffectiveModel(currentGame, GAME_MASTER, currentGame.gameMasterAiType);
                     const gmAgent = AgentFactory.createAgent(
                         GAME_MASTER, GM_DAY_SUMMARY_SYSTEM_PROMPT,
-                        currentGame.gameMasterAiType, apiKeys, false
+                        gmSummaryModel.aiType, apiKeys, gmSummaryModel.enableThinking
                     );
                     gmAgent.gameId = gameId;
                     gmAgent.userId = session.user.email;
@@ -1316,7 +1327,8 @@ async function summarizePastDayImpl(gameId: string): Promise<GameActionResponse>
         };
 
         // Create agent
-        const agent = AgentFactory.createAgent(bot.name, botPrompt, bot.aiType, apiKeys, false);
+        const summaryModel = getEffectiveModel(currentGame, bot.name, bot.aiType);
+        const agent = AgentFactory.createAgent(bot.name, botPrompt, summaryModel.aiType, apiKeys, summaryModel.enableThinking);
         agent.gameId = gameId;
         agent.userId = session.user.email;
 
@@ -1393,6 +1405,7 @@ function gameFromFirestore(id: string, data: any): Game {
         gameStateParamQueue: data.gameStateParamQueue,
         gameStateProcessQueue: data.gameStateProcessQueue,
         errorState: data.errorState || null,
+        modelOverride: data.modelOverride || null,
         nightResults: data.nightResults || {},
         previousNightResults: data.previousNightResults || {},
         messageCounter: data.messageCounter || 0,

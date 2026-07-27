@@ -40,6 +40,7 @@ import {
 import {ModelError} from "@/app/ai/errors";
 import {
     addMessageToChatAndSaveToDb,
+    consumeModelOverride,
     getBotMessages,
     getGame,
     getGameMessages,
@@ -53,7 +54,8 @@ import {
     generateBotContextSection,
     generatePlayStyleDescription,
     generateWerewolfTeammatesSection,
-    getAlivePlayerNames
+    getAlivePlayerNames,
+    getEffectiveModel
 } from "@/app/utils/bot-utils";
 import {checkGameEndConditions} from "@/app/utils/game-utils";
 import {getProviderSignatureFields} from "@/app/ai/ai-models";
@@ -302,6 +304,10 @@ function shouldTriggerAutoVote(game: Game): boolean {
             return { game, messages: [] };
         }
 
+        // One-shot "Retry with different model" override: consume it now so it applies
+        // to exactly this request (it stays on the in-memory game object).
+        await consumeModelOverride(gameId, game);
+
         try {
             // If queue is empty, move to DAY_DISCUSSION state
             if (game.gameStateParamQueue.length === 0) {
@@ -332,7 +338,8 @@ function shouldTriggerAutoVote(game: Game): boolean {
     
             const botPrompt = generateBotSystemPrompt(bot, game);
     
-            const agent = AgentFactory.createAgent(bot.name, botPrompt, bot.aiType, apiKeys, false);
+            const welcomeModel = getEffectiveModel(game, bot.name, bot.aiType);
+            const agent = AgentFactory.createAgent(bot.name, botPrompt, welcomeModel.aiType, apiKeys, welcomeModel.enableThinking);
             agent.gameId = gameId;
             agent.userId = session.user.email;
 
@@ -444,7 +451,11 @@ function shouldTriggerAutoVote(game: Game): boolean {
         if (game.gameState !== GAME_STATES.DAY_DISCUSSION && !isAfterGameDiscussion) {
             return staleActionNoOp('talkToAll', `game is in ${game.gameState}, not a discussion state`, game);
         }
-    
+
+        // One-shot "Retry with different model" override: consume it now so it applies
+        // to exactly this request (it stays on the in-memory game object).
+        await consumeModelOverride(gameId, game);
+
         try {
             let newMessages: GameMessage[] = [];
 
@@ -544,6 +555,10 @@ async function keepBotsGoingImpl(gameId: string): Promise<GameActionResponse> {
 
         // Ensure day activity counter is initialized for backward compatibility
         await ensureDayActivityCounter(gameId);
+
+        // One-shot "Retry with different model" override (e.g. after a GM selection
+        // failure): consume it now so it applies to exactly this request.
+        await consumeModelOverride(gameId, game);
 
         // Ask the GM which bots should continue the conversation (without human input)
         const selectedBots = await selectRespondingBots(game, apiKeys, session.user.email);
@@ -724,7 +739,8 @@ async function processNextBotInQueue(
 
     const botPrompt = generateBotSystemPrompt(bot, game);
 
-    const agent = AgentFactory.createAgent(bot.name, botPrompt, bot.aiType, apiKeys, false);
+    const replyModel = getEffectiveModel(game, bot.name, bot.aiType);
+    const agent = AgentFactory.createAgent(bot.name, botPrompt, replyModel.aiType, apiKeys, replyModel.enableThinking);
     agent.gameId = gameId;
     agent.userId = userEmail;
     // Include the GM command in history with playstyle reminder without saving it yet
@@ -747,7 +763,7 @@ async function processNextBotInQueue(
         id: null,
         recipientName: RECIPIENT_ALL,
         authorName: bot.name,
-        msg: { reply: botReply, thinking: thinking || "", ...getProviderSignatureFields(bot.aiType, thinkingSignature) },
+        msg: { reply: botReply, thinking: thinking || "", ...getProviderSignatureFields(replyModel.aiType, thinkingSignature) },
         messageType: MessageType.BOT_ANSWER,
         day: game.currentDay,
         timestamp: Date.now(),
@@ -1037,7 +1053,12 @@ async function voteImpl(gameId: string): Promise<GameActionResponse> {
             if (currentGame.gameState !== GAME_STATES.VOTE) {
                 return staleActionNoOp('vote', `game state changed during processing: ${currentGame.gameState}`, currentGame);
             }
-            
+
+            // One-shot "Retry with different model" override: consume it now so it applies
+            // to exactly this vote request (it stays on the in-memory currentGame).
+            await consumeModelOverride(gameId, currentGame);
+
+
             // Get all alive players for voting options
             const alivePlayerNames = [
                 ...currentGame.bots.filter(b => b.isAlive && b.name !== bot.name).map(b => b.name),
@@ -1086,7 +1107,8 @@ async function voteImpl(gameId: string): Promise<GameActionResponse> {
                 ? `\n**WEREWOLF NOTE — your fellow Werewolves still alive:** ${aliveWerewolfTeammates.join(', ')}. Voting for a teammate is allowed ONLY when it is clearly strategic (e.g., to blend in when the table is already piling on them). Otherwise, do NOT vote for them.`
                 : "";
             
-            const agent = AgentFactory.createAgent(bot.name, botPrompt, bot.aiType, apiKeys, false);
+            const voteModel = getEffectiveModel(currentGame, bot.name, bot.aiType);
+            const agent = AgentFactory.createAgent(bot.name, botPrompt, voteModel.aiType, apiKeys, voteModel.enableThinking);
             agent.gameId = gameId;
             agent.userId = session.user!.email!;
 
@@ -1185,7 +1207,7 @@ async function voteImpl(gameId: string): Promise<GameActionResponse> {
                     who: voteResponse.who,
                     why: voteResponse.why,
                     thinking: thinking || "",
-                    ...getProviderSignatureFields(bot.aiType, thinkingSignature)
+                    ...getProviderSignatureFields(voteModel.aiType, thinkingSignature)
                 },
                 messageType: MessageType.VOTE_MESSAGE,
                 day: currentGame.currentDay,

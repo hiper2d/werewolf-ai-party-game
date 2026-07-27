@@ -15,7 +15,7 @@ import {auth} from "@/auth";
 import {convertToAIMessages} from "@/app/utils/message-utils";
 import {BOT_DETECTIVE_ACTION_PROMPT, BOT_SYSTEM_PROMPT, STRICT_TARGET_NAME_INSTRUCTION} from "@/app/ai/prompts/bot-prompts";
 import {format} from "@/app/ai/prompts/utils";
-import {generateBotContextSection, getAlivePlayerNames} from "@/app/utils/bot-utils";
+import {generateBotContextSection, getAlivePlayerNames, getEffectiveModel} from "@/app/utils/bot-utils";
 import {DetectiveActionZodSchema} from "@/app/ai/prompts/zod-schemas";
 import {recordBotTokenUsage} from "@/app/api/cost-tracking";
 import {getProviderSignatureFields} from "@/app/ai/ai-models";
@@ -202,8 +202,9 @@ export class DetectiveProcessor extends BaseRoleProcessor {
                 bot_context: generateBotContextSection(detectiveBot, this.game)
             });
 
-            // Create agent
-            const agent = AgentFactory.createAgent(detectiveBot.name, detectivePrompt, detectiveBot.aiType, apiKeys, detectiveBot.enableThinking || false);
+            // Create agent (honors a one-shot "Retry with different model" override)
+            const detectiveModel = getEffectiveModel(this.game, detectiveBot.name, detectiveBot.aiType, detectiveBot.enableThinking);
+            const agent = AgentFactory.createAgent(detectiveBot.name, detectivePrompt, detectiveModel.aiType, apiKeys, detectiveModel.enableThinking);
             agent.gameId = this.gameId;
             agent.userId = session.user.email;
 
@@ -294,7 +295,7 @@ export class DetectiveProcessor extends BaseRoleProcessor {
                 ...detectiveResponse,
                 result: resultMessage,
                 thinking: thinking || "",
-                ...getProviderSignatureFields(detectiveBot.aiType, thinkingSignature)
+                ...getProviderSignatureFields(detectiveModel.aiType, thinkingSignature)
             };
 
             const detectiveMessage: GameMessage = {

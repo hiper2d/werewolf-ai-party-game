@@ -12,7 +12,7 @@ import {
 import {AgentFactory} from "@/app/ai/agent-factory";
 import {addMessageToChatAndSaveToDb, getBotMessages} from "@/app/api/game-actions";
 import {getApiKeysForUser} from "@/app/utils/tier-utils";
-import {generateBotContextSection, generateWerewolfTeammatesSection, getAlivePlayerNames} from "@/app/utils/bot-utils";
+import {generateBotContextSection, generateWerewolfTeammatesSection, getAlivePlayerNames, getEffectiveModel} from "@/app/utils/bot-utils";
 import {auth} from "@/auth";
 import {convertToAIMessages} from "@/app/utils/message-utils";
 import {
@@ -200,8 +200,9 @@ export class WerewolfProcessor extends BaseRoleProcessor {
                 bot_context: generateBotContextSection(werewolfBot, this.game)
             });
 
-            // Create agent
-            const agent = AgentFactory.createAgent(werewolfBot.name, werewolfPrompt, werewolfBot.aiType, apiKeys, werewolfBot.enableThinking || false);
+            // Create agent (honors a one-shot "Retry with different model" override)
+            const werewolfModel = getEffectiveModel(this.game, werewolfBot.name, werewolfBot.aiType, werewolfBot.enableThinking);
+            const agent = AgentFactory.createAgent(werewolfBot.name, werewolfPrompt, werewolfModel.aiType, apiKeys, werewolfModel.enableThinking);
             agent.gameId = this.gameId;
             agent.userId = session.user.email;
 
@@ -297,8 +298,8 @@ export class WerewolfProcessor extends BaseRoleProcessor {
             // Create werewolf response message with WEREWOLVES recipient
             // Add thinking content and signature to the response object
             const msgWithThinking = isLastWerewolf
-                ? { ...(werewolfResponse as WerewolfActionZod), thinking: thinking || "", ...getProviderSignatureFields(werewolfBot.aiType, thinkingSignature) }
-                : { ...(werewolfResponse as any), thinking: thinking || "", ...getProviderSignatureFields(werewolfBot.aiType, thinkingSignature) };
+                ? { ...(werewolfResponse as WerewolfActionZod), thinking: thinking || "", ...getProviderSignatureFields(werewolfModel.aiType, thinkingSignature) }
+                : { ...(werewolfResponse as any), thinking: thinking || "", ...getProviderSignatureFields(werewolfModel.aiType, thinkingSignature) };
 
             const werewolfMessage: GameMessage = {
                 id: null,

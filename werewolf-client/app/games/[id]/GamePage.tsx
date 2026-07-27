@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { getGame, updateBotModel, updateGameMasterModel, clearGameErrorState, setGameErrorState, afterGameDiscussion } from "@/app/api/game-actions";
+import { getGame, updateBotModel, updateGameMasterModel, clearGameErrorState, setGameErrorState, afterGameDiscussion, retryWithModelOverride } from "@/app/api/game-actions";
 import { startNewDay, summarizePastDay, selectDayResponders } from "@/app/api/night-actions";
 import GameChat from "@/app/games/[id]/components/GameChat";
 import ModelSelectionDialog from "@/app/games/[id]/components/ModelSelectionDialog";
@@ -59,6 +59,9 @@ function GamePageContent({
     const [game, setGame] = useState(initialGame);
     const [pendingMessages, setPendingMessages] = useState<GameMessage[]>([]);
     const [selectedBot, setSelectedBot] = useState<{ name: string; aiType: string; enableThinking?: boolean } | null>(null);
+    // 'change' permanently updates the bot's model (players list); 'retry' applies the
+    // chosen model to the failed request only (error banner), so hidden roles don't leak.
+    const [modelDialogMode, setModelDialogMode] = useState<'change' | 'retry'>('change');
     const [clearNightMessages, setClearNightMessages] = useState(false);
     const [isKeepGoingLoading, setIsKeepGoingLoading] = useState(false);
     const [showCancel, setShowCancel] = useState(false);
@@ -543,9 +546,26 @@ function GamePageContent({
         }
     };
 
-    const openModelDialog = (botName: string, currentModel: string, enableThinking?: boolean) => {
+    const openModelDialog = (botName: string, currentModel: string, enableThinking?: boolean, mode: 'change' | 'retry' = 'change') => {
+        setModelDialogMode(mode);
         setSelectedBot({ name: botName, aiType: currentModel, enableThinking });
         openModal('modelSelection');
+    };
+
+    // One-shot retry from the error banner: the chosen model is used for the failed
+    // request only; the bot's stored model never changes.
+    const handleRetryWithModel = async (newModel: string, enableThinking?: boolean) => {
+        try {
+            const updatedGame = await runGameAction(() => retryWithModelOverride(game.id, newModel, enableThinking));
+            if (updatedGame) {
+                setGame(updatedGame);
+            }
+        } catch (error) {
+            if (handleGameActionError(error)) {
+                return;
+            }
+            console.error('Error retrying with a different model:', error);
+        }
     };
 
     // Combine human player and bots for participants list
@@ -1218,16 +1238,16 @@ function GamePageContent({
                     onPendingMessagesConsumed={() => setPendingMessages([])}
                     clearNightMessages={clearNightMessages}
                     onErrorHandled={handleErrorCleared}
-                    onChangeModel={(botName: string) => {
-                        const currentModel = botName === 'Game Master'
+                    onRetryWithModel={(failedName?: string) => {
+                        // failedName may be a role name during NIGHT (hidden roles) or
+                        // missing entirely — the server resolves the actual target from
+                        // the persisted error state, so an empty model here is fine.
+                        const currentModel = failedName === 'Game Master'
                             ? game.gameMasterAiType
-                            : game.bots.find(b => b.name === botName)?.aiType;
-                        const enableThinking = botName === 'Game Master'
-                            ? undefined
-                            : game.bots.find(b => b.name === botName)?.enableThinking;
-                        if (currentModel) {
-                            openModelDialog(botName, currentModel, enableThinking);
-                        }
+                            : game.bots.find(b => b.name === failedName)?.aiType;
+                        // Capitalize lowercase night role names ("doctor") for the dialog header.
+                        const displayName = failedName ? failedName.charAt(0).toUpperCase() + failedName.slice(1) : '';
+                        openModelDialog(displayName, currentModel ?? '', undefined, 'retry');
                     }}
                     isExternalLoading={isKeepGoingLoading}
                     gameControls={flowControlsElement}
@@ -1279,8 +1299,10 @@ function GamePageContent({
                 onClose={() => {
                     closeModal('modelSelection');
                     setSelectedBot(null);
+                    setModelDialogMode('change');
                 }}
-                onSelect={handleModelUpdate}
+                onSelect={modelDialogMode === 'retry' ? handleRetryWithModel : handleModelUpdate}
+                mode={modelDialogMode}
                 currentModel={selectedBot?.aiType || ''}
                 botName={selectedBot?.name || ''}
                 gameTier={game.createdWithTier}

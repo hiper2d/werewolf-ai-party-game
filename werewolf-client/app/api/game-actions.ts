@@ -982,6 +982,106 @@ export async function clearGameErrorState(gameId: string): Promise<Game> {
 }
 
 /**
+ * Figures out whose failed AI call a retry should target: the exact agent name from the
+ * error context when the agent reported it, otherwise the head of the queue that was
+ * being processed when the failure happened (paramQueue holds player names during
+ * WELCOME/NIGHT, processQueue elsewhere), otherwise the Game Master for GM-side
+ * failures (night summary / narration) that carry gmAiType in their context.
+ */
+function resolveRetryTarget(game: Game): string | null {
+    const ctx = (game.errorState?.context ?? {}) as Record<string, any>;
+    const isValidTarget = (name: unknown): name is string =>
+        typeof name === 'string' && (name === GAME_MASTER || game.bots.some(b => b.name === name));
+
+    const queueHead = game.gameState === GAME_STATES.WELCOME || game.gameState === GAME_STATES.NIGHT
+        ? game.gameStateParamQueue?.[0]
+        : game.gameStateProcessQueue?.[0];
+
+    const candidates: unknown[] = [
+        ctx.agentName,
+        ctx.botName,
+        queueHead,
+        ctx.gmAiType ? GAME_MASTER : undefined,
+        // Night-results narration runs with an empty process queue — the only actor
+        // that can fail there is the Game Master.
+        game.gameState === GAME_STATES.NIGHT && game.gameStateProcessQueue.length === 0 ? GAME_MASTER : undefined
+    ];
+    for (const candidate of candidates) {
+        if (isValidTarget(candidate)) {
+            return candidate;
+        }
+    }
+    return null;
+}
+
+/**
+ * "Retry with different model": stores a one-shot model override for the player whose
+ * AI call failed and clears the error state in the same write, so the auto-processing
+ * effects re-run the failed action once with the chosen model. The bot's stored aiType
+ * is never changed — nothing shows up in the players list, so a hidden role (maniac,
+ * doctor, detective, werewolf) is not revealed by the retry.
+ */
+export async function retryWithModelOverride(gameId: string, model: string, enableThinking?: boolean): Promise<Game> {
+    const session = await auth();
+    if (!session || !session.user?.email) {
+        throw new Error('Not authenticated');
+    }
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+
+    const gameRef = db.collection('games').doc(gameId);
+    const gameSnap = await gameRef.get();
+    if (!gameSnap.exists) {
+        throw new Error('Game not found');
+    }
+
+    const gameData = gameSnap.data();
+    const {gameTier} = await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: (gameData?.createdWithTier ?? 'free') });
+    const game = gameFromFirestore(gameId, gameData);
+
+    // Stale call (double click / second tab already handled it): nothing to retry.
+    if (!game.errorState) {
+        return game;
+    }
+
+    const target = resolveRetryTarget(game);
+    if (!target) {
+        throw new Error('Could not determine whose action to retry');
+    }
+
+    // Enforce the same tier/usage rules as a permanent model change, with the
+    // override substituted for the target's model.
+    const gmModel = target === GAME_MASTER ? model : game.gameMasterAiType;
+    const botModels = game.bots.map(b => (b.name === target ? model : b.aiType));
+    const { apiKeys } = await getUserTierAndApiKeys(session.user.email);
+    validateModelUsageForTier(gameTier, gmModel, botModels, apiKeys);
+
+    const modelOverride = { botName: target, model, enableThinking: enableThinking ?? false };
+    await gameRef.update({ modelOverride, errorState: null });
+    logger.info(`One-shot model override set for retry`, { gameId, model, gameState: game.gameState });
+
+    return gameFromFirestore(gameId, { ...gameData, modelOverride, errorState: null });
+}
+
+/**
+ * Consumes a pending one-shot model override: deletes it from Firestore BEFORE the AI
+ * call runs (so it applies to exactly one request — if that request fails again, the
+ * next attempt is back on the player's own model) while keeping it on the in-memory
+ * game object so the current request can still honor it via getEffectiveModel.
+ */
+export async function consumeModelOverride(gameId: string, game: Game): Promise<Game> {
+    if (!game.modelOverride) {
+        return game;
+    }
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+    await db.collection('games').doc(gameId).update({ modelOverride: null });
+    return game;
+}
+
+/**
  * Move game to AFTER_GAME_DISCUSSION state
  * This is called when the Game Over button is clicked
  */
@@ -1148,6 +1248,7 @@ function gameFromFirestore(id: string, data: any): Game {
         gameStateParamQueue: data.gameStateParamQueue,
         gameStateProcessQueue: data.gameStateProcessQueue,
         errorState: data.errorState || null,
+        modelOverride: data.modelOverride || null,
         nightResults: data.nightResults || {},
         previousNightResults: data.previousNightResults || {},
         messageCounter: data.messageCounter || 0, // Default to 0 for existing games

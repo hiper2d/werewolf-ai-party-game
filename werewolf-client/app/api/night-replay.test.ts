@@ -20,7 +20,8 @@ jest.mock("./game-actions", () => ({
     getGame: jest.fn(),
     setGameErrorState: jest.fn().mockImplementation((gameId, error) => {
         return { errorState: error };
-    })
+    }),
+    consumeModelOverride: jest.fn(async (_gameId: string, game: any) => game)
 }));
 
 jest.mock("@/app/utils/tier-utils", () => ({

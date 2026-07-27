@@ -22,6 +22,9 @@ interface ModelSelectionDialogProps {
     botName: string;
     gameTier: UserTier;
     usageCounts: Record<string, number>;
+    // 'change' (default) permanently switches the bot's model; 'retry' applies the
+    // chosen model to the failed request only, leaving the bot's model untouched.
+    mode?: 'change' | 'retry';
 }
 
 export default function ModelSelectionDialog({
@@ -30,7 +33,8 @@ export default function ModelSelectionDialog({
     currentModel,
     botName,
     gameTier,
-    usageCounts
+    usageCounts,
+    mode = 'change'
 }: ModelSelectionDialogProps) {
     const { isModalOpen } = useUIControls();
     const isOpen = isModalOpen('modelSelection');
@@ -145,9 +149,13 @@ export default function ModelSelectionDialog({
                 {/* Header */}
                 <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--line-1)]">
                     <div>
-                        <h3 className="text-[16px] font-semibold text-[var(--fg-0)]">Change AI Model</h3>
+                        <h3 className="text-[16px] font-semibold text-[var(--fg-0)]">
+                            {mode === 'retry' ? 'Retry with a Different Model' : 'Change AI Model'}
+                        </h3>
                         <p className="text-[12px] text-[var(--fg-2)] mt-0.5">
-                            {botName} &middot; Currently: <span className="font-mono">{getModelDisplayName(currentModel)}</span>
+                            {mode === 'retry'
+                                ? <>{botName ? <>{botName} &middot; </> : null}one-time retry &mdash; no player&apos;s model is changed</>
+                                : <>{botName} &middot; Currently: <span className="font-mono">{getModelDisplayName(currentModel)}</span></>}
                         </p>
                     </div>
                     <button onClick={onClose} className="w-8 h-8 rounded-[var(--radius-md)] hover:bg-[var(--bg-3)] text-[var(--fg-2)] flex items-center justify-center transition-colors duration-[120ms]">
@@ -237,7 +245,9 @@ export default function ModelSelectionDialog({
                         disabled={isUpdating || selectedModel === currentModel}
                         className={`px-4 py-2 text-[13px] font-medium rounded-[var(--radius-md)] bg-[var(--accent)] text-[var(--on-accent)] hover:brightness-110 transition-all duration-[120ms] ${isUpdating || selectedModel === currentModel ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
-                        {isUpdating ? 'Updating...' : 'Apply'}
+                        {isUpdating
+                            ? (mode === 'retry' ? 'Retrying...' : 'Updating...')
+                            : (mode === 'retry' ? 'Retry' : 'Apply')}
                     </button>
                 </div>
             </div>

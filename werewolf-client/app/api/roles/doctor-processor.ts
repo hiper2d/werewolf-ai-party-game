@@ -8,7 +8,7 @@ import { auth } from "@/auth";
 import { convertToAIMessages } from "@/app/utils/message-utils";
 import { BOT_SYSTEM_PROMPT, BOT_DOCTOR_ACTION_PROMPT, STRICT_TARGET_NAME_INSTRUCTION } from "@/app/ai/prompts/bot-prompts";
 import { format } from "@/app/ai/prompts/utils";
-import { generateBotContextSection, getAlivePlayerNames } from "@/app/utils/bot-utils";
+import { generateBotContextSection, getAlivePlayerNames, getEffectiveModel } from "@/app/utils/bot-utils";
 import { DoctorActionZodSchema } from "@/app/ai/prompts/zod-schemas";
 import { DoctorAction } from "@/app/ai/prompts/ai-schemas";
 import { recordBotTokenUsage } from "@/app/api/cost-tracking";
@@ -166,8 +166,9 @@ export class DoctorProcessor extends BaseRoleProcessor {
                 bot_context: generateBotContextSection(doctorBot, this.game)
             });
 
-            // Create agent
-            const agent = AgentFactory.createAgent(doctorBot.name, doctorPrompt, doctorBot.aiType, apiKeys, doctorBot.enableThinking || false);
+            // Create agent (honors a one-shot "Retry with different model" override)
+            const doctorModel = getEffectiveModel(this.game, doctorBot.name, doctorBot.aiType, doctorBot.enableThinking);
+            const agent = AgentFactory.createAgent(doctorBot.name, doctorPrompt, doctorModel.aiType, apiKeys, doctorModel.enableThinking);
             agent.gameId = this.gameId;
             agent.userId = session.user.email;
 
@@ -297,7 +298,7 @@ export class DoctorProcessor extends BaseRoleProcessor {
                 id: null,
                 recipientName: RECIPIENT_DOCTOR,
                 authorName: doctorBot.name,
-                msg: { ...doctorResponse, thinking: thinking || "", ...getProviderSignatureFields(doctorBot.aiType, thinkingSignature) },
+                msg: { ...doctorResponse, thinking: thinking || "", ...getProviderSignatureFields(doctorModel.aiType, thinkingSignature) },
                 messageType: MessageType.DOCTOR_ACTION,
                 day: this.game.currentDay,
                 timestamp: Date.now(),
