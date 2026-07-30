@@ -402,7 +402,7 @@ export interface ModelPricing {
 /**
  * Centralized pricing configuration for all AI models
  * All prices are per million (1,000,000) tokens
- * Updated as of April 2026
+ * Updated as of July 2026
  */
 export const MODEL_PRICING: Record<string, ModelPricing> = {
     // OpenAI GPT-5.6 models
@@ -412,14 +412,22 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
         cacheHitPrice: 0.500
     },
     [SupportedAiModels[LLM_CONSTANTS.GPT_5_6_TERRA].modelApiName]: {
-        inputPrice: 2.500,
-        outputPrice: 15.000,
-        cacheHitPrice: 0.250
+        inputPrice: 2.000,
+        outputPrice: 12.000,
+        cacheHitPrice: 0.200,
+        extendedContextInputPrice: 4.000,
+        extendedContextOutputPrice: 18.000,
+        extendedContextCacheHitPrice: 0.400,
+        extendedContextThresholdTokens: 272_000
     },
     [SupportedAiModels[LLM_CONSTANTS.GPT_5_6_LUNA].modelApiName]: {
-        inputPrice: 1.000,
-        outputPrice: 6.000,
-        cacheHitPrice: 0.100
+        inputPrice: 0.200,
+        outputPrice: 1.200,
+        cacheHitPrice: 0.020,
+        extendedContextInputPrice: 0.400,
+        extendedContextOutputPrice: 1.800,
+        extendedContextCacheHitPrice: 0.040,
+        extendedContextThresholdTokens: 272_000
     },
 
     // DeepSeek V4 models
@@ -585,8 +593,8 @@ export function resolveModelId(modelId: string): string {
 
 export const FREE_TIER_OUTPUT_PRICE_BANDS = {
     UNLIMITED_MAX: 2,   // <= $2/1M output → unlimited bots
-    // Bumped 5 → 6 with the GPT-5.6 promotion so Luna ($6 output) keeps the 3-bot cap
-    // its predecessor gpt-5.4-mini had. Grok 4.5 ($6 output) rides along 1 → 3 bots.
+    // Bumped 5 → 6 with the GPT-5.6 promotion; Luna has since dropped to $1.20 output
+    // (unlimited band), so Grok 4.5 ($6 output) is now what holds this band at 6.
     LIMITED_MAX: 6,     // <= $6 → up to LIMITED_MAX_BOTS bots
     SINGLE_MAX: 15,     // <= $15 → 1 bot; above → not available on free tier
 } as const;
