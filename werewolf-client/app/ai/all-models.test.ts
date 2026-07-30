@@ -1,5 +1,18 @@
 /**
- * Integration test: sends a welcome request through AgentFactory for every model.
+ * Integration test: runs every model through a realistic day-2 VOTE request,
+ * built with the exact production code path (system prompt with full game
+ * context, real message-history conversion, real vote command). The scenario
+ * is reconstructed from a real production game — see
+ * test-fixtures/day2-vote-fixture.ts.
+ *
+ * Each model plays Kenji (villager, alive) on day 2: the context contains the
+ * day-1 discussion summary, the full day-1 voting history, the night-1
+ * narrative (detective killed), two dead players, and a 20+ message day-2
+ * discussion in which the room turns on Kenji — five votes are already cast,
+ * all against him. The model votes 6th of 8 as the mob's cornered target and
+ * must still return a valid candidate — alive players only, self excluded.
+ * This recreates a real prod failure where a cornered bot voted for itself.
+ *
  * Skips models whose API key is not set in the environment.
  *
  * Run:  npm test -- --testPathPattern=all-models
@@ -13,11 +26,24 @@ dotenv.config();
 
 import { AgentFactory } from "@/app/ai/agent-factory";
 import { LLM_CONSTANTS, SupportedAiModels, API_KEY_CONSTANTS } from "@/app/ai/ai-models";
-import { ApiKeyMap, AIMessage, GAME_ROLES, PLAY_STYLES } from "@/app/api/game-models";
-import { BotAnswerZodSchema } from "@/app/ai/prompts/zod-schemas";
-import { BOT_SYSTEM_PROMPT } from "@/app/ai/prompts/bot-prompts";
+import { ApiKeyMap, AIMessage, GAME_MASTER, GAME_ROLES, GameMessage, MessageType } from "@/app/api/game-models";
+import { BotVoteZodSchema } from "@/app/ai/prompts/zod-schemas";
+import { BOT_SYSTEM_PROMPT, BOT_VOTE_PROMPT, BOT_REMINDER_POSTFIX } from "@/app/ai/prompts/bot-prompts";
 import { GM_COMMAND_INTRODUCE_YOURSELF } from "@/app/ai/prompts/gm-commands";
 import { format } from "@/app/ai/prompts/utils";
+import { convertToAIMessages } from "@/app/utils/message-utils";
+import {
+    generateBotContextSection,
+    generateWerewolfTeammatesSection,
+    generatePlayStyleDescription,
+} from "@/app/utils/bot-utils";
+import {
+    DAY2_VOTE_GAME,
+    DAY2_MESSAGES,
+    TEST_BOT_NAME,
+    VALID_VOTE_TARGETS,
+    INVALID_VOTE_TARGETS,
+} from "@/app/ai/test-fixtures/day2-vote-fixture";
 
 // Map from API_KEY_CONSTANTS values to env var names
 const ENV_KEY_MAP: Record<string, string> = {
@@ -71,7 +97,63 @@ const allModels = Object.entries(LLM_CONSTANTS)
     .filter(([key]) => key !== 'RANDOM')
     .map(([key, value]) => ({ key, llmType: value }));
 
-describe("All models - welcome request via AgentFactory", () => {
+// ---------------------------------------------------------------------------
+// Day-2 vote scenario, built with the same code path as bot-actions.ts vote():
+// system prompt (with generateBotContextSection), getBotMessages-shaped
+// message log, BOT_VOTE_PROMPT command with playstyle reminder,
+// convertToAIMessages, askWithZodSchema(BotVoteZodSchema).
+// ---------------------------------------------------------------------------
+
+const kenji = DAY2_VOTE_GAME.bots.find(b => b.name === TEST_BOT_NAME)!;
+
+// Mirrors bot-actions.ts vote(): alive bots minus self, plus the human player
+const alivePlayerNames = [
+    ...DAY2_VOTE_GAME.bots.filter(b => b.isAlive && b.name !== kenji.name).map(b => b.name),
+    DAY2_VOTE_GAME.humanPlayerName,
+];
+
+const voteSystemPrompt = format(BOT_SYSTEM_PROMPT, {
+    name: kenji.name,
+    personal_story: kenji.story,
+    play_style: "",
+    role: kenji.role,
+    human_player_name: DAY2_VOTE_GAME.humanPlayerName,
+    werewolf_teammates_section: generateWerewolfTeammatesSection(kenji, DAY2_VOTE_GAME),
+    players_names: alivePlayerNames.join(", "),
+    dead_players_names_with_roles: DAY2_VOTE_GAME.bots
+        .filter(b => !b.isAlive)
+        .map(b => `${b.name} (${b.role})`)
+        .join(", "),
+    bot_context: generateBotContextSection(kenji, DAY2_VOTE_GAME),
+});
+
+const validTargetsList = alivePlayerNames.map(n => `- ${n}`).join("\n");
+
+// 5 votes are already on the table in the fixture — all against Kenji.
+// He votes 6th of 8 as the mob's target; the model must still pick a valid
+// candidate (never itself, never a dead player).
+const voteCommand: GameMessage = {
+    id: null,
+    recipientName: kenji.name,
+    authorName: GAME_MASTER,
+    msg: format(BOT_VOTE_PROMPT, {
+        bot_name: kenji.name,
+        vote_position: "6",
+        total_voters: "8",
+        valid_targets: validTargetsList,
+        werewolf_vote_note: "",
+    }) + format(BOT_REMINDER_POSTFIX, {
+        play_style: generatePlayStyleDescription(kenji),
+        human_player_name: DAY2_VOTE_GAME.humanPlayerName,
+    }),
+    messageType: MessageType.GM_COMMAND,
+    day: DAY2_VOTE_GAME.currentDay,
+    timestamp: Date.now(),
+};
+
+const voteHistory: AIMessage[] = convertToAIMessages(kenji.name, [...DAY2_MESSAGES, voteCommand]);
+
+describe("All models - day 2 vote with full game context", () => {
     for (const { key, llmType } of allModels) {
         const config = SupportedAiModels[llmType];
         if (!config) {
@@ -87,24 +169,28 @@ describe("All models - welcome request via AgentFactory", () => {
             continue;
         }
 
-        it(`${config.displayName} (${llmType}) should respond to welcome`, async () => {
+        it(`${config.displayName} (${llmType}) should cast a valid day-2 vote`, async () => {
             const agent = AgentFactory.createAgent(
-                BOT_NAME,
-                systemPrompt,
+                kenji.name,
+                voteSystemPrompt,
                 llmType,
                 apiKeys,
             );
 
             const [response, thinking, tokenUsage] = await agent.askWithZodSchema(
-                BotAnswerZodSchema,
-                messages,
+                BotVoteZodSchema,
+                voteHistory,
             );
 
-            // Response must be valid
+            // Response must match the vote schema
             expect(response).toBeDefined();
-            expect(response).toHaveProperty('reply');
-            expect(typeof response.reply).toBe('string');
-            expect(response.reply.length).toBeGreaterThan(0);
+            expect(typeof response.who).toBe('string');
+            expect(typeof response.why).toBe('string');
+            expect(response.why.length).toBeGreaterThan(0);
+
+            // The target must be a live candidate — never a dead player, never self
+            expect(INVALID_VOTE_TARGETS).not.toContain(response.who);
+            expect(VALID_VOTE_TARGETS).toContain(response.who);
 
             // Token usage should be present
             expect(tokenUsage).toBeDefined();
@@ -112,10 +198,10 @@ describe("All models - welcome request via AgentFactory", () => {
             expect(tokenUsage!.outputTokens).toBeGreaterThan(0);
 
             console.log(
-                `✅ ${config.displayName}: "${response.reply.substring(0, 80)}..." ` +
+                `✅ ${config.displayName} votes ${response.who}: "${response.why.substring(0, 100)}..." ` +
                 `(${tokenUsage!.totalTokens} tokens, $${tokenUsage!.costUSD.toFixed(4)})`
             );
-        }, 120000); // 2 min per model — thinking models can be slow
+        }, 180000); // 3 min per model — large context + thinking models can be slow
     }
 });
 

@@ -13,6 +13,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        id: "full-game-video", date: "Jul 2026", tags: ["Guides"],
+        title: "New video: a full day and night of play",
+        body: (<>The second tutorial video is up — a real round against <strong>11 AI bots</strong>, played
+            start to finish: the day discussion, the vote, and the night phase with special roles acting in
+            order. If you want to see what a game actually feels like before creating one, this is the one
+            to watch. Also available on the rules page alongside the other tutorials.</>),
+        media: {label: "youtube · full day and night", youtubeId: "cPpwOJtGilQ"},
+        links: [{label: "Create a game", href: "/games"}, {label: "Read the rules", href: "/rules"}],
+    },
+    {
         id: "opus-5", date: "Jul 2026", tags: ["Models"],
         title: "Claude 5 Opus replaces Claude 4.8 Opus",
         body: (<>Anthropic&apos;s brand-new <strong>Claude 5 Opus</strong> takes over the Opus slot in the model
