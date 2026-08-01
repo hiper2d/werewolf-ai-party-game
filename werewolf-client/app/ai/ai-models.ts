@@ -397,6 +397,24 @@ export interface ModelPricing {
     extendedContextOutputPrice?: number; // Optional: Price per million output tokens when context exceeds threshold
     extendedContextCacheHitPrice?: number; // Optional: Price per million cached tokens for extended contexts
     extendedContextThresholdTokens?: number; // Optional: Threshold at which extended pricing applies
+    peakPricing?: PeakPricing; // Optional: time-of-day surcharge (e.g. DeepSeek peak-valley pricing)
+}
+
+/**
+ * Time-of-day surcharge applied to all billing items (input, output, cache) when the
+ * request falls inside one of the UTC windows. Free-tier banding intentionally ignores
+ * this and uses the regular (off-peak) output price.
+ */
+export interface PeakPricing {
+    multiplier: number; // e.g. 2 → peak-hour prices are double the regular price
+    windowsUtc: Array<[number, number]>; // [startHour, endHour) pairs in UTC, e.g. [[1, 4], [6, 10]]
+}
+
+/** True if the timestamp's UTC time-of-day falls inside any [startHour, endHour) window. */
+export function isInPeakWindow(timestampMs: number, windowsUtc: Array<[number, number]>): boolean {
+    const d = new Date(timestampMs);
+    const hour = d.getUTCHours() + d.getUTCMinutes() / 60;
+    return windowsUtc.some(([start, end]) => hour >= start && hour < end);
 }
 
 /**
@@ -431,6 +449,10 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
     },
 
     // DeepSeek V4 models
+    // DeepSeek has announced peak-valley pricing (2× on all billing items during UTC 1:00–4:00
+    // and 6:00–10:00) but no effective date yet ("subject to official notice"). When it lands,
+    // add to both entries:  peakPricing: { multiplier: 2, windowsUtc: [[1, 4], [6, 10]] }
+    // Free-tier bands are unaffected either way — even at 2× both models stay in their bands.
     [SupportedAiModels[LLM_CONSTANTS.DEEPSEEK_V4_FLASH].modelApiName]: {
         inputPrice: 0.14,
         outputPrice: 0.28,
@@ -653,6 +675,7 @@ export interface CostCalculationOptions {
     cacheHitTokens?: number;
     contextTokens?: number;
     totalTokens?: number;
+    timestamp?: number; // When the request was billed; defaults to now. Only affects peakPricing models.
 }
 
 /**
@@ -699,6 +722,15 @@ export function calculateModelCost(
         activeCachePrice = pricing.extendedContextCacheHitPrice ?? pricing.cacheHitPrice ?? activeInputPrice;
     } else if (pricing.cacheHitPrice !== undefined) {
         activeCachePrice = pricing.cacheHitPrice;
+    }
+
+    if (
+        pricing.peakPricing &&
+        isInPeakWindow(options.timestamp ?? Date.now(), pricing.peakPricing.windowsUtc)
+    ) {
+        activeInputPrice *= pricing.peakPricing.multiplier;
+        activeOutputPrice *= pricing.peakPricing.multiplier;
+        activeCachePrice *= pricing.peakPricing.multiplier;
     }
 
     // Calculate costs

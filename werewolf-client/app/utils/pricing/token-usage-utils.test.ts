@@ -108,13 +108,73 @@ describe('Token Usage Utils', () => {
 
         it('should return 0 for unknown models', () => {
             const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
-            
+
             const cost = calculateCost('unknown-model', 1000, 500);
-            
+
             expect(cost).toBe(0);
             expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('No pricing information available'));
-            
+
             consoleSpy.mockRestore();
+        });
+
+        describe('peak-valley pricing', () => {
+            // No real model has peakPricing active yet (DeepSeek's effective date is pending),
+            // so exercise the mechanism through a temporary entry.
+            const TEST_MODEL = 'test-peak-model';
+
+            beforeAll(() => {
+                MODEL_PRICING[TEST_MODEL] = {
+                    inputPrice: 1.0,
+                    outputPrice: 2.0,
+                    cacheHitPrice: 0.1,
+                    peakPricing: { multiplier: 2, windowsUtc: [[1, 4], [6, 10]] }
+                };
+            });
+
+            afterAll(() => {
+                delete MODEL_PRICING[TEST_MODEL];
+            });
+
+            const at = (hour: number, minute = 0) => Date.UTC(2026, 7, 1, hour, minute);
+
+            it('doubles all billing items inside a peak window', () => {
+                const cost = calculateCost(TEST_MODEL, 1_000_000, 500_000, {
+                    cacheHitTokens: 500_000,
+                    timestamp: at(2, 30)
+                });
+                // 500k uncached @ $2 + 500k cached @ $0.20 + 500k output @ $4
+                expect(cost).toBeCloseTo(1.0 + 0.1 + 2.0, 5);
+            });
+
+            it('charges regular prices outside peak windows', () => {
+                const cost = calculateCost(TEST_MODEL, 1_000_000, 500_000, {
+                    cacheHitTokens: 500_000,
+                    timestamp: at(5, 0)
+                });
+                expect(cost).toBeCloseTo(0.5 + 0.05 + 1.0, 5);
+            });
+
+            it('treats windows as [start, end): start hour is peak, end hour is not', () => {
+                const offPeak = calculateCost(TEST_MODEL, 1_000_000, 0, { timestamp: at(5) });
+                expect(calculateCost(TEST_MODEL, 1_000_000, 0, { timestamp: at(1) })).toBeCloseTo(offPeak * 2, 5);
+                expect(calculateCost(TEST_MODEL, 1_000_000, 0, { timestamp: at(3, 59) })).toBeCloseTo(offPeak * 2, 5);
+                expect(calculateCost(TEST_MODEL, 1_000_000, 0, { timestamp: at(4) })).toBeCloseTo(offPeak, 5);
+                expect(calculateCost(TEST_MODEL, 1_000_000, 0, { timestamp: at(6) })).toBeCloseTo(offPeak * 2, 5);
+                expect(calculateCost(TEST_MODEL, 1_000_000, 0, { timestamp: at(10) })).toBeCloseTo(offPeak, 5);
+            });
+
+            it('defaults to the current time when no timestamp is given', () => {
+                const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(at(7));
+                const cost = calculateCost(TEST_MODEL, 1_000_000, 0);
+                nowSpy.mockRestore();
+                expect(cost).toBeCloseTo(2.0, 5);
+            });
+
+            it('ignores peak windows for models without peakPricing', () => {
+                const pricing = MODEL_PRICING['deepseek-v4-flash'];
+                const peak = calculateCost('deepseek-v4-flash', 1_000_000, 0, { timestamp: at(2) });
+                expect(peak).toBeCloseTo(pricing.inputPrice, 5);
+            });
         });
     });
 
