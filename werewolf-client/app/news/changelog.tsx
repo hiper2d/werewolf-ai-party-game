@@ -13,6 +13,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        id: "qwen-minimax", date: "Aug 2026", tags: ["Models"],
+        title: "Two new providers: Qwen and MiniMax",
+        body: (<>The roster grows to <strong>11 providers</strong>. Alibaba&apos;s Qwen arrives with three
+            models: <strong>Qwen3.8 Max</strong> — the brand-new 2.4-trillion-parameter flagship with a 1M-token
+            context window — plus the balanced <strong>Qwen3.7 Plus</strong> and the very cheap
+            <strong> Qwen3.7 Flash</strong>. Joining them is <strong>MiniMax M3</strong>, a 1M-context reasoner
+            with adaptive thinking. All four think before every answer; we tuned their reasoning budgets so
+            turns stay bearable — expect them among the slower, more deliberate bots at the table. On the free
+            tier: Flash is unlimited, Plus and M3 seat up to 3 bots per game, and Max is 1 per game.</>),
+        media: null,
+        links: [{label: "Create a game", href: "/games"}, {label: "See all models", href: "/models"}],
+    },
+    {
         id: "full-game-video", date: "Jul 2026", tags: ["Guides"],
         title: "New video: a full day and night of play",
         body: (<>The second tutorial video is up — a real round against <strong>11 AI bots</strong>, played
