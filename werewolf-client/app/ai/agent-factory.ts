@@ -10,6 +10,8 @@ import { GrokAgent } from "@/app/ai/grok-agent";
 import { KimiAgent } from "@/app/ai/kimi-agent";
 import { GlmAgent } from "@/app/ai/glm-agent";
 import { FuguAgent } from "@/app/ai/fugu-agent";
+import { QwenAgent } from "@/app/ai/qwen-agent";
+import { MiniMaxAgent } from "@/app/ai/minimax-agent";
 
 export class AgentFactory {
 
@@ -70,6 +72,16 @@ export class AgentFactory {
             // Sakana Fugu models — always-on reasoning, no temperature (ignored by the model)
             case LLM_CONSTANTS.FUGU_ULTRA:
                 return new FuguAgent(name, instruction, model.modelApiName, key, shouldEnableThinking);
+
+            // Qwen models — thinking-only (enable_thinking always sent)
+            case LLM_CONSTANTS.QWEN_MAX:
+            case LLM_CONSTANTS.QWEN_PLUS:
+            case LLM_CONSTANTS.QWEN_FLASH:
+                return new QwenAgent(name, instruction, model.modelApiName, key, model.temperature!, shouldEnableThinking);
+
+            // MiniMax M3 — adaptive thinking (the model decides per-request)
+            case LLM_CONSTANTS.MINIMAX:
+                return new MiniMaxAgent(name, instruction, model.modelApiName, key, model.temperature!, shouldEnableThinking);
             default:
                 throw new Error(`Unknown Key: ${modelName}`);
         }

@@ -10,6 +10,7 @@ const TAG_STYLES: Record<ModelTag, { text: string; border: string; bg: string; l
     'very-fast': { text: 'var(--tag-fast-text)', border: 'var(--tag-fast-border)', bg: 'var(--tag-fast-bg)', label: 'very fast' },
     fast: { text: 'var(--tag-fast-text)', border: 'var(--tag-fast-border)', bg: 'var(--tag-fast-bg)', label: 'fast' },
     slow: { text: 'var(--tag-std-text)', border: 'var(--tag-std-border)', bg: 'var(--tag-std-bg)', label: 'slow' },
+    'very-slow': { text: 'var(--warn-fg)', border: 'var(--warn-line)', bg: 'var(--warn-soft)', label: 'very slow' },
     'extremely-slow': { text: 'var(--danger)', border: 'oklch(70% 0.13 25 / 0.3)', bg: 'oklch(70% 0.13 25 / 0.08)', label: 'extremely slow' },
     cheap: { text: 'var(--tag-fast-text)', border: 'var(--tag-fast-border)', bg: 'var(--tag-fast-bg)', label: 'cheap' },
     expensive: { text: 'var(--tag-std-text)', border: 'var(--tag-std-border)', bg: 'var(--tag-std-bg)', label: 'expensive' },
@@ -84,7 +85,7 @@ export default function ModelSelectionDialog({
         const providerNames: Record<string, string> = {
             ANTHROPIC_API_KEY: 'Anthropic', OPENAI_API_KEY: 'OpenAI', GOOGLE_API_KEY: 'Google',
             DEEPSEEK_API_KEY: 'DeepSeek', GROK_API_KEY: 'Grok', MISTRAL_API_KEY: 'Mistral', MOONSHOT_API_KEY: 'Moonshot',
-            Z_AI_API_KEY: 'Z.AI', FUGU_API_KEY: 'Sakana Fugu'
+            Z_AI_API_KEY: 'Z.AI', FUGU_API_KEY: 'Sakana Fugu', QWEN_API_KEY: 'Qwen', MINIMAX_API_KEY: 'MiniMax'
         };
         for (const opt of modelOptions) {
             const config = SupportedAiModels[opt.model];

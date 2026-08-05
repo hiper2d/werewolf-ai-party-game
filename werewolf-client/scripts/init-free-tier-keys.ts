@@ -33,7 +33,11 @@ async function initializeFreeTierKeys() {
                 DEEPSEEK_API_KEY: '',
                 MISTRAL_API_KEY: '',
                 GROK_API_KEY: '',
-                MOONSHOT_API_KEY: ''
+                MOONSHOT_API_KEY: '',
+                Z_AI_API_KEY: '',
+                FUGU_API_KEY: '',
+                QWEN_API_KEY: '',
+                MINIMAX_API_KEY: ''
             },
             createdAt: new Date().toISOString(),
             lastUpdated: new Date().toISOString()

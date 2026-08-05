@@ -18,7 +18,9 @@ const VALID_KEY_NAMES = [
     'GROK_API_KEY',
     'MOONSHOT_API_KEY',
     'Z_AI_API_KEY',
-    'FUGU_API_KEY'
+    'FUGU_API_KEY',
+    'QWEN_API_KEY',
+    'MINIMAX_API_KEY'
 ];
 
 async function updateFreeTierKey(keyName: string, keyValue: string) {

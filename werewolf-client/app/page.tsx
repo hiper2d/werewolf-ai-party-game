@@ -9,7 +9,7 @@ import { DISCORD_URL } from "@/app/config/external-links";
 
 const MODELS = [
   'Claude 5 Opus', 'GPT-5.5', 'Gemini Flash 3.5', 'DeepSeek V4 Pro',
-  'Mistral 3.5 Medium', 'GLM 5.2', 'Kimi K3', 'Grok 4.5', 'Sakana Fugu Ultra',
+  'Mistral 3.5 Medium', 'GLM 5.2', 'Kimi K3', 'Grok 4.5', 'Qwen3.8 Max', 'MiniMax M3', 'Sakana Fugu Ultra',
 ];
 
 // Real plans: Free (platform-paid, capped) vs Paid (pay-as-you-go, no subscription).
@@ -176,7 +176,7 @@ export default async function Home() {
             </div>
             <h3 className="mt-0.5 m-0 text-[17px] font-semibold tracking-[-0.01em] text-[var(--fg-0)]">All Top AI Models Together</h3>
             <p className="m-0 text-[14px] text-[var(--fg-2)] leading-[1.6] [text-wrap:pretty]">
-              Mix models from 9 providers in the same game. Watch them argue, deceive, and form alliances against each other — and you.
+              Mix models from 11 providers in the same game. Watch them argue, deceive, and form alliances against each other — and you.
             </p>
             <div className="flex flex-wrap gap-[7px] mt-1">
               {MODELS.map((m) => (
@@ -224,7 +224,7 @@ export default async function Home() {
             role, stay in character, and still be fun to play against took real engineering.
           </p>
           <p className="m-0 text-[15px] text-[var(--fg-2)] leading-[1.7] [text-wrap:pretty]">
-            After a lot of games, the answer is yes. The best models from all nine providers form
+            After a lot of games, the answer is yes. The best models from all eleven providers form
             alliances, make strategic accusations, defend themselves under pressure, and sometimes
             pull off a bluff good enough to win. Mixing providers at one table is the most
             interesting part, because each has its own temperament: some aggressive, some cautious,

@@ -5,6 +5,8 @@ import { Gpt5Agent } from './gpt-5-agent';
 import { GoogleAgent } from './google-agent';
 import { MistralAgent } from './mistral-agent';
 import { GlmAgent } from './glm-agent';
+import { QwenAgent } from './qwen-agent';
+import { MiniMaxAgent } from './minimax-agent';
 import { KimiAgent } from './kimi-agent';
 import { GrokAgent } from './grok-agent';
 
@@ -84,6 +86,22 @@ const cases: AgentCase[] = [
     name: 'GlmAgent',
     make: () => {
       const agent = new GlmAgent('Bot', 'instruction', 'glm-test', 'key', 0.2, false, SILENT_LOGGING);
+      (agent as any).client = openAiChatEmpty;
+      return agent;
+    },
+  },
+  {
+    name: 'QwenAgent',
+    make: () => {
+      const agent = new QwenAgent('Bot', 'instruction', 'qwen-test', 'key', 0.2, false, SILENT_LOGGING);
+      (agent as any).client = openAiChatEmpty;
+      return agent;
+    },
+  },
+  {
+    name: 'MiniMaxAgent',
+    make: () => {
+      const agent = new MiniMaxAgent('Bot', 'instruction', 'minimax-test', 'key', 0.2, false, SILENT_LOGGING);
       (agent as any).client = openAiChatEmpty;
       return agent;
     },

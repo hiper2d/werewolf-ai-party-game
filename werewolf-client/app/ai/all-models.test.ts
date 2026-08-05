@@ -18,7 +18,7 @@
  * Run:  npm test -- --testPathPattern=all-models
  *
  * Env vars (set the ones you have):
- *   OPENAI_K, ANTHROPIC_K, GOOGLE_K, MISTRAL_K, DEEP_SEEK_K, GROK_K, MOONSHOT_K
+ *   OPENAI_K, ANTHROPIC_K, GOOGLE_K, MISTRAL_K, DEEP_SEEK_K, GROK_K, MOONSHOT_K, Z_K, FUGU_K, GW_K, MX_K
  */
 
 import dotenv from "dotenv";
@@ -57,6 +57,8 @@ const ENV_KEY_MAP: Record<string, string> = {
     [API_KEY_CONSTANTS.MOONSHOT]: 'MOONSHOT_K',
     [API_KEY_CONSTANTS.Z_AI]: 'Z_K',
     [API_KEY_CONSTANTS.FUGU]: 'FUGU_K',
+    [API_KEY_CONSTANTS.QWEN]: 'GW_K',
+    [API_KEY_CONSTANTS.MINIMAX]: 'MX_K',
 };
 
 // Build ApiKeyMap from environment
@@ -251,6 +253,8 @@ const TEXT_SWEEP_MODELS = new Set<string>([
     LLM_CONSTANTS.KIMI,
     LLM_CONSTANTS.GLM,
     LLM_CONSTANTS.FUGU_ULTRA,                // one representative for the Fugu askText code path
+    LLM_CONSTANTS.QWEN_FLASH,                // one representative for the Qwen askText code path
+    LLM_CONSTANTS.MINIMAX,                   // MiniMax askText code path (adaptive thinking)
 ]);
 
 describe("All models - plain text welcome via askText", () => {

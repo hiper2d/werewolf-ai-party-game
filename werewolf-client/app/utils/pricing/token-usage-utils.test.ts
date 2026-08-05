@@ -346,6 +346,10 @@ describe('Token Usage Utils', () => {
                 SupportedAiModels[LLM_CONSTANTS.MISTRAL_MAGISTRAL].modelApiName,
                 SupportedAiModels[LLM_CONSTANTS.GROK_4_5].modelApiName,
                 SupportedAiModels[LLM_CONSTANTS.GLM].modelApiName,
+                SupportedAiModels[LLM_CONSTANTS.QWEN_MAX].modelApiName,
+                SupportedAiModels[LLM_CONSTANTS.QWEN_PLUS].modelApiName,
+                SupportedAiModels[LLM_CONSTANTS.QWEN_FLASH].modelApiName,
+                SupportedAiModels[LLM_CONSTANTS.MINIMAX].modelApiName,
             ];
 
             expectedModels.forEach(model => {

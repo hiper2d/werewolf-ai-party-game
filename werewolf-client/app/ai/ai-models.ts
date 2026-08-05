@@ -17,7 +17,9 @@ export const API_KEY_CONSTANTS = {
     GROK: 'GROK_API_KEY',
     MOONSHOT: 'MOONSHOT_API_KEY',
     Z_AI: 'Z_AI_API_KEY',
-    FUGU: 'FUGU_API_KEY'
+    FUGU: 'FUGU_API_KEY',
+    QWEN: 'QWEN_API_KEY',
+    MINIMAX: 'MINIMAX_API_KEY'
 } as const;
 
 export const SupportedAiKeyNames: Record<string, string> = {
@@ -29,7 +31,9 @@ export const SupportedAiKeyNames: Record<string, string> = {
     [API_KEY_CONSTANTS.GROK]: 'Grok',
     [API_KEY_CONSTANTS.MOONSHOT]: 'Moonshot',
     [API_KEY_CONSTANTS.Z_AI]: 'Z.AI',
-    [API_KEY_CONSTANTS.FUGU]: 'Sakana Fugu'
+    [API_KEY_CONSTANTS.FUGU]: 'Sakana Fugu',
+    [API_KEY_CONSTANTS.QWEN]: 'Qwen',
+    [API_KEY_CONSTANTS.MINIMAX]: 'MiniMax'
 };
 
 export const LLM_CONSTANTS = {
@@ -59,6 +63,13 @@ export const LLM_CONSTANTS = {
     KIMI: 'kimi',
     GLM: 'glm',
     FUGU_ULTRA: 'fugu-ultra',
+    // Qwen (QwenCloud/DashScope). Stable picker ids without the version, matching the gpt/gemini
+    // pattern, so future repoints don't orphan persisted game docs.
+    QWEN_MAX: 'qwen-max',
+    QWEN_PLUS: 'qwen-plus',
+    QWEN_FLASH: 'qwen-flash',
+    // MiniMax. Single M3 entry; stable id without the version for the same repoint reason.
+    MINIMAX: 'minimax',
     RANDOM: 'random',
 }
 
@@ -83,11 +94,12 @@ export const AUDIO_MODEL_PRICING: Record<string, AudioModelPricing> = {
     },
 };
 
-// Speed tags re-graded 2026-08-04 from live measurements (one identical day-2 vote per model,
-// all-models.test): very-fast < 3s, fast 3-6s, slow > 15s, very-slow = minutes. Models in the
-// 6-13s middle carry NO speed tag on purpose — "medium" is the unlabeled default. Single-sample
-// measurements: trust the bucket, not fine ordering.
-export type ModelTag = 'very-fast' | 'fast' | 'slow' | 'extremely-slow' | 'cheap' | 'expensive';
+// Speed tags graded from live measurements (one identical day-2 vote per model, all-models.test;
+// re-graded 2026-08-04, very-slow tier added 2026-08-05): very-fast < 3s, fast 3-6s,
+// slow 15-25s, very-slow > 25s (the K3 / Qwen Max / MiniMax cluster), extremely-slow = minutes
+// (Fugu Ultra exclusively). Models in the 6-13s middle carry NO speed tag on purpose — "medium"
+// is the unlabeled default. Single-sample measurements: trust the bucket, not fine ordering.
+export type ModelTag = 'very-fast' | 'fast' | 'slow' | 'very-slow' | 'extremely-slow' | 'cheap' | 'expensive';
 
 export type ReasoningEffort = 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 
@@ -255,7 +267,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         tags: ['very-fast', 'cheap'],
     },
     [LLM_CONSTANTS.MISTRAL_MAGISTRAL]: {
-        displayName: 'Magistral Medium 1.2 (Thinking)',
+        displayName: 'Magistral Medium 1.2',
         modelApiName: 'magistral-medium-latest',
         apiKeyName: API_KEY_CONSTANTS.MISTRAL,
         hasThinking: true,
@@ -272,7 +284,8 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         apiKeyName: API_KEY_CONSTANTS.MOONSHOT,
         hasThinking: true,
         // Temperature is omitted from the request: kimi-k3 rejects any value other than 1.
-        tags: ['slow', 'expensive'],
+        // Speed samples: 17s (2026-08-04) and 28.9s (2026-08-05) — graded into the >25s tier.
+        tags: ['very-slow', 'expensive'],
         // Explicit policy, opting out of price banding. Banding on the $15 sticker output price
         // would land K3 exactly on the SINGLE_MAX boundary (1 bot), but that price understates
         // what a turn really costs: K3 always reasons at max effort, and ~85-90% of its output
@@ -310,6 +323,60 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         apiKeyName: API_KEY_CONSTANTS.FUGU,
         hasThinking: false,
         tags: ['extremely-slow', 'expensive'],
+    },
+
+    // Qwen models (QwenCloud, OpenAI-compatible endpoint). Added 2026-08-05 straight into the
+    // thinking-only catalog: their API has an `enable_thinking` toggle, we always send true, and
+    // thinking arrives in `reasoning_content` (verified live against all three, non-streaming).
+    // Speed tags from the 2026-08-05 live day-2 votes (two samples each): plus 17.4s/14.5s,
+    // flash 14.3s/16.4s (both slow); max 30.6s/100.5s — its latency tracks how long it decides
+    // to think (4.2K reasoning tokens on the slow run), hence the budget cap below.
+    [LLM_CONSTANTS.QWEN_MAX]: {
+        displayName: 'Qwen3.8 Max',
+        modelApiName: 'qwen3.8-max',
+        apiKeyName: API_KEY_CONSTANTS.QWEN,
+        hasThinking: true,
+        temperature: 0.7,
+        // Caps `thinking_budget` to bound the 30–100s latency variance. The same knob works on
+        // the 3.7 models (verified live) — add it to their entries if they ever need taming.
+        thinkingBudgetTokens: 1024,
+        // Capped it measures 25-26s → the >25s tier.
+        tags: ['very-slow'],
+    },
+    [LLM_CONSTANTS.QWEN_PLUS]: {
+        displayName: 'Qwen3.7 Plus',
+        modelApiName: 'qwen3.7-plus',
+        apiKeyName: API_KEY_CONSTANTS.QWEN,
+        hasThinking: true,
+        temperature: 0.7,
+        thinkingBudgetTokens: 1024,
+        tags: ['slow', 'cheap'],
+    },
+    [LLM_CONSTANTS.QWEN_FLASH]: {
+        displayName: 'Qwen3.7 Flash',
+        modelApiName: 'qwen3.7-flash',
+        apiKeyName: API_KEY_CONSTANTS.QWEN,
+        hasThinking: true,
+        temperature: 0.7,
+        // Uncapped it swung to 3K reasoning tokens (21s); same cap as its siblings.
+        thinkingBudgetTokens: 1024,
+        tags: ['slow', 'cheap'],
+    },
+
+    // MiniMax M3 (OpenAI-compatible endpoint, 1M context). Thinking-only entry: M3's `thinking`
+    // param defaults to adaptive (it decides per-request how much to think) and can be disabled,
+    // making it hybrid for free-tier banding. The agent always sends `reasoning_split: true` so
+    // thinking arrives in `reasoning_content` instead of as `<think>` tags inside the answer.
+    // Note: unlike Qwen, M3 has NO thinking-budget parameter — adaptive is the only throttle.
+    // Speed from the 2026-08-05 live day-2 vote (single sample): 25.3s → the >25s tier.
+    // Temperature: MiniMax range is [0,2], default 1.
+    [LLM_CONSTANTS.MINIMAX]: {
+        displayName: 'MiniMax M3',
+        modelApiName: 'MiniMax-M3',
+        apiKeyName: API_KEY_CONSTANTS.MINIMAX,
+        hasThinking: true,
+        temperature: 1,
+        tags: ['very-slow', 'cheap'],
     },
 };
 
@@ -532,6 +599,54 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
         extendedContextOutputPrice: 45.0,
         extendedContextCacheHitPrice: 1.00,
         extendedContextThresholdTokens: 272_000
+    },
+
+    // Qwen models. Cache-hit rates follow QwenCloud's implicit-cache rule: hits bill at 20% of
+    // the input price (docs.qwencloud.com → Context cache); we don't send explicit cache_control.
+    // qwen3.8-max: $2/$6 is from the launch coverage/OpenRouter (2026-08-03) — the official docs
+    // defer to the Model Marketplace, which WebFetch can't read. Third parties quote $0.25 cached,
+    // which contradicts the 20% rule ($0.40); we charge the documented 20% to avoid a Fugu-style
+    // undercharge. Reconcile both against the console bill after the first real games.
+    [SupportedAiModels[LLM_CONSTANTS.QWEN_MAX].modelApiName]: {
+        inputPrice: 2.0,
+        outputPrice: 6.0,
+        cacheHitPrice: 0.40
+    },
+    [SupportedAiModels[LLM_CONSTANTS.QWEN_PLUS].modelApiName]: {
+        inputPrice: 0.40,
+        outputPrice: 1.60,
+        cacheHitPrice: 0.08,
+        extendedContextInputPrice: 1.20,
+        extendedContextOutputPrice: 4.80,
+        extendedContextCacheHitPrice: 0.24,
+        extendedContextThresholdTokens: 256_000
+    },
+    // qwen3.7-flash actually has THREE price tiers (≤32K: 0.03/0.13, 32K–256K: 0.10/0.40,
+    // 256K–1M: 0.20/0.80) but the schema supports one threshold. We model the first boundary and
+    // bill the middle tier above it, knowingly undercharging 2× past 256K — game contexts
+    // essentially never get there, and the absolute rates are tiny either way.
+    [SupportedAiModels[LLM_CONSTANTS.QWEN_FLASH].modelApiName]: {
+        inputPrice: 0.03,
+        outputPrice: 0.13,
+        cacheHitPrice: 0.006,
+        extendedContextInputPrice: 0.10,
+        extendedContextOutputPrice: 0.40,
+        extendedContextCacheHitPrice: 0.02,
+        extendedContextThresholdTokens: 32_000
+    },
+
+    // MiniMax M3. Rates from platform.minimax.io/docs/guides/pricing-paygo (2026-08-05, USD,
+    // "permanent 50% off" already applied): ≤512k and >512k input tiers. Caching is automatic
+    // (≥512 input tokens), hits reported in prompt_tokens_details.cached_tokens; no write fee
+    // for M3.
+    [SupportedAiModels[LLM_CONSTANTS.MINIMAX].modelApiName]: {
+        inputPrice: 0.30,
+        outputPrice: 1.20,
+        cacheHitPrice: 0.06,
+        extendedContextInputPrice: 0.60,
+        extendedContextOutputPrice: 2.40,
+        extendedContextCacheHitPrice: 0.12,
+        extendedContextThresholdTokens: 512_000
     }
 };
 
@@ -619,6 +734,12 @@ const HYBRID_THINKING_API_NAMES = new Set([
     SupportedAiModels[LLM_CONSTANTS.DEEPSEEK_V4_FLASH].modelApiName,
     SupportedAiModels[LLM_CONSTANTS.DEEPSEEK_V4_PRO].modelApiName,
     SupportedAiModels[LLM_CONSTANTS.GLM].modelApiName,
+    // Qwen ships thinking-only from day one, but the API's enable_thinking toggle makes these
+    // hybrid by the same definition: we force reasoning on, so they pay the multiplier.
+    SupportedAiModels[LLM_CONSTANTS.QWEN_MAX].modelApiName,
+    SupportedAiModels[LLM_CONSTANTS.QWEN_PLUS].modelApiName,
+    SupportedAiModels[LLM_CONSTANTS.QWEN_FLASH].modelApiName,
+    SupportedAiModels[LLM_CONSTANTS.MINIMAX].modelApiName,
 ]);
 
 /** True for hybrid thinking-only models, i.e. the ones whose ×FREE_TIER_THINKING_COST_FACTOR

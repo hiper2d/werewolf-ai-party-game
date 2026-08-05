@@ -2,7 +2,7 @@ import Image from "next/image";
 import DocFooter from "@/app/components/DocFooter";
 import BuyMeACoffee from "@/app/components/BuyMeACoffee";
 
-const PROVIDERS = ["OpenAI", "Anthropic", "Google", "DeepSeek", "Mistral", "xAI", "Moonshot", "Z.AI"];
+const PROVIDERS = ["OpenAI", "Anthropic", "Google", "DeepSeek", "Mistral", "xAI", "Moonshot", "Z.AI", "Qwen", "MiniMax", "Sakana"];
 
 function PlayersIcon() {
   return (
