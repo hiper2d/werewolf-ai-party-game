@@ -267,9 +267,10 @@ describe("GrokAgent integration", () => {
     });
 
     it("should discount cached input tokens", () => {
-      // Half the input cached at $0.50: 0.5M * $2 + 0.5M * $0.50 + 1M * $6
+      // Half the input cached at $0.30 (per docs.x.ai, grok-4.5 cached rate):
+      // 0.5M * $2 + 0.5M * $0.30 + 1M * $6
       const cost = calculateGrokCost("grok-4.5", 1000000, 1000000, 500000);
-      expect(cost).toBeCloseTo(7.25, 2);
+      expect(cost).toBeCloseTo(7.15, 2);
     });
   });
 

@@ -41,6 +41,9 @@ const OLD_TO_NEW: Record<string, string> = {
     'kimi-turbo': 'kimi',
     'kimi-turbo-thinking': 'kimi',
     'kimi-thinking': 'kimi',
+    // Base Fugu retired 2026-08-04 — it billed at fugu-ultra's rates anyway.
+    'Sakana Fugu': 'fugu-ultra',
+    'fugu': 'fugu-ultra',
     'Random': 'random',
 };
 

@@ -42,12 +42,17 @@ export function extractTokenUsage(response: any): TokenUsage | null {
         totalTokens: usage.total_tokens || 0
     };
     
-    // Extract cache information if available. DeepSeek reports cache hits as a top-level
-    // prompt_cache_hit_tokens; OpenAI, Kimi, Grok and Fugu nest them under prompt_tokens_details.
+    // Extract cache information if available. Three wire shapes (verified against live
+    // provider docs 2026-08-04): DeepSeek reports cache hits as a top-level
+    // prompt_cache_hit_tokens; OpenAI, Grok, GLM and Fugu nest them under
+    // prompt_tokens_details.cached_tokens; Kimi reports a top-level cached_tokens
+    // (NOT nested, despite being OpenAI-compatible).
     if (usage.prompt_cache_hit_tokens !== undefined) {
         result.cacheHitTokens = usage.prompt_cache_hit_tokens;
     } else if (usage.prompt_tokens_details?.cached_tokens !== undefined) {
         result.cacheHitTokens = usage.prompt_tokens_details.cached_tokens;
+    } else if (usage.cached_tokens !== undefined) {
+        result.cacheHitTokens = usage.cached_tokens;
     }
 
     if (usage.prompt_cache_miss_tokens !== undefined) {
@@ -219,6 +224,17 @@ export function extractMistralTokenUsage(response: any): TokenUsage | null {
             result.reasoningTokens = additionalProps.reasoningTokens;
         } else if (additionalProps.thinking_tokens !== undefined) {
             result.reasoningTokens = additionalProps.thinking_tokens;
+        }
+
+        // Mistral documents cached billing (10% of input via prompt_cache_key) but no usage
+        // field for hits; the SDK collects unknown wire fields here, so probe the plausible
+        // shapes. Whichever one actually arrives (if any) gets picked up automatically.
+        if (additionalProps.prompt_cache_hit_tokens !== undefined) {
+            result.cacheHitTokens = additionalProps.prompt_cache_hit_tokens;
+        } else if (additionalProps.cached_tokens !== undefined) {
+            result.cacheHitTokens = additionalProps.cached_tokens;
+        } else if (additionalProps.prompt_tokens_details?.cached_tokens !== undefined) {
+            result.cacheHitTokens = additionalProps.prompt_tokens_details.cached_tokens;
         }
     }
 

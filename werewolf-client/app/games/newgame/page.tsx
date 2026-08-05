@@ -5,7 +5,7 @@ import {useRouter} from 'next/navigation';
 import {useSession} from 'next-auth/react';
 import {createGame, previewGame} from '@/app/api/game-actions';
 import {GAME_ROLES, GamePreview, GamePreviewWithGeneratedBots, GENDER_OPTIONS, getVoicesForGender, getRandomVoiceForGender, PLAY_STYLES, PLAY_STYLE_CONFIGS, RANDOM_ROLE, UserTier, USER_TIERS} from "@/app/api/game-models";
-import {LLM_CONSTANTS, SupportedAiModels, getModelDisplayName, modelHasTag} from "@/app/ai/ai-models";
+import {LLM_CONSTANTS, SupportedAiModels, getModelDisplayName, modelHasTag, modelIsFast} from "@/app/ai/ai-models";
 import {FREE_TIER_UNLIMITED, getCandidateModelsForTier, getModelPickerOptions, getPerGameModelLimit, getSelectableModelsForUser} from "@/app/ai/model-limit-utils";
 import AIModelSelect from '@/app/components/AIModelSelect';
 import ExpandableTextarea from '@/app/components/ExpandableTextarea';
@@ -34,8 +34,8 @@ function pickRandom<T>(arr: T[]): T {
 // Default GM pick: the GM narrates every turn, so speed matters most.
 // Prefer fast+cheap, then any fast, then whatever the pool allows.
 function pickDefaultGmModel(pool: string[]): string {
-    const fastCheap = pool.filter(m => modelHasTag(m, 'fast') && modelHasTag(m, 'cheap'));
-    const fast = fastCheap.length > 0 ? fastCheap : pool.filter(m => modelHasTag(m, 'fast'));
+    const fastCheap = pool.filter(m => modelIsFast(m) && modelHasTag(m, 'cheap'));
+    const fast = fastCheap.length > 0 ? fastCheap : pool.filter(m => modelIsFast(m));
     const candidates = fast.length > 0 ? fast : pool;
     return candidates.length > 0 ? pickRandom(candidates) : LLM_CONSTANTS.RANDOM;
 }
@@ -85,7 +85,7 @@ export default function CreateNewGamePage() {
     }, [userTier]);
     const candidateModels = useMemo(() => getCandidateModelsForTier(userTier), [userTier]);
     const FAST_MODELS = useMemo(() => new Set(
-        Object.values(LLM_CONSTANTS).filter(m => modelHasTag(m, 'fast'))
+        Object.values(LLM_CONSTANTS).filter(m => modelIsFast(m))
     ), []);
 
     const gmModelOptions = useMemo(() => {

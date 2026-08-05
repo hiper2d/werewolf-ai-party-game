@@ -61,7 +61,6 @@ export const LLM_CONSTANTS = {
     KIMI: 'kimi',
     GLM: 'glm',
     GLM_THINKING: 'glm-thinking',
-    FUGU: 'fugu',
     FUGU_ULTRA: 'fugu-ultra',
     RANDOM: 'random',
 }
@@ -87,7 +86,11 @@ export const AUDIO_MODEL_PRICING: Record<string, AudioModelPricing> = {
     },
 };
 
-export type ModelTag = 'fast' | 'slow' | 'very-slow' | 'cheap' | 'expensive';
+// Speed tags re-graded 2026-08-04 from live measurements (one identical day-2 vote per model,
+// all-models.test): very-fast < 3s, fast 3-6s, slow > 15s, very-slow = minutes. Models in the
+// 6-13s middle carry NO speed tag on purpose — "medium" is the unlabeled default. Single-sample
+// measurements: trust the bucket, not fine ordering.
+export type ModelTag = 'very-fast' | 'fast' | 'slow' | 'extremely-slow' | 'cheap' | 'expensive';
 
 export type ReasoningEffort = 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 
@@ -123,7 +126,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
         hasThinking: true,
         reasoningEffort: 'high',
-        tags: ['slow', 'expensive'],
+        tags: ['expensive'],
     },
 
     // Claude models - separate with/without thinking versions
@@ -132,7 +135,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         modelApiName: 'claude-opus-5',
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
         hasThinking: false,
-        tags: ['expensive'],
+        tags: ['fast', 'expensive'],
     },
     [LLM_CONSTANTS.CLAUDE_4_OPUS_THINKING]: {
         displayName: 'Claude 5 Opus (Thinking)',
@@ -147,7 +150,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         modelApiName: 'claude-sonnet-5',
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
         hasThinking: false,
-        tags: ['expensive'],
+        tags: ['fast', 'expensive'],
     },
     [LLM_CONSTANTS.CLAUDE_4_SONNET_THINKING]: {
         displayName: 'Claude 5 Sonnet (Thinking)',
@@ -162,7 +165,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         modelApiName: 'claude-haiku-4-5',
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
         hasThinking: false,
-        tags: ['fast', 'cheap'],
+        tags: ['very-fast', 'cheap'],
     },
     [LLM_CONSTANTS.CLAUDE_4_HAIKU_THINKING]: {
         displayName: 'Claude 4.5 Haiku (Thinking)',
@@ -170,7 +173,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
         hasThinking: true,
         thinkingBudgetTokens: 1024,
-        tags: ['fast', 'cheap'],
+        tags: ['slow', 'cheap'],
     },
 
     // DeepSeek V4 models - Flash and Pro, each with thinking toggle
@@ -190,7 +193,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         hasThinking: true,
         // Reasoning tokens share the output budget, so leave room for both CoT and answer.
         maxOutputTokens: 65536,
-        tags: ['fast', 'cheap'],
+        tags: ['cheap'],
     },
     [LLM_CONSTANTS.DEEPSEEK_V4_PRO]: {
         displayName: 'DeepSeek V4 Pro',
@@ -199,7 +202,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         hasThinking: false,
         temperature: 0.6,
         maxOutputTokens: 16384,
-        tags: ['slow', 'cheap'],
+        tags: ['cheap'],
     },
     [LLM_CONSTANTS.DEEPSEEK_V4_PRO_THINKING]: {
         displayName: 'DeepSeek V4 Pro (Thinking)',
@@ -208,7 +211,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         hasThinking: true,
         // Reasoning tokens share the output budget, so leave room for both CoT and answer.
         maxOutputTokens: 65536,
-        tags: ['slow', 'cheap'],
+        tags: ['cheap'],
     },
 
     // Models with always-on reasoning
@@ -228,7 +231,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         apiKeyName: API_KEY_CONSTANTS.OPENAI,
         hasThinking: true,
         temperature: 1,
-        tags: ['expensive'],
+        tags: ['fast', 'expensive'],
     },
     [LLM_CONSTANTS.GPT_5_6_LUNA]: {
         displayName: 'GPT-5.6 Luna',
@@ -244,7 +247,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         apiKeyName: API_KEY_CONSTANTS.GOOGLE,
         hasThinking: true,
         thinkingBudgetTokens: 1024,
-        tags: ['slow', 'expensive'],
+        tags: ['expensive'],
     },
     [LLM_CONSTANTS.GEMINI_3_FLASH]: {
         displayName: 'Gemini 3.6 Flash',
@@ -269,7 +272,6 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         apiKeyName: API_KEY_CONSTANTS.GROK,
         hasThinking: true,
         temperature: 0.7,
-        tags: ['slow'],
     },
 
     // Mistral models
@@ -278,26 +280,30 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         modelApiName: 'mistral-large-latest',
         apiKeyName: API_KEY_CONSTANTS.MISTRAL,
         hasThinking: false,
+        tags: ['fast'],
     },
     [LLM_CONSTANTS.MISTRAL_3_5_MEDIUM]: {
         displayName: 'Mistral Medium 3.5',
         modelApiName: 'mistral-medium-3',
         apiKeyName: API_KEY_CONSTANTS.MISTRAL,
         hasThinking: false,
-        tags: ['fast', 'expensive'],
+        tags: ['very-fast', 'expensive'],
     },
     [LLM_CONSTANTS.MISTRAL_4_SMALL]: {
         displayName: 'Mistral 4 Small',
         modelApiName: 'mistral-small-latest',
         apiKeyName: API_KEY_CONSTANTS.MISTRAL,
         hasThinking: false,
-        tags: ['fast', 'cheap'],
+        tags: ['very-fast', 'cheap'],
     },
     [LLM_CONSTANTS.MISTRAL_MAGISTRAL]: {
         displayName: 'Magistral Medium 1.2 (Thinking)',
         modelApiName: 'magistral-medium-latest',
         apiKeyName: API_KEY_CONSTANTS.MISTRAL,
         hasThinking: true,
+        // Measured very-fast (1.6s) because JSON response mode suppresses its thinking
+        // (see mistral-agent.ts) — it effectively runs as a non-reasoning model here.
+        tags: ['very-fast'],
     },
 
     // Kimi models. Single always-reasoning entry: K3 reasons by default and the only way to stop
@@ -308,7 +314,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         apiKeyName: API_KEY_CONSTANTS.MOONSHOT,
         hasThinking: true,
         // Temperature is omitted from the request: kimi-k3 rejects any value other than 1.
-        tags: ['expensive'],
+        tags: ['slow', 'expensive'],
         // Explicit policy, opting out of price banding. Banding on the $15 sticker output price
         // would land K3 exactly on the SINGLE_MAX boundary (1 bot), but that price understates
         // what a turn really costs: K3 always reasons at max effort, and ~85-90% of its output
@@ -325,6 +331,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         apiKeyName: API_KEY_CONSTANTS.Z_AI,
         hasThinking: false,
         temperature: 0.7,
+        tags: ['fast'],
     },
     [LLM_CONSTANTS.GLM_THINKING]: {
         displayName: 'GLM-5.2 (Thinking)',
@@ -339,19 +346,20 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
     // "orchestration" tokens), but never surface reasoning to us: responses come back with
     // reasoning_tokens: 0 and no reasoning_content. So hasThinking is false — there's no
     // thinking content to show and no user-facing thinking toggle. Single picker entry per model.
-    [LLM_CONSTANTS.FUGU]: {
-        displayName: 'Sakana Fugu',
-        modelApiName: 'fugu',
-        apiKeyName: API_KEY_CONSTANTS.FUGU,
-        hasThinking: false,
-        tags: ['slow'],
-    },
+    //
+    // Base `fugu` was RETIRED 2026-08-04 (see DEPRECATED_MODEL_MAP). It was carried as a cheap
+    // everyday option at an assumed $1/$3, but reconciling BetterStack token logs against the
+    // Sakana balance showed it actually bills at fugu-ultra's rates: 592K prompt + 54K completion
+    // tokens over Aug 1-3 cost $4.80 real against $0.85 tracked, a 5.7x undercharge. It is a
+    // router with no published price, so the rate is not even guaranteed stable, and its cache
+    // hit rate was 9.3% — effectively zero, since every hit came from a duplicate call seconds
+    // apart rather than turn-to-turn prefix reuse. Ultra costs the same and is predictable.
     [LLM_CONSTANTS.FUGU_ULTRA]: {
         displayName: 'Sakana Fugu Ultra',
         modelApiName: 'fugu-ultra',
         apiKeyName: API_KEY_CONSTANTS.FUGU,
         hasThinking: false,
-        tags: ['slow', 'expensive'],
+        tags: ['extremely-slow', 'expensive'],
     },
 };
 
@@ -363,6 +371,11 @@ export function getModelTags(modelId: string): ModelTag[] {
 
 export function modelHasTag(modelId: string, tag: ModelTag): boolean {
     return getModelTags(modelId).includes(tag);
+}
+
+/** Speed is an ordered scale — "fast" filters must also admit very-fast models. */
+export function modelIsFast(modelId: string): boolean {
+    return modelHasTag(modelId, 'fast') || modelHasTag(modelId, 'very-fast');
 }
 
 export function getModelDisplayName(modelId: string): string {
@@ -526,42 +539,40 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
         cacheHitPrice: 0.025
     },
 
-    // Mistral models
+    // Mistral models. Cached tokens bill at 10% of the input price (documented on the
+    // prompt_cache_key param in the API reference; no per-model cached prices published).
     [SupportedAiModels[LLM_CONSTANTS.MISTRAL_3_LARGE].modelApiName]: {
         inputPrice: 0.5,
-        outputPrice: 1.5
+        outputPrice: 1.5,
+        cacheHitPrice: 0.05
     },
     [SupportedAiModels[LLM_CONSTANTS.MISTRAL_3_5_MEDIUM].modelApiName]: {
         inputPrice: 1.5,
-        outputPrice: 7.5
+        outputPrice: 7.5,
+        cacheHitPrice: 0.15
     },
     [SupportedAiModels[LLM_CONSTANTS.MISTRAL_4_SMALL].modelApiName]: {
         inputPrice: 0.15,
-        outputPrice: 0.6
+        outputPrice: 0.6,
+        cacheHitPrice: 0.015
     },
     [SupportedAiModels[LLM_CONSTANTS.MISTRAL_MAGISTRAL].modelApiName]: {
         inputPrice: 2.0,
-        outputPrice: 5.0
+        outputPrice: 5.0,
+        cacheHitPrice: 0.2
     },
 
-    // Grok models
+    // Grok models. Cached price is per-model on xAI (0.15-0.20x, not a uniform ratio):
+    // grok-4.5 is $0.30/M cached vs $2.00/M input per docs.x.ai (verified 2026-08-04).
     [SupportedAiModels[LLM_CONSTANTS.GROK_4_5].modelApiName]: {
         inputPrice: 2.0,
         outputPrice: 6.0,
-        cacheHitPrice: 0.50
+        cacheHitPrice: 0.30
     },
 
-    // Sakana Fugu models
-    // base `fugu` is a dynamic router — Sakana publishes no fixed per-token price ("you pay the
-    // underlying model's rate"). We've set a working rate of $1 in / $3 out: the $3 output lands
-    // it in the "<= $5 output → 3 bots" free-tier band (see FREE_TIER_OUTPUT_PRICE_BANDS), which
-    // is the intended cap. NOTE this rate is input-blind on purpose for now — `fugu` is actually
-    // input-heavy and barely cacheable (~2% cache hits, it's a router), so output-price banding
-    // understates its real cost. Revisit with real Sakana dashboard numbers if it proves too cheap.
-    [SupportedAiModels[LLM_CONSTANTS.FUGU].modelApiName]: {
-        inputPrice: 1.0,
-        outputPrice: 3.0
-    },
+    // Sakana Fugu models. Base `fugu` was retired 2026-08-04 — it had no published price and
+    // measured out at these same ultra rates, so it has no pricing entry; DEPRECATED_MODEL_MAP
+    // resolves any persisted `fugu` id here.
     // fugu-ultra has published pricing. Above 272K context the rates roughly double.
     [SupportedAiModels[LLM_CONSTANTS.FUGU_ULTRA].modelApiName]: {
         inputPrice: 5.0,
@@ -606,6 +617,13 @@ const DEPRECATED_MODEL_MAP: Record<string, string> = {
     'grok-thinking': LLM_CONSTANTS.GROK_4_5,
     // Kimi collapsed to a single always-reasoning K3 entry.
     'kimi-thinking': LLM_CONSTANTS.KIMI,
+    // Base `fugu` retired 2026-08-04: it billed at ultra's rates anyway (see the Fugu comment in
+    // MODEL_PRICING), so persisted bots resolve to the model they were effectively already paying
+    // for. NOTE fugu-ultra is not free-tier eligible ($30 output), so a free-tier game still
+    // holding a migrated bot plays fine (agent creation resolves the id) but its model picker and
+    // "Retry with different model" will reject until that bot is switched — validateModelUsageForTier
+    // re-checks every bot in the game, not just the one being changed.
+    'fugu': LLM_CONSTANTS.FUGU_ULTRA,
 };
 
 /** Maps a possibly-retired model ID to its current equivalent; unknown IDs pass through. */

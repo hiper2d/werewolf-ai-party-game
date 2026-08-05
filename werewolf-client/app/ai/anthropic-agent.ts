@@ -19,6 +19,7 @@ interface ThinkingBlock {
 interface TextBlock {
     type: 'text';
     text: string;
+    cache_control?: { type: 'ephemeral' };
 }
 
 type ContentBlock = ThinkingBlock | TextBlock;
@@ -31,9 +32,20 @@ interface AnthropicMessage {
 export class ClaudeAgent extends AbstractAgent {
     private readonly client: Anthropic;
     private readonly maxTokens = 16384; // Set to 16k to handle longer JSON responses
+    // System-prompt breakpoints, one per cache tier (see CACHE_TIER_MARKER):
+    //   block 1 — shared static rules, byte-identical across all bots and games with the
+    //             same rule set, so one org-level entry serves everyone and ANY bot's call
+    //             refreshes its TTL;
+    //   block 2 — per-bot identity + game state + summaries, byte-stable from the start of
+    //             a game day through the end of its night (deaths/role knowledge/summaries
+    //             only change in startNewDay), so every call within a day reads it.
+    // GM prompts have no marker → single block, same behavior as before. Haiku 4.5 needs a
+    // 4096-token cacheable prefix, so tiers below that silently no-op on Haiku — expected.
     private readonly defaultParams: Omit<Anthropic.MessageCreateParams, 'messages'> = {
         max_tokens: this.maxTokens,
-        system: this.instruction,
+        system: this.instructionParts.map(part => (
+            { type: 'text' as const, text: part, cache_control: { type: 'ephemeral' as const } }
+        )),
         model: this.model,
     };
 
@@ -67,6 +79,16 @@ export class ClaudeAgent extends AbstractAgent {
     }
 
 
+
+    /**
+     * Unlike the base class, does NOT merge consecutive user messages: the Messages API
+     * combines consecutive user turns into a single turn while preserving separate content
+     * blocks, so the trailing reminder stays out of the persisted command block and the
+     * fast cache breakpoint (see applyCacheBreakpoint) lands on bytes that repeat.
+     */
+    protected prepareMessages(messages: AIMessage[]): AIMessage[] {
+        return messages;
+    }
 
     private convertToAnthropicMessages(messages: AIMessage[]): AnthropicMessage[] {
         return messages.map(msg => ({
@@ -141,6 +163,67 @@ export class ClaudeAgent extends AbstractAgent {
         return result;
     }
 
+    /**
+     * Breakpoint 2 (fast tier): the last message that will be re-sent byte-identically on
+     * the next request. That is the SECOND-to-last message, not the last one — the final
+     * user message carries unpersisted content (the reminder postfix / schema description)
+     * appended to the GM command, so its bytes never repeat and a breakpoint there would be
+     * a pure 1.25x write tax with no reads. The second-to-last message (the bot's previous
+     * reply, or an earlier flushed block) reappears verbatim next turn, where the moved-
+     * forward breakpoint finds it via the 20-block lookback.
+     *
+     * NOT the top-level auto-caching mode: that mode targets the LAST cacheable block,
+     * which for us is exactly the never-repeated tail — every entry it wrote would be dead.
+     */
+    private applyCacheBreakpoint(messages: AnthropicMessage[]): void {
+        if (messages.length < 2) {
+            return; // one-shot call: system-prompt breakpoint still applies
+        }
+        const anchor = messages[messages.length - 2];
+        if (typeof anchor.content === 'string') {
+            if (anchor.content.length > 0) {
+                anchor.content = [{ type: 'text', text: anchor.content, cache_control: { type: 'ephemeral' } }];
+            }
+            return;
+        }
+        // Thinking blocks are not cacheable — mark the last text block instead.
+        for (let i = anchor.content.length - 1; i >= 0; i--) {
+            const block = anchor.content[i];
+            if (block.type === 'text' && block.text.length > 0) {
+                block.cache_control = { type: 'ephemeral' };
+                return;
+            }
+        }
+    }
+
+    /**
+     * Builds TokenUsage from the response. Anthropic's input_tokens EXCLUDES cached tokens
+     * (total prompt = input_tokens + cache_read + cache_creation), unlike the OpenAI-shaped
+     * providers whose prompt_tokens include them — so reconstruct the full prompt size here
+     * before pricing. Cache reads bill at the cacheHitPrice (~0.1x); cache writes bill at
+     * 1.25x input, which MODEL_PRICING doesn't model, so written tokens are priced at the
+     * plain input rate (~20% undercount on the written span only).
+     */
+    private buildTokenUsage(usage: Anthropic.Messages.Usage): TokenUsage {
+        const cacheReadTokens = usage.cache_read_input_tokens ?? 0;
+        const cacheWriteTokens = usage.cache_creation_input_tokens ?? 0;
+        const uncachedInputTokens = usage.input_tokens || 0;
+        const inputTokens = uncachedInputTokens + cacheReadTokens + cacheWriteTokens;
+        const outputTokens = usage.output_tokens || 0;
+        const cost = calculateAnthropicCost(this.model, inputTokens, outputTokens, cacheReadTokens);
+
+        if (cacheReadTokens > 0 || cacheWriteTokens > 0) {
+            this.logger(`💾 Prompt cache: ${cacheReadTokens} read, ${cacheWriteTokens} written, ${uncachedInputTokens} uncached`);
+        }
+
+        return {
+            inputTokens,
+            outputTokens,
+            totalTokens: inputTokens + outputTokens,
+            costUSD: cost
+        };
+    }
+
     private convertRole(role: string): AnthropicRole {
         if (role === 'system' || role === 'user') {
             return 'user';
@@ -184,6 +267,7 @@ export class ClaudeAgent extends AbstractAgent {
             const anthropicMessages = canUseThinking
                 ? this.convertToAnthropicMessagesWithThinking(messagesWithSchema)
                 : this.convertToAnthropicMessages(messagesWithSchema);
+            this.applyCacheBreakpoint(anthropicMessages);
 
             const params: Anthropic.MessageCreateParams = {
                 ...this.defaultParams,
@@ -267,18 +351,7 @@ export class ClaudeAgent extends AbstractAgent {
             // Extract token usage information
             let tokenUsage: TokenUsage | undefined;
             if (response.usage) {
-                const cost = calculateAnthropicCost(
-                    this.model,
-                    response.usage.input_tokens || 0,
-                    response.usage.output_tokens || 0
-                );
-
-                tokenUsage = {
-                    inputTokens: response.usage.input_tokens || 0,
-                    outputTokens: response.usage.output_tokens || 0,
-                    totalTokens: (response.usage.input_tokens || 0) + (response.usage.output_tokens || 0),
-                    costUSD: cost
-                };
+                tokenUsage = this.buildTokenUsage(response.usage);
 
                 // Log thinking information if available
                 if (this.enableThinking && thinkingContent) {
@@ -332,6 +405,7 @@ export class ClaudeAgent extends AbstractAgent {
             const anthropicMessages = canUseThinking
                 ? this.convertToAnthropicMessagesWithThinking(aiMessages)
                 : this.convertToAnthropicMessages(aiMessages);
+            this.applyCacheBreakpoint(anthropicMessages);
 
             const params: Anthropic.MessageCreateParams = {
                 ...this.defaultParams,
@@ -400,18 +474,7 @@ export class ClaudeAgent extends AbstractAgent {
 
             let tokenUsage: TokenUsage | undefined;
             if (response.usage) {
-                const cost = calculateAnthropicCost(
-                    this.model,
-                    response.usage.input_tokens || 0,
-                    response.usage.output_tokens || 0
-                );
-
-                tokenUsage = {
-                    inputTokens: response.usage.input_tokens || 0,
-                    outputTokens: response.usage.output_tokens || 0,
-                    totalTokens: (response.usage.input_tokens || 0) + (response.usage.output_tokens || 0),
-                    costUSD: cost
-                };
+                tokenUsage = this.buildTokenUsage(response.usage);
 
                 if (this.enableThinking && thinkingContent) {
                     this.logger(`Thinking enabled: ${thinkingContent.length} characters of thinking content`);

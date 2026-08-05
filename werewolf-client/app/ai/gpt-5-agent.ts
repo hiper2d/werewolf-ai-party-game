@@ -52,7 +52,7 @@ export class Gpt5Agent extends AbstractAgent {
             // Combine system instruction with messages for the input
             const input = [
                 `System: ${this.instruction}`,
-                ...messages.map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
+                ...this.prepareMessages(messages).map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
             ].join('\n\n');
 
             // Extend schema with thinking field if enabled
@@ -87,11 +87,18 @@ export class Gpt5Agent extends AbstractAgent {
             // Extract token usage
             let tokenUsage: TokenUsage | undefined;
             if (response.usage) {
+                // Responses API reports cache hits under input_tokens_details.cached_tokens
+                // (input_tokens already INCLUDES them); bill hits at the cached rate.
+                const cachedTokens = (response.usage as any).input_tokens_details?.cached_tokens ?? 0;
                 const cost = calculateOpenAICost(
                     this.model,
                     response.usage.input_tokens,
-                    response.usage.output_tokens
+                    response.usage.output_tokens,
+                    cachedTokens
                 );
+                if (cachedTokens > 0) {
+                    this.logger(`💾 Prompt cache: ${cachedTokens} of ${response.usage.input_tokens} input tokens served from cache`);
+                }
 
                 tokenUsage = {
                     inputTokens: response.usage.input_tokens,
@@ -135,7 +142,7 @@ export class Gpt5Agent extends AbstractAgent {
             // Combine system instruction with messages for the input
             const input = [
                 `System: ${this.instruction}`,
-                ...messages.map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
+                ...this.prepareMessages(messages).map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
             ].join('\n\n');
 
             const response = await this.client.responses.create({
@@ -153,11 +160,18 @@ export class Gpt5Agent extends AbstractAgent {
             // Extract token usage
             let tokenUsage: TokenUsage | undefined;
             if (response.usage) {
+                // Responses API reports cache hits under input_tokens_details.cached_tokens
+                // (input_tokens already INCLUDES them); bill hits at the cached rate.
+                const cachedTokens = (response.usage as any).input_tokens_details?.cached_tokens ?? 0;
                 const cost = calculateOpenAICost(
                     this.model,
                     response.usage.input_tokens,
-                    response.usage.output_tokens
+                    response.usage.output_tokens,
+                    cachedTokens
                 );
+                if (cachedTokens > 0) {
+                    this.logger(`💾 Prompt cache: ${cachedTokens} of ${response.usage.input_tokens} input tokens served from cache`);
+                }
 
                 tokenUsage = {
                     inputTokens: response.usage.input_tokens,

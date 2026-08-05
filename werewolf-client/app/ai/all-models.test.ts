@@ -244,7 +244,7 @@ const TEXT_SWEEP_MODELS = new Set<string>([
     LLM_CONSTANTS.KIMI,
     LLM_CONSTANTS.GLM,
     LLM_CONSTANTS.GLM_THINKING,
-    LLM_CONSTANTS.FUGU,                      // one representative for the Fugu askText code path
+    LLM_CONSTANTS.FUGU_ULTRA,                // one representative for the Fugu askText code path
 ]);
 
 describe("All models - plain text welcome via askText", () => {

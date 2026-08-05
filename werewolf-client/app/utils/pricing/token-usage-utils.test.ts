@@ -355,4 +355,52 @@ describe('Token Usage Utils', () => {
             });
         });
     });
+
+    // Cache-hit wire shapes verified against live provider docs/APIs 2026-08-04.
+    describe('cache-hit extraction wire shapes', () => {
+        it('reads Kimi top-level usage.cached_tokens (third wire shape)', () => {
+            const usage = extractKimiTokenUsage({
+                usage: { prompt_tokens: 1000, completion_tokens: 100, total_tokens: 1100, cached_tokens: 800 }
+            });
+            expect(usage?.cacheHitTokens).toBe(800);
+        });
+
+        it('prefers DeepSeek prompt_cache_hit_tokens and nested cached_tokens over Kimi shape', () => {
+            const deepseek = extractTokenUsage({
+                usage: { prompt_tokens: 1000, completion_tokens: 100, total_tokens: 1100, prompt_cache_hit_tokens: 700, prompt_cache_miss_tokens: 300 }
+            });
+            expect(deepseek?.cacheHitTokens).toBe(700);
+            expect(deepseek?.cacheMissTokens).toBe(300);
+
+            const nested = extractTokenUsage({
+                usage: { prompt_tokens: 1000, completion_tokens: 100, total_tokens: 1100, prompt_tokens_details: { cached_tokens: 600 } }
+            });
+            expect(nested?.cacheHitTokens).toBe(600);
+        });
+
+        it('reads Mistral cache hits from usage.additionalProperties (observed live: prompt_tokens_details.cached_tokens)', () => {
+            const usage = extractMistralTokenUsage({
+                usage: {
+                    promptTokens: 2950,
+                    completionTokens: 86,
+                    totalTokens: 3036,
+                    additionalProperties: { prompt_tokens_details: { cached_tokens: 2933 }, service_tier: 'standard' }
+                }
+            });
+            expect(usage?.cacheHitTokens).toBe(2933);
+        });
+
+        it('leaves cacheHitTokens unset when Mistral reports no cache fields', () => {
+            const usage = extractMistralTokenUsage({
+                usage: { promptTokens: 100, completionTokens: 10, totalTokens: 110, additionalProperties: { service_tier: 'standard' } }
+            });
+            expect(usage?.cacheHitTokens).toBeUndefined();
+        });
+
+        it('bills cached tokens at the cached rate end to end (grok-4.5 at $0.30/M cached)', () => {
+            // 0.5M uncached * $2 + 0.5M cached * $0.30 + 1M out * $6
+            const cost = calculateCost('grok-4.5', 1_000_000, 1_000_000, { cacheHitTokens: 500_000 });
+            expect(cost).toBeCloseTo(7.15, 2);
+        });
+    });
 });

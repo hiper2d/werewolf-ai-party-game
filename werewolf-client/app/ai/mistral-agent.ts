@@ -1,5 +1,7 @@
 import { AbstractAgent } from "@/app/ai/abstract-agent";
+import { createHash } from "crypto";
 import { Mistral } from "@mistralai/mistralai";
+import { HTTPClient } from "@mistralai/mistralai/lib/http";
 import { ChatCompletionResponse } from "@mistralai/mistralai/models/components";
 import { AIMessage, MESSAGE_ROLE, TokenUsage, AgentLoggingConfig, DEFAULT_LOGGING_CONFIG } from "@/app/api/game-models";
 import { cleanResponse } from "@/app/utils/message-utils";
@@ -39,7 +41,33 @@ export class MistralAgent extends AbstractAgent {
         agentLoggingConfig: AgentLoggingConfig = DEFAULT_LOGGING_CONFIG.agents
     ) {
         super(name, instruction, model, 0.7, enableThinking, agentLoggingConfig);
-        this.client = new Mistral({ apiKey: apiKey });
+
+        // Mistral's cache hint is the `prompt_cache_key` request param ("use the same key
+        // for requests with shared prompt prefixes ... to increase cache hits"), but SDK
+        // 1.10.0 has no typed field for it and its outbound zod schema strips unknown keys.
+        // Inject it via the SDK's beforeRequest hook instead. The key is derived from bot
+        // identity + system prompt, so it is stable within a game day. Any failure falls
+        // back to sending the request untouched.
+        const promptCacheKey = createHash('sha256').update(`${name}\n${instruction}`).digest('hex');
+        const httpClient = new HTTPClient();
+        httpClient.addHook("beforeRequest", async (request) => {
+            try {
+                if (request.method === 'POST' && new URL(request.url).pathname.endsWith('/chat/completions')) {
+                    const body = await request.clone().text();
+                    const json = JSON.parse(body);
+                    json.prompt_cache_key = promptCacheKey;
+                    return new Request(request.url, {
+                        method: request.method,
+                        headers: request.headers,
+                        body: JSON.stringify(json),
+                    });
+                }
+            } catch {
+                // fall through to the original request
+            }
+            return request;
+        });
+        this.client = new Mistral({ apiKey: apiKey, httpClient });
 
         // Note: Magistral reasoning models can generate thinking content, but only when
         // responseFormat is not set to 'json_object'. Since this game requires JSON responses,
@@ -50,7 +78,7 @@ export class MistralAgent extends AbstractAgent {
 
 
     private convertToMistralMessages(messages: AIMessage[]) {
-        return messages.map(msg => ({
+        return this.prepareMessages(messages).map(msg => ({
             role: msg.role === 'developer' ? 'system' : msg.role,
             content: msg.content
         }));
@@ -111,14 +139,24 @@ export class MistralAgent extends AbstractAgent {
         const usage = extractMistralTokenUsage(response);
         if (!usage) return undefined;
 
+        // MISTRAL_CACHE_CALIBRATION: Mistral documents cached billing but no usage field for
+        // hits; the SDK parks unknown wire fields in usage.additionalProperties. Log the raw
+        // usage until one real game answers whether hits are reported at all, then remove.
+        this.logger(`MISTRAL_CACHE_CALIBRATION raw usage: ${JSON.stringify(response?.usage)}`);
+
         // Log reasoning tokens if available (Magistral models)
         if (usage.reasoningTokens && usage.reasoningTokens > 0) {
             this.logger(`🧠 Reasoning tokens used: ${usage.reasoningTokens}`);
         }
 
+        if (usage.cacheHitTokens && usage.cacheHitTokens > 0) {
+            this.logger(`💾 Prompt cache: ${usage.cacheHitTokens} of ${usage.promptTokens} input tokens served from cache`);
+        }
+
         // Calculate cost using centralized pricing from ai-models.ts
         const costUSD = calculateCost(this.model, usage.promptTokens, usage.completionTokens, {
-            totalTokens: usage.totalTokens
+            totalTokens: usage.totalTokens,
+            cacheHitTokens: usage.cacheHitTokens || 0
         });
 
         return {

@@ -9,7 +9,7 @@ import { DISCORD_URL } from "@/app/config/external-links";
 
 const MODELS = [
   'Claude 5 Opus', 'GPT-5.5', 'Gemini Flash 3.5', 'DeepSeek V4 Pro',
-  'Mistral 3.5 Medium', 'GLM 5.2', 'Kimi K3', 'Grok 4.5', 'Sakana Fugu',
+  'Mistral 3.5 Medium', 'GLM 5.2', 'Kimi K3', 'Grok 4.5', 'Sakana Fugu Ultra',
 ];
 
 // Real plans: Free (platform-paid, capped) vs Paid (pay-as-you-go, no subscription).
@@ -199,6 +199,45 @@ export default async function Home() {
               Test how well the latest models handle deduction, bluffing, and social reasoning. See which AI is the best liar — and which one you can fool.
             </p>
           </article>
+        </div>
+      </section>
+
+      {/* About */}
+      <section className="mb-14 sm:mb-[72px]">
+        <div className="text-center max-w-[56ch] mx-auto mb-8 sm:mb-10">
+          <div className="font-mono text-[11px] tracking-[0.14em] uppercase text-[var(--fg-2)] mb-3">About</div>
+          <h2 className="m-0 text-[clamp(28px,4vw,38px)] font-bold tracking-[-0.025em] text-[var(--fg-0)]">
+            Can AI actually play Werewolf?
+          </h2>
+        </div>
+
+        <div className="max-w-[68ch] mx-auto flex flex-col gap-5">
+          <p className="m-0 text-[15px] text-[var(--fg-2)] leading-[1.7] [text-wrap:pretty]">
+            Werewolf AI started with one question: can large language models play a social deduction
+            game for real - not just follow the rules, but bluff, read the table, build trust, and
+            break it at the right moment?
+          </p>
+          <p className="m-0 text-[15px] text-[var(--fg-2)] leading-[1.7] [text-wrap:pretty]">
+            Werewolf is a hard test for a model. It rewards everything that does not come naturally
+            to an LLM: reading between the lines, keeping a secret across a long game, lying
+            convincingly, and adapting when the room turns against you. Getting bots to hold their
+            role, stay in character, and still be fun to play against took real engineering.
+          </p>
+          <p className="m-0 text-[15px] text-[var(--fg-2)] leading-[1.7] [text-wrap:pretty]">
+            After a lot of games, the answer is yes. The best models from all nine providers form
+            alliances, make strategic accusations, defend themselves under pressure, and sometimes
+            pull off a bluff good enough to win. Mixing providers at one table is the most
+            interesting part, because each has its own temperament: some aggressive, some cautious,
+            some far better at deduction than at deception.
+          </p>
+          <div className="text-center mt-1">
+            <Link
+              href="/about"
+              className="font-mono text-[13px] tracking-[0.01em] text-[var(--accent-text)] hover:underline"
+            >
+              Read the full story
+            </Link>
+          </div>
         </div>
       </section>
 

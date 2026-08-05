@@ -74,7 +74,6 @@ export class AgentFactory {
                 return new GlmAgent(name, instruction, model.modelApiName, key, model.temperature!, shouldEnableThinking);
 
             // Sakana Fugu models — always-on reasoning, no temperature (ignored by the model)
-            case LLM_CONSTANTS.FUGU:
             case LLM_CONSTANTS.FUGU_ULTRA:
                 return new FuguAgent(name, instruction, model.modelApiName, key, shouldEnableThinking);
             default:

@@ -12,6 +12,7 @@ import {
     GAME_ROLES,
     GAME_STATES,
     GameMessage,
+    MESSAGE_ROLE,
     MessageType,
     RECIPIENT_ALL,
     RECIPIENT_DETECTIVE,
@@ -357,13 +358,13 @@ function shouldTriggerAutoVote(game: Game): boolean {
             // Get messages for this bot (ALL + direct messages to this bot)
             const botMessages = await getBotMessages(gameId, bot.name, game.currentDay);
     
-            // Include the GM command in history with playstyle reminder without saving it yet
+            // Include the GM command in history without saving it yet. The playstyle
+            // reminder rides as its own trailing message (never persisted) so the GM
+            // command block stays byte-stable for prompt caches; providers that need
+            // alternating roles merge it back in prepareMessages.
             const playStyleReminder = format(BOT_REMINDER_POSTFIX, { play_style: generatePlayStyleDescription(bot), human_player_name: game.humanPlayerName });
-            const messagesWithPlaystyle = [...botMessages, {
-                ...gmMessage,
-                msg: gmMessage.msg + playStyleReminder
-            }];
-            const history = convertToAIMessages(bot.name, messagesWithPlaystyle);
+            const history = convertToAIMessages(bot.name, [...botMessages, gmMessage]);
+            history.push({ role: MESSAGE_ROLE.USER, content: playStyleReminder.trim() });
             const [answer, thinking, tokenUsage, thinkingSignature] = await agent.askText(history);
 
             if (!answer) {
@@ -743,13 +744,13 @@ async function processNextBotInQueue(
     const agent = AgentFactory.createAgent(bot.name, botPrompt, replyModel.aiType, apiKeys, replyModel.enableThinking);
     agent.gameId = gameId;
     agent.userId = userEmail;
-    // Include the GM command in history with playstyle reminder without saving it yet
+    // Include the GM command in history without saving it yet. The playstyle reminder
+    // rides as its own trailing message (never persisted) so the GM command block stays
+    // byte-stable for prompt caches; providers that need alternating roles merge it back
+    // in prepareMessages.
     const playStyleReminder = format(BOT_REMINDER_POSTFIX, { play_style: generatePlayStyleDescription(bot), human_player_name: game.humanPlayerName });
-    const messagesWithPlaystyle = [...botMessages, {
-        ...gmMessage,
-        msg: gmMessage.msg + playStyleReminder
-    }];
-    const history = convertToAIMessages(bot.name, messagesWithPlaystyle);
+    const history = convertToAIMessages(bot.name, [...botMessages, gmMessage]);
+    history.push({ role: MESSAGE_ROLE.USER, content: playStyleReminder.trim() });
     const [botReply, thinking, tokenUsage, thinkingSignature] = await agent.askText(history);
     if (!botReply) {
         throw new BotResponseError(
@@ -1130,13 +1131,12 @@ async function voteImpl(gameId: string): Promise<GameActionResponse> {
             // Get messages for this bot
             const botMessages = await getBotMessages(gameId, bot.name, currentGame.currentDay);
             
-            // Create history including the voting command with playstyle reminder
+            // Create history including the voting command; the playstyle reminder rides
+            // as its own trailing message (never persisted) so the GM command block stays
+            // byte-stable for prompt caches.
             const playStyleReminder = format(BOT_REMINDER_POSTFIX, { play_style: generatePlayStyleDescription(bot), human_player_name: currentGame.humanPlayerName });
-            const messagesWithPlaystyle = [...botMessages, {
-                ...gmMessage,
-                msg: gmMessage.msg + playStyleReminder
-            }];
-            const history = convertToAIMessages(bot.name, messagesWithPlaystyle);
+            const history = convertToAIMessages(bot.name, [...botMessages, gmMessage]);
+            history.push({ role: MESSAGE_ROLE.USER, content: playStyleReminder.trim() });
             
             let voteResponse: any;
             let thinking: string;

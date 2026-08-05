@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { SupportedAiModels, SupportedAiKeyNames, getModelDisplayName, getModelTags, modelHasTag, type ModelTag } from '@/app/ai/ai-models';
+import { SupportedAiModels, SupportedAiKeyNames, getModelDisplayName, getModelTags, modelIsFast, type ModelTag } from '@/app/ai/ai-models';
 
 interface OptionMeta {
     disabled?: boolean;
@@ -21,9 +21,10 @@ interface AIModelSelectProps {
 }
 
 const TAG_STYLES: Record<ModelTag, { text: string; border: string; bg: string; label: string }> = {
+    'very-fast': { text: 'var(--tag-fast-text)', border: 'var(--tag-fast-border)', bg: 'var(--tag-fast-bg)', label: 'very fast' },
     fast: { text: 'var(--tag-fast-text)', border: 'var(--tag-fast-border)', bg: 'var(--tag-fast-bg)', label: 'fast' },
     slow: { text: 'var(--tag-std-text)', border: 'var(--tag-std-border)', bg: 'var(--tag-std-bg)', label: 'slow' },
-    'very-slow': { text: 'var(--danger)', border: 'oklch(70% 0.13 25 / 0.3)', bg: 'oklch(70% 0.13 25 / 0.08)', label: 'very slow' },
+    'extremely-slow': { text: 'var(--danger)', border: 'oklch(70% 0.13 25 / 0.3)', bg: 'oklch(70% 0.13 25 / 0.08)', label: 'extremely slow' },
     cheap: { text: 'var(--tag-fast-text)', border: 'var(--tag-fast-border)', bg: 'var(--tag-fast-bg)', label: 'cheap' },
     expensive: { text: 'var(--tag-std-text)', border: 'var(--tag-std-border)', bg: 'var(--tag-std-bg)', label: 'expensive' },
 };
@@ -168,7 +169,7 @@ export default function AIModelSelect({
         const matches = options.filter(modelId => {
             const meta = optionMetaFn?.(modelId);
             if (meta?.disabled) return false;
-            if (nextFastOnly && !modelHasTag(modelId, 'fast')) return false;
+            if (nextFastOnly && !modelIsFast(modelId)) return false;
             if (nextProviders.size > 0 && !nextProviders.has(getProviderName(modelId))) return false;
             return true;
         });

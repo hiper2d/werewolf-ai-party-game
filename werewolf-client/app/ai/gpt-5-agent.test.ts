@@ -232,9 +232,13 @@ describe("Gpt5Agent integration", () => {
       const pricing = MODEL_PRICING[apiName];
       expect(pricing).toBeDefined();
 
+      // 1M input tokens exceeds Luna's 272K extended-context threshold, so the
+      // extended-context rates apply (added with the Luna/Terra repricing).
       const cost = calculateOpenAICost(apiName, 1000000, 1000000);
       expect(cost).toBeGreaterThan(0);
-      expect(cost).toBeCloseTo(pricing.inputPrice + pricing.outputPrice, 2);
+      const expectedInput = pricing.extendedContextInputPrice ?? pricing.inputPrice;
+      const expectedOutput = pricing.extendedContextOutputPrice ?? pricing.outputPrice;
+      expect(cost).toBeCloseTo(expectedInput + expectedOutput, 2);
     });
   });
 

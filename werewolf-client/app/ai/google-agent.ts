@@ -57,7 +57,8 @@ export class GoogleAgent extends AbstractAgent {
         });
     }
 
-    private convertToContents(messages: AIMessage[]): Content[] {
+    private convertToContents(rawMessages: AIMessage[]): Content[] {
+        const messages = this.prepareMessages(rawMessages);
         try {
             // Track thinking stats for aggregated logging
             let assistantMsgCount = 0;

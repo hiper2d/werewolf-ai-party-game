@@ -1,27 +1,38 @@
 import { AIMessage, TokenUsage, AgentLoggingConfig, DEFAULT_LOGGING_CONFIG } from "@/app/api/game-models";
 import { z } from 'zod';
 import { logger } from "@/app/utils/logger";
+import { CACHE_TIER_MARKER } from "@/app/ai/prompts/bot-prompts";
 
 export abstract class AbstractAgent {
     name: string;
     gameId?: string;
     userId?: string;
     protected readonly instruction: string;
+    /**
+     * The instruction split on CACHE_TIER_MARKER: [shared static tier, per-bot tier].
+     * Length 1 when the prompt has no marker (GM prompts, tests). Providers with
+     * explicit cache breakpoints (Anthropic) place one per part; everyone else uses
+     * the joined marker-free `instruction`, whose shared prefix implicit caches match.
+     */
+    protected readonly instructionParts: string[];
     protected readonly temperature: number;
     protected readonly model: string;
     protected readonly enableThinking: boolean;
     protected readonly agentLoggingConfig: AgentLoggingConfig;
 
     protected constructor(
-        name: string, 
-        instruction: string, 
-        model: string, 
-        temperature: number, 
+        name: string,
+        instruction: string,
+        model: string,
+        temperature: number,
         enableThinking: boolean = false,
         agentLoggingConfig: AgentLoggingConfig = DEFAULT_LOGGING_CONFIG.agents
     ) {
         this.name = name;
-        this.instruction = instruction;
+        this.instructionParts = instruction
+            .split(CACHE_TIER_MARKER)
+            .filter(part => part.trim().length > 0);
+        this.instruction = this.instructionParts.join('\n\n');
         this.temperature = temperature;
         this.model = model;
         this.enableThinking = enableThinking;
@@ -93,7 +104,24 @@ export abstract class AbstractAgent {
     }
 
 
+    /**
+     * Merges consecutive user messages (e.g. a GM command followed by the detached
+     * reminder postfix) into one, for providers that expect alternating roles — this
+     * reproduces the pre-detachment request shape. ClaudeAgent overrides this to keep
+     * them separate: Anthropic combines consecutive user turns into one turn but keeps
+     * distinct content blocks, which lets its fast cache breakpoint sit on the persisted
+     * command block while the throwaway reminder rides behind it.
+     */
     protected prepareMessages(messages: AIMessage[]): AIMessage[] {
-        return messages;
+        const result: AIMessage[] = [];
+        for (const msg of messages) {
+            const prev = result[result.length - 1];
+            if (prev && prev.role === 'user' && msg.role === 'user') {
+                result[result.length - 1] = { ...prev, content: `${prev.content}\n\n${msg.content}` };
+            } else {
+                result.push(msg);
+            }
+        }
+        return result;
     }
 }

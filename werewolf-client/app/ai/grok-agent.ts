@@ -1,4 +1,5 @@
 import {AbstractAgent} from "@/app/ai/abstract-agent";
+import {createHash} from "crypto";
 import {OpenAI} from "openai";
 import {AIMessage, TokenUsage, AgentLoggingConfig, DEFAULT_LOGGING_CONFIG} from "@/app/api/game-models";
 import {parseAndValidateLlmJson} from './json-response-parser';
@@ -41,10 +42,17 @@ export class GrokAgent extends AbstractAgent {
         agentLoggingConfig: AgentLoggingConfig = DEFAULT_LOGGING_CONFIG.agents
     ) {
         super(name, instruction, model, temperature, enableThinking, agentLoggingConfig);
+        // xAI routes requests by the x-grok-conv-id header: the same id lands on the same
+        // server, which is where the prompt cache lives — without it, cache hits are luck
+        // of the load balancer. Derive a stable id from the bot's identity + system prompt:
+        // stable within a game day (the instruction only changes at the day boundary, when
+        // the cache would be cold anyway).
+        const convId = createHash('sha256').update(`${name}\n${instruction}`).digest('hex');
         this.client = new OpenAI({
             apiKey: apiKey,
             baseURL: 'https://api.x.ai/v1',
             timeout: 1200000,
+            defaultHeaders: { 'x-grok-conv-id': convId },
         });
     }
 
