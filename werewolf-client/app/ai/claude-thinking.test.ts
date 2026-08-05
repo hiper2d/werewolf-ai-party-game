@@ -27,7 +27,7 @@ describeOrSkip("Claude Agent Thinking & Mixed History", () => {
     });
 
     // Use a thinking-capable model
-    const model = SupportedAiModels[LLM_CONSTANTS.CLAUDE_4_SONNET_THINKING].modelApiName;
+    const model = SupportedAiModels[LLM_CONSTANTS.CLAUDE_4_SONNET].modelApiName;
 
     it("should return thinking content and signature when thinking is enabled", async () => {
         const agent = new ClaudeAgent(botName, instruction, model, process.env.ANTHROPIC_K!, true);

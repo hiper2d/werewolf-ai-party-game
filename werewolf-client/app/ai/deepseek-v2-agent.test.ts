@@ -16,7 +16,7 @@ describe("DeepSeekV2Agent integration", () => {
   const describeOrSkip = hasApiKey ? describe : describe.skip;
   
   // Helper function to create a DeepSeek agent (focusing on reasoner model only)
-  const createAgent = (modelType: string = LLM_CONSTANTS.DEEPSEEK_V4_PRO_THINKING): DeepSeekV2Agent => {
+  const createAgent = (modelType: string = LLM_CONSTANTS.DEEPSEEK_V4_PRO): DeepSeekV2Agent => {
     const testBot = {
       name: "TestBot",
       story: "A brilliant strategist with deep analytical capabilities",
@@ -53,7 +53,7 @@ describe("DeepSeekV2Agent integration", () => {
   describe("Zod integration with DeepSeek Reasoner", () => {
     describeOrSkip("askWithZodSchema with real API", () => {
       it("should work with Zod schema for bot answers using DeepSeek Reasoner", async () => {
-        const agent = createAgent(LLM_CONSTANTS.DEEPSEEK_V4_PRO_THINKING);
+        const agent = createAgent(LLM_CONSTANTS.DEEPSEEK_V4_PRO);
         const messages: AIMessage[] = [{
           role: 'user',
           content: 'Think step by step: What do you think about the current situation in the village after David was revealed as a werewolf?'
@@ -95,7 +95,7 @@ describe("DeepSeekV2Agent integration", () => {
         const gmAgent = new DeepSeekV2Agent(
           GAME_MASTER,
           STORY_SYSTEM_PROMPT,
-          SupportedAiModels[LLM_CONSTANTS.DEEPSEEK_V4_PRO_THINKING].modelApiName,
+          SupportedAiModels[LLM_CONSTANTS.DEEPSEEK_V4_PRO].modelApiName,
           process.env.DEEP_SEEK_K!,
           0.7,
           true // Enable thinking for story generation
@@ -220,7 +220,7 @@ describe("DeepSeekV2Agent integration", () => {
 
     describeOrSkip("askText with real API", () => {
       it("should return plain text (no JSON wrapper) with thinking model", async () => {
-        const agent = createAgent(LLM_CONSTANTS.DEEPSEEK_V4_PRO_THINKING);
+        const agent = createAgent(LLM_CONSTANTS.DEEPSEEK_V4_PRO);
         const messages: AIMessage[] = [{
           role: 'user',
           content: 'In 3-4 sentences, what do you think about the current situation in the village after David was revealed as a werewolf?'
@@ -304,7 +304,7 @@ describe("DeepSeekV2Agent integration", () => {
   describe("Reasoning model characteristics", () => {
     it("should properly differentiate reasoning vs non-reasoning model behavior", () => {
       // Test that reasoning model is configured correctly
-      const reasonerAgent = createAgent(LLM_CONSTANTS.DEEPSEEK_V4_PRO_THINKING);
+      const reasonerAgent = createAgent(LLM_CONSTANTS.DEEPSEEK_V4_PRO);
       
       // Verify the reasoner agent has thinking enabled
       expect((reasonerAgent as any).enableThinking).toBe(true);

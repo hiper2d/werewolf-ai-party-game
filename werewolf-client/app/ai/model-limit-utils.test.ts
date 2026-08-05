@@ -209,8 +209,8 @@ describe('getSelectableModelsForUser (model picker contract: GM dropdown, bot li
     it('FREE tier lists only free-tier-available models — premium models like Claude Opus are hidden', () => {
         const models = getSelectableModelsForUser(USER_TIERS.FREE, new Set());
         expect(models).not.toContain(LLM_CONSTANTS.CLAUDE_4_OPUS);
-        expect(models).not.toContain(LLM_CONSTANTS.CLAUDE_4_OPUS_THINKING);
-        expect(models).toContain(LLM_CONSTANTS.CLAUDE_4_SONNET);
+        expect(models).not.toContain(LLM_CONSTANTS.CLAUDE_4_SONNET);
+        expect(models).toContain(LLM_CONSTANTS.CLAUDE_4_HAIKU);
         // exactly the models whose config allows free-tier use
         for (const model of models) {
             const cfg = SupportedAiModels[model];
@@ -263,18 +263,20 @@ describe('getModelPickerOptions (single source of truth for every picker)', () =
     // Pin concrete models with distinct free-tier policies, and self-validate the
     // pricing-derived policy so this test fails loudly (rather than silently drifting)
     // if a band ever changes.
-    const UNLIMITED = LLM_CONSTANTS.DEEPSEEK_V4_FLASH;   // <= $2 output → unlimited
-    const LIMITED_3 = LLM_CONSTANTS.CLAUDE_4_HAIKU;      // <= $5 output → 3 bots
-    const SINGLE_1 = LLM_CONSTANTS.CLAUDE_4_SONNET;      // <= $15 output → 1 bot
-    const UNAVAILABLE = LLM_CONSTANTS.CLAUDE_4_OPUS;     // > $15 output → not available
+    // Effective output price = sticker × 2.5 for hybrid thinking-only models (Claude, DeepSeek, GLM).
+    const UNLIMITED = LLM_CONSTANTS.DEEPSEEK_V4_FLASH;   // $0.28 × 2.5 = $0.70 <= $2 → unlimited
+    const LIMITED_3 = LLM_CONSTANTS.DEEPSEEK_V4_PRO;     // $0.87 × 2.5 = $2.18 <= $6 → 3 bots
+    const SINGLE_1 = LLM_CONSTANTS.CLAUDE_4_HAIKU;       // $5 × 2.5 = $12.50 <= $15 → 1 bot
+    const UNAVAILABLE = LLM_CONSTANTS.CLAUDE_4_OPUS;     // $25 × 2.5 > $15 → not available
 
     it('pins the assumed free-tier policies (guards against pricing drift)', () => {
         expect(SupportedAiModels[UNLIMITED].freeTier).toMatchObject({ available: true, maxBotsPerGame: -1 });
         expect(SupportedAiModels[LIMITED_3].freeTier).toMatchObject({ available: true, maxBotsPerGame: 3 });
         expect(SupportedAiModels[SINGLE_1].freeTier).toMatchObject({ available: true, maxBotsPerGame: 1 });
         expect(SupportedAiModels[UNAVAILABLE].freeTier).toMatchObject({ available: false, maxBotsPerGame: 0 });
-        // A thinking variant is a separate model id with its own free-tier limit.
-        expect(SupportedAiModels[LLM_CONSTANTS.CLAUDE_4_HAIKU_THINKING].freeTier?.maxBotsPerGame).toBe(1);
+        // Hybrid thinking-only models keep paying the reasoning multiplier: GLM-5.2 at $4.4
+        // sticker output would be 3 bots, but ×2.5 = $11 effective lands it in the 1-bot band.
+        expect(SupportedAiModels[LLM_CONSTANTS.GLM].freeTier?.maxBotsPerGame).toBe(1);
     });
 
     it('never returns the RANDOM pseudo-model on any tier', () => {
@@ -421,7 +423,14 @@ describe('deprecated model IDs in persisted games', () => {
         ['grok-fast', LLM_CONSTANTS.GROK_4_5],
         ['gpt-5.4', LLM_CONSTANTS.GPT_5_6_TERRA],
         ['deepseek-chat', LLM_CONSTANTS.DEEPSEEK_V4_FLASH],
-        ['deepseek-reasoner', LLM_CONSTANTS.DEEPSEEK_V4_FLASH_THINKING],
+        ['deepseek-reasoner', LLM_CONSTANTS.DEEPSEEK_V4_FLASH],
+        // '-thinking' picker ids retired 2026-08-05 when the catalog went thinking-only.
+        ['claude-opus-thinking', LLM_CONSTANTS.CLAUDE_4_OPUS],
+        ['claude-sonnet-thinking', LLM_CONSTANTS.CLAUDE_4_SONNET],
+        ['claude-haiku-thinking', LLM_CONSTANTS.CLAUDE_4_HAIKU],
+        ['deepseek-flash-thinking', LLM_CONSTANTS.DEEPSEEK_V4_FLASH],
+        ['deepseek-pro-thinking', LLM_CONSTANTS.DEEPSEEK_V4_PRO],
+        ['glm-thinking', LLM_CONSTANTS.GLM],
     ];
 
     it.each(LEGACY_TO_CURRENT)('resolves %s to a supported model', (legacy, current) => {

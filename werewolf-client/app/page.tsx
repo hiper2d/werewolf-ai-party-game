@@ -44,7 +44,7 @@ const TIERS = [
     featured: true,
     badge: 'No subscription',
     features: [
-      'The full model catalog — every model & Thinking variant',
+      'The full model catalog — every model, reasoning always on',
       'No per-game bot caps — mix freely',
       'No daily game limit',
       'Prepaid balance — top up anytime',

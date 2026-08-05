@@ -29,14 +29,11 @@ export class AgentFactory {
         const shouldEnableThinking = model.hasThinking;
 
         switch (modelName) {
-            // Claude models - both regular and thinking versions
+            // Claude models — thinking-only since 2026-08-05
             case LLM_CONSTANTS.CLAUDE_FABLE:
             case LLM_CONSTANTS.CLAUDE_4_OPUS:
-            case LLM_CONSTANTS.CLAUDE_4_OPUS_THINKING:
             case LLM_CONSTANTS.CLAUDE_4_SONNET:
-            case LLM_CONSTANTS.CLAUDE_4_SONNET_THINKING:
             case LLM_CONSTANTS.CLAUDE_4_HAIKU:
-            case LLM_CONSTANTS.CLAUDE_4_HAIKU_THINKING:
                 return new ClaudeAgent(name, instruction, model.modelApiName, key, shouldEnableThinking);
 
             // Always-on reasoning models
@@ -51,11 +48,9 @@ export class AgentFactory {
             case LLM_CONSTANTS.GROK_4_5:
                 return new GrokAgent(name, instruction, model.modelApiName, key, model.temperature!, shouldEnableThinking);
 
-            // DeepSeek V4 models - flash and pro, with thinking toggle
+            // DeepSeek V4 models — thinking-only since 2026-08-05
             case LLM_CONSTANTS.DEEPSEEK_V4_FLASH:
-            case LLM_CONSTANTS.DEEPSEEK_V4_FLASH_THINKING:
             case LLM_CONSTANTS.DEEPSEEK_V4_PRO:
-            case LLM_CONSTANTS.DEEPSEEK_V4_PRO_THINKING:
                 return new DeepSeekV2Agent(name, instruction, model.modelApiName, key, model.temperature ?? 0, shouldEnableThinking);
 
             // Mistral models
@@ -68,9 +63,8 @@ export class AgentFactory {
                 // Kimi K3 rejects any temperature but 1; the agent never sends the field.
                 return new KimiAgent(name, instruction, model.modelApiName, key, 0, shouldEnableThinking);
 
-            // Z.AI models
+            // Z.AI models — thinking-only since 2026-08-05
             case LLM_CONSTANTS.GLM:
-            case LLM_CONSTANTS.GLM_THINKING:
                 return new GlmAgent(name, instruction, model.modelApiName, key, model.temperature!, shouldEnableThinking);
 
             // Sakana Fugu models — always-on reasoning, no temperature (ignored by the model)

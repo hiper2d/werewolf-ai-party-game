@@ -76,7 +76,7 @@ describe("GlmAgent integration", () => {
         }, 60000);
 
         it("should respond with valid schema-based answer using GLM-5.2 (thinking enabled)", async () => {
-            const agent = createAgent("TestBot", LLM_CONSTANTS.GLM_THINKING, true);
+            const agent = createAgent("TestBot", LLM_CONSTANTS.GLM, true);
             const messages: AIMessage[] = [{
                 role: 'user',
                 content: 'Who do you suspect might be a werewolf, and why?'

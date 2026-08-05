@@ -33,18 +33,16 @@ export const SupportedAiKeyNames: Record<string, string> = {
 };
 
 export const LLM_CONSTANTS = {
-    // Fable 5 always reasons — its thinking cannot be disabled — so there's no non-thinking variant.
+    // Thinking-only catalog since 2026-08-05: models whose API offers a thinking toggle used to
+    // ship as separate with/without picker entries. The non-thinking variants were retired and
+    // the surviving thinking entries took over the plain ids ('claude-opus', 'glm', …); the old
+    // '-thinking' ids persisted in game docs resolve via DEPRECATED_MODEL_MAP.
     CLAUDE_FABLE: 'claude-fable',
     CLAUDE_4_OPUS: 'claude-opus',
-    CLAUDE_4_OPUS_THINKING: 'claude-opus-thinking',
     CLAUDE_4_SONNET: 'claude-sonnet',
-    CLAUDE_4_SONNET_THINKING: 'claude-sonnet-thinking',
     CLAUDE_4_HAIKU: 'claude-haiku',
-    CLAUDE_4_HAIKU_THINKING: 'claude-haiku-thinking',
     DEEPSEEK_V4_FLASH: 'deepseek-flash',
-    DEEPSEEK_V4_FLASH_THINKING: 'deepseek-flash-thinking',
     DEEPSEEK_V4_PRO: 'deepseek-pro',
-    DEEPSEEK_V4_PRO_THINKING: 'deepseek-pro-thinking',
     // GPT-5.6 family. 'gpt' and 'gpt-mini' are stable picker ids carried over from the
     // GPT-5.5 / GPT-5.4-mini era so existing games keep working across the repoint.
     GPT_5_6_SOL: 'gpt-sol',
@@ -60,7 +58,6 @@ export const LLM_CONSTANTS = {
     GROK_4_5: 'grok',
     KIMI: 'kimi',
     GLM: 'glm',
-    GLM_THINKING: 'glm-thinking',
     FUGU_ULTRA: 'fugu-ultra',
     RANDOM: 'random',
 }
@@ -129,16 +126,9 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         tags: ['expensive'],
     },
 
-    // Claude models - separate with/without thinking versions
+    // Claude models — thinking-only entries (non-thinking variants retired 2026-08-05)
     [LLM_CONSTANTS.CLAUDE_4_OPUS]: {
         displayName: 'Claude 5 Opus',
-        modelApiName: 'claude-opus-5',
-        apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
-        hasThinking: false,
-        tags: ['fast', 'expensive'],
-    },
-    [LLM_CONSTANTS.CLAUDE_4_OPUS_THINKING]: {
-        displayName: 'Claude 5 Opus (Thinking)',
         modelApiName: 'claude-opus-5',
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
         hasThinking: true,
@@ -149,13 +139,6 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         displayName: 'Claude 5 Sonnet',
         modelApiName: 'claude-sonnet-5',
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
-        hasThinking: false,
-        tags: ['fast', 'expensive'],
-    },
-    [LLM_CONSTANTS.CLAUDE_4_SONNET_THINKING]: {
-        displayName: 'Claude 5 Sonnet (Thinking)',
-        modelApiName: 'claude-sonnet-5',
-        apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
         hasThinking: true,
         reasoningEffort: 'high',
         tags: ['expensive'],
@@ -164,30 +147,14 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         displayName: 'Claude 4.5 Haiku',
         modelApiName: 'claude-haiku-4-5',
         apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
-        hasThinking: false,
-        tags: ['very-fast', 'cheap'],
-    },
-    [LLM_CONSTANTS.CLAUDE_4_HAIKU_THINKING]: {
-        displayName: 'Claude 4.5 Haiku (Thinking)',
-        modelApiName: 'claude-haiku-4-5',
-        apiKeyName: API_KEY_CONSTANTS.ANTHROPIC,
         hasThinking: true,
         thinkingBudgetTokens: 1024,
         tags: ['slow', 'cheap'],
     },
 
-    // DeepSeek V4 models - Flash and Pro, each with thinking toggle
+    // DeepSeek V4 models — thinking-only entries (non-thinking variants retired 2026-08-05)
     [LLM_CONSTANTS.DEEPSEEK_V4_FLASH]: {
         displayName: 'DeepSeek V4 Flash',
-        modelApiName: 'deepseek-v4-flash',
-        apiKeyName: API_KEY_CONSTANTS.DEEPSEEK,
-        hasThinking: false,
-        temperature: 0.6,
-        maxOutputTokens: 16384,
-        tags: ['fast', 'cheap'],
-    },
-    [LLM_CONSTANTS.DEEPSEEK_V4_FLASH_THINKING]: {
-        displayName: 'DeepSeek V4 Flash (Thinking)',
         modelApiName: 'deepseek-v4-flash',
         apiKeyName: API_KEY_CONSTANTS.DEEPSEEK,
         hasThinking: true,
@@ -197,15 +164,6 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
     },
     [LLM_CONSTANTS.DEEPSEEK_V4_PRO]: {
         displayName: 'DeepSeek V4 Pro',
-        modelApiName: 'deepseek-v4-pro',
-        apiKeyName: API_KEY_CONSTANTS.DEEPSEEK,
-        hasThinking: false,
-        temperature: 0.6,
-        maxOutputTokens: 16384,
-        tags: ['cheap'],
-    },
-    [LLM_CONSTANTS.DEEPSEEK_V4_PRO_THINKING]: {
-        displayName: 'DeepSeek V4 Pro (Thinking)',
         modelApiName: 'deepseek-v4-pro',
         apiKeyName: API_KEY_CONSTANTS.DEEPSEEK,
         hasThinking: true,
@@ -324,17 +282,9 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         freeTier: { available: false, maxBotsPerGame: 0 },
     },
 
-    // Z.AI models
+    // Z.AI models — thinking-only entry (non-thinking variant retired 2026-08-05)
     [LLM_CONSTANTS.GLM]: {
         displayName: 'GLM-5.2',
-        modelApiName: 'glm-5.2',
-        apiKeyName: API_KEY_CONSTANTS.Z_AI,
-        hasThinking: false,
-        temperature: 0.7,
-        tags: ['fast'],
-    },
-    [LLM_CONSTANTS.GLM_THINKING]: {
-        displayName: 'GLM-5.2 (Thinking)',
         modelApiName: 'glm-5.2',
         apiKeyName: API_KEY_CONSTANTS.Z_AI,
         hasThinking: true,
@@ -383,9 +333,9 @@ export function getModelDisplayName(modelId: string): string {
 }
 
 /**
- * Looks up a model's config by API name. Thinking and non-thinking picker variants share a
- * modelApiName but can differ in config (reasoning knobs, maxOutputTokens), so pass hasThinking
- * to select the right variant; without it (or if no variant matches) the first entry wins.
+ * Looks up a model's config by API name. Since the catalog went thinking-only (2026-08-05) each
+ * modelApiName has a single entry, so hasThinking no longer disambiguates anything; it is kept
+ * for call-site compatibility and as a filter should variants ever return.
  */
 export function getModelConfigByApiName(modelApiName: string, hasThinking?: boolean): ModelConfig | undefined {
     const candidates = Object.values(SupportedAiModels).filter(config => config.modelApiName === modelApiName);
@@ -594,10 +544,11 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
  *   <= $15 → 1 bot
  *   > $15  → not available on the free tier
  *
- * Optional "(Thinking)" variants — a thinking model that shares its `modelApiName` with a cheaper
- * non-thinking sibling — burn extra reasoning tokens at the same per-token price, so their
- * effective output price is multiplied by THINKING_COST_FACTOR before banding. Always-on reasoning
- * models (GPT-5, Gemini 3, Magistral) have no non-thinking sibling and are priced as listed.
+ * Hybrid models — models whose API can run without thinking but that we ship as thinking-only
+ * entries (the non-thinking picker variants were retired 2026-08-05) — burn extra reasoning
+ * tokens at the same per-token price, so their effective output price is multiplied by
+ * THINKING_COST_FACTOR before banding, exactly as their "(Thinking)" variants always were.
+ * Always-on reasoning models (GPT-5, Gemini 3, Magistral) are priced as listed.
  */
 /**
  * Model IDs that games may still hold in Firestore but that no longer exist in LLM_CONSTANTS,
@@ -612,11 +563,21 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
 const DEPRECATED_MODEL_MAP: Record<string, string> = {
     'gpt-5.4': LLM_CONSTANTS.GPT_5_6_TERRA,
     'deepseek-chat': LLM_CONSTANTS.DEEPSEEK_V4_FLASH,
-    'deepseek-reasoner': LLM_CONSTANTS.DEEPSEEK_V4_FLASH_THINKING,
+    'deepseek-reasoner': LLM_CONSTANTS.DEEPSEEK_V4_FLASH,
     'grok-fast': LLM_CONSTANTS.GROK_4_5,
     'grok-thinking': LLM_CONSTANTS.GROK_4_5,
     // Kimi collapsed to a single always-reasoning K3 entry.
     'kimi-thinking': LLM_CONSTANTS.KIMI,
+    // Catalog went thinking-only 2026-08-05: the non-thinking variants were retired and the
+    // thinking entries took over the plain ids. A persisted plain id ('claude-opus', 'glm', …)
+    // is therefore still live — it now just always runs with reasoning enabled — while the old
+    // '-thinking' ids resolve back to those plain ids here.
+    'claude-opus-thinking': LLM_CONSTANTS.CLAUDE_4_OPUS,
+    'claude-sonnet-thinking': LLM_CONSTANTS.CLAUDE_4_SONNET,
+    'claude-haiku-thinking': LLM_CONSTANTS.CLAUDE_4_HAIKU,
+    'deepseek-flash-thinking': LLM_CONSTANTS.DEEPSEEK_V4_FLASH,
+    'deepseek-pro-thinking': LLM_CONSTANTS.DEEPSEEK_V4_PRO,
+    'glm-thinking': LLM_CONSTANTS.GLM,
     // Base `fugu` retired 2026-08-04: it billed at ultra's rates anyway (see the Fugu comment in
     // MODEL_PRICING), so persisted bots resolve to the model they were effectively already paying
     // for. NOTE fugu-ultra is not free-tier eligible ($30 output), so a free-tier game still
@@ -645,13 +606,29 @@ export const FREE_TIER_LIMITED_MAX_BOTS = 3;
 // extra cost of running a model in reasoning mode, and it's what free-tier budgeting is based on.
 export const FREE_TIER_THINKING_COST_FACTOR = 2.5;
 
-/** modelApiNames that have at least one non-thinking config — i.e. a thinking entry on one of
- *  these is an optional "(Thinking)" variant that should pay the reasoning-cost multiplier. */
-const NON_THINKING_API_NAMES = new Set(
-    Object.values(SupportedAiModels)
-        .filter(c => !c.hasThinking)
-        .map(c => c.modelApiName)
-);
+/** modelApiNames of hybrid models: their APIs offer a thinking toggle, but the catalog ships them
+ *  thinking-only (non-thinking variants retired 2026-08-05). Their entries keep paying the
+ *  reasoning-cost multiplier so free-tier banding matches what these thinking variants cost
+ *  before the retirement — banding them on sticker price would silently expand free-tier cost.
+ *  This is hand-maintained now: it can no longer be derived from the catalog, since no
+ *  non-thinking siblings exist to derive it from. */
+const HYBRID_THINKING_API_NAMES = new Set([
+    SupportedAiModels[LLM_CONSTANTS.CLAUDE_4_OPUS].modelApiName,
+    SupportedAiModels[LLM_CONSTANTS.CLAUDE_4_SONNET].modelApiName,
+    SupportedAiModels[LLM_CONSTANTS.CLAUDE_4_HAIKU].modelApiName,
+    SupportedAiModels[LLM_CONSTANTS.DEEPSEEK_V4_FLASH].modelApiName,
+    SupportedAiModels[LLM_CONSTANTS.DEEPSEEK_V4_PRO].modelApiName,
+    SupportedAiModels[LLM_CONSTANTS.GLM].modelApiName,
+]);
+
+/** True for hybrid thinking-only models, i.e. the ones whose ×FREE_TIER_THINKING_COST_FACTOR
+ *  effective output price is a known quantity (it's what free-tier banding uses). Always-on
+ *  reasoning models (GPT-5, Gemini, Grok, Kimi, Fable, Magistral) also burn reasoning tokens,
+ *  but their multiplier hasn't been measured — don't display or bill an effective price for
+ *  them until usage statistics establish one. */
+export function isHybridThinkingModel(modelApiName: string): boolean {
+    return HYBRID_THINKING_API_NAMES.has(modelApiName);
+}
 
 /**
  * Derives a model's free-tier policy ({ available, maxBotsPerGame }) from its price.
@@ -665,7 +642,7 @@ export function getFreeTierPolicy(
     if (!pricing) {
         return { available: false, maxBotsPerGame: 0 };
     }
-    const isOptionalThinkingVariant = hasThinking && NON_THINKING_API_NAMES.has(modelApiName);
+    const isOptionalThinkingVariant = hasThinking && HYBRID_THINKING_API_NAMES.has(modelApiName);
     const effectiveOutputPrice = isOptionalThinkingVariant
         ? pricing.outputPrice * FREE_TIER_THINKING_COST_FACTOR
         : pricing.outputPrice;

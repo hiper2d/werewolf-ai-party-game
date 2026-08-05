@@ -281,24 +281,6 @@ describe('previewGame tier enforcement', () => {
                 previewGame(
                     makePreview({
                         playerCount: 2, // 1 bot
-                        gameMasterAiType: LLM_CONSTANTS.CLAUDE_4_SONNET,
-                        playersAiType: [LLM_CONSTANTS.CLAUDE_4_SONNET],
-                    })
-                )
-            ).rejects.toThrow(
-                'No AI models are available for additional bots on the free tier with the current selection.'
-            );
-        });
-
-        it('rejects when a capped model (Haiku, max 3) is exhausted across GM + bots', async () => {
-            mockTier(USER_TIERS.FREE);
-            setupDbForPreview(0);
-            stubAgentReturning(3);
-
-            await expect(
-                previewGame(
-                    makePreview({
-                        playerCount: 4, // 3 bots; GM + 3 bots = 4 > cap of 3
                         gameMasterAiType: LLM_CONSTANTS.CLAUDE_4_HAIKU,
                         playersAiType: [LLM_CONSTANTS.CLAUDE_4_HAIKU],
                     })
@@ -308,7 +290,25 @@ describe('previewGame tier enforcement', () => {
             );
         });
 
-        it('allows a capped model exactly up to its per-game limit (GM + 2 bots = 3 Haiku uses)', async () => {
+        it('rejects when a capped model (DeepSeek Pro, max 3) is exhausted across GM + bots', async () => {
+            mockTier(USER_TIERS.FREE);
+            setupDbForPreview(0);
+            stubAgentReturning(3);
+
+            await expect(
+                previewGame(
+                    makePreview({
+                        playerCount: 4, // 3 bots; GM + 3 bots = 4 > cap of 3
+                        gameMasterAiType: LLM_CONSTANTS.DEEPSEEK_V4_PRO,
+                        playersAiType: [LLM_CONSTANTS.DEEPSEEK_V4_PRO],
+                    })
+                )
+            ).rejects.toThrow(
+                'No AI models are available for additional bots on the free tier with the current selection.'
+            );
+        });
+
+        it('allows a capped model exactly up to its per-game limit (GM + 2 bots = 3 DeepSeek Pro uses)', async () => {
             mockTier(USER_TIERS.FREE);
             setupDbForPreview(0);
             stubAgentReturning(2);
@@ -316,16 +316,16 @@ describe('previewGame tier enforcement', () => {
             const result = await previewGame(
                 makePreview({
                     playerCount: 3, // 2 bots
-                    gameMasterAiType: LLM_CONSTANTS.CLAUDE_4_HAIKU,
-                    playersAiType: [LLM_CONSTANTS.CLAUDE_4_HAIKU],
+                    gameMasterAiType: LLM_CONSTANTS.DEEPSEEK_V4_PRO,
+                    playersAiType: [LLM_CONSTANTS.DEEPSEEK_V4_PRO],
                 })
             );
 
-            expect(result.gameMasterAiType).toBe(LLM_CONSTANTS.CLAUDE_4_HAIKU);
+            expect(result.gameMasterAiType).toBe(LLM_CONSTANTS.DEEPSEEK_V4_PRO);
             expect(result.bots).toHaveLength(2);
             expect(result.bots.map(b => b.playerAiType)).toEqual([
-                LLM_CONSTANTS.CLAUDE_4_HAIKU,
-                LLM_CONSTANTS.CLAUDE_4_HAIKU,
+                LLM_CONSTANTS.DEEPSEEK_V4_PRO,
+                LLM_CONSTANTS.DEEPSEEK_V4_PRO,
             ]);
         });
 
@@ -517,29 +517,29 @@ describe('createGame tier enforcement', () => {
         const { setGame } = setupDbForCreate();
 
         const preview = makeGeneratedPreview({
-            gameMasterAiType: LLM_CONSTANTS.CLAUDE_4_SONNET,
+            gameMasterAiType: LLM_CONSTANTS.CLAUDE_4_HAIKU,
         });
-        preview.bots[0].playerAiType = LLM_CONSTANTS.CLAUDE_4_SONNET;
+        preview.bots[0].playerAiType = LLM_CONSTANTS.CLAUDE_4_HAIKU;
 
         await expect(createGame(preview)).rejects.toThrow(
-            `Failed to create game: The AI model ${LLM_CONSTANTS.CLAUDE_4_SONNET} can only be used once per game on the free tier.`
+            `Failed to create game: The AI model ${LLM_CONSTANTS.CLAUDE_4_HAIKU} can only be used once per game on the free tier.`
         );
         expect(setGame).not.toHaveBeenCalled();
     });
 
-    it('rejects free-tier games exceeding a capped model limit across bots (Haiku x4)', async () => {
+    it('rejects free-tier games exceeding a capped model limit across bots (DeepSeek Pro x4)', async () => {
         mockTier(USER_TIERS.FREE);
         const { setGame } = setupDbForCreate();
 
         const preview = makeGeneratedPreview({
-            gameMasterAiType: LLM_CONSTANTS.CLAUDE_4_HAIKU,
+            gameMasterAiType: LLM_CONSTANTS.DEEPSEEK_V4_PRO,
         });
         preview.bots.forEach(bot => {
-            bot.playerAiType = LLM_CONSTANTS.CLAUDE_4_HAIKU; // GM + 3 bots = 4 > 3
+            bot.playerAiType = LLM_CONSTANTS.DEEPSEEK_V4_PRO; // GM + 3 bots = 4 > 3
         });
 
         await expect(createGame(preview)).rejects.toThrow(
-            `Failed to create game: The AI model ${LLM_CONSTANTS.CLAUDE_4_HAIKU} can only be used 3 times per game on the free tier.`
+            `Failed to create game: The AI model ${LLM_CONSTANTS.DEEPSEEK_V4_PRO} can only be used 3 times per game on the free tier.`
         );
         expect(setGame).not.toHaveBeenCalled();
     });

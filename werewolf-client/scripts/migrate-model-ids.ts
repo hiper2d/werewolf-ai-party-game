@@ -12,13 +12,23 @@ const DRY_RUN = process.argv.includes('--dry-run');
 
 const OLD_TO_NEW: Record<string, string> = {
     'Claude 4.6 Opus': 'claude-opus',
-    'Claude 4.6 Opus (Thinking)': 'claude-opus-thinking',
+    'Claude 4.6 Opus (Thinking)': 'claude-opus',
     'Claude 4.6 Sonnet': 'claude-sonnet',
-    'Claude 4.6 Sonnet (Thinking)': 'claude-sonnet-thinking',
+    'Claude 4.6 Sonnet (Thinking)': 'claude-sonnet',
     'Claude 4.5 Haiku': 'claude-haiku',
-    'Claude 4.5 Haiku (Thinking)': 'claude-haiku-thinking',
-    'DeepSeek Chat': 'deepseek-chat',
-    'DeepSeek Reasoner': 'deepseek-reasoner',
+    'Claude 4.5 Haiku (Thinking)': 'claude-haiku',
+    'DeepSeek Chat': 'deepseek-flash',
+    'DeepSeek Reasoner': 'deepseek-flash',
+    'deepseek-chat': 'deepseek-flash',
+    'deepseek-reasoner': 'deepseek-flash',
+    // Catalog went thinking-only 2026-08-05: '-thinking' picker ids collapsed onto the plain ids
+    // (which now always run with reasoning enabled).
+    'claude-opus-thinking': 'claude-opus',
+    'claude-sonnet-thinking': 'claude-sonnet',
+    'claude-haiku-thinking': 'claude-haiku',
+    'deepseek-flash-thinking': 'deepseek-flash',
+    'deepseek-pro-thinking': 'deepseek-pro',
+    'glm-thinking': 'glm',
     'GPT-5.2': 'gpt',
     'GPT-5-mini': 'gpt-mini',
     'Gemini 3.1 Pro Preview': 'gemini-pro',

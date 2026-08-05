@@ -9,6 +9,7 @@ import {
     FREE_TIER_LIMITED_MAX_BOTS,
     FREE_TIER_OUTPUT_PRICE_BANDS,
     getFreeTierPolicy,
+    isHybridThinkingModel,
 } from '@/app/ai/ai-models';
 
 type BandId = 'unlim' | 'three' | 'one' | 'paid';
@@ -85,9 +86,13 @@ function buildBands(): Record<BandId, CatalogModel[]> {
             cachedPrice: pricing.cacheHitPrice ?? null,
             price: pricing.outputPrice,
             // "eff" = effective output price: the raw output rate scaled up to include the reasoning
-            // (thinking) tokens a reasoning model emits on average. Shown for every model that
-            // reasons, whether thinking is optional or always on.
-            eff: config.hasThinking ? pricing.outputPrice * FREE_TIER_THINKING_COST_FACTOR : null,
+            // (thinking) tokens the model emits on average. Shown only for hybrid thinking-only
+            // models, where the ×2.5 multiplier is known (it's what free-tier banding uses).
+            // Always-on reasoning models reason too, but their multiplier hasn't been measured —
+            // no hint until usage statistics establish one.
+            eff: isHybridThinkingModel(config.modelApiName)
+                ? pricing.outputPrice * FREE_TIER_THINKING_COST_FACTOR
+                : null,
         });
     }
     // Within each band, order by price, cheapest first: input price, then output price,

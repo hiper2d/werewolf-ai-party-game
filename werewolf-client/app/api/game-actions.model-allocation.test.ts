@@ -199,7 +199,7 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 describe('previewGame model allocation — fair distribution (paid tier)', () => {
-    const TWO_MODELS = [LLM_CONSTANTS.DEEPSEEK_V4_FLASH, LLM_CONSTANTS.CLAUDE_4_HAIKU];
+    const TWO_MODELS = [LLM_CONSTANTS.DEEPSEEK_V4_FLASH, LLM_CONSTANTS.DEEPSEEK_V4_PRO];
 
     it('spreads two selected models evenly when bot count divides evenly', async () => {
         mockTier(USER_TIERS.PAID);
@@ -212,7 +212,7 @@ describe('previewGame model allocation — fair distribution (paid tier)', () =>
         expect(result.bots).toHaveLength(6);
         expect(modelCounts(result.bots)).toEqual({
             [LLM_CONSTANTS.DEEPSEEK_V4_FLASH]: 3,
-            [LLM_CONSTANTS.CLAUDE_4_HAIKU]: 3,
+            [LLM_CONSTANTS.DEEPSEEK_V4_PRO]: 3,
         });
     });
 
@@ -233,7 +233,7 @@ describe('previewGame model allocation — fair distribution (paid tier)', () =>
         mockTier(USER_TIERS.PAID);
         const threeModels = [
             LLM_CONSTANTS.DEEPSEEK_V4_FLASH,
-            LLM_CONSTANTS.CLAUDE_4_HAIKU,
+            LLM_CONSTANTS.DEEPSEEK_V4_PRO,
             LLM_CONSTANTS.GPT_5_6_TERRA,
         ];
 
@@ -245,7 +245,7 @@ describe('previewGame model allocation — fair distribution (paid tier)', () =>
         expect(result.bots).toHaveLength(9);
         expect(modelCounts(result.bots)).toEqual({
             [LLM_CONSTANTS.DEEPSEEK_V4_FLASH]: 3,
-            [LLM_CONSTANTS.CLAUDE_4_HAIKU]: 3,
+            [LLM_CONSTANTS.DEEPSEEK_V4_PRO]: 3,
             [LLM_CONSTANTS.GPT_5_6_TERRA]: 3,
         });
     });
@@ -260,14 +260,14 @@ describe('previewGame model allocation — fair distribution (paid tier)', () =>
                 playersAiType: [
                     LLM_CONSTANTS.DEEPSEEK_V4_FLASH,
                     LLM_CONSTANTS.DEEPSEEK_V4_FLASH,
-                    LLM_CONSTANTS.CLAUDE_4_HAIKU,
+                    LLM_CONSTANTS.DEEPSEEK_V4_PRO,
                 ],
             })
         );
 
         expect(modelCounts(result.bots)).toEqual({
             [LLM_CONSTANTS.DEEPSEEK_V4_FLASH]: 3,
-            [LLM_CONSTANTS.CLAUDE_4_HAIKU]: 3,
+            [LLM_CONSTANTS.DEEPSEEK_V4_PRO]: 3,
         });
     });
 });
@@ -326,13 +326,13 @@ describe('previewGame model allocation — free-tier capacity dropout', () => {
         mockTier(USER_TIERS.FREE);
         setupDbForPreview(0);
 
-        // GM uses the unlimited model so it does not eat into Haiku's budget.
-        // Haiku is capped at 3 bots/game; the rest of the 8 bots fall to Deepseek.
+        // GM uses the unlimited model so it does not eat into DeepSeek Pro's budget.
+        // DeepSeek Pro is capped at 3 bots/game; the rest of the 8 bots fall to Deepseek Flash.
         const result = await previewGame(
             makePreview(9, {
                 gameMasterAiType: LLM_CONSTANTS.DEEPSEEK_V4_FLASH,
                 playersAiType: [
-                    LLM_CONSTANTS.CLAUDE_4_HAIKU,
+                    LLM_CONSTANTS.DEEPSEEK_V4_PRO,
                     LLM_CONSTANTS.DEEPSEEK_V4_FLASH,
                 ],
             })
@@ -340,7 +340,7 @@ describe('previewGame model allocation — free-tier capacity dropout', () => {
 
         expect(result.bots).toHaveLength(8);
         expect(modelCounts(result.bots)).toEqual({
-            [LLM_CONSTANTS.CLAUDE_4_HAIKU]: 3, // exactly its per-game cap
+            [LLM_CONSTANTS.DEEPSEEK_V4_PRO]: 3, // exactly its per-game cap
             [LLM_CONSTANTS.DEEPSEEK_V4_FLASH]: 5,
         });
     });
@@ -349,13 +349,13 @@ describe('previewGame model allocation — free-tier capacity dropout', () => {
         mockTier(USER_TIERS.FREE);
         setupDbForPreview(0);
 
-        // Only Haiku selected (cap 3), GM on Deepseek, but 5 bots requested:
-        // after 3 Haiku bots there are no valid candidates left.
+        // Only DeepSeek Pro selected (cap 3), GM on Deepseek Flash, but 5 bots requested:
+        // after 3 DeepSeek Pro bots there are no valid candidates left.
         await expect(
             previewGame(
                 makePreview(6, {
                     gameMasterAiType: LLM_CONSTANTS.DEEPSEEK_V4_FLASH,
-                    playersAiType: [LLM_CONSTANTS.CLAUDE_4_HAIKU],
+                    playersAiType: [LLM_CONSTANTS.DEEPSEEK_V4_PRO],
                 })
             )
         ).rejects.toThrow(
