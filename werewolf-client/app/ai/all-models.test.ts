@@ -32,6 +32,7 @@ import { BOT_SYSTEM_PROMPT, BOT_VOTE_PROMPT, BOT_REMINDER_POSTFIX } from "@/app/
 import { GM_COMMAND_INTRODUCE_YOURSELF } from "@/app/ai/prompts/gm-commands";
 import { format } from "@/app/ai/prompts/utils";
 import { convertToAIMessages } from "@/app/utils/message-utils";
+import { withPerf, writePerfReport } from "@/app/ai/live-perf-report";
 import {
     generateBotContextSection,
     generateWerewolfTeammatesSection,
@@ -96,6 +97,13 @@ const apiKeys = buildApiKeys();
 const allModels = Object.entries(LLM_CONSTANTS)
     .filter(([key]) => key !== 'RANDOM')
     .map(([key, value]) => ({ key, llmType: value }));
+
+// Performance table (duration / tokens / cost per model, sorted by speed) — printed after
+// the whole file runs and written to logs/live-perf-<ts>.md. Rows are recorded by the
+// withPerf() wrappers around the agent calls below.
+afterAll(() => {
+    writePerfReport();
+});
 
 // ---------------------------------------------------------------------------
 // Day-2 vote scenario, built with the same code path as bot-actions.ts vote():
@@ -177,9 +185,10 @@ describe("All models - day 2 vote with full game context", () => {
                 apiKeys,
             );
 
-            const [response, thinking, tokenUsage] = await agent.askWithZodSchema(
-                BotVoteZodSchema,
-                voteHistory,
+            const [response, thinking, tokenUsage] = await withPerf(
+                'Day-2 vote (full game context)',
+                config.displayName,
+                () => agent.askWithZodSchema(BotVoteZodSchema, voteHistory),
             );
 
             // Response must match the vote schema
@@ -271,7 +280,11 @@ describe("All models - plain text welcome via askText", () => {
                 apiKeys,
             );
 
-            const [reply, thinking, tokenUsage, signature] = await agent.askText(messages);
+            const [reply, thinking, tokenUsage, signature] = await withPerf(
+                'Welcome (plain text)',
+                config.displayName,
+                () => agent.askText(messages),
+            );
 
             // Must be non-empty plain prose...
             expect(typeof reply).toBe('string');
