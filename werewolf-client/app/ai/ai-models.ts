@@ -115,9 +115,10 @@ export interface ModelConfig {
     // ReasoningEffort is the superset of provider vocabularies — each provider accepts only its
     // own slice, and the agent passes the value through verbatim, so pick one the model's API
     // supports: Anthropic adaptive thinking takes low|medium|high|xhigh|max, OpenAI takes
-    // minimal|low|medium|high|xhigh, Fugu takes high|xhigh.
-    reasoningEffort?: ReasoningEffort; // Effort-based APIs (Anthropic adaptive thinking)
-    thinkingBudgetTokens?: number; // Budget-based APIs (Anthropic enabled thinking, Gemini)
+    // minimal|low|medium|high|xhigh, Gemini 3.x takes minimal|low|medium|high (sent uppercase
+    // as thinkingLevel), Fugu takes high|xhigh.
+    reasoningEffort?: ReasoningEffort; // Effort-based APIs (Anthropic adaptive thinking, Gemini 3.x)
+    thinkingBudgetTokens?: number; // Budget-based APIs (Anthropic enabled thinking, Qwen thinking_budget)
     maxOutputTokens?: number;
     tags?: ModelTag[];
     freeTier?: {
@@ -211,12 +212,19 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         temperature: 1,
         tags: ['fast', 'cheap'],
     },
+    // Gemini 3.x reasons via the effort dialect (thinkingLevel). The level is a CEILING on an
+    // always-dynamic process — the model still scales actual thinking depth per request within
+    // it; "high" is the fully open dynamic range. Levels below are each model's documented
+    // default (Pro accepts low|medium|high only — no minimal). This replaced the deprecated
+    // 2.5-era thinkingBudget: 1024 (2026-08-06), which HAD been binding — so Flash Lite now
+    // thinks noticeably less under its "minimal" default (0.8s/49-token votes vs 4.5s/650
+    // budgeted); bump it to 'low' if its play quality visibly drops.
     [LLM_CONSTANTS.GEMINI_3_PRO]: {
         displayName: 'Gemini 3.1 Pro Preview',
         modelApiName: 'gemini-3.1-pro-preview',
         apiKeyName: API_KEY_CONSTANTS.GOOGLE,
         hasThinking: true,
-        thinkingBudgetTokens: 1024,
+        reasoningEffort: 'high',
         tags: ['expensive'],
     },
     [LLM_CONSTANTS.GEMINI_3_FLASH]: {
@@ -224,7 +232,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         modelApiName: 'gemini-3.6-flash',
         apiKeyName: API_KEY_CONSTANTS.GOOGLE,
         hasThinking: true,
-        thinkingBudgetTokens: 1024,
+        reasoningEffort: 'medium',
         tags: ['fast'],
     },
     [LLM_CONSTANTS.GEMINI_3_FLASH_LITE]: {
@@ -232,7 +240,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         modelApiName: 'gemini-3.5-flash-lite',
         apiKeyName: API_KEY_CONSTANTS.GOOGLE,
         hasThinking: true,
-        thinkingBudgetTokens: 1024,
+        reasoningEffort: 'minimal',
         tags: ['fast', 'cheap'],
     },
     // Always-on reasoning (xAI default effort "high", cannot be disabled) — no non-thinking sibling

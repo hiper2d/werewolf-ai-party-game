@@ -165,7 +165,8 @@ export class MistralAgent extends AbstractAgent {
             totalTokens: usage.totalTokens,
             costUSD,
             // Omitted when absent so we never hand Firestore an undefined value.
-            ...(usage.reasoningTokens ? { reasoningTokens: usage.reasoningTokens } : {})
+            ...(usage.reasoningTokens ? { reasoningTokens: usage.reasoningTokens } : {}),
+            ...(usage.cacheHitTokens ? { cachedInputTokens: usage.cacheHitTokens } : {})
         };
     }
 
@@ -178,7 +179,7 @@ export class MistralAgent extends AbstractAgent {
      * mode. The human-readable schema description is still appended to the last
      * message because the enforced schema omits field descriptions/semantics.
      */
-    async askWithZodSchema<T>(zodSchema: z.ZodSchema<T>, messages: AIMessage[]): Promise<[T, string, TokenUsage?, string?]> {
+    async doAskWithZodSchema<T>(zodSchema: z.ZodSchema<T>, messages: AIMessage[]): Promise<[T, string, TokenUsage?, string?]> {
         try {
             // Convert Zod schema to human-readable prompt description
             const schemaDescription = ZodSchemaConverter.toPromptDescription(zodSchema);
@@ -289,7 +290,7 @@ export class MistralAgent extends AbstractAgent {
      * reasoning models only return thinking traces when responseFormat is NOT
      * json_object, so unlike askWithZodSchema this path can surface thinking content.
      */
-    async askText(messages: AIMessage[]): Promise<[string, string, TokenUsage?, string?]> {
+    async doAskText(messages: AIMessage[]): Promise<[string, string, TokenUsage?, string?]> {
         try {
             const convertedMessages = this.convertToMistralMessages(messages);
 

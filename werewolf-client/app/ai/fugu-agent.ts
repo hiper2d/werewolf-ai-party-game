@@ -104,7 +104,8 @@ export class FuguAgent extends AbstractAgent {
                 inputTokens: usageResult.usage.promptTokens,
                 outputTokens: usageResult.usage.completionTokens,
                 totalTokens: usageResult.usage.totalTokens,
-                costUSD: usageResult.cost
+                costUSD: usageResult.cost,
+                ...(usageResult.usage.cacheHitTokens !== undefined ? { cachedInputTokens: usageResult.usage.cacheHitTokens } : {})
             };
 
             if (usageResult.usage.reasoningTokens) {
@@ -127,7 +128,7 @@ export class FuguAgent extends AbstractAgent {
         }
     }
 
-    async askWithZodSchema<T>(zodSchema: z.ZodSchema<T>, messages: AIMessage[]): Promise<[T, string, TokenUsage?, string?]> {
+    async doAskWithZodSchema<T>(zodSchema: z.ZodSchema<T>, messages: AIMessage[]): Promise<[T, string, TokenUsage?, string?]> {
         try {
             const preparedMessages = this.prepareMessages(messages);
             const openAIMessages = this.convertToOpenAIMessages(preparedMessages);
@@ -190,7 +191,7 @@ export class FuguAgent extends AbstractAgent {
      * Plain-text ask: no schema appended to the prompt. Reasoning extraction and token
      * accounting are identical to askWithZodSchema.
      */
-    async askText(messages: AIMessage[]): Promise<[string, string, TokenUsage?, string?]> {
+    async doAskText(messages: AIMessage[]): Promise<[string, string, TokenUsage?, string?]> {
         try {
             const preparedMessages = this.prepareMessages(messages);
             const openAIMessages = this.convertToOpenAIMessages(preparedMessages);

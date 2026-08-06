@@ -89,6 +89,7 @@ export class KimiAgent extends AbstractAgent {
                 outputTokens: usageResult.usage.completionTokens,
                 totalTokens: usageResult.usage.totalTokens,
                 costUSD: usageResult.cost,
+                ...(usageResult.usage.cacheHitTokens !== undefined ? { cachedInputTokens: usageResult.usage.cacheHitTokens } : {}),
                 // Only present when reasoning ran; the key is omitted otherwise so we never
                 // hand Firestore an undefined value.
                 ...(reasoningTokens ? { reasoningTokens } : {})
@@ -112,7 +113,7 @@ export class KimiAgent extends AbstractAgent {
      * Kimi/Moonshot AI API is OpenAI-compatible, so we try JSON mode first,
      * and fall back to prompt-based schema if not supported
      */
-    async askWithZodSchema<T>(zodSchema: z.ZodSchema<T>, messages: AIMessage[]): Promise<[T, string, TokenUsage?, string?]> {
+    async doAskWithZodSchema<T>(zodSchema: z.ZodSchema<T>, messages: AIMessage[]): Promise<[T, string, TokenUsage?, string?]> {
         try {
             const preparedMessages = this.prepareMessages(messages);
             const openAIMessages = this.convertToOpenAIMessages(preparedMessages);
@@ -224,7 +225,7 @@ export class KimiAgent extends AbstractAgent {
      * Plain-text ask: no JSON mode (and therefore no prompt-based schema fallback).
      * Thinking toggle and reasoning_content extraction are identical to askWithZodSchema.
      */
-    async askText(messages: AIMessage[]): Promise<[string, string, TokenUsage?, string?]> {
+    async doAskText(messages: AIMessage[]): Promise<[string, string, TokenUsage?, string?]> {
         try {
             const preparedMessages = this.prepareMessages(messages);
             const openAIMessages = this.convertToOpenAIMessages(preparedMessages);

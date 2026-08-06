@@ -54,6 +54,14 @@ export interface TokenUsage {
     // Omitted entirely rather than set to 0/undefined: Firestore rejects undefined values,
     // and non-reasoning models have no breakdown to record.
     reasoningTokens?: number;
+    // Cached input tokens, for providers that report cache hits. Like reasoningTokens this
+    // is a breakdown of inputTokens (already reflected in costUSD), omitted when the
+    // provider reported nothing.
+    cachedInputTokens?: number;
+    // Wall-clock duration of the API call, stamped by AbstractAgent's public ask wrappers.
+    // Client-measured — providers don't return processing time — so it includes network,
+    // which is what the player actually waits through. Omitted when not measured.
+    durationMs?: number;
 }
 
 export interface GameTokenUsage {

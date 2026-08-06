@@ -32,15 +32,18 @@ type FakeTransaction = {
 function setupTransaction(
     gameData: any | null,
     userData: any | null | undefined = undefined
-): { txn: FakeTransaction; gameRef: any; userRef: any } {
+): { txn: FakeTransaction; gameRef: any; userRef: any; statRef: any } {
     const gameSnapshot = { exists: gameData !== null, data: () => gameData };
     const userSnapshot = { exists: userData !== null && userData !== undefined, data: () => userData };
 
     const gameRef = { id: 'games/fake', get: jest.fn().mockResolvedValue(gameSnapshot) };
     const userRef = { id: 'users/fake', get: jest.fn().mockResolvedValue(userSnapshot) };
+    const statRef = { id: 'requestStats/fake' };
 
     (db!.collection as jest.Mock).mockImplementation((name: string) => ({
-        doc: jest.fn().mockReturnValue(name === 'users' ? userRef : gameRef)
+        doc: jest.fn().mockReturnValue(
+            name === 'users' ? userRef : name === 'requestStats' ? statRef : gameRef
+        )
     }));
 
     const txn: FakeTransaction = {
@@ -52,7 +55,13 @@ function setupTransaction(
     };
     (db!.runTransaction as jest.Mock).mockImplementation(async (cb: any) => cb(txn));
 
-    return { txn, gameRef, userRef };
+    return { txn, gameRef, userRef, statRef };
+}
+
+/** Find the requestStats document written by the transaction, if any. */
+function statWrite(txn: FakeTransaction, statRef: any): any | undefined {
+    const call = txn.set.mock.calls.find(c => c[0] === statRef);
+    return call ? call[1] : undefined;
 }
 
 /** Find the transaction write (update or set) made against the user doc. */
@@ -430,5 +439,111 @@ describe('cost-tracking', () => {
             await expect(getGameTier(gameId)).resolves.toBeUndefined();
             await expect(getGameTier(undefined)).resolves.toBeUndefined();
         });
+    });
+});
+
+describe('requestStats recording (per-request statistics doc)', () => {
+    const gameId = 'game-1';
+    const userEmail = 'player@example.com';
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+    });
+
+    it('writes a stats doc for a bot call with model info derived from the game doc', async () => {
+        const { txn, statRef } = setupTransaction({
+            bots: [{ name: 'Bot1', aiType: 'qwen-max' }],
+            totalGameCost: 0,
+            createdWithTier: 'free'
+        }, { tier: 'free' });
+
+        await recordBotTokenUsage(gameId, 'Bot1', {
+            inputTokens: 8000,
+            outputTokens: 1100,
+            totalTokens: 9100,
+            costUSD: 0.02,
+            reasoningTokens: 900,
+            cachedInputTokens: 6000,
+            durationMs: 25400
+        }, userEmail);
+
+        const stat = statWrite(txn, statRef);
+        expect(stat).toMatchObject({
+            gameId,
+            userId: userEmail,
+            tier: 'free',
+            actor: 'bot',
+            botName: 'Bot1',
+            modelId: 'qwen-max',
+            modelApiName: 'qwen3.8-max',
+            apiKeyName: 'QWEN_API_KEY',
+            thinkingEnabled: true,
+            inputTokens: 8000,
+            cachedInputTokens: 6000,
+            outputTokens: 1100,
+            reasoningTokens: 900,
+            totalTokens: 9100,
+            costUSD: 0.02,
+            durationMs: 25400,
+            status: 'ok'
+        });
+        expect(stat.createdAt).toBeInstanceOf(Date);
+        expect(stat.expireAt.getTime()).toBeGreaterThan(stat.createdAt.getTime());
+    });
+
+    it('resolves deprecated model ids before recording', async () => {
+        const { txn, statRef } = setupTransaction({
+            bots: [{ name: 'OldBot', aiType: 'glm-thinking' }],
+            totalGameCost: 0
+        }, { tier: 'free' });
+
+        await recordBotTokenUsage(gameId, 'OldBot', {
+            inputTokens: 10, outputTokens: 5, totalTokens: 15, costUSD: 0.001
+        }, userEmail);
+
+        const stat = statWrite(txn, statRef);
+        expect(stat.modelId).toBe('glm');
+        expect(stat.modelApiName).toBe('glm-5.2');
+        // Absent breakdowns are recorded as explicit zeros in the stats doc.
+        expect(stat.cachedInputTokens).toBe(0);
+        expect(stat.reasoningTokens).toBe(0);
+        expect(stat.durationMs).toBe(0);
+    });
+
+    it('writes a GM stats doc keyed off gameMasterAiType', async () => {
+        const { txn, statRef } = setupTransaction({
+            gameMasterAiType: 'gpt',
+            gameMasterTokenUsage: { inputTokens: 0, outputTokens: 0, totalTokens: 0, costUSD: 0 },
+            totalGameCost: 0
+        }, { tier: 'paid', balance: 100 });
+
+        await recordGameMasterTokenUsage(gameId, {
+            inputTokens: 12000, outputTokens: 200, totalTokens: 12200, costUSD: 0.03, durationMs: 3600
+        }, userEmail);
+
+        const stat = statWrite(txn, statRef);
+        expect(stat).toMatchObject({
+            actor: 'gm',
+            tier: 'paid',
+            modelId: 'gpt',
+            modelApiName: 'gpt-5.6-terra',
+            apiKeyName: 'OPENAI_API_KEY',
+            durationMs: 3600,
+            status: 'ok'
+        });
+        expect(stat.botName).toBeUndefined();
+    });
+
+    it('does not write a stats doc when the bot is not in the game (no charge, no stat)', async () => {
+        const { txn, statRef } = setupTransaction({
+            bots: [{ name: 'SomeoneElse', aiType: 'glm' }],
+            totalGameCost: 0
+        }, { tier: 'free' });
+
+        await recordBotTokenUsage(gameId, 'Ghost', {
+            inputTokens: 10, outputTokens: 5, totalTokens: 15, costUSD: 0.001
+        }, userEmail);
+
+        expect(statWrite(txn, statRef)).toBeUndefined();
     });
 });

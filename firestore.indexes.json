@@ -77,6 +77,20 @@
           "order": "ASCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "requestStats",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "modelApiName",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []

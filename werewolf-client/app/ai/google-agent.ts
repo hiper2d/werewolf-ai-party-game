@@ -172,7 +172,7 @@ export class GoogleAgent extends AbstractAgent {
      * New method using Zod with Google's Gemini API
      * This provides better schema handling and runtime validation
      */
-    async askWithZodSchema<T>(zodSchema: z.ZodSchema<T>, messages: AIMessage[]): Promise<[T, string, TokenUsage?, string?]> {
+    async doAskWithZodSchema<T>(zodSchema: z.ZodSchema<T>, messages: AIMessage[]): Promise<[T, string, TokenUsage?, string?]> {
         // Google's thinking API doesn't require signature validation like Anthropic
         // Google models decide internally whether to use thinking
         // We simply enable the thinking config if the agent has thinking enabled
@@ -192,11 +192,17 @@ export class GoogleAgent extends AbstractAgent {
                 systemInstruction: this.instruction
             };
 
-            // Add thinking config for Google models with thinking mode
+            // Add thinking config for Google models with thinking mode.
+            // Gemini 3.x effort dialect: thinkingLevel is a CEILING on an always-dynamic
+            // process (the model still scales actual depth per request; "high" = fully open
+            // range). Replaces the legacy 2.5-era thinkingBudget — which did transmit and
+            // bind under SDK 1.x, but is deprecated for Gemini 3; needs SDK >=2.x, where
+            // thinkingLevel is typed (1.x stripped it — verified 2026-08-06 by probe).
+            // Level comes from the model config reasoningEffort, sent uppercase.
             if (this.enableThinking) {
                 config.thinkingConfig = {
                     includeThoughts: true,
-                    thinkingBudget: getModelConfigByApiName(this.model, this.enableThinking)?.thinkingBudgetTokens ?? 1024
+                    thinkingLevel: (getModelConfigByApiName(this.model, this.enableThinking)?.reasoningEffort ?? 'low').toUpperCase()
                 };
             }
 
@@ -267,7 +273,8 @@ export class GoogleAgent extends AbstractAgent {
                     outputTokens,
                     totalTokens,
                     costUSD,
-                    ...(reasoningTokens > 0 ? { reasoningTokens } : {})
+                    ...(reasoningTokens > 0 ? { reasoningTokens } : {}),
+                    ...(cacheHitTokens > 0 ? { cachedInputTokens: cacheHitTokens } : {})
                 };
             }
 
@@ -304,7 +311,7 @@ export class GoogleAgent extends AbstractAgent {
      * responseMimeType, returning the raw text. Thinking parts and thought signatures
      * are extracted identically.
      */
-    async askText(messages: AIMessage[]): Promise<[string, string, TokenUsage?, string?]> {
+    async doAskText(messages: AIMessage[]): Promise<[string, string, TokenUsage?, string?]> {
         const contents = this.convertToContents(messages);
 
         try {
@@ -314,11 +321,17 @@ export class GoogleAgent extends AbstractAgent {
                 systemInstruction: this.instruction
             };
 
-            // Add thinking config for Google models with thinking mode
+            // Add thinking config for Google models with thinking mode.
+            // Gemini 3.x effort dialect: thinkingLevel is a CEILING on an always-dynamic
+            // process (the model still scales actual depth per request; "high" = fully open
+            // range). Replaces the legacy 2.5-era thinkingBudget — which did transmit and
+            // bind under SDK 1.x, but is deprecated for Gemini 3; needs SDK >=2.x, where
+            // thinkingLevel is typed (1.x stripped it — verified 2026-08-06 by probe).
+            // Level comes from the model config reasoningEffort, sent uppercase.
             if (this.enableThinking) {
                 config.thinkingConfig = {
                     includeThoughts: true,
-                    thinkingBudget: getModelConfigByApiName(this.model, this.enableThinking)?.thinkingBudgetTokens ?? 1024
+                    thinkingLevel: (getModelConfigByApiName(this.model, this.enableThinking)?.reasoningEffort ?? 'low').toUpperCase()
                 };
             }
 
@@ -384,7 +397,8 @@ export class GoogleAgent extends AbstractAgent {
                     outputTokens,
                     totalTokens,
                     costUSD,
-                    ...(reasoningTokens > 0 ? { reasoningTokens } : {})
+                    ...(reasoningTokens > 0 ? { reasoningTokens } : {}),
+                    ...(cacheHitTokens > 0 ? { cachedInputTokens: cacheHitTokens } : {})
                 };
             }
 

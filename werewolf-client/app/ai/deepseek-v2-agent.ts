@@ -78,7 +78,7 @@ export class DeepSeekV2Agent extends AbstractAgent {
      * json_object) is supported with or without thinking, so we always request it.
      * Thinking additionally surfaces reasoning via reasoning_content.
      */
-    async askWithZodSchema<T>(zodSchema: z.ZodSchema<T>, messages: AIMessage[]): Promise<[T, string, TokenUsage?, string?]> {
+    async doAskWithZodSchema<T>(zodSchema: z.ZodSchema<T>, messages: AIMessage[]): Promise<[T, string, TokenUsage?, string?]> {
         try {
             const input = this.convertToOpenAIMessages(messages);
 
@@ -161,6 +161,7 @@ export class DeepSeekV2Agent extends AbstractAgent {
                     outputTokens: usageResult.usage.completionTokens,
                     totalTokens: usageResult.usage.totalTokens,
                     costUSD: usageResult.cost,
+                    ...(usageResult.usage.cacheHitTokens !== undefined ? { cachedInputTokens: usageResult.usage.cacheHitTokens } : {}),
                     // Omitted when absent so we never hand Firestore an undefined value.
                     ...(usageResult.usage.reasoningTokens ? { reasoningTokens: usageResult.usage.reasoningTokens } : {})
                 };
@@ -182,7 +183,7 @@ export class DeepSeekV2Agent extends AbstractAgent {
      * Plain-text ask: same request structure as askWithZodSchema but without JSON mode
      * or a schema appended to the prompt. The raw response string is returned as-is.
      */
-    async askText(messages: AIMessage[]): Promise<[string, string, TokenUsage?, string?]> {
+    async doAskText(messages: AIMessage[]): Promise<[string, string, TokenUsage?, string?]> {
         try {
             const input = this.convertToOpenAIMessages(messages);
 
@@ -238,6 +239,7 @@ export class DeepSeekV2Agent extends AbstractAgent {
                     outputTokens: usageResult.usage.completionTokens,
                     totalTokens: usageResult.usage.totalTokens,
                     costUSD: usageResult.cost,
+                    ...(usageResult.usage.cacheHitTokens !== undefined ? { cachedInputTokens: usageResult.usage.cacheHitTokens } : {}),
                     // Omitted when absent so we never hand Firestore an undefined value.
                     ...(usageResult.usage.reasoningTokens ? { reasoningTokens: usageResult.usage.reasoningTokens } : {})
                 };

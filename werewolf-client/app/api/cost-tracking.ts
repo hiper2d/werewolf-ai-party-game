@@ -1,5 +1,6 @@
 import {db} from "@/firebase/server";
 import {Game, TokenUsage, UserTier, USER_TIERS} from "@/app/api/game-models";
+import {SupportedAiModels, resolveModelId} from "@/app/ai/ai-models";
 import {PAID_TIER_MARKUP} from "@/app/config/credit-packages";
 import {applySpending, formatPeriod} from "@/app/utils/spending-utils";
 
@@ -13,6 +14,8 @@ function normalizeTokenUsage(usage: TokenUsageInput): TokenUsage {
     const totalTokens = suppliedTotal > 0 ? suppliedTotal : computedTotal;
     const costUSD = parseFloat((Number(usage?.costUSD) || 0).toFixed(6));
     const reasoningTokens = Number(usage?.reasoningTokens) || 0;
+    const cachedInputTokens = Number(usage?.cachedInputTokens) || 0;
+    const durationMs = Number(usage?.durationMs) || 0;
 
     return {
         inputTokens,
@@ -21,7 +24,63 @@ function normalizeTokenUsage(usage: TokenUsageInput): TokenUsage {
         costUSD,
         // Kept out of the object unless the model actually reasoned: Firestore rejects
         // undefined, and a 0 on every non-reasoning model is just noise.
-        ...(reasoningTokens > 0 ? { reasoningTokens } : {})
+        ...(reasoningTokens > 0 ? { reasoningTokens } : {}),
+        ...(cachedInputTokens > 0 ? { cachedInputTokens } : {}),
+        ...(durationMs > 0 ? { durationMs } : {})
+    };
+}
+
+// Per-request statistics: one doc per AI call in the top-level `requestStats` collection,
+// written inside the same transaction as billing so stats and money can never disagree.
+// Raw provider-reported numbers only — derived values (uncached input, visible output,
+// effective multiplier) are computed at read time by scripts/request-stats-report.ts.
+// `expireAt` enables a Firestore TTL policy later without a migration.
+const REQUEST_STATS_TTL_MS = 180 * 24 * 60 * 60 * 1000; // 180 days
+
+interface RequestStatContext {
+    actor: 'bot' | 'gm';
+    botName?: string;
+}
+
+function buildRequestStatDoc(
+    game: Game,
+    gameId: string,
+    userEmail: string | undefined,
+    tier: UserTier,
+    context: RequestStatContext,
+    usage: TokenUsage,
+    timestamp: number
+): Record<string, any> | null {
+    const rawModelId = context.actor === 'gm'
+        ? game.gameMasterAiType
+        : (Array.isArray(game.bots) ? game.bots.find(b => b.name === context.botName)?.aiType : undefined);
+    if (!rawModelId) {
+        return null;
+    }
+    const modelId = resolveModelId(rawModelId);
+    const config = SupportedAiModels[modelId];
+
+    return {
+        gameId,
+        ...(userEmail ? { userId: userEmail } : {}),
+        tier,
+        actor: context.actor,
+        ...(context.botName ? { botName: context.botName } : {}),
+        ...(typeof (game as any).currentDay === 'number' ? { day: (game as any).currentDay } : {}),
+        modelId,
+        modelApiName: config?.modelApiName ?? modelId,
+        apiKeyName: config?.apiKeyName ?? 'unknown',
+        thinkingEnabled: config?.hasThinking ?? false,
+        inputTokens: usage.inputTokens,
+        cachedInputTokens: usage.cachedInputTokens ?? 0,
+        outputTokens: usage.outputTokens,
+        reasoningTokens: usage.reasoningTokens ?? 0,
+        totalTokens: usage.totalTokens,
+        costUSD: usage.costUSD,
+        durationMs: usage.durationMs ?? 0,
+        status: 'ok',
+        createdAt: new Date(timestamp),
+        expireAt: new Date(timestamp + REQUEST_STATS_TTL_MS)
     };
 }
 
@@ -47,6 +106,8 @@ async function commitUsageAtomically(
     userEmail: string | undefined,
     costUSD: number,
     buildGameUpdate: (game: Game) => Record<string, any> | null,
+    statContext: RequestStatContext,
+    statUsage: TokenUsage,
     timestamp: number = Date.now()
 ): Promise<void> {
     if (!db) {
@@ -56,6 +117,8 @@ async function commitUsageAtomically(
     const gameRef = db.collection('games').doc(gameId);
     const userRef = userEmail ? db.collection('users').doc(userEmail) : null;
     const shouldCharge = !!userRef && costUSD > 0;
+    // Pre-allocated so the write can join the transaction (refs can't be created inside).
+    const statRef = db.collection('requestStats').doc();
 
     await db.runTransaction(async (transaction) => {
         // ---- all reads first (Firestore requires reads before writes) ----
@@ -73,10 +136,16 @@ async function commitUsageAtomically(
 
         const userSnap = shouldCharge ? await transaction.get(userRef!) : null;
 
+        // The tier that actually billed: the user's current tier when charging, the game's
+        // creation tier otherwise (zero-cost calls, platform-key games with no user email).
+        const billedTier: UserTier = userSnap
+            ? ((userSnap.data()?.tier as UserTier) || USER_TIERS.FREE)
+            : (game.createdWithTier || USER_TIERS.FREE);
+
         // ---- charge the user (writes deferred until after all reads) ----
         if (userSnap) {
             const userData = userSnap.data() || {};
-            const tier = (userData.tier as UserTier) || USER_TIERS.FREE;
+            const tier = billedTier;
 
             let recordedAmount = costUSD;
             const userUpdate: Record<string, any> = {};
@@ -103,6 +172,12 @@ async function commitUsageAtomically(
 
         // ---- commit the game cost ----
         transaction.update(gameRef, gameUpdate);
+
+        // ---- record per-request statistics (same transaction as the money) ----
+        const statDoc = buildRequestStatDoc(game, gameId, userEmail, billedTier, statContext, statUsage, timestamp);
+        if (statDoc) {
+            transaction.set(statRef, statDoc);
+        }
     });
 }
 
@@ -141,7 +216,7 @@ export async function recordGameMasterTokenUsage(
             gameMasterTokenUsage: updatedUsage,
             totalGameCost: updatedTotalCost
         };
-    });
+    }, { actor: 'gm' }, usage);
 }
 
 export async function recordBotTokenUsage(
@@ -198,7 +273,7 @@ export async function recordBotTokenUsage(
             bots: updatedBots,
             totalGameCost: updatedTotalCost
         };
-    });
+    }, { actor: 'bot', botName }, usage);
 }
 
 /**

@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.60.0",
-    "@google/genai": "1.15.0",
+    "@google/genai": "^2.15.0",
     "@logtail/node": "^0.5.6",
     "@mistralai/mistralai": "^1.10.0",
     "firebase": "^12.5.0",

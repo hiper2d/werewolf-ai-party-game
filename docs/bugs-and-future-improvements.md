@@ -3,8 +3,11 @@
 ## Other improvements / wishlist (not from the test push, not test-pinned)
 
 - **Remove Sakana Fugu Ultra; add Qwen 3.8 Max and MiniMax in its place.** Decided 2026-08-04
-  after the speed grading. Full measured write-up (price breakdown, latency runs, orchestration
-  design) in `docs/fugu-ultra-findings.md` — written as source notes for a media post. Fugu Ultra's live numbers: 16s-180s+ latency on the same day-2 vote
+  after the speed grading. UPDATE 2026-08-05: Qwen (x3) and MiniMax M3 are shipped, and all 23
+  games holding a Fugu bot were migrated to DeepSeek V4 Pro (`scripts/migrate-fugu-to-deepseek.ts`);
+  only the catalog removal itself remains. Full measured write-up (price breakdown, latency runs,
+  orchestration design) in `docs/model-findings.md` (merged from the former
+  `fugu-ultra-findings.md`) — written as source notes for a media post. Fugu Ultra's live numbers: 16s-180s+ latency on the same day-2 vote
   call (variance is its internal orchestration loop, not load), tagged `extremely-slow` in the
   picker for now. One vote call measured via `FUGU_COST_CALIBRATION`: 13.7k visible prompt +
   25.2k orchestration-input tokens billed at input rate, 4.5k visible completion + 8.5k

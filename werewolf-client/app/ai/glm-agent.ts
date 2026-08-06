@@ -71,7 +71,8 @@ export class GlmAgent extends AbstractAgent {
                 inputTokens: usageResult.usage.promptTokens,
                 outputTokens: usageResult.usage.completionTokens,
                 totalTokens: usageResult.usage.totalTokens,
-                costUSD: usageResult.cost
+                costUSD: usageResult.cost,
+                ...(usageResult.usage.cacheHitTokens !== undefined ? { cachedInputTokens: usageResult.usage.cacheHitTokens } : {})
             };
 
             if (this.enableThinking && usageResult.usage.reasoningTokens) {
@@ -95,7 +96,7 @@ export class GlmAgent extends AbstractAgent {
         return parseAndValidateLlmJson(rawReply, zodSchema, (m) => this.logger(m));
     }
 
-    async askWithZodSchema<T>(zodSchema: z.ZodSchema<T>, messages: AIMessage[]): Promise<[T, string, TokenUsage?, string?]> {
+    async doAskWithZodSchema<T>(zodSchema: z.ZodSchema<T>, messages: AIMessage[]): Promise<[T, string, TokenUsage?, string?]> {
         try {
             const preparedMessages = this.prepareMessages(messages);
             const openAIMessages = this.convertToOpenAIMessages(preparedMessages);
@@ -163,7 +164,7 @@ export class GlmAgent extends AbstractAgent {
      * Plain-text ask: no JSON mode and no schema appended to the prompt.
      * Thinking toggle and reasoning_content extraction are identical to askWithZodSchema.
      */
-    async askText(messages: AIMessage[]): Promise<[string, string, TokenUsage?, string?]> {
+    async doAskText(messages: AIMessage[]): Promise<[string, string, TokenUsage?, string?]> {
         try {
             const preparedMessages = this.prepareMessages(messages);
             const openAIMessages = this.convertToOpenAIMessages(preparedMessages);

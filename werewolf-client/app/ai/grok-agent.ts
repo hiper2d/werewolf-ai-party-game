@@ -60,7 +60,7 @@ export class GrokAgent extends AbstractAgent {
      * Structured output implementation for Grok using json_object mode with prompt
      * augmentation — more reliable than json_schema on OpenAI-compatible endpoints.
      */
-    async askWithZodSchema<T>(zodSchema: z.ZodSchema<T>, messages: AIMessage[]): Promise<[T, string, TokenUsage?, string?]> {
+    async doAskWithZodSchema<T>(zodSchema: z.ZodSchema<T>, messages: AIMessage[]): Promise<[T, string, TokenUsage?, string?]> {
         try {
             const schemaDescription = ZodSchemaConverter.toPromptDescription(zodSchema);
             const input = this.buildResponsesInput(this.prepareMessages(messages));
@@ -105,7 +105,7 @@ export class GrokAgent extends AbstractAgent {
      * Plain-text ask: no JSON mode and no schema appended to the prompt.
      * Reasoning extraction and token accounting are identical to askWithZodSchema.
      */
-    async askText(messages: AIMessage[]): Promise<[string, string, TokenUsage?, string?]> {
+    async doAskText(messages: AIMessage[]): Promise<[string, string, TokenUsage?, string?]> {
         try {
             const input = this.buildResponsesInput(this.prepareMessages(messages));
 
@@ -242,7 +242,8 @@ export class GrokAgent extends AbstractAgent {
             totalTokens: inputTokens + outputTokens,
             costUSD: cost,
             // Omitted when zero so we never hand Firestore an undefined value.
-            ...(reasoningTokens > 0 ? { reasoningTokens } : {})
+            ...(reasoningTokens > 0 ? { reasoningTokens } : {}),
+            ...(cachedTokens > 0 ? { cachedInputTokens: cachedTokens } : {})
         };
     }
 }

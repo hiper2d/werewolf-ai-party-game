@@ -44,7 +44,7 @@ export class Gpt5Agent extends AbstractAgent {
      * 
      * Uses responses.parse for models that support structured outputs
      */
-    async askWithZodSchema<T>(zodSchema: z.ZodSchema<T>, messages: AIMessage[]): Promise<[T, string, TokenUsage?, string?]> {
+    async doAskWithZodSchema<T>(zodSchema: z.ZodSchema<T>, messages: AIMessage[]): Promise<[T, string, TokenUsage?, string?]> {
         try {
             this.logAsking(messages);
             this.logMessages(messages);
@@ -104,7 +104,9 @@ export class Gpt5Agent extends AbstractAgent {
                     inputTokens: response.usage.input_tokens,
                     outputTokens: response.usage.output_tokens,
                     totalTokens: response.usage.total_tokens || 0,
-                    costUSD: cost
+                    costUSD: cost,
+                    ...(response.usage.output_tokens_details?.reasoning_tokens ? { reasoningTokens: response.usage.output_tokens_details.reasoning_tokens } : {}),
+                    ...(response.usage.input_tokens_details?.cached_tokens ? { cachedInputTokens: response.usage.input_tokens_details.cached_tokens } : {})
                 };
 
                 // Log reasoning token breakdown if available
@@ -134,7 +136,7 @@ export class Gpt5Agent extends AbstractAgent {
      * doesn't apply to plain text, so thinking content is empty here (OpenAI does not
      * expose chain-of-thought directly).
      */
-    async askText(messages: AIMessage[]): Promise<[string, string, TokenUsage?, string?]> {
+    async doAskText(messages: AIMessage[]): Promise<[string, string, TokenUsage?, string?]> {
         try {
             this.logAsking(messages);
             this.logMessages(messages);
@@ -177,7 +179,9 @@ export class Gpt5Agent extends AbstractAgent {
                     inputTokens: response.usage.input_tokens,
                     outputTokens: response.usage.output_tokens,
                     totalTokens: response.usage.total_tokens || 0,
-                    costUSD: cost
+                    costUSD: cost,
+                    ...(response.usage.output_tokens_details?.reasoning_tokens ? { reasoningTokens: response.usage.output_tokens_details.reasoning_tokens } : {}),
+                    ...(response.usage.input_tokens_details?.cached_tokens ? { cachedInputTokens: response.usage.input_tokens_details.cached_tokens } : {})
                 };
 
                 if (response.usage.output_tokens_details?.reasoning_tokens) {

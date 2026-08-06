@@ -220,7 +220,9 @@ export class ClaudeAgent extends AbstractAgent {
             inputTokens,
             outputTokens,
             totalTokens: inputTokens + outputTokens,
-            costUSD: cost
+            costUSD: cost,
+            // Cache reads only — writes are a billing premium, not reuse of prior context.
+            ...(cacheReadTokens > 0 ? { cachedInputTokens: cacheReadTokens } : {})
         };
     }
 
@@ -238,7 +240,7 @@ export class ClaudeAgent extends AbstractAgent {
      * New method using Zod with Anthropic's Claude API
      * Since Anthropic doesn't support native JSON schemas, we generate prompt descriptions
      */
-    async askWithZodSchema<T>(zodSchema: z.ZodSchema<T>, messages: AIMessage[]): Promise<[T, string, TokenUsage?, string?]> {
+    async doAskWithZodSchema<T>(zodSchema: z.ZodSchema<T>, messages: AIMessage[]): Promise<[T, string, TokenUsage?, string?]> {
         // Validate roles first, before entering the main try-catch block
         const aiMessages = this.prepareMessages(messages);
 
@@ -393,7 +395,7 @@ export class ClaudeAgent extends AbstractAgent {
      * appended to the prompt and without JSON parsing. Thinking blocks and signatures
      * are extracted identically.
      */
-    async askText(messages: AIMessage[]): Promise<[string, string, TokenUsage?, string?]> {
+    async doAskText(messages: AIMessage[]): Promise<[string, string, TokenUsage?, string?]> {
         const aiMessages = this.prepareMessages(messages);
 
         this.logAsking(messages);
