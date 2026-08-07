@@ -60,7 +60,11 @@ export default function CreateNewGamePage() {
             Object.values(LLM_CONSTANTS).filter(m => m !== LLM_CONSTANTS.RANDOM)
         );
     });
-    const [selectedPlayerAiTypes, setSelectedPlayerAiTypes] = useState<string[]>(Object.values(LLM_CONSTANTS).filter(model => model !== LLM_CONSTANTS.RANDOM));
+    // Fugu Ultra is opt-in only (expensive) — excluded from the default selection but
+    // still selectable in the dropdown.
+    const [selectedPlayerAiTypes, setSelectedPlayerAiTypes] = useState<string[]>(
+        Object.values(LLM_CONSTANTS).filter(model => model !== LLM_CONSTANTS.RANDOM && model !== LLM_CONSTANTS.FUGU_ULTRA)
+    );
     const [isFormValid, setIsFormValid] = useState(false);
     const [gameData, setGameData] = useState<GamePreviewWithGeneratedBots | null>(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -285,8 +289,10 @@ export default function CreateNewGamePage() {
                     return filtered;
                 }
                 // Fall back to whatever is actually visible — not the full candidate set,
-                // which may include models the API-tier user has no key for.
-                return visiblePlayerModels;
+                // which may include models the API-tier user has no key for. Fugu Ultra
+                // stays opt-in unless it's the only thing available.
+                const defaultVisible = visiblePlayerModels.filter(m => m !== LLM_CONSTANTS.FUGU_ULTRA);
+                return defaultVisible.length > 0 ? defaultVisible : visiblePlayerModels;
             }
 
             if (filtered.length !== prev.length) {
