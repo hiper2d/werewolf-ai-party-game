@@ -737,6 +737,27 @@ function GamePageContent({
         </button>
     ) : null;
 
+    // Shared by the composer toolbar (Vote / Go on) and the right-panel duplicates.
+    async function handleVoteAction() {
+        const result = await runGameAction(() => vote(game.id));
+        if (result) {
+            applyActionResult(result);
+        }
+    }
+
+    async function handleKeepGoingAction() {
+        preActionGameRef.current = game;
+        setIsKeepGoingLoading(true);
+        try {
+            const result = await runGameAction(() => keepBotsGoing(game.id));
+            if (result) {
+                applyActionResult(result);
+            }
+        } finally {
+            setIsKeepGoingLoading(false);
+        }
+    }
+
     // Chat controls: Vote + Go On — shown inside the composer toolbar alongside Send
     function buildChatControls(): React.ReactNode {
         if (game.gameState === GAME_STATES.DAY_DISCUSSION &&
@@ -746,12 +767,7 @@ function GamePageContent({
                     <button
                         className={`${voteUrgency.isUrgent ? btnDanger + ' animate-pulse' : voteUrgency.isWarning ? btnWarn : btnGhost} ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                         disabled={!areControlsEnabled}
-                        onClick={async () => {
-                            const result = await runGameAction(() => vote(game.id));
-                            if (result) {
-                                applyActionResult(result);
-                            }
-                        }}
+                        onClick={handleVoteAction}
                         title={voteUrgency.isUrgent
                             ? `Vote now! Auto-voting in ${Math.ceil(voteUrgency.messagesLeft)} messages`
                             : `Start the voting phase (${Math.round(voteUrgency.percentage)}% to auto-vote)`}
@@ -761,18 +777,7 @@ function GamePageContent({
                     <button
                         className={`${btnGhost} ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                         disabled={!areControlsEnabled}
-                        onClick={async () => {
-                            preActionGameRef.current = game;
-                            setIsKeepGoingLoading(true);
-                            try {
-                                const result = await runGameAction(() => keepBotsGoing(game.id));
-                                if (result) {
-                                    applyActionResult(result);
-                                }
-                            } finally {
-                                setIsKeepGoingLoading(false);
-                            }
-                        }}
+                        onClick={handleKeepGoingAction}
                         title={`Let ${BOT_SELECTION_CONFIG.MIN}-${BOT_SELECTION_CONFIG.MAX} bots continue the conversation`}
                     >
                         Go on
@@ -787,18 +792,7 @@ function GamePageContent({
                 <button
                     className={`${btnGhost} ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                     disabled={!areControlsEnabled}
-                    onClick={async () => {
-                        preActionGameRef.current = game;
-                        setIsKeepGoingLoading(true);
-                        try {
-                            const result = await runGameAction(() => keepBotsGoing(game.id));
-                            if (result) {
-                                applyActionResult(result);
-                            }
-                        } finally {
-                            setIsKeepGoingLoading(false);
-                        }
-                    }}
+                    onClick={handleKeepGoingAction}
                     title={`Let ${BOT_SELECTION_CONFIG.MIN}-${BOT_SELECTION_CONFIG.MAX} bots continue the conversation`}
                 >
                     Go on
@@ -1187,6 +1181,44 @@ function GamePageContent({
                         </svg>
                         Select Bots Manually
                     </button>
+                    {/* Same action as the composer's "Go on" button */}
+                    <button
+                        className={`w-full mt-2 px-3 py-2 text-[13px] font-medium rounded-[var(--radius-md)] bg-[var(--bg-3)] border border-[var(--line-3)] text-[var(--fg-0)] hover:bg-[var(--bg-4)] transition-all duration-[120ms] flex items-center justify-center gap-2 ${!areControlsEnabled || isKeepGoingLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        onClick={handleKeepGoingAction}
+                        disabled={!areControlsEnabled || isKeepGoingLoading}
+                        title={`Let ${BOT_SELECTION_CONFIG.MIN}-${BOT_SELECTION_CONFIG.MAX} bots continue the conversation`}
+                    >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="16 3 21 3 21 8"/>
+                            <line x1="4" y1="20" x2="21" y2="3"/>
+                            <polyline points="21 16 21 21 16 21"/>
+                            <line x1="15" y1="15" x2="21" y2="21"/>
+                            <line x1="4" y1="4" x2="9" y2="9"/>
+                        </svg>
+                        Select Bots Automatically
+                    </button>
+                    {game.gameState === GAME_STATES.DAY_DISCUSSION && (
+                        <button
+                            className={`w-full mt-2 px-3 py-2 text-[13px] font-medium rounded-[var(--radius-md)] border transition-all duration-[120ms] flex items-center justify-center gap-2 ${
+                                voteUrgency.isUrgent
+                                    ? 'bg-[var(--danger)] border-[var(--danger)] text-white hover:brightness-110 animate-pulse'
+                                    : voteUrgency.isWarning
+                                        ? 'bg-[oklch(75%_0.10_65)] border-[oklch(75%_0.10_65)] text-[var(--bg-0)] hover:brightness-110'
+                                        : 'bg-[var(--bg-3)] border-[var(--line-3)] text-[var(--fg-0)] hover:bg-[var(--bg-4)]'
+                            } ${!areControlsEnabled || isKeepGoingLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            onClick={handleVoteAction}
+                            disabled={!areControlsEnabled || isKeepGoingLoading}
+                            title={voteUrgency.isUrgent
+                                ? `Vote now! Auto-voting in ${Math.ceil(voteUrgency.messagesLeft)} messages`
+                                : `Start the voting phase (${Math.round(voteUrgency.percentage)}% to auto-vote)`}
+                        >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="9 11 12 14 22 4"/>
+                                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+                            </svg>
+                            Vote {(voteUrgency.isUrgent || voteUrgency.isWarning) && '⚠️'}
+                        </button>
+                    )}
                 </div>
             )}
         </div>
