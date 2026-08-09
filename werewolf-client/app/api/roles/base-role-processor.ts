@@ -1,4 +1,4 @@
-import { Game, Bot, GAME_MASTER, GameMessage, MessageType, RECIPIENT_ALL, ROLE_CONFIGS, GAME_ROLES } from "@/app/api/game-models";
+import { Game, Bot, GAME_MASTER, GameMessage, MessageType, RECIPIENT_ALL, RECIPIENT_WEREWOLVES, ROLE_CONFIGS, GAME_ROLES } from "@/app/api/game-models";
 import { addMessageToChatAndSaveToDb } from "@/app/api/game-actions";
 
 /**
@@ -244,12 +244,12 @@ export abstract class BaseRoleProcessor {
     }
 
     /**
-     * Create a game message to be sent to all players
+     * Create a game message, addressed to all players unless a recipient is given
      */
-    protected createGameMessage(content: string, messageType: MessageType = MessageType.GM_COMMAND): GameMessage {
+    protected createGameMessage(content: string, messageType: MessageType = MessageType.GM_COMMAND, recipientName: string = RECIPIENT_ALL): GameMessage {
         return {
             id: null,
-            recipientName: RECIPIENT_ALL,
+            recipientName,
             authorName: GAME_MASTER,
             msg: content,
             messageType,
@@ -259,10 +259,10 @@ export abstract class BaseRoleProcessor {
     }
 
     /**
-     * Send a message to all players
+     * Send a message, to all players unless a recipient is given
      */
-    protected async sendMessage(content: string, messageType: MessageType = MessageType.GM_COMMAND): Promise<GameMessage> {
-        const message = this.createGameMessage(content, messageType);
+    protected async sendMessage(content: string, messageType: MessageType = MessageType.GM_COMMAND, recipientName: string = RECIPIENT_ALL): Promise<GameMessage> {
+        const message = this.createGameMessage(content, messageType, recipientName);
         return await addMessageToChatAndSaveToDb(message, this.gameId);
     }
 
@@ -283,23 +283,29 @@ export abstract class BaseRoleProcessor {
             return;
         }
 
-        // Create a generic announcement that doesn't reveal specific player identities
-        let announcement: string;
+        const isWerewolfTurn = this.roleName === GAME_ROLES.WEREWOLF;
+        const hasMultiplePlayers = playersInfo.allPlayers.length > 1;
 
-        if (this.roleName === GAME_ROLES.WEREWOLF && playersInfo.hasHumanPlayer) {
+        // This announcement goes to every player, so it must stay generic: naming the
+        // players with this role would hand the whole village the werewolf roster.
+        const announcement = isWerewolfTurn && hasMultiplePlayers
+            ? `🌙 **Night Phase**: It's time for the ${roleConfig.name}s to act. ${roleConfig.description}.`
+            : `🌙 **Night Phase**: It's time for the ${roleConfig.name} to act. ${roleConfig.description}.`;
+
+        await this.sendMessage(announcement);
+
+        // The human werewolf still needs to see who their packmates are. That goes out
+        // on the werewolves-only channel, which no villager can read.
+        if (isWerewolfTurn && playersInfo.hasHumanPlayer) {
             const werewolfRoster = playersInfo.allPlayers
                 .map(player => player.isHuman ? `${player.name} (You)` : player.name)
                 .join(', ');
-            announcement = `🌙 **Night Phase**: It's time for the ${roleConfig.name}s to act. Discuss privately with your pack (${werewolfRoster}) before locking in a target.`;
-        } else if (this.roleName === GAME_ROLES.WEREWOLF && playersInfo.allPlayers.length > 1) {
-            // Special case for multiple werewolves without human involvement
-            announcement = `🌙 **Night Phase**: It's time for the ${roleConfig.name}s to act. ${roleConfig.description}.`;
-        } else {
-            // Single role or single werewolf
-            announcement = `🌙 **Night Phase**: It's time for the ${roleConfig.name} to act. ${roleConfig.description}.`;
+            const packNote = hasMultiplePlayers
+                ? `🐺 **Your pack**: ${werewolfRoster}. Discuss privately before locking in a target.`
+                : `🐺 **Your pack**: ${werewolfRoster}. You are the only werewolf left — pick a target on your own.`;
+            await this.sendMessage(packNote, MessageType.GM_COMMAND, RECIPIENT_WEREWOLVES);
         }
 
-        await this.sendMessage(announcement);
         this.logNightAction(`Announced turn for ${roleConfig.name}`);
     }
 
