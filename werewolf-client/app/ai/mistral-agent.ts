@@ -12,11 +12,15 @@ import { extractMistralTokenUsage, calculateCost } from '@/app/utils/pricing/tok
 
 export class MistralAgent extends AbstractAgent {
     private readonly client: Mistral;
-    private readonly defaultParams: Omit<Parameters<Mistral['chat']['complete']>[0], 'messages'> = {
-        model: this.model,
-        maxTokens: 16384,  // Set to 16k to handle longer JSON responses
-        temperature: this.temperature,
-    };
+    // A getter, not a field: `maxOutputTokens` can be raised after construction, and a field
+    // initializer would snapshot the default and silently ignore the override.
+    private get defaultParams(): Omit<Parameters<Mistral['chat']['complete']>[0], 'messages'> {
+        return {
+            model: this.model,
+            maxTokens: this.maxOutputTokens,
+            temperature: this.temperature,
+        };
+    }
 
     // Log message templates
     private readonly logTemplates = {

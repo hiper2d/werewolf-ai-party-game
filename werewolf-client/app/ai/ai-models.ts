@@ -78,6 +78,31 @@ export const AUDIO_MODEL_CONSTANTS = {
     STT: 'whisper-1',
 } as const;
 
+/**
+ * Per-request output ceiling for ordinary game turns (bot answers, votes, night actions,
+ * GM bot-selection). Reasoning tokens are billed inside this budget on every provider, so
+ * the cap has to clear thinking AND the answer — set below what a turn really emits and the
+ * *answer* is what gets truncated, producing malformed JSON rather than a cheaper turn.
+ *
+ * 8192 is ~2.5x the largest turn measured in `requestStats` over 30 days (3,337 output
+ * tokens, claude-haiku-4-5); p99 across all models was 3,337 and p90 was 1,376. Re-measure
+ * with `scripts/output-token-percentiles.ts` before moving it.
+ *
+ * NOTE this is a blast-radius cap, not a cost lever: providers bill tokens generated, never
+ * the unused ceiling. Lowering it saves nothing on a well-behaved turn — it only bounds a
+ * runaway one. Reasoning effort and thinking budgets are the knobs that change spend.
+ */
+export const DEFAULT_MAX_OUTPUT_TOKENS = 8192;
+
+/**
+ * Story generation emits a whole game setup in one response — a character object per bot
+ * (name, story, play style, voice, gender) for up to a dozen bots — so it needs far more
+ * room than a turn. It bills directly rather than through `recordGameMasterTokenUsage`, so
+ * it produces no `requestStats` rows and is absent from the measurements above; this keeps
+ * the 16k it has always run with rather than guessing a smaller number from no data.
+ */
+export const STORY_MAX_OUTPUT_TOKENS = 16384;
+
 export interface AudioModelPricing {
     pricePerMillionCharacters?: number;
     pricePerMinute?: number;
@@ -119,6 +144,9 @@ export interface ModelConfig {
     // as thinkingLevel), Fugu takes high|xhigh.
     reasoningEffort?: ReasoningEffort; // Effort-based APIs (Anthropic adaptive thinking, Gemini 3.x)
     thinkingBudgetTokens?: number; // Budget-based APIs (Anthropic enabled thinking, Qwen thinking_budget)
+    // Per-request output ceiling, overriding DEFAULT_MAX_OUTPUT_TOKENS. Only set it for models
+    // that measurably need more room than a game turn takes (see the DeepSeek entries, whose
+    // reasoning tokens share this budget). Every agent honors it via AbstractAgent.
     maxOutputTokens?: number;
     tags?: ModelTag[];
     freeTier?: {

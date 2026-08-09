@@ -18,14 +18,18 @@ import { parseAndValidateLlmJson } from './json-response-parser';
 // never via response_format.
 export class QwenAgent extends AbstractAgent {
     private readonly client: OpenAI;
-    private readonly defaultParams: Omit<Parameters<OpenAI['chat']['completions']['create']>[0], 'messages'> = {
-        model: this.model,
-        temperature: this.temperature,
-        stream: false,
-        // Reasoning tokens share the completion budget on Qwen, so leave room for both CoT and
-        // answer. Do not shrink this: a truncated response cuts the JSON mid-object.
-        max_tokens: 16384,
-    };
+    // A getter, not a field: `maxOutputTokens` can be raised after construction, and a field
+    // initializer would snapshot the default and silently ignore the override.
+    private get defaultParams(): Omit<Parameters<OpenAI['chat']['completions']['create']>[0], 'messages'> {
+        return {
+            model: this.model,
+            temperature: this.temperature,
+            stream: false,
+            // Reasoning tokens share the completion budget on Qwen, so this has to leave room
+            // for both CoT and answer — too small cuts the JSON mid-object.
+            max_tokens: this.maxOutputTokens,
+        };
+    }
 
     private readonly logTemplates = {
         error: (name: string, error: unknown) => `Error in ${name} agent: ${error}`,

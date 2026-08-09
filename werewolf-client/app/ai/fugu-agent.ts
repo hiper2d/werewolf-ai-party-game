@@ -15,12 +15,17 @@ import { parseAndValidateLlmJson } from './json-response-parser';
 // Reasoning content, when returned, surfaces as `message.reasoning_content` (OpenAI-compatible).
 export class FuguAgent extends AbstractAgent {
     private readonly client: OpenAI;
-    private readonly defaultParams: Omit<Parameters<OpenAI['chat']['completions']['create']>[0], 'messages'> = {
-        model: this.model,
-        stream: false,
-        max_tokens: 16384, // Cap visible output to match every other agent (16k). Server-side
-                           // orchestration/reasoning tokens are separate and unaffected by this.
-    };
+    // A getter, not a field: `maxOutputTokens` can be raised after construction, and a field
+    // initializer would snapshot the default and silently ignore the override.
+    private get defaultParams(): Omit<Parameters<OpenAI['chat']['completions']['create']>[0], 'messages'> {
+        return {
+            model: this.model,
+            stream: false,
+            // Caps visible output only. Server-side orchestration/reasoning tokens are
+            // separate and unaffected by this.
+            max_tokens: this.maxOutputTokens,
+        };
+    }
 
     private readonly logTemplates = {
         error: (name: string, error: unknown) => `Error in ${name} agent: ${error}`,

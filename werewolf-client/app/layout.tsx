@@ -8,6 +8,7 @@ import { ThemeProvider } from "@/app/providers/ThemeProvider";
 import { LoginDialogProvider } from "@/app/providers/LoginDialogProvider";
 import LoginDialog from "@/components/login-dialog";
 import WhatsNewPopup from "@/app/news/WhatsNewPopup";
+import { SITE_URL } from "@/app/config/external-links";
 
 const inter = Inter({
   subsets: ['latin'],
@@ -29,14 +30,14 @@ const jetbrains_mono = JetBrains_Mono({
 })
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://aiwerewolf.net"),
+  metadataBase: new URL(SITE_URL),
   title: "Werewolf AI",
   description: "Play the classic Werewolf party game with top AI models from OpenAI, Anthropic, Google, Mistral, and more. Each bot has its own personality, goals, and alliances.",
   openGraph: {
     title: "Werewolf AI",
     description: "Play the classic Werewolf party game with top AI models from OpenAI, Anthropic, Google, Mistral, and more.",
     siteName: "Werewolf AI",
-    url: "https://aiwerewolf.net",
+    url: SITE_URL,
     type: "website",
     images: [
       {

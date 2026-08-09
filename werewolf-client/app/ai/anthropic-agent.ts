@@ -31,7 +31,6 @@ interface AnthropicMessage {
 
 export class ClaudeAgent extends AbstractAgent {
     private readonly client: Anthropic;
-    private readonly maxTokens = 16384; // Set to 16k to handle longer JSON responses
     // System-prompt breakpoints, one per cache tier (see CACHE_TIER_MARKER):
     //   block 1 — shared static rules, byte-identical across all bots and games with the
     //             same rule set, so one org-level entry serves everyone and ANY bot's call
@@ -41,13 +40,17 @@ export class ClaudeAgent extends AbstractAgent {
     //             only change in startNewDay), so every call within a day reads it.
     // GM prompts have no marker → single block, same behavior as before. Haiku 4.5 needs a
     // 4096-token cacheable prefix, so tiers below that silently no-op on Haiku — expected.
-    private readonly defaultParams: Omit<Anthropic.MessageCreateParams, 'messages'> = {
-        max_tokens: this.maxTokens,
-        system: this.instructionParts.map(part => (
-            { type: 'text' as const, text: part, cache_control: { type: 'ephemeral' as const } }
-        )),
-        model: this.model,
-    };
+    // A getter, not a field: `maxOutputTokens` can be raised after construction, and a field
+    // initializer would snapshot the default and silently ignore the override.
+    private get defaultParams(): Omit<Anthropic.MessageCreateParams, 'messages'> {
+        return {
+            max_tokens: this.maxOutputTokens,
+            system: this.instructionParts.map(part => (
+                { type: 'text' as const, text: part, cache_control: { type: 'ephemeral' as const } }
+            )),
+            model: this.model,
+        };
+    }
 
     // Log message templates
     private readonly logTemplates = {
@@ -296,7 +299,6 @@ export class ClaudeAgent extends AbstractAgent {
                     (params as any).thinking = { type: "enabled", budget_tokens: modelConfig?.thinkingBudgetTokens ?? 1024 };
                     params.temperature = 1;
                 }
-                params.max_tokens = 16384;
             } else if (usesAdaptiveThinking) {
                 // Opus 4.8 / Sonnet 5 reject a non-default temperature. Sonnet 5 also defaults to
                 // adaptive thinking when `thinking` is omitted, so disable it explicitly to keep the
@@ -429,7 +431,6 @@ export class ClaudeAgent extends AbstractAgent {
                     (params as any).thinking = { type: "enabled", budget_tokens: modelConfig?.thinkingBudgetTokens ?? 1024 };
                     params.temperature = 1;
                 }
-                params.max_tokens = 16384;
             } else if (usesAdaptiveThinking) {
                 // Opus 4.8 / Sonnet 5 reject a non-default temperature and default to adaptive
                 // thinking when `thinking` is omitted; disable it explicitly for the non-thinking variant.

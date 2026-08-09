@@ -188,7 +188,7 @@ export class GoogleAgent extends AbstractAgent {
                 temperature: this.temperature,
                 responseMimeType: "application/json",
                 responseSchema: googleSchema,
-                maxOutputTokens: 16384,  // Set to 16k to handle longer JSON responses
+                maxOutputTokens: this.maxOutputTokens,
                 systemInstruction: this.instruction
             };
 
@@ -317,7 +317,7 @@ export class GoogleAgent extends AbstractAgent {
         try {
             const config: any = {
                 temperature: this.temperature,
-                maxOutputTokens: 16384,
+                maxOutputTokens: this.maxOutputTokens,
                 systemInstruction: this.instruction
             };
 

@@ -2,11 +2,19 @@ import { AIMessage, TokenUsage, AgentLoggingConfig, DEFAULT_LOGGING_CONFIG } fro
 import { z } from 'zod';
 import { logger } from "@/app/utils/logger";
 import { CACHE_TIER_MARKER } from "@/app/ai/prompts/bot-prompts";
+import { DEFAULT_MAX_OUTPUT_TOKENS, getModelConfigByApiName } from "@/app/ai/ai-models";
 
 export abstract class AbstractAgent {
     name: string;
     gameId?: string;
     userId?: string;
+    /**
+     * Output ceiling sent with every request from this agent. Resolved once from the model's
+     * catalog override, else DEFAULT_MAX_OUTPUT_TOKENS. Callers needing more room raise it
+     * after construction (see story generation), the same way gameId/userId are assigned —
+     * so subclasses must read it when building a request, never snapshot it at construction.
+     */
+    maxOutputTokens: number;
     protected readonly instruction: string;
     /**
      * The instruction split on CACHE_TIER_MARKER: [shared static tier, per-bot tier].
@@ -37,6 +45,7 @@ export abstract class AbstractAgent {
         this.model = model;
         this.enableThinking = enableThinking;
         this.agentLoggingConfig = agentLoggingConfig;
+        this.maxOutputTokens = getModelConfigByApiName(model)?.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS;
     }
 
     /**

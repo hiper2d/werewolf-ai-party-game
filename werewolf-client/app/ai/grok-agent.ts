@@ -135,9 +135,10 @@ export class GrokAgent extends AbstractAgent {
             model: this.model,
             temperature: this.temperature,
             input,
-            // Reasoning bills against the output budget on top of the visible answer,
-            // so this is larger than the old chat-completions max_tokens of 16384.
-            max_output_tokens: 32768,
+            // Reasoning bills against the output budget on top of the visible answer, so this
+            // has to cover both. Raise it with a catalog `maxOutputTokens` override if Grok
+            // ever starts truncating — measured turns peak far below the shared default.
+            max_output_tokens: this.maxOutputTokens,
             // We manage conversation state ourselves; encrypted reasoning is only
             // returned for unstored responses.
             store: false,

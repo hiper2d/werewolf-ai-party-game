@@ -2,7 +2,6 @@ import { AbstractAgent } from "@/app/ai/abstract-agent";
 import OpenAI from "openai";
 import { AIMessage, TokenUsage, AgentLoggingConfig, DEFAULT_LOGGING_CONFIG } from "@/app/api/game-models";
 import { extractUsageAndCalculateCost } from "@/app/utils/pricing";
-import { getModelConfigByApiName } from "@/app/ai/ai-models";
 import { z } from 'zod';
 import { ZodSchemaConverter } from './zod-schema-converter';
 import { parseAndValidateLlmJson } from './json-response-parser';
@@ -88,16 +87,14 @@ export class DeepSeekV2Agent extends AbstractAgent {
             // For reasoning models, add schema description to prompt
             // For non-reasoning models, use JSON schema format
             let modifiedInput = [...input];
-            // Respect the model's configured output budget. The previous hard cap of 8192
-            // truncated long replies mid-JSON on thinking models, where reasoning_content
-            // shares this budget with the answer.
-            const modelConfig = getModelConfigByApiName(this.model, this.enableThinking);
-            const maxOutputTokens = Math.max(1, modelConfig?.maxOutputTokens ?? 8192);
-
+            // Respect the model's configured output budget (resolved in AbstractAgent). An
+            // 8192 cap used to truncate long replies mid-JSON on thinking models, where
+            // reasoning_content shares this budget with the answer — hence the catalog
+            // override on both DeepSeek entries.
             let requestParams: any = {
                 model: this.model,
                 messages: this.addSystemInstruction(modifiedInput),
-                max_tokens: maxOutputTokens,
+                max_tokens: this.maxOutputTokens,
                 ...(this.enableThinking ? {} : { temperature: this.temperature }),
             };
 
@@ -190,15 +187,12 @@ export class DeepSeekV2Agent extends AbstractAgent {
             this.logAsking(messages);
             this.logMessages(messages);
 
-            // Respect the model's configured output budget: reasoning_content shares
-            // this budget with the answer on thinking models.
-            const modelConfig = getModelConfigByApiName(this.model, this.enableThinking);
-            const maxOutputTokens = Math.max(1, modelConfig?.maxOutputTokens ?? 8192);
-
+            // Respect the model's configured output budget (resolved in AbstractAgent):
+            // reasoning_content shares this budget with the answer on thinking models.
             const requestParams: any = {
                 model: this.model,
                 messages: this.addSystemInstruction(input),
-                max_tokens: maxOutputTokens,
+                max_tokens: this.maxOutputTokens,
                 ...(this.enableThinking ? {} : { temperature: this.temperature }),
             };
 

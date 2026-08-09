@@ -19,13 +19,17 @@ import { parseAndValidateLlmJson } from './json-response-parser';
 export class KimiAgent extends AbstractAgent {
     private readonly client: OpenAI;
     // kimi-k3 rejects any temperature other than 1, so we never send the field.
-    private readonly defaultParams: Omit<Parameters<OpenAI['chat']['completions']['create']>[0], 'messages'> = {
-        model: this.model,
-        stream: false,
-        max_tokens: 16384,  // Set to 16k to handle longer JSON responses
-        // Moonshot's only accepted level; "max" is not in the OpenAI SDK's ReasoningEffort union.
-        reasoning_effort: 'max' as any,
-    };
+    // A getter, not a field: `maxOutputTokens` can be raised after construction, and a field
+    // initializer would snapshot the default and silently ignore the override.
+    private get defaultParams(): Omit<Parameters<OpenAI['chat']['completions']['create']>[0], 'messages'> {
+        return {
+            model: this.model,
+            stream: false,
+            max_tokens: this.maxOutputTokens,
+            // Moonshot's only accepted level; "max" is not in the OpenAI SDK's ReasoningEffort union.
+            reasoning_effort: 'max' as any,
+        };
+    }
 
     // Log message templates
     private readonly logTemplates = {

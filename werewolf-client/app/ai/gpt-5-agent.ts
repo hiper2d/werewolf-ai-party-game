@@ -67,7 +67,7 @@ export class Gpt5Agent extends AbstractAgent {
                 model: this.model,
                 instructions: this.instruction,
                 input: input,
-                max_output_tokens: 16384,  // Set to 16k to handle longer JSON responses
+                max_output_tokens: this.maxOutputTokens,
                 text: {
                     format: zodTextFormat(schemaToSend, "response_schema"),
                 }
@@ -151,7 +151,7 @@ export class Gpt5Agent extends AbstractAgent {
                 model: this.model,
                 instructions: this.instruction,
                 input: input,
-                max_output_tokens: 16384,
+                max_output_tokens: this.maxOutputTokens,
             });
 
             const content = response.output_text;
