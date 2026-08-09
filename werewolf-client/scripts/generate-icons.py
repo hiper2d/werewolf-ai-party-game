@@ -19,7 +19,7 @@ Requires Pillow (pip install Pillow).
 """
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageDraw
 
 ROOT = Path(__file__).resolve().parent.parent
 LOGO = ROOT / "public" / "werewolf-ai-logo-2.png"
@@ -42,11 +42,29 @@ def squared_logo() -> Image.Image:
     return out
 
 
-def render(logo: Image.Image, size: int) -> Image.Image:
-    """One opaque square icon at `size`."""
+def render(logo: Image.Image, size: int, circular: bool = True) -> Image.Image:
+    """
+    One icon at `size`: the logo flattened onto the brand near-black.
+
+    Circular by default, because the logo is itself a circular emblem — on a square
+    backing the dark corners read as stray padding around the ring. The disc is cut
+    from a 4x-supersampled mask so the edge stays smooth at 16px, where a directly
+    drawn ellipse aliases into visible steps.
+
+    `circular=False` keeps the full square, which Apple touch icons require: iOS
+    composites them with no alpha handling (transparency comes out black) and applies
+    its own rounded-rect mask.
+    """
     canvas = Image.new("RGBA", (size, size), BG)
     inner = int(size * (1 - 2 * PAD))
     canvas.alpha_composite(logo.resize((inner, inner), Image.LANCZOS), ((size - inner) // 2,) * 2)
+
+    if circular:
+        ss = 4
+        mask = Image.new("L", (size * ss, size * ss), 0)
+        ImageDraw.Draw(mask).ellipse((0, 0, size * ss - 1, size * ss - 1), fill=255)
+        canvas.putalpha(mask.resize((size, size), Image.LANCZOS))
+
     return canvas
 
 
@@ -60,9 +78,9 @@ def main() -> None:
     base.save(app / "favicon.ico", sizes=[(16, 16), (32, 32), (48, 48)])
 
     render(logo, 192).save(app / "icon.png")
-    # Apple touch icons are composited onto the home screen with no alpha handling,
-    # so this one must be flat — which render() already guarantees.
-    render(logo, 180).save(app / "apple-icon.png")
+    # Square on purpose — see render(): iOS renders transparency black and rounds the
+    # corners itself, so a pre-rounded apple-icon would show black notches.
+    render(logo, 180, circular=False).save(app / "apple-icon.png")
 
     for name in ("favicon.ico", "icon.png", "apple-icon.png"):
         print(f"wrote app/{name}")

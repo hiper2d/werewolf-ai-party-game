@@ -25,9 +25,14 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import { AgentFactory } from "@/app/ai/agent-factory";
-import { LLM_CONSTANTS, SupportedAiModels, API_KEY_CONSTANTS } from "@/app/ai/ai-models";
-import { ApiKeyMap, AIMessage, GAME_MASTER, GAME_ROLES, GameMessage, MessageType } from "@/app/api/game-models";
-import { BotVoteZodSchema } from "@/app/ai/prompts/zod-schemas";
+import { LLM_CONSTANTS, SupportedAiModels, API_KEY_CONSTANTS, STORY_MAX_OUTPUT_TOKENS } from "@/app/ai/ai-models";
+import {
+    ApiKeyMap, AIMessage, GAME_MASTER, GAME_ROLES, GameMessage, MessageType,
+    PLAY_STYLE_CONFIGS, ROLE_CONFIGS,
+} from "@/app/api/game-models";
+import { BotVoteZodSchema, GameSetupZodSchema } from "@/app/ai/prompts/zod-schemas";
+import { STORY_SYSTEM_PROMPT, STORY_USER_PROMPT } from "@/app/ai/prompts/story-gen-prompts";
+import { getDefaultVoiceProvider, getVoiceConfig } from "@/app/ai/voice-config";
 import { BOT_SYSTEM_PROMPT, BOT_VOTE_PROMPT, BOT_REMINDER_POSTFIX } from "@/app/ai/prompts/bot-prompts";
 import { GM_COMMAND_INTRODUCE_YOURSELF } from "@/app/ai/prompts/gm-commands";
 import { format } from "@/app/ai/prompts/utils";
@@ -462,6 +467,109 @@ describe("Cross-provider thinking history swap via askText", () => {
                 `✅ ${fromConfig.displayName} -> ${toConfig.displayName}: "${secondReply.substring(0, 80)}..." ` +
                 `(foreign thinking ${firstThinking ? `present (${firstThinking.length} chars), must be dropped` : 'absent'})`
             );
+        }, 240000);
+    }
+});
+
+// ---------------------------------------------------------------------------
+// Story generation, built with the same code path as game-actions.ts
+// createGameWithPreview(): AgentFactory + STORY_SYSTEM_PROMPT, the story cap
+// raised to STORY_MAX_OUTPUT_TOKENS, and STORY_USER_PROMPT filled from the real
+// role/playstyle/voice config.
+//
+// This is the one call that emits a character object per bot, so it is where an
+// output cap actually binds — and it produced no requestStats rows to size from,
+// because the story path bills directly instead of going through
+// recordGameMasterTokenUsage. The per-agent live suites cover story generation
+// for 8 providers only, construct agents directly rather than through the
+// factory (so they never exercise the production cap), and use 3-4 bots. This
+// runs every model in the catalog at the largest lobby the UI allows.
+// ---------------------------------------------------------------------------
+
+// 16-player lobby (the API-tier maximum in games/newgame) minus the human. The
+// point of the test is the worst case: a smaller count clears any sane cap.
+const STORY_BOT_COUNT = 15;
+
+const storyRolesText = [
+    ROLE_CONFIGS[GAME_ROLES.WEREWOLF],
+    ROLE_CONFIGS[GAME_ROLES.DOCTOR],
+    ROLE_CONFIGS[GAME_ROLES.DETECTIVE],
+    ROLE_CONFIGS[GAME_ROLES.MANIAC],
+].map(role => `- **${role.name}** (${role.alignment}): ${role.description}`).join('\n');
+
+const storyPlayStylesText = Object.entries(PLAY_STYLE_CONFIGS)
+    .map(([key, cfg]) => `* ${key}: ${cfg.name} - ${cfg.uiDescription}`)
+    .join('\n');
+
+const storyUserPrompt = format(STORY_USER_PROMPT, {
+    theme: "Victorian Manor Mystery",
+    description: "A grand estate harbors dark secrets during a stormy night",
+    excluded_name: "TestPlayer",
+    number_of_players: STORY_BOT_COUNT,
+    game_roles: storyRolesText,
+    werewolf_count: 3,
+    play_styles: storyPlayStylesText,
+    available_voices: getVoiceConfig(getDefaultVoiceProvider()).getPromptDescription(),
+});
+
+const storyMessages: AIMessage[] = [{ role: 'user', content: storyUserPrompt }];
+
+describe("All models - story generation at max lobby size", () => {
+    for (const { key, llmType } of allModels) {
+        const config = SupportedAiModels[llmType];
+        if (!config) {
+            it.skip(`${key} (${llmType}) — no config found`, () => {});
+            continue;
+        }
+
+        const envVar = ENV_KEY_MAP[config.apiKeyName];
+        if (!apiKeys[config.apiKeyName]) {
+            it.skip(`${config.displayName} (${llmType}) — ${envVar} not set`, () => {});
+            continue;
+        }
+
+        it(`${config.displayName} (${llmType}) should generate ${STORY_BOT_COUNT} characters without truncating`, async () => {
+            const agent = AgentFactory.createAgent(GAME_MASTER, STORY_SYSTEM_PROMPT, llmType, apiKeys, false);
+            // Mirrors game-actions.ts. Asserted rather than assumed: if that override is ever
+            // dropped, story generation silently falls back to the turn-sized default.
+            agent.maxOutputTokens = STORY_MAX_OUTPUT_TOKENS;
+            expect(agent.maxOutputTokens).toBe(STORY_MAX_OUTPUT_TOKENS);
+
+            const [setup, , tokenUsage] = await withPerf(
+                `Story generation (${STORY_BOT_COUNT} bots)`,
+                config.displayName,
+                // A truncated response cuts the JSON mid-object, so schema parsing throwing
+                // here IS the truncation signal — there is no partial-success path.
+                () => agent.askWithZodSchema(GameSetupZodSchema, storyMessages),
+            );
+
+            expect(setup).toBeDefined();
+            expect(typeof setup.scene).toBe('string');
+            expect(setup.scene.length).toBeGreaterThan(50);
+            expect(Array.isArray(setup.players)).toBe(true);
+            expect(setup.players.length).toBe(STORY_BOT_COUNT);
+
+            const validPlayStyles = Object.keys(PLAY_STYLE_CONFIGS);
+            for (const player of setup.players) {
+                expect(typeof player.name).toBe('string');
+                expect(player.name.length).toBeGreaterThan(0);
+                expect(player.story.length).toBeGreaterThan(0);
+                expect(validPlayStyles).toContain(player.playStyle);
+            }
+            // Names must be unique — the game keys bots by name.
+            expect(new Set(setup.players.map(p => p.name)).size).toBe(STORY_BOT_COUNT);
+
+            // The measurement this test exists to produce: how close the worst realistic
+            // story runs to the cap. Anything near 1.0 means STORY_MAX_OUTPUT_TOKENS is
+            // too tight for this model and needs a catalog override.
+            if (tokenUsage?.outputTokens) {
+                const used = tokenUsage.outputTokens / STORY_MAX_OUTPUT_TOKENS;
+                console.log(
+                    `${config.displayName}: ${tokenUsage.outputTokens} output tokens ` +
+                    `(${(used * 100).toFixed(1)}% of the ${STORY_MAX_OUTPUT_TOKENS} story cap)`
+                );
+                expect(tokenUsage.outputTokens).toBeLessThan(STORY_MAX_OUTPUT_TOKENS);
+            }
         }, 240000);
     }
 });
