@@ -2,7 +2,7 @@ import { BaseRoleProcessor, NightActionResult, NightState } from "./base-role-pr
 import { registerRoleProcessor } from "./role-processor-factory";
 import { GAME_ROLES, GAME_MASTER, GameMessage, MessageType, BotResponseError, RECIPIENT_DOCTOR, ROLE_CONFIGS } from "@/app/api/game-models";
 import { AgentFactory } from "@/app/ai/agent-factory";
-import { addMessageToChatAndSaveToDb, getBotMessages, getUserFromFirestore } from "@/app/api/game-actions";
+import { addMessageToChatAndSaveToDb, consumeRetryHint, getBotMessages, getUserFromFirestore } from "@/app/api/game-actions";
 import { getApiKeysForUser } from "@/app/utils/tier-utils";
 import { auth } from "@/auth";
 import { convertToAIMessages } from "@/app/utils/message-utils";
@@ -10,6 +10,7 @@ import { BOT_SYSTEM_PROMPT, BOT_DOCTOR_ACTION_PROMPT, STRICT_TARGET_NAME_INSTRUC
 import { format } from "@/app/ai/prompts/utils";
 import { generateBotContextSection, getAlivePlayerNames, getEffectiveModel } from "@/app/utils/bot-utils";
 import { DoctorActionZodSchema } from "@/app/ai/prompts/zod-schemas";
+import { invalidTargetExplanation, repeatTargetExplanation, selfSelectionExplanation } from "@/app/api/retry-hint";
 import { DoctorAction } from "@/app/ai/prompts/ai-schemas";
 import { recordBotTokenUsage } from "@/app/api/cost-tracking";
 import { getProviderSignatureFields } from "@/app/ai/ai-models";
@@ -207,6 +208,14 @@ export class DoctorProcessor extends BaseRoleProcessor {
             doctorActionPrompt += `\n\n**Available targets for protection${killAbilityAvailable ? ' or kill' : ''}:** ${targetNames}`;
             doctorActionPrompt += STRICT_TARGET_NAME_INSTRUCTION;
 
+            // One-shot hint from a user-triggered Retry explaining why the previous answer was
+            // rejected. Null on a first attempt and on "Retry with different model"; cleared in
+            // Firestore as it is read, so it rides exactly this one prompt.
+            const retryHint = await consumeRetryHint(this.gameId, this.game, doctorBot.name);
+            if (retryHint) {
+                doctorActionPrompt += `\n\n${retryHint}`;
+            }
+
             const gmMessage: GameMessage = {
                 id: null,
                 recipientName: doctorBot.name,
@@ -241,7 +250,8 @@ export class DoctorProcessor extends BaseRoleProcessor {
                             availableTargets: availableTargets,
                             doctorName: doctorBot.name
                         },
-                        true
+                        true,
+                        repeatTargetExplanation(doctorResponse.target, availableTargets)
                     );
                 } else if (!allLivePlayers.includes(doctorResponse.target)) {
                     throw new BotResponseError(
@@ -252,7 +262,8 @@ export class DoctorProcessor extends BaseRoleProcessor {
                             availableTargets: availableTargets,
                             doctorName: doctorBot.name
                         },
-                        true
+                        true,
+                        invalidTargetExplanation(doctorResponse.target, availableTargets)
                     );
                 } else {
                     // This shouldn't happen, but catch any other validation issues
@@ -265,7 +276,8 @@ export class DoctorProcessor extends BaseRoleProcessor {
                             previousTarget: previousProtectedTarget,
                             doctorName: doctorBot.name
                         },
-                        true
+                        true,
+                        invalidTargetExplanation(doctorResponse.target, availableTargets)
                     );
                 }
             }

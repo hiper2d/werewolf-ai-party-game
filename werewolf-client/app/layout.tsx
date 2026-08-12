@@ -8,7 +8,7 @@ import { ThemeProvider } from "@/app/providers/ThemeProvider";
 import { LoginDialogProvider } from "@/app/providers/LoginDialogProvider";
 import LoginDialog from "@/components/login-dialog";
 import WhatsNewPopup from "@/app/news/WhatsNewPopup";
-import { SITE_URL } from "@/app/config/external-links";
+import { DISCORD_URL, SITE_URL } from "@/app/config/external-links";
 
 const inter = Inter({
   subsets: ['latin'],
@@ -56,6 +56,38 @@ export const metadata: Metadata = {
   },
 };
 
+// Search engines composite result thumbnails onto a white card, where the
+// transparent hero logo washes out. logo-512.png is the same artwork baked onto
+// the brand background so it reads on any surface.
+const structuredData = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": `${SITE_URL}/#organization`,
+      name: "Werewolf AI",
+      url: SITE_URL,
+      logo: {
+        "@type": "ImageObject",
+        url: `${SITE_URL}/logo-512.png`,
+        width: 512,
+        height: 512,
+      },
+      image: `${SITE_URL}/logo-512.png`,
+      sameAs: [DISCORD_URL],
+    },
+    {
+      "@type": "WebSite",
+      "@id": `${SITE_URL}/#website`,
+      name: "Werewolf AI",
+      url: SITE_URL,
+      description:
+        "Play the classic Werewolf party game with top AI models from OpenAI, Anthropic, Google, Mistral, and more.",
+      publisher: { "@id": `${SITE_URL}/#organization` },
+    },
+  ],
+};
+
 // Inline script to prevent flash of wrong theme
 const themeScript = `
   (function() {
@@ -76,6 +108,10 @@ export default function RootLayout(
       <html suppressHydrationWarning lang="en" className={`${inter.variable} ${roboto_mono.variable} ${jetbrains_mono.variable} min-h-full`}>
           <head>
             <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+            />
           </head>
           <body className="font-inter m-0 p-0 min-h-full">
             <ThemeProvider>

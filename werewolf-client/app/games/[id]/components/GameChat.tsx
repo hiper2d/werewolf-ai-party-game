@@ -32,6 +32,9 @@ interface GameChatProps {
     // request only (never changes the bot's stored model). failedName may be a role
     // name (night hidden roles) or undefined — the server resolves the real target.
     onRetryWithModel?: (failedName?: string) => void;
+    // Re-runs the GM bot-selection step after a router failure, where clearing the error alone
+    // cannot resume the game (the process queue was never written).
+    onRetryBotSelection?: () => void;
     isExternalLoading?: boolean;
     gameControls?: React.ReactNode;
     chatControls?: React.ReactNode;
@@ -382,7 +385,7 @@ function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcludin
     );
 }
 
-export default function GameChat({ gameId, game, runGameAction, onGameStateChange, pendingMessages, onPendingMessagesConsumed, clearNightMessages, onErrorHandled, onRetryWithModel, isExternalLoading, gameControls, chatControls, onBeforeAction, cancelButton }: GameChatProps) {
+export default function GameChat({ gameId, game, runGameAction, onGameStateChange, pendingMessages, onPendingMessagesConsumed, clearNightMessages, onErrorHandled, onRetryWithModel, onRetryBotSelection, isExternalLoading, gameControls, chatControls, onBeforeAction, cancelButton }: GameChatProps) {
     // Without a parent-provided lock, run actions directly (standalone use).
     const runAction = useMemo(
         () => runGameAction ?? (<T,>(action: () => Promise<T>) => action()),
@@ -912,6 +915,12 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
     };
 
     const handleDismissError = async () => {
+        // A GM-router failure throws BEFORE the process queue is written, so clearing the error
+        // is not enough to resume: the auto-processing effect below is gated on a non-empty
+        // queue and would never fire. Re-run the selection step explicitly instead. Read the
+        // flag before clearing — clearGameErrorState wipes errorState.
+        const wasBotSelectionFailure = game.errorState?.context?.action === 'bot_selection';
+
         // Clear the persistent error state in the database
         try {
             console.log('🔄 CLEARING GAME ERROR STATE and refreshing...');
@@ -922,6 +931,15 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
             console.log('✅ GAME ERROR STATE CLEARED and game state refreshed');
         } catch (error) {
             console.error('Error clearing game error state:', error);
+            return;
+        }
+
+        if (wasBotSelectionFailure && onRetryBotSelection) {
+            // The human's message (if any) was persisted before the router ran, so any draft
+            // still in the composer is a duplicate of what is already in the chat.
+            setNewMessage('');
+            console.log('🔁 RE-RUNNING GM BOT SELECTION after router failure');
+            onRetryBotSelection();
         }
     };
 

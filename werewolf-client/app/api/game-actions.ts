@@ -974,11 +974,23 @@ export async function clearGameErrorState(gameId: string): Promise<Game> {
         const gameData = gameSnap.data();
         await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: (gameData?.createdWithTier ?? 'free') });
         
-        // Clear the error state in Firestore
-        await gameRef.update({ errorState: null });
-        
+        // Plain Retry: carry the explanation recorded at the throw site into the rebuilt prompt, so
+        // the model is not replayed byte-identical context it already got wrong. Failures with
+        // nothing useful to say (timeouts, 5xx) carry no explanation and retry exactly as before.
+        const errorState = gameData?.errorState as SystemErrorMessage | undefined;
+        const hintText = errorState?.explanation ?? null;
+        const hintTarget = hintText
+            ? resolveRetryTarget(gameFromFirestore(gameId, gameData))
+            : null;
+        const retryHint = hintText && hintTarget ? { botName: hintTarget, hint: hintText } : null;
+        if (retryHint) {
+            logger.info('RETRY_HINT set for user-triggered retry', { gameId, botName: retryHint.botName });
+        }
+
+        await gameRef.update({ errorState: null, retryHint });
+
         // Return the updated game
-        return gameFromFirestore(gameId, { ...gameData, errorState: null });
+        return gameFromFirestore(gameId, { ...gameData, errorState: null, retryHint });
     } catch (error: any) {
         logger.error("Error clearing game error state: ", { error: error.message, gameId });
         throw new Error(`Failed to clear game error state: ${error.message}`);
@@ -1062,10 +1074,12 @@ export async function retryWithModelOverride(gameId: string, model: string, enab
     validateModelUsageForTier(gameTier, gmModel, botModels, apiKeys);
 
     const modelOverride = { botName: target, model, enableThinking: enableThinking ?? false };
-    await gameRef.update({ modelOverride, errorState: null });
+    // No hint on this path by design: a different model has not made the mistake being described,
+    // and any hint left over from an earlier plain Retry is cleared here rather than inherited.
+    await gameRef.update({ modelOverride, errorState: null, retryHint: null });
     logger.info(`One-shot model override set for retry`, { gameId, model, gameState: game.gameState });
 
-    return gameFromFirestore(gameId, { ...gameData, modelOverride, errorState: null });
+    return gameFromFirestore(gameId, { ...gameData, modelOverride, errorState: null, retryHint: null });
 }
 
 /**
@@ -1083,6 +1097,31 @@ export async function consumeModelOverride(gameId: string, game: Game): Promise<
     }
     await db.collection('games').doc(gameId).update({ modelOverride: null });
     return game;
+}
+
+/**
+ * Returns the retry hint for `botName` and deletes it from Firestore, mirroring
+ * `consumeModelOverride`: cleared BEFORE the AI call so it applies to exactly one request, but
+ * still returned to the caller so the current prompt can use it. If that request fails again the
+ * next Retry writes a fresh hint from the new error.
+ *
+ * Returns null when there is no hint, or when the stored hint belongs to a different actor — a
+ * hint about one bot's bad target must never leak into another bot's prompt.
+ */
+export async function consumeRetryHint(gameId: string, game: Game, botName: string): Promise<string | null> {
+    const stored = game.retryHint;
+    if (!stored) {
+        return null;
+    }
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+    await db.collection('games').doc(gameId).update({ retryHint: null });
+    if (stored.botName !== botName) {
+        return null;
+    }
+    logger.info('RETRY_HINT consumed', { gameId, botName });
+    return stored.hint;
 }
 
 /**
@@ -1253,6 +1292,7 @@ function gameFromFirestore(id: string, data: any): Game {
         gameStateProcessQueue: data.gameStateProcessQueue,
         errorState: data.errorState || null,
         modelOverride: data.modelOverride || null,
+        retryHint: data.retryHint || null,
         nightResults: data.nightResults || {},
         previousNightResults: data.previousNightResults || {},
         messageCounter: data.messageCounter || 0, // Default to 0 for existing games

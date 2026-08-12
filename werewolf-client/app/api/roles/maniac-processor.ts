@@ -9,7 +9,7 @@ import {
     RECIPIENT_MANIAC
 } from "@/app/api/game-models";
 import { AgentFactory } from "@/app/ai/agent-factory";
-import { addMessageToChatAndSaveToDb, getBotMessages } from "@/app/api/game-actions";
+import { addMessageToChatAndSaveToDb, consumeRetryHint, getBotMessages } from "@/app/api/game-actions";
 import { getApiKeysForUser } from "@/app/utils/tier-utils";
 import { auth } from "@/auth";
 import { convertToAIMessages } from "@/app/utils/message-utils";
@@ -17,6 +17,7 @@ import { BOT_SYSTEM_PROMPT, BOT_MANIAC_ACTION_PROMPT, STRICT_TARGET_NAME_INSTRUC
 import { format } from "@/app/ai/prompts/utils";
 import { generateBotContextSection, getAlivePlayerNames, getEffectiveModel } from "@/app/utils/bot-utils";
 import { ManiacActionZodSchema } from "@/app/ai/prompts/zod-schemas";
+import { invalidTargetExplanation, repeatTargetExplanation, selfSelectionExplanation } from "@/app/api/retry-hint";
 import { recordBotTokenUsage } from "@/app/api/cost-tracking";
 import { getProviderSignatureFields } from "@/app/ai/ai-models";
 
@@ -136,6 +137,14 @@ export class ManiacProcessor extends BaseRoleProcessor {
             maniacActionPrompt += `\n\n**Available targets for abduction:** ${targetNames}`;
             maniacActionPrompt += STRICT_TARGET_NAME_INSTRUCTION;
 
+            // One-shot hint from a user-triggered Retry explaining why the previous answer was
+            // rejected. Null on a first attempt and on "Retry with different model"; cleared in
+            // Firestore as it is read, so it rides exactly this one prompt.
+            const retryHint = await consumeRetryHint(this.gameId, this.game, maniacBot.name);
+            if (retryHint) {
+                maniacActionPrompt += `\n\n${retryHint}`;
+            }
+
             const gmMessage: GameMessage = {
                 id: null,
                 recipientName: maniacBot.name,
@@ -170,7 +179,8 @@ export class ManiacProcessor extends BaseRoleProcessor {
                             availableTargets: availableTargets,
                             maniacName: maniacBot.name
                         },
-                        true
+                        true,
+                        repeatTargetExplanation(maniacResponse.target, availableTargets)
                     );
                 } else if (!allLivePlayers.includes(maniacResponse.target)) {
                     throw new BotResponseError(
@@ -181,7 +191,11 @@ export class ManiacProcessor extends BaseRoleProcessor {
                             availableTargets: availableTargets,
                             maniacName: maniacBot.name
                         },
-                        true
+                        true,
+                        // Self is excluded from the maniac's list, so a self-pick lands here.
+                        maniacResponse.target === maniacBot.name
+                            ? selfSelectionExplanation('abduct', availableTargets)
+                            : invalidTargetExplanation(maniacResponse.target, availableTargets)
                     );
                 } else {
                     throw new BotResponseError(
@@ -193,7 +207,8 @@ export class ManiacProcessor extends BaseRoleProcessor {
                             previousTarget: previousAbductedTarget,
                             maniacName: maniacBot.name
                         },
-                        true
+                        true,
+                        invalidTargetExplanation(maniacResponse.target, availableTargets)
                     );
                 }
             }

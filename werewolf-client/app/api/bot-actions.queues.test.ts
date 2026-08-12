@@ -55,6 +55,8 @@ jest.mock('@/app/api/game-actions', () => ({
     addMessageToChatAndSaveToDb: jest.fn(),
     setGameErrorState: jest.fn(),
     consumeModelOverride: jest.fn(async (_gameId: string, game: any) => game),
+    // No hint on a first attempt; the hint wording is covered by retry-hint.test.ts.
+    consumeRetryHint: jest.fn(async () => null),
 }));
 
 jest.mock('@/app/utils/tier-utils', () => ({

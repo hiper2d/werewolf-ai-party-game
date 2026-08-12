@@ -9,7 +9,7 @@ import {
     RECIPIENT_DETECTIVE
 } from "@/app/api/game-models";
 import {AgentFactory} from "@/app/ai/agent-factory";
-import {addMessageToChatAndSaveToDb, getBotMessages} from "@/app/api/game-actions";
+import {addMessageToChatAndSaveToDb, consumeRetryHint, getBotMessages} from "@/app/api/game-actions";
 import {getApiKeysForUser} from "@/app/utils/tier-utils";
 import {auth} from "@/auth";
 import {convertToAIMessages} from "@/app/utils/message-utils";
@@ -17,6 +17,7 @@ import {BOT_DETECTIVE_ACTION_PROMPT, BOT_SYSTEM_PROMPT, STRICT_TARGET_NAME_INSTR
 import {format} from "@/app/ai/prompts/utils";
 import {generateBotContextSection, getAlivePlayerNames, getEffectiveModel} from "@/app/utils/bot-utils";
 import {DetectiveActionZodSchema} from "@/app/ai/prompts/zod-schemas";
+import { invalidTargetExplanation, repeatTargetExplanation, selfSelectionExplanation } from "@/app/api/retry-hint";
 import {recordBotTokenUsage} from "@/app/api/cost-tracking";
 import {getProviderSignatureFields} from "@/app/ai/ai-models";
 
@@ -224,6 +225,14 @@ export class DetectiveProcessor extends BaseRoleProcessor {
             }
             detectiveActionPrompt += STRICT_TARGET_NAME_INSTRUCTION;
 
+            // One-shot hint from a user-triggered Retry explaining why the previous answer was
+            // rejected. Null on a first attempt and on "Retry with different model"; cleared in
+            // Firestore as it is read, so it rides exactly this one prompt.
+            const retryHint = await consumeRetryHint(this.gameId, this.game, detectiveBot.name);
+            if (retryHint) {
+                detectiveActionPrompt += `\n\n${retryHint}`;
+            }
+
             const gmMessage: GameMessage = {
                 id: null,
                 recipientName: detectiveBot.name,
@@ -256,7 +265,11 @@ export class DetectiveProcessor extends BaseRoleProcessor {
                         availableTargets: allLivePlayers,
                         detectiveName: detectiveBot.name
                     },
-                    true
+                    true,
+                    // Self is excluded from the detective's list, so a self-pick lands here.
+                    detectiveResponse.target === detectiveBot.name
+                        ? selfSelectionExplanation('investigate', allLivePlayers)
+                        : invalidTargetExplanation(detectiveResponse.target, allLivePlayers)
                 );
             }
 

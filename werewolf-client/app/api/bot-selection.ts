@@ -11,11 +11,12 @@ import {
 import { GM_ROUTER_SYSTEM_PROMPT } from "@/app/ai/prompts/gm-prompts";
 import { GM_COMMAND_SELECT_RESPONDERS } from "@/app/ai/prompts/gm-commands";
 import { GmBotSelectionZodSchema } from "@/app/ai/prompts/zod-schemas";
+import { invalidJsonExplanation } from "@/app/api/retry-hint";
 import { AgentFactory } from "@/app/ai/agent-factory";
 import { format } from "@/app/ai/prompts/utils";
 import { formatMessagesForBotSelection } from "@/app/utils/message-utils";
 import { getEffectiveModel } from "@/app/utils/bot-utils";
-import { addMessageToChatAndSaveToDb, getGameMessages } from "@/app/api/game-actions";
+import { addMessageToChatAndSaveToDb, consumeRetryHint, getGameMessages } from "@/app/api/game-actions";
 import { recordGameMasterTokenUsage } from "@/app/api/cost-tracking";
 import { logger } from "@/app/utils/logger";
 
@@ -140,7 +141,11 @@ export async function selectRespondingBots(
     const gmAgent = AgentFactory.createAgent(GAME_MASTER, gmPrompt, gmModel.aiType, apiKeys, gmModel.enableThinking);
     gmAgent.gameId = game.id;
     gmAgent.userId = userEmail;
-    const selectionCommand = format(GM_COMMAND_SELECT_RESPONDERS, { candidate_names: candidateNames });
+    // One-shot hint from a user-triggered Retry: the GM's previous response was unusable
+    // (empty or wrong shape). Cleared in Firestore as it is read, so it rides this prompt only.
+    const retryHint = await consumeRetryHint(game.id, game, GAME_MASTER);
+    const selectionCommand = format(GM_COMMAND_SELECT_RESPONDERS, { candidate_names: candidateNames })
+        + (retryHint ? `\n\n${retryHint}` : '');
 
     // Include recent conversation in the GM's history for bot selection
     const history = formatMessagesForBotSelection(dayMessages, selectionCommand);
@@ -150,7 +155,8 @@ export async function selectRespondingBots(
             'Game Master failed to select responding bots',
             'GM did not respond to bot selection request',
             { gmAiType: game.gameMasterAiType, action: 'bot_selection' },
-            true
+            true,
+            invalidJsonExplanation()
         );
     }
 
@@ -162,8 +168,11 @@ export async function selectRespondingBots(
         throw new BotResponseError(
             'Game Master provided invalid bot selection',
             'GM response format was invalid or missing selected_bots array',
-            { gmAiType: game.gameMasterAiType, response: gmResponse },
-            true
+            // action tags this as a router failure so the UI can re-run the selection step
+            // rather than waiting on a queue that was never written.
+            { gmAiType: game.gameMasterAiType, action: 'bot_selection', response: gmResponse },
+            true,
+            invalidJsonExplanation()
         );
     }
 

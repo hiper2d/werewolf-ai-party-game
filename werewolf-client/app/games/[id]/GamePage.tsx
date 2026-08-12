@@ -555,10 +555,18 @@ function GamePageContent({
     // One-shot retry from the error banner: the chosen model is used for the failed
     // request only; the bot's stored model never changes.
     const handleRetryWithModel = async (newModel: string, enableThinking?: boolean) => {
+        // Same gap as the plain Retry: a router failure never wrote the process queue, so the
+        // auto-processing effect cannot resume on its own. Captured before the override clears
+        // errorState.
+        const wasBotSelectionFailure = game.errorState?.context?.action === 'bot_selection';
         try {
             const updatedGame = await runGameAction(() => retryWithModelOverride(game.id, newModel, enableThinking));
             if (updatedGame) {
                 setGame(updatedGame);
+            }
+            if (wasBotSelectionFailure) {
+                // keepBotsGoingImpl consumes the override, so the re-run uses the chosen model.
+                await handleKeepGoingAction();
             }
         } catch (error) {
             if (handleGameActionError(error)) {
@@ -1270,6 +1278,7 @@ function GamePageContent({
                     onPendingMessagesConsumed={() => setPendingMessages([])}
                     clearNightMessages={clearNightMessages}
                     onErrorHandled={handleErrorCleared}
+                    onRetryBotSelection={handleKeepGoingAction}
                     onRetryWithModel={(failedName?: string) => {
                         // failedName may be a role name during NIGHT (hidden roles) or
                         // missing entirely — the server resolves the actual target from

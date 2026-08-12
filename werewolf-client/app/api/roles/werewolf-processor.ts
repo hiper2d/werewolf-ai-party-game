@@ -10,7 +10,7 @@ import {
     RECIPIENT_WEREWOLVES
 } from "@/app/api/game-models";
 import {AgentFactory} from "@/app/ai/agent-factory";
-import {addMessageToChatAndSaveToDb, getBotMessages} from "@/app/api/game-actions";
+import {addMessageToChatAndSaveToDb, consumeRetryHint, getBotMessages} from "@/app/api/game-actions";
 import {getApiKeysForUser} from "@/app/utils/tier-utils";
 import {generateBotContextSection, generateWerewolfTeammatesSection, getAlivePlayerNames, getEffectiveModel} from "@/app/utils/bot-utils";
 import {auth} from "@/auth";
@@ -23,6 +23,7 @@ import {
 } from "@/app/ai/prompts/bot-prompts";
 import {format} from "@/app/ai/prompts/utils";
 import {BotAnswerZodSchema, WerewolfActionZod, WerewolfActionZodSchema} from "@/app/ai/prompts/zod-schemas";
+import { invalidTargetExplanation, repeatTargetExplanation, selfSelectionExplanation } from "@/app/api/retry-hint";
 import {recordBotTokenUsage} from "@/app/api/cost-tracking";
 import {getProviderSignatureFields} from "@/app/ai/ai-models";
 
@@ -218,7 +219,12 @@ export class WerewolfProcessor extends BaseRoleProcessor {
                 const targetablePlayers = this.getTargetablePlayers(true); // Exclude werewolves
                 const targetNames = targetablePlayers.map(p => p.name).join(', ');
 
-                const werewolfActionPrompt = `${format(BOT_WEREWOLF_ACTION_PROMPT, { bot_name: werewolfBot.name })}\n\n**Available targets:** ${targetNames}${STRICT_TARGET_NAME_INSTRUCTION}`;
+                // One-shot hint from a user-triggered Retry explaining why the previous answer
+                // was rejected. Only the deciding werewolf names a target, so only this branch
+                // needs it; cleared in Firestore as it is read.
+                const retryHint = await consumeRetryHint(this.gameId, this.game, werewolfBot.name);
+                const werewolfActionPrompt = `${format(BOT_WEREWOLF_ACTION_PROMPT, { bot_name: werewolfBot.name })}\n\n**Available targets:** ${targetNames}${STRICT_TARGET_NAME_INSTRUCTION}`
+                    + (retryHint ? `\n\n${retryHint}` : '');
 
                 gmMessage = {
                     id: null,
@@ -279,7 +285,11 @@ export class WerewolfProcessor extends BaseRoleProcessor {
                             availableTargets: targetableNames,
                             werewolfName: werewolfBot.name
                         },
-                        true
+                        true,
+                        // The whole pack (including self) is excluded, so a self-pick lands here.
+                        targetName === werewolfBot.name
+                            ? selfSelectionExplanation('eliminate', targetableNames)
+                            : invalidTargetExplanation(targetName, targetableNames)
                     );
                 }
 

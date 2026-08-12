@@ -66,7 +66,9 @@ function normalizeNestedReply(value: unknown, log: (message: string) => void): u
  *    variant for Gemini's quoted-JSON-string quirk).
  * 2. Extraction of the first balanced JSON object embedded in prose
  *    (rescues "Sure, here is my answer: {...}" replies).
- * 3. Wrapping raw prose as `{ reply: ... }` for BotAnswer-shaped schemas
+ * 3. Re-bracing replies that look like an object body missing its outer braces
+ *    (rescues MiniMax-M3's `"who": "...", "why": "..."` replies).
+ * 4. Wrapping raw prose as `{ reply: ... }` for BotAnswer-shaped schemas
  *    (rescues bots that "speak in character" instead of returning JSON).
  *
  * Throws with the same message prefixes the agents have always used
@@ -120,7 +122,26 @@ export function parseAndValidateLlmJson<T>(
         }
     }
 
-    // 3. Last resort: accept prose for BotAnswer-shaped schemas
+    // 3. Object body missing its outer braces: `"who": ...` → `{"who": ...}`.
+    //    Also try adding only the opening brace, for replies that kept the closing one.
+    for (const candidate of candidates) {
+        if (!candidate.startsWith('"')) continue;
+        for (const rebraced of [`{${candidate}}`, `{${candidate}`]) {
+            let parsed: unknown;
+            try {
+                parsed = JSON.parse(rebraced);
+            } catch {
+                continue;
+            }
+            const validated = tryValidate(parsed);
+            if (validated) {
+                log(`Recovered JSON missing outer braces (${candidate.length} chars)`);
+                return validated.data;
+            }
+        }
+    }
+
+    // 4. Last resort: accept prose for BotAnswer-shaped schemas
     const wrapped = safeValidateResponse(zodSchema, { reply: cleaned });
     if (wrapped.success) {
         log(`Wrapped prose response as reply (${cleaned.length} chars)`);

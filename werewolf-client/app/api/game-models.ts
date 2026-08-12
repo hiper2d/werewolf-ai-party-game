@@ -247,6 +247,10 @@ export interface Game {
     // consumed. Never mutates the bot's stored aiType, so retrying a hidden role's
     // failed night action doesn't reveal the role via a model change in the players list.
     modelOverride?: { botName: string; model: string; enableThinking?: boolean } | null;
+    // One-shot "why the last attempt failed" line, set when the user presses Retry and consumed
+    // by the next AI call for that actor. Same lifecycle as modelOverride. Never set by
+    // "Retry with different model".
+    retryHint?: { botName: string; hint: string } | null;
     nightResults?: Record<string, { target: string; actionType?: string; narrativeHint?: string }>; // Dynamic night results for each role that has night actions
     previousNightResults?: Record<string, { target: string; actionType?: string; narrativeHint?: string }>; // Previous night's results for reference
     messageCounter?: number; // Counter for generating incremental message IDs
@@ -685,24 +689,36 @@ export interface SystemErrorMessage {
     context: Record<string, any>;
     recoverable: boolean;
     timestamp: number;
+    // Model-facing explanation of why the answer was rejected, written at the throw site. Appended
+    // to the rebuilt prompt when the user presses Retry; absent for failures with nothing useful
+    // to tell the model (timeouts, 5xx). Not shown in the UI — `details` is the user-facing text.
+    explanation?: string;
 }
 
 export class BotResponseError extends Error {
     public details: string;
     public context: Record<string, any>;
     public recoverable: boolean;
+    /**
+     * Model-facing explanation of the rejection, set where the failure is detected and carried
+     * through to `SystemErrorMessage.explanation`. Used only to enrich a user-triggered Retry
+     * prompt — see `app/api/retry-hint.ts`.
+     */
+    public explanation?: string;
 
     constructor(
         message: string,
         details: string = '',
         context: Record<string, any> = {},
-        recoverable: boolean = true
+        recoverable: boolean = true,
+        explanation?: string
     ) {
         super(message);
         this.name = 'BotResponseError';
         this.details = details;
         this.context = context;
         this.recoverable = recoverable;
+        this.explanation = explanation;
     }
 }
 

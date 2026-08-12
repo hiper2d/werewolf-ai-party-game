@@ -30,6 +30,7 @@ import {
 import {BOT_REMINDER_POSTFIX, BOT_SYSTEM_PROMPT, BOT_VOTE_PROMPT, BOT_AFTER_GAME_SYSTEM_PROMPT_ADDITION} from "@/app/ai/prompts/bot-prompts";
 import {HUMAN_SUGGESTION_PROMPT} from "@/app/ai/prompts/gm-prompts";
 import {BotVoteZodSchema} from "@/app/ai/prompts/zod-schemas";
+import {invalidTargetExplanation, selfSelectionExplanation} from "@/app/api/retry-hint";
 import {AgentFactory} from "@/app/ai/agent-factory";
 import {format} from "@/app/ai/prompts/utils";
 import {auth} from "@/auth";
@@ -42,6 +43,7 @@ import {ModelError} from "@/app/ai/errors";
 import {
     addMessageToChatAndSaveToDb,
     consumeModelOverride,
+    consumeRetryHint,
     getBotMessages,
     getGame,
     getGameMessages,
@@ -1117,12 +1119,18 @@ async function voteImpl(gameId: string): Promise<GameActionResponse> {
             const totalVoters = currentGame.bots.filter(b => b.isAlive).length + 1; // +1 for human
             const votePosition = totalVoters - currentGame.gameStateProcessQueue.length + 1;
 
+            // One-shot hint from a user-triggered Retry explaining why the previous vote was
+            // rejected (a dead/unknown name, or the bot voting for itself). Null on a first
+            // attempt and on "Retry with different model"; cleared in Firestore as it is read.
+            const voteRetryHint = await consumeRetryHint(gameId, currentGame, bot.name);
+
             // Create the voting command message
             const gmMessage: GameMessage = {
                 id: null,
                 recipientName: bot.name,
                 authorName: GAME_MASTER,
-                msg: format(BOT_VOTE_PROMPT, { bot_name: bot.name, vote_position: String(votePosition), total_voters: String(totalVoters), valid_targets: validTargetsList, werewolf_vote_note: werewolfVoteNote }),
+                msg: format(BOT_VOTE_PROMPT, { bot_name: bot.name, vote_position: String(votePosition), total_voters: String(totalVoters), valid_targets: validTargetsList, werewolf_vote_note: werewolfVoteNote })
+                    + (voteRetryHint ? `\n\n${voteRetryHint}` : ''),
                 messageType: MessageType.GM_COMMAND,
                 day: currentGame.currentDay,
                 timestamp: Date.now()
@@ -1169,11 +1177,17 @@ async function voteImpl(gameId: string): Promise<GameActionResponse> {
             
             // Validate the vote target is alive and valid
             if (!alivePlayerNames.includes(voteResponse.who)) {
+                // Voting for yourself is never legal, so it gets its own explanation — the generic
+                // "not on the list" wording reads as a typo and doesn't state the actual rule.
+                const explanation = voteResponse.who === bot.name
+                    ? selfSelectionExplanation('vote for', alivePlayerNames)
+                    : invalidTargetExplanation(voteResponse.who, alivePlayerNames);
                 throw new BotResponseError(
                     `Invalid vote target: ${voteResponse.who}`,
                     `Bot ${bot.name} attempted to vote for an invalid target. Valid targets: ${alivePlayerNames.join(', ')}`,
                     { botName: bot.name, aiType: bot.aiType, action: 'vote', invalidTarget: voteResponse.who },
-                    true
+                    true,
+                    explanation
                 );
             }
             

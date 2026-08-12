@@ -16,7 +16,12 @@ import { parseAndValidateLlmJson } from './json-response-parser';
 // blocks from the answer defensively.
 //
 // Structured output: the M-series Chat Completions API has no `response_format` at all, so
-// schema constraints are conveyed in-prompt and parsed leniently.
+// schema constraints are conveyed in-prompt and parsed leniently. MiniMax's Anthropic-compatible
+// endpoint was evaluated as an alternative (forced tool_choice, arguments as a parsed object) and
+// rejected: it removes JSON syntax errors but MiniMax does no constrained decoding, so required
+// fields are still dropped (observed live: story generation omitting a required field from all 15
+// players), and tool_choice is not always honored. It needs the same in-prompt schema description
+// and the same lenient parsing, for a second client against a second endpoint.
 export class MiniMaxAgent extends AbstractAgent {
     private readonly client: OpenAI;
     // A getter, not a field: `maxOutputTokens` can be raised after construction, and a field

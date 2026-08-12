@@ -159,8 +159,8 @@ export default function AIModelSelect({
 
     // Recompute selection from the active filter set.
     // - No active filters → empty selection.
-    // - One filter → just that subset.
-    // - Multiple filters → intersection (e.g. fast ∩ OpenAI).
+    // - Otherwise → union of the chips (e.g. fast ∪ MiniMax): each chip adds its
+    //   subset, so a provider with no fast models still contributes its models.
     // Skips models that are explicitly disabled by `optionMetaFn` (e.g. tier policy).
     const applyFiltersToSelection = (nextFastOnly: boolean, nextProviders: Set<string>) => {
         if (!nextFastOnly && nextProviders.size === 0) {
@@ -170,9 +170,8 @@ export default function AIModelSelect({
         const matches = options.filter(modelId => {
             const meta = optionMetaFn?.(modelId);
             if (meta?.disabled) return false;
-            if (nextFastOnly && !modelIsFast(modelId)) return false;
-            if (nextProviders.size > 0 && !nextProviders.has(getProviderName(modelId))) return false;
-            return true;
+            return (nextFastOnly && modelIsFast(modelId))
+                || nextProviders.has(getProviderName(modelId));
         });
         onChange(matches);
     };

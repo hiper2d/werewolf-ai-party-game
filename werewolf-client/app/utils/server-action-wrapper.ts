@@ -1,5 +1,6 @@
 import { setGameErrorState, getGame } from '@/app/api/game-actions';
 import { SystemErrorMessage, BotResponseError, GameActionResponse, GAME_STATES, Game } from '@/app/api/game-models';
+import { invalidJsonExplanation, isResponseFormatFailure } from '@/app/api/retry-hint';
 import { isTierMismatchError } from '@/app/api/errors';
 import { logger } from '@/app/utils/logger';
 
@@ -80,6 +81,12 @@ export function withErrorHandling<T extends any[]>(
           ? error.stack || error.message
           : String(error);
       const recoverable = error instanceof BotResponseError ? error.recoverable : true;
+      // Set at the throw site when there is something worth telling the model on a Retry. Agent-layer
+      // failures don't carry one, so derive the response-format case from the details string here —
+      // it's the one explanation that isn't about a game rule.
+      const explanation = error instanceof BotResponseError
+        ? error.explanation ?? (isResponseFormatFailure(error.details) ? invalidJsonExplanation() : undefined)
+        : undefined;
 
       const context: Record<string, any> = {
         ...baseContext,
@@ -114,7 +121,8 @@ export function withErrorHandling<T extends any[]>(
         details: errorDetails,
         context,
         recoverable,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        ...(explanation ? { explanation } : {}),
       };
 
       // Update game with error state and return it wrapped in GameActionResponse.

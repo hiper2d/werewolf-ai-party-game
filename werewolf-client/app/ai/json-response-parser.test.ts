@@ -66,6 +66,18 @@ describe('parseAndValidateLlmJson', () => {
         expect(result.reply).toContain('"speech": "hi"');
     });
 
+    it('re-braces an object body missing both outer braces (MiniMax-M3 vote case)', () => {
+        const raw = '"who": "Luke",\n  "why": "Luke\'s flip is the freshest suspicious pattern"';
+        expect(parseAndValidateLlmJson(raw, BotVoteZodSchema))
+            .toEqual({ who: 'Luke', why: "Luke's flip is the freshest suspicious pattern" });
+    });
+
+    it('re-braces an object body missing only the opening brace', () => {
+        const raw = '"who": "Luke", "why": "kept the closing brace"}';
+        expect(parseAndValidateLlmJson(raw, BotVoteZodSchema))
+            .toEqual({ who: 'Luke', why: 'kept the closing brace' });
+    });
+
     it('wraps raw prose as reply for BotAnswer-shaped schemas', () => {
         const result = parseAndValidateLlmJson('I am just talking in character.', BotAnswerZodSchema);
         expect(result).toEqual({ reply: 'I am just talking in character.' });
