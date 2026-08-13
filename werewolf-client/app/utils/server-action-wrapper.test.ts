@@ -143,6 +143,32 @@ describe('withErrorHandling', () => {
       expect(systemError.details).toBe('string failure');
       expect(systemError.recoverable).toBe(true);
     });
+
+    it('derives the JSON-format retry explanation from a plain Error (agent parse failures reach here unwrapped)', async () => {
+      // The vote and night-action paths rethrow agent errors as-is — observed live with
+      // qwen-max answering a vote prompt in prose instead of JSON.
+      const boom = new Error(
+        "Failed to get response from Qwen API: Failed to parse JSON response: SyntaxError: Unexpected token 'L'"
+      );
+      const wrapped = withErrorHandling(async () => { throw boom; }, () => GAME_ID);
+
+      await wrapped();
+
+      const { systemError } = lastErrorStateCall();
+      expect(systemError.explanation).toContain('Reply with ONLY the JSON');
+    });
+
+    it('sets no explanation on a plain Error that is not a response-format failure', async () => {
+      const wrapped = withErrorHandling(
+        async () => { throw new Error('Empty or undefined response from MiniMax API'); },
+        () => GAME_ID
+      );
+
+      await wrapped();
+
+      const { systemError } = lastErrorStateCall();
+      expect(systemError.explanation).toBeUndefined();
+    });
   });
 
   describe('BotResponseError handling', () => {

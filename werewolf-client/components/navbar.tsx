@@ -12,7 +12,6 @@ import type { UserTier } from '@/app/api/game-models';
 
 const tierConfig: Record<UserTier, { label: string; className: string }> = {
     free: { label: 'Free', className: 'border border-[var(--line-2)] text-[var(--fg-2)]' },
-    api: { label: 'API', className: 'border border-[var(--line-2)] text-[var(--fg-2)]' },
     paid: { label: 'Paid', className: 'border border-[var(--accent-line)] text-[var(--accent)]' },
 };
 

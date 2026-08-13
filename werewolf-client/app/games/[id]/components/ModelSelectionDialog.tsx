@@ -41,43 +41,18 @@ export default function ModelSelectionDialog({
     const { isModalOpen } = useUIControls();
     const isOpen = isModalOpen('modelSelection');
     const [search, setSearch] = useState('');
-    const [providedKeyNames, setProvidedKeyNames] = useState<Set<string> | null>(null);
-
-    // Load API-tier user's provided key names (only relevant when gameTier === API).
-    useEffect(() => {
-        if (gameTier !== USER_TIERS.API || !isOpen || providedKeyNames !== null) return;
-        let cancelled = false;
-        fetch('/api/user-key-names')
-            .then(r => r.ok ? r.json() : { providedKeys: [] })
-            .then(data => {
-                if (cancelled) return;
-                const list = Array.isArray(data?.providedKeys) ? data.providedKeys as string[] : [];
-                setProvidedKeyNames(new Set(list));
-            })
-            .catch(() => {
-                if (!cancelled) setProvidedKeyNames(new Set());
-            });
-        return () => { cancelled = true; };
-    }, [gameTier, isOpen, providedKeyNames]);
 
     const modelOptions = useMemo(() => {
-        // API tier with keys not yet loaded — show only the current model to avoid
-        // flashing the full list before gating data arrives.
-        if (gameTier === USER_TIERS.API && providedKeyNames === null) {
-            return currentModel && currentModel !== LLM_CONSTANTS.RANDOM
-                ? [{ model: currentModel, disabled: false }]
-                : [];
-        }
         // Tested single source of truth for tier rules, usage counts, and the
         // current-model escape hatch. We only strip the suffix (this dialog renders its
         // own labels) and hide disabled non-current models (they can't be selected here).
-        return getModelPickerOptions(gameTier, providedKeyNames ?? new Set(), {
+        return getModelPickerOptions(gameTier, {
             usageCounts,
             currentModel,
         })
             .map(({ model, disabled }) => ({ model, disabled }))
             .filter(option => !(option.disabled && option.model !== currentModel));
-    }, [gameTier, providedKeyNames, usageCounts, currentModel]);
+    }, [gameTier, usageCounts, currentModel]);
 
     // Group by provider
     const groupedModels = useMemo(() => {

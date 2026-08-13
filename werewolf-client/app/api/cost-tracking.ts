@@ -138,9 +138,10 @@ async function commitUsageAtomically(
 
         // The tier that actually billed: the user's current tier when charging, the game's
         // creation tier otherwise (zero-cost calls, platform-key games with no user email).
-        const billedTier: UserTier = userSnap
-            ? ((userSnap.data()?.tier as UserTier) || USER_TIERS.FREE)
-            : (game.createdWithTier || USER_TIERS.FREE);
+        // Coerced, not cast: a stray legacy tier string (e.g. the retired 'api') must bill
+        // as free — otherwise its spend would land in no bucket at all.
+        const rawTier = userSnap ? userSnap.data()?.tier : game.createdWithTier;
+        const billedTier: UserTier = rawTier === USER_TIERS.PAID ? USER_TIERS.PAID : USER_TIERS.FREE;
 
         // ---- charge the user (writes deferred until after all reads) ----
         if (userSnap) {

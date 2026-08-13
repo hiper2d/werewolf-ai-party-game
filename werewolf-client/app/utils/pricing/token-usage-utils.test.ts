@@ -344,7 +344,7 @@ describe('Token Usage Utils', () => {
                 SupportedAiModels[LLM_CONSTANTS.MISTRAL_3_5_MEDIUM].modelApiName,
                 SupportedAiModels[LLM_CONSTANTS.MISTRAL_4_SMALL].modelApiName,
                 SupportedAiModels[LLM_CONSTANTS.MISTRAL_MAGISTRAL].modelApiName,
-                SupportedAiModels[LLM_CONSTANTS.GROK_4_5].modelApiName,
+                SupportedAiModels[LLM_CONSTANTS.GROK_4_6].modelApiName,
                 SupportedAiModels[LLM_CONSTANTS.GLM].modelApiName,
                 SupportedAiModels[LLM_CONSTANTS.QWEN_MAX].modelApiName,
                 SupportedAiModels[LLM_CONSTANTS.QWEN_PLUS].modelApiName,
@@ -401,10 +401,17 @@ describe('Token Usage Utils', () => {
             expect(usage?.cacheHitTokens).toBeUndefined();
         });
 
-        it('bills cached tokens at the cached rate end to end (grok-4.5 at $0.30/M cached)', () => {
-            // 0.5M uncached * $2 + 0.5M cached * $0.30 + 1M out * $6
-            const cost = calculateCost('grok-4.5', 1_000_000, 1_000_000, { cacheHitTokens: 500_000 });
-            expect(cost).toBeCloseTo(7.15, 2);
+        it('bills cached tokens at the cached rate end to end (grok-4.6 at $0.50/M cached)', () => {
+            // Stay under the 200K extended-context threshold to test the base tier:
+            // 50K uncached * $2 + 50K cached * $0.50 + 100K out * $6, per million.
+            const cost = calculateCost('grok-4.6', 100_000, 100_000, { cacheHitTokens: 50_000 });
+            expect(cost).toBeCloseTo(0.725, 4);
+        });
+
+        it('doubles all grok-4.6 rates once the prompt reaches 200K tokens', () => {
+            // 0.5M uncached * $4 + 0.5M cached * $1 + 1M out * $12 (>=200K prompt tier)
+            const cost = calculateCost('grok-4.6', 1_000_000, 1_000_000, { cacheHitTokens: 500_000 });
+            expect(cost).toBeCloseTo(14.5, 2);
         });
     });
 });

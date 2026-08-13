@@ -47,7 +47,7 @@ export class AgentFactory {
             case LLM_CONSTANTS.GEMINI_3_FLASH:
             case LLM_CONSTANTS.GEMINI_3_FLASH_LITE:
                 return new GoogleAgent(name, instruction, model.modelApiName, key, shouldEnableThinking);
-            case LLM_CONSTANTS.GROK_4_5:
+            case LLM_CONSTANTS.GROK_4_6:
                 return new GrokAgent(name, instruction, model.modelApiName, key, model.temperature!, shouldEnableThinking);
 
             // DeepSeek V4 models — thinking-only since 2026-08-05

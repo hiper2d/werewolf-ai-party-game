@@ -38,7 +38,7 @@ firebase deploy --only firestore:indexes    # Deploy Firestore indexes
 ### Authentication & Data
 - **NextAuth v5**: GitHub and Google OAuth providers
 - **Firebase**: Firestore for data persistence, Firebase Auth integration
-- **User API Keys**: Users store their own AI provider API keys
+- **Tiers & Billing**: Two tiers — free (daily/monthly caps) and paid (prepaid USD balance via Stripe, 15% markup). All AI calls use platform keys (Firestore doc `config/freeTierApiKeys`); users never supply their own API keys
 
 ### Key Directories
 - `app/ai/`: AI agent implementations and prompts
@@ -59,7 +59,8 @@ Required environment variables:
 - `GITHUB_ID`, `GITHUB_SECRET` (GitHub OAuth)
 - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (Google OAuth)
 - `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY` (Firebase Admin SDK)
-- Users provide their own AI API keys via the profile page
+- `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_STRIPE_PRICE_*` (Stripe payments)
+- AI provider keys live in the Firestore doc `config/freeTierApiKeys` (platform keys, all tiers)
 
 ## Production Debugging
 

@@ -75,16 +75,13 @@ export async function generateSpeech(
   }
 
   try {
-    // Resolve keys by tier: 'api' → user's personal keys, 'free'/'paid' → platform keys
-    const { tier, apiKeys } = await getUserTierAndApiKeys(session.user.email);
+    // All tiers run on platform keys (config/freeTierApiKeys)
+    const { apiKeys } = await getUserTierAndApiKeys(session.user.email);
     const openaiApiKey = apiKeys[API_KEY_CONSTANTS.OPENAI];
 
     if (!openaiApiKey) {
-      if (tier === USER_TIERS.API) {
-        throw new Error('OpenAI API key not found. Please add your OpenAI API key in your profile.');
-      }
-      // Free/paid users rely on platform keys (config/freeTierApiKeys) — a missing key is our misconfiguration, not theirs
-      console.error(`TTS: platform OpenAI API key is missing for ${tier}-tier user ${session.user.email}`);
+      // A missing platform key is our misconfiguration, not the user's
+      console.error(`TTS: platform OpenAI API key is missing (user ${session.user.email})`);
       throw new Error('Voice generation is temporarily unavailable. Please try again later.');
     }
 

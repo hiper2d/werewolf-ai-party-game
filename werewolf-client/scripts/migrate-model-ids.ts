@@ -36,7 +36,7 @@ const OLD_TO_NEW: Record<string, string> = {
     'Mistral Large 3': 'mistral-large',
     'Mistral Medium 3.1': 'mistral-medium',
     'Magistral Medium 1.2 (Thinking)': 'mistral-magistral',
-    // All Grok variants collapsed onto the single always-reasoning grok-4.5 ('grok').
+    // All Grok variants collapsed onto the single always-reasoning Grok entry ('grok').
     'Grok 4': 'grok',
     'Grok 4.1 Fast Reasoning': 'grok',
     'grok-fast': 'grok',

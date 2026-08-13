@@ -90,7 +90,7 @@ export default async function UserProfilePage({ searchParams }: PageProps) {
         ? 'text-[var(--accent-text)] border-[var(--accent-line)] bg-[var(--accent-soft)]'
         : 'text-[var(--fg-1)] border-[var(--line-2)] bg-[var(--bg-0)]';
     const tierDotClass = isPaid ? 'bg-[var(--accent)] shadow-[0_0_7px_var(--accent-line)]' : 'bg-[var(--fg-2)]';
-    const tierLabel = isPaid ? 'Paid tier' : userTier === USER_TIERS.API ? 'API tier' : 'Free tier';
+    const tierLabel = isPaid ? 'Paid tier' : 'Free tier';
 
     const statCard = 'flex flex-col gap-2.5 border border-[var(--line-1)] rounded-[var(--radius-lg)] bg-[var(--bg-1)] px-[22px] pt-5 pb-[22px]';
     const statLabel = 'flex items-center justify-between gap-2 font-mono text-[12px] tracking-[0.06em] uppercase text-[var(--fg-2)]';

@@ -2,7 +2,7 @@
 
 import {db} from "@/firebase/server";
 import {firestore} from "firebase-admin";
-import {ApiKeyMap, FREE_TIER_LIMITS, User, UserMonthlySpending, UserTier, USER_TIERS} from "@/app/api/game-models";
+import {FREE_TIER_LIMITS, User, UserMonthlySpending, UserTier, USER_TIERS} from "@/app/api/game-models";
 import {VoiceProvider, getDefaultVoiceProvider} from "@/app/ai/voice-config";
 import {applySpending, formatPeriod, getFreeSpendForPeriod, normalizeSpendings} from "@/app/utils/spending-utils";
 import FieldValue = firestore.FieldValue;
@@ -38,10 +38,6 @@ export async function upsertUser(user: any): Promise<boolean> {
         const updatedUser = {
             ...existingUser,
             ...user,
-            apiKeys: {
-                ...existingUser.apiKeys,
-                ...user.apiKeys
-            },
             last_login_timestamp: FieldValue.serverTimestamp(),
             spendings: normalizeSpendings(existingUser.spendings)
         };
@@ -51,68 +47,6 @@ export async function upsertUser(user: any): Promise<boolean> {
     } catch (error) {
         console.error("Error processing user:", error);
         return false;
-    }
-}
-
-export async function getUserApiKeys(userId: string): Promise<ApiKeyMap> {
-    if (!db) {
-        throw new Error('Firestore is not initialized');
-    }
-    try {
-        const userDoc = await db.collection('users').doc(userId).get();
-        if (!userDoc.exists) {
-            throw new Error('User not found');
-        }
-        const user = userDoc.data() as User;
-        return user?.apiKeys || {};
-    } catch (error: any) {
-        console.error("Error fetching API keys: ", error);
-        throw new Error(`Failed to fetch API keys: ${error.message}`);
-    }
-}
-
-export async function addApiKey(userId: string, model: string, value: string): Promise<void> {
-    if (!db) {
-        throw new Error('Firestore is not initialized');
-    }
-    try {
-        const userRef = db.collection('users').doc(userId);
-        await userRef.update({
-            [`apiKeys.${model}`]: value
-        });
-    } catch (error: any) {
-        console.error("Error adding API key: ", error);
-        throw new Error(`Failed to add API key: ${error.message}`);
-    }
-}
-
-export async function updateApiKey(userId: string, model: string, newValue: string): Promise<void> {
-    if (!db) {
-        throw new Error('Firestore is not initialized');
-    }
-    try {
-        const userRef = db.collection('users').doc(userId);
-        await userRef.update({
-            [`apiKeys.${model}`]: newValue
-        });
-    } catch (error: any) {
-        console.error("Error updating API key: ", error);
-        throw new Error(`Failed to update API key: ${error.message}`);
-    }
-}
-
-export async function deleteApiKey(userId: string, model: string): Promise<void> {
-    if (!db) {
-        throw new Error('Firestore is not initialized');
-    }
-    try {
-        const userRef = db.collection('users').doc(userId);
-        await userRef.update({
-            [`apiKeys.${model}`]: FieldValue.delete()
-        });
-    } catch (error: any) {
-        console.error("Error deleting API key: ", error);
-        throw new Error(`Failed to delete API key: ${error.message}`);
     }
 }
 
@@ -161,8 +95,9 @@ export async function getUserTier(userId: string): Promise<UserTier> {
         if (!userDoc.exists) {
             throw new Error('User not found');
         }
-        const user = userDoc.data() as User;
-        return user?.tier || 'free';
+        const userData = userDoc.data();
+        // Anything that isn't 'paid' — including stray legacy 'api' strings — reads as free.
+        return userData?.tier === USER_TIERS.PAID ? USER_TIERS.PAID : USER_TIERS.FREE;
     } catch (error: any) {
         console.error("Error fetching user tier: ", error);
         throw new Error(`Failed to fetch user tier: ${error.message}`);
@@ -172,11 +107,6 @@ export async function getUserTier(userId: string): Promise<UserTier> {
 export async function updateUserTier(userId: string, tier: UserTier): Promise<void> {
     if (!db) {
         throw new Error('Firestore is not initialized');
-    }
-    // The 'api' tier is no longer offered. Existing api-tier accounts keep working,
-    // but no one can switch into it.
-    if (tier === USER_TIERS.API) {
-        throw new Error('The API tier is no longer available.');
     }
     try {
         const userRef = db.collection('users').doc(userId);
@@ -203,8 +133,7 @@ export async function getUser(userId: string): Promise<User> {
         return {
             name: userData?.name || '',
             email: userData?.email || userId,
-            apiKeys: userData?.apiKeys || {},
-            tier: userData?.tier || 'free',
+            tier: userData?.tier === USER_TIERS.PAID ? USER_TIERS.PAID : USER_TIERS.FREE,
             spendings: normalizeSpendings(userData?.spendings),
             voiceProvider: userData?.voiceProvider || getDefaultVoiceProvider(),
             balance: userData?.balance || 0,
@@ -285,8 +214,8 @@ export async function addBalance(userId: string, amountUSD: number): Promise<voi
         const update: { balance: number; tier?: UserTier } = { balance: newBalance };
         // Adding funds is an explicit opt-in to paid usage. Without this a free-tier
         // top-up only raises the balance while the user keeps playing under free-tier
-        // rules. Legacy 'api'-tier accounts (own keys) are left untouched.
-        if ((data?.tier || 'free') === USER_TIERS.FREE) {
+        // rules.
+        if ((data?.tier || 'free') !== USER_TIERS.PAID) {
             update.tier = USER_TIERS.PAID;
         }
         transaction.update(userRef, update);

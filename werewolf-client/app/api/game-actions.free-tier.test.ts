@@ -1,4 +1,4 @@
-import {API_KEY_CONSTANTS, LLM_CONSTANTS} from '@/app/ai/ai-models';
+import {LLM_CONSTANTS} from '@/app/ai/ai-models';
 import {
     getCandidateModelsForTier,
     validateModelUsageForTier
@@ -57,17 +57,10 @@ describe('free tier model limits', () => {
         ).toThrow('not available on the free tier');
     });
 
-    it('allows API tier users to reuse any models without per-game caps when their key is present', () => {
-        const keys = { [API_KEY_CONSTANTS.ANTHROPIC]: 'sk-test' };
+    it('allows paid tier users to reuse any models without per-game caps', () => {
         expect(() =>
-            validateModelUsageForTier('api', LLM_CONSTANTS.CLAUDE_4_OPUS, Array(3).fill(LLM_CONSTANTS.CLAUDE_4_OPUS), keys)
+            validateModelUsageForTier('paid', LLM_CONSTANTS.CLAUDE_4_OPUS, Array(3).fill(LLM_CONSTANTS.CLAUDE_4_OPUS))
         ).not.toThrow();
-    });
-
-    it('rejects API-tier requests for models whose key is missing', () => {
-        expect(() =>
-            validateModelUsageForTier('api', LLM_CONSTANTS.CLAUDE_4_OPUS, [LLM_CONSTANTS.CLAUDE_4_OPUS], {})
-        ).toThrow(/ANTHROPIC_API_KEY/);
     });
 
     it('lists only free-tier-accessible models for random selection', () => {

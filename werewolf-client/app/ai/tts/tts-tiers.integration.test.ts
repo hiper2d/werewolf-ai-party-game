@@ -2,10 +2,9 @@
  * Real-API integration tests for the voice (TTS/STT) cores — the voice
  * equivalent of the agent tests. Costs a fraction of a cent per run.
  *
- * Covers both key sources the game uses (see app/utils/tier-utils.ts):
- *  - 'api' tier  → personal keys (OPENAI_K / GOOGLE_K from .env)
- *  - 'free'/'paid' tiers → platform keys from Firestore config/freeTierApiKeys,
- *    read with the same Firebase Admin credentials prod uses
+ * All tiers run on the platform keys from Firestore config/freeTierApiKeys
+ * (see app/utils/tier-utils.ts), read with the same Firebase Admin credentials
+ * prod uses.
  */
 import { generateOpenAiTtsAudio } from "./openai-tts";
 import { generateGoogleTtsAudio } from "./google-tts";

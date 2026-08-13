@@ -250,7 +250,7 @@ describe('cost-tracking', () => {
             );
         });
 
-        it('api tier: never deducts balance but still records monthly spending', async () => {
+        it("a stray legacy 'api' tier string bills as free: no balance deduction, spend in the free bucket", async () => {
             const { txn, userRef } = setupTransaction({ totalGameCost: 0 }, { tier: 'api' });
 
             await recordGameMasterTokenUsage(gameId, { inputTokens: 1, outputTokens: 1, costUSD: 0.5 }, userEmail);
@@ -258,7 +258,7 @@ describe('cost-tracking', () => {
             const write = userWrite(txn, userRef);
             expect(write).not.toHaveProperty('balance');
             expect(write.spendings).toEqual(
-                expect.arrayContaining([expect.objectContaining({ amountUSD: 0.5, apiAmountUSD: 0.5 })])
+                expect.arrayContaining([expect.objectContaining({ amountUSD: 0.5, freeAmountUSD: 0.5, apiAmountUSD: 0 })])
             );
         });
 

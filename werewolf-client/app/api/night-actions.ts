@@ -1411,7 +1411,8 @@ function gameFromFirestore(id: string, data: any): Game {
         messageCounter: data.messageCounter || 0,
         dayActivityCounter: data.dayActivityCounter || {},
         ownerEmail: data.ownerEmail || '',
-        createdWithTier: data.createdWithTier || 'free',
+        // Stray legacy values (e.g. the retired 'api' tier) read as free so the game stays openable.
+        createdWithTier: data.createdWithTier === 'paid' ? 'paid' : 'free',
         votingHistory: data.votingHistory || [],
         nightNarratives: data.nightNarratives || [],
         dayDiscussionSummaries: data.dayDiscussionSummaries || [],

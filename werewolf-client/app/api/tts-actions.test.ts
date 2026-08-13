@@ -71,15 +71,6 @@ describe('generateSpeech tier-aware key resolution', () => {
     expect(recordGameCost).toHaveBeenCalledWith('game-1', calculateOpenAITtsCost(TEXT.length));
   });
 
-  it('api tier without a personal key: tells the user to add a key in their profile', async () => {
-    mockTierKeys.mockResolvedValue({ tier: USER_TIERS.API, apiKeys: {} });
-
-    await expect(generateSpeech(TEXT)).rejects.toThrow(
-      'Please add your OpenAI API key in your profile'
-    );
-    expect(mockOpenAiTts).not.toHaveBeenCalled();
-  });
-
   it('free tier with a missing platform key: generic message, no profile advice', async () => {
     mockTierKeys.mockResolvedValue({ tier: USER_TIERS.FREE, apiKeys: {} });
 
@@ -155,14 +146,6 @@ describe('generateGoogleSpeech tier-aware key resolution', () => {
       voiceName: 'Kore',
       voiceStyle: undefined,
     });
-  });
-
-  it('api tier without a personal key: tells the user to add a key in their profile', async () => {
-    mockTierKeys.mockResolvedValue({ tier: USER_TIERS.API, apiKeys: {} });
-
-    await expect(generateGoogleSpeech(TEXT, { voiceName: 'Kore' })).rejects.toThrow(
-      'Please add your Google API key in your profile'
-    );
   });
 
   it('free tier with a missing platform key: generic message, no profile advice', async () => {

@@ -30,7 +30,9 @@ export async function ensureUserCanAccessGame(
             throw new Error('Game not found');
         }
         const gameData = gameDoc.data();
-        storedTier = storedTier ?? (gameData?.createdWithTier as UserTier | undefined) ?? 'free';
+        // Coerce rather than cast: a stray legacy value (e.g. the retired 'api' tier)
+        // must compare as 'free', not throw an unresolvable TierMismatchError.
+        storedTier = storedTier ?? (gameData?.createdWithTier === 'paid' ? 'paid' : 'free');
         gameOwnerEmail = gameOwnerEmail ?? gameData?.ownerEmail;
     }
 

@@ -10,7 +10,7 @@ import {ZodSchemaConverter} from './zod-schema-converter';
 /**
  * xAI Grok agent on the Responses API.
  *
- * grok-4.5 is an always-on reasoning model; we do not send `reasoning_effort` and use the
+ * grok-4.6 is an always-on reasoning model; we do not send `reasoning_effort` and use the
  * xAI default ("high"). Reasoning cannot be disabled. Each response's encrypted reasoning
  * items (requested via `include: ["reasoning.encrypted_content"]`) are returned as the 4th
  * tuple element, stored on the game message as `grokEncryptedReasoning`, and replayed into

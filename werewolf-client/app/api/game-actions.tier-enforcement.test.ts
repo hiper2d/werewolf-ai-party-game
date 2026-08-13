@@ -341,58 +341,6 @@ describe('previewGame tier enforcement', () => {
         });
     });
 
-    describe('API tier key restrictions', () => {
-        it('rejects a GM model whose vendor key was not uploaded BEFORE story generation (no charge)', async () => {
-            mockTier(USER_TIERS.API, {}); // no keys at all
-            const agent = stubAgentReturning(3);
-
-            await expect(
-                previewGame(
-                    makePreview({
-                        gameMasterAiType: LLM_CONSTANTS.CLAUDE_4_OPUS,
-                        playersAiType: [LLM_CONSTANTS.CLAUDE_4_OPUS],
-                    })
-                )
-            ).rejects.toThrow(
-                `The AI model ${LLM_CONSTANTS.CLAUDE_4_OPUS} requires the ${API_KEY_CONSTANTS.ANTHROPIC} API key as the game master. Please add it on your Profile page.`
-            );
-
-            // The missing-key check now runs up front: no LLM call, no spending recorded.
-            expect(agent.askWithZodSchema).not.toHaveBeenCalled();
-            expect(updateUserMonthlySpending).not.toHaveBeenCalled();
-        });
-
-        it('rejects bot models whose vendor key was not uploaded', async () => {
-            mockTier(USER_TIERS.API, { [API_KEY_CONSTANTS.DEEPSEEK]: 'sk-deepseek' });
-            stubAgentReturning(3);
-
-            await expect(
-                previewGame(
-                    makePreview({
-                        gameMasterAiType: LLM_CONSTANTS.DEEPSEEK_V4_FLASH,
-                        playersAiType: [LLM_CONSTANTS.CLAUDE_4_OPUS],
-                    })
-                )
-            ).rejects.toThrow(
-                `The AI model ${LLM_CONSTANTS.CLAUDE_4_OPUS} requires the ${API_KEY_CONSTANTS.ANTHROPIC} API key for bots. Please add it on your Profile page.`
-            );
-        });
-
-        it('treats whitespace-only keys as missing', async () => {
-            mockTier(USER_TIERS.API, { [API_KEY_CONSTANTS.ANTHROPIC]: '   ' });
-            stubAgentReturning(3);
-
-            await expect(
-                previewGame(
-                    makePreview({
-                        gameMasterAiType: LLM_CONSTANTS.CLAUDE_4_OPUS,
-                        playersAiType: [LLM_CONSTANTS.CLAUDE_4_OPUS],
-                    })
-                )
-            ).rejects.toThrow(new RegExp(API_KEY_CONSTANTS.ANTHROPIC));
-        });
-    });
-
     describe('paid tier charging', () => {
         it('charges the preview cost plus the 15% markup and records spending', async () => {
             mockTier(USER_TIERS.PAID);
@@ -544,32 +492,6 @@ describe('createGame tier enforcement', () => {
         expect(setGame).not.toHaveBeenCalled();
     });
 
-    it('rejects API-tier games when the GM model vendor key is missing', async () => {
-        mockTier(USER_TIERS.API, { [API_KEY_CONSTANTS.DEEPSEEK]: 'sk-deepseek' });
-        const { setGame } = setupDbForCreate();
-
-        await expect(
-            createGame(
-                makeGeneratedPreview({ gameMasterAiType: LLM_CONSTANTS.CLAUDE_4_OPUS })
-            )
-        ).rejects.toThrow(
-            `Failed to create game: The AI model ${LLM_CONSTANTS.CLAUDE_4_OPUS} requires the ${API_KEY_CONSTANTS.ANTHROPIC} API key as the game master. Please add it on your Profile page.`
-        );
-        expect(setGame).not.toHaveBeenCalled();
-    });
-
-    it('rejects API-tier games when a bot model vendor key is missing', async () => {
-        mockTier(USER_TIERS.API, { [API_KEY_CONSTANTS.DEEPSEEK]: 'sk-deepseek' });
-        setupDbForCreate();
-
-        const preview = makeGeneratedPreview();
-        preview.bots[1].playerAiType = LLM_CONSTANTS.GPT_5_6_TERRA;
-
-        await expect(createGame(preview)).rejects.toThrow(
-            `Failed to create game: The AI model ${LLM_CONSTANTS.GPT_5_6_TERRA} requires the ${API_KEY_CONSTANTS.OPENAI} API key for bots. Please add it on your Profile page.`
-        );
-    });
-
     it('rejects unresolved RANDOM GM model on the free tier', async () => {
         mockTier(USER_TIERS.FREE);
         setupDbForCreate();
@@ -578,17 +500,6 @@ describe('createGame tier enforcement', () => {
             createGame(makeGeneratedPreview({ gameMasterAiType: LLM_CONSTANTS.RANDOM }))
         ).rejects.toThrow(
             'Failed to create game: Random AI model selections must be resolved before generating or saving a game.'
-        );
-    });
-
-    it('rejects unresolved RANDOM GM model on the API tier', async () => {
-        mockTier(USER_TIERS.API, { [API_KEY_CONSTANTS.DEEPSEEK]: 'sk-deepseek' });
-        setupDbForCreate();
-
-        await expect(
-            createGame(makeGeneratedPreview({ gameMasterAiType: LLM_CONSTANTS.RANDOM }))
-        ).rejects.toThrow(
-            'Failed to create game: Random AI model selections must be resolved before validating API tier access.'
         );
     });
 

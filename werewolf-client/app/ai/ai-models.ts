@@ -59,7 +59,7 @@ export const LLM_CONSTANTS = {
     MISTRAL_3_5_MEDIUM: 'mistral-medium',
     MISTRAL_4_SMALL: 'mistral-small',
     MISTRAL_MAGISTRAL: 'mistral-magistral',
-    GROK_4_5: 'grok',
+    GROK_4_6: 'grok',
     KIMI: 'kimi',
     GLM: 'glm',
     FUGU_ULTRA: 'fugu-ultra',
@@ -272,9 +272,9 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         tags: ['fast', 'cheap'],
     },
     // Always-on reasoning (xAI default effort "high", cannot be disabled) — no non-thinking sibling
-    [LLM_CONSTANTS.GROK_4_5]: {
-        displayName: 'Grok 4.5',
-        modelApiName: 'grok-4.5',
+    [LLM_CONSTANTS.GROK_4_6]: {
+        displayName: 'Grok 4.6',
+        modelApiName: 'grok-4.6',
         apiKeyName: API_KEY_CONSTANTS.GROK,
         hasThinking: true,
         temperature: 0.7,
@@ -557,8 +557,8 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
         cacheHitPrice: 0.50
     },
     [SupportedAiModels[LLM_CONSTANTS.CLAUDE_4_SONNET].modelApiName]: {
-        inputPrice: 3.0,
-        outputPrice: 15.0,
+        inputPrice: 2.0,
+        outputPrice: 10.0,
         cacheHitPrice: 0.20
     },
     [SupportedAiModels[LLM_CONSTANTS.CLAUDE_4_HAIKU].modelApiName]: {
@@ -615,12 +615,17 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
         cacheHitPrice: 0.2
     },
 
-    // Grok models. Cached price is per-model on xAI (0.15-0.20x, not a uniform ratio):
-    // grok-4.5 is $0.30/M cached vs $2.00/M input per docs.x.ai (verified 2026-08-04).
-    [SupportedAiModels[LLM_CONSTANTS.GROK_4_5].modelApiName]: {
+    // Grok models. Cached price is per-model on xAI (not a uniform ratio):
+    // grok-4.6 is $0.50/M cached vs $2.00/M input, and all rates double for prompts
+    // >= 200K tokens, per docs.x.ai/developers/models (verified 2026-08-12).
+    [SupportedAiModels[LLM_CONSTANTS.GROK_4_6].modelApiName]: {
         inputPrice: 2.0,
         outputPrice: 6.0,
-        cacheHitPrice: 0.30
+        cacheHitPrice: 0.50,
+        extendedContextInputPrice: 4.0,
+        extendedContextOutputPrice: 12.0,
+        extendedContextCacheHitPrice: 1.0,
+        extendedContextThresholdTokens: 200_000
     },
 
     // Sakana Fugu models. Base `fugu` was retired 2026-08-04 — it had no published price and
@@ -715,8 +720,8 @@ const DEPRECATED_MODEL_MAP: Record<string, string> = {
     'gpt-5.4': LLM_CONSTANTS.GPT_5_6_TERRA,
     'deepseek-chat': LLM_CONSTANTS.DEEPSEEK_V4_FLASH,
     'deepseek-reasoner': LLM_CONSTANTS.DEEPSEEK_V4_FLASH,
-    'grok-fast': LLM_CONSTANTS.GROK_4_5,
-    'grok-thinking': LLM_CONSTANTS.GROK_4_5,
+    'grok-fast': LLM_CONSTANTS.GROK_4_6,
+    'grok-thinking': LLM_CONSTANTS.GROK_4_6,
     // Kimi collapsed to a single always-reasoning K3 entry.
     'kimi-thinking': LLM_CONSTANTS.KIMI,
     // Catalog went thinking-only 2026-08-05: the non-thinking variants were retired and the
@@ -746,7 +751,7 @@ export function resolveModelId(modelId: string): string {
 export const FREE_TIER_OUTPUT_PRICE_BANDS = {
     UNLIMITED_MAX: 2,   // <= $2/1M output → unlimited bots
     // Bumped 5 → 6 with the GPT-5.6 promotion; Luna has since dropped to $1.20 output
-    // (unlimited band), so Grok 4.5 ($6 output) is now what holds this band at 6.
+    // (unlimited band), so Grok 4.6 ($6 output) is now what holds this band at 6.
     LIMITED_MAX: 6,     // <= $6 → up to LIMITED_MAX_BOTS bots
     SINGLE_MAX: 15,     // <= $15 → 1 bot; above → not available on free tier
 } as const;

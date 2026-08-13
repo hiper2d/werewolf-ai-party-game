@@ -254,7 +254,7 @@ const TEXT_SWEEP_MODELS = new Set<string>([
     LLM_CONSTANTS.GEMINI_3_FLASH_LITE,
     LLM_CONSTANTS.MISTRAL_4_SMALL,
     LLM_CONSTANTS.MISTRAL_MAGISTRAL,         // structured content array (thinking)
-    LLM_CONSTANTS.GROK_4_5,
+    LLM_CONSTANTS.GROK_4_6,
     LLM_CONSTANTS.KIMI,
     LLM_CONSTANTS.GLM,
     LLM_CONSTANTS.FUGU_ULTRA,                // one representative for the Fugu askText code path

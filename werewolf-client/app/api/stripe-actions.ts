@@ -59,8 +59,8 @@ export async function createCheckoutSession(
             },
         ],
         mode: 'payment',
-        success_url: `${baseUrl}/profile?tab=paid&payment=success`,
-        cancel_url: `${baseUrl}/profile?tab=paid&payment=cancelled`,
+        success_url: `${baseUrl}/profile?payment=success`,
+        cancel_url: `${baseUrl}/profile?payment=cancelled`,
         metadata: {
             userId,
             packageId: pkg.id,

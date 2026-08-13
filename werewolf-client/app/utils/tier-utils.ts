@@ -1,37 +1,26 @@
 'use server'
 
-import { ApiKeyMap, UserTier, USER_TIERS } from "@/app/api/game-models";
+import { ApiKeyMap, UserTier } from "@/app/api/game-models";
 import { getFreeTierApiKeys } from "@/app/api/free-tier-actions";
-import { getUserApiKeys, getUserTier } from "@/app/api/user-actions";
+import { getUserTier } from "@/app/api/user-actions";
 
 /**
- * Gets the appropriate API keys based on user tier
- * - For 'api' tier: Returns user's own API keys
- * - For 'free' tier: Returns global free tier API keys
+ * Returns the platform API keys (Firestore doc config/freeTierApiKeys).
+ * All tiers run on platform keys — users never provide their own. The userId
+ * param is kept so call sites and test mocks stay stable.
  */
-export async function getApiKeysForUser(userId: string): Promise<ApiKeyMap> {
-    const tier = await getUserTier(userId);
-
-    if (tier === USER_TIERS.API) {
-        return await getUserApiKeys(userId);
-    } else {
-        // Both 'free' and 'paid' tiers use platform API keys
-        return await getFreeTierApiKeys();
-    }
+export async function getApiKeysForUser(_userId: string): Promise<ApiKeyMap> {
+    return getFreeTierApiKeys();
 }
 
 /**
- * Gets user tier and appropriate API keys in one call
- * More efficient when you need both pieces of information
+ * Gets user tier and the platform API keys in one call.
+ * More efficient when you need both pieces of information.
  */
 export async function getUserTierAndApiKeys(userId: string): Promise<{
     tier: UserTier;
     apiKeys: ApiKeyMap;
 }> {
-    const tier = await getUserTier(userId);
-    const apiKeys = tier === USER_TIERS.API
-        ? await getUserApiKeys(userId)
-        : await getFreeTierApiKeys();
-
+    const [tier, apiKeys] = await Promise.all([getUserTier(userId), getFreeTierApiKeys()]);
     return { tier, apiKeys };
 }

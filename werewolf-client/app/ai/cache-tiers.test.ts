@@ -88,9 +88,9 @@ describe('prompt cache tiers', () => {
         expect(usage.inputTokens).toBe(4600);
         expect(usage.outputTokens).toBe(200);
         expect(usage.totalTokens).toBe(4800);
-        // Sonnet 5: $3/M input, $15/M output, $0.20/M cached.
-        // (600 uncached+written) * 3 + 4000 cached * 0.20 + 200 out * 15, per million.
-        const expected = (600 * 3.0 + 4000 * 0.20 + 200 * 15.0) / 1_000_000;
+        // Sonnet 5: $2/M input, $10/M output, $0.20/M cached.
+        // (600 uncached+written) * 2 + 4000 cached * 0.20 + 200 out * 10, per million.
+        const expected = (600 * 2.0 + 4000 * 0.20 + 200 * 10.0) / 1_000_000;
         expect(usage.costUSD).toBeCloseTo(expected, 10);
     });
 

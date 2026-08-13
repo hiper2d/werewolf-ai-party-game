@@ -6,7 +6,7 @@ import {useSession} from 'next-auth/react';
 import {createGame, previewGame} from '@/app/api/game-actions';
 import {GAME_ROLES, GamePreview, GamePreviewWithGeneratedBots, GENDER_OPTIONS, getVoicesForGender, getRandomVoiceForGender, PLAY_STYLES, PLAY_STYLE_CONFIGS, RANDOM_ROLE, UserTier, USER_TIERS} from "@/app/api/game-models";
 import {LLM_CONSTANTS, SupportedAiModels, getModelDisplayName, modelHasTag, modelIsFast} from "@/app/ai/ai-models";
-import {FREE_TIER_UNLIMITED, getCandidateModelsForTier, getModelPickerOptions, getPerGameModelLimit, getSelectableModelsForUser} from "@/app/ai/model-limit-utils";
+import {FREE_TIER_UNLIMITED, getCandidateModelsForTier, getModelPickerOptions, getPerGameModelLimit} from "@/app/ai/model-limit-utils";
 import AIModelSelect from '@/app/components/AIModelSelect';
 import ExpandableTextarea from '@/app/components/ExpandableTextarea';
 import ModelSelectDropdown from '@/app/components/ModelSelectDropdown';
@@ -80,34 +80,30 @@ export default function CreateNewGamePage() {
     const [botNameErrors, setBotNameErrors] = useState<{[key: number]: string}>({});
     const [userTier, setUserTier] = useState<UserTier>('free');
     const [isTierLoaded, setIsTierLoaded] = useState(false);
-    const [providedKeyNames, setProvidedKeyNames] = useState<Set<string>>(new Set());
-    const [isKeysLoaded, setIsKeysLoaded] = useState(false);
     const hasInitializedPlayerModels = useRef(false);
     const playerOptions = useMemo(() => {
-        const maxPlayers = userTier === USER_TIERS.API ? 16 : 12;
+        const maxPlayers = 12;
         return Array.from({ length: maxPlayers - 5 }, (_, i) => i + 6);
-    }, [userTier]);
+    }, []);
     const candidateModels = useMemo(() => getCandidateModelsForTier(userTier), [userTier]);
     const FAST_MODELS = useMemo(() => new Set(
         Object.values(LLM_CONSTANTS).filter(m => modelIsFast(m))
     ), []);
 
     const gmModelOptions = useMemo(() => {
-        // Tested single source of truth: free tier → free-tier catalog,
-        // API tier → vendors with provided keys, paid → all models.
-        return getSelectableModelsForUser(userTier, providedKeyNames)
+        // Tested single source of truth: free tier → free-tier catalog, paid → all models.
+        return getCandidateModelsForTier(userTier)
             .map(model => {
                 const name = getModelDisplayName(model);
                 return { model, disabled: false, label: name, displayLabel: name };
             });
-    }, [userTier, providedKeyNames]);
+    }, [userTier]);
 
     // Free tier shows ALL models (available selectable, unavailable greyed out via
-    // showUnavailableDisabled); API tier shows only models whose keys the user provided.
-    // Single tested source of truth — no inline tier rules here.
+    // showUnavailableDisabled). Single tested source of truth — no inline tier rules here.
     const playerPickerOptions = useMemo(
-        () => getModelPickerOptions(userTier, providedKeyNames, { showUnavailableDisabled: true }),
-        [userTier, providedKeyNames]
+        () => getModelPickerOptions(userTier, { showUnavailableDisabled: true }),
+        [userTier]
     );
     const playerModelOptions = useMemo(
         () => playerPickerOptions.map(o => o.model),
@@ -161,34 +157,6 @@ export default function CreateNewGamePage() {
             cancelled = true;
         };
     }, [status, isTierLoaded]);
-
-    useEffect(() => {
-        if (status !== 'authenticated' || isKeysLoaded) {
-            return;
-        }
-        let cancelled = false;
-        const loadKeys = async () => {
-            try {
-                const response = await fetch('/api/user-key-names');
-                if (!cancelled && response?.ok) {
-                    const data = await response.json();
-                    if (Array.isArray(data?.providedKeys)) {
-                        setProvidedKeyNames(new Set(data.providedKeys as string[]));
-                    }
-                }
-            } catch (err) {
-                console.error('Failed to load user API key names for model selection', err);
-            } finally {
-                if (!cancelled) {
-                    setIsKeysLoaded(true);
-                }
-            }
-        };
-        loadKeys();
-        return () => {
-            cancelled = true;
-        };
-    }, [status, isKeysLoaded]);
 
     useEffect(() => {
         if (werewolfCount >= playerCount) {
@@ -271,13 +239,13 @@ export default function CreateNewGamePage() {
     // GM defaults to RANDOM, resolved during preview generation
 
     useEffect(() => {
-        if (!isTierLoaded || (userTier === USER_TIERS.API && !isKeysLoaded)) {
+        if (!isTierLoaded) {
             return;
         }
 
         // Only candidate (available) models should be auto-selected
         const availablePlayerModels = candidateModels.filter(m => m !== LLM_CONSTANTS.RANDOM);
-        // Gated set actually shown in the UI (API-tier-aware).
+        // Set actually shown in the UI.
         const visiblePlayerModels = playerModelOptions;
 
         setSelectedPlayerAiTypes(prev => {
@@ -288,9 +256,8 @@ export default function CreateNewGamePage() {
                 if (filtered.length > 0) {
                     return filtered;
                 }
-                // Fall back to whatever is actually visible — not the full candidate set,
-                // which may include models the API-tier user has no key for. Fugu Ultra
-                // stays opt-in unless it's the only thing available.
+                // Fall back to whatever is actually visible. Fugu Ultra stays opt-in
+                // unless it's the only thing available.
                 const defaultVisible = visiblePlayerModels.filter(m => m !== LLM_CONSTANTS.FUGU_ULTRA);
                 return defaultVisible.length > 0 ? defaultVisible : visiblePlayerModels;
             }
@@ -301,21 +268,20 @@ export default function CreateNewGamePage() {
 
             return prev;
         });
-    }, [isTierLoaded, isKeysLoaded, userTier, playerModelOptions, candidateModels]);
+    }, [isTierLoaded, userTier, playerModelOptions, candidateModels]);
 
-    // If the auto-picked GM model isn't allowed for the current tier+keys, re-pick from
+    // If the auto-picked GM model isn't allowed for the current tier, re-pick from
     // the user's actually-allowed models (fast preferred), regardless of tier.
     useEffect(() => {
         if (!isTierLoaded) return;
-        if (userTier === USER_TIERS.API && !isKeysLoaded) return;
         if (gameMasterAiType === LLM_CONSTANTS.RANDOM) return;
 
         // Tested single source of truth for the allowed-for-this-user set.
-        const allowed = getSelectableModelsForUser(userTier, providedKeyNames);
+        const allowed = getCandidateModelsForTier(userTier);
         if (allowed.includes(gameMasterAiType)) return;
 
         setGameMasterAiType(pickDefaultGmModel(allowed.filter(m => m !== LLM_CONSTANTS.RANDOM)));
-    }, [isTierLoaded, isKeysLoaded, userTier, providedKeyNames, gameMasterAiType]);
+    }, [isTierLoaded, userTier, gameMasterAiType]);
 
     // Compute per-model usage counts from preview data (GM + all bots)
     const previewUsageCounts = useMemo(() => {
@@ -336,14 +302,14 @@ export default function CreateNewGamePage() {
     // rules come from the shared helper; here we only decorate to the dropdown's shape.
     const getPreviewModelOptions = useMemo(() => {
         return (currentModel: string) =>
-            getModelPickerOptions(userTier, providedKeyNames, {
+            getModelPickerOptions(userTier, {
                 usageCounts: userTier === USER_TIERS.FREE ? previewUsageCounts : undefined,
                 currentModel,
             }).map(({ model, disabled, suffix }) => {
                 const displayLabel = getModelDisplayName(model);
                 return { model, disabled, label: suffix ? `${displayLabel} ${suffix}` : displayLabel, displayLabel };
             });
-    }, [userTier, providedKeyNames, previewUsageCounts]);
+    }, [userTier, previewUsageCounts]);
 
     // If the selected role becomes unavailable (its special role was unchecked), fall back to Random.
     // Must run before any conditional returns to keep hook order stable.
@@ -469,7 +435,7 @@ export default function CreateNewGamePage() {
             } else if (err.message.includes('Response validation failed')) {
                 userFriendlyError = `The AI model generated an invalid response format. Please try again or use a different AI model.`;
             } else if (err.message.includes('Failed to get response') || err.message.includes('API')) {
-                userFriendlyError = `Unable to connect to the AI service. Please check your API keys and try again.`;
+                userFriendlyError = `Unable to connect to the AI service. Please try again.`;
             }
             
             setError(userFriendlyError);

@@ -11,7 +11,7 @@ import { format } from "@/app/ai/prompts/utils";
 import { ROLE_CONFIGS, PLAY_STYLE_CONFIGS } from "@/app/api/game-models";
 
 // Helper function to create a GrokAgent instance (defaults to GROK-4)
-const createAgent = (botName: string, modelType: string = LLM_CONSTANTS.GROK_4_5, enableThinking: boolean = true): GrokAgent => {
+const createAgent = (botName: string, modelType: string = LLM_CONSTANTS.GROK_4_6, enableThinking: boolean = true): GrokAgent => {
   const testBot = {
     name: botName,
     story: "A mysterious wanderer with a hidden past",
@@ -52,7 +52,7 @@ describe("GrokAgent integration", () => {
   
   describeOrSkip("askWithZodSchema with real API", () => {
     it("should respond with valid schema-based answer using grok-4 (with reasoning)", async () => {
-      const agent = createAgent("TestBot", LLM_CONSTANTS.GROK_4_5, true);
+      const agent = createAgent("TestBot", LLM_CONSTANTS.GROK_4_6, true);
       const messages: AIMessage[] = [{
         role: 'user',
         content: 'What do you think about the current situation in the village?'
@@ -134,10 +134,10 @@ describe("GrokAgent integration", () => {
       const gmAgent = new GrokAgent(
         GAME_MASTER,
         STORY_SYSTEM_PROMPT,
-        SupportedAiModels[LLM_CONSTANTS.GROK_4_5].modelApiName,
+        SupportedAiModels[LLM_CONSTANTS.GROK_4_6].modelApiName,
         process.env.GROK_K!,
         0.7,
-        true // grok-4.5 reasoning is always on (xAI default effort)
+        true // grok-4.6 reasoning is always on (xAI default effort)
       );
 
       // Prepare game configuration
@@ -241,7 +241,7 @@ describe("GrokAgent integration", () => {
       const agent = new GrokAgent(
         "TestBot",
         "Test instruction",
-        SupportedAiModels[LLM_CONSTANTS.GROK_4_5].modelApiName,
+        SupportedAiModels[LLM_CONSTANTS.GROK_4_6].modelApiName,
         "invalid_api_key",
         0.7,
         false
@@ -259,18 +259,23 @@ describe("GrokAgent integration", () => {
   });
   
   describe("token usage calculation", () => {
-    it("should calculate correct costs for grok-4.5", () => {
-      // Test the external pricing function that Grok agent uses
-      const cost = calculateGrokCost("grok-4.5", 1000000, 1000000);
-      // Based on ai-models.ts pricing: $2.00 per 1M input, $6.00 per 1M output
-      expect(cost).toBeCloseTo(8.0, 2);
+    it("should calculate correct costs for grok-4.6", () => {
+      // Base tier (prompt < 200K): $2.00 per 1M input, $6.00 per 1M output
+      const cost = calculateGrokCost("grok-4.6", 100000, 100000);
+      expect(cost).toBeCloseTo(0.8, 4);
     });
 
     it("should discount cached input tokens", () => {
-      // Half the input cached at $0.30 (per docs.x.ai, grok-4.5 cached rate):
-      // 0.5M * $2 + 0.5M * $0.30 + 1M * $6
-      const cost = calculateGrokCost("grok-4.5", 1000000, 1000000, 500000);
-      expect(cost).toBeCloseTo(7.15, 2);
+      // Half the input cached at $0.50 (per docs.x.ai, grok-4.6 cached rate):
+      // 50K * $2 + 50K * $0.50 + 100K * $6, per million
+      const cost = calculateGrokCost("grok-4.6", 100000, 100000, 50000);
+      expect(cost).toBeCloseTo(0.725, 4);
+    });
+
+    it("should double rates for prompts at or above 200K tokens", () => {
+      // Extended tier: 1M * $4 input + 1M * $12 output
+      const cost = calculateGrokCost("grok-4.6", 1000000, 1000000);
+      expect(cost).toBeCloseTo(16.0, 2);
     });
   });
 

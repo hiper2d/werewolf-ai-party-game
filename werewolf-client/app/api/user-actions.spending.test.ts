@@ -161,7 +161,7 @@ describe('updateUserMonthlySpending', () => {
         it('creates the user doc with set(..., {merge: true}) when the user is missing', async () => {
             const { txn, userRef } = setupTransaction(null);
 
-            await updateUserMonthlySpending(userId, 0.5, 'api', JUNE_2026);
+            await updateUserMonthlySpending(userId, 0.5, 'paid', JUNE_2026);
 
             expect(txn.update).not.toHaveBeenCalled();
             expect(txn.set).toHaveBeenCalledWith(
@@ -171,8 +171,8 @@ describe('updateUserMonthlySpending', () => {
                         period: '2026-06',
                         amountUSD: 0.5,
                         freeAmountUSD: 0,
-                        apiAmountUSD: 0.5,
-                        paidAmountUSD: 0
+                        apiAmountUSD: 0,
+                        paidAmountUSD: 0.5
                     }]
                 },
                 { merge: true }
@@ -328,12 +328,12 @@ describe('addBalance', () => {
         expect(txn.update).toHaveBeenCalledWith(userRef, { balance: 5 });
     });
 
-    it('leaves a legacy api-tier account untouched (own keys)', async () => {
+    it("promotes a stray legacy 'api'-tier account to paid on top-up (the tier no longer exists)", async () => {
         const { txn, userRef } = setupTransaction({ balance: 0, tier: 'api' });
 
         await addBalance(userId, 10);
 
-        expect(txn.update).toHaveBeenCalledWith(userRef, { balance: 10 });
+        expect(txn.update).toHaveBeenCalledWith(userRef, { balance: 10, tier: 'paid' });
     });
 
     it('rounds the new balance to 6 decimal places', async () => {

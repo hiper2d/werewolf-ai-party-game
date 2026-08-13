@@ -37,13 +37,13 @@ export function applySpending(
 
         const newTotal = parseFloat((record.amountUSD + normalizedAmount).toFixed(6));
         let freeAmount = record.freeAmountUSD || 0;
-        let apiAmount = record.apiAmountUSD || 0;
+        // Legacy bucket from the retired 'api' tier: preserved verbatim so old months
+        // keep reconciling with amountUSD, but never added to.
+        const apiAmount = record.apiAmountUSD || 0;
         let paidAmount = record.paidAmountUSD || 0;
 
         if (tier === 'free') {
             freeAmount = parseFloat((freeAmount + normalizedAmount).toFixed(6));
-        } else if (tier === 'api') {
-            apiAmount = parseFloat((apiAmount + normalizedAmount).toFixed(6));
         } else if (tier === 'paid') {
             paidAmount = parseFloat((paidAmount + normalizedAmount).toFixed(6));
         }
@@ -62,7 +62,7 @@ export function applySpending(
             period,
             amountUSD: normalizedAmount,
             freeAmountUSD: tier === 'free' ? normalizedAmount : 0,
-            apiAmountUSD: tier === 'api' ? normalizedAmount : 0,
+            apiAmountUSD: 0,
             paidAmountUSD: tier === 'paid' ? normalizedAmount : 0
         });
     }

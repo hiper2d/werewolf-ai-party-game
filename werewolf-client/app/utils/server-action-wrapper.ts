@@ -82,11 +82,13 @@ export function withErrorHandling<T extends any[]>(
           : String(error);
       const recoverable = error instanceof BotResponseError ? error.recoverable : true;
       // Set at the throw site when there is something worth telling the model on a Retry. Agent-layer
-      // failures don't carry one, so derive the response-format case from the details string here —
-      // it's the one explanation that isn't about a game rule.
+      // failures don't carry one — and most reach here as plain Errors, not BotResponseError (the
+      // vote and night-action paths rethrow agent errors as-is) — so derive the response-format
+      // case from the message/details string for both shapes. It's the one explanation that isn't
+      // about a game rule.
       const explanation = error instanceof BotResponseError
         ? error.explanation ?? (isResponseFormatFailure(error.details) ? invalidJsonExplanation() : undefined)
-        : undefined;
+        : isResponseFormatFailure(errorMessage) ? invalidJsonExplanation() : undefined;
 
       const context: Record<string, any> = {
         ...baseContext,

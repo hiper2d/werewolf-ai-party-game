@@ -42,7 +42,6 @@ import {convertToAIMessage} from "@/app/utils/message-utils";
 import {serializeMessageForFirestore} from "@/app/api/message-serialization";
 import {LLM_CONSTANTS, STORY_MAX_OUTPUT_TOKENS, SupportedAiModels} from "@/app/ai/ai-models";
 import {
-    assertModelAllowedForApiTier,
     consumeModelUsage,
     getCandidateModelsForTier,
     getPerGameModelLimit,
@@ -194,7 +193,7 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
 
         if (todaysGamesSnapshot.size >= FREE_TIER_LIMITS.GAMES_PER_CALENDAR_DAY) {
             throw new Error(
-                `Free tier limit reached: you can create up to ${FREE_TIER_LIMITS.GAMES_PER_CALENDAR_DAY} games per day. Please try again tomorrow or switch to API tier.`
+                `Free tier limit reached: you can create up to ${FREE_TIER_LIMITS.GAMES_PER_CALENDAR_DAY} games per day. Please try again tomorrow or add funds on your profile page.`
             );
         }
     }
@@ -229,11 +228,8 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
     // so an invalid selection never incurs preview cost (#6). The per-bot model
     // distribution below only ever picks from these selected candidates, so this is
     // the authoritative check; the post-distribution validateModelUsageForTier call
-    // remains as a backstop. For API tier this checks the user uploaded the vendor
-    // key; for free tier, model availability; for paid, that the model id is real.
-    if (tier === USER_TIERS.API) {
-        assertModelAllowedForApiTier(resolvedGmAiType, tier, apiKeys, 'as the game master');
-    }
+    // remains as a backstop. For free tier this checks model availability; for paid,
+    // that the model id is real.
     const selectedBotModels: string[] = Array.isArray(gamePreview.playersAiType)
         ? (gamePreview.playersAiType.length > 0 ? gamePreview.playersAiType : [LLM_CONSTANTS.RANDOM])
         : [gamePreview.playersAiType];
@@ -241,9 +237,7 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
         if (model === LLM_CONSTANTS.RANDOM) {
             continue; // resolved per-bot later from tier candidates
         }
-        if (tier === USER_TIERS.API) {
-            assertModelAllowedForApiTier(model, tier, apiKeys, 'for bots');
-        } else if (tier === USER_TIERS.FREE) {
+        if (tier === USER_TIERS.FREE) {
             if (getPerGameModelLimit(model, tier) === 0) {
                 throw new Error(`The AI model ${model} is not available on the free tier for bots. Please update your bot AI selection.`);
             }
@@ -439,7 +433,7 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
         };
     });
 
-    validateModelUsageForTier(tier, resolvedGmAiType, bots.map(bot => bot.playerAiType), apiKeys);
+    validateModelUsageForTier(tier, resolvedGmAiType, bots.map(bot => bot.playerAiType));
 
     // Game Master voice selection (AI-selected or fallback)
     let gameMasterVoice = aiResponse.gameMasterVoice;
@@ -474,7 +468,7 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
     }
     try {
         const { tier, apiKeys } = await getUserTierAndApiKeys(session.user.email);
-        validateModelUsageForTier(tier, gamePreview.gameMasterAiType, gamePreview.bots.map(bot => bot.playerAiType), apiKeys);
+        validateModelUsageForTier(tier, gamePreview.gameMasterAiType, gamePreview.bots.map(bot => bot.playerAiType));
 
         const totalPlayers = gamePreview.playerCount;
         const werewolfCount = gamePreview.werewolfCount;
@@ -723,7 +717,7 @@ export async function updateBotModel(gameId: string, botName: string, newAiType:
         });
 
         const { apiKeys: currentApiKeys } = await getUserTierAndApiKeys(session.user.email);
-        validateModelUsageForTier(gameTier, gameMasterAiType, updatedBots.map((bot: Bot) => bot.aiType), currentApiKeys);
+        validateModelUsageForTier(gameTier, gameMasterAiType, updatedBots.map((bot: Bot) => bot.aiType));
         
         // Update the game in Firestore
         await gameRef.update({ bots: updatedBots });
@@ -758,7 +752,7 @@ export async function updateGameMasterModel(gameId: string, newAiType: string): 
 
         const bots = (gameData?.bots || []) as Bot[];
         const { apiKeys: currentApiKeys } = await getUserTierAndApiKeys(session.user.email);
-        validateModelUsageForTier(gameTier, newAiType, bots.map((bot: Bot) => bot.aiType), currentApiKeys);
+        validateModelUsageForTier(gameTier, newAiType, bots.map((bot: Bot) => bot.aiType));
 
         // Update the Game Master AI type in Firestore
         await gameRef.update({ gameMasterAiType: newAiType });
@@ -1071,7 +1065,7 @@ export async function retryWithModelOverride(gameId: string, model: string, enab
     const gmModel = target === GAME_MASTER ? model : game.gameMasterAiType;
     const botModels = game.bots.map(b => (b.name === target ? model : b.aiType));
     const { apiKeys } = await getUserTierAndApiKeys(session.user.email);
-    validateModelUsageForTier(gameTier, gmModel, botModels, apiKeys);
+    validateModelUsageForTier(gameTier, gmModel, botModels);
 
     const modelOverride = { botName: target, model, enableThinking: enableThinking ?? false };
     // No hint on this path by design: a different model has not made the mistake being described,
@@ -1231,8 +1225,7 @@ export async function getUserFromFirestore(email: string): Promise<User | null> 
         return {
             name: userData?.name,
             email: userData?.email,
-            apiKeys: userData?.apiKeys || {},
-            tier: userData?.tier || 'free',
+            tier: userData?.tier === 'paid' ? 'paid' : 'free',
             spendings: normalizeSpendings(userData?.spendings)
         };
     } else {
@@ -1301,7 +1294,8 @@ function gameFromFirestore(id: string, data: any): Game {
         createdAt: data.createdAt || extractTimestampFromGameId(id), // Use stored timestamp or extract from ID for existing games
         totalGameCost: data.totalGameCost || 0,
         gameMasterTokenUsage: data.gameMasterTokenUsage || data.tokenUsage?.gameMasterUsage || null,
-        createdWithTier: data.createdWithTier || 'free',
+        // Stray legacy values (e.g. the retired 'api' tier) read as free so the game stays openable.
+        createdWithTier: data.createdWithTier === 'paid' ? 'paid' : 'free',
         votingHistory: data.votingHistory || [],
         nightNarratives: data.nightNarratives || [],
         dayDiscussionSummaries: data.dayDiscussionSummaries || [],
