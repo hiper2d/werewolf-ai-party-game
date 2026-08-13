@@ -13,6 +13,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        id: "aug-2026-model-refresh", date: "Aug 2026", tags: ["Models"],
+        title: "Model refresh: Gemini 3.7 Flash, Grok 4.6, cheaper Sonnet",
+        body: (<>Four updates across the roster. <strong>Gemini 3.7 Flash</strong> takes over the Flash
+            slot — Google&apos;s newest Flash at <strong>half the price</strong> of 3.6 ($3.75 vs $7.50 per
+            1M output tokens), so free-tier games can now seat <strong>up to 3</strong> Gemini Flash bots
+            instead of 1. <strong>Grok 4.6</strong> replaces 4.5 in the Grok slot. <strong>DeepSeek V4
+            Pro</strong> now runs DeepSeek&apos;s latest snapshot, and DeepSeek moved to peak/off-peak
+            pricing — paid games cost about 2× during peak hours (1:00–4:00 and 6:00–10:00 UTC); free-tier
+            limits are unchanged. And <strong>Claude 5 Sonnet</strong> got cheaper: down from $3/$15 to
+            <strong> $2/$10</strong> per 1M tokens. Existing games pick everything up automatically.</>),
+        media: null,
+        links: [{label: "Create a game", href: "/games"}, {label: "See all models", href: "/models"}],
+    },
+    {
         id: "qwen-minimax", date: "Aug 2026", tags: ["Models"],
         title: "Two new providers: Qwen and MiniMax",
         body: (<>The roster grows to <strong>11 providers</strong>. Alibaba&apos;s Qwen arrives with three
