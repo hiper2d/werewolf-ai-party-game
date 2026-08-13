@@ -141,7 +141,7 @@ export interface ModelConfig {
     // own slice, and the agent passes the value through verbatim, so pick one the model's API
     // supports: Anthropic adaptive thinking takes low|medium|high|xhigh|max, OpenAI takes
     // minimal|low|medium|high|xhigh, Gemini 3.x takes minimal|low|medium|high (sent uppercase
-    // as thinkingLevel), Fugu takes high|xhigh.
+    // as thinkingLevel; 3.1 Pro and 3.7 Flash reject 'minimal'), Fugu takes high|xhigh.
     reasoningEffort?: ReasoningEffort; // Effort-based APIs (Anthropic adaptive thinking, Gemini 3.x)
     thinkingBudgetTokens?: number; // Budget-based APIs (Anthropic enabled thinking, Qwen thinking_budget)
     // Per-request output ceiling, overriding DEFAULT_MAX_OUTPUT_TOKENS. Only set it for models
@@ -256,8 +256,10 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         tags: ['expensive'],
     },
     [LLM_CONSTANTS.GEMINI_3_FLASH]: {
-        displayName: 'Gemini 3.6 Flash',
-        modelApiName: 'gemini-3.6-flash',
+        // Repointed from gemini-3.6-flash 2026-08-13 (stable picker id, same pattern as gpt).
+        // 3.7 rejects thinkingLevel 'minimal' (low|medium|high only), unlike 3.5/3.6.
+        displayName: 'Gemini 3.7 Flash',
+        modelApiName: 'gemini-3.7-flash',
         apiKeyName: API_KEY_CONSTANTS.GOOGLE,
         hasThinking: true,
         reasoningEffort: 'medium',
@@ -515,19 +517,24 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
     },
 
     // DeepSeek V4 models
-    // DeepSeek has announced peak-valley pricing (2× on all billing items during UTC 1:00–4:00
-    // and 6:00–10:00) but no effective date yet ("subject to official notice"). When it lands,
-    // add to both entries:  peakPricing: { multiplier: 2, windowsUtc: [[1, 4], [6, 10]] }
-    // Free-tier bands are unaffected either way — even at 2× both models stay in their bands.
+    // Peak-valley pricing landed: these are the new base (off-peak) rates with a 2× surcharge
+    // during UTC 1:00–4:00 and 6:00–10:00, effective provider-side 2026-08-16 16:00 UTC
+    // (api-docs.deepseek.com/quick_start/pricing, fetched 2026-08-13). We charge the new rates
+    // from deploy — knowingly a few days early, matching the carry-the-higher-price policy used
+    // for Sonnet's intro pricing. Free-tier bands are computed off the off-peak output price
+    // (peak is ignored by design, see PeakPricing): flash 0.66×2.5 = 1.65 stays unlimited
+    // (now near the $2 cutoff), pro 1.98×2.5 = 4.95 stays in the 3-bot band.
     [SupportedAiModels[LLM_CONSTANTS.DEEPSEEK_V4_FLASH].modelApiName]: {
-        inputPrice: 0.14,
-        outputPrice: 0.28,
-        cacheHitPrice: 0.0028
+        inputPrice: 0.22,
+        outputPrice: 0.66,
+        cacheHitPrice: 0.007,
+        peakPricing: { multiplier: 2, windowsUtc: [[1, 4], [6, 10]] }
     },
     [SupportedAiModels[LLM_CONSTANTS.DEEPSEEK_V4_PRO].modelApiName]: {
-        inputPrice: 0.435,
-        outputPrice: 0.87,
-        cacheHitPrice: 0.003625
+        inputPrice: 0.66,
+        outputPrice: 1.98,
+        cacheHitPrice: 0.022,
+        peakPricing: { multiplier: 2, windowsUtc: [[1, 4], [6, 10]] }
     },
 
     // Kimi/Moonshot models
@@ -578,11 +585,14 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
         extendedContextThresholdTokens: 200_000
     },
     [SupportedAiModels[LLM_CONSTANTS.GEMINI_3_FLASH].modelApiName]: {
-        // Cache storage cost ($1.00 / 1M tokens per hour) is not tracked here — the
+        // Launch pricing through 2026-12-31; doubles to $1.50/$7.50/$0.15 on 2027-01-01
+        // (ai.google.dev pricing page, fetched 2026-08-13) — ACTION NEEDED then: update these
+        // rates, which will also move it from the 3-bot free-tier band back to the 1-bot band.
+        // Cache storage cost ($0.50 / 1M tokens per hour) is not tracked here — the
         // schema only models per-token call costs, not time-based storage.
-        inputPrice: 1.50,
-        outputPrice: 7.50,
-        cacheHitPrice: 0.15
+        inputPrice: 0.75,
+        outputPrice: 3.75,
+        cacheHitPrice: 0.075
     },
     [SupportedAiModels[LLM_CONSTANTS.GEMINI_3_FLASH_LITE].modelApiName]: {
         // Cache storage cost ($1.00 / 1M tokens per hour) is not tracked here — the

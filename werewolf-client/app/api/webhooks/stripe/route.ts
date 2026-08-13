@@ -37,6 +37,13 @@ export async function POST(request: NextRequest) {
     if (event.type === 'checkout.session.completed') {
         const session = event.data.object as Stripe.Checkout.Session;
 
+        // Webhook endpoints receive account-wide events — process only checkouts stamped
+        // as ours and acknowledge the rest unread (missing `app` counts as ours: sessions
+        // created before this guard carry no app metadata).
+        if ((session.metadata?.app ?? 'werewolf') !== 'werewolf') {
+            return NextResponse.json({ received: true });
+        }
+
         // Idempotency: check if we've already processed this event
         if (db) {
             const eventRef = db.collection('stripe_events').doc(event.id);

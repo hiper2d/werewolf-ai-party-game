@@ -51,8 +51,8 @@ describe('getModelPickerOptions (single source of truth for every picker)', () =
     // pricing-derived policy so this test fails loudly (rather than silently drifting)
     // if a band ever changes.
     // Effective output price = sticker × 2.5 for hybrid thinking-only models (Claude, DeepSeek, GLM).
-    const UNLIMITED = LLM_CONSTANTS.DEEPSEEK_V4_FLASH;   // $0.28 × 2.5 = $0.70 <= $2 → unlimited
-    const LIMITED_3 = LLM_CONSTANTS.DEEPSEEK_V4_PRO;     // $0.87 × 2.5 = $2.18 <= $6 → 3 bots
+    const UNLIMITED = LLM_CONSTANTS.DEEPSEEK_V4_FLASH;   // $0.66 × 2.5 = $1.65 <= $2 → unlimited
+    const LIMITED_3 = LLM_CONSTANTS.DEEPSEEK_V4_PRO;     // $1.98 × 2.5 = $4.95 <= $6 → 3 bots
     const SINGLE_1 = LLM_CONSTANTS.CLAUDE_4_HAIKU;       // $5 × 2.5 = $12.50 <= $15 → 1 bot
     const UNAVAILABLE = LLM_CONSTANTS.CLAUDE_4_OPUS;     // $25 × 2.5 > $15 → not available
 

@@ -118,8 +118,8 @@ describe('Token Usage Utils', () => {
         });
 
         describe('peak-valley pricing', () => {
-            // No real model has peakPricing active yet (DeepSeek's effective date is pending),
-            // so exercise the mechanism through a temporary entry.
+            // DeepSeek carries live peakPricing (since 2026-08-16), but exercise the mechanism
+            // through a temporary entry so these tests don't track its real rates.
             const TEST_MODEL = 'test-peak-model';
 
             beforeAll(() => {
@@ -171,8 +171,9 @@ describe('Token Usage Utils', () => {
             });
 
             it('ignores peak windows for models without peakPricing', () => {
-                const pricing = MODEL_PRICING['deepseek-v4-flash'];
-                const peak = calculateCost('deepseek-v4-flash', 1_000_000, 0, { timestamp: at(2) });
+                const pricing = MODEL_PRICING['glm-5.2'];
+                expect(pricing.peakPricing).toBeUndefined();
+                const peak = calculateCost('glm-5.2', 1_000_000, 0, { timestamp: at(2) });
                 expect(peak).toBeCloseTo(pricing.inputPrice, 5);
             });
         });

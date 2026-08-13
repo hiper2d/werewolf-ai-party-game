@@ -75,6 +75,21 @@ export function withErrorHandling<T extends any[]>(
       const { game, botName, model, gameState } = await resolveErrorAttribution(gameId, baseContext);
 
       const errorMessage = error instanceof Error ? error.message : 'Unknown system error occurred';
+
+      // The game doc no longer exists and the action failed because of it: the
+      // player deleted the game while the action (or a retry) was in flight.
+      // There is nothing to persist an errorState onto — setGameErrorState
+      // would just throw "Game not found" again, producing a 3-4 line error
+      // cascade per attempt. Treat it as a stale action instead: one warn
+      // line, benign response, client re-syncs and drops the dead game.
+      if (game === null && errorMessage.includes('Game not found')) {
+        logger.warn(`STALE_ACTION ${fnName}: game deleted mid-action`, {
+          gameId,
+          function: fnName,
+        });
+        return { game: { id: gameId, errorState: null } as Game, messages: [] };
+      }
+
       const errorDetails = error instanceof BotResponseError
         ? error.details
         : error instanceof Error

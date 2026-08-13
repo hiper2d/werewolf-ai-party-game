@@ -62,6 +62,9 @@ export async function createCheckoutSession(
         success_url: `${baseUrl}/profile?payment=success`,
         cancel_url: `${baseUrl}/profile?payment=cancelled`,
         metadata: {
+            // The webhook processes only checkouts stamped as ours — the Stripe account
+            // may host other apps' products.
+            app: 'werewolf',
             userId,
             packageId: pkg.id,
             amountUSD: pkg.amountUSD.toString(),

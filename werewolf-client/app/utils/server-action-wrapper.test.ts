@@ -332,6 +332,61 @@ describe('withErrorHandling', () => {
     });
   });
 
+  describe('deleted-game stale no-op', () => {
+    // Observed live 2026-08-13: a player deleted a game while welcome retries
+    // were in flight; every retry produced a 3-4 line error cascade because
+    // setGameErrorState also failed on the missing doc.
+    it('logs a single STALE_ACTION warn and returns a benign response when the game doc is gone', async () => {
+      mockGetGame.mockRejectedValue(new Error('Game not found'));
+      async function welcomeAction(_gameId: string): Promise<GameActionResponse> {
+        throw new Error('Game not found');
+      }
+      const wrapped = withErrorHandling(welcomeAction, (gameId) => gameId);
+
+      const response = await wrapped(GAME_ID);
+
+      expect(logger.warn).toHaveBeenCalledTimes(1);
+      expect(logger.warn).toHaveBeenCalledWith(
+        expect.stringContaining('STALE_ACTION welcomeAction'),
+        expect.objectContaining({ gameId: GAME_ID, function: 'welcomeAction' })
+      );
+      expect(logger.error).not.toHaveBeenCalled();
+      expect(mockSetGameErrorState).not.toHaveBeenCalled();
+      expect(response).toEqual({ game: { id: GAME_ID, errorState: null }, messages: [] });
+    });
+
+    it('also matches wrapped messages like "Failed to add message: Game not found"', async () => {
+      mockGetGame.mockRejectedValue(new Error('Game not found'));
+      const wrapped = withErrorHandling(
+        async () => { throw new Error('Failed to add message: Game not found'); },
+        () => GAME_ID
+      );
+
+      const response = await wrapped();
+
+      expect(logger.warn).toHaveBeenCalledTimes(1);
+      expect(logger.error).not.toHaveBeenCalled();
+      expect(mockSetGameErrorState).not.toHaveBeenCalled();
+      expect((response.game as any).errorState).toBeNull();
+    });
+
+    it('still persists the error state when the game doc exists despite a "Game not found" message', async () => {
+      // e.g. a subquery threw "Game not found" but the game itself is alive —
+      // that is a genuine error, not a deleted game.
+      mockGetGame.mockResolvedValue(makeGame());
+      const wrapped = withErrorHandling(
+        async () => { throw new Error('Game not found'); },
+        () => GAME_ID
+      );
+
+      const response = await wrapped();
+
+      expect(logger.warn).not.toHaveBeenCalled();
+      expect(mockSetGameErrorState).toHaveBeenCalledTimes(1);
+      expect(response).toEqual({ game: ERROR_GAME, messages: [] });
+    });
+  });
+
   describe('error-state persistence failures (#12)', () => {
     it('does not mask the original error when setGameErrorState throws — returns a fallback game carrying the error', async () => {
       const game = makeGame();
