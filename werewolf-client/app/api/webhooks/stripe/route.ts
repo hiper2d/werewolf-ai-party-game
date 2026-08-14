@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { addBalance } from '@/app/api/user-actions';
 import { db } from '@/firebase/server';
 
 function getStripe(): Stripe {
@@ -44,16 +43,6 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ received: true });
         }
 
-        // Idempotency: check if we've already processed this event
-        if (db) {
-            const eventRef = db.collection('stripe_events').doc(event.id);
-            const eventDoc = await eventRef.get();
-            if (eventDoc.exists) {
-                console.log(`Stripe event ${event.id} already processed, skipping`);
-                return NextResponse.json({ received: true });
-            }
-        }
-
         const userId = session.metadata?.userId;
         const amountUSD = parseFloat(session.metadata?.amountUSD || '0');
 
@@ -63,19 +52,50 @@ export async function POST(request: NextRequest) {
         }
 
         try {
-            await addBalance(userId, amountUSD);
-
-            // Record processed event for idempotency
-            if (db) {
-                await db.collection('stripe_events').doc(event.id).set({
+            if (!db) {
+                throw new Error('Firestore is not initialized');
+            }
+            // Credit exactly once per event: the idempotency claim, the balance credit
+            // and the tier upgrade commit in ONE transaction. A get-then-set check
+            // leaves a window where two concurrent deliveries of the same event (Stripe
+            // retries, or two `stripe listen` forwarders in dev) both read "not
+            // processed" and both credit.
+            const eventRef = db.collection('stripe_events').doc(event.id);
+            const userRef = db.collection('users').doc(userId);
+            let credited = false;
+            await db.runTransaction(async (transaction) => {
+                credited = false;
+                const [eventSnap, userSnap] = await Promise.all([
+                    transaction.get(eventRef),
+                    transaction.get(userRef),
+                ]);
+                if (eventSnap.exists) {
+                    return; // already processed — a retry or a duplicate delivery
+                }
+                if (!userSnap.exists) {
+                    throw new Error(`User ${userId} not found`);
+                }
+                const data = userSnap.data();
+                const update: { balance: number; tier?: string } = {
+                    balance: parseFloat(((data?.balance || 0) + amountUSD).toFixed(6)),
+                };
+                // Adding funds is an explicit opt-in to paid usage (same rule as addBalance).
+                if ((data?.tier || 'free') !== 'paid') {
+                    update.tier = 'paid';
+                }
+                transaction.update(userRef, update);
+                transaction.set(eventRef, {
                     userId,
                     amountUSD,
                     packageId: session.metadata?.packageId,
                     processedAt: new Date().toISOString(),
                 });
-            }
+                credited = true;
+            });
 
-            console.log(`Added $${amountUSD} balance for user ${userId}`);
+            console.log(credited
+                ? `Added $${amountUSD} balance for user ${userId}`
+                : `Stripe event ${event.id} already processed, skipping`);
         } catch (error) {
             console.error('Failed to add balance:', error);
             return NextResponse.json({ error: 'Failed to process payment' }, { status: 500 });
