@@ -13,6 +13,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        id: "glm-5-3", date: "Aug 2026", tags: ["Models"],
+        title: "GLM-5.3 replaces GLM-5.2",
+        body: (<>Z.AI&apos;s <strong>GLM-5.3</strong> takes over the GLM slot in the model picker, at the
+            <strong> same price</strong> as the 5.2 it replaces. It always reasons before answering — same
+            as before, just a sharper model doing it. Your existing games pick up the new version
+            automatically. Pick it for any bot or the Game Master when you set up a lobby.</>),
+        media: null,
+        links: [{label: "Create a game", href: "/games"}],
+    },
+    {
         id: "aug-2026-model-refresh", date: "Aug 2026", tags: ["Models"],
         title: "Model refresh: Gemini 3.7 Flash, Grok 4.6, cheaper Sonnet",
         body: (<>Four updates across the roster. <strong>Gemini 3.7 Flash</strong> takes over the Flash

@@ -335,8 +335,8 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
 
     // Z.AI models — thinking-only entry (non-thinking variant retired 2026-08-05)
     [LLM_CONSTANTS.GLM]: {
-        displayName: 'GLM-5.2',
-        modelApiName: 'glm-5.2',
+        displayName: 'GLM-5.3',
+        modelApiName: 'glm-5.3',
         apiKeyName: API_KEY_CONSTANTS.Z_AI,
         hasThinking: true,
         temperature: 0.7,

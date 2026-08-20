@@ -61,7 +61,7 @@ describe('getModelPickerOptions (single source of truth for every picker)', () =
         expect(SupportedAiModels[LIMITED_3].freeTier).toMatchObject({ available: true, maxBotsPerGame: 3 });
         expect(SupportedAiModels[SINGLE_1].freeTier).toMatchObject({ available: true, maxBotsPerGame: 1 });
         expect(SupportedAiModels[UNAVAILABLE].freeTier).toMatchObject({ available: false, maxBotsPerGame: 0 });
-        // Hybrid thinking-only models keep paying the reasoning multiplier: GLM-5.2 at $4.4
+        // Hybrid thinking-only models keep paying the reasoning multiplier: GLM-5.3 at $4.4
         // sticker output would be 3 bots, but ×2.5 = $11 effective lands it in the 1-bot band.
         expect(SupportedAiModels[LLM_CONSTANTS.GLM].freeTier?.maxBotsPerGame).toBe(1);
     });

@@ -171,9 +171,9 @@ describe('Token Usage Utils', () => {
             });
 
             it('ignores peak windows for models without peakPricing', () => {
-                const pricing = MODEL_PRICING['glm-5.2'];
+                const pricing = MODEL_PRICING['glm-5.3'];
                 expect(pricing.peakPricing).toBeUndefined();
-                const peak = calculateCost('glm-5.2', 1_000_000, 0, { timestamp: at(2) });
+                const peak = calculateCost('glm-5.3', 1_000_000, 0, { timestamp: at(2) });
                 expect(peak).toBeCloseTo(pricing.inputPrice, 5);
             });
         });

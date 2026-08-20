@@ -503,7 +503,7 @@ describe('requestStats recording (per-request statistics doc)', () => {
 
         const stat = statWrite(txn, statRef);
         expect(stat.modelId).toBe('glm');
-        expect(stat.modelApiName).toBe('glm-5.2');
+        expect(stat.modelApiName).toBe('glm-5.3');
         // Absent breakdowns are recorded as explicit zeros in the stats doc.
         expect(stat.cachedInputTokens).toBe(0);
         expect(stat.reasoningTokens).toBe(0);

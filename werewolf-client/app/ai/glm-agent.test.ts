@@ -49,7 +49,7 @@ describe("GlmAgent integration", () => {
     const describeOrSkip = hasApiKey ? describe : describe.skip;
 
     describeOrSkip("askWithZodSchema with real API", () => {
-        it("should respond with valid schema-based answer using GLM-5.2 (no thinking)", async () => {
+        it("should respond with valid schema-based answer using GLM-5.3 (thinking not surfaced)", async () => {
             const agent = createAgent("TestBot", LLM_CONSTANTS.GLM, false);
             const messages: AIMessage[] = [{
                 role: 'user',
@@ -66,7 +66,8 @@ describe("GlmAgent integration", () => {
             const botAnswer = new BotAnswer(response.reply);
             expect(botAnswer.reply.length).toBeGreaterThan(0);
 
-            // Thinking should be empty when disabled
+            // Thinking should be empty when not surfaced (GLM-5.3 always reasons; enableThinking
+            // only gates whether reasoning_content is captured)
             expect(thinking).toBe('');
 
             expect(tokenUsage).toBeDefined();
@@ -75,7 +76,7 @@ describe("GlmAgent integration", () => {
             expect(tokenUsage!.costUSD).toBeGreaterThan(0);
         }, 60000);
 
-        it("should respond with valid schema-based answer using GLM-5.2 (thinking enabled)", async () => {
+        it("should respond with valid schema-based answer using GLM-5.3 (thinking enabled)", async () => {
             const agent = createAgent("TestBot", LLM_CONSTANTS.GLM, true);
             const messages: AIMessage[] = [{
                 role: 'user',
@@ -97,7 +98,7 @@ describe("GlmAgent integration", () => {
             expect(tokenUsage!.outputTokens).toBeGreaterThan(0);
         }, 60000);
 
-        it("should generate a game preview using Zod schema with GLM-5.2", async () => {
+        it("should generate a game preview using Zod schema with GLM-5.3", async () => {
             const gmAgent = new GlmAgent(
                 GAME_MASTER,
                 STORY_SYSTEM_PROMPT,
@@ -222,9 +223,9 @@ describe("GlmAgent integration", () => {
     });
 
     describe("token usage calculation", () => {
-        it("should calculate correct costs for glm-5.2", () => {
+        it("should calculate correct costs for glm-5.3", () => {
             // Pricing in ai-models.ts: $1.4/M input, $4.4/M output
-            const cost = calculateCost("glm-5.2", 1_000_000, 1_000_000);
+            const cost = calculateCost("glm-5.3", 1_000_000, 1_000_000);
             expect(cost).toBeCloseTo(5.8, 2);
         });
     });

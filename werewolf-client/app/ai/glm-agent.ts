@@ -6,9 +6,10 @@ import { z } from 'zod';
 import { ZodSchemaConverter } from './zod-schema-converter';
 import { parseAndValidateLlmJson } from './json-response-parser';
 
-// Z.AI / GLM-5.2 agent. The API is OpenAI-compatible (https://api.z.ai/api/paas/v4/),
-// so we use the OpenAI SDK with a custom baseURL. GLM-5.2 supports a thinking toggle
-// via `thinking: { type: 'enabled' | 'disabled' }`, identical to Kimi K3.
+// Z.AI / GLM-5.3 agent. The API is OpenAI-compatible (https://api.z.ai/api/paas/v4/),
+// so we use the OpenAI SDK with a custom baseURL. GLM-5.3 rejects requests with
+// `thinking: { type: 'disabled' }` (reasoning is always on), so we always send 'enabled';
+// `enableThinking` only controls whether reasoning_content is surfaced to the game.
 export class GlmAgent extends AbstractAgent {
     private readonly client: OpenAI;
     // A getter, not a field: `maxOutputTokens` can be raised after construction, and a field
@@ -133,7 +134,7 @@ export class GlmAgent extends AbstractAgent {
                     ...this.defaultParams,
                     messages: openAIMessages,
                     response_format: { type: 'json_object' },
-                    thinking: { type: this.enableThinking ? 'enabled' : 'disabled' }
+                    thinking: { type: 'enabled' }
                 };
                 completion = await this.client.chat.completions.create(params) as OpenAI.Chat.Completions.ChatCompletion;
             } catch (apiError) {
@@ -191,7 +192,7 @@ export class GlmAgent extends AbstractAgent {
                 const params: any = {
                     ...this.defaultParams,
                     messages: openAIMessages,
-                    thinking: { type: this.enableThinking ? 'enabled' : 'disabled' }
+                    thinking: { type: 'enabled' }
                 };
                 completion = await this.client.chat.completions.create(params) as OpenAI.Chat.Completions.ChatCompletion;
             } catch (apiError) {
