@@ -13,7 +13,8 @@ import ConfirmModal from "./ConfirmModal";
 import { ttsService } from "@/app/services/tts-service";
 import { sttService } from "@/app/services/stt-service";
 import { getDefaultVoiceProvider } from "@/app/ai/voice-config";
-import { getModelDisplayName } from "@/app/ai/ai-models";
+import { getModelDisplayName, getModelProviderName } from "@/app/ai/ai-models";
+import { isProviderBusyError } from "@/app/api/errors";
 import { DISCORD_URL } from "@/app/config/external-links";
 import { useUIControls } from '../context/UIControlsContext';
 
@@ -1570,6 +1571,13 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                     const model = game.gameState === GAME_STATES.NIGHT
                         ? undefined
                         : game.errorState.context?.model as string | undefined;
+                    // Provider throttling (429 "at capacity", rate limits, …) deserves its own
+                    // wording: it's the AI provider's outage, not a game bug, and it clears on
+                    // its own. Anthropic-shaped errors carry the status text only in `details`.
+                    const providerBusy = isProviderBusyError(game.errorState.error)
+                        || isProviderBusyError(game.errorState.details);
+                    // Hidden during NIGHT for the same reason as the model name.
+                    const provider = model ? getModelProviderName(model) : undefined;
                     return (
                         <div className="mx-2 my-2 p-3 rounded-[var(--radius-lg)] border bg-[oklch(70%_0.13_25_/_0.08)] border-[oklch(70%_0.13_25_/_0.3)]">
                             <div className="flex items-start gap-2">
@@ -1580,11 +1588,22 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                                 </svg>
                                 <div className="flex-1 min-w-0">
                                     <div className="text-[13px] font-medium text-[var(--fg-0)] break-words">
-                                        {displayWho ? `${displayWho}'s AI model call failed` : 'An AI model call failed'}
+                                        {providerBusy
+                                            ? (displayWho ? `${displayWho}'s AI provider is overloaded` : 'The AI provider is overloaded')
+                                            : (displayWho ? `${displayWho}'s AI model call failed` : 'An AI model call failed')}
                                     </div>
                                     <div className="text-[12px] mt-1 text-[var(--fg-1)] break-words">
-                                        {displayWho ? `${displayWho} couldn't generate a response` : 'The AI model couldn\'t generate a response'}
-                                        {model ? ` (${getModelDisplayName(model)})` : ''}. You can retry the same model, or retry this one action with a different model — that won&apos;t change anyone&apos;s model permanently.
+                                        {providerBusy ? (
+                                            <>
+                                                {provider ?? 'The provider'} is temporarily rate-limited or at capacity
+                                                {model ? ` (${getModelDisplayName(model)})` : ''} — this is an issue on the AI provider&apos;s side, not with the game, and it usually clears within a minute or two. You can wait and retry the same model, or retry this one action with a different model — that won&apos;t change anyone&apos;s model permanently.
+                                            </>
+                                        ) : (
+                                            <>
+                                                {displayWho ? `${displayWho} couldn't generate a response` : 'The AI model couldn\'t generate a response'}
+                                                {model ? ` (${getModelDisplayName(model)})` : ''}. You can retry the same model, or retry this one action with a different model — that won&apos;t change anyone&apos;s model permanently.
+                                            </>
+                                        )}
                                     </div>
                                     <div className="text-[12px] mt-1 text-[var(--fg-2)] break-words">
                                         Keeps happening? Let us know on{' '}

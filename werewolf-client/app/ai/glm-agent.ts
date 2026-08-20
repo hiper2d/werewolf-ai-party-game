@@ -1,6 +1,7 @@
 import { AbstractAgent } from "@/app/ai/abstract-agent";
 import { OpenAI } from "openai";
 import { AIMessage, TokenUsage, AgentLoggingConfig, DEFAULT_LOGGING_CONFIG } from "@/app/api/game-models";
+import { getModelConfigByApiName } from "@/app/ai/ai-models";
 import { extractUsageAndCalculateCost } from "@/app/utils/pricing";
 import { z } from 'zod';
 import { ZodSchemaConverter } from './zod-schema-converter';
@@ -10,16 +11,25 @@ import { parseAndValidateLlmJson } from './json-response-parser';
 // so we use the OpenAI SDK with a custom baseURL. GLM-5.3 rejects requests with
 // `thinking: { type: 'disabled' }` (reasoning is always on), so we always send 'enabled';
 // `enableThinking` only controls whether reasoning_content is surfaced to the game.
+// `reasoning_effort` comes from the catalog and must never be omitted: the server default
+// is 'max', whose reasoning tokens count against max_tokens and can exhaust the whole
+// budget before any content is emitted (see the GLM entry in ai-models.ts).
 export class GlmAgent extends AbstractAgent {
     private readonly client: OpenAI;
     // A getter, not a field: `maxOutputTokens` can be raised after construction, and a field
     // initializer would snapshot the default and silently ignore the override.
-    private get defaultParams(): Omit<Parameters<OpenAI['chat']['completions']['create']>[0], 'messages'> {
+    // `reasoning_effort` is re-declared as string: the OpenAI SDK's union lacks Z.AI's 'max'.
+    private get defaultParams(): Omit<Parameters<OpenAI['chat']['completions']['create']>[0], 'messages' | 'reasoning_effort'> & {
+        thinking: { type: 'enabled' };
+        reasoning_effort: string;
+    } {
         return {
             model: this.model,
             temperature: this.temperature,
             stream: false,
             max_tokens: this.maxOutputTokens,
+            thinking: { type: 'enabled' },
+            reasoning_effort: getModelConfigByApiName(this.model)?.reasoningEffort ?? 'high',
         };
     }
 
@@ -28,7 +38,8 @@ export class GlmAgent extends AbstractAgent {
     };
 
     private readonly errorMessages = {
-        emptyResponse: 'Empty or undefined response from Z.AI API',
+        emptyResponse: (finishReason: string | undefined) =>
+            `Empty or undefined response from Z.AI API (finish_reason: ${finishReason ?? 'unknown'})`,
         invalidFormat: 'Invalid response format from Z.AI API',
         apiError: (error: unknown) =>
             `Failed to get response from Z.AI API: ${error instanceof Error ? error.message : String(error)}`,
@@ -133,8 +144,7 @@ export class GlmAgent extends AbstractAgent {
                 const params: any = {
                     ...this.defaultParams,
                     messages: openAIMessages,
-                    response_format: { type: 'json_object' },
-                    thinking: { type: 'enabled' }
+                    response_format: { type: 'json_object' }
                 };
                 completion = await this.client.chat.completions.create(params) as OpenAI.Chat.Completions.ChatCompletion;
             } catch (apiError) {
@@ -144,7 +154,7 @@ export class GlmAgent extends AbstractAgent {
 
             const reply = completion.choices[0]?.message?.content;
             if (!reply) {
-                throw new Error(this.errorMessages.emptyResponse);
+                throw new Error(this.errorMessages.emptyResponse(completion.choices[0]?.finish_reason));
             }
 
             const validated = this.parseAndValidate(reply, zodSchema);
@@ -191,8 +201,7 @@ export class GlmAgent extends AbstractAgent {
             try {
                 const params: any = {
                     ...this.defaultParams,
-                    messages: openAIMessages,
-                    thinking: { type: 'enabled' }
+                    messages: openAIMessages
                 };
                 completion = await this.client.chat.completions.create(params) as OpenAI.Chat.Completions.ChatCompletion;
             } catch (apiError) {
@@ -202,7 +211,7 @@ export class GlmAgent extends AbstractAgent {
 
             const reply = completion.choices[0]?.message?.content;
             if (!reply) {
-                throw new Error(this.errorMessages.emptyResponse);
+                throw new Error(this.errorMessages.emptyResponse(completion.choices[0]?.finish_reason));
             }
 
             const { thinkingContent, tokenUsage } = this.extractThinkingAndUsage(completion);

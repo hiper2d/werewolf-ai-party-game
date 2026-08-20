@@ -141,7 +141,9 @@ export interface ModelConfig {
     // own slice, and the agent passes the value through verbatim, so pick one the model's API
     // supports: Anthropic adaptive thinking takes low|medium|high|xhigh|max, OpenAI takes
     // minimal|low|medium|high|xhigh, Gemini 3.x takes minimal|low|medium|high (sent uppercase
-    // as thinkingLevel; 3.1 Pro and 3.7 Flash reject 'minimal'), Fugu takes high|xhigh.
+    // as thinkingLevel; 3.1 Pro and 3.7 Flash reject 'minimal'), Fugu takes high|xhigh,
+    // Z.AI GLM-5.3 takes low|high|max ONLY (the generic Z.AI API reference lists a 7-value
+    // scale, but glm-5.3 rejects anything else with a 400).
     reasoningEffort?: ReasoningEffort; // Effort-based APIs (Anthropic adaptive thinking, Gemini 3.x)
     thinkingBudgetTokens?: number; // Budget-based APIs (Anthropic enabled thinking, Qwen thinking_budget)
     // Per-request output ceiling, overriding DEFAULT_MAX_OUTPUT_TOKENS. Only set it for models
@@ -334,12 +336,21 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
     },
 
     // Z.AI models — thinking-only entry (non-thinking variant retired 2026-08-05)
+    // reasoningEffort MUST be set: GLM-5.3 forces reasoning on and defaults the effort to 'max',
+    // and its reasoning tokens count against max_tokens. At 'max' a long-context game turn can
+    // burn the whole 8192 budget on reasoning and return finish_reason 'length' with content ""
+    // (prod empty-response incidents + live repro, 2026-08-20). 'high' answered the same test
+    // prompt with ~10x fewer reasoning tokens.
     [LLM_CONSTANTS.GLM]: {
         displayName: 'GLM-5.3',
         modelApiName: 'glm-5.3',
         apiKeyName: API_KEY_CONSTANTS.Z_AI,
         hasThinking: true,
         temperature: 0.7,
+        reasoningEffort: 'high',
+        // Headroom for the shared reasoning+answer budget (like the DeepSeek entries), sized
+        // at 2x default rather than DeepSeek's 65536 to bound worst-case latency on a slow model.
+        maxOutputTokens: 16384,
         tags: ['slow'],
     },
 
@@ -435,6 +446,12 @@ export function modelIsFast(modelId: string): boolean {
 
 export function getModelDisplayName(modelId: string): string {
     return SupportedAiModels[modelId]?.displayName ?? modelId;
+}
+
+/** Human-readable provider name ("Anthropic", "Grok", …) for a picker model id, if known. */
+export function getModelProviderName(modelId: string): string | undefined {
+    const apiKeyName = SupportedAiModels[modelId]?.apiKeyName;
+    return apiKeyName ? SupportedAiKeyNames[apiKeyName] : undefined;
 }
 
 /**
