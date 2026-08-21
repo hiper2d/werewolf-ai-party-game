@@ -1,4 +1,5 @@
 import { AbstractAgent } from "@/app/ai/abstract-agent";
+import { mergeThinking, stripInlineThinking } from "./thinking-utils";
 import OpenAI from "openai";
 import { AIMessage, TokenUsage, AgentLoggingConfig, DEFAULT_LOGGING_CONFIG } from "@/app/api/game-models";
 import { extractUsageAndCalculateCost } from "@/app/utils/pricing";
@@ -138,7 +139,13 @@ export class DeepSeekV2Agent extends AbstractAgent {
                 }
             }
 
-            const content = response.choices[0]?.message?.content;
+            const rawContent = response.choices[0]?.message?.content;
+            if (!rawContent) {
+                throw new Error(this.errorMessages.emptyResponse);
+            }
+
+            const { text: content, thinking: inlineThinking } = stripInlineThinking(rawContent);
+            thinkingContent = mergeThinking(thinkingContent, inlineThinking);
             if (!content) {
                 throw new Error(this.errorMessages.emptyResponse);
             }
@@ -218,7 +225,13 @@ export class DeepSeekV2Agent extends AbstractAgent {
                 }
             }
 
-            const content = response.choices[0]?.message?.content;
+            const rawContent = response.choices[0]?.message?.content;
+            if (!rawContent) {
+                throw new Error(this.errorMessages.emptyResponse);
+            }
+
+            const { text: content, thinking: inlineThinking } = stripInlineThinking(rawContent);
+            thinkingContent = mergeThinking(thinkingContent, inlineThinking);
             if (!content) {
                 throw new Error(this.errorMessages.emptyResponse);
             }

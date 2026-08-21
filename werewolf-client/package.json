@@ -24,6 +24,7 @@
     "openai": "5.20.3",
     "react": "19.2.0",
     "react-dom": "19.2.0",
+    "sharp": "^0.35.3",
     "stripe": "^20.4.1",
     "zod": "^3.25.76",
     "zod-to-json-schema": "^3.24.6"
@@ -47,5 +48,9 @@
   "overrides": {
     "@types/react": "19.2.2",
     "@types/react-dom": "19.2.2"
+  },
+  "allowScripts": {
+    "sharp@0.34.5": true,
+    "sharp@0.35.3": true
   }
 }

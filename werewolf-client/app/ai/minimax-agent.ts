@@ -1,4 +1,5 @@
 import { AbstractAgent } from "@/app/ai/abstract-agent";
+import { mergeThinking, stripInlineThinking } from "./thinking-utils";
 import { OpenAI } from "openai";
 import { AIMessage, TokenUsage, AgentLoggingConfig, DEFAULT_LOGGING_CONFIG } from "@/app/api/game-models";
 import { extractUsageAndCalculateCost } from "@/app/utils/pricing";
@@ -69,12 +70,6 @@ export class MiniMaxAgent extends AbstractAgent {
             thinking: { type: this.enableThinking ? 'adaptive' : 'disabled' },
             reasoning_split: true,
         };
-    }
-
-    /** Defensive: with reasoning_split the content should be clean, but a stray <think> block
-     *  in the answer would break JSON parsing and read badly in chat. */
-    private stripThinkTags(text: string): string {
-        return text.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
     }
 
     private convertToOpenAIMessages(messages: AIMessage[]): OpenAI.Chat.Completions.ChatCompletionMessageParam[] {
@@ -172,11 +167,13 @@ export class MiniMaxAgent extends AbstractAgent {
                 throw new Error(this.errorMessages.emptyResponse);
             }
 
-            const validated = this.parseAndValidate(this.stripThinkTags(reply), zodSchema);
+            const { text: cleanReply, thinking: inlineThinking } = stripInlineThinking(reply);
+            const validated = this.parseAndValidate(cleanReply, zodSchema);
 
             this.logger(`✅ Response validated successfully with Zod schema`);
 
-            const { thinkingContent, tokenUsage } = this.extractThinkingAndUsage(completion);
+            const { thinkingContent: reasoningContent, tokenUsage } = this.extractThinkingAndUsage(completion);
+            const thinkingContent = mergeThinking(reasoningContent, inlineThinking);
 
             if (validated) {
                 this.logReply(validated, thinkingContent, tokenUsage);
@@ -230,12 +227,13 @@ export class MiniMaxAgent extends AbstractAgent {
                 throw new Error(this.errorMessages.emptyResponse);
             }
 
-            const cleanReply = this.stripThinkTags(reply);
+            const { text: cleanReply, thinking: inlineThinking } = stripInlineThinking(reply);
             if (!cleanReply) {
                 throw new Error(this.errorMessages.emptyResponse);
             }
 
-            const { thinkingContent, tokenUsage } = this.extractThinkingAndUsage(completion);
+            const { thinkingContent: reasoningContent, tokenUsage } = this.extractThinkingAndUsage(completion);
+            const thinkingContent = mergeThinking(reasoningContent, inlineThinking);
 
             this.logReply(cleanReply, thinkingContent, tokenUsage);
 

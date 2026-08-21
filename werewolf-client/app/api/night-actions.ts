@@ -209,7 +209,15 @@ async function endNightWithResults(gameId: string, game: Game): Promise<GameActi
         id: null,
         recipientName: RECIPIENT_ALL,
         authorName: GAME_MASTER,
-        msg: { story: finalNightResultsMessage, thinking: thinking || "", ...getProviderSignatureFields(gmModel.aiType, thinkingSignature) },
+        msg: {
+            story: finalNightResultsMessage,
+            thinking: thinking || "",
+            // Who died this night, for the memorial avatar row in the chat.
+            // Names only — roles stay in the narrative to avoid leaking more
+            // than the GM chose to reveal.
+            deaths: nightState.deaths.map(d => d.player),
+            ...getProviderSignatureFields(gmModel.aiType, thinkingSignature),
+        },
         messageType: MessageType.NIGHT_SUMMARY,
         day: game.currentDay,
         timestamp: Date.now(),
@@ -1417,7 +1425,9 @@ function gameFromFirestore(id: string, data: any): Game {
         nightNarratives: data.nightNarratives || [],
         dayDiscussionSummaries: data.dayDiscussionSummaries || [],
         oneTimeAbilitiesUsed: data.oneTimeAbilitiesUsed || {},
-        resolvedNightState: data.resolvedNightState || null
+        resolvedNightState: data.resolvedNightState || null,
+        avatarsStatus: data.avatarsStatus, // absent on games from before themed avatars
+        avatarsVersion: data.avatarsVersion,
     };
 }
 

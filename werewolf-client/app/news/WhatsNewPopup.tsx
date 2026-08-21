@@ -92,6 +92,18 @@ export default function WhatsNewPopup() {
                         </div>
                         <h2 id="whats-new-title" className="tl-title">{latest.title}</h2>
                         <p className="news-body">{latest.body}</p>
+                        {latest.media?.images && (
+                            <div className="tl-media">
+                                <div className="tl-imgs">
+                                    {latest.media.images.map((img) => (
+                                        <a key={img.src} href={img.src} target="_blank" rel="noopener noreferrer" title={img.alt}>
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <img src={img.src} alt={img.alt} loading="lazy"/>
+                                        </a>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                         <div className="flex flex-wrap items-center gap-4 mt-4">
                             {latest.links.map((l, i) => (
                                 l.href.startsWith("http") ? (

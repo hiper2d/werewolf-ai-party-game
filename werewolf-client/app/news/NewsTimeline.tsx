@@ -89,7 +89,18 @@ export default function NewsTimeline() {
                             <p className="news-body">{e.body}</p>
                             {e.media && (
                                 <div className="tl-media">
-                                    <Yt label={e.media.label} youtubeId={e.media.youtubeId}/>
+                                    {e.media.images ? (
+                                        <div className="tl-imgs">
+                                            {e.media.images.map((img) => (
+                                                <a key={img.src} href={img.src} target="_blank" rel="noopener noreferrer" title={img.alt}>
+                                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                    <img src={img.src} alt={img.alt} loading="lazy"/>
+                                                </a>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <Yt label={e.media.label} youtubeId={e.media.youtubeId}/>
+                                    )}
                                 </div>
                             )}
                             {e.links.length > 0 && (

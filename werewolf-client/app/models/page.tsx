@@ -2,7 +2,7 @@ import React from 'react';
 import type { Metadata } from 'next';
 import ModelsCatalog from './ModelsCatalog';
 import { InfoIcon } from '@/app/components/ui-icons';
-import { API_KEY_CONSTANTS, AUDIO_MODEL_CONSTANTS } from '@/app/ai/ai-models';
+import { API_KEY_CONSTANTS, AUDIO_MODEL_CONSTANTS, IMAGE_MODEL_CONSTANTS } from '@/app/ai/ai-models';
 
 export const metadata: Metadata = {
     title: 'Models — Werewolf AI',
@@ -114,6 +114,32 @@ export default function ModelsPage() {
                         </div>
                     </div>
                     <p className="m-0 mt-3 text-[12px] text-[var(--fg-3)] font-mono">Requires: {API_KEY_CONSTANTS.OPENAI}</p>
+                </div>
+            </section>
+
+            {/* Image models */}
+            <section className="mt-11">
+                <div className="flex items-baseline justify-between gap-4 mb-[18px] flex-wrap">
+                    <h2 className="m-0 font-mono text-[13px] font-semibold tracking-[0.08em] uppercase text-[var(--fg-2)]">Image models</h2>
+                </div>
+                <div className="border border-[var(--line-1)] rounded-[var(--radius-xl)] bg-[var(--bg-1)] p-6 sm:p-7">
+                    <p className="m-0 mb-4 text-[13.5px] text-[var(--fg-2)] leading-[1.55] max-w-[70ch]">
+                        Every new game gets a themed visual set generated once at creation: portrait avatars for the whole cast
+                        (including the Game Master) plus day and night scene illustrations for the chat — all drawn in a single
+                        style matching your game&apos;s theme.
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="border border-[var(--line-1)] rounded-[var(--radius-lg)] bg-[var(--bg-0)] px-4 py-3.5">
+                            <div className="font-mono text-[11px] tracking-[0.06em] uppercase text-[var(--fg-3)] mb-1.5">Avatars &amp; scenes</div>
+                            <div className="text-[14px] text-[var(--fg-0)] font-mono">{IMAGE_MODEL_CONSTANTS.AVATARS}</div>
+                            <div className="text-[12.5px] text-[var(--fg-2)] mt-1">~$0.14 per game (two images: cast sheet + scene pair)</div>
+                        </div>
+                        <div className="border border-[var(--line-1)] rounded-[var(--radius-lg)] bg-[var(--bg-0)] px-4 py-3.5">
+                            <div className="font-mono text-[11px] tracking-[0.06em] uppercase text-[var(--fg-3)] mb-1.5">Layout verification</div>
+                            <div className="text-[14px] text-[var(--fg-0)] font-mono">{IMAGE_MODEL_CONSTANTS.VERIFIER}</div>
+                            <div className="text-[12.5px] text-[var(--fg-2)] mt-1">Checks every generated portrait; negligible cost</div>
+                        </div>
+                    </div>
                 </div>
             </section>
         </div>

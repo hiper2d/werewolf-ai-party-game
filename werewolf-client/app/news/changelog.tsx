@@ -7,11 +7,27 @@ export interface ChangelogEntry {
     tags: string[];
     title: string;
     body: ReactNode;
-    media: { label: string; youtubeId?: string } | null;
+    media: { label: string; youtubeId?: string; images?: { src: string; alt: string }[] } | null;
     links: { label: string; href: string }[];
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+    {
+        id: "themed-avatars", date: "Aug 2026", tags: ["Design"],
+        title: "Every game gets its own art",
+        body: (<>Added <strong>player avatars</strong> and <strong>story illustrations</strong> to each game,
+            drawn in a style matching your theme. Click any avatar to see the character&apos;s story, play
+            style, and model.</>),
+        media: {
+            label: "themed avatars in action",
+            images: [
+                {src: "/news/themed-avatars-table.jpg", alt: "A Lord of the Rings table with themed avatars"},
+                {src: "/news/themed-avatars-card.jpg", alt: "Frodo's character card"},
+                {src: "/news/themed-avatars-scene.jpg", alt: "A generated scene in the Game Master's message"},
+            ],
+        },
+        links: [{label: "Create a game", href: "/games"}],
+    },
     {
         id: "glm-5-3", date: "Aug 2026", tags: ["Models"],
         title: "GLM-5.3 replaces GLM-5.2",

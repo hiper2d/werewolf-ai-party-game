@@ -1,4 +1,5 @@
 import { AbstractAgent } from "@/app/ai/abstract-agent";
+import { stripInlineThinking } from "./thinking-utils";
 import { OpenAI } from "openai";
 import { AIMessage, TokenUsage, AgentLoggingConfig, DEFAULT_LOGGING_CONFIG } from "@/app/api/game-models";
 import { getModelConfigByApiName } from "@/app/ai/ai-models";
@@ -161,7 +162,12 @@ export class QwenAgent extends AbstractAgent {
                 throw new Error(this.errorMessages.apiError(apiError));
             }
 
-            const reply = completion.choices[0]?.message?.content;
+            const rawReply = completion.choices[0]?.message?.content;
+            if (!rawReply) {
+                throw new Error(this.errorMessages.emptyResponse);
+            }
+
+            const { text: reply, thinking: inlineThinking } = stripInlineThinking(rawReply);
             if (!reply) {
                 throw new Error(this.errorMessages.emptyResponse);
             }
@@ -170,7 +176,8 @@ export class QwenAgent extends AbstractAgent {
 
             this.logger(`✅ Response validated successfully with Zod schema`);
 
-            const { thinkingContent, tokenUsage } = this.extractThinkingAndUsage(completion);
+            const { thinkingContent: reasoningContent, tokenUsage } = this.extractThinkingAndUsage(completion);
+            const thinkingContent = [reasoningContent, inlineThinking].filter(Boolean).join("\n");
 
             if (validated) {
                 this.logReply(validated, thinkingContent, tokenUsage);
@@ -219,12 +226,18 @@ export class QwenAgent extends AbstractAgent {
                 throw new Error(this.errorMessages.apiError(apiError));
             }
 
-            const reply = completion.choices[0]?.message?.content;
+            const rawReply = completion.choices[0]?.message?.content;
+            if (!rawReply) {
+                throw new Error(this.errorMessages.emptyResponse);
+            }
+
+            const { text: reply, thinking: inlineThinking } = stripInlineThinking(rawReply);
             if (!reply) {
                 throw new Error(this.errorMessages.emptyResponse);
             }
 
-            const { thinkingContent, tokenUsage } = this.extractThinkingAndUsage(completion);
+            const { thinkingContent: reasoningContent, tokenUsage } = this.extractThinkingAndUsage(completion);
+            const thinkingContent = [reasoningContent, inlineThinking].filter(Boolean).join("\n");
 
             this.logReply(reply, thinkingContent, tokenUsage);
 

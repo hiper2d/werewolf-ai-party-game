@@ -78,6 +78,14 @@ export const AUDIO_MODEL_CONSTANTS = {
     STT: 'whisper-1',
 } as const;
 
+// Image generation (themed avatars + chat scenes, generated once per game).
+// AVATARS draws the grids; VERIFIER is the cheap vision model that checks the
+// sliced avatars' nameplates. See app/utils/avatar-generation.ts.
+export const IMAGE_MODEL_CONSTANTS = {
+    AVATARS: 'gemini-3.1-flash-image',
+    VERIFIER: 'gemini-3.5-flash-lite',
+} as const;
+
 /**
  * Per-request output ceiling for ordinary game turns (bot answers, votes, night actions,
  * GM bot-selection). Reasoning tokens are billed inside this budget on every provider, so

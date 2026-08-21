@@ -266,6 +266,13 @@ export interface Game {
     nightNarratives?: NightNarrativeResult[]; // GM night result narratives for each night
     dayDiscussionSummaries?: DayDiscussionSummary[]; // GM-generated summaries of day discussions
     chatResetCounts?: Record<number, number>; // game day number → reset count (free tier only)
+    // Themed avatar generation lifecycle. Absent on games created before the
+    // feature — those never generate and keep the initial-letter avatars.
+    // 'pending' (set at creation) → 'generating' → 'ready' | 'failed'.
+    avatarsStatus?: 'pending' | 'generating' | 'ready' | 'failed';
+    // Bumped on every (re)generation; getAvatarUrl appends it as ?v= so
+    // immutable browser caching never serves a previous generation's images.
+    avatarsVersion?: number;
     oneTimeAbilitiesUsed?: {
         doctorKill?: boolean;  // True if doctor has used their one-time kill ability
         detectiveKill?: boolean; // True if detective has used their one-time kill ability
@@ -730,6 +737,12 @@ export const MESSAGE_ROLE = {
 } as const;
 
 export const GAME_MASTER = 'Game Master';
+// Doc ids / URL segments for generated images that aren't player avatars.
+// Player avatar keys are the sanitized player names; these can't collide
+// because sanitized names never contain a dash.
+export const AVATAR_GM_KEY = 'game-master';
+export const SCENE_WELCOME_KEY = 'scene-welcome'; // shown with the GM's opening story message
+export const SCENE_NIGHT_KEY = 'scene-night';     // shown with each "night begins" message
 export const RECIPIENT_ALL = 'ALL';
 export const RECIPIENT_WEREWOLVES = 'WEREWOLVES';
 export const RECIPIENT_DOCTOR = 'DOCTOR';

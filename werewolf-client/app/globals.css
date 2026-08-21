@@ -901,6 +901,27 @@ html {
   margin: 16px 0 0;
   max-width: 520px;
 }
+.news-doc .tl-media:has(.tl-imgs) {
+  max-width: 100%;
+}
+.news-doc .tl-imgs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+.news-doc .tl-imgs img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  aspect-ratio: 16 / 11;
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius-lg);
+  transition: border-color 120ms ease;
+}
+.news-doc .tl-imgs a:hover img {
+  border-color: var(--line-3);
+}
 .news-doc .tl-actions {
   margin-top: 16px;
   display: flex;

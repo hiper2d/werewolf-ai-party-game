@@ -53,6 +53,8 @@ import {format} from "@/app/ai/prompts/utils";
 import {GameSetupZodSchema} from "@/app/ai/prompts/zod-schemas";
 import {ensureUserCanAccessGame} from "@/app/api/tier-guards";
 import {logger} from "@/app/utils/logger";
+import {after} from "next/server";
+import {runAvatarGeneration} from "@/app/utils/avatar-generation";
 
 /**
  * Counts how many games the user has created since 00:00 UTC today — mirrors the free-tier
@@ -116,6 +118,10 @@ export async function removeGameById(id: string, ownerEmail: string) {
     // Delete messages individually
     const messageDeletePromises = messagesSnapshot.docs.map((doc: any) => doc.ref.delete());
     await Promise.all(messageDeletePromises);
+
+    // Delete generated avatars/scenes (subcollections aren't removed with the parent doc)
+    const avatarsSnapshot = await db.collection('games').doc(id).collection('avatars').get();
+    await Promise.all(avatarsSnapshot.docs.map((doc: any) => doc.ref.delete()));
 
     // Delete the game
     await gameRef.delete();
@@ -563,6 +569,7 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
             createdAt: timestamp, // Store creation timestamp
             expireAt: expireAt, // Firestore TTL: auto-delete after 30 days
             createdWithTier: tier,
+            avatarsStatus: 'pending', // Themed avatars generate on first game-page load (avatar-actions.ts)
             totalGameCost: previewCost, // Total cost starts with preview generation cost
             gameMasterTokenUsage: gamePreview.tokenUsage ? {
                 inputTokens: gamePreview.tokenUsage.inputTokens || 0,
@@ -600,6 +607,21 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
 
         await addMessageToChatAndSaveToDb(gameStoryMessage, customGameId);
         logger.info(`Game created: ${customGameId}`, { theme: gamePreview.theme, owner: session.user.email });
+
+        // Kick off themed avatar generation right at creation, after the response
+        // is sent so navigation isn't delayed. The transaction inside makes it
+        // exactly-once; the game page's 'pending' check is only a safety net in
+        // case this background work dies before claiming the game.
+        const ownerEmail = session.user.email;
+        try {
+            after(() => runAvatarGeneration(customGameId, ownerEmail).catch(error =>
+                logger.error(`Avatar generation kickoff failed for ${customGameId}`, { error: error.message })
+            ));
+        } catch {
+            // Outside a request scope (unit tests, scripts): skip the kickoff —
+            // the game page's 'pending' safety net starts generation instead.
+        }
+
         return customGameId;
     } catch (error: any) {
         logger.error("Error adding document: ", { error: error.message, stack: error.stack });
@@ -1300,6 +1322,8 @@ function gameFromFirestore(id: string, data: any): Game {
         nightNarratives: data.nightNarratives || [],
         dayDiscussionSummaries: data.dayDiscussionSummaries || [],
         chatResetCounts: data.chatResetCounts || {},
+        avatarsStatus: data.avatarsStatus, // absent on games from before themed avatars
+        avatarsVersion: data.avatarsVersion,
         oneTimeAbilitiesUsed: data.oneTimeAbilitiesUsed || {},
         resolvedNightState: data.resolvedNightState || null
     };

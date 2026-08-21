@@ -6,6 +6,7 @@ import { humanPlayerTalkWerewolves } from "@/app/api/night-actions";
 import { GAME_STATES, MessageType, RECIPIENT_ALL, RECIPIENT_WEREWOLVES, RECIPIENT_DOCTOR, RECIPIENT_DETECTIVE, RECIPIENT_MANIAC, GameMessage, Game, GameActionResponse, SystemErrorMessage, BotResponseError, GAME_MASTER, ROLE_CONFIGS, GAME_ROLES, FREE_TIER_LIMITS } from "@/app/api/game-models";
 import PlayerAvatar from "@/app/components/PlayerAvatar";
 import { clearGameErrorState } from "@/app/api/game-actions";
+import { getAvatarUrl, getSceneUrl } from "@/app/utils/avatar-utils";
 import VotingModal from "./VotingModal";
 import NightActionModal from "./NightActionModal";
 import MentionDropdown from "./MentionDropdown";
@@ -41,6 +42,8 @@ interface GameChatProps {
     chatControls?: React.ReactNode;
     onBeforeAction?: () => void;
     cancelButton?: React.ReactNode;
+    // Opens the character card for a participant (avatar clicks in messages).
+    onAvatarClick?: (name: string) => void;
 }
 
 interface BotAnswer {
@@ -164,6 +167,28 @@ function renderMessageContent(content: string) {
     return content;
 }
 
+/** Chat scene illustration with a pulsing skeleton while the image streams in
+ *  (authed route, a few hundred ms) and a fade-in on load. The fixed aspect
+ *  ratio (scene slices are ~3:2) prevents layout shift; a 404 (scene
+ *  generation failed) collapses the block entirely. */
+function ChatSceneImage({ src, alt }: { src: string; alt: string }) {
+    const [loaded, setLoaded] = useState(false);
+    const [failed, setFailed] = useState(false);
+    if (failed) return null;
+    return (
+        <span className={`block w-full max-w-[560px] rounded-[var(--radius-md)] border border-[var(--line-1)] mb-2 overflow-hidden aspect-[3/2] ${loaded ? '' : 'animate-pulse bg-[var(--bg-3)]'}`}>
+            {/* eslint-disable-next-line @next/next/no-img-element -- authed dynamic route; next/image can't optimize it */}
+            <img
+                src={src}
+                alt={alt}
+                className={`block w-full h-full object-cover transition-opacity duration-500 ${loaded ? 'opacity-100' : 'opacity-0'}`}
+                onLoad={() => setLoaded(true)}
+                onError={() => setFailed(true)}
+            />
+        </span>
+    );
+}
+
 interface GameMessageItemProps {
     message: GameMessage;
     gameId: string;
@@ -175,9 +200,13 @@ interface GameMessageItemProps {
     loadingMessageId: string | null;
     pausedMessageId: string | null;
     resetsRemaining: number | null; // null = unlimited (api tier)
+    onAvatarClick?: (name: string) => void;
+    // True on the first Game-Master message of the rendered day: that message
+    // (game story on day 1, "Day N begins" later) carries the day scene image.
+    showDayScene?: boolean;
 }
 
-function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcluding, game, onSpeak, speakingMessageId, loadingMessageId, pausedMessageId, resetsRemaining }: GameMessageItemProps) {
+function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcluding, game, onSpeak, speakingMessageId, loadingMessageId, pausedMessageId, resetsRemaining, onAvatarClick, showDayScene }: GameMessageItemProps) {
     const [showDeleteMenu, setShowDeleteMenu] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
 
@@ -276,7 +305,14 @@ function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcludin
     return (
         <div className={`${isGameMaster ? 'py-1.5' : 'mb-2'} group`}>
             <div className="flex gap-2.5">
-                <PlayerAvatar name={message.authorName} size={36} isGM={isGameMaster} className="mt-0.5" />
+                <button
+                    type="button"
+                    onClick={() => onAvatarClick?.(isGameMaster ? GAME_MASTER : message.authorName)}
+                    className="flex-none self-start mt-0.5 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+                    title={`View ${message.authorName}`}
+                >
+                    <PlayerAvatar name={message.authorName} size={36} isGM={isGameMaster} avatarUrl={getAvatarUrl(game, isGameMaster ? GAME_MASTER : message.authorName)} />
+                </button>
                 <div className="flex-1 min-w-0 text-left">
             <div className="flex items-center justify-between mb-1">
                 <div className="flex items-center gap-2">
@@ -378,7 +414,53 @@ function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcludin
                 isVoteMessage ? 'bg-[var(--bg-2)] border-[var(--line-1)] pl-4 border-l-[3px] border-l-[var(--werewolf-fg)]' :
                 isUserMessage ? 'bg-[var(--accent-soft)] border-[var(--accent-line)] pl-4 border-l-[3px] border-l-[var(--accent)]' : 'bg-[var(--bg-2)] border-[var(--line-1)] hover:border-[var(--line-2)]'
             } text-[var(--fg-0)]`}>
+                {(() => {
+                    // Day-elimination memorial: the dead player's avatar greyed out
+                    // above the GM's text. Keyed on the stable template from
+                    // message-utils (`X has been eliminated!`).
+                    const elim = displayContent.match(/^(\S+) has been eliminated!/);
+                    const elimName = elim && (game.bots.some(b => b.name === elim[1]) || elim[1] === game.humanPlayerName) ? elim[1] : null;
+                    if (!elimName) return null;
+                    return (
+                        <span className="flex items-center gap-3 mb-2">
+                            <PlayerAvatar name={elimName} size={48} isDead avatarUrl={getAvatarUrl(game, elimName)} />
+                            <span className="text-[15px] font-semibold line-through text-[var(--fg-2)]">{elimName}</span>
+                        </span>
+                    );
+                })()}
+                {(() => {
+                    // Thematic scene images: the day scene rides only on the first
+                    // GM message of the day (GAME_STORY is reused for votes and
+                    // eliminations, so type alone would repeat it); the night scene
+                    // rides on each "night falls" message. Scene generation can fail
+                    // while avatars succeed, so a 404 just hides the image.
+                    const scene = message.messageType === MessageType.NIGHT_BEGINS ? 'night'
+                        : showDayScene ? 'welcome' : null;
+                    const sceneUrl = scene ? getSceneUrl(game, scene) : undefined;
+                    return sceneUrl ? (
+                        <ChatSceneImage src={sceneUrl} alt={scene === 'welcome' ? 'The setting of this game' : 'The setting at night'} />
+                    ) : null;
+                })()}
                 {renderMessageContent(displayContent)}
+                {(() => {
+                    // Night-death memorial closes the night-results message: the
+                    // fallen players' avatars greyed out after the narrative.
+                    // Structured in the NIGHT_SUMMARY payload (newer games only).
+                    if (message.messageType !== MessageType.NIGHT_SUMMARY) return null;
+                    const deadNames = (((message.msg as { deaths?: string[] })?.deaths) || [])
+                        .filter(n => game.bots.some(b => b.name === n) || n === game.humanPlayerName);
+                    if (deadNames.length === 0) return null;
+                    return (
+                        <span className="flex items-center gap-4 flex-wrap mt-3">
+                            {deadNames.map(n => (
+                                <span key={n} className="flex items-center gap-2.5">
+                                    <PlayerAvatar name={n} size={48} isDead avatarUrl={getAvatarUrl(game, n)} />
+                                    <span className="text-[15px] font-semibold line-through text-[var(--fg-2)]">{n}</span>
+                                </span>
+                            ))}
+                        </span>
+                    );
+                })()}
             </span>
                 </div>{/* end message column */}
             </div>{/* end avatar + message row */}
@@ -386,7 +468,7 @@ function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcludin
     );
 }
 
-export default function GameChat({ gameId, game, runGameAction, onGameStateChange, pendingMessages, onPendingMessagesConsumed, clearNightMessages, onErrorHandled, onRetryWithModel, onRetryBotSelection, isExternalLoading, gameControls, chatControls, onBeforeAction, cancelButton }: GameChatProps) {
+export default function GameChat({ gameId, game, runGameAction, onGameStateChange, pendingMessages, onPendingMessagesConsumed, clearNightMessages, onErrorHandled, onRetryWithModel, onRetryBotSelection, isExternalLoading, gameControls, chatControls, onBeforeAction, cancelButton, onAvatarClick }: GameChatProps) {
     // Without a parent-provided lock, run actions directly (standalone use).
     const runAction = useMemo(
         () => runGameAction ?? (<T,>(action: () => Promise<T>) => action()),
@@ -1513,7 +1595,9 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                         No messages for Day {selectedDay} yet.
                     </div>
                 ) : (
-                    messages.map((message, index) => {
+                    (() => {
+                        const firstGmIndex = messages.findIndex(m => m.authorName === GAME_MASTER);
+                        return messages.map((message, index) => {
                         const fallbackKey = message.timestamp ? `ts-${message.timestamp}-${index}` : `idx-${index}`;
                         const key = message.id ?? fallbackKey;
                         return (
@@ -1529,9 +1613,12 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                                 loadingMessageId={loadingMessageId}
                                 pausedMessageId={pausedMessageId}
                                 resetsRemaining={resetsRemaining}
+                                onAvatarClick={onAvatarClick}
+                                showDayScene={index === firstGmIndex}
                             />
                         );
-                    })
+                        });
+                    })()
                 )}
                 {isDeleting && !isLoadingMessages && (
                     <div className="text-center text-[var(--fg-2)] text-[13px] py-2">
@@ -1667,6 +1754,56 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
             {gameControls && (
                 <div className="flex-shrink-0 flex items-center gap-2 px-1 py-1.5">
                     {gameControls}
+                </div>
+            )}
+
+            {/* Currently-thinking bot: first name in the process queue while bots
+                are talking. Shows the themed avatar (when generated) with a pulse. */}
+            {game.gameStateProcessQueue.length > 0 &&
+                (game.gameState === GAME_STATES.DAY_DISCUSSION || game.gameState === GAME_STATES.AFTER_GAME_DISCUSSION) && (
+                <div className="flex-shrink-0 px-1 pb-1">
+                    <div className="inline-flex items-center gap-2.5 rounded-full bg-[var(--bg-2)] border border-[var(--line-2)] pl-1 pr-3.5 py-1 shadow-subtle">
+                        <span className="animate-pulse rounded-full">
+                            <PlayerAvatar
+                                name={game.gameStateProcessQueue[0]}
+                                size={28}
+                                avatarUrl={getAvatarUrl(game, game.gameStateProcessQueue[0])}
+                            />
+                        </span>
+                        <span className="text-[13px] text-[var(--fg-1)]">
+                            <span className="font-semibold text-[var(--fg-0)]">{game.gameStateProcessQueue[0]}</span> is thinking
+                        </span>
+                        <span className="inline-flex gap-[3px]">
+                            {[0, 1, 2].map(i => (
+                                <span
+                                    key={i}
+                                    className="w-[5px] h-[5px] rounded-full bg-[var(--accent)] animate-bounce"
+                                    style={{ animationDelay: `${i * 0.18}s` }}
+                                />
+                            ))}
+                        </span>
+                    </div>
+                </div>
+            )}
+
+            {/* Themed art generates in the background for ~30s after game
+                creation; without this chip players think images are missing.
+                Styled to match the "is thinking" chip above. */}
+            {(game.avatarsStatus === 'pending' || game.avatarsStatus === 'generating') && (
+                <div className="flex-shrink-0 px-1 pb-1">
+                    <div className="inline-flex items-center gap-2.5 rounded-full bg-[var(--bg-2)] border border-[var(--line-2)] pl-3 pr-3.5 py-1.5 shadow-subtle">
+                        <span className="w-2 h-2 rounded-full bg-[var(--accent)] animate-pulse flex-none" />
+                        <span className="text-[13px] text-[var(--fg-1)]">Images are loading</span>
+                        <span className="inline-flex gap-[3px]">
+                            {[0, 1, 2].map(i => (
+                                <span
+                                    key={i}
+                                    className="w-[5px] h-[5px] rounded-full bg-[var(--accent)] animate-bounce"
+                                    style={{ animationDelay: `${i * 0.18}s` }}
+                                />
+                            ))}
+                        </span>
+                    </div>
                 </div>
             )}
 

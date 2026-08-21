@@ -17,6 +17,9 @@ import { welcome, vote, keepBotsGoing, manualSelectBots, cancelBotResponses } fr
 import BotSelectionDialog from '@/app/games/[id]/components/BotSelectionDialog';
 import { replayNight, performNightAction } from '@/app/api/night-actions';
 import PlayerAvatar from "@/app/components/PlayerAvatar";
+import CharacterCard from "@/app/games/[id]/components/CharacterCard";
+import { generateGameAvatars } from "@/app/api/avatar-actions";
+import { getAvatarUrl } from "@/app/utils/avatar-utils";
 import { DiscordIcon } from "@/app/components/ui-icons";
 import { DISCORD_URL } from "@/app/config/external-links";
 import { checkGameEndConditions } from "@/app/utils/game-utils";
@@ -68,7 +71,53 @@ function GamePageContent({
     const [descExpanded, setDescExpanded] = useState(false);
     const [descClamps, setDescClamps] = useState(false);
     const [showCosts, setShowCosts] = useState(true);
+    // Character card modal: participant name, or null when closed.
+    const [characterCardFor, setCharacterCardFor] = useState<string | null>(null);
     const descRef = useRef<HTMLParagraphElement>(null);
+    const avatarGenerationRef = useRef(false);
+
+    // Themed avatar generation follow-up. createGame starts generation
+    // server-side at creation; by the time the player lands here the status is
+    // usually 'generating' (in flight) or already 'ready'. This effect:
+    //  - 'pending'    → safety net: the creation kickoff died before claiming
+    //                   the game, so trigger generation from here (transaction-
+    //                   guarded; a double-invoke is a no-op);
+    //  - 'generating' → poll until it lands so avatars appear without a reload.
+    // Never retries 'failed' — regeneration costs money and stays a deliberate
+    // (future, paid) action. Legacy games have no avatarsStatus: never processed.
+    useEffect(() => {
+        if (game.avatarsStatus !== 'pending' && game.avatarsStatus !== 'generating') return;
+        if (avatarGenerationRef.current) return;
+        avatarGenerationRef.current = true;
+        let cancelled = false;
+
+        const run = async () => {
+            try {
+                if (game.avatarsStatus === 'pending') {
+                    const result = await generateGameAvatars(game.id);
+                    if (cancelled || !result) return;
+                    setGame(prev => ({ ...prev, avatarsStatus: result.avatarsStatus }));
+                    if (result.avatarsStatus !== 'generating') return;
+                }
+                // Another runner (the creation kickoff, a second tab) holds the
+                // claim — poll the game doc until generation lands.
+                for (let i = 0; i < 30 && !cancelled; i++) {
+                    await new Promise(resolve => setTimeout(resolve, 3000));
+                    const fresh = await getGame(game.id);
+                    if (cancelled || !fresh) return;
+                    if (fresh.avatarsStatus === 'ready' || fresh.avatarsStatus === 'failed') {
+                        setGame(prev => ({ ...prev, avatarsStatus: fresh.avatarsStatus }));
+                        return;
+                    }
+                }
+            } catch (error) {
+                console.error('Avatar generation follow-up failed:', error);
+            }
+        };
+        run();
+        return () => { cancelled = true; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [game.avatarsStatus, game.id]);
     const preActionGameRef = useRef<Game | null>(null);
     const cancelledRef = useRef(false);
     // Guards against dispatching a second game action while one is still in flight.
@@ -1029,7 +1078,14 @@ function GamePageContent({
                             }`}
                         >
                             <div className="flex items-center gap-2">
-                                <PlayerAvatar name={participant.name} size={32} isGM={participant.isGameMaster} isDead={isDead} />
+                                <button
+                                    type="button"
+                                    onClick={() => setCharacterCardFor(participant.name)}
+                                    className="flex-none rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+                                    title={`View ${participant.name}`}
+                                >
+                                    <PlayerAvatar name={participant.name} size={32} isGM={participant.isGameMaster} isDead={isDead} avatarUrl={getAvatarUrl(game, participant.name)} />
+                                </button>
                                 <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-1.5 flex-wrap">
                                     <span
@@ -1272,6 +1328,7 @@ function GamePageContent({
                 <GameChat
                     gameId={game.id}
                     game={game}
+                    onAvatarClick={setCharacterCardFor}
                     runGameAction={runGameAction}
                     onGameStateChange={applyActionResult}
                     pendingMessages={pendingMessages}
@@ -1333,6 +1390,11 @@ function GamePageContent({
                         {mobilePanel === 'players' ? leftPanelContent : rightPanelContent}
                     </div>
                 </div>
+            )}
+
+            {/* Character card (click on any avatar) */}
+            {characterCardFor && (
+                <CharacterCard game={game} name={characterCardFor} onClose={() => setCharacterCardFor(null)} />
             )}
 
             {/* Model Selection Dialog */}
