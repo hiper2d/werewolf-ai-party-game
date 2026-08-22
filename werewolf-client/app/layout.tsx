@@ -113,7 +113,10 @@ export default function RootLayout(
                 dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
             />
           </head>
-          <body className="font-inter m-0 p-0 min-h-full">
+          {/* suppressHydrationWarning: browser extensions (Grammarly et al.)
+              inject attributes into <body> before React hydrates; this only
+              silences attribute mismatches on this one element. */}
+          <body suppressHydrationWarning className="font-inter m-0 p-0 min-h-full">
             <ThemeProvider>
               <AuthProvider>
                 <LoginDialogProvider>
