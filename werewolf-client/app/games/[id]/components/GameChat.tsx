@@ -6,7 +6,7 @@ import { humanPlayerTalkWerewolves } from "@/app/api/night-actions";
 import { GAME_STATES, MessageType, RECIPIENT_ALL, RECIPIENT_WEREWOLVES, RECIPIENT_DOCTOR, RECIPIENT_DETECTIVE, RECIPIENT_MANIAC, GameMessage, Game, GameActionResponse, SystemErrorMessage, BotResponseError, GAME_MASTER, ROLE_CONFIGS, GAME_ROLES, FREE_TIER_LIMITS } from "@/app/api/game-models";
 import PlayerAvatar from "@/app/components/PlayerAvatar";
 import { clearGameErrorState } from "@/app/api/game-actions";
-import { getAvatarUrl, getSceneUrl } from "@/app/utils/avatar-utils";
+import { getAvatarUrl, getIllustrationUrl, getSceneUrl } from "@/app/utils/avatar-utils";
 import VotingModal from "./VotingModal";
 import NightActionModal from "./NightActionModal";
 import MentionDropdown from "./MentionDropdown";
@@ -171,12 +171,12 @@ function renderMessageContent(content: string) {
  *  (authed route, a few hundred ms) and a fade-in on load. The fixed aspect
  *  ratio (scene slices are ~3:2) prevents layout shift; a 404 (scene
  *  generation failed) collapses the block entirely. */
-function ChatSceneImage({ src, alt }: { src: string; alt: string }) {
+function ChatSceneImage({ src, alt, standalone = false }: { src: string; alt: string; standalone?: boolean }) {
     const [loaded, setLoaded] = useState(false);
     const [failed, setFailed] = useState(false);
     if (failed) return null;
     return (
-        <span className={`block w-full max-w-[560px] rounded-[var(--radius-md)] border border-[var(--line-1)] mb-2 overflow-hidden aspect-[3/2] ${loaded ? '' : 'animate-pulse bg-[var(--bg-3)]'}`}>
+        <span className={`block w-full max-w-[560px] rounded-[var(--radius-md)] border border-[var(--line-1)] ${standalone ? '' : 'mb-2'} overflow-hidden aspect-[3/2] ${loaded ? '' : 'animate-pulse bg-[var(--bg-3)]'}`}>
             {/* eslint-disable-next-line @next/next/no-img-element -- authed dynamic route; next/image can't optimize it */}
             <img
                 src={src}
@@ -284,6 +284,11 @@ function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcludin
                 break;
             case MessageType.HUMAN_PLAYER_MESSAGE:
                 displayContent = typeof message.msg === 'string' ? message.msg : 'Invalid message format';
+                break;
+            case MessageType.GM_ILLUSTRATION:
+                // Image-only message: the picture renders in the scene slot
+                // below; empty text also hides the speak/delete controls.
+                displayContent = '';
                 break;
             default:
                 if (typeof message.msg === 'string') {
@@ -436,8 +441,15 @@ function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcludin
                     // Thematic scene images: the day scene rides only on the first
                     // GM message of the day (GAME_STORY is reused for votes and
                     // eliminations, so type alone would repeat it); the night scene
-                    // rides on each "night falls" message. Scene generation can fail
-                    // while avatars succeed, so a 404 just hides the image.
+                    // rides on each "night falls" message; GM_ILLUSTRATION messages
+                    // are nothing but their image. Scene generation can fail while
+                    // avatars succeed, so a 404 just hides the image.
+                    if (message.messageType === MessageType.GM_ILLUSTRATION) {
+                        const sceneKey = (message.msg as { sceneKey?: string })?.sceneKey;
+                        return sceneKey ? (
+                            <ChatSceneImage src={getIllustrationUrl(game, sceneKey)} alt="A scene from this night's events" standalone />
+                        ) : null;
+                    }
                     const scene = message.messageType === MessageType.NIGHT_BEGINS ? 'night'
                         : showDayScene ? 'welcome' : null;
                     const sceneUrl = scene ? getSceneUrl(game, scene) : undefined;
@@ -1600,8 +1612,29 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                     </div>
                 ) : (
                     (() => {
-                        const firstGmIndex = messages.findIndex(m => m.authorName === GAME_MASTER);
-                        return messages.map((message, index) => {
+                        // A day always OPENS with the GM's intro story. The night
+                        // illustration generates asynchronously, so by timestamp it
+                        // can land before or after that intro — normalize here:
+                        // any illustration sitting above the day's first GM text
+                        // message is moved to directly below it. Illustrations
+                        // already deeper in the day (e.g. under a game-ending
+                        // night summary) stay where they are.
+                        const firstGmTextIndex = messages.findIndex(m => m.authorName === GAME_MASTER && m.messageType !== MessageType.GM_ILLUSTRATION);
+                        let ordered = messages;
+                        if (firstGmTextIndex > 0) {
+                            const early = messages.slice(0, firstGmTextIndex).filter(m => m.messageType === MessageType.GM_ILLUSTRATION);
+                            if (early.length > 0) {
+                                const rest = messages.filter(m => !early.includes(m));
+                                const anchor = rest.indexOf(messages[firstGmTextIndex]);
+                                ordered = [...rest.slice(0, anchor + 1), ...early, ...rest.slice(anchor + 1)];
+                            }
+                        }
+                        // The day scene rides on the GM's day-opening story even
+                        // when a night illustration follows it — the intro keeps
+                        // its establishing shot, the illustration is its own beat.
+                        // (Recomputed on `ordered`: the reorder above shifts indices.)
+                        const firstGmIndex = ordered.findIndex(m => m.authorName === GAME_MASTER && m.messageType !== MessageType.GM_ILLUSTRATION);
+                        return ordered.map((message, index) => {
                         const fallbackKey = message.timestamp ? `ts-${message.timestamp}-${index}` : `idx-${index}`;
                         const key = message.id ?? fallbackKey;
                         return (

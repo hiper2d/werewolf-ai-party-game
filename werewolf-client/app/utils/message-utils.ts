@@ -50,6 +50,10 @@ export function convertMessageContent(message: GameMessage): string {
         case MessageType.SYSTEM_WARNING:
             const errorMsg = message.msg as { error: string; details: string };
             return `${errorMsg.error}: ${errorMsg.details}`;
+
+        case MessageType.GM_ILLUSTRATION:
+            // Image-only message; the bytes live in the avatars subcollection.
+            return '🖼️ (scene illustration)';
         
         default:
             // Fallback to JSON string for unknown types
@@ -115,6 +119,12 @@ export function convertToAIMessages(currentBotName: string, messages: GameMessag
     let lastMessageHash: string | null = null;
     
     messages.forEach(((message, index) => {
+        // Chat illustrations are for the human's eyes only: bots must never see
+        // them (the GM branch below would stringify the payload into history).
+        if (message.messageType === MessageType.GM_ILLUSTRATION) {
+            return;
+        }
+
         // Calculate hash for current message
         const currentHash = calculateMessageHash(message);
         

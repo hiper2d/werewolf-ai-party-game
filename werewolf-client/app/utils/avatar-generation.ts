@@ -68,22 +68,29 @@ No text anywhere except the nameplates.`;
 }
 
 
-interface GeneratedImage {
+export interface GeneratedImage {
     buffer: Buffer;
     costUSD: number;
 }
 
 /** One image-model call. Cost is per IMAGE, not per pixel (a 1K and a 2K image
  * both bill ~1120 output tokens), so fewer calls — not lower resolution — is
- * what minimizes cost. */
-async function generateImage(apiKey: string, prompt: string, aspectRatio: string): Promise<GeneratedImage> {
+ * what minimizes cost. Optional labeled reference JPEGs (the game's welcome
+ * scene, character portraits) anchor mid-game illustrations to the established
+ * style, location and faces. */
+export async function generateImage(apiKey: string, prompt: string, aspectRatio: string, opts?: {references?: {label: string; jpeg: Buffer}[]; imageSize?: '1K' | '2K'}): Promise<GeneratedImage> {
+    const input: any[] = [{type: "text", text: prompt}];
+    for (const ref of opts?.references ?? []) {
+        input.push({type: "text", text: ref.label});
+        input.push({type: "image", mime_type: "image/jpeg", data: ref.jpeg.toString('base64')});
+    }
     const res = await fetch("https://generativelanguage.googleapis.com/v1beta/interactions", {
         method: "POST",
         headers: {"Content-Type": "application/json", "x-goog-api-key": apiKey},
         body: JSON.stringify({
             model: AVATAR_MODEL,
-            input: [{type: "text", text: prompt}],
-            response_format: {type: "image", mime_type: "image/jpeg", aspect_ratio: aspectRatio, image_size: "2K"},
+            input,
+            response_format: {type: "image", mime_type: "image/jpeg", aspect_ratio: aspectRatio, image_size: opts?.imageSize ?? "2K"},
         }),
     });
     if (!res.ok) {
@@ -327,6 +334,9 @@ export async function runAvatarGeneration(gameId: string, userEmail: string): Pr
             avatarsStatus: 'ready',
             avatarsVersion: Date.now(),
             totalGameCost: firestore.FieldValue.increment(costUSD),
+            // Image spending is tracked separately from LLM calls so its real
+            // cost stays visible (totalImagesCost is a subset of totalGameCost).
+            totalImagesCost: firestore.FieldValue.increment(costUSD),
         });
         await batch.commit();
 

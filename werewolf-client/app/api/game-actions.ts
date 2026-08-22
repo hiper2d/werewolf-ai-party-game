@@ -1315,6 +1315,7 @@ function gameFromFirestore(id: string, data: any): Game {
         ownerEmail: data.ownerEmail || '', // Empty string for legacy games without owner
         createdAt: data.createdAt || extractTimestampFromGameId(id), // Use stored timestamp or extract from ID for existing games
         totalGameCost: data.totalGameCost || 0,
+        totalImagesCost: data.totalImagesCost || 0,
         gameMasterTokenUsage: data.gameMasterTokenUsage || data.tokenUsage?.gameMasterUsage || null,
         // Stray legacy values (e.g. the retired 'api' tier) read as free so the game stays openable.
         createdWithTier: data.createdWithTier === 'paid' ? 'paid' : 'free',

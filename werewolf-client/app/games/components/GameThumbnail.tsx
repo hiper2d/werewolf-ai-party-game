@@ -14,12 +14,24 @@ export default function GameThumbnail({ game, locked = false }: { game: Game; lo
     const [failed, setFailed] = useState(false);
     const [loaded, setLoaded] = useState(false);
     const src = getSceneUrl(game, 'welcome');
+
+    // A cached image can finish (or fail) before hydration attaches the
+    // onLoad/onError handlers — the load event then never reaches React and
+    // the thumbnail would sit under the skeleton at opacity-0 forever. The
+    // callback ref checks the element's already-settled state on attach.
+    const imgRef = (el: HTMLImageElement | null) => {
+        if (!el || !el.complete) return;
+        if (el.naturalWidth > 0) setLoaded(true);
+        else setFailed(true);
+    };
+
     if (!src || failed) return null;
 
     return (
         <div className={`flex-none w-24 h-16 sm:w-36 sm:h-24 rounded-[var(--radius-md)] overflow-hidden border border-[var(--line-1)] ${loaded ? '' : 'animate-pulse bg-[var(--bg-3)]'} ${locked ? 'grayscale' : ''}`}>
             {/* eslint-disable-next-line @next/next/no-img-element -- authed dynamic route; next/image can't optimize it */}
             <img
+                ref={imgRef}
                 src={src}
                 alt={`${game.theme} scene`}
                 loading="lazy"

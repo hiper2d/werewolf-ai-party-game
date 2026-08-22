@@ -38,6 +38,8 @@ import { BOT_DAY_SUMMARY_PROMPT, BOT_SYSTEM_PROMPT } from "@/app/ai/prompts/bot-
 import { generateBotContextSection, generateWerewolfTeammatesSection, getAlivePlayerNames, getEffectiveModel } from "@/app/utils/bot-utils";
 import { format } from "@/app/ai/prompts/utils";
 import { convertToAIMessages, convertMessageContent, formatMessagesForNightSummary } from "@/app/utils/message-utils";
+import { after } from "next/server";
+import { midGameImagesEnabled, runNightIllustration } from "@/app/utils/illustration-generation";
 import { checkGameEndConditions } from "@/app/utils/game-utils";
 import { getProviderSignatureFields } from "@/app/ai/ai-models";
 import { GameEndChecker } from "@/app/utils/game-end-checker";
@@ -226,6 +228,24 @@ async function endNightWithResults(gameId: string, game: Game): Promise<GameActi
 
     // Save the Game Master message
     const savedNightSummaryMsg = await addMessageToChatAndSaveToDb(gameMessage, gameId);
+
+    // Eventful nights (a death, or a kill foiled by the doctor) get ONE
+    // illustration posted to the chat as its own GM_ILLUSTRATION message —
+    // generated after the response is sent so night pacing never waits on the
+    // image model. Quiet nights aren't worth the $0.07. It posts into the NEXT
+    // day so the image opens the morning discussion (unless the game just
+    // ended — then there is no next day and it stays under the final summary).
+    if ((nightState.deaths.length > 0 || werewolfKillPrevented) && midGameImagesEnabled(game)) {
+        const illustrationUserEmail = session.user.email;
+        const illustrationPostDay = endGameCheck.isEnded ? game.currentDay : game.currentDay + 1;
+        try {
+            after(() => runNightIllustration(gameId, illustrationUserEmail, game.currentDay, finalNightResultsMessage, savedNightSummaryMsg.id!, illustrationPostDay).catch(error =>
+                logger.warn(`Night illustration kickoff failed for ${gameId}`, { gameId, error: error.message })
+            ));
+        } catch {
+            // Outside a request scope (unit tests, scripts): no illustration.
+        }
+    }
 
     // Build chronological night events following action order: Maniac(0) → Werewolves(1) → Doctor(2) → Detective(3)
     const nightEvents: Array<{ order: number; role: string; description: string }> = [];
@@ -1446,6 +1466,7 @@ function gameFromFirestore(id: string, data: any): Game {
         resolvedNightState: data.resolvedNightState || null,
         avatarsStatus: data.avatarsStatus, // absent on games from before themed avatars
         avatarsVersion: data.avatarsVersion,
+        totalImagesCost: data.totalImagesCost || 0,
     };
 }
 

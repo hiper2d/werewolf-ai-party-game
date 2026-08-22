@@ -1047,9 +1047,15 @@ function GamePageContent({
                 {(descClamps || (game.totalGameCost !== undefined && game.totalGameCost > 0)) && (
                     <div className="flex items-center justify-between gap-2">
                         {game.totalGameCost !== undefined && game.totalGameCost > 0 ? (
-                            <div className="flex items-center gap-1.5 text-[11px] font-mono text-[var(--fg-2)]">
+                            <div
+                                className="flex items-center gap-1.5 text-[11px] font-mono text-[var(--fg-2)]"
+                                title={game.totalImagesCost ? `incl. $${game.totalImagesCost.toFixed(4)} on images` : undefined}
+                            >
                                 <span className="w-1.5 h-1.5 rounded-full bg-[var(--tag-fast-text)]"></span>
                                 ${game.totalGameCost.toFixed(4)}
+                                {(game.totalImagesCost ?? 0) > 0 && (
+                                    <span className="text-[var(--fg-3)]">(🖼️ ${game.totalImagesCost!.toFixed(4)})</span>
+                                )}
                             </div>
                         ) : <span />}
                         {descClamps && (

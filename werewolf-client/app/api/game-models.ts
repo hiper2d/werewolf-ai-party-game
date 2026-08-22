@@ -258,6 +258,7 @@ export interface Game {
     dayActivityCounter?: Record<string, number>; // Track number of messages each bot has sent during current day
     gameMasterTokenUsage?: TokenUsage; // Track token usage for the Game Master only
     totalGameCost?: number; // Total cost in USD for all AI calls in this game (bots + game master)
+    totalImagesCost?: number; // Portion of totalGameCost spent on image generation (avatars, scenes, mid-game illustrations)
     createdAt?: number; // UTC timestamp when the game was created
     expireAt?: any; // Firestore Timestamp for TTL auto-deletion (30 days after creation)
     ownerEmail: string; // Email of the user who created this game
@@ -661,6 +662,7 @@ export enum MessageType {
     SYSTEM_ERROR = 'SYSTEM_ERROR',
     SYSTEM_WARNING = 'SYSTEM_WARNING',
     GM_BOT_SELECTION = 'GM_BOT_SELECTION', // Debug-only: GM's reasoning for which bots to select next
+    GM_ILLUSTRATION = 'GM_ILLUSTRATION', // Image-only GM chat message ({sceneKey}); invisible to bots, bytes live in the avatars subcollection
 }
 
 export class BotAnswer {
@@ -743,6 +745,12 @@ export const GAME_MASTER = 'Game Master';
 export const AVATAR_GM_KEY = 'game-master';
 export const SCENE_WELCOME_KEY = 'scene-welcome'; // shown with the GM's opening story message
 export const SCENE_NIGHT_KEY = 'scene-night';     // shown with each "night begins" message
+
+// Mid-game illustration docs share the avatars subcollection. Dashed keys can
+// never collide with player names (those are sanitized to [a-zA-Z0-9]).
+export function nightIllustrationKey(day: number): string {
+    return `illustration-night-${day}`;
+}
 export const RECIPIENT_ALL = 'ALL';
 export const RECIPIENT_WEREWOLVES = 'WEREWOLVES';
 export const RECIPIENT_DOCTOR = 'DOCTOR';

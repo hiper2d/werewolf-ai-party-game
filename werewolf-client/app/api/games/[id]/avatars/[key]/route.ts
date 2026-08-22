@@ -21,7 +21,9 @@ export async function GET(request: NextRequest, {params}: {params: Promise<{id: 
     await ensureUserCanAccessGame(gameId, session.user.email);
 
     const doc = await db.collection('games').doc(gameId).collection('avatars').doc(key).get();
-    if (!doc.exists) {
+    // Docs without `data` are in-flight claim placeholders (mid-game
+    // illustrations write those before the image bytes) — treat as absent.
+    if (!doc.exists || !(doc.data() as any)?.data) {
         return NextResponse.json({error: 'Avatar not found'}, {status: 404});
     }
     const {data, mime} = doc.data() as {data: string, mime: string};
