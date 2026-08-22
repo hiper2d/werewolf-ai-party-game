@@ -359,6 +359,80 @@ html {
   opacity: 0.15;
 }
 
+/* ── Ambient phase-reactive fog (design handoff "Option D") ──────────
+   Two drifting radial-gradient blobs over the scene backdrop; palette is
+   bound to the game phase (cold blue at night, warm amber by day) via the
+   `fog-day` class on the container. Pure CSS, no assets. */
+.fogfield {
+  position: absolute;
+  inset: -20%;
+  pointer-events: none;
+}
+.fogfield .fog {
+  position: absolute;
+  inset: 0;
+  background-repeat: no-repeat;
+  background-size: 70% 60%, 55% 45%;
+  background-position: 10% 30%, 70% 70%;
+  background-image:
+    radial-gradient(closest-side, oklch(70% 0.05 250 / 0.10), transparent 70%),
+    radial-gradient(closest-side, oklch(70% 0.05 250 / 0.08), transparent 70%);
+  animation: fogdrift 26s ease-in-out infinite alternate;
+}
+.fogfield .fog + .fog {
+  animation-duration: 38s;
+  animation-direction: alternate-reverse;
+  opacity: 0.7;
+}
+.fogfield.fog-day .fog {
+  background-image:
+    radial-gradient(closest-side, oklch(80% 0.09 75 / 0.13), transparent 70%),
+    radial-gradient(closest-side, oklch(80% 0.09 75 / 0.09), transparent 70%);
+}
+.fog-horizon {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 45%;
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent, oklch(60% 0.06 250 / 0.10));
+}
+.fog-day ~ .fog-horizon,
+.fogfield.fog-day + .fog-horizon {
+  background: linear-gradient(180deg, transparent, oklch(70% 0.10 70 / 0.10));
+}
+[data-theme='light'] .fogfield .fog { opacity: 0.5; }
+[data-theme='light'] .fogfield .fog + .fog { opacity: 0.35; }
+@keyframes fogdrift {
+  from { transform: translate3d(-4%, 2%, 0) scale(1); }
+  to   { transform: translate3d(6%, -3%, 0) scale(1.12); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fogfield .fog { animation: none; }
+}
+
+/* ── Cinematic Speaker Mode ─────────────────────────────────────────── */
+@keyframes cine-card-in {
+  from { opacity: 0; transform: translateY(18px) scale(0.96); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes cine-card-swap {
+  from { opacity: 0; transform: translateX(24px) scale(0.97); }
+  to   { opacity: 1; transform: none; }
+}
+.cine-card-enter { animation: cine-card-in 480ms cubic-bezier(.2,.8,.25,1); }
+.cine-card-swap  { animation: cine-card-swap 380ms cubic-bezier(.2,.8,.25,1); }
+@keyframes cine-caret-blink { 50% { opacity: 0; } }
+.cine-caret {
+  display: inline-block;
+  width: 8px; height: 19px;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: var(--accent);
+  animation: cine-caret-blink 1s steps(1) infinite;
+}
+/* Roleplay *asterisk* text inside the bubble */
+.cine-speech em { color: var(--fg-2); font-style: italic; }
+
 [data-theme='light'] .logo-backdrop {
   background: radial-gradient(circle, #1e293b 35%, rgba(247, 248, 250, 0) 70%);
   padding: 0.75rem;

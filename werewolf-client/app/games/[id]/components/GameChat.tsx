@@ -11,6 +11,7 @@ import VotingModal from "./VotingModal";
 import NightActionModal from "./NightActionModal";
 import MentionDropdown from "./MentionDropdown";
 import ConfirmModal from "./ConfirmModal";
+import CinematicMode, { SPEECH_TYPES } from "./CinematicMode";
 import { ttsService } from "@/app/services/tts-service";
 import { sttService } from "@/app/services/stt-service";
 import { getDefaultVoiceProvider } from "@/app/ai/voice-config";
@@ -491,6 +492,15 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
         [runGameAction]
     );
     const [messages, setMessages] = useState<GameMessage[]>([]);
+    const [cinematicOpen, setCinematicOpen] = useState(false);
+    const [cinematicStartId, setCinematicStartId] = useState<string | undefined>(undefined);
+    // Ids already in the chat when we last looked — arrivals beyond this set
+    // are "someone just spoke" events that auto-open cinematic mode. Starts
+    // null so the initial day load never triggers it.
+    const seenMsgIdsRef = useRef<Set<string> | null>(null);
+    // Closing the overlay mid-burst means "let me read the chat" — don't pop
+    // it back up until the current speaking burst is over.
+    const cinematicDismissedRef = useRef(false);
     const [newMessage, setNewMessage] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
@@ -554,6 +564,37 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
             message.authorName !== GAME_MASTER
         ).length;
     }, [messages, selectedDay]);
+
+    // Auto-open cinematic mode when a character speaks: any newly arrived
+    // speech message not authored by the human pops the card+bubble overlay,
+    // starting at that line. While the overlay is open, CinematicMode itself
+    // follows the live feed.
+    useEffect(() => {
+        // While a day's history is (re)loading, the list is replaced wholesale —
+        // that's not "someone spoke". Re-baseline and wait for real arrivals.
+        if (isLoadingMessages) { seenMsgIdsRef.current = null; return; }
+        if (seenMsgIdsRef.current === null) {
+            seenMsgIdsRef.current = new Set(messages.map(m => m.id).filter(Boolean) as string[]);
+            return;
+        }
+        const seen = seenMsgIdsRef.current;
+        const fresh = messages.filter(m => m.id && !seen.has(m.id));
+        fresh.forEach(m => seen.add(m.id!));
+        if (cinematicOpen || cinematicDismissedRef.current || !isCurrentDaySelected) return;
+        const spoken = fresh.find(m =>
+            SPEECH_TYPES.has(m.messageType as MessageType) &&
+            m.authorName !== game.humanPlayerName
+        );
+        if (spoken) {
+            setCinematicStartId(spoken.id!);
+            setCinematicOpen(true);
+        }
+    }, [messages, isLoadingMessages, cinematicOpen, isCurrentDaySelected, game.humanPlayerName]);
+
+    // A finished speaking burst lifts the "stop popping up" suppression.
+    useEffect(() => {
+        if (game.gameStateProcessQueue.length === 0) cinematicDismissedRef.current = false;
+    }, [game.gameStateProcessQueue.length]);
 
     // Get mention candidates
     const mentionCandidates = useMemo(() => {
@@ -1559,6 +1600,16 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                     </span>
                 </div>
                 <div className="flex items-center gap-3 max-[720px]:gap-2 max-[720px]:flex-shrink-0">
+                    <button
+                        type="button"
+                        onClick={() => { setCinematicStartId(undefined); setCinematicOpen(true); }}
+                        disabled={messages.length === 0}
+                        title="Play the last messages as a scene"
+                        className="flex items-center gap-1.5 text-[13px] px-3 py-1.5 rounded-full border border-[var(--accent-line)] bg-[var(--accent-soft)] text-[var(--fg-0)] hover:brightness-110 transition-all duration-[120ms] disabled:opacity-40 disabled:cursor-not-allowed max-[720px]:text-[12px] max-[720px]:px-2 max-[720px]:py-1"
+                    >
+                        <svg width="10" height="10" viewBox="0 0 12 12" fill="currentColor"><path d="M2 1.5v9l8-4.5z"/></svg>
+                        <span className="max-[720px]:hidden">Cinematic</span>
+                    </button>
                     {shouldShowMessageCount && (
                         <span className="msg-count text-[12px] font-mono text-[var(--fg-2)] max-[720px]:hidden">
                             {messageCountLabel}
@@ -1994,6 +2045,20 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                 onConfirm={confirmModal.onConfirm}
                 onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
             />
+            {cinematicOpen && (
+                <CinematicMode
+                    game={game}
+                    messages={messages}
+                    startMessageId={cinematicStartId}
+                    onClose={() => {
+                        // Manual close mid-burst = "let me read the chat":
+                        // suppress auto-reopen until this burst finishes.
+                        if (game.gameStateProcessQueue.length > 0) cinematicDismissedRef.current = true;
+                        setCinematicOpen(false);
+                        setCinematicStartId(undefined);
+                    }}
+                />
+            )}
         </div>
     );
 }

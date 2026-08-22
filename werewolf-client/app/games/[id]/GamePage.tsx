@@ -1329,6 +1329,9 @@ function GamePageContent({
     );
 
     const pageBackdropUrl = getSceneUrl(game, 'welcome');
+    const isNightPhase = game.gameState === GAME_STATES.NIGHT
+        || game.gameState === GAME_STATES.NIGHT_RESULTS
+        || game.gameState === GAME_STATES.NIGHT_IMPRESSION;
 
     return (
         <div className="flex flex-col lg:flex-row text-[var(--fg-0)] h-full">
@@ -1366,26 +1369,35 @@ function GamePageContent({
             </div>
 
             {/* Center - Chat */}
-            <div className="relative isolate flex-1 min-w-0 min-h-0 flex flex-col lg:px-4">
+            <div className="relative isolate flex-1 min-w-0 min-h-0 flex flex-col lg:px-7">
                 {/* Thematic backdrop behind the CHAT ONLY: the game's welcome
-                    scene, dimmed and blurred; side panels keep the plain
-                    background. Absent for legacy games (no generated art).
-                    `isolate` keeps the -z layer inside this stacking context,
-                    above the app background but below the chat content. */}
-                {pageBackdropUrl && (
-                    <div aria-hidden className="absolute inset-0 -z-10 pointer-events-none overflow-hidden">
-                        {/* eslint-disable-next-line @next/next/no-img-element -- authed dynamic route */}
-                        <img
-                            src={pageBackdropUrl}
-                            alt=""
-                            className="game-backdrop-img w-full h-full object-cover blur-[5px] scale-105"
-                        />
-                        <div
-                            className="absolute inset-0"
-                            style={{background: 'linear-gradient(to bottom, color-mix(in srgb, var(--bg-0) 45%, transparent), transparent 30%, transparent 65%, color-mix(in srgb, var(--bg-0) 55%, transparent))'}}
-                        />
+                    scene (when generated) with phase-reactive drifting fog on
+                    top; side panels keep the plain background. `isolate` keeps
+                    the -z layer inside this stacking context, above the app
+                    background but below the chat content. */}
+                {/* Inset horizontally on desktop so the image doesn't touch the
+                    side panels; rounded to read as a framed stage. */}
+                <div aria-hidden className="absolute inset-y-0 inset-x-0 lg:inset-x-4 -z-10 pointer-events-none overflow-hidden lg:rounded-[var(--radius-xl)]">
+                    {pageBackdropUrl && (
+                        <>
+                            {/* eslint-disable-next-line @next/next/no-img-element -- authed dynamic route */}
+                            <img
+                                src={pageBackdropUrl}
+                                alt=""
+                                className="game-backdrop-img w-full h-full object-cover blur-[5px] scale-105"
+                            />
+                            <div
+                                className="absolute inset-0"
+                                style={{background: 'linear-gradient(to bottom, color-mix(in srgb, var(--bg-0) 45%, transparent), transparent 30%, transparent 65%, color-mix(in srgb, var(--bg-0) 55%, transparent))'}}
+                            />
+                        </>
+                    )}
+                    <div className={`fogfield ${isNightPhase ? '' : 'fog-day'}`}>
+                        <div className="fog" />
+                        <div className="fog" />
                     </div>
-                )}
+                    <div className="fog-horizon" />
+                </div>
                 <GameChat
                     gameId={game.id}
                     game={game}
