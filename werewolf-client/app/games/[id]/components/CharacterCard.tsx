@@ -49,7 +49,7 @@ export default function CharacterCard({ game, name, onClose }: CharacterCardProp
 
     return (
         <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-[2px]"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay)] backdrop-blur-[2px]"
             onClick={onClose}
         >
             <div
@@ -66,7 +66,7 @@ export default function CharacterCard({ game, name, onClose }: CharacterCardProp
                         </div>
                     )}
                     <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-[var(--bg-1)] to-transparent" />
-                    <div className="absolute left-4 bottom-2 text-[24px] font-bold text-white [text-shadow:0_2px_8px_rgba(0,0,0,0.9)]">
+                    <div className="card-plate-name absolute left-4 bottom-2 text-[24px] font-bold">
                         {name}{isDead ? ' ✝' : ''}
                     </div>
                     <button

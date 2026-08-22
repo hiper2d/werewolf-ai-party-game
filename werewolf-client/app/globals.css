@@ -193,6 +193,16 @@ html {
   --accent-strong: oklch(62% 0.10 230);
   --on-accent: #ffffff;
   --overlay: rgba(0,0,0,0.55);
+  /* Cinematic Speaker Mode */
+  --cine-scrim: radial-gradient(120% 100% at 50% 45%, rgba(5,6,8,0.40) 0%, rgba(5,6,8,0.88) 100%);
+  --cine-panel: rgba(18,21,27,0.92);
+  --cine-panel-solid: #12151b;
+  --cine-panel-hover: rgba(26,31,39,0.94);
+  --cine-chip: rgba(11,12,15,0.80);
+  --cine-plate: linear-gradient(180deg, transparent, rgba(8,10,13,0.90) 45%, #080a0d);
+  --cine-plate-fg: #ffffff;
+  --cine-card-shadow: 0 40px 90px -20px rgba(0,0,0,0.80), 0 0 0 1px rgba(255,255,255,0.04) inset;
+  --cine-panel-shadow: 0 30px 70px -30px rgba(0,0,0,0.85);
 }
 
 [data-theme='light'] {
@@ -205,6 +215,16 @@ html {
   --accent-strong: oklch(48% 0.13 235);
   --on-accent: #ffffff;
   --overlay: rgba(15,20,30,0.30);
+  /* Cinematic Speaker Mode — light: pale panels, softer scrim, real shadows */
+  --cine-scrim: radial-gradient(120% 100% at 50% 45%, rgba(15,20,30,0.22) 0%, rgba(15,20,30,0.58) 100%);
+  --cine-panel: rgba(255,255,255,0.94);
+  --cine-panel-solid: #ffffff;
+  --cine-panel-hover: rgba(243,244,246,0.96);
+  --cine-chip: rgba(255,255,255,0.86);
+  --cine-plate: linear-gradient(180deg, transparent, rgba(255,255,255,0.90) 48%, #ffffff);
+  --cine-plate-fg: var(--fg-0);
+  --cine-card-shadow: 0 24px 60px -20px rgba(0,0,0,0.28), 0 0 0 1px rgba(0,0,0,0.05) inset;
+  --cine-panel-shadow: 0 20px 48px -26px rgba(0,0,0,0.25);
 }
 
 /* ── Speed Tag Colors (semantic, theme-independent) ─────────────── */
@@ -353,10 +373,14 @@ html {
    light theme keeps it fainter — a dark night scene at full presence turns a
    white page muddy. */
 .game-backdrop-img {
-  opacity: 0.30;
+  opacity: 0.45;
+  filter: blur(5px) brightness(1.25) saturate(1.05);
 }
 [data-theme='light'] .game-backdrop-img {
-  opacity: 0.15;
+  /* Scenes are mostly night-dark art: lift them so they read as a bright
+     wash on the light page instead of a gray smudge. */
+  opacity: 0.4;
+  filter: blur(5px) brightness(1.85) saturate(1.2);
 }
 
 /* ── Ambient phase-reactive fog (design handoff "Option D") ──────────
@@ -432,6 +456,30 @@ html {
 }
 /* Roleplay *asterisk* text inside the bubble */
 .cine-speech em { color: var(--fg-2); font-style: italic; }
+
+/* Day phase tag in the chat header. The warm amber reads only on dark —
+   light theme needs a much darker ink on the same warm tint. */
+.phase-tag-day {
+  background: oklch(80% 0.10 85 / 0.10);
+  border: 1px solid oklch(80% 0.10 85 / 0.35);
+  color: oklch(82% 0.10 85);
+}
+[data-theme='light'] .phase-tag-day {
+  background: oklch(75% 0.10 85 / 0.18);
+  border-color: oklch(50% 0.10 85 / 0.5);
+  color: oklch(42% 0.09 80);
+}
+
+/* Name over a portrait card's bottom plate (CharacterCard, RoleCard). The
+   plate fades to --bg-1, so the name must be --fg-0 in both themes; the dark
+   halo only makes sense over the dark plate. */
+.card-plate-name {
+  color: var(--fg-0);
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9);
+}
+[data-theme='light'] .card-plate-name {
+  text-shadow: none;
+}
 
 [data-theme='light'] .logo-backdrop {
   background: radial-gradient(circle, #1e293b 35%, rgba(247, 248, 250, 0) 70%);

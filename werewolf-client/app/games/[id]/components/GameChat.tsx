@@ -1590,9 +1590,9 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
 
     return (
         <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-            <div className="flex items-center justify-between mb-3 flex-shrink-0 px-1 max-[720px]:gap-2 max-[720px]:px-3 max-[720px]:py-[10px]">
+            <div className="flex items-center justify-between mb-3 pt-2 flex-shrink-0 px-1 lg:px-7 max-[720px]:gap-2 max-[720px]:px-3 max-[720px]:py-[10px]">
                 <div className="flex items-center gap-2 max-[720px]:flex-1 max-[720px]:min-w-0">
-                    <span className="text-[10px] font-mono font-semibold uppercase tracking-[0.06em] px-2 py-1 rounded-[var(--radius-sm)] bg-[oklch(80%_0.10_85_/_0.10)] border border-[oklch(80%_0.10_85_/_0.35)] text-[oklch(82%_0.10_85)] max-[720px]:text-[9px] max-[720px]:px-1.5 max-[720px]:py-0.5 max-[720px]:tracking-[0.05em] max-[720px]:whitespace-nowrap max-[720px]:flex-shrink-0">
+                    <span className="phase-tag-day text-[10px] font-mono font-semibold uppercase tracking-[0.06em] px-2 py-1 rounded-[var(--radius-sm)] max-[720px]:text-[9px] max-[720px]:px-1.5 max-[720px]:py-0.5 max-[720px]:tracking-[0.05em] max-[720px]:whitespace-nowrap max-[720px]:flex-shrink-0">
                         Day {game.currentDay}
                     </span>
                     <span className="text-[16px] font-semibold text-[var(--fg-0)] max-[720px]:text-[14px] max-[720px]:flex-1 max-[720px]:min-w-0 max-[720px]:truncate">
@@ -1646,13 +1646,13 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                 </div>
             </div>
             {!isCurrentDaySelected && (
-                <div className="mb-3 text-xs text-[var(--fg-2)] italic">
+                <div className="mb-3 text-xs text-[var(--fg-2)] italic lg:px-7">
                     Viewing Day {selectedDay} history (read-only)
                 </div>
             )}
             {/* Error is shown inline at the bottom of the chat messages */}
             {/* Messages area - grows to fill space, scrolls internally */}
-            <div ref={messagesContainerRef} className="flex-1 mb-3 px-3 py-2 overflow-y-auto">
+            <div ref={messagesContainerRef} className="flex-1 mb-3 px-3 lg:px-7 py-2 overflow-y-auto">
                 {isLoadingMessages ? (
                     <div className="text-center text-[var(--fg-2)] text-[13px] py-4">
                         Loading Day {selectedDay}...
@@ -1713,26 +1713,8 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                         Deleting messages...
                     </div>
                 )}
-                {(isProcessing || isExternalLoading || (game.gameState === GAME_STATES.VOTE && game.gameStateProcessQueue.length > 0 && !game.errorState) || (game.gameState === GAME_STATES.WELCOME && game.gameStateParamQueue.length > 0 && !game.errorState) || (game.gameState === GAME_STATES.NIGHT_IMPRESSION && !game.errorState)) && !isLoadingMessages && (
-                    <div className="flex items-center gap-2 py-2 px-3">
-                        <div className="flex gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-bounce" style={{ animationDelay: '0ms' }}></span>
-                            <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-bounce" style={{ animationDelay: '150ms' }}></span>
-                            <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-bounce" style={{ animationDelay: '300ms' }}></span>
-                        </div>
-                        <span className="text-[12px] italic text-[var(--fg-2)]">
-                            {game.gameState === GAME_STATES.VOTE && game.gameStateProcessQueue.length > 0
-                                ? `${game.gameStateProcessQueue[0]} is voting...`
-                                : game.gameState === GAME_STATES.WELCOME && game.gameStateParamQueue.length > 0
-                                    ? `${game.gameStateParamQueue[0]} is thinking...`
-                                    : game.gameState === GAME_STATES.NIGHT_IMPRESSION
-                                        ? 'Starting the day...'
-                                        : game.gameStateProcessQueue.length > 0
-                                            ? `${game.gameStateProcessQueue[0]} is thinking...`
-                                            : 'Processing...'}
-                        </span>
-                    </div>
-                )}
+                {/* In-stream activity indicator removed: the avatar chip above
+                    the composer is the single "someone is busy" signal now. */}
                 {!isProcessing && game.errorState && !isLoadingMessages && (() => {
                     const failedBot = game.gameState === GAME_STATES.WELCOME
                         ? game.gameStateParamQueue[0]
@@ -1840,45 +1822,63 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
 
             {/* Game controls bar — always visible outside the composer */}
             {gameControls && (
-                <div className="flex-shrink-0 flex items-center gap-2 px-1 py-1.5">
+                <div className="flex-shrink-0 flex items-center gap-2 px-1 lg:px-7 py-1.5">
                     {gameControls}
                 </div>
             )}
 
-            {/* Currently-thinking bot: first name in the process queue while bots
-                are talking. Shows the themed avatar (when generated) with a pulse. */}
-            {game.gameStateProcessQueue.length > 0 &&
-                (game.gameState === GAME_STATES.DAY_DISCUSSION || game.gameState === GAME_STATES.AFTER_GAME_DISCUSSION) && (
-                <div className="flex-shrink-0 px-1 pb-1">
-                    <div className="inline-flex items-center gap-2.5 rounded-full bg-[var(--bg-2)] border border-[var(--line-2)] pl-1 pr-3.5 py-1 shadow-subtle">
-                        <span className="animate-pulse rounded-full">
-                            <PlayerAvatar
-                                name={game.gameStateProcessQueue[0]}
-                                size={28}
-                                avatarUrl={getAvatarUrl(game, game.gameStateProcessQueue[0])}
-                            />
-                        </span>
-                        <span className="text-[13px] text-[var(--fg-1)]">
-                            <span className="font-semibold text-[var(--fg-0)]">{game.gameStateProcessQueue[0]}</span> is thinking
-                        </span>
-                        <span className="inline-flex gap-[3px]">
-                            {[0, 1, 2].map(i => (
-                                <span
-                                    key={i}
-                                    className="w-[5px] h-[5px] rounded-full bg-[var(--accent)] animate-bounce"
-                                    style={{ animationDelay: `${i * 0.18}s` }}
-                                />
-                            ))}
-                        </span>
+            {/* Activity chip — the ONLY "someone is busy" indicator. Shows the
+                current actor with their themed avatar; covers thinking, voting,
+                welcome intros and day-start processing. */}
+            {(() => {
+                if (game.errorState) return null;
+                let name: string | null = null;
+                let label: string | null = null;
+                if (game.gameState === GAME_STATES.VOTE && game.gameStateProcessQueue.length > 0) {
+                    name = game.gameStateProcessQueue[0]; label = 'is voting';
+                } else if (game.gameState === GAME_STATES.WELCOME && game.gameStateParamQueue.length > 0) {
+                    name = game.gameStateParamQueue[0]; label = 'is thinking';
+                } else if (game.gameState === GAME_STATES.NIGHT_IMPRESSION) {
+                    label = 'Starting the day';
+                } else if ((game.gameState === GAME_STATES.DAY_DISCUSSION || game.gameState === GAME_STATES.AFTER_GAME_DISCUSSION) && game.gameStateProcessQueue.length > 0) {
+                    name = game.gameStateProcessQueue[0]; label = 'is thinking';
+                } else if (isProcessing || isExternalLoading) {
+                    label = 'Processing';
+                }
+                if (!label) return null;
+                return (
+                    <div className="flex-shrink-0 px-1 lg:px-7 pb-1">
+                        <div className={`inline-flex items-center gap-2.5 rounded-full bg-[var(--bg-2)] border border-[var(--line-2)] ${name ? 'pl-1 py-1' : 'pl-3 py-1.5'} pr-3.5 shadow-subtle`}>
+                            {name ? (
+                                <span className="animate-pulse rounded-full">
+                                    <PlayerAvatar name={name} size={28} avatarUrl={getAvatarUrl(game, name)} />
+                                </span>
+                            ) : (
+                                <span className="w-2 h-2 rounded-full bg-[var(--accent)] animate-pulse flex-none" />
+                            )}
+                            <span className="text-[13px] text-[var(--fg-1)]">
+                                {name && <><span className="font-semibold text-[var(--fg-0)]">{name}</span>{' '}</>}
+                                {label}
+                            </span>
+                            <span className="inline-flex gap-[3px]">
+                                {[0, 1, 2].map(i => (
+                                    <span
+                                        key={i}
+                                        className="w-[5px] h-[5px] rounded-full bg-[var(--accent)] animate-bounce"
+                                        style={{ animationDelay: `${i * 0.18}s` }}
+                                    />
+                                ))}
+                            </span>
+                        </div>
                     </div>
-                </div>
-            )}
+                );
+            })()}
 
             {/* Themed art generates in the background for ~30s after game
                 creation; without this chip players think images are missing.
                 Styled to match the "is thinking" chip above. */}
             {(game.avatarsStatus === 'pending' || game.avatarsStatus === 'generating') && (
-                <div className="flex-shrink-0 px-1 pb-1">
+                <div className="flex-shrink-0 px-1 lg:px-7 pb-1">
                     <div className="inline-flex items-center gap-2.5 rounded-full bg-[var(--bg-2)] border border-[var(--line-2)] pl-3 pr-3.5 py-1.5 shadow-subtle">
                         <span className="w-2 h-2 rounded-full bg-[var(--accent)] animate-pulse flex-none" />
                         <span className="text-[13px] text-[var(--fg-1)]">Images are loading</span>
@@ -1895,10 +1895,16 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                 </div>
             )}
 
-            {/* Input area */}
-            <form ref={composerRef} onSubmit={sendMessage} className="flex-shrink-0 z-10 pt-1">
+            {/* Input area — a translucent strip over the ambient backdrop, per
+                the design's .composer-wrap (border-top, blur, bg-0 at 78%). */}
+            <form
+                ref={composerRef}
+                onSubmit={sendMessage}
+                className="flex-shrink-0 z-10 mt-1 lg:px-7 pt-3 pb-2 border-t border-[var(--line-1)] backdrop-blur-[10px]"
+                style={{background: 'color-mix(in oklch, var(--bg-0) 78%, transparent)'}}
+            >
                 <div
-                    className={`relative rounded-[var(--radius-lg)] bg-[var(--bg-2)] border transition-all duration-200 ${!isInputEnabled() ? 'opacity-50 border-[var(--line-2)] pointer-events-none' : composerExpanded ? 'border-[var(--accent-line)] shadow-[0_0_0_3px_var(--accent-soft)]' : 'border-[var(--line-2)] cursor-text'}`}
+                    className={`relative rounded-[var(--radius-lg)] bg-[var(--bg-1)] border transition-[border-color,box-shadow,opacity] duration-200 ${!isInputEnabled() ? 'opacity-50 border-[var(--line-2)] pointer-events-none' : composerExpanded ? 'border-[var(--accent-line)] shadow-[0_0_0_3px_var(--accent-soft)]' : 'border-[var(--line-2)] cursor-text'}`}
                     onClick={() => { if (isInputEnabled() && !composerExpanded) { setComposerExpanded(true); textareaRef.current?.focus(); } }}
                 >
                     {isInputEnabled() && (
@@ -1917,7 +1923,8 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                         onFocus={() => setComposerExpanded(true)}
                         disabled={!isInputEnabled()}
                         rows={composerExpanded ? 5 : 1}
-                        className={`w-full px-4 bg-transparent text-[14px] leading-[1.5] text-[var(--fg-0)] placeholder:text-[var(--fg-3)] focus:outline-none resize-none transition-all duration-200 ${
+                        style={{outline: 'none'}}
+                        className={`w-full px-4 bg-transparent text-[14px] leading-[1.5] text-[var(--fg-0)] placeholder:text-[var(--fg-3)] outline-none focus:outline-none resize-none transition-[min-height,padding] duration-200 ${
                             composerExpanded ? 'pt-3.5 pb-1.5 min-h-[140px] max-h-[280px]' : 'py-2.5 min-h-[40px] max-h-[56px]'
                         } ${!isInputEnabled() ? 'cursor-not-allowed' : ''}`}
                         placeholder={getInputPlaceholder()}
@@ -2050,6 +2057,9 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                     game={game}
                     messages={messages}
                     startMessageId={cinematicStartId}
+                    onSpeak={handleSpeak}
+                    speakingMessageId={speakingMessageId}
+                    loadingMessageId={loadingMessageId}
                     onClose={() => {
                         // Manual close mid-burst = "let me read the chat":
                         // suppress auto-reopen until this burst finishes.

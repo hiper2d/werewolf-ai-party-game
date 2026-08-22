@@ -1201,7 +1201,10 @@ function GamePageContent({
 
     // Right panel content (queue info only, no game controls since those moved to chat)
     const rightPanelContent = (
-        <div className="flex-grow overflow-auto hide-scrollbar">
+        // Design: queue body scrolls, action buttons live in a footer pinned to
+        // the panel's bottom edge.
+        <div className="flex flex-col flex-1 min-h-0">
+            <div className="flex-grow overflow-auto hide-scrollbar min-h-0">
             <h2 className="text-[15px] font-semibold text-[var(--fg-0)] mb-1">{queueInfo.title}</h2>
             <p className="text-[12px] text-[var(--fg-2)] mb-3">{queueInfo.description}</p>
             {queueInfo.subtitle && (
@@ -1270,9 +1273,11 @@ function GamePageContent({
                 );
             })()}
 
-            {/* Manual Bot Selection Button */}
+            </div>{/* end scrollable queue body */}
+
+            {/* Action footer — pinned to the panel's bottom (design .queue-footer) */}
             {(game.gameState === GAME_STATES.DAY_DISCUSSION || game.gameState === GAME_STATES.AFTER_GAME_DISCUSSION) && game.gameStateProcessQueue.length === 0 && (
-                <div className="mt-3 pt-3 border-t border-[var(--line-1)]">
+                <div className="flex-shrink-0 mt-3 pt-3 border-t border-[var(--line-1)]">
                     <button
                         className={`w-full px-3 py-2 text-[13px] font-medium rounded-[var(--radius-md)] bg-[var(--bg-3)] border border-[var(--line-3)] text-[var(--fg-0)] hover:bg-[var(--bg-4)] transition-all duration-[120ms] flex items-center justify-center gap-2 ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                         onClick={() => openModal('botSelection')}
@@ -1369,7 +1374,9 @@ function GamePageContent({
             </div>
 
             {/* Center - Chat */}
-            <div className="relative isolate flex-1 min-w-0 min-h-0 flex flex-col lg:px-7">
+            {/* No horizontal padding here: GameChat pads its sections itself so
+                the composer strip can span the full column width. */}
+            <div className="relative isolate flex-1 min-w-0 min-h-0 flex flex-col">
                 {/* Thematic backdrop behind the CHAT ONLY: the game's welcome
                     scene (when generated) with phase-reactive drifting fog on
                     top; side panels keep the plain background. `isolate` keeps
@@ -1428,8 +1435,9 @@ function GamePageContent({
                 />
             </div>
 
-            {/* Right column - Queue Info (desktop only) */}
-            <div className="hidden lg:flex lg:w-1/5 lg:flex-col lg:h-full lg:overflow-auto hide-scrollbar">
+            {/* Right column - Queue Info (desktop only). No overflow here: the
+                queue body scrolls internally so the action footer stays pinned. */}
+            <div className="hidden lg:flex lg:w-1/5 lg:flex-col lg:h-full lg:overflow-hidden">
                 {rightPanelContent}
             </div>
 

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Game, GameMessage, GAME_MASTER, GAME_ROLES, GAME_STATES, MessageType, PLAY_STYLE_CONFIGS } from '@/app/api/game-models';
 import { getModelDisplayName } from '@/app/ai/ai-models';
 import { getAvatarUrl } from '@/app/utils/avatar-utils';
@@ -61,9 +62,13 @@ interface CinematicModeProps {
     onClose: () => void;
     // Message id to open on (auto-open on a newly arrived line); default turn 0.
     startMessageId?: string;
+    // Chat's TTS pipeline: play/pause the current line with the speaker's voice.
+    onSpeak?: (messageId: string, text: string) => void;
+    speakingMessageId?: string | null;
+    loadingMessageId?: string | null;
 }
 
-export default function CinematicMode({ game, messages, onClose, startMessageId }: CinematicModeProps) {
+export default function CinematicMode({ game, messages, onClose, startMessageId, onSpeak, speakingMessageId, loadingMessageId }: CinematicModeProps) {
     const turns = useMemo<Turn[]>(() =>
         messages
             .filter(m => SPEECH_TYPES.has(m.messageType as MessageType))
@@ -83,10 +88,14 @@ export default function CinematicMode({ game, messages, onClose, startMessageId 
             .slice(-10),
         [messages]);
 
+    // Auto-open lands on the line that just arrived; manual open starts at the
+    // NEWEST line (the scene is "what's happening now" — Previous/rail go back).
     const [turnIndex, setTurnIndex] = useState(() => {
-        if (!startMessageId) return 0;
-        const i = turns.findIndex(t => t.key === startMessageId);
-        return i >= 0 ? i : 0;
+        if (startMessageId) {
+            const i = turns.findIndex(t => t.key === startMessageId);
+            if (i >= 0) return i;
+        }
+        return Math.max(0, turns.length - 1);
     });
     const [typedCount, setTypedCount] = useState(0);
     const typingTimer = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -173,49 +182,85 @@ export default function CinematicMode({ game, messages, onClose, startMessageId 
         (game.humanPlayerRole === GAME_ROLES.WEREWOLF && role === GAME_ROLES.WEREWOLF)
     );
     const roleLabel = isGM ? 'GAME MASTER' : roleVisible ? role!.toUpperCase() : 'CREW';
-    // Role tints per the design: crew neutral, werewolf red, GM green.
+    // Role tints per the design: crew neutral, werewolf red, GM green — built
+    // from the app's theme-aware tokens so both themes read correctly.
     const tint = isGM
-        ? { line: 'oklch(60% 0.13 155 / 0.5)', glow: 'oklch(60% 0.13 155 / 0.3)', text: 'oklch(75% 0.13 155)' }
+        ? { line: 'color-mix(in oklch, var(--gm-rail) 55%, transparent)', glow: 'color-mix(in oklch, var(--gm-rail) 32%, transparent)', text: 'var(--gm-fg)' }
         : roleVisible && role === GAME_ROLES.WEREWOLF
-            ? { line: 'oklch(60% 0.18 25 / 0.55)', glow: 'oklch(60% 0.18 25 / 0.35)', text: 'oklch(72% 0.16 25)' }
-            : { line: 'var(--line-3)', glow: 'color-mix(in srgb, var(--line-3) 40%, transparent)', text: 'var(--fg-1)' };
+            ? { line: 'var(--danger-line)', glow: 'color-mix(in oklch, var(--danger) 32%, transparent)', text: 'var(--werewolf-fg)' }
+            : { line: 'var(--line-3)', glow: 'color-mix(in oklch, var(--line-3) 40%, transparent)', text: 'var(--fg-1)' };
     const avatarUrl = getAvatarUrl(game, turn.speaker);
     const modelName = isHuman ? 'Human' : getModelDisplayName(isGM ? game.gameMasterAiType : bot?.aiType ?? '');
     const playStyleName = bot ? (PLAY_STYLE_CONFIGS[bot.playStyle]?.name ?? bot.playStyle) : null;
 
     const typedHtml = tokens.slice(0, typedCount).join('');
-    const nextLabel = !typingDone ? 'Skip' : atLastTurn ? (botsStillTalking ? 'Waiting…' : 'Close') : 'Next speaker';
+    const waiting = atLastTurn && typingDone && botsStillTalking;
+    // Scene over: the dedicated Close button becomes the primary action —
+    // Next never doubles as a second, differently-styled "Close".
+    const sceneOver = atLastTurn && typingDone && !botsStillTalking;
+    const nextLabel = !typingDone ? 'Skip' : waiting ? 'Waiting…' : 'Next speaker';
 
-    return (
+    // Portal to <body>: rendered inside the chat column, the overlay lives in
+    // that column's stacking context and the side panels (later DOM siblings)
+    // paint OVER its edges — which buried the close button under the right panel.
+    return createPortal(
         <div className="fixed inset-0 z-50 transition-opacity duration-300">
-            {/* Scrim: blurs and dims the chat behind; click exits. */}
+            {/* Scrim: blurs and dims the chat behind; click exits. The scrim
+                gradient token carries the per-theme dimming, so no brightness
+                filter (it muddies the light theme). */}
             <div
-                className="absolute inset-0 backdrop-blur-[3px] backdrop-saturate-[.7] backdrop-brightness-[.55]"
-                style={{background: 'radial-gradient(120% 100% at 50% 45%, #05060866 0%, #050608e0 100%)'}}
+                className="absolute inset-0 backdrop-blur-[3px] backdrop-saturate-[.7]"
+                style={{background: 'var(--cine-scrim)'}}
                 onClick={onClose}
             />
+
+            {/* Voice — plays the current line with the speaker's voice */}
+            {onSpeak && (
+                <button
+                    onClick={() => onSpeak(turn.key, turn.text)}
+                    aria-label="Read this line aloud"
+                    title={speakingMessageId === turn.key ? 'Pause' : 'Read aloud'}
+                    className={`fixed top-4 right-[68px] z-30 w-[42px] h-[42px] flex items-center justify-center rounded-full border transition-colors ${
+                        speakingMessageId === turn.key
+                            ? 'border-[var(--accent-line)] text-[var(--accent)]'
+                            : 'border-[var(--line-3)] text-[var(--fg-1)] hover:text-[var(--fg-0)]'
+                    }`}
+                    style={{background: 'var(--cine-panel)', backdropFilter: 'blur(8px)'}}
+                >
+                    {loadingMessageId === turn.key ? (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg>
+                    ) : speakingMessageId === turn.key ? (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
+                    ) : (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5,6 9,2 9,2 15,6 15,11 19"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                    )}
+                </button>
+            )}
 
             {/* Close — top-right corner */}
             <button
                 onClick={onClose}
                 aria-label="Exit cinematic mode"
                 title="Close (Esc)"
-                className="fixed top-4 right-4 z-30 w-[42px] h-[42px] flex items-center justify-center rounded-full border border-[var(--line-3)] text-white/90 hover:text-white hover:border-white/40 transition-colors"
-                style={{background: '#12151bee', backdropFilter: 'blur(8px)'}}
+                className="fixed top-4 right-4 z-30 w-[42px] h-[42px] flex items-center justify-center rounded-full border border-[var(--line-3)] text-[var(--fg-1)] hover:text-[var(--fg-0)] hover:border-[var(--line-3)] transition-colors"
+                style={{background: 'var(--cine-panel)', backdropFilter: 'blur(8px)'}}
             >
                 <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg>
             </button>
 
             {/* Stage */}
             <div className="absolute inset-0 grid place-items-center p-6 sm:p-[48px_56px] overflow-auto pointer-events-none">
-                <div className="pointer-events-auto w-full grid items-center gap-[clamp(20px,3vw,40px)] grid-cols-1 max-w-[540px] min-[1101px]:max-w-[1320px] min-[1101px]:[grid-template-columns:clamp(240px,26vw,400px)_minmax(0,1fr)]">
+                <div
+                    className="pointer-events-auto w-full grid items-center gap-[clamp(20px,3vw,40px)] grid-cols-1 max-w-[540px] min-[1101px]:max-w-[1320px] min-[1101px]:[grid-template-columns:clamp(240px,26vw,400px)_minmax(0,1fr)]"
+                    onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+                >
 
                     {/* Portrait card — order 2 on small screens (bubble first) */}
                     <div className="order-2 min-[1101px]:order-1 justify-self-center min-[1101px]:justify-self-stretch w-[min(300px,58vw)] min-[1101px]:w-full">
                         <div
                             key={turn.key}
                             className="cine-card-swap relative w-full overflow-hidden rounded-[20px] border border-[var(--line-3)]"
-                            style={{aspectRatio: '3 / 4.35', boxShadow: '0 40px 90px -20px #000c, 0 0 0 1px #ffffff0a inset', background: 'var(--bg-2)'}}
+                            style={{aspectRatio: '3 / 4.35', boxShadow: 'var(--cine-card-shadow)', background: 'var(--bg-2)'}}
                         >
                             {avatarUrl ? (
                                 // eslint-disable-next-line @next/next/no-img-element -- authed dynamic route
@@ -228,11 +273,11 @@ export default function CinematicMode({ game, messages, onClose, startMessageId 
                             {/* Role-tinted glow ring */}
                             <div aria-hidden className="absolute inset-0 rounded-[20px] pointer-events-none" style={{boxShadow: `0 0 0 1px ${tint.line} inset, 0 0 60px -10px ${tint.glow}`}} />
                             {/* Corner chips */}
-                            <span className="absolute top-3 left-3 font-mono text-[10px] tracking-[0.1em] px-[9px] py-[4px] rounded-[5px]" style={{background: '#0b0c0fcc', backdropFilter: 'blur(6px)', color: tint.text}}>{roleLabel}</span>
-                            <span className="absolute top-3 right-3 font-mono text-[10px] tracking-[0.1em] px-[9px] py-[4px] rounded-[5px] text-[var(--fg-1)]" style={{background: '#0b0c0fcc', backdropFilter: 'blur(6px)'}}>{turnIndex + 1} / {turns.length}</span>
+                            <span className="absolute top-3 left-3 font-mono text-[10px] tracking-[0.1em] px-[9px] py-[4px] rounded-[5px]" style={{background: 'var(--cine-chip)', backdropFilter: 'blur(6px)', color: tint.text}}>{roleLabel}</span>
+                            <span className="absolute top-3 right-3 font-mono text-[10px] tracking-[0.1em] px-[9px] py-[4px] rounded-[5px] text-[var(--fg-1)]" style={{background: 'var(--cine-chip)', backdropFilter: 'blur(6px)'}}>{turnIndex + 1} / {turns.length}</span>
                             {/* Name plate */}
-                            <div className="absolute inset-x-0 bottom-0 pointer-events-none px-[22px] pb-[20px] pt-[64px]" style={{background: 'linear-gradient(180deg, transparent, #080a0de6 45%, #080a0d)'}}>
-                                <div className="text-white font-bold tracking-[-0.02em] text-[clamp(20px,2vw,30px)] leading-tight">{turn.speaker}{isDead ? ' ✝' : ''}</div>
+                            <div className="absolute inset-x-0 bottom-0 pointer-events-none px-[22px] pb-[20px] pt-[64px]" style={{background: 'var(--cine-plate)'}}>
+                                <div className="font-bold tracking-[-0.02em] text-[clamp(20px,2vw,30px)] leading-tight" style={{color: 'var(--cine-plate-fg)'}}>{turn.speaker}{isDead ? ' ✝' : ''}</div>
                                 <div className="mt-1.5 font-mono text-[11px] text-[var(--fg-2)] flex flex-col gap-0.5">
                                     <span>Model <span className="text-[var(--fg-1)]">{modelName}</span></span>
                                     {playStyleName && <span>Play style <span className="text-[var(--fg-1)]">{playStyleName}</span></span>}
@@ -246,11 +291,11 @@ export default function CinematicMode({ game, messages, onClose, startMessageId 
                     <div className="order-1 min-[1101px]:order-2 w-full">
                         <div
                             className="relative rounded-[20px] border border-[var(--line-2)]"
-                            style={{background: 'color-mix(in srgb, #12151b 92%, transparent)', backdropFilter: 'blur(10px)', boxShadow: '0 30px 70px -30px #000d', padding: 'clamp(18px,2vw,26px) clamp(18px,2.2vw,30px)'}}
+                            style={{background: 'var(--cine-panel)', backdropFilter: 'blur(10px)', boxShadow: 'var(--cine-panel-shadow)', padding: 'clamp(18px,2vw,26px) clamp(18px,2.2vw,30px)'}}
                         >
                             {/* Tail: points left at the card on desktop, down on small screens */}
-                            <span aria-hidden className="absolute w-4 h-4 rotate-45 border-[var(--line-2)] hidden min-[1101px]:block min-[1101px]:left-[-9px] min-[1101px]:top-16 min-[1101px]:border-l min-[1101px]:border-b" style={{background: '#12151b'}} />
-                            <span aria-hidden className="absolute w-4 h-4 rotate-45 border-[var(--line-2)] block min-[1101px]:hidden left-1/2 -ml-2 bottom-[-9px] border-r border-b" style={{background: '#12151b'}} />
+                            <span aria-hidden className="absolute w-4 h-4 rotate-45 border-[var(--line-2)] hidden min-[1101px]:block min-[1101px]:left-[-9px] min-[1101px]:top-16 min-[1101px]:border-l min-[1101px]:border-b" style={{background: 'var(--cine-panel-solid)'}} />
+                            <span aria-hidden className="absolute w-4 h-4 rotate-45 border-[var(--line-2)] block min-[1101px]:hidden left-1/2 -ml-2 bottom-[-9px] border-r border-b" style={{background: 'var(--cine-panel-solid)'}} />
                             <div className="flex items-baseline justify-between gap-3 mb-2">
                                 <span className="text-[15px] font-semibold text-[var(--fg-0)]">{turn.speaker}</span>
                                 <span className="font-mono text-[10.5px] text-[var(--fg-3)] whitespace-nowrap">DAY {turn.day} · MESSAGE {turn.msgNo}</span>
@@ -267,26 +312,46 @@ export default function CinematicMode({ game, messages, onClose, startMessageId 
                                 <button
                                     onClick={prev}
                                     disabled={turnIndex === 0}
-                                    className="rounded-[11px] border border-[var(--line-2)] px-5 py-3 text-[13.5px] font-medium text-[var(--fg-1)] disabled:opacity-40 disabled:cursor-not-allowed hover:border-[var(--line-3)] transition-colors"
-                                    style={{background: '#12151bcc', backdropFilter: 'blur(8px)'}}
+                                    className="rounded-[11px] border border-[var(--line-2)] px-5 py-3 text-[13.5px] font-medium text-[var(--fg-1)] disabled:opacity-40 disabled:cursor-not-allowed hover:border-[var(--line-3)] hover:bg-[var(--cine-panel-hover)] transition-colors"
+                                    style={{background: 'var(--cine-panel)', backdropFilter: 'blur(8px)'}}
                                 >
                                     Previous
                                 </button>
                                 <button
                                     onClick={next}
-                                    disabled={atLastTurn && typingDone && botsStillTalking}
-                                    className="rounded-[11px] border border-[var(--accent-line)] px-5 py-3 text-[13.5px] font-medium text-[var(--fg-0)] bg-[var(--accent-soft)] hover:brightness-110 disabled:opacity-60 transition-all inline-flex items-center gap-2"
-                                    style={{backdropFilter: 'blur(8px)'}}
+                                    disabled={waiting || sceneOver}
+                                    className={`rounded-[11px] border border-[var(--line-2)] px-5 py-3 text-[13.5px] font-medium transition-all inline-flex items-center gap-2 ${
+                                        (waiting || sceneOver)
+                                            ? 'text-[var(--fg-2)] cursor-not-allowed opacity-70'
+                                            : 'text-[var(--fg-1)] hover:border-[var(--line-3)] hover:bg-[var(--cine-panel-hover)]'
+                                    }`}
+                                    style={{background: 'var(--cine-panel)', backdropFilter: 'blur(8px)'}}
                                 >
                                     {nextLabel}
-                                    <span className="hidden sm:inline-block font-mono text-[10px] px-1.5 py-0.5 rounded border border-[var(--line-2)] text-[var(--fg-2)]">SPACE</span>
+                                    {!waiting && <span className="hidden sm:inline-block font-mono text-[10px] px-1.5 py-0.5 rounded border border-[var(--line-2)] text-[var(--fg-2)]">SPACE</span>}
+                                    {waiting && (
+                                        <span className="inline-flex gap-[3px]">
+                                            {[0, 1, 2].map(i => (
+                                                <span key={i} className="w-[4px] h-[4px] rounded-full bg-[var(--accent)] animate-bounce" style={{animationDelay: `${i * 0.18}s`}} />
+                                            ))}
+                                        </span>
+                                    )}
                                 </button>
                             </div>
+                            <button
+                                onClick={onClose}
+                                className="rounded-[11px] border border-[var(--line-2)] px-5 py-3 text-[13.5px] font-medium text-[var(--fg-1)] hover:border-[var(--line-3)] hover:bg-[var(--cine-panel-hover)] transition-colors inline-flex items-center gap-2"
+                                style={{background: 'var(--cine-panel)', backdropFilter: 'blur(8px)'}}
+                            >
+                                Close
+                                <span className="hidden sm:inline-block font-mono text-[10px] px-1.5 py-0.5 rounded border border-[var(--line-2)] text-[var(--fg-2)]">ESC</span>
+                            </button>
                         </div>
                     </div>
 
                     {/* Speaker rail */}
-                    <div className="order-3 min-[1101px]:col-span-2 flex justify-center gap-2 flex-wrap max-h-[92px] overflow-hidden">
+                    {/* pt-1 gives the active thumb's -3px lift headroom inside overflow-hidden */}
+                    <div className="order-3 min-[1101px]:col-span-2 flex justify-center gap-2 flex-wrap max-h-[96px] overflow-hidden pt-1">
                         {turns.map((t, i) => {
                             const url = getAvatarUrl(game, t.speaker);
                             const state = i === turnIndex ? 'active' : i < turnIndex ? 'done' : 'todo';
@@ -297,7 +362,7 @@ export default function CinematicMode({ game, messages, onClose, startMessageId 
                                     title={t.speaker}
                                     className={`w-[38px] h-[38px] rounded-[10px] overflow-hidden border transition-all flex-none ${
                                         state === 'active'
-                                            ? 'opacity-100 border-[var(--accent)] -translate-y-[3px] shadow-[0_0_0_2px_var(--accent-soft)]'
+                                            ? 'opacity-100 border-[var(--accent)] shadow-[0_0_0_2px_var(--accent-soft)]'
                                             : state === 'done' ? 'opacity-[.65] border-transparent' : 'opacity-40 border-transparent'
                                     }`}
                                 >
@@ -313,6 +378,7 @@ export default function CinematicMode({ game, messages, onClose, startMessageId 
                     </div>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }

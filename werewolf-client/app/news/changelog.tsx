@@ -13,6 +13,24 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        id: "cinematic-mode", date: "Aug 2026", tags: ["Design"],
+        title: "Cinematic Mode",
+        body: (<>Watch the discussion play out as a scene: when a character speaks, their
+            <strong> portrait card</strong> rises over the chat and their line types out in a
+            <strong> speech bubble</strong> — with a voice button to hear it read aloud. Step through
+            speakers or replay the latest exchange anytime with the <strong>▶ Cinematic</strong> button.
+            The game screen also got a facelift: a thematic backdrop with drifting fog behind the chat,
+            and refreshed role cards.</>),
+        media: {
+            label: "cinematic mode in action",
+            images: [
+                {src: "/news/cinematic-mode-stage.jpg", alt: "A character card and speech bubble over the chat"},
+                {src: "/news/cinematic-mode-role-card.jpg", alt: "The refreshed Werewolf role card"},
+            ],
+        },
+        links: [{label: "Create a game", href: "/games"}],
+    },
+    {
         id: "themed-avatars", date: "Aug 2026", tags: ["Design"],
         title: "Every game gets its own art",
         body: (<>Added <strong>player avatars</strong> and <strong>story illustrations</strong> to each game,
