@@ -305,17 +305,21 @@ function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcludin
     return (
         <div className={`${isGameMaster ? 'py-1.5' : 'mb-2'} group`}>
             <div className="flex gap-2.5">
+                {/* The avatar renders larger than the 36px layout slot it occupies:
+                    it overflows via negative margins so bumping its size never
+                    shifts the message column. */}
                 <button
                     type="button"
                     onClick={() => onAvatarClick?.(isGameMaster ? GAME_MASTER : message.authorName)}
-                    className="flex-none self-start mt-0.5 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+                    className="flex-none self-start mt-0.5 w-9 h-9 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
                     title={`View ${message.authorName}`}
                 >
-                    <PlayerAvatar name={message.authorName} size={36} isGM={isGameMaster} avatarUrl={getAvatarUrl(game, isGameMaster ? GAME_MASTER : message.authorName)} />
+                    <PlayerAvatar name={message.authorName} size={48} isGM={isGameMaster} className="-mt-1.5 -ml-1.5 relative z-[1]" avatarUrl={getAvatarUrl(game, isGameMaster ? GAME_MASTER : message.authorName)} />
                 </button>
                 <div className="flex-1 min-w-0 text-left">
             <div className="flex items-center justify-between mb-1">
-                <div className="flex items-center gap-2">
+                {/* pl-2 clears the avatar's 6px overflow into this column */}
+                <div className="flex items-center gap-2 pl-2">
                     <span className={`text-[12px] font-semibold ${
                         isGameMaster ? 'text-[var(--gm-fg)]' :
                         isUserMessage ? 'text-[var(--you-fg)]' : 'text-[var(--fg-0)]'

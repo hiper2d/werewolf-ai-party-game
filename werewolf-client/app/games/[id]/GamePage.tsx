@@ -18,6 +18,7 @@ import BotSelectionDialog from '@/app/games/[id]/components/BotSelectionDialog';
 import { replayNight, performNightAction } from '@/app/api/night-actions';
 import PlayerAvatar from "@/app/components/PlayerAvatar";
 import CharacterCard from "@/app/games/[id]/components/CharacterCard";
+import RoleCard from "@/app/games/[id]/components/RoleCard";
 import { generateGameAvatars } from "@/app/api/avatar-actions";
 import { getAvatarUrl } from "@/app/utils/avatar-utils";
 import { DiscordIcon } from "@/app/components/ui-icons";
@@ -73,8 +74,29 @@ function GamePageContent({
     const [showCosts, setShowCosts] = useState(true);
     // Character card modal: participant name, or null when closed.
     const [characterCardFor, setCharacterCardFor] = useState<string | null>(null);
+    // Role explainer card: a GAME_ROLES value (own = the human player's role,
+    // which titles the card "You are the …"), or null when closed. Opens
+    // automatically on the first open of a fresh game (the player's own role)
+    // and from clicking any visible role tag in the players panel.
+    const [roleCardFor, setRoleCardFor] = useState<{ role: string; own: boolean } | null>(null);
     const descRef = useRef<HTMLParagraphElement>(null);
     const avatarGenerationRef = useRef(false);
+
+    // Introduce the player to their secret role the first time a freshly
+    // created game (still in WELCOME) is opened. Dismissal is remembered per
+    // game in localStorage; storage failures (private mode) just skip the card.
+    useEffect(() => {
+        if (initialGame.gameState !== GAME_STATES.WELCOME) return;
+        try {
+            if (!localStorage.getItem(`roleCardSeen:${initialGame.id}`)) setRoleCardFor({ role: initialGame.humanPlayerRole, own: true });
+        } catch { /* storage unavailable — skip the card */ }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    const closeRoleCard = () => {
+        setRoleCardFor(null);
+        try { localStorage.setItem(`roleCardSeen:${game.id}`, '1'); } catch { /* ignore */ }
+    };
 
     // Themed avatar generation follow-up. createGame starts generation
     // server-side at creation; by the time the player lands here the status is
@@ -1099,9 +1121,13 @@ function GamePageContent({
                                             you
                                         </span>
                                     )}
-                                    {/* Inline role tag */}
+                                    {/* Inline role tag: click opens the role explainer card */}
                                     {(isHuman || isDead || isGameOver || (game.humanPlayerRole === GAME_ROLES.WEREWOLF && participant.role === GAME_ROLES.WEREWOLF)) && !participant.isGameMaster && (
-                                        <span className={`text-[9px] font-mono font-semibold uppercase tracking-[0.08em] px-1.5 py-0.5 rounded border ${
+                                        <button
+                                            type="button"
+                                            onClick={() => setRoleCardFor({ role: participant.role!, own: participant.isHuman })}
+                                            title={`What does the ${participant.role} do?`}
+                                            className={`text-[9px] font-mono font-semibold uppercase tracking-[0.08em] px-1.5 py-0.5 rounded border cursor-pointer hover:brightness-125 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] transition-all duration-[120ms] ${
                                             participant.role === GAME_ROLES.WEREWOLF
                                                 ? 'bg-[oklch(60%_0.13_25_/_0.12)] border-[oklch(60%_0.13_25_/_0.3)] text-[var(--werewolf-fg)]'
                                                 : participant.role === GAME_ROLES.DOCTOR
@@ -1115,7 +1141,7 @@ function GamePageContent({
                                                                 : 'bg-[var(--bg-2)] border-[var(--line-2)] text-[var(--fg-2)]'
                                         }`}>
                                             {participant.role}
-                                        </span>
+                                        </button>
                                     )}
                                 </div>
                                 <div className="text-[11px] font-mono text-[var(--fg-2)]">
@@ -1395,6 +1421,11 @@ function GamePageContent({
             {/* Character card (click on any avatar) */}
             {characterCardFor && (
                 <CharacterCard game={game} name={characterCardFor} onClose={() => setCharacterCardFor(null)} />
+            )}
+
+            {/* Role explainer card: first open of a fresh game, or a role tag click */}
+            {roleCardFor && (
+                <RoleCard role={roleCardFor.role} own={roleCardFor.own} onClose={closeRoleCard} />
             )}
 
             {/* Model Selection Dialog */}
