@@ -20,7 +20,7 @@ import PlayerAvatar from "@/app/components/PlayerAvatar";
 import CharacterCard from "@/app/games/[id]/components/CharacterCard";
 import RoleCard from "@/app/games/[id]/components/RoleCard";
 import { generateGameAvatars } from "@/app/api/avatar-actions";
-import { getAvatarUrl } from "@/app/utils/avatar-utils";
+import { getAvatarUrl, getSceneUrl } from "@/app/utils/avatar-utils";
 import { DiscordIcon } from "@/app/components/ui-icons";
 import { DISCORD_URL } from "@/app/config/external-links";
 import { checkGameEndConditions } from "@/app/utils/game-utils";
@@ -1054,7 +1054,15 @@ function GamePageContent({
                                 <span className="w-1.5 h-1.5 rounded-full bg-[var(--tag-fast-text)]"></span>
                                 ${game.totalGameCost.toFixed(4)}
                                 {(game.totalImagesCost ?? 0) > 0 && (
-                                    <span className="text-[var(--fg-3)]">(🖼️ ${game.totalImagesCost!.toFixed(4)})</span>
+                                    <span className="inline-flex items-center gap-1 text-[var(--fg-3)]">
+                                        {/* emoji renders as tofu in some mono-font contexts — use an SVG */}
+                                        (<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                                            <rect x="3" y="3" width="18" height="18" rx="2"/>
+                                            <circle cx="8.5" cy="8.5" r="1.5"/>
+                                            <path d="M21 15l-5-5L5 21"/>
+                                        </svg>
+                                        ${game.totalImagesCost!.toFixed(4)})
+                                    </span>
                                 )}
                             </div>
                         ) : <span />}
@@ -1320,6 +1328,8 @@ function GamePageContent({
         </div>
     );
 
+    const pageBackdropUrl = getSceneUrl(game, 'welcome');
+
     return (
         <div className="flex flex-col lg:flex-row text-[var(--fg-0)] h-full">
             {/* Fixed edge drawer toggle buttons (mobile/tablet only) */}
@@ -1356,7 +1366,26 @@ function GamePageContent({
             </div>
 
             {/* Center - Chat */}
-            <div className="flex-1 min-w-0 min-h-0 flex flex-col lg:px-4">
+            <div className="relative isolate flex-1 min-w-0 min-h-0 flex flex-col lg:px-4">
+                {/* Thematic backdrop behind the CHAT ONLY: the game's welcome
+                    scene, dimmed and blurred; side panels keep the plain
+                    background. Absent for legacy games (no generated art).
+                    `isolate` keeps the -z layer inside this stacking context,
+                    above the app background but below the chat content. */}
+                {pageBackdropUrl && (
+                    <div aria-hidden className="absolute inset-0 -z-10 pointer-events-none overflow-hidden">
+                        {/* eslint-disable-next-line @next/next/no-img-element -- authed dynamic route */}
+                        <img
+                            src={pageBackdropUrl}
+                            alt=""
+                            className="game-backdrop-img w-full h-full object-cover blur-[5px] scale-105"
+                        />
+                        <div
+                            className="absolute inset-0"
+                            style={{background: 'linear-gradient(to bottom, color-mix(in srgb, var(--bg-0) 45%, transparent), transparent 30%, transparent 65%, color-mix(in srgb, var(--bg-0) 55%, transparent))'}}
+                        />
+                    </div>
+                )}
                 <GameChat
                     gameId={game.id}
                     game={game}

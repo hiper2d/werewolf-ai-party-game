@@ -269,20 +269,8 @@ export function formatMessagesForNightSummary(nightResultsCommand: string): AIMe
     return [{ role: MESSAGE_ROLE.USER, content: nightResultsCommand }];
 }
 
-export function cleanResponse(response: string): string {
-    let cleanResponse = response.trim();
-    if (cleanResponse.startsWith('```json')) {
-        cleanResponse = cleanResponse.slice(7);
-    } else if (cleanResponse.startsWith('```')) {
-        cleanResponse = cleanResponse.slice(3);
-    }
-
-    if (cleanResponse.endsWith('```')) {
-        cleanResponse = cleanResponse.slice(0, -3);
-    }
-
-    return cleanResponse.trim();
-}
+// cleanResponse moved to @hiper2d/llm-agents; re-exported to keep this import path alive.
+export { cleanResponse } from '@hiper2d/llm-agents';
 
 
 /**

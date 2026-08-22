@@ -15,7 +15,9 @@ module.exports = {
   setupFiles: ['dotenv/config'],
   roots: ['<rootDir>'],
   moduleNameMapper: {
-    "^@/(.*)$": "<rootDir>/$1"
+    "^@/(.*)$": "<rootDir>/$1",
+    // Workspace package, resolved to source so ts-jest compiles it like app code.
+    "^@hiper2d/llm-agents$": "<rootDir>/packages/llm-agents/src"
   },
   testTimeout: 60000,
   // The live pattern is read by jest.live.config.js (always index 1 here).

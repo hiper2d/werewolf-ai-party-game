@@ -3,6 +3,8 @@ module.exports = {
     compiler: {
         styledComponents: true,
     },
+    // The workspace package ships TypeScript source (no build step); Next compiles it.
+    transpilePackages: ['@hiper2d/llm-agents'],
     experimental: {
         staleTimes: {
             dynamic: 30,

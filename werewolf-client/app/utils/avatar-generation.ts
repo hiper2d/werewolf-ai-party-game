@@ -4,15 +4,14 @@ import {Game, USER_TIERS, AVATAR_GM_KEY, SCENE_WELCOME_KEY, SCENE_NIGHT_KEY} fro
 import {getUserTierAndApiKeys} from "@/app/utils/tier-utils";
 import {updateUserMonthlySpending, deductBalance} from "@/app/api/user-actions";
 import {PAID_TIER_MARKUP} from "@/app/config/credit-packages";
-import {API_KEY_CONSTANTS, IMAGE_MODEL_CONSTANTS} from "@/app/ai/ai-models";
+import {API_KEY_CONSTANTS, IMAGE_MODEL_CONSTANTS, IMAGE_MODEL_PRICING} from "@/app/ai/ai-models";
 import {logger} from "@/app/utils/logger";
 
-// One grid image covers the whole cast. gemini-3.1-flash-image bills images at
-// $60/M output tokens (a 2K image is ~1120 tokens ≈ $0.067) plus a negligible
-// text-input cost. Prices per 1M tokens, from ai.google.dev/gemini-api/docs/pricing.
+// One grid image covers the whole cast; models and pricing live in
+// IMAGE_MODEL_CONSTANTS / IMAGE_MODEL_PRICING (ai-models.ts).
 const AVATAR_MODEL = IMAGE_MODEL_CONSTANTS.AVATARS;
-const IMAGE_OUTPUT_PRICE_PER_M = 60;
-const TEXT_INPUT_PRICE_PER_M = 0.5;
+const IMAGE_OUTPUT_PRICE_PER_M = IMAGE_MODEL_PRICING[AVATAR_MODEL].imageOutputPricePerM;
+const TEXT_INPUT_PRICE_PER_M = IMAGE_MODEL_PRICING[AVATAR_MODEL].textInputPricePerM;
 
 // Grid dimensions by cell count (bots + human player + Game Master).
 // The model reliably fills row-major grids up to 4x4 in one 2K image.

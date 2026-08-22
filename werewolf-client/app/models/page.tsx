@@ -126,18 +126,19 @@ export default function ModelsPage() {
                     <p className="m-0 mb-4 text-[13.5px] text-[var(--fg-2)] leading-[1.55] max-w-[70ch]">
                         Every new game gets a themed visual set generated once at creation: portrait avatars for the whole cast
                         (including the Game Master) plus day and night scene illustrations for the chat — all drawn in a single
-                        style matching your game&apos;s theme.
+                        style matching your game&apos;s theme. Eventful nights also get a one-off illustration of what happened,
+                        with the involved characters drawn from their portraits.
                     </p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className="border border-[var(--line-1)] rounded-[var(--radius-lg)] bg-[var(--bg-0)] px-4 py-3.5">
-                            <div className="font-mono text-[11px] tracking-[0.06em] uppercase text-[var(--fg-3)] mb-1.5">Avatars &amp; scenes</div>
+                            <div className="font-mono text-[11px] tracking-[0.06em] uppercase text-[var(--fg-3)] mb-1.5">Avatars, scenes &amp; illustrations</div>
                             <div className="text-[14px] text-[var(--fg-0)] font-mono">{IMAGE_MODEL_CONSTANTS.AVATARS}</div>
-                            <div className="text-[12.5px] text-[var(--fg-2)] mt-1">~$0.14 per game (two images: cast sheet + scene pair)</div>
+                            <div className="text-[12.5px] text-[var(--fg-2)] mt-1">~$0.14 per game at creation, plus ~$0.07 per eventful night</div>
                         </div>
                         <div className="border border-[var(--line-1)] rounded-[var(--radius-lg)] bg-[var(--bg-0)] px-4 py-3.5">
-                            <div className="font-mono text-[11px] tracking-[0.06em] uppercase text-[var(--fg-3)] mb-1.5">Layout verification</div>
+                            <div className="font-mono text-[11px] tracking-[0.06em] uppercase text-[var(--fg-3)] mb-1.5">Verification &amp; scene briefs</div>
                             <div className="text-[14px] text-[var(--fg-0)] font-mono">{IMAGE_MODEL_CONSTANTS.VERIFIER}</div>
-                            <div className="text-[12.5px] text-[var(--fg-2)] mt-1">Checks every generated portrait; negligible cost</div>
+                            <div className="text-[12.5px] text-[var(--fg-2)] mt-1">Checks every generated portrait and drafts illustration briefs; negligible cost</div>
                         </div>
                     </div>
                 </div>

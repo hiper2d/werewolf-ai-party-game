@@ -349,6 +349,16 @@ html {
 
 /* ── Logo Backdrop ──────────────────────────────────────────────── */
 
+/* Thematic chat backdrop (GamePage). Dark theme lets the scene glow through;
+   light theme keeps it fainter — a dark night scene at full presence turns a
+   white page muddy. */
+.game-backdrop-img {
+  opacity: 0.30;
+}
+[data-theme='light'] .game-backdrop-img {
+  opacity: 0.15;
+}
+
 [data-theme='light'] .logo-backdrop {
   background: radial-gradient(circle, #1e293b 35%, rgba(247, 248, 250, 0) 70%);
   padding: 0.75rem;

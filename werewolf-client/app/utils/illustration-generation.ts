@@ -14,7 +14,7 @@ import {addMessageToChatAndSaveToDb} from "@/app/api/game-actions";
 import {getUserTierAndApiKeys} from "@/app/utils/tier-utils";
 import {updateUserMonthlySpending, deductBalance} from "@/app/api/user-actions";
 import {PAID_TIER_MARKUP} from "@/app/config/credit-packages";
-import {API_KEY_CONSTANTS, IMAGE_MODEL_CONSTANTS} from "@/app/ai/ai-models";
+import {API_KEY_CONSTANTS, IMAGE_MODEL_CONSTANTS, IMAGE_MODEL_PRICING} from "@/app/ai/ai-models";
 import {generateImage} from "@/app/utils/avatar-generation";
 import {logger} from "@/app/utils/logger";
 
@@ -29,12 +29,12 @@ export function midGameImagesEnabled(game: Game): boolean {
     return game.avatarsStatus === 'ready';
 }
 
-// Prices per 1M tokens for the brief-writer model (gemini-3.5-flash-lite),
-// from ai.google.dev/gemini-api/docs/pricing. A brief is a few hundred tokens,
-// so this adds well under $0.001 — but it still counts into totalImagesCost.
-const BRIEF_MODEL = IMAGE_MODEL_CONSTANTS.VERIFIER;
-const BRIEF_INPUT_PRICE_PER_M = 0.30;
-const BRIEF_OUTPUT_PRICE_PER_M = 2.50;
+// Model and pricing come from the image-pipeline config (ai-models.ts). A
+// brief is a few hundred tokens, so it adds well under $0.001 — but it still
+// counts into totalImagesCost.
+const BRIEF_MODEL = IMAGE_MODEL_CONSTANTS.ILLUSTRATION_BRIEF;
+const BRIEF_INPUT_PRICE_PER_M = IMAGE_MODEL_PRICING[BRIEF_MODEL].inputPricePerM;
+const BRIEF_OUTPUT_PRICE_PER_M = IMAGE_MODEL_PRICING[BRIEF_MODEL].outputPricePerM;
 
 /**
  * A cheap "illustrator's assistant" pass: turns the GM's narration plus the
