@@ -46,6 +46,7 @@ jest.mock('@/app/api/game-actions', () => ({
     addMessageToChatAndSaveToDb: jest.fn(),
     setGameErrorState: jest.fn(),
     consumeModelOverride: jest.fn(async (_gameId: string, game: any) => game),
+    consumeRetryHint: jest.fn(async () => null),
 }));
 
 jest.mock('@/app/utils/tier-utils', () => ({
@@ -340,6 +341,40 @@ describe('night queue advancement', () => {
         expect(endUpdate.gameState).toBe(GAME_STATES.NIGHT_RESULTS);
         expect(result.messages.length).toBeGreaterThan(0);
         expect(setGameErrorState).not.toHaveBeenCalled();
+    });
+
+    test('bot action finishing after the night ended is a benign no-op (summaries queue left alone)', async () => {
+        // The doctor's LLM call is slow; while it runs, a concurrent duplicate
+        // request finishes the night and startNewDay moves the game to
+        // NEW_DAY_BOT_SUMMARIES, whose process queue holds BOT NAMES. Before the
+        // post-action state re-check, the late request advanced that queue as if
+        // it held roles → "No processor for role: <botName>" errorState.
+        const nightGame = makeGame({
+            gameStateProcessQueue: [GAME_ROLES.DOCTOR],
+            gameStateParamQueue: ['Doc'],
+        });
+        const summariesGame = makeGame({
+            gameState: GAME_STATES.NEW_DAY_BOT_SUMMARIES,
+            gameStateProcessQueue: ['__GM_DAY_SUMMARY__', 'Wolf', 'Doc', 'Vil'],
+            gameStateParamQueue: [],
+        });
+        (getGame as jest.Mock)
+            .mockResolvedValueOnce(nightGame) // entry read: still NIGHT
+            .mockResolvedValue(summariesGame); // post-action re-read: day already started
+        mockAskWithZodSchema.mockResolvedValue([
+            { target: 'Vil', action_type: 'protect' },
+            '',
+            undefined,
+            undefined,
+        ]);
+
+        const result = await performNightAction(GAME_ID);
+
+        expect(mockUpdate).not.toHaveBeenCalled();
+        expect(setGameErrorState).not.toHaveBeenCalled();
+        expect(result.game.gameState).toBe(GAME_STATES.NEW_DAY_BOT_SUMMARIES);
+        expect(result.game.gameStateProcessQueue).toEqual(summariesGame.gameStateProcessQueue);
+        expect(result.messages).toEqual([]);
     });
 
     test('unknown/dead bot at the param queue head produces an error state', async () => {

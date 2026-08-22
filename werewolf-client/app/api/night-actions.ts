@@ -618,6 +618,13 @@ async function advanceToNextNightRole(gameId: string, game: Game): Promise<GameA
         throw new Error('Firestore is not initialized');
     }
 
+    // Outside NIGHT the process queue holds bot names (or the summaries
+    // sentinel), not roles — advancing it here would clear or corrupt a queue
+    // another state owns. Only a stale racer can get here in that situation.
+    if (game.gameState !== GAME_STATES.NIGHT) {
+        return staleActionNoOp('advanceToNextNightRole', `game is in ${game.gameState}, not NIGHT`, game);
+    }
+
     const newProcessQueue = game.gameStateProcessQueue.slice(1);
 
     if (newProcessQueue.length === 0) {
@@ -756,6 +763,17 @@ async function processNightQueue(gameId: string, game: Game): Promise<GameAction
                 },
                 true // Recoverable - user can replay night phase
             );
+        }
+
+        // The bot's LLM call above can outlive the night: a concurrent duplicate
+        // request may have finished the remaining roles and moved the game on
+        // (e.g. to NEW_DAY_BOT_SUMMARIES) while this one was in flight. Re-check
+        // before writing anything — stale night updates would pollute the new
+        // day's state, and advancing would treat the summaries queue's bot names
+        // as roles ("No processor for role: <botName>").
+        const postActionGame = await getGame(gameId) as Game;
+        if (postActionGame.gameState !== GAME_STATES.NIGHT) {
+            return staleActionNoOp('processNightQueue', `game advanced to ${postActionGame.gameState} during night action`, postActionGame);
         }
 
         // Apply game updates from the role processor

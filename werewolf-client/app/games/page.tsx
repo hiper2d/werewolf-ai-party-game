@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import {getAllGames} from "@/app/api/game-actions";
 import RemoveGame from "@/app/games/components/RemoveGame";
+import GameThumbnail from "@/app/games/components/GameThumbnail";
 import {redirect} from "next/navigation";
 import {Game} from "@/app/api/game-models";
 import { auth } from "@/auth";
@@ -140,7 +141,9 @@ function GameListEntryContent({
 }) {
     const stateLabel = game.gameState.toLowerCase().replace(/_/g, ' ');
     return (
-        <div className={`flex flex-col gap-1.5 ${locked ? 'pointer-events-none' : ''}`}>
+        <div className={`flex items-start gap-3.5 ${locked ? 'pointer-events-none' : ''}`}>
+            <GameThumbnail game={game} locked={locked} />
+            <div className="flex flex-col gap-1.5 min-w-0 flex-grow">
             {/* Top row: Theme and Date/Status */}
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-4">
                 <h2 className="text-[16px] capitalize text-[var(--fg-0)] font-semibold truncate">
@@ -164,6 +167,7 @@ function GameListEntryContent({
             {/* Bottom row: Tier */}
             <div className="text-[10px] font-mono uppercase tracking-[0.06em] text-[var(--fg-3)]">
                 {game.createdWithTier} tier
+            </div>
             </div>
         </div>
     );
