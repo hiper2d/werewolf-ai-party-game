@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { getAvatarGradient } from '@/app/utils/color-utils';
+import { isPresetAvatarUrl } from '@/app/utils/preset-avatars';
 
 interface PlayerAvatarProps {
     name: string;
@@ -33,10 +34,16 @@ export default function PlayerAvatar({ name, size = 32, isGM = false, isDead = f
         return () => { cancelled = true; };
     }, [avatarUrl]);
 
-    // Portraits are head-and-shoulders busts: anchor near the top and zoom
-    // slightly so the face fills the circle.
+    // Generated portraits are head-and-shoulders busts: anchor near the top and
+    // zoom slightly so the face fills the circle. Preset mannequins are waist-up
+    // pose studies on pure white: show the whole figure and MULTIPLY it over the
+    // per-name gradient, so the white ground takes the bot's color and every
+    // placeholder is distinct by pose + color.
+    const preset = Boolean(avatarUrl && isPresetAvatarUrl(avatarUrl));
     const background = avatarUrl && imgLoaded
-        ? `url(${avatarUrl}) center 15%/140% auto no-repeat, linear-gradient(135deg, ${c1} 0%, ${c2} 100%)`
+        ? preset
+            ? `url(${avatarUrl}) center top/cover no-repeat, linear-gradient(135deg, ${c1} 0%, ${c2} 100%)`
+            : `url(${avatarUrl}) center 15%/140% auto no-repeat, linear-gradient(135deg, ${c1} 0%, ${c2} 100%)`
         : `linear-gradient(135deg, ${c1} 0%, ${c2} 100%)`;
 
     const showPortrait = Boolean(avatarUrl && imgLoaded);
@@ -48,6 +55,7 @@ export default function PlayerAvatar({ name, size = 32, isGM = false, isDead = f
                 width: size,
                 height: size,
                 background,
+                ...(preset && imgLoaded ? { backgroundBlendMode: 'multiply, normal' } : {}),
                 fontSize,
                 color: 'white',
                 border: '1px solid rgba(0,0,0,0.2)',

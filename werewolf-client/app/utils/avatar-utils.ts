@@ -1,12 +1,17 @@
 import {AVATAR_GM_KEY, Game, GAME_MASTER, SCENE_NIGHT_KEY, SCENE_WELCOME_KEY} from "@/app/api/game-models";
+import {getPresetAvatarUrl} from "@/app/utils/preset-avatars";
 
 /**
- * URL of a participant's generated avatar, or undefined when the game has no
- * generated set (legacy games, generation pending/failed) — callers fall back
- * to the initial-letter avatar.
+ * URL of a participant's portrait. While the themed set is generating (or
+ * failed), bots and the GM get a universal preset sketch (static asset, instant)
+ * assigned deterministically by gender — see preset-avatars.ts. The human player
+ * has no gender on record and returns undefined (initial-letter fallback). When
+ * avatarsStatus flips to 'ready', the same call sites swap to the themed art.
  */
 export function getAvatarUrl(game: Game, name: string): string | undefined {
-    if (game.avatarsStatus !== 'ready') return undefined;
+    if (game.avatarsStatus !== 'ready') {
+        return getPresetAvatarUrl(game.bots, name);
+    }
     const key = name === GAME_MASTER ? AVATAR_GM_KEY : name;
     return `/api/games/${game.id}/avatars/${encodeURIComponent(key)}?v=${game.avatarsVersion ?? 0}`;
 }

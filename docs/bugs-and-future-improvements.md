@@ -1,6 +1,8 @@
 # Bugs and improvements
 
 ## Open
+- Create a welcome game for new users? Randomly create a game with free tier models in a predefined theme in the WELCOME state.
+Every new user gets one.
 
 - **Cost-accounting loose ends.** The main fix shipped 2026-08-04 (all 9 providers feed cache hits
   into `calculate*Cost`). Still outstanding:

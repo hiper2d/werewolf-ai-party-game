@@ -25,15 +25,28 @@ function gridFor(cells: number): { cols: number; rows: number } {
 
 interface AvatarCell {
     key: string;      // Firestore doc id + URL segment ([a-zA-Z0-9] names, or the GM key)
-    label: string;    // Nameplate text drawn into the image
+    label: string;    // Character name, for logs and prompt guidance — never drawn into the image
     prompt: string;   // One-line visual description for this cell
+    // What the slice verifier expects to see in this slot; undefined = don't
+    // check (the human player has no gender on record, fillers aren't stored).
+    expectedGender?: 'male' | 'female';
+}
+
+// Stories are narrative, not visual — one sentence is plenty of guidance for the
+// painter. Feeding the full three-sentence story per cell is what made the model
+// typeset it INTO the image as a bio column next to the face (the Evangelion
+// "character card" failure, 2026-08-23).
+function firstSentence(text: string): string {
+    const m = text.match(/^.{0,180}?[.!?](?=\s|$)/);
+    return m ? m[0] : text.slice(0, 180);
 }
 
 function buildCells(game: Game): AvatarCell[] {
     const cells: AvatarCell[] = game.bots.map(bot => ({
         key: bot.name,
         label: bot.name,
-        prompt: `(${bot.gender}) "${bot.name}" — ${bot.story}`,
+        prompt: `(${bot.gender}) "${bot.name}" — ${firstSentence(bot.story)}`,
+        expectedGender: bot.gender === 'male' || bot.gender === 'female' ? bot.gender : undefined,
     }));
     cells.push({
         key: game.humanPlayerName,
@@ -46,16 +59,17 @@ function buildCells(game: Game): AvatarCell[] {
         // Male on purpose: the GM's TTS voice defaults to male (previewGame
         // falls back to a random male voice), so the portrait must match.
         prompt: `(male) "Game Master" — the omniscient narrator of this story: a male storyteller figure fitting the setting, keeper of every secret at the table, serene, impartial, faintly amused`,
+        expectedGender: 'male',
     });
     return cells;
 }
 
 function buildPrompt(game: Game, cells: AvatarCell[], cols: number, rows: number): string {
     const cellLines = cells.map(
-        (c, i) => `Cell ${i + 1}: ${c.prompt}. Small nameplate label "${c.label}" at the bottom of the cell, its own distinct flat solid muted background color.`
+        (c, i) => `Cell ${i + 1}: ${c.prompt}. Its own distinct flat solid muted background color.`
     ).join("\n");
 
-    return `A character portrait sheet for a social deduction game, drawn as a single image: a precise grid of exactly ${cells.length} rectangular cells, ${cols} columns and ${rows} rows, all cells exactly equal size, separated by thin dark divider lines. Each cell contains one bust portrait (head and shoulders) of a different character.
+    return `A character portrait sheet for a social deduction game, drawn as a single image: a precise grid of exactly ${cells.length} rectangular cells, ${cols} columns and ${rows} rows, all cells exactly equal size, separated by thin dark divider lines. Each cell contains one bust portrait (head and shoulders) of a different character, centered in its cell.
 
 Setting — "${game.theme}": ${game.description}
 
@@ -63,7 +77,7 @@ Choose ONE cohesive illustration style that fits this setting and apply it consi
 
 ${cellLines}
 
-No text anywhere except the nameplates.`;
+The character descriptions above are guidance for the drawing only — NEVER render them as text. Absolutely no text anywhere in the image: no names, no labels, no captions, no letters, no writing of any kind — and no lettering on clothing, equipment, insignia or logos.`;
 }
 
 
@@ -127,14 +141,17 @@ Bottom panel: the same setting at night — dark, ominous, something predatory h
 No text anywhere in the image.`;
 }
 
-// Cheap vision model that transcribes the nameplates baked into each sliced
-// avatar — the geometric proof that slicing matched the model's actual grid
-// (a misaligned grid puts the wrong or no nameplate in a crop).
+// Cheap vision model that inspects every sliced avatar: no rendered text, and
+// the apparent gender matches the expected character in that slot. The gender
+// sequence doubles as the misalignment detector — a drifted grid puts the
+// wrong face in a slot (this replaced nameplate transcription 2026-08-23 when
+// nameplates were dropped so portraits carry no text at all).
 const VERIFY_MODEL = IMAGE_MODEL_CONSTANTS.VERIFIER;
 
 interface AvatarSlice {
     key: string;
     label: string;
+    expectedGender?: 'male' | 'female';
     jpeg: Buffer;
 }
 
@@ -159,17 +176,19 @@ async function sliceGrid(sharp: any, grid: Buffer, cells: AvatarCell[], count: n
             .resize(512, 512, {fit: 'cover', position: 'top'})
             .jpeg({quality: 85})
             .toBuffer();
-        slices.push({key: cells[i].key, label: cells[i].label, jpeg});
+        slices.push({key: cells[i].key, label: cells[i].label, expectedGender: cells[i].expectedGender, jpeg});
     }
     return slices;
 }
 
-/** Reads the nameplate out of every sliced avatar and compares it to the
- * expected character name. One mismatch is tolerated (transcription flake);
- * more means the grid layout drifted and the whole set must be regenerated. */
-async function verifyNameplates(apiKey: string, slices: AvatarSlice[]): Promise<{ok: boolean; mismatches: string[]}> {
+/** Inspects every sliced avatar: rejects the set when any slice contains
+ * rendered text (the model typeset a description into the cell) or when the
+ * apparent gender contradicts the expected character in that slot — the
+ * misalignment detector. Text is a hard fail; one gender mismatch is tolerated
+ * (stylized faces read ambiguously, and OTHER never counts as a mismatch). */
+async function verifySlices(apiKey: string, slices: AvatarSlice[]): Promise<{ok: boolean; problems: string[]}> {
     const parts: any[] = [{
-        text: `Each image below is a character portrait with a nameplate label near the bottom. Transcribe each nameplate. Reply with exactly ${slices.length} lines, formatted "<number>: <nameplate text>" (NONE if no nameplate is visible). No other text.`,
+        text: `Each image below is a single character portrait. For each image answer two things: TEXT = YES only if clearly readable letters, words or numbers are written in the image (captions, labels, signs, writing on clothing), otherwise NO — decorative shapes, hair clips, jewelry, emblems or patterns without readable letters are NOT text. GENDER = MALE, FEMALE or OTHER for the portrait's subject (OTHER for robots, creatures, masked or ambiguous figures). Reply with exactly ${slices.length} lines, formatted "<number>: TEXT=<YES|NO> GENDER=<MALE|FEMALE|OTHER>". No other text.`,
     }];
     slices.forEach((sl, i) => {
         parts.push({text: `Image ${i + 1}:`});
@@ -181,24 +200,41 @@ async function verifyNameplates(apiKey: string, slices: AvatarSlice[]): Promise<
         headers: {'Content-Type': 'application/json', 'x-goog-api-key': apiKey},
         body: JSON.stringify({contents: [{parts}]}),
     });
-    if (!res.ok) throw new Error(`Nameplate verification failed: HTTP ${res.status}`);
+    if (!res.ok) throw new Error(`Slice verification failed: HTTP ${res.status}`);
     const json = await res.json();
     const text: string = (json.candidates?.[0]?.content?.parts || []).map((pt: any) => pt.text || '').join('\n');
 
-    const norm = (x: string) => x.toLowerCase().replace(/[^a-z0-9]/g, '');
-    const byIndex = new Map<number, string>();
+    const byIndex = new Map<number, {hasText: boolean; gender: string}>();
     for (const line of text.split('\n')) {
-        const m = line.match(/^\s*(\d+)\s*[:.\-]\s*(.*)$/);
-        if (m) byIndex.set(parseInt(m[1], 10), m[2]);
+        const m = line.match(/^\s*(\d+)\s*[:.\-]?\s*TEXT\s*=\s*(YES|NO)\s+GENDER\s*=\s*(MALE|FEMALE|OTHER)/i);
+        if (m) byIndex.set(parseInt(m[1], 10), {hasText: m[2].toUpperCase() === 'YES', gender: m[3].toLowerCase()});
     }
-    const mismatches = slices
-        .filter((sl, i) => {
-            const got = norm(byIndex.get(i + 1) || '');
-            const want = norm(sl.label);
-            return !(got && (got.includes(want) || want.includes(got)));
-        })
-        .map(sl => sl.label);
-    return {ok: mismatches.length <= 1, mismatches};
+    if (byIndex.size === 0) {
+        // Completely unparseable reply = verifier misbehaving, not a bad grid;
+        // treat like an outage (the caller accepts the slices with a warning).
+        throw new Error('Slice verification reply was unparseable');
+    }
+
+    let textViolations = 0;
+    let genderMismatches = 0;
+    const problems: string[] = [];
+    slices.forEach((sl, i) => {
+        const verdict = byIndex.get(i + 1);
+        if (!verdict) {
+            genderMismatches++;
+            problems.push(`${sl.label}: no verdict`);
+            return;
+        }
+        if (verdict.hasText) {
+            textViolations++;
+            problems.push(`${sl.label}: rendered text`);
+        }
+        if (sl.expectedGender && verdict.gender !== 'other' && verdict.gender !== sl.expectedGender) {
+            genderMismatches++;
+            problems.push(`${sl.label}: expected ${sl.expectedGender}, saw ${verdict.gender}`);
+        }
+    });
+    return {ok: textViolations === 0 && genderMismatches <= 1, problems};
 }
 
 /**
@@ -264,30 +300,35 @@ export async function runAvatarGeneration(gameId: string, userEmail: string): Pr
         // client/server bundle graph.
         const sharp = (await import('sharp')).default;
 
-        // Generate → slice → verify, with ONE retry: the nameplate check reads
-        // the label baked into every crop, so a drifted grid (model drew a
-        // different layout than requested) can never reach players.
+        // Generate → slice → verify, with retries: the slice check inspects
+        // every crop (no rendered text, expected gender in each slot), so a
+        // drifted grid or a text-riddled "character card" layout (the model
+        // drew something other than clean portraits) can never reach players.
+        // Three attempts: the no-text gate is strict and text-prone themes
+        // (IPs whose canon designs carry lettering) burned two attempts in
+        // live testing (2026-08-23); a failed set falls back to preset
+        // sketches, so the extra ~$0.07 roll is cheaper than a set-less game.
         let slices: AvatarSlice[] = [];
         let gridCostUSD = 0;
         let verified = false;
-        for (let attempt = 1; attempt <= 2 && !verified; attempt++) {
+        for (let attempt = 1; attempt <= 3 && !verified; attempt++) {
             const grid = await generateImage(apiKey, buildPrompt(claimed, cells, cols, rows), "4:3");
             gridCostUSD += grid.costUSD;
             slices = await sliceGrid(sharp, grid.buffer, cells, realCount, cols);
             try {
-                const check = await verifyNameplates(apiKey, slices);
+                const check = await verifySlices(apiKey, slices);
                 if (check.ok) {
                     verified = true;
                 } else {
-                    logger.warn(`Avatar grid failed nameplate verification (attempt ${attempt})`, {gameId, mismatches: check.mismatches});
+                    logger.warn(`Avatar grid failed slice verification (attempt ${attempt})`, {gameId, problems: check.problems});
                 }
             } catch (verifyError: any) {
                 // Verifier outage must not block avatars — accept the slices.
-                logger.warn(`Nameplate verifier unavailable, accepting slices`, {gameId, error: verifyError.message});
+                logger.warn(`Slice verifier unavailable, accepting slices`, {gameId, error: verifyError.message});
                 verified = true;
             }
         }
-        if (!verified) throw new Error('Avatar grid failed nameplate verification twice');
+        if (!verified) throw new Error('Avatar grid failed slice verification twice');
         const sceneResult = await scenePromise;
         const batch = db.batch();
         for (const slice of slices) {

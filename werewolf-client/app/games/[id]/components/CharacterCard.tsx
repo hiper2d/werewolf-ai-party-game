@@ -4,6 +4,8 @@ import React, { useEffect } from 'react';
 import { Game, GAME_MASTER, GAME_ROLES, GAME_STATES, PLAY_STYLE_CONFIGS } from '@/app/api/game-models';
 import { getModelDisplayName } from '@/app/ai/ai-models';
 import { getAvatarUrl } from '@/app/utils/avatar-utils';
+import { isPresetAvatarUrl } from '@/app/utils/preset-avatars';
+import { getAvatarGradient } from '@/app/utils/color-utils';
 import PlayerAvatar from '@/app/components/PlayerAvatar';
 
 interface CharacterCardProps {
@@ -56,16 +58,25 @@ export default function CharacterCard({ game, name, onClose }: CharacterCardProp
                 className="w-[340px] max-w-[calc(100vw-32px)] rounded-2xl overflow-hidden bg-[var(--bg-1)] border border-[var(--line-2)] shadow-2xl"
                 onClick={e => e.stopPropagation()}
             >
-                <div className="relative">
+                <div
+                    className="relative"
+                    style={avatarUrl && isPresetAvatarUrl(avatarUrl)
+                        // Preset mannequins are pencil-on-white: multiply over the
+                        // character's gradient so the placeholder carries their color.
+                        ? {background: `linear-gradient(135deg, ${getAvatarGradient(name)[0]} 0%, ${getAvatarGradient(name)[1]} 100%)`}
+                        : undefined}
+                >
                     {avatarUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element -- authed dynamic route; next/image can't optimize it
-                        <img src={avatarUrl} alt={name} className={`w-full block ${isDead ? 'grayscale brightness-[.55]' : ''}`} />
+                        <img src={avatarUrl} alt={name} className={`w-full block ${isDead ? 'grayscale brightness-[.55]' : ''}`} style={isPresetAvatarUrl(avatarUrl) ? {mixBlendMode: 'multiply'} : undefined} />
                     ) : (
                         <div className="w-full aspect-square flex items-center justify-center bg-[var(--bg-2)]">
                             <PlayerAvatar name={name} size={140} isGM={isGM} isDead={isDead} />
                         </div>
                     )}
-                    <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-[var(--bg-1)] to-transparent" />
+                    {/* Short, faint plate: solid only at the very bottom edge, faint above —
+                        a tall or strong fade reads as a white blanket over the portrait. */}
+                    <div className="absolute inset-x-0 bottom-0 h-14" style={{background: 'linear-gradient(to top, var(--bg-1) 8%, color-mix(in srgb, var(--bg-1) 30%, transparent) 55%, transparent)'}} />
                     <div className="card-plate-name absolute left-4 bottom-2 text-[24px] font-bold">
                         {name}{isDead ? ' ✝' : ''}
                     </div>

@@ -122,8 +122,12 @@ function GamePageContent({
                     if (result.avatarsStatus !== 'generating') return;
                 }
                 // Another runner (the creation kickoff, a second tab) holds the
-                // claim — poll the game doc until generation lands.
-                for (let i = 0; i < 30 && !cancelled; i++) {
+                // claim — poll the game doc until generation lands. 100 × 3s
+                // (~5min) comfortably outlasts the worst case (grid regen after
+                // a failed slice check); until then the preset sketches
+                // stand in, but a poll that gives up too early would leave them
+                // up permanently even after the themed art arrives.
+                for (let i = 0; i < 100 && !cancelled; i++) {
                     await new Promise(resolve => setTimeout(resolve, 3000));
                     const fresh = await getGame(game.id);
                     if (cancelled || !fresh) return;

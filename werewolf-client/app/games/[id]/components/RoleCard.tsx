@@ -53,7 +53,8 @@ export default function RoleCard({ role, own = false, onClose }: RoleCardProps) 
                 <div className="relative">
                     {/* eslint-disable-next-line @next/next/no-img-element -- small static asset, no optimization needed */}
                     <img src={`/roles/${role}.jpg`} alt={detail.name} className="w-full block" />
-                    <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[var(--bg-1)] to-transparent" />
+                    {/* Same softened plate as CharacterCard: short and faint. */}
+                    <div className="absolute inset-x-0 bottom-0 h-12" style={{background: 'linear-gradient(to top, var(--bg-1) 8%, color-mix(in srgb, var(--bg-1) 30%, transparent) 55%, transparent)'}} />
                     <div className="absolute left-4 bottom-2 card-plate-name text-[24px] font-bold">
                         {own ? `You are the ${detail.name}` : detail.name}
                     </div>

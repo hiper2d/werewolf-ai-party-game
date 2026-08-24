@@ -5,6 +5,8 @@ import { createPortal } from 'react-dom';
 import { Game, GameMessage, GAME_MASTER, GAME_ROLES, GAME_STATES, MessageType, PLAY_STYLE_CONFIGS } from '@/app/api/game-models';
 import { getModelDisplayName } from '@/app/ai/ai-models';
 import { getAvatarUrl } from '@/app/utils/avatar-utils';
+import { isPresetAvatarUrl } from '@/app/utils/preset-avatars';
+import { getAvatarGradient } from '@/app/utils/color-utils';
 import { convertMessageContent } from '@/app/utils/message-utils';
 import PlayerAvatar from '@/app/components/PlayerAvatar';
 
@@ -98,6 +100,9 @@ export default function CinematicMode({ game, messages, onClose, startMessageId,
         return Math.max(0, turns.length - 1);
     });
     const [typedCount, setTypedCount] = useState(0);
+    // Bot story on the portrait card: collapsed by default, and the choice
+    // persists across turns — expand once and every speaker shows their story.
+    const [storyOpen, setStoryOpen] = useState(false);
     const typingTimer = useRef<ReturnType<typeof setInterval> | null>(null);
     const prevTurnCount = useRef(turns.length);
 
@@ -192,6 +197,7 @@ export default function CinematicMode({ game, messages, onClose, startMessageId,
     const avatarUrl = getAvatarUrl(game, turn.speaker);
     const modelName = isHuman ? 'Human' : getModelDisplayName(isGM ? game.gameMasterAiType : bot?.aiType ?? '');
     const playStyleName = bot ? (PLAY_STYLE_CONFIGS[bot.playStyle]?.name ?? bot.playStyle) : null;
+    const story = bot?.story;
 
     const typedHtml = tokens.slice(0, typedCount).join('');
     const waiting = atLastTurn && typingDone && botsStillTalking;
@@ -260,11 +266,24 @@ export default function CinematicMode({ game, messages, onClose, startMessageId,
                         <div
                             key={turn.key}
                             className="cine-card-swap relative w-full overflow-hidden rounded-[20px] border border-[var(--line-3)]"
-                            style={{aspectRatio: '3 / 4.35', boxShadow: 'var(--cine-card-shadow)', background: 'var(--bg-2)'}}
+                            style={{
+                                aspectRatio: '3 / 4.35',
+                                boxShadow: 'var(--cine-card-shadow)',
+                                // Preset mannequins are pencil-on-white: the card takes the
+                                // speaker's gradient and the sketch multiplies over it.
+                                background: avatarUrl && isPresetAvatarUrl(avatarUrl)
+                                    ? `linear-gradient(135deg, ${getAvatarGradient(turn.speaker)[0]} 0%, ${getAvatarGradient(turn.speaker)[1]} 100%)`
+                                    : 'var(--bg-2)',
+                            }}
                         >
                             {avatarUrl ? (
                                 // eslint-disable-next-line @next/next/no-img-element -- authed dynamic route
-                                <img src={avatarUrl} alt={turn.speaker} className={`absolute inset-0 w-full h-full object-cover object-top ${isDead ? 'grayscale brightness-[.6]' : ''}`} />
+                                <img
+                                    src={avatarUrl}
+                                    alt={turn.speaker}
+                                    className={`absolute inset-0 w-full h-full object-cover object-top ${isDead ? 'grayscale brightness-[.6]' : ''}`}
+                                    style={isPresetAvatarUrl(avatarUrl) ? {mixBlendMode: 'multiply'} : undefined}
+                                />
                             ) : (
                                 <div className="absolute inset-0 flex items-center justify-center">
                                     <PlayerAvatar name={turn.speaker} size={150} isGM={isGM} isDead={isDead} />
@@ -275,13 +294,41 @@ export default function CinematicMode({ game, messages, onClose, startMessageId,
                             {/* Corner chips */}
                             <span className="absolute top-3 left-3 font-mono text-[10px] tracking-[0.1em] px-[9px] py-[4px] rounded-[5px]" style={{background: 'var(--cine-chip)', backdropFilter: 'blur(6px)', color: tint.text}}>{roleLabel}</span>
                             <span className="absolute top-3 right-3 font-mono text-[10px] tracking-[0.1em] px-[9px] py-[4px] rounded-[5px] text-[var(--fg-1)]" style={{background: 'var(--cine-chip)', backdropFilter: 'blur(6px)'}}>{turnIndex + 1} / {turns.length}</span>
+                            {/* Expanded story: overlays the top of the portrait, below the chips,
+                                so it never fights the name plate at the bottom for space. */}
+                            {story && storyOpen && (
+                                <p
+                                    className="absolute top-12 left-3 right-3 m-0 rounded-[8px] px-2.5 py-2 text-[12px] leading-relaxed text-[#e6e8ec] max-h-[45%] overflow-y-auto"
+                                    style={{background: 'rgba(10,12,16,0.62)', backdropFilter: 'blur(6px)', textShadow: 'none'}}
+                                >
+                                    {story}
+                                </p>
+                            )}
                             {/* Name plate */}
-                            <div className="absolute inset-x-0 bottom-0 pointer-events-none px-[22px] pb-[20px] pt-[64px]" style={{background: 'var(--cine-plate)'}}>
+                            {/* text-shadow inherits: one halo declaration covers name, meta and chip. */}
+                            <div className="absolute inset-x-0 bottom-0 pointer-events-none px-[22px] pb-[20px] pt-[64px]" style={{background: 'var(--cine-plate)', textShadow: 'var(--cine-plate-text-shadow)'}}>
                                 <div className="font-bold tracking-[-0.02em] text-[clamp(20px,2vw,30px)] leading-tight" style={{color: 'var(--cine-plate-fg)'}}>{turn.speaker}{isDead ? ' ✝' : ''}</div>
-                                <div className="mt-1.5 font-mono text-[11px] text-[var(--fg-2)] flex flex-col gap-0.5">
-                                    <span>Model <span className="text-[var(--fg-1)]">{modelName}</span></span>
-                                    {playStyleName && <span>Play style <span className="text-[var(--fg-1)]">{playStyleName}</span></span>}
-                                    {turn.cost !== undefined && turn.cost > 0 && <span className="max-[1100px]:hidden">Cost <span className="text-[var(--fg-1)]">${turn.cost.toFixed(4)}</span></span>}
+                                <div className="mt-1.5 font-mono text-[11px] text-[var(--cine-plate-fg-2)] flex flex-col gap-0.5">
+                                    <span>Model <span className="text-[var(--cine-plate-fg-1)]">{modelName}</span></span>
+                                    {playStyleName && <span>Play style <span className="text-[var(--cine-plate-fg-1)]">{playStyleName}</span></span>}
+                                    {(story || (turn.cost !== undefined && turn.cost > 0)) && (
+                                        <div className="flex items-center gap-2 min-h-[20px]">
+                                            {turn.cost !== undefined && turn.cost > 0 && <span className="max-[1100px]:hidden">Cost <span className="text-[var(--cine-plate-fg-1)]">${turn.cost.toFixed(4)}</span></span>}
+                                            {story && (
+                                                <button
+                                                    onClick={() => setStoryOpen(o => !o)}
+                                                    aria-expanded={storyOpen}
+                                                    className="pointer-events-auto ml-auto inline-flex items-center gap-1.5 font-mono text-[10px] tracking-[0.1em] px-[9px] py-[4px] rounded-[5px] text-[var(--cine-plate-fg-2)] hover:text-[var(--cine-plate-fg)] transition-colors"
+                                                    style={{background: 'rgba(10,12,16,0.55)', backdropFilter: 'blur(6px)'}}
+                                                >
+                                                    STORY
+                                                    <svg width="9" height="9" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className={`transition-transform ${storyOpen ? 'rotate-180' : ''}`}>
+                                                        <path d="M1.5 3.5L5 7l3.5-3.5" />
+                                                    </svg>
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -365,10 +412,13 @@ export default function CinematicMode({ game, messages, onClose, startMessageId,
                                             ? 'opacity-100 border-[var(--accent)] shadow-[0_0_0_2px_var(--accent-soft)]'
                                             : state === 'done' ? 'opacity-[.65] border-transparent' : 'opacity-40 border-transparent'
                                     }`}
+                                    style={url && isPresetAvatarUrl(url)
+                                        ? {background: `linear-gradient(135deg, ${getAvatarGradient(t.speaker)[0]} 0%, ${getAvatarGradient(t.speaker)[1]} 100%)`}
+                                        : undefined}
                                 >
                                     {url ? (
                                         // eslint-disable-next-line @next/next/no-img-element -- authed dynamic route
-                                        <img src={url} alt={t.speaker} className="w-full h-full object-cover object-top" />
+                                        <img src={url} alt={t.speaker} className="w-full h-full object-cover object-top" style={isPresetAvatarUrl(url) ? {mixBlendMode: 'multiply'} : undefined} />
                                     ) : (
                                         <PlayerAvatar name={t.speaker} size={38} isGM={t.speaker === GAME_MASTER} />
                                     )}
