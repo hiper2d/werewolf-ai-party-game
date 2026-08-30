@@ -68,11 +68,11 @@ export const LLM_CONSTANTS = {
     GROK_4_6: 'grok',
     KIMI: 'kimi',
     GLM: 'glm',
+    GLM_FLASH: 'glm-flash',
     FUGU_ULTRA: 'fugu-ultra',
     // Qwen (QwenCloud/DashScope). Stable picker ids without the version, matching the gpt/gemini
     // pattern, so future repoints don't orphan persisted ids.
     QWEN_MAX: 'qwen-max',
-    QWEN_PLUS: 'qwen-plus',
     QWEN_FLASH: 'qwen-flash',
     // MiniMax. Single M3 entry; stable id without the version for the same repoint reason.
     MINIMAX: 'minimax',
@@ -114,7 +114,8 @@ export interface ModelConfig {
     // minimal|low|medium|high|xhigh, Gemini 3.x takes minimal|low|medium|high (sent uppercase
     // as thinkingLevel; 3.1 Pro and 3.7 Flash reject 'minimal'), Fugu takes high|xhigh,
     // Z.AI GLM-5.3 takes low|high|max ONLY (the generic Z.AI API reference lists a 7-value
-    // scale, but glm-5.3 rejects anything else with a 400).
+    // scale, but glm-5.3 rejects anything else with a 400), DeepSeek V4 takes low|high|max
+    // (medium is aliased to high; default high).
     reasoningEffort?: ReasoningEffort; // Effort-based APIs (Anthropic adaptive thinking, Gemini 3.x)
     thinkingBudgetTokens?: number; // Budget-based APIs (Anthropic enabled thinking, Qwen thinking_budget)
     // Per-request output ceiling, overriding DEFAULT_MAX_OUTPUT_TOKENS. Only set it for models
@@ -161,12 +162,17 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         tags: ['slow', 'cheap'],
     },
 
-    // DeepSeek V4 models — thinking-only entries (non-thinking variants retired 2026-08-05)
+    // DeepSeek V4 models — thinking-only entries (non-thinking variants retired 2026-08-05).
+    // reasoningEffort pinned to 'low' 2026-08-30: at the provider default ('high', no budget
+    // knob exists) both models emitted ~8 reasoning tokens per answer token in prod
+    // (requestStats 30d: flash p50 8.9s / p90 36s, pro p50 18.9s / p90 56s) and a 15-bot story
+    // took 68-105s. Latency tracks reasoning length ~linearly, so effort is the only lever.
     [LLM_CONSTANTS.DEEPSEEK_V4_FLASH]: {
         displayName: 'DeepSeek V4 Flash',
         modelApiName: 'deepseek-v4-flash',
         apiKeyName: API_KEY_CONSTANTS.DEEPSEEK,
         hasThinking: true,
+        reasoningEffort: 'low',
         // Reasoning tokens share the output budget, so leave room for both CoT and answer.
         maxOutputTokens: 65536,
         tags: ['cheap'],
@@ -176,6 +182,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         modelApiName: 'deepseek-v4-pro',
         apiKeyName: API_KEY_CONSTANTS.DEEPSEEK,
         hasThinking: true,
+        reasoningEffort: 'low',
         // Reasoning tokens share the output budget, so leave room for both CoT and answer.
         maxOutputTokens: 65536,
         tags: ['cheap'],
@@ -314,6 +321,21 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         maxOutputTokens: 16384,
         tags: ['slow'],
     },
+    // GLM-5.3-Flash (added 2026-08-30): the cheap sibling. Same API contract as GLM-5.3 —
+    // thinking cannot be disabled and reasoning_effort takes low|high|max only
+    // (docs.z.ai/guides/llm/glm-5.3-flash, /guides/capabilities/thinking), so it gets the same
+    // 'high' pin and the same reasoning+answer headroom.
+    [LLM_CONSTANTS.GLM_FLASH]: {
+        displayName: 'GLM-5.3 Flash',
+        modelApiName: 'glm-5.3-flash',
+        apiKeyName: API_KEY_CONSTANTS.Z_AI,
+        hasThinking: true,
+        temperature: 0.7,
+        reasoningEffort: 'high',
+        maxOutputTokens: 16384,
+        // Live 2026-08-30 (one sample each): day-2 vote 11.8s, 15-character story 56.2s.
+        tags: ['cheap'],
+    },
 
     // Sakana Fugu models — OpenAI-compatible. They reason internally (and bill it as
     // "orchestration" tokens), but never surface reasoning to us: responses come back with
@@ -353,18 +375,13 @@ export const SupportedAiModels: Record<string, ModelConfig> = {
         // Capped it measures 25-26s → the >25s tier.
         tags: ['very-slow'],
     },
-    [LLM_CONSTANTS.QWEN_PLUS]: {
-        displayName: 'Qwen3.7 Plus',
-        modelApiName: 'qwen3.7-plus',
-        apiKeyName: API_KEY_CONSTANTS.QWEN,
-        hasThinking: true,
-        temperature: 0.7,
-        thinkingBudgetTokens: 1024,
-        tags: ['slow', 'cheap'],
-    },
+    // qwen3.8-flash replaced qwen3.7-flash on 2026-08-30 (same 1M context, 128k max output);
+    // qwen3.7-plus was retired the same day — persisted 'qwen-plus' ids resolve to this entry
+    // in consumers' deprecated-id maps. Live 2026-08-30 (one sample each): day-2 vote 13.8s,
+    // 15-character story 26.4s — same bucket as 3.7-flash, so the tags carry over.
     [LLM_CONSTANTS.QWEN_FLASH]: {
-        displayName: 'Qwen3.7 Flash',
-        modelApiName: 'qwen3.7-flash',
+        displayName: 'Qwen3.8 Flash',
+        modelApiName: 'qwen3.8-flash',
         apiKeyName: API_KEY_CONSTANTS.QWEN,
         hasThinking: true,
         temperature: 0.7,
@@ -472,6 +489,10 @@ export interface ModelPricing {
 export interface PeakPricing {
     multiplier: number; // e.g. 2 → peak-hour prices are double the regular price
     windowsUtc: Array<[number, number]>; // [startHour, endHour) pairs in UTC, e.g. [[1, 4], [6, 10]]
+    /** When set, the windows apply Monday–Friday only: a request that falls on a Saturday or
+     *  Sunday in the provider's local timezone (given as a UTC offset in hours) bills at the
+     *  base rate all day. */
+    weekendOffPeak?: { utcOffsetHours: number };
 }
 
 /** True if the timestamp's UTC time-of-day falls inside any [startHour, endHour) window. */
@@ -481,16 +502,45 @@ export function isInPeakWindow(timestampMs: number, windowsUtc: Array<[number, n
     return windowsUtc.some(([start, end]) => hour >= start && hour < end);
 }
 
+/** True if the timestamp falls on a Saturday or Sunday in the timezone at the given UTC offset. */
+export function isWeekendAt(timestampMs: number, utcOffsetHours: number): boolean {
+    const day = new Date(timestampMs + utcOffsetHours * 3_600_000).getUTCDay();
+    return day === 0 || day === 6;
+}
+
+/** True if a request at this timestamp bills at the peak multiplier under the schedule. */
+export function isPeakBilling(timestampMs: number, peak: PeakPricing): boolean {
+    if (peak.weekendOffPeak && isWeekendAt(timestampMs, peak.weekendOffPeak.utcOffsetHours)) {
+        return false;
+    }
+    return isInPeakWindow(timestampMs, peak.windowsUtc);
+}
+
+/** DeepSeek's peak-valley schedule: 2× during Beijing 09:00–12:00 and 14:00–18:00
+ *  (UTC 1–4, 6–10), Monday–Friday Beijing time only. */
+export const DEEPSEEK_PEAK_SCHEDULE: PeakPricing = {
+    multiplier: 2,
+    windowsUtc: [[1, 4], [6, 10]],
+    weekendOffPeak: { utcOffsetHours: 8 },
+};
+
 /**
  * Centralized pricing configuration for all AI models
  * All prices are per million (1,000,000) tokens
  */
 export const MODEL_PRICING: Record<string, ModelPricing> = {
     // OpenAI GPT-5.6 models
+    // Sol repriced 2026-08-30 (developers.openai.com/api/docs/pricing): $4/$20 short context,
+    // $8/$30 past the long-context threshold — the same 272k boundary its siblings use.
+    // Cache writes ($5/$10) are not modelled; OpenAI caching is automatic and we only see hits.
     [SupportedAiModels[LLM_CONSTANTS.GPT_5_6_SOL].modelApiName]: {
-        inputPrice: 5.000,
-        outputPrice: 30.000,
-        cacheHitPrice: 0.500
+        inputPrice: 4.000,
+        outputPrice: 20.000,
+        cacheHitPrice: 0.400,
+        extendedContextInputPrice: 8.000,
+        extendedContextOutputPrice: 30.000,
+        extendedContextCacheHitPrice: 0.800,
+        extendedContextThresholdTokens: 272_000
     },
     [SupportedAiModels[LLM_CONSTANTS.GPT_5_6_TERRA].modelApiName]: {
         inputPrice: 2.000,
@@ -514,18 +564,20 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
     // DeepSeek V4 models
     // Peak-valley pricing landed: these are the new base (off-peak) rates with a 2× surcharge
     // during UTC 1:00–4:00 and 6:00–10:00, effective provider-side 2026-08-16 16:00 UTC
-    // (api-docs.deepseek.com/quick_start/pricing, fetched 2026-08-13).
+    // (api-docs.deepseek.com/quick_start/pricing, fetched 2026-08-13; rates re-confirmed
+    // 2026-08-30). Since 2026-08-23 00:00 Beijing (UTC+8) the surcharge is weekdays-only:
+    // Saturday and Sunday Beijing time bill at the off-peak rate all day (DeepSeek notice email).
     [SupportedAiModels[LLM_CONSTANTS.DEEPSEEK_V4_FLASH].modelApiName]: {
         inputPrice: 0.22,
         outputPrice: 0.66,
         cacheHitPrice: 0.007,
-        peakPricing: { multiplier: 2, windowsUtc: [[1, 4], [6, 10]] }
+        peakPricing: DEEPSEEK_PEAK_SCHEDULE
     },
     [SupportedAiModels[LLM_CONSTANTS.DEEPSEEK_V4_PRO].modelApiName]: {
         inputPrice: 0.66,
         outputPrice: 1.98,
         cacheHitPrice: 0.022,
-        peakPricing: { multiplier: 2, windowsUtc: [[1, 4], [6, 10]] }
+        peakPricing: DEEPSEEK_PEAK_SCHEDULE
     },
 
     // Kimi/Moonshot models
@@ -540,6 +592,14 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
         inputPrice: 1.4,
         outputPrice: 4.4,
         cacheHitPrice: 0.26
+    },
+    // GLM-5.3-Flash list rates (docs.z.ai/guides/overview/pricing, 2026-08-30). The page shows a
+    // 50% promo ($0.075 / $0.015 / $0.25) ending 2026-09-09 24:00 UTC+8; we bill the list rate
+    // rather than track a ten-day promo.
+    [SupportedAiModels[LLM_CONSTANTS.GLM_FLASH].modelApiName]: {
+        inputPrice: 0.15,
+        outputPrice: 0.50,
+        cacheHitPrice: 0.03
     },
 
     // Anthropic models
@@ -642,38 +702,21 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
         extendedContextThresholdTokens: 272_000
     },
 
-    // Qwen models. Cache-hit rates follow QwenCloud's implicit-cache rule: hits bill at 20% of
-    // the input price (docs.qwencloud.com → Context cache); we don't send explicit cache_control.
-    // qwen3.8-max: $2/$6 is from the launch coverage/OpenRouter (2026-08-03) — the official docs
-    // defer to the Model Marketplace, which WebFetch can't read. Third parties quote $0.25 cached,
-    // which contradicts the 20% rule ($0.40); we charge the documented 20% to avoid a Fugu-style
-    // undercharge. Reconcile both against the console bill after real usage.
+    // Qwen models. Rates from the official pricing page (qwencloud.com/pricing/api, read
+    // 2026-08-30 — the page is client-rendered, so it was read by eye, not WebFetch):
+    // qwen3.8-max $2/$6 with implicit-cache hits at $0.25; qwen3.8-flash $0.15/$0.47, hits
+    // $0.016. Neither has input-length tiers (the tier column is "-" for both). These
+    // published cached rates supersede the 20%-of-input rule charged before 2026-08-30; we
+    // still don't send explicit cache_control.
     [SupportedAiModels[LLM_CONSTANTS.QWEN_MAX].modelApiName]: {
         inputPrice: 2.0,
         outputPrice: 6.0,
-        cacheHitPrice: 0.40
+        cacheHitPrice: 0.25
     },
-    [SupportedAiModels[LLM_CONSTANTS.QWEN_PLUS].modelApiName]: {
-        inputPrice: 0.40,
-        outputPrice: 1.60,
-        cacheHitPrice: 0.08,
-        extendedContextInputPrice: 1.20,
-        extendedContextOutputPrice: 4.80,
-        extendedContextCacheHitPrice: 0.24,
-        extendedContextThresholdTokens: 256_000
-    },
-    // qwen3.7-flash actually has THREE price tiers (≤32K: 0.03/0.13, 32K–256K: 0.10/0.40,
-    // 256K–1M: 0.20/0.80) but the schema supports one threshold. We model the first boundary and
-    // bill the middle tier above it, knowingly undercharging 2× past 256K — long contexts
-    // essentially never get there, and the absolute rates are tiny either way.
     [SupportedAiModels[LLM_CONSTANTS.QWEN_FLASH].modelApiName]: {
-        inputPrice: 0.03,
-        outputPrice: 0.13,
-        cacheHitPrice: 0.006,
-        extendedContextInputPrice: 0.10,
-        extendedContextOutputPrice: 0.40,
-        extendedContextCacheHitPrice: 0.02,
-        extendedContextThresholdTokens: 32_000
+        inputPrice: 0.15,
+        outputPrice: 0.47,
+        cacheHitPrice: 0.016
     },
 
     // MiniMax M3. Rates from platform.minimax.io/docs/guides/pricing-paygo (2026-08-05, USD,
@@ -704,10 +747,10 @@ const HYBRID_THINKING_API_NAMES = new Set([
     SupportedAiModels[LLM_CONSTANTS.DEEPSEEK_V4_FLASH].modelApiName,
     SupportedAiModels[LLM_CONSTANTS.DEEPSEEK_V4_PRO].modelApiName,
     SupportedAiModels[LLM_CONSTANTS.GLM].modelApiName,
+    SupportedAiModels[LLM_CONSTANTS.GLM_FLASH].modelApiName,
     // Qwen ships thinking-only from day one, but the API's enable_thinking toggle makes these
     // hybrid by the same definition: we force reasoning on, so they carry the multiplier.
     SupportedAiModels[LLM_CONSTANTS.QWEN_MAX].modelApiName,
-    SupportedAiModels[LLM_CONSTANTS.QWEN_PLUS].modelApiName,
     SupportedAiModels[LLM_CONSTANTS.QWEN_FLASH].modelApiName,
     SupportedAiModels[LLM_CONSTANTS.MINIMAX].modelApiName,
 ]);
@@ -774,7 +817,7 @@ export function calculateModelCost(
 
     if (
         pricing.peakPricing &&
-        isInPeakWindow(options.timestamp ?? Date.now(), pricing.peakPricing.windowsUtc)
+        isPeakBilling(options.timestamp ?? Date.now(), pricing.peakPricing)
     ) {
         activeInputPrice *= pricing.peakPricing.multiplier;
         activeOutputPrice *= pricing.peakPricing.multiplier;

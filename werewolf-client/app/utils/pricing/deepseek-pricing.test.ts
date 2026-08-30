@@ -2,7 +2,7 @@ import {
     extractTokenUsageFromResponse,
     calculateDeepSeekCost
 } from './deepseek-pricing';
-import { MODEL_PRICING } from '../../ai/ai-models';
+import { MODEL_PRICING, calculateModelCost as calculateCost } from '../../ai/ai-models';
 
 describe('DeepSeek Pricing Utils', () => {
     describe('extractTokenUsageFromResponse', () => {
@@ -183,13 +183,23 @@ describe('DeepSeek Pricing Utils', () => {
             expect(MODEL_PRICING['deepseek-v4-pro'].cacheHitPrice).toBe(0.022);
         });
 
-        it('should carry the peak-valley schedule on both DeepSeek models', () => {
+        it('should carry the weekday-only peak-valley schedule on both DeepSeek models', () => {
             for (const model of ['deepseek-v4-flash', 'deepseek-v4-pro']) {
                 expect(MODEL_PRICING[model].peakPricing).toEqual({
                     multiplier: 2,
-                    windowsUtc: [[1, 4], [6, 10]]
+                    windowsUtc: [[1, 4], [6, 10]],
+                    weekendOffPeak: { utcOffsetHours: 8 }
                 });
             }
+        });
+
+        it('bills weekends (Beijing time) at the off-peak rate even inside a peak window', () => {
+            // 2026-08-29 is a Saturday; 2026-08-31 a Monday. 02:00 UTC = 10:00 Beijing, peak.
+            const saturday = Date.UTC(2026, 7, 29, 2);
+            const monday = Date.UTC(2026, 7, 31, 2);
+            const offPeak = 0.22;
+            expect(calculateCost('deepseek-v4-flash', 1_000_000, 0, { timestamp: saturday })).toBeCloseTo(offPeak, 5);
+            expect(calculateCost('deepseek-v4-flash', 1_000_000, 0, { timestamp: monday })).toBeCloseTo(offPeak * 2, 5);
         });
     });
 });

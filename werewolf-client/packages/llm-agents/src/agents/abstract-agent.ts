@@ -2,7 +2,7 @@ import { AIMessage, TokenUsage, AgentLoggingConfig, DEFAULT_LOGGING_CONFIG } fro
 import { z } from 'zod';
 import { logger } from "../logger";
 import { CACHE_TIER_MARKER } from "../cache-tier";
-import { DEFAULT_MAX_OUTPUT_TOKENS, getModelConfigByApiName } from "../catalog";
+import { DEFAULT_MAX_OUTPUT_TOKENS, getModelConfigByApiName, ReasoningEffort } from "../catalog";
 
 export abstract class AbstractAgent {
     name: string;
@@ -15,6 +15,15 @@ export abstract class AbstractAgent {
      * so subclasses must read it when building a request, never snapshot it at construction.
      */
     maxOutputTokens: number;
+    /**
+     * Reasoning-depth knobs, resolved once from the catalog like maxOutputTokens and, like it,
+     * overridable per instance for calls whose profile differs from a turn (story generation
+     * runs deeper). Each provider speaks one dialect — effort (DeepSeek, GLM, Gemini, Claude
+     * adaptive) or a token budget (Qwen, Claude Haiku) — and reads only the field it
+     * understands; the other is ignored. Subclasses read these when building a request.
+     */
+    reasoningEffort?: ReasoningEffort;
+    thinkingBudgetTokens?: number;
     protected readonly instruction: string;
     /**
      * The instruction split on CACHE_TIER_MARKER: [shared static tier, per-bot tier].
@@ -45,7 +54,10 @@ export abstract class AbstractAgent {
         this.model = model;
         this.enableThinking = enableThinking;
         this.agentLoggingConfig = agentLoggingConfig;
-        this.maxOutputTokens = getModelConfigByApiName(model)?.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS;
+        const modelConfig = getModelConfigByApiName(model);
+        this.maxOutputTokens = modelConfig?.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS;
+        this.reasoningEffort = modelConfig?.reasoningEffort;
+        this.thinkingBudgetTokens = modelConfig?.thinkingBudgetTokens;
     }
 
     /**

@@ -71,6 +71,26 @@ export class DeepSeekV2Agent extends AbstractAgent {
     }
 
     /**
+     * Thinking params for the request body. DeepSeek V4 toggles thinking with a top-level
+     * `thinking: { type }` (the docs' `extra_body` is a Python-SDK wrapper; openai-node has no
+     * such thing and sends the key literally, where the API ignores it — probed 2026-08-30:
+     * `extra_body: {thinking: {type: 'disabled'}}` still reasoned, top-level `thinking` did
+     * not). Thinking is on by default, so the flag matters only for turning it off.
+     * `reasoning_effort` takes low|high|max (default high, no budget parameter exists); it is
+     * the instance field (catalog default, per-call override) and is only sent when set.
+     */
+    private thinkingParams(): Record<string, unknown> {
+        if (!this.enableThinking) {
+            return { thinking: { type: 'disabled' } };
+        }
+        const effort = this.reasoningEffort;
+        return {
+            thinking: { type: 'enabled' },
+            ...(effort ? { reasoning_effort: effort } : {}),
+        };
+    }
+
+    /**
      * New method using Zod with DeepSeek API
      * This provides better schema handling and runtime validation
      * 
@@ -92,7 +112,7 @@ export class DeepSeekV2Agent extends AbstractAgent {
             // 8192 cap used to truncate long replies mid-JSON on thinking models, where
             // reasoning_content shares this budget with the answer — hence the catalog
             // override on both DeepSeek entries.
-            let requestParams: any = {
+            const requestParams: any = {
                 model: this.model,
                 messages: this.addSystemInstruction(modifiedInput),
                 max_tokens: this.maxOutputTokens,
@@ -116,10 +136,7 @@ export class DeepSeekV2Agent extends AbstractAgent {
                 type: 'json_object'
             };
 
-            if (this.enableThinking) {
-                // DeepSeek V4: enable thinking via extra_body
-                requestParams.extra_body = { thinking: { type: 'enabled' } };
-            }
+            Object.assign(requestParams, this.thinkingParams());
 
             let response;
             try {
@@ -203,10 +220,7 @@ export class DeepSeekV2Agent extends AbstractAgent {
                 ...(this.enableThinking ? {} : { temperature: this.temperature }),
             };
 
-            if (this.enableThinking) {
-                // DeepSeek V4: enable thinking via extra_body
-                requestParams.extra_body = { thinking: { type: 'enabled' } };
-            }
+            Object.assign(requestParams, this.thinkingParams());
 
             let response;
             try {

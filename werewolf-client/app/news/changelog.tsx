@@ -13,6 +13,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        id: "glm-flash-qwen-38", date: "Aug 2026", tags: ["Models"],
+        title: "Two new cheap reasoners, and two price drops",
+        body: (<><strong>GLM-5.3 Flash</strong> joins the picker — Z.AI&apos;s budget sibling of GLM-5.3, with
+            the same always-on reasoning at a fraction of the price. It&apos;s unlimited on the free tier.
+            <strong> Qwen3.8 Flash</strong> takes over the Qwen Flash slot from 3.7 Flash, with a larger 128k
+            output window. (Qwen3.7 Plus is retired; any bots still using it now play as Qwen3.8 Flash.)
+            On the pricing side, good news for paid players: <strong>GPT-5.6 Sol</strong> got cheaper —
+            $4 / $20 per million tokens, down from $5 / $30 — and <strong>DeepSeek</strong> now bills its
+            off-peak rate all weekend (Beijing time), so Saturday and Sunday games skip the 2× peak
+            surcharge entirely.</>),
+        media: null,
+        links: [{label: "Create a game", href: "/games"}],
+    },
+    {
         id: "cinematic-mode", date: "Aug 2026", tags: ["Design"],
         title: "Cinematic Mode",
         body: (<>Watch the discussion play out as a scene: when a character speaks, their

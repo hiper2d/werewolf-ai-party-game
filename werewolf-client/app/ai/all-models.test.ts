@@ -25,7 +25,9 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import { AgentFactory } from "@/app/ai/agent-factory";
-import { LLM_CONSTANTS, SupportedAiModels, API_KEY_CONSTANTS, STORY_MAX_OUTPUT_TOKENS } from "@/app/ai/ai-models";
+import {
+    LLM_CONSTANTS, SupportedAiModels, API_KEY_CONSTANTS, STORY_MAX_OUTPUT_TOKENS, configureStoryAgent,
+} from "@/app/ai/ai-models";
 import {
     ApiKeyMap, AIMessage, GAME_MASTER, GAME_ROLES, GameMessage, MessageType,
     PLAY_STYLE_CONFIGS, ROLE_CONFIGS,
@@ -530,10 +532,13 @@ describe("All models - story generation at max lobby size", () => {
 
         it(`${config.displayName} (${llmType}) should generate ${STORY_BOT_COUNT} characters without truncating`, async () => {
             const agent = AgentFactory.createAgent(GAME_MASTER, STORY_SYSTEM_PROMPT, llmType, apiKeys, false);
-            // Mirrors game-actions.ts. Asserted rather than assumed: if that override is ever
-            // dropped, story generation silently falls back to the turn-sized default.
-            agent.maxOutputTokens = STORY_MAX_OUTPUT_TOKENS;
+            // Same profile as game-actions.ts. Asserted rather than assumed: if the override is
+            // ever dropped, story generation silently falls back to the turn-sized defaults.
+            configureStoryAgent(agent);
             expect(agent.maxOutputTokens).toBe(STORY_MAX_OUTPUT_TOKENS);
+            // Reasoning deliberately stays at the catalog default — see configureStoryAgent.
+            expect(agent.reasoningEffort).toBe(SupportedAiModels[llmType].reasoningEffort);
+            expect(agent.thinkingBudgetTokens).toBe(SupportedAiModels[llmType].thinkingBudgetTokens);
 
             const [setup, , tokenUsage] = await withPerf(
                 `Story generation (${STORY_BOT_COUNT} bots)`,

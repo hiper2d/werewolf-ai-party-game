@@ -13,6 +13,7 @@ import {
     SupportedAiModels as DEFAULT_MODEL_CATALOG,
     MODEL_PRICING,
     isHybridThinkingModel,
+    type AbstractAgent,
 } from '@hiper2d/llm-agents';
 
 // Generic catalog + pricing surface, re-exported so existing '@/app/ai/ai-models' imports
@@ -33,6 +34,8 @@ export {
     getModelProviderName,
     getModelConfigByApiName,
     isInPeakWindow,
+    isWeekendAt,
+    isPeakBilling,
     MODEL_PRICING,
     isHybridThinkingModel,
     calculateModelCost,
@@ -87,6 +90,19 @@ export const IMAGE_MODEL_CONSTANTS = {
  * the 16k it has always run with rather than guessing a smaller number from no data.
  */
 export const STORY_MAX_OUTPUT_TOKENS = 16384;
+
+/**
+ * Applies the story-generation profile to a freshly created GM agent (used by the story path
+ * and mirrored by the live story test). Only the output ceiling differs from a turn: reasoning
+ * stays at each model's catalog default (DeepSeek `low`, Qwen budget 1024, …). A deeper
+ * story profile (effort `high` + budget 8192) was measured 2026-08-30 and rejected — it
+ * roughly doubled setup time on every model and made DeepSeek Flash volatile (60s to a
+ * 240s timeout) with no observed quality gain. The per-instance `reasoningEffort` /
+ * `thinkingBudgetTokens` fields on AbstractAgent remain available if that ever changes.
+ */
+export function configureStoryAgent(agent: AbstractAgent): void {
+    agent.maxOutputTokens = STORY_MAX_OUTPUT_TOKENS;
+}
 
 export interface AudioModelPricing {
     pricePerMillionCharacters?: number;
@@ -233,6 +249,9 @@ const DEPRECATED_MODEL_MAP: Record<string, string> = {
     // picker and "Retry with different model" will reject until that bot is switched —
     // validateModelUsageForTier re-checks every bot in the game, not just the one being changed.
     'fugu': LLM_CONSTANTS.FUGU_ULTRA,
+    // Qwen3.7 Plus retired 2026-08-30 alongside the 3.7→3.8 Flash swap; the Flash entry is the
+    // cheap Qwen tier that replaces it.
+    'qwen-plus': LLM_CONSTANTS.QWEN_FLASH,
 };
 
 /** Maps a possibly-retired model ID to its current equivalent; unknown IDs pass through. */

@@ -10,7 +10,7 @@ import {
     extractGoogleTokenUsage,
     extractMistralTokenUsage
 } from './token-usage-utils';
-import { LLM_CONSTANTS, MODEL_PRICING, SupportedAiModels } from '../../ai/ai-models';
+import { LLM_CONSTANTS, MODEL_PRICING, SupportedAiModels, isWeekendAt } from '../../ai/ai-models';
 
 describe('Token Usage Utils', () => {
     describe('extractTokenUsage', () => {
@@ -168,6 +168,48 @@ describe('Token Usage Utils', () => {
                 const cost = calculateCost(TEST_MODEL, 1_000_000, 0);
                 nowSpy.mockRestore();
                 expect(cost).toBeCloseTo(2.0, 5);
+            });
+
+            describe('weekendOffPeak', () => {
+                const WEEKEND_MODEL = 'test-weekend-peak-model';
+                beforeAll(() => {
+                    MODEL_PRICING[WEEKEND_MODEL] = {
+                        inputPrice: 1.0,
+                        outputPrice: 2.0,
+                        peakPricing: { multiplier: 2, windowsUtc: [[1, 4], [6, 10]], weekendOffPeak: { utcOffsetHours: 8 } }
+                    };
+                });
+                afterAll(() => {
+                    delete MODEL_PRICING[WEEKEND_MODEL];
+                });
+
+                // 2026-08-01 is a Saturday, 2026-08-03 a Monday.
+                const saturday = (hour: number) => Date.UTC(2026, 7, 1, hour);
+                const monday = (hour: number) => Date.UTC(2026, 7, 3, hour);
+
+                it('bills the base rate inside a peak window on a weekend', () => {
+                    expect(calculateCost(WEEKEND_MODEL, 1_000_000, 0, { timestamp: saturday(2) })).toBeCloseTo(1.0, 5);
+                });
+
+                it('still doubles inside a peak window on a weekday', () => {
+                    expect(calculateCost(WEEKEND_MODEL, 1_000_000, 0, { timestamp: monday(2) })).toBeCloseTo(2.0, 5);
+                });
+
+                it('decides the weekend in the provider timezone, not UTC', () => {
+                    // Sunday 20:00 UTC is already Monday 04:00 in UTC+8 — but that hour is outside
+                    // every window, so the day boundary is checked through isWeekendAt directly.
+                    const sundayLateUtc = Date.UTC(2026, 7, 2, 20);
+                    expect(isWeekendAt(sundayLateUtc, 0)).toBe(true);
+                    expect(isWeekendAt(sundayLateUtc, 8)).toBe(false);
+                    // Friday 23:00 UTC is Saturday 07:00 in UTC+8.
+                    const fridayLateUtc = Date.UTC(2026, 7, 7, 23);
+                    expect(isWeekendAt(fridayLateUtc, 0)).toBe(false);
+                    expect(isWeekendAt(fridayLateUtc, 8)).toBe(true);
+                });
+
+                it('is off by default: plain peakPricing doubles on weekends too', () => {
+                    expect(calculateCost(TEST_MODEL, 1_000_000, 0, { timestamp: saturday(2) })).toBeCloseTo(2.0, 5);
+                });
             });
 
             it('ignores peak windows for models without peakPricing', () => {
@@ -347,8 +389,8 @@ describe('Token Usage Utils', () => {
                 SupportedAiModels[LLM_CONSTANTS.MISTRAL_MAGISTRAL].modelApiName,
                 SupportedAiModels[LLM_CONSTANTS.GROK_4_6].modelApiName,
                 SupportedAiModels[LLM_CONSTANTS.GLM].modelApiName,
+                SupportedAiModels[LLM_CONSTANTS.GLM_FLASH].modelApiName,
                 SupportedAiModels[LLM_CONSTANTS.QWEN_MAX].modelApiName,
-                SupportedAiModels[LLM_CONSTANTS.QWEN_PLUS].modelApiName,
                 SupportedAiModels[LLM_CONSTANTS.QWEN_FLASH].modelApiName,
                 SupportedAiModels[LLM_CONSTANTS.MINIMAX].modelApiName,
             ];

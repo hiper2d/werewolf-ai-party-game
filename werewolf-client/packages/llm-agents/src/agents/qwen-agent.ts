@@ -2,7 +2,6 @@ import { AbstractAgent } from "./abstract-agent";
 import { stripInlineThinking } from "../thinking-utils";
 import { OpenAI } from "openai";
 import { AIMessage, TokenUsage, AgentLoggingConfig, DEFAULT_LOGGING_CONFIG } from "../types";
-import { getModelConfigByApiName } from "../catalog";
 import { extractUsageAndCalculateCost } from "../pricing";
 import { z } from 'zod';
 import { ZodSchemaConverter } from '../zod-schema-converter';
@@ -61,11 +60,19 @@ export class QwenAgent extends AbstractAgent {
 
     /**
      * Thinking params for the request body. `thinking_budget` caps reasoning length and is only
-     * sent when the model's config sets `thinkingBudgetTokens` (qwen3.8-max's latency swings
-     * 30–100s uncapped); models without it think at the provider default.
+     * sent when the instance has one (catalog default, or a per-call override like story
+     * generation); without it the model thinks at the provider default, and qwen3.8-max's
+     * latency then swings 30–100s.
+     *
+     * `reasoning_effort` is deliberately NOT sent. Probed live 2026-08-30 on qwen3.8-flash and
+     * qwen3.8-max: every value low..max is accepted, but reasoning length doesn't track it
+     * (max: low → 1,686 reasoning tokens / 44s, high → 226 / 7s, xhigh → 1,102 / 30s), while
+     * thinking_budget bounds it reliably (≤340 at 1024). The docs also call the two mutually
+     * exclusive on qwen3.8-max. So on Qwen the budget IS the effort knob; `reasoningEffort`
+     * on this agent is ignored.
      */
     private thinkingParams(): Record<string, unknown> {
-        const budget = getModelConfigByApiName(this.model, this.enableThinking)?.thinkingBudgetTokens;
+        const budget = this.thinkingBudgetTokens;
         return {
             enable_thinking: this.enableThinking,
             ...(this.enableThinking && budget !== undefined ? { thinking_budget: budget } : {}),

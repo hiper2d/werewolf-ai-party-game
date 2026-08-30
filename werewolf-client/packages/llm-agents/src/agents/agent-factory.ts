@@ -67,6 +67,7 @@ export class AgentFactory {
 
             // Z.AI models — thinking-only since 2026-08-05
             case LLM_CONSTANTS.GLM:
+            case LLM_CONSTANTS.GLM_FLASH:
                 return new GlmAgent(name, instruction, model.modelApiName, key, model.temperature!, shouldEnableThinking);
 
             // Sakana Fugu models — always-on reasoning, no temperature (ignored by the model)
@@ -75,7 +76,6 @@ export class AgentFactory {
 
             // Qwen models — thinking-only (enable_thinking always sent)
             case LLM_CONSTANTS.QWEN_MAX:
-            case LLM_CONSTANTS.QWEN_PLUS:
             case LLM_CONSTANTS.QWEN_FLASH:
                 return new QwenAgent(name, instruction, model.modelApiName, key, model.temperature!, shouldEnableThinking);
 

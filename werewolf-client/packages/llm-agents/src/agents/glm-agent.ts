@@ -2,7 +2,6 @@ import { AbstractAgent } from "./abstract-agent";
 import { mergeThinking, stripInlineThinking } from "../thinking-utils";
 import { OpenAI } from "openai";
 import { AIMessage, TokenUsage, AgentLoggingConfig, DEFAULT_LOGGING_CONFIG } from "../types";
-import { getModelConfigByApiName } from "../catalog";
 import { extractUsageAndCalculateCost } from "../pricing";
 import { z } from 'zod';
 import { ZodSchemaConverter } from '../zod-schema-converter';
@@ -30,7 +29,7 @@ export class GlmAgent extends AbstractAgent {
             stream: false,
             max_tokens: this.maxOutputTokens,
             thinking: { type: 'enabled' },
-            reasoning_effort: getModelConfigByApiName(this.model)?.reasoningEffort ?? 'high',
+            reasoning_effort: this.reasoningEffort ?? 'high',
         };
     }
 

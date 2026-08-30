@@ -329,3 +329,69 @@ What the reconstruction says:
 - Your remembered numbers are both real: **GLM 25.4s** is the Aug-4 thinking-variant
   measurement, and **Kimi 17s** is the Aug-4 grading run — Kimi has simply been running slower
   (29-34s) all of Aug 5.
+
+---
+
+## Addendum 2026-08-30 — catalog/pricing refresh
+
+- **GPT-5.6 Sol repriced**: $4 / $20 short context (cached $0.40), $8 / $30 past 272k (cached
+  $0.80). Was $5 / $30 flat. Still above the $15 free-tier ceiling.
+- **DeepSeek weekends**: since 2026-08-23 (Beijing) the 2× peak surcharge applies Mon–Fri only;
+  Saturday/Sunday Beijing time bill off-peak all day. Modelled as `PeakPricing.weekendOffPeak`
+  in the library; rates themselves unchanged.
+- **GLM-5.3 Flash added** (`glm-5.3-flash`): list $0.15 / $0.50, cached $0.03. Same
+  low|high|max `reasoning_effort` contract as GLM-5.3, pinned `high`. A 50% promo runs until
+  2026-09-09 (UTC+8); we bill list rate.
+- **Qwen**: `qwen3.8-flash` ($0.15 / $0.47, cached $0.016, no input-length tiers) replaces
+  `qwen3.7-flash`; `qwen3.7-plus` retired, persisted `qwen-plus` ids resolve to the Flash
+  entry. `qwen3.8-max` cached input corrected to the published $0.25 (was the 20%-rule $0.40).
+- **DeepSeek `reasoning_effort` pinned to `low`** (both V4 models; the agent now forwards the
+  catalog value — it never sent one before, so both ran at the provider default `high`).
+  Trigger: prod `requestStats` (30d) showed ~8 reasoning tokens per answer token (flash p50
+  8.9s / p90 36s, pro p50 18.9s / p90 56s) and a 15-bot story at 68–105s. Live A/B, same day:
+
+  | | high (default) | low |
+  |---|---|---|
+  | Flash, day-2 vote | 31.5s, 3,040 out | 5.3s, 383 out |
+  | Flash, 15-bot story | 67.9s, 7,097 out | 30.9s, 3,618 out |
+  | Flash, welcome text | 9.6s, 674 out | 5.7s, 410 out |
+  | Pro, day-2 vote | 16.3s, 802 out | 20.8s, 995 out |
+  | Pro, 15-bot story | 104.5s, 6,181 out | 79.3s, 5,142 out |
+
+  Single samples. **Correction, later the same day:** a 3×3 repeat of the Flash vote showed
+  no difference (`low` 5.2s/11.7s/6.1s with 370/1,161/436 output tokens vs `high` 5.1s/6.9s/8.0s
+  with 380/497/591), and a direct API probe on a 6-character story prompt gave reasoning
+  counts of 122 (nothing sent), 764 / 338 (`low`), 39 (`high` — in 196s) — i.e. DeepSeek's
+  `reasoning_effort` has **no measurable effect** on our prompts, and the 5s→196s spread is
+  provider-side latency, not reasoning length. The `low` pin stays (documented, harmless),
+  but the "31s → 5s" reading above was variance, not the parameter.
+- **DeepSeek `extra_body` was never reaching the API.** openai-node has no `extra_body`
+  (that's the Python SDK); the key went out literally and was ignored. Probe:
+  `extra_body: {thinking: {type: 'disabled'}}` still reasoned (1,233 tokens), top-level
+  `thinking: {type: 'disabled'}` did not (0). Harmless so far because V4 defaults thinking on
+  and the factory always enables it for DeepSeek, but the agent now sends `thinking` at the
+  top level, and sends `disabled` explicitly when thinking is off.
+- **Per-call reasoning profile** (2026-08-30): `AbstractAgent` now carries `reasoningEffort`
+  and `thinkingBudgetTokens` as instance fields (catalog default, overridable like
+  `maxOutputTokens`); every effort/budget-aware agent reads the instance field. Story
+  generation runs `configureStoryAgent()` — 16k output, effort `high`, budget 8192 — while
+  turns stay at the catalog defaults (8k output; DeepSeek pinned `low`, Qwen budget 1024).
+  **Qwen's `reasoning_effort` is a no-op**: probed live, every value is accepted but reasoning
+  length doesn't track it (qwen3.8-max: low → 1,686 reasoning tokens / 44s, high → 226 / 7s,
+  xhigh → 1,102 / 30s); `thinking_budget` bounds it reliably (≤340 at 1024). The Qwen agent
+  therefore never sends effort — the budget is its effort knob. Story with the profile:
+
+  | | turn profile (budget 1024 / effort low) | story profile (budget 8192 / effort high) |
+  |---|---|---|
+  | Qwen3.8 Flash, 15-bot story | 22.2s, 2,738 out | 33.7s, 3,857 out |
+  | Qwen3.8 Max, 15-bot story | 58.5s, 3,266 out | 85.7s, 3,844 out |
+  | DeepSeek V4 Flash, 15-bot story | 30.9s, 3,618 out | 59.8s, 8,256 out — and one run hit the test timeout (246s) |
+
+  DeepSeek Flash at `high` remains the volatile one: it is the same behaviour that produced the
+  67.9s/failed pair earlier in the day. The other three story runs that failed on first attempt
+  (two Qwen at ~1–2s) passed on both reruns; cause not captured.
+
+  **Decision (same day): the deep story profile was rejected.** `configureStoryAgent()` now
+  only raises the output ceiling to 16k; reasoning stays at the catalog default for the story
+  too (DeepSeek `low`, Qwen budget 1024). The per-instance override fields stay in the
+  library for future use.

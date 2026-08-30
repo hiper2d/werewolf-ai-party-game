@@ -42,7 +42,7 @@ import {getDefaultVoiceProvider, getVoiceConfig} from "@/app/ai/voice-config";
 import {normalizeSpendings} from "@/app/utils/spending-utils";
 import {convertToAIMessage} from "@/app/utils/message-utils";
 import {serializeMessageForFirestore} from "@/app/api/message-serialization";
-import {LLM_CONSTANTS, STORY_MAX_OUTPUT_TOKENS, SupportedAiModels} from "@/app/ai/ai-models";
+import {LLM_CONSTANTS, configureStoryAgent, SupportedAiModels} from "@/app/ai/ai-models";
 import {
     consumeModelUsage,
     getCandidateModelsForTier,
@@ -262,9 +262,9 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
     );
     storyTellAgent.userId = session.user.email;
     // One response carries the whole game setup — a character object per bot — so this is the
-    // one call that needs far more room than a turn. Everything else runs at the smaller
-    // DEFAULT_MAX_OUTPUT_TOKENS.
-    storyTellAgent.maxOutputTokens = STORY_MAX_OUTPUT_TOKENS;
+    // one call that needs far more output room than a turn (see configureStoryAgent).
+    // Reasoning depth stays at the catalog default, same as every other call.
+    configureStoryAgent(storyTellAgent);
 
     // Gather role configurations for the story generation
     const gameRoleConfigs = [];
