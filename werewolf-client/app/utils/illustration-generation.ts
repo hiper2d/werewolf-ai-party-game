@@ -17,6 +17,7 @@ import {PAID_TIER_MARKUP} from "@/app/config/credit-packages";
 import {API_KEY_CONSTANTS, IMAGE_MODEL_CONSTANTS, IMAGE_MODEL_PRICING} from "@/app/ai/ai-models";
 import {generateImage} from "@/app/utils/avatar-generation";
 import {logger} from "@/app/utils/logger";
+import {sanitizeArtStyle} from "@/app/utils/art-style";
 
 /**
  * Whether a game gets occasional mid-game illustrations. Free for everyone for
@@ -87,9 +88,14 @@ function buildIllustrationPrompt(game: Game, sceneDescription: string, character
     const characterLine = characterNames.length > 0
         ? `The named characters must be recognizable — match each one's face, hair and clothing to their labeled reference portrait. `
         : `Characters may be shown from a distance or partially obscured. `;
+    // The establishing-shot reference already carries the game's look; the
+    // player's art direction is restated for the case where that reference is
+    // missing (the scene pair failed at creation) so the style still holds.
+    const artStyle = sanitizeArtStyle(game.artStyle);
+    const styleLine = artStyle ? `\n\nArt style, chosen by the player: "${artStyle}"` : '';
     return `Illustrate this moment from a social deduction story. Cinematic composition, atmospheric night lighting.
 
-Setting — "${game.theme}": ${game.description}
+Setting — "${game.theme}": ${game.description}${styleLine}
 
 Scene to depict:
 ${sceneDescription}

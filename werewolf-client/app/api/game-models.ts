@@ -53,6 +53,10 @@ export interface GamePreview {
     name: string;
     theme: string;
     description: string;
+    // Optional free-text art direction for every generated image of this game
+    // (avatars, the welcome/night scenes, mid-game illustrations). Never used
+    // by story/LLM prompts — see app/utils/art-style.ts.
+    artStyle?: string;
     playerCount: number;
     werewolfCount: number;
     specialRoles: string[];
@@ -174,6 +178,7 @@ export interface Game {
     id: string;
     description: string;
     theme: string;
+    artStyle?: string; // Player-supplied art direction for image generation (locked at creation)
     werewolfCount: number;
     specialRoles: string[];
     gameMasterAiType: string;
@@ -222,6 +227,26 @@ export interface Game {
     // Bumped on every (re)generation; getAvatarUrl appends it as ?v= so
     // immutable browser caching never serves a previous generation's images.
     avatarsVersion?: number;
+    // Portrait candidates per avatar key. Every verification round keeps its
+    // slices (they used to be discarded wholesale when one cell was flagged),
+    // so each character can carry alternates the owner flips through on the
+    // character card. `n` = how many candidates exist in the avatarVariants
+    // subcollection, `sel` = which one is copied into avatars/{key} and is
+    // therefore what every reader (chat, cinematic, illustration references)
+    // sees. Absent on games generated before variants existed = one candidate.
+    avatarVariants?: Record<string, { n: number; sel: number }>;
+    // Per-key cache-buster, bumped when that one portrait switches candidate.
+    // A global avatarsVersion bump would re-download the whole cast for one
+    // changed face. getAvatarUrl prefers this over avatarsVersion.
+    avatarVersions?: Record<string, number>;
+    // Owner-triggered full-set rerolls so far. Free-tier games get one.
+    avatarRegenCount?: number;
+    // When the in-flight reroll started, or null. Deliberately not
+    // avatarsStatus: 'generating' would send the whole cast back to preset
+    // sketches for the ~20s of a reroll (getAvatarUrl gates on status), so the
+    // current portraits stay up instead. A timestamp rather than a flag so a
+    // run killed mid-reroll (function timeout) can't lock the game out forever.
+    avatarsRegeneratingAt?: number | null;
     oneTimeAbilitiesUsed?: {
         doctorKill?: boolean;  // True if doctor has used their one-time kill ability
         detectiveKill?: boolean; // True if detective has used their one-time kill ability
@@ -665,6 +690,16 @@ export const GAME_MASTER = 'Game Master';
 export const AVATAR_GM_KEY = 'game-master';
 export const SCENE_WELCOME_KEY = 'scene-welcome'; // shown with the GM's opening story message
 export const SCENE_NIGHT_KEY = 'scene-night';     // shown with each "night begins" message
+
+// Portrait candidates live in their own subcollection, one doc per candidate;
+// games/{id}/avatars/{key} always holds a copy of the selected one so every
+// existing reader keeps working unchanged.
+export const AVATAR_VARIANTS_COLLECTION = 'avatarVariants';
+export function avatarVariantKey(key: string, index: number): string {
+    return `${key}__${index}`;
+}
+// Free-tier games may reroll their portraits once; paid games are unlimited.
+export const FREE_TIER_AVATAR_REGENS = 1;
 
 // Mid-game illustration docs share the avatars subcollection. Dashed keys can
 // never collide with player names (those are sanitized to [a-zA-Z0-9]).

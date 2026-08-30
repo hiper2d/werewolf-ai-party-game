@@ -64,6 +64,10 @@ function getProviderName(modelId: string): string {
 // Provider display order
 const PROVIDER_ORDER = ['OpenAI', 'Anthropic', 'Google', 'DeepSeek', 'Grok', 'Mistral', 'Moonshot', 'Z.AI', 'Qwen', 'MiniMax', 'Sakana Fugu'];
 
+/**
+ * Full AI model selector with provider grouping and tags.
+ * @category Forms
+ */
 export default function AIModelSelect({
     options,
     selectedOptions,

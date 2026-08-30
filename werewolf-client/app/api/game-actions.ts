@@ -27,13 +27,15 @@ import {
     GameActionResponse,
     SystemErrorMessage,
     User,
-    USER_TIERS
+    USER_TIERS,
+    AVATAR_VARIANTS_COLLECTION
 } from "@/app/api/game-models";
 import {auth} from "@/auth";
 import {AgentFactory} from "@/app/ai/agent-factory";
 import {STORY_SYSTEM_PROMPT, STORY_USER_PROMPT} from "@/app/ai/prompts/story-gen-prompts";
 import {getUserTierAndApiKeys} from "@/app/utils/tier-utils";
 import {sanitizePlayerName} from "@/app/utils/name-utils";
+import {sanitizeArtStyle} from "@/app/utils/art-style";
 import {getUserTier, getUserBalance, getVoiceProvider, updateUserMonthlySpending, deductBalance} from "@/app/api/user-actions";
 import {PAID_TIER_MARKUP} from "@/app/config/credit-packages";
 import {getDefaultVoiceProvider, getVoiceConfig} from "@/app/ai/voice-config";
@@ -119,9 +121,12 @@ export async function removeGameById(id: string, ownerEmail: string) {
     const messageDeletePromises = messagesSnapshot.docs.map((doc: any) => doc.ref.delete());
     await Promise.all(messageDeletePromises);
 
-    // Delete generated avatars/scenes (subcollections aren't removed with the parent doc)
-    const avatarsSnapshot = await db.collection('games').doc(id).collection('avatars').get();
-    await Promise.all(avatarsSnapshot.docs.map((doc: any) => doc.ref.delete()));
+    // Delete generated avatars/scenes and the portrait candidates behind them
+    // (subcollections aren't removed with the parent doc)
+    for (const collection of ['avatars', AVATAR_VARIANTS_COLLECTION]) {
+        const snapshot = await db.collection('games').doc(id).collection(collection).get();
+        await Promise.all(snapshot.docs.map((doc: any) => doc.ref.delete()));
+    }
 
     // Delete the game
     await gameRef.delete();
@@ -546,9 +551,14 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
         const expireAt = firestore.Timestamp.fromMillis(timestamp + 30 * 24 * 60 * 60 * 1000); // 30 days TTL
         const previewCost = gamePreview.tokenUsage?.costUSD || 0;
         
+        // Optional player-supplied art direction for image generation; omitted
+        // entirely when blank (Firestore rejects undefined field values).
+        const artStyle = sanitizeArtStyle(gamePreview.artStyle);
+
         const game = {
             description: gamePreview.description,
             theme: gamePreview.theme,
+            ...(artStyle ? {artStyle} : {}),
             werewolfCount: gamePreview.werewolfCount,
             specialRoles: gamePreview.specialRoles,
             gameMasterAiType: gamePreview.gameMasterAiType,
@@ -1325,6 +1335,10 @@ function gameFromFirestore(id: string, data: any): Game {
         chatResetCounts: data.chatResetCounts || {},
         avatarsStatus: data.avatarsStatus, // absent on games from before themed avatars
         avatarsVersion: data.avatarsVersion,
+        avatarVariants: data.avatarVariants || {}, // portrait candidates per key; empty before variants existed
+        avatarVersions: data.avatarVersions || {},
+        avatarRegenCount: data.avatarRegenCount || 0,
+        avatarsRegeneratingAt: data.avatarsRegeneratingAt ?? null,
         oneTimeAbilitiesUsed: data.oneTimeAbilitiesUsed || {},
         resolvedNightState: data.resolvedNightState || null
     };

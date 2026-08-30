@@ -8,6 +8,9 @@ interface RoleCardProps {
     role: string; // GAME_ROLES value
     own?: boolean; // true when this is the human player's own role
     onClose: () => void;
+    // Overrides the /roles/<role>.jpg static asset. Only for rendering outside
+    // the app (the design kit, previews) where that path can't resolve.
+    imageSrc?: string;
 }
 
 // GAME_ROLES values → the written rules entry on /rules (same wording, one source).
@@ -23,8 +26,9 @@ const ROLE_DETAIL_BY_ROLE: Record<string, RoleDetail | undefined> = {
  * First-open "your role" card, styled after CharacterCard: schematic chalk
  * illustration, role title, team, and the same rules wording as /rules.
  * Shown once when a freshly created game is opened (see GamePage).
+ * @category Game
  */
-export default function RoleCard({ role, own = false, onClose }: RoleCardProps) {
+export default function RoleCard({ role, own = false, onClose, imageSrc }: RoleCardProps) {
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
         document.addEventListener('keydown', onKey);
@@ -52,7 +56,7 @@ export default function RoleCard({ role, own = false, onClose }: RoleCardProps) 
             >
                 <div className="relative">
                     {/* eslint-disable-next-line @next/next/no-img-element -- small static asset, no optimization needed */}
-                    <img src={`/roles/${role}.jpg`} alt={detail.name} className="w-full block" />
+                    <img src={imageSrc ?? `/roles/${role}.jpg`} alt={detail.name} className="w-full block" />
                     {/* Same softened plate as CharacterCard: short and faint. */}
                     <div className="absolute inset-x-0 bottom-0 h-12" style={{background: 'linear-gradient(to top, var(--bg-1) 8%, color-mix(in srgb, var(--bg-1) 30%, transparent) 55%, transparent)'}} />
                     <div className="absolute left-4 bottom-2 card-plate-name text-[24px] font-bold">

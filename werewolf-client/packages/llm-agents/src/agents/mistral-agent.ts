@@ -1,5 +1,5 @@
 import { AbstractAgent } from "./abstract-agent";
-import { createHash } from "crypto";
+import { stableHashHex } from "../text-utils";
 import { Mistral } from "@mistralai/mistralai";
 import { HTTPClient } from "@mistralai/mistralai/lib/http";
 import { ChatCompletionResponse } from "@mistralai/mistralai/models/components";
@@ -52,7 +52,7 @@ export class MistralAgent extends AbstractAgent {
         // Inject it via the SDK's beforeRequest hook instead. The key is derived from bot
         // identity + system prompt, so it is stable within a game day. Any failure falls
         // back to sending the request untouched.
-        const promptCacheKey = createHash('sha256').update(`${name}\n${instruction}`).digest('hex');
+        const promptCacheKey = stableHashHex(`${name}\n${instruction}`);
         const httpClient = new HTTPClient();
         httpClient.addHook("beforeRequest", async (request) => {
             try {

@@ -11,6 +11,7 @@ import AIModelSelect from '@/app/components/AIModelSelect';
 import ExpandableTextarea from '@/app/components/ExpandableTextarea';
 import ModelSelectDropdown from '@/app/components/ModelSelectDropdown';
 import SelectDropdown from '@/app/components/SelectDropdown';
+import {ART_STYLE_MAX_LENGTH} from "@/app/utils/art-style";
 import {ttsService} from "@/app/services/tts-service";
 import {getVoiceConfig, getDefaultVoiceProvider, VOICE_PROVIDER_DISPLAY_NAMES} from "@/app/ai/voice-config";
 import {VoiceProvider} from "@/app/ai/voice-config/voice-config";
@@ -48,6 +49,10 @@ export default function CreateNewGamePage() {
     const [name, setName] = useState(() => pickRandom(RANDOM_NAMES));
     const [theme, setTheme] = useState(() => pickRandom(RANDOM_THEMES));
     const [description, setDescription] = useState('');
+    // Free-text drawing direction for avatars/illustrations — image prompts only,
+    // never the story prompts. Stays editable after the preview is generated, so
+    // the live value (not the one baked into gameData) is what createGame gets.
+    const [artStyle, setArtStyle] = useState('');
     const [playerCount, setPlayerCount] = useState(12);
     const [werewolfCount, setWerewolfCount] = useState(3);
     const [specialRoles, setSpecialRoles] = useState<string[]>([GAME_ROLES.DOCTOR, GAME_ROLES.DETECTIVE, GAME_ROLES.MANIAC]);
@@ -384,6 +389,7 @@ export default function CreateNewGamePage() {
             name,
             theme,
             description,
+            artStyle,
             playerCount,
             werewolfCount,
             specialRoles,
@@ -460,7 +466,7 @@ export default function CreateNewGamePage() {
         setIsLoading(true);
         setError(null);
         try {
-            const newGameId = await createGame(gameData);
+            const newGameId = await createGame({ ...gameData, artStyle });
             if (newGameId) {
                 router.push(`/games/${newGameId}`);
             } else {
@@ -625,6 +631,22 @@ export default function CreateNewGamePage() {
                         onChange={(e) => setDescription(e.target.value)}
                         rows={3}
                     />
+                </div>
+
+                {/* Row 2.5: Art style — drawing direction for every generated image */}
+                <div>
+                    <label className={`${labelStyle} block mb-1.5`}>Art Style <span className="text-[var(--fg-3)] font-normal">(optional)</span></label>
+                    <input
+                        className={inputStyle}
+                        type="text"
+                        placeholder="e.g. 90s anime cel animation, muted watercolor, gritty noir comic..."
+                        value={artStyle}
+                        onChange={(e) => setArtStyle(e.target.value)}
+                        maxLength={ART_STYLE_MAX_LENGTH}
+                    />
+                    <p className="text-[var(--fg-3)] text-[12px] mt-1">
+                        How character portraits and story illustrations should be drawn. Leave empty to let the AI pick a style that fits the setting.
+                    </p>
                 </div>
 
                 {/* Row 3: Players AI */}

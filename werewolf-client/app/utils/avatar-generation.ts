@@ -1,11 +1,12 @@
 import {db} from "@/firebase/server";
 import {firestore} from "firebase-admin";
-import {Game, USER_TIERS, AVATAR_GM_KEY, SCENE_WELCOME_KEY, SCENE_NIGHT_KEY} from "@/app/api/game-models";
+import {Game, USER_TIERS, UserTier, AVATAR_GM_KEY, SCENE_WELCOME_KEY, SCENE_NIGHT_KEY, AVATAR_VARIANTS_COLLECTION, avatarVariantKey} from "@/app/api/game-models";
 import {getUserTierAndApiKeys} from "@/app/utils/tier-utils";
 import {updateUserMonthlySpending, deductBalance} from "@/app/api/user-actions";
 import {PAID_TIER_MARKUP} from "@/app/config/credit-packages";
 import {API_KEY_CONSTANTS, IMAGE_MODEL_CONSTANTS, IMAGE_MODEL_PRICING} from "@/app/ai/ai-models";
 import {logger} from "@/app/utils/logger";
+import {sanitizeArtStyle} from "@/app/utils/art-style";
 
 // One grid image covers the whole cast; models and pricing live in
 // IMAGE_MODEL_CONSTANTS / IMAGE_MODEL_PRICING (ai-models.ts).
@@ -69,11 +70,18 @@ function buildPrompt(game: Game, cells: AvatarCell[], cols: number, rows: number
         (c, i) => `Cell ${i + 1}: ${c.prompt}. Its own distinct flat solid muted background color.`
     ).join("\n");
 
+    // The player's art direction replaces the model's free choice of style; it
+    // stays style-only guidance, and the no-text rule below still has the last word.
+    const artStyle = sanitizeArtStyle(game.artStyle);
+    const styleLine = artStyle
+        ? `Render every portrait in this art style, chosen by the player: "${artStyle}". Apply it consistently to every portrait: same rendering technique, same palette family, same lighting.`
+        : `Choose ONE cohesive illustration style that fits this setting and apply it consistently to every portrait: same rendering technique, same palette family, same lighting.`;
+
     return `A character portrait sheet for a social deduction game, drawn as a single image: a precise grid of exactly ${cells.length} rectangular cells, ${cols} columns and ${rows} rows, all cells exactly equal size, separated by thin dark divider lines. Each cell contains one bust portrait (head and shoulders) of a different character, centered in its cell.
 
 Setting — "${game.theme}": ${game.description}
 
-Choose ONE cohesive illustration style that fits this setting and apply it consistently to every portrait: same rendering technique, same palette family, same lighting. Every face must be distinct and memorable, and match its character description. No character may span more than one cell. Give each cell its own flat solid muted desaturated background color, different from its neighbors. Row-major order, left to right, top to bottom:
+${styleLine} Every face must be distinct and memorable, and match its character description. No character may span more than one cell. Give each cell its own flat solid muted desaturated background color, different from its neighbors. Row-major order, left to right, top to bottom:
 
 ${cellLines}
 
@@ -131,7 +139,11 @@ export async function generateImage(apiKey: string, prompt: string, aspectRatio:
 // Both chat scene images ride in ONE image (stacked panels, sliced in half):
 // top = the welcome establishing shot, bottom = the same place at night.
 function buildScenePrompt(game: Game): string {
-    return `A single image divided into exactly 2 equal horizontal panels, one above the other, separated by a thin dark divider line. Both panels depict the same place, in one cohesive illustration style that fits this setting — atmospheric establishing shots, no people in close-up, cinematic composition.
+    const artStyle = sanitizeArtStyle(game.artStyle);
+    const styleClause = artStyle
+        ? `in this art style, chosen by the player: "${artStyle}"`
+        : `in one cohesive illustration style that fits this setting`;
+    return `A single image divided into exactly 2 equal horizontal panels, one above the other, separated by a thin dark divider line. Both panels depict the same place, ${styleClause} — atmospheric establishing shots, no people in close-up, cinematic composition.
 
 Setting — "${game.theme}": ${game.description}
 
@@ -181,12 +193,27 @@ async function sliceGrid(sharp: any, grid: Buffer, cells: AvatarCell[], count: n
     return slices;
 }
 
-/** Inspects every sliced avatar: rejects the set when any slice contains
- * rendered text (the model typeset a description into the cell) or when the
- * apparent gender contradicts the expected character in that slot — the
- * misalignment detector. Text is a hard fail; one gender mismatch is tolerated
- * (stylized faces read ambiguously, and OTHER never counts as a mismatch). */
-async function verifySlices(apiKey: string, slices: AvatarSlice[]): Promise<{ok: boolean; problems: string[]}> {
+/** Verdict for one crop. `hasText` = the model typeset something into the cell;
+ * `genderMismatch` = the face doesn't match the character expected in that
+ * slot, which is also how a drifted grid shows up (every slot holds a
+ * neighbour's face). */
+export interface SliceVerdict {
+    hasText: boolean;
+    genderMismatch: boolean;
+    problem?: string;
+}
+
+/** Inspects every sliced avatar in ONE call — all crops in a single request,
+ * one verdict line each — and returns those verdicts unreduced.
+ *
+ * It used to collapse them into a single ok/not-ok for the whole grid, which is
+ * what let one lettered badge throw away twelve good portraits: 78% of the
+ * re-rolls in a 7-day sample discarded a majority-good set, and a third of all
+ * runs hard-failed to preset sketches (docs/avatar-slice-verification-failures.md).
+ * Deciding what to keep is the caller's job now.
+ *
+ * Throws when the reply is unparseable — a misbehaving verifier, not a bad grid. */
+async function verifySlices(apiKey: string, slices: AvatarSlice[]): Promise<SliceVerdict[]> {
     const parts: any[] = [{
         text: `Each image below is a single character portrait. For each image answer two things: TEXT = YES only if clearly readable letters, words or numbers are written in the image (captions, labels, signs, writing on clothing), otherwise NO — decorative shapes, hair clips, jewelry, emblems or patterns without readable letters are NOT text. GENDER = MALE, FEMALE or OTHER for the portrait's subject (OTHER for robots, creatures, masked or ambiguous figures). Reply with exactly ${slices.length} lines, formatted "<number>: TEXT=<YES|NO> GENDER=<MALE|FEMALE|OTHER>". No other text.`,
     }];
@@ -209,32 +236,178 @@ async function verifySlices(apiKey: string, slices: AvatarSlice[]): Promise<{ok:
         const m = line.match(/^\s*(\d+)\s*[:.\-]?\s*TEXT\s*=\s*(YES|NO)\s+GENDER\s*=\s*(MALE|FEMALE|OTHER)/i);
         if (m) byIndex.set(parseInt(m[1], 10), {hasText: m[2].toUpperCase() === 'YES', gender: m[3].toLowerCase()});
     }
-    if (byIndex.size === 0) {
-        // Completely unparseable reply = verifier misbehaving, not a bad grid;
-        // treat like an outage (the caller accepts the slices with a warning).
-        throw new Error('Slice verification reply was unparseable');
+    if (byIndex.size === 0) throw new Error('Slice verification reply was unparseable');
+
+    return slices.map((sl, i) => {
+        const verdict = byIndex.get(i + 1);
+        // A missing line is a hole in the reply, not evidence about the crop —
+        // flag it so a clean alternate wins the selection, and say why.
+        if (!verdict) return {hasText: false, genderMismatch: true, problem: `${sl.label}: no verdict`};
+        if (verdict.hasText) return {hasText: true, genderMismatch: false, problem: `${sl.label}: rendered text`};
+        // OTHER never counts: stylized, masked and non-human faces read
+        // ambiguously and would flag half a themed cast.
+        if (sl.expectedGender && verdict.gender !== 'other' && verdict.gender !== sl.expectedGender) {
+            return {hasText: false, genderMismatch: true, problem: `${sl.label}: expected ${sl.expectedGender}, saw ${verdict.gender}`};
+        }
+        return {hasText: false, genderMismatch: false};
+    });
+}
+
+/** A drawn portrait plus what the verifier thought of it. Every round's crops
+ * are kept: the ones a stricter pipeline would have thrown away are exactly the
+ * alternates a player wants to flip between on the character card. */
+export interface AvatarCandidate {
+    key: string;
+    jpeg: Buffer;
+    flagged: boolean;
+    problem?: string;
+}
+
+/** Which candidate to show by default: the first the verifier had no complaint
+ * about, else the first drawn. A flagged portrait still beats no portrait — the
+ * owner can flip to another one, and a themed face with a stray letter on its
+ * collar reads better than a preset pencil sketch. */
+export function chooseSelected(candidates: {flagged: boolean}[]): number {
+    const clean = candidates.findIndex(c => !c.flagged);
+    return clean >= 0 ? clean : 0;
+}
+
+/** Whether a round failed as a whole image rather than in a few cells — the one
+ * case where another draw is the right answer.
+ *
+ * A majority of cells carrying text means the model drew a labeled
+ * character-card layout instead of portraits; more than one gender mismatch
+ * means the grid drifted and the slots hold the wrong faces. A couple of
+ * flagged cells is just a badge or a shop sign on one costume: the other eleven
+ * portraits are fine, and re-rolling them is what used to burn ~2 extra grid
+ * images per game (~$0.13) without reliably converging. */
+export function isSystemicFailure(verdicts: SliceVerdict[]): boolean {
+    const textViolations = verdicts.filter(v => v.hasText).length;
+    const genderMismatches = verdicts.filter(v => v.genderMismatch).length;
+    return textViolations > verdicts.length / 2 || genderMismatches > 1;
+}
+
+/** One image call: draw the grid, slice it, judge every slice. */
+async function generateCandidateRound(
+    apiKey: string,
+    game: Game,
+    sharp: any,
+    cells: AvatarCell[],
+    cols: number,
+    rows: number,
+    realCount: number,
+    gameId: string,
+): Promise<{candidates: AvatarCandidate[]; costUSD: number; systemic: boolean; problems: string[]}> {
+    const grid = await generateImage(apiKey, buildPrompt(game, cells, cols, rows), "4:3");
+    const slices = await sliceGrid(sharp, grid.buffer, cells, realCount, cols);
+
+    let verdicts: SliceVerdict[];
+    try {
+        verdicts = await verifySlices(apiKey, slices);
+    } catch (verifyError: any) {
+        // A verifier outage must never cost the player their portraits: accept
+        // the crops unjudged (that is also what the old pipeline did).
+        logger.warn(`Slice verifier unavailable, accepting slices unjudged`, {gameId, error: verifyError.message});
+        verdicts = slices.map(() => ({hasText: false, genderMismatch: false}));
     }
 
-    let textViolations = 0;
-    let genderMismatches = 0;
-    const problems: string[] = [];
-    slices.forEach((sl, i) => {
-        const verdict = byIndex.get(i + 1);
-        if (!verdict) {
-            genderMismatches++;
-            problems.push(`${sl.label}: no verdict`);
-            return;
+    return {
+        candidates: slices.map((sl, i) => ({
+            key: sl.key,
+            jpeg: sl.jpeg,
+            flagged: verdicts[i].hasText || verdicts[i].genderMismatch,
+            problem: verdicts[i].problem,
+        })),
+        costUSD: grid.costUSD,
+        systemic: isSystemicFailure(verdicts),
+        problems: verdicts.map(v => v.problem).filter((p): p is string => !!p),
+    };
+}
+
+// One avatar doc is ~60-90KB of base64, and a full cast over three rounds is
+// ~40 of them — far under the 500-write batch limit but well over Firestore's
+// request size limit, so commits go out in small chunks.
+const AVATAR_DOC_BATCH = 8;
+
+// How long a reroll marker is trusted before another attempt may claim the game.
+const STALE_REGEN_MS = 5 * 60 * 1000;
+
+interface PendingWrite {
+    ref: firestore.DocumentReference;
+    data: Record<string, any>;
+}
+
+async function commitChunked(writes: PendingWrite[]): Promise<void> {
+    for (let i = 0; i < writes.length; i += AVATAR_DOC_BATCH) {
+        const batch = db!.batch();
+        for (const w of writes.slice(i, i + AVATAR_DOC_BATCH)) batch.set(w.ref, w.data);
+        await batch.commit();
+    }
+}
+
+export type AvatarVariantMap = Record<string, {n: number; sel: number}>;
+
+/** Stores every candidate in the avatarVariants subcollection and copies the
+ * selected one into avatars/{key}, where all the existing readers look (the
+ * image route, illustration reference portraits, the chat and cinematic UIs) —
+ * that copy is why variants needed no changes anywhere downstream.
+ * `existing` carries the counts already stored, so a reroll appends. */
+async function writeCandidates(
+    gameRef: firestore.DocumentReference,
+    rounds: AvatarCandidate[][],
+    existing: AvatarVariantMap,
+    extraWrites: PendingWrite[] = [],
+): Promise<{variants: AvatarVariantMap; versions: Record<string, number>}> {
+    const byKey = new Map<string, AvatarCandidate[]>();
+    for (const round of rounds) {
+        for (const candidate of round) {
+            const list = byKey.get(candidate.key) ?? [];
+            list.push(candidate);
+            byKey.set(candidate.key, list);
         }
-        if (verdict.hasText) {
-            textViolations++;
-            problems.push(`${sl.label}: rendered text`);
-        }
-        if (sl.expectedGender && verdict.gender !== 'other' && verdict.gender !== sl.expectedGender) {
-            genderMismatches++;
-            problems.push(`${sl.label}: expected ${sl.expectedGender}, saw ${verdict.gender}`);
-        }
-    });
-    return {ok: textViolations === 0 && genderMismatches <= 1, problems};
+    }
+
+    const now = Date.now();
+    const writes: PendingWrite[] = [...extraWrites];
+    const variants: AvatarVariantMap = {...existing};
+    const versions: Record<string, number> = {};
+
+    for (const [key, list] of byKey) {
+        const offset = existing[key]?.n ?? 0;
+        list.forEach((candidate, i) => writes.push({
+            ref: gameRef.collection(AVATAR_VARIANTS_COLLECTION).doc(avatarVariantKey(key, offset + i)),
+            data: {
+                data: candidate.jpeg.toString('base64'),
+                mime: 'image/jpeg',
+                flagged: candidate.flagged,
+                ...(candidate.problem ? {problem: candidate.problem} : {}),
+                createdAt: now,
+            },
+        }));
+        const localSel = chooseSelected(list);
+        variants[key] = {n: offset + list.length, sel: offset + localSel};
+        versions[key] = now;
+        writes.push({
+            ref: gameRef.collection('avatars').doc(key),
+            data: {data: list[localSel].jpeg.toString('base64'), mime: 'image/jpeg', createdAt: now},
+        });
+    }
+
+    await commitChunked(writes);
+    return {variants, versions};
+}
+
+/** Paid tier pays cost + markup off the prepaid balance; free tier only records
+ * the spend. Same shape as every other image call in the app. */
+async function billImages(userEmail: string, tier: UserTier, costUSD: number): Promise<void> {
+    if (costUSD <= 0) return;
+    if (tier === USER_TIERS.PAID) {
+        const chargedAmount = parseFloat((costUSD * (1 + PAID_TIER_MARKUP)).toFixed(6));
+        await deductBalance(userEmail, chargedAmount);
+        await updateUserMonthlySpending(userEmail, chargedAmount, tier);
+    } else {
+        await updateUserMonthlySpending(userEmail, costUSD, tier);
+    }
 }
 
 /**
@@ -242,12 +415,43 @@ async function verifySlices(apiKey: string, slices: AvatarSlice[]): Promise<{ok:
  * for the flow description. Split out from the server action so scripts (tests,
  * backfills) can run it with an explicit owner email.
  *
- * Returns the game's final avatarsStatus (a PLAIN object — raw Firestore doc
- * data contains Timestamp class instances that server actions can't serialize
- * to client components), or null when the game doesn't exist.
+ * Returns a PLAIN object (raw Firestore doc data contains Timestamp class
+ * instances that server actions can't serialize to client components), or null
+ * when the game doesn't exist.
  */
 export interface AvatarGenerationResult {
     avatarsStatus: Game['avatarsStatus'];
+    avatarsVersion?: number;
+    avatarVariants?: AvatarVariantMap;
+    avatarVersions?: Record<string, number>;
+    avatarRegenCount?: number;
+}
+
+function resultFrom(game: Game): AvatarGenerationResult {
+    return {
+        avatarsStatus: game.avatarsStatus,
+        avatarsVersion: game.avatarsVersion,
+        avatarVariants: game.avatarVariants ?? {},
+        avatarVersions: game.avatarVersions ?? {},
+        avatarRegenCount: game.avatarRegenCount ?? 0,
+    };
+}
+
+/** Cells plus the throwaway fillers that keep the grid full. The model reliably
+ * fills FULL grids but sometimes ignores "leave the last cells empty", which
+ * shifts every row and corrupts the slicing. */
+function buildPaddedCells(game: Game): {cells: AvatarCell[]; cols: number; rows: number; realCount: number} {
+    const cells = buildCells(game);
+    const {cols, rows} = gridFor(cells.length);
+    const realCount = cells.length;
+    for (let i = cells.length; i < cols * rows; i++) {
+        cells.push({
+            key: `__filler${i}`,
+            label: 'Stranger',
+            prompt: `"Stranger" — an anonymous hooded figure fitting the setting, face hidden in shadow`,
+        });
+    }
+    return {cells, cols, rows, realCount};
 }
 
 export async function runAvatarGeneration(gameId: string, userEmail: string): Promise<AvatarGenerationResult | null> {
@@ -268,27 +472,23 @@ export async function runAvatarGeneration(gameId: string, userEmail: string): Pr
     });
     if (!claimed) {
         const snap = await gameRef.get();
-        return snap.exists ? {avatarsStatus: (snap.data() as Game).avatarsStatus} : null;
+        return snap.exists ? resultFrom(snap.data() as Game) : null;
     }
 
+    // Hoisted out of the try: a run that dies partway still spent real money on
+    // whatever images it did get, and that spend used to vanish entirely (the
+    // billing block sat after the throw) — roughly $0.60 of invisible spend in
+    // one 7-day sample.
+    let spentUSD = 0;
+    let tier: UserTier = USER_TIERS.FREE;
+
     try {
-        const {tier, apiKeys} = await getUserTierAndApiKeys(userEmail);
-        const apiKey = apiKeys[API_KEY_CONSTANTS.GOOGLE];
+        const keys = await getUserTierAndApiKeys(userEmail);
+        tier = keys.tier;
+        const apiKey = keys.apiKeys[API_KEY_CONSTANTS.GOOGLE];
         if (!apiKey) throw new Error('No Google API key available for avatar generation');
 
-        const cells = buildCells(claimed);
-        const {cols, rows} = gridFor(cells.length);
-        // The model reliably fills FULL grids but sometimes ignores "leave the
-        // last cells empty", which shifts every row and corrupts the slicing.
-        // Pad with throwaway filler characters instead; they're never stored.
-        const realCount = cells.length;
-        for (let i = cells.length; i < cols * rows; i++) {
-            cells.push({
-                key: `__filler${i}`,
-                label: 'Stranger',
-                prompt: `"Stranger" — an anonymous hooded figure fitting the setting, face hidden in shadow`,
-            });
-        }
+        const {cells, cols, rows, realCount} = buildPaddedCells(claimed);
 
         // The scene pair (optional — its failure never blocks avatars) runs in
         // parallel with the grid work.
@@ -300,48 +500,28 @@ export async function runAvatarGeneration(gameId: string, userEmail: string): Pr
         // client/server bundle graph.
         const sharp = (await import('sharp')).default;
 
-        // Generate → slice → verify, with retries: the slice check inspects
-        // every crop (no rendered text, expected gender in each slot), so a
-        // drifted grid or a text-riddled "character card" layout (the model
-        // drew something other than clean portraits) can never reach players.
-        // Three attempts: the no-text gate is strict and text-prone themes
-        // (IPs whose canon designs carry lettering) burned two attempts in
-        // live testing (2026-08-23); a failed set falls back to preset
-        // sketches, so the extra ~$0.07 roll is cheaper than a set-less game.
-        let slices: AvatarSlice[] = [];
-        let gridCostUSD = 0;
-        let verified = false;
-        for (let attempt = 1; attempt <= 3 && !verified; attempt++) {
-            const grid = await generateImage(apiKey, buildPrompt(claimed, cells, cols, rows), "4:3");
-            gridCostUSD += grid.costUSD;
-            slices = await sliceGrid(sharp, grid.buffer, cells, realCount, cols);
-            try {
-                const check = await verifySlices(apiKey, slices);
-                if (check.ok) {
-                    verified = true;
-                } else {
-                    logger.warn(`Avatar grid failed slice verification (attempt ${attempt})`, {gameId, problems: check.problems});
-                }
-            } catch (verifyError: any) {
-                // Verifier outage must not block avatars — accept the slices.
-                logger.warn(`Slice verifier unavailable, accepting slices`, {gameId, error: verifyError.message});
-                verified = true;
+        // Draw → slice → judge, keeping every round's crops. Another draw only
+        // happens when a round failed as a whole image (a labeled character-card
+        // layout, or a drifted grid); a few flagged cells are shipped as-is with
+        // their alternates one arrow-click away on the character card.
+        const rounds: AvatarCandidate[][] = [];
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            const round = await generateCandidateRound(apiKey, claimed, sharp, cells, cols, rows, realCount, gameId);
+            spentUSD += round.costUSD;
+            rounds.push(round.candidates);
+            if (round.problems.length > 0) {
+                logger.warn(`Avatar grid slices flagged (attempt ${attempt})`, {gameId, systemic: round.systemic, problems: round.problems});
             }
+            if (!round.systemic) break;
         }
-        if (!verified) throw new Error('Avatar grid failed slice verification twice');
+
         const sceneResult = await scenePromise;
-        const batch = db.batch();
-        for (const slice of slices) {
-            batch.set(gameRef.collection('avatars').doc(slice.key), {
-                data: slice.jpeg.toString('base64'),
-                mime: 'image/jpeg',
-                createdAt: Date.now(),
-            });
-        }
 
         // Scene pair: stacked panels sliced in half → welcome (top), night
         // (bottom). Downscale to 1024 wide — plenty for a chat bubble.
+        const sceneWrites: PendingWrite[] = [];
         if (sceneResult.status === 'fulfilled') {
+            spentUSD += sceneResult.value.costUSD;
             const scenes = sceneResult.value.buffer;
             const sceneMeta = await sharp(scenes).metadata();
             const w = sceneMeta.width || 0;
@@ -353,49 +533,218 @@ export async function runAvatarGeneration(gameId: string, userEmail: string): Pr
                     .resize({width: 1024})
                     .jpeg({quality: 80})
                     .toBuffer();
-                batch.set(gameRef.collection('avatars').doc(key), {
-                    data: jpeg.toString('base64'),
-                    mime: 'image/jpeg',
-                    createdAt: Date.now(),
+                sceneWrites.push({
+                    ref: gameRef.collection('avatars').doc(key),
+                    data: {data: jpeg.toString('base64'), mime: 'image/jpeg', createdAt: Date.now()},
                 });
             }
         } else {
             logger.warn(`Scene image generation failed for game ${gameId}`, {gameId, error: sceneResult.reason?.message});
         }
 
-        // Bill like the story preview: raw cost into the game total, cost+markup
-        // off the paid-tier balance.
-        const costUSD = parseFloat((
-            gridCostUSD +
-            (sceneResult.status === 'fulfilled' ? sceneResult.value.costUSD : 0)
-        ).toFixed(6));
+        const {variants, versions} = await writeCandidates(gameRef, rounds, {}, sceneWrites);
 
-        batch.update(gameRef, {
+        const costUSD = parseFloat(spentUSD.toFixed(6));
+        await gameRef.update({
             avatarsStatus: 'ready',
             avatarsVersion: Date.now(),
+            avatarVariants: variants,
+            avatarVersions: versions,
             totalGameCost: firestore.FieldValue.increment(costUSD),
             // Image spending is tracked separately from LLM calls so its real
             // cost stays visible (totalImagesCost is a subset of totalGameCost).
             totalImagesCost: firestore.FieldValue.increment(costUSD),
         });
-        await batch.commit();
+        spentUSD = 0; // accounted for; the catch must not double-count it
 
-        if (tier === USER_TIERS.PAID && costUSD > 0) {
-            const chargedAmount = parseFloat((costUSD * (1 + PAID_TIER_MARKUP)).toFixed(6));
-            await deductBalance(userEmail, chargedAmount);
-            await updateUserMonthlySpending(userEmail, chargedAmount, tier);
-        } else if (costUSD > 0) {
-            await updateUserMonthlySpending(userEmail, costUSD, tier);
-        }
+        await billImages(userEmail, tier, costUSD);
 
-        logger.info(`Avatars generated for game ${gameId}`, {gameId, cells: cells.length, costUSD});
+        logger.info(`Avatars generated for game ${gameId}`, {gameId, cells: cells.length, rounds: rounds.length, costUSD});
     } catch (error: any) {
         // Avatars are decorative: never surface errorState, just mark failed so
-        // the UI keeps its initial-letter fallback and a later visit may retry.
-        logger.error(`Avatar generation failed for game ${gameId}`, {gameId, error: error.message});
+        // the UI keeps its preset-sketch fallback and a later visit may retry.
+        logger.error(`Avatar generation failed for game ${gameId}`, {gameId, error: error.message, costUSD: spentUSD});
         await gameRef.update({avatarsStatus: 'failed'});
+        await recordAbandonedSpend(gameRef, userEmail, tier, spentUSD, gameId);
     }
 
     const snap = await gameRef.get();
-    return snap.exists ? {avatarsStatus: (snap.data() as Game).avatarsStatus} : null;
+    return snap.exists ? resultFrom(snap.data() as Game) : null;
+}
+
+/** Images a failed run already paid Google for. Recorded (and billed) rather
+ * than silently eaten — the player keeps no portraits, but the spend is real
+ * and has to show up in the game's cost total. */
+async function recordAbandonedSpend(
+    gameRef: firestore.DocumentReference,
+    userEmail: string,
+    tier: UserTier,
+    spentUSD: number,
+    gameId: string,
+): Promise<void> {
+    if (spentUSD <= 0) return;
+    const costUSD = parseFloat(spentUSD.toFixed(6));
+    try {
+        await gameRef.update({
+            totalGameCost: firestore.FieldValue.increment(costUSD),
+            totalImagesCost: firestore.FieldValue.increment(costUSD),
+        });
+        await billImages(userEmail, tier, costUSD);
+    } catch (billingError: any) {
+        logger.error(`Failed to record abandoned image spend for game ${gameId}`, {gameId, error: billingError.message, costUSD});
+    }
+}
+
+/**
+ * Owner-triggered portrait reroll. Draws exactly ONE new grid — never the
+ * three-attempt loop — because a reroll the player clicked must cost exactly
+ * what the button promised. Its crops are appended to each character's
+ * candidate list and become the shown portraits; the previous ones stay
+ * reachable through the arrows on the character card.
+ *
+ * The scene images are not redrawn: they cost as much again as the portraits,
+ * and a player asking for new faces did not ask for a new tavern.
+ *
+ * `maxRegens` is enforced inside the claim transaction so two tabs can't spend
+ * a free game's single reroll twice. Returns null when the reroll can't start
+ * (not the owner, not ready, already running, or out of rerolls).
+ */
+export async function runAvatarRegeneration(gameId: string, userEmail: string, maxRegens: number): Promise<AvatarGenerationResult | null> {
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+    const gameRef = db.collection('games').doc(gameId);
+
+    const claimed = await db.runTransaction(async tx => {
+        const snap = await tx.get(gameRef);
+        if (!snap.exists) return null;
+        const g = snap.data() as Game;
+        if (g.ownerEmail !== userEmail) return null;
+        if (g.avatarsStatus !== 'ready') return null;
+        // A reroll that died mid-flight (function timeout) leaves the marker
+        // behind; after the stale window the game is claimable again rather
+        // than locked out of rerolls forever.
+        if (g.avatarsRegeneratingAt && Date.now() - g.avatarsRegeneratingAt < STALE_REGEN_MS) return null;
+        if ((g.avatarRegenCount ?? 0) >= maxRegens) return null;
+        // Deliberately not avatarsStatus: 'generating' — that would send the
+        // whole cast back to preset sketches for the ~20s of the reroll
+        // (getAvatarUrl gates on status). The current portraits stay up.
+        tx.update(gameRef, {avatarsRegeneratingAt: Date.now()});
+        return {...g, id: snap.id} as Game;
+    });
+    if (!claimed) return null;
+
+    let spentUSD = 0;
+    let tier: UserTier = USER_TIERS.FREE;
+
+    try {
+        const keys = await getUserTierAndApiKeys(userEmail);
+        tier = keys.tier;
+        const apiKey = keys.apiKeys[API_KEY_CONSTANTS.GOOGLE];
+        if (!apiKey) throw new Error('No Google API key available for avatar regeneration');
+
+        const {cells, cols, rows, realCount} = buildPaddedCells(claimed);
+        const sharp = (await import('sharp')).default;
+
+        // Games generated before variants existed have portraits but no
+        // candidate list; adopt what they have as candidate 0 so the reroll
+        // appends instead of orphaning it.
+        const existing = Object.keys(claimed.avatarVariants ?? {}).length > 0
+            ? claimed.avatarVariants!
+            : await adoptExistingAvatars(gameRef, cells.slice(0, realCount).map(c => c.key));
+
+        const round = await generateCandidateRound(apiKey, claimed, sharp, cells, cols, rows, realCount, gameId);
+        spentUSD += round.costUSD;
+        if (round.problems.length > 0) {
+            logger.warn(`Avatar reroll slices flagged`, {gameId, systemic: round.systemic, problems: round.problems});
+        }
+
+        const {variants, versions} = await writeCandidates(gameRef, [round.candidates], existing);
+
+        const costUSD = parseFloat(spentUSD.toFixed(6));
+        await gameRef.update({
+            avatarsRegeneratingAt: null,
+            avatarsVersion: Date.now(),
+            avatarVariants: variants,
+            avatarVersions: versions,
+            avatarRegenCount: firestore.FieldValue.increment(1),
+            totalGameCost: firestore.FieldValue.increment(costUSD),
+            totalImagesCost: firestore.FieldValue.increment(costUSD),
+        });
+        spentUSD = 0;
+
+        await billImages(userEmail, tier, costUSD);
+        logger.info(`Avatars regenerated for game ${gameId}`, {gameId, costUSD, flagged: round.problems.length});
+    } catch (error: any) {
+        // A failed reroll leaves the existing portraits exactly as they were.
+        logger.error(`Avatar regeneration failed for game ${gameId}`, {gameId, error: error.message, costUSD: spentUSD});
+        await gameRef.update({avatarsRegeneratingAt: null});
+        await recordAbandonedSpend(gameRef, userEmail, tier, spentUSD, gameId);
+    }
+
+    const snap = await gameRef.get();
+    return snap.exists ? resultFrom(snap.data() as Game) : null;
+}
+
+/** Copies a pre-variants game's portraits into the candidate subcollection as
+ * candidate 0, so a reroll adds a second option instead of replacing the only one. */
+async function adoptExistingAvatars(gameRef: firestore.DocumentReference, keys: string[]): Promise<AvatarVariantMap> {
+    const snaps = await Promise.all(keys.map(key => gameRef.collection('avatars').doc(key).get()));
+    const writes: PendingWrite[] = [];
+    const variants: AvatarVariantMap = {};
+    snaps.forEach((snap, i) => {
+        const data = snap.exists ? (snap.data() as any) : null;
+        if (!data?.data) return;
+        writes.push({
+            ref: gameRef.collection(AVATAR_VARIANTS_COLLECTION).doc(avatarVariantKey(keys[i], 0)),
+            data: {data: data.data, mime: data.mime || 'image/jpeg', flagged: false, createdAt: data.createdAt || Date.now()},
+        });
+        variants[keys[i]] = {n: 1, sel: 0};
+    });
+    await commitChunked(writes);
+    return variants;
+}
+
+/**
+ * Switches which candidate a character shows: copies that candidate's bytes
+ * into avatars/{key} (the doc every reader already looks at) and bumps only
+ * this key's cache-buster. Returns the new per-key version, or null when the
+ * caller isn't the owner or the index doesn't exist.
+ */
+export async function selectAvatarVariantFor(
+    gameId: string,
+    userEmail: string,
+    key: string,
+    index: number,
+): Promise<{key: string; sel: number; version: number} | null> {
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+    const gameRef = db.collection('games').doc(gameId);
+    const snap = await gameRef.get();
+    if (!snap.exists) return null;
+    const game = snap.data() as Game;
+    if (game.ownerEmail !== userEmail) return null;
+
+    const entry = game.avatarVariants?.[key];
+    if (!entry || index < 0 || index >= entry.n) return null;
+    if (entry.sel === index) return {key, sel: index, version: game.avatarVersions?.[key] ?? game.avatarsVersion ?? 0};
+
+    const variantSnap = await gameRef.collection(AVATAR_VARIANTS_COLLECTION).doc(avatarVariantKey(key, index)).get();
+    const variant = variantSnap.exists ? (variantSnap.data() as any) : null;
+    if (!variant?.data) return null;
+
+    const version = Date.now();
+    await gameRef.collection('avatars').doc(key).set({
+        data: variant.data,
+        mime: variant.mime || 'image/jpeg',
+        createdAt: version,
+    });
+    // FieldPath, not a dotted string: the Game Master's key contains a dash,
+    // which a string field path would reject.
+    await gameRef.update(
+        new firestore.FieldPath('avatarVariants', key, 'sel'), index,
+        new firestore.FieldPath('avatarVersions', key), version,
+    );
+    return {key, sel: index, version};
 }

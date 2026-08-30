@@ -1466,6 +1466,10 @@ function gameFromFirestore(id: string, data: any): Game {
         resolvedNightState: data.resolvedNightState || null,
         avatarsStatus: data.avatarsStatus, // absent on games from before themed avatars
         avatarsVersion: data.avatarsVersion,
+        avatarVariants: data.avatarVariants || {},
+        avatarVersions: data.avatarVersions || {},
+        avatarRegenCount: data.avatarRegenCount || 0,
+        avatarsRegeneratingAt: data.avatarsRegeneratingAt ?? null,
         totalImagesCost: data.totalImagesCost || 0,
     };
 }

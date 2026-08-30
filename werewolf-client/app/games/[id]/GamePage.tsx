@@ -19,7 +19,7 @@ import { replayNight, performNightAction } from '@/app/api/night-actions';
 import PlayerAvatar from "@/app/components/PlayerAvatar";
 import CharacterCard from "@/app/games/[id]/components/CharacterCard";
 import RoleCard from "@/app/games/[id]/components/RoleCard";
-import { generateGameAvatars } from "@/app/api/avatar-actions";
+import { generateGameAvatars, regenerateGameAvatars, selectAvatarVariant } from "@/app/api/avatar-actions";
 import { getAvatarUrl, getSceneUrl } from "@/app/utils/avatar-utils";
 import { DiscordIcon } from "@/app/components/ui-icons";
 import { DISCORD_URL } from "@/app/config/external-links";
@@ -1479,7 +1479,16 @@ function GamePageContent({
 
             {/* Character card (click on any avatar) */}
             {characterCardFor && (
-                <CharacterCard game={game} name={characterCardFor} onClose={() => setCharacterCardFor(null)} />
+                <CharacterCard
+                    key={characterCardFor}
+                    game={game}
+                    name={characterCardFor}
+                    onClose={() => setCharacterCardFor(null)}
+                    isOwner={!!session?.user?.email && session.user.email === game.ownerEmail}
+                    onGameChange={patch => setGame(prev => ({ ...prev, ...patch }))}
+                    onRegenerate={regenerateGameAvatars}
+                    onSelectVariant={selectAvatarVariant}
+                />
             )}
 
             {/* Role explainer card: first open of a fresh game, or a role tag click */}

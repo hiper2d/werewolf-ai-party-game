@@ -13,7 +13,22 @@ export function getAvatarUrl(game: Game, name: string): string | undefined {
         return getPresetAvatarUrl(game.bots, name);
     }
     const key = name === GAME_MASTER ? AVATAR_GM_KEY : name;
-    return `/api/games/${game.id}/avatars/${encodeURIComponent(key)}?v=${game.avatarsVersion ?? 0}`;
+    return `/api/games/${game.id}/avatars/${encodeURIComponent(key)}?v=${avatarVersion(game, key)}`;
+}
+
+/** Cache-buster for one portrait. Switching a character to another candidate
+ * bumps only that key, so picking a new face for one player doesn't force the
+ * browser to re-download the whole cast. */
+export function avatarVersion(game: Game, key: string): number {
+    return game.avatarVersions?.[key] ?? game.avatarsVersion ?? 0;
+}
+
+/** How many portrait candidates a character has, and which one is showing.
+ * Games generated before candidates existed report a single, fixed one. */
+export function getAvatarVariantState(game: Game, name: string): {key: string; count: number; selected: number} {
+    const key = name === GAME_MASTER ? AVATAR_GM_KEY : name;
+    const entry = game.avatarVariants?.[key];
+    return {key, count: entry?.n ?? 1, selected: entry?.sel ?? 0};
 }
 
 /**

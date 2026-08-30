@@ -17,6 +17,7 @@ interface ExpandableTextareaProps {
  * A textarea that stays compact by default but expands to fit its full content
  * on click/focus, so long stories don't have to be scrolled inside a tiny box.
  * A pill toggle in the top-right lets the user expand/collapse explicitly.
+ * @category Forms
  */
 export default function ExpandableTextarea({
     value,

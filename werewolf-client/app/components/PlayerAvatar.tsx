@@ -15,6 +15,11 @@ interface PlayerAvatarProps {
     avatarUrl?: string;
 }
 
+/**
+ * Circular participant avatar: themed portrait when generated, initial-letter
+ * gradient fallback otherwise. Used at every size from chat rows to cards.
+ * @category Game
+ */
 export default function PlayerAvatar({ name, size = 32, isGM = false, isDead = false, className = '', avatarUrl }: PlayerAvatarProps) {
     const [c1, c2] = getAvatarGradient(name);
     const initial = name.charAt(0).toUpperCase();

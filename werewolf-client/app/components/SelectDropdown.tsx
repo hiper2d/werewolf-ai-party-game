@@ -19,6 +19,10 @@ interface SelectDropdownProps {
     disabled?: boolean;
 }
 
+/**
+ * Single-select dropdown styled to the app theme.
+ * @category Forms
+ */
 export default function SelectDropdown({
     options,
     value,

@@ -19,6 +19,10 @@ interface MultiSelectDropdownProps {
     optionMetaFn?: (option: string) => OptionMeta | undefined;
 }
 
+/**
+ * Multi-select dropdown with checkbox rows.
+ * @category Forms
+ */
 export default function MultiSelectDropdown({
     options,
     selectedOptions,

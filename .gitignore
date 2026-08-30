@@ -17,3 +17,11 @@ images/old
 
 # Personal Claude Code automation (contains local paths / private sibling-project details)
 .claude/skills/news/
+
+# design-sync (claude.ai/design UI-kit converter) — staged scripts + build output
+.ds-sync/
+ds-bundle/
+.design-sync/.cache/
+.design-sync/learnings/
+.design-sync/node_modules
+werewolf-client/design-kit/static/

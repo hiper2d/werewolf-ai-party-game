@@ -28,6 +28,10 @@ interface ModelSelectDropdownProps {
     disabled?: boolean;
 }
 
+/**
+ * Dropdown for picking an AI model, with capability tags.
+ * @category Forms
+ */
 export default function ModelSelectDropdown({
     options,
     value,

@@ -1,0 +1,94 @@
+{
+  "projectId": "0452896e-3c85-46e5-bd3a-97b081cea91b",
+  "shape": "package",
+  "pkg": "werewolf-client",
+  "globalName": "WerewolfUI",
+  "entry": "./werewolf-client/design-kit/index.ts",
+  "buildCmd": "cd werewolf-client && npm run build && cd .. && node werewolf-client/design-kit/refresh-css.mjs",
+  "srcDir": "app",
+  "tsconfig": "tsconfig.json",
+  "cssEntry": "design-kit/static/chunks/styles.css",
+  "provider": {
+    "component": "DesignPreviewProvider"
+  },
+  "componentSrcMap": {
+    "PlayerAvatar": "app/components/PlayerAvatar.tsx",
+    "CharacterCard": "app/games/[id]/components/CharacterCard.tsx",
+    "RoleCard": "app/games/[id]/components/RoleCard.tsx",
+    "SelectDropdown": "app/components/SelectDropdown.tsx",
+    "MultiSelectDropdown": "app/components/MultiSelectDropdown.tsx",
+    "ModelSelectDropdown": "app/components/ModelSelectDropdown.tsx",
+    "AIModelSelect": "app/components/AIModelSelect.tsx",
+    "ExpandableTextarea": "app/components/ExpandableTextarea.tsx",
+    "CheckIcon": "app/components/ui-icons.tsx",
+    "DashIcon": "app/components/ui-icons.tsx",
+    "ArrowIcon": "app/components/ui-icons.tsx",
+    "InfoIcon": "app/components/ui-icons.tsx",
+    "GoogleIcon": "app/components/ui-icons.tsx",
+    "GithubIcon": "app/components/ui-icons.tsx",
+    "DiscordIcon": "app/components/ui-icons.tsx",
+    "DesignPreviewProvider": null
+  },
+  "overrides": {
+    "CharacterCard": {
+      "cardMode": "single",
+      "primaryStory": "Owner",
+      "viewport": "420x660"
+    },
+    "RoleCard": {
+      "cardMode": "single",
+      "primaryStory": "YourRole",
+      "viewport": "420x780"
+    },
+    "PlayerAvatar": {
+      "viewport": "520x140"
+    },
+    "MultiSelectDropdown": {
+      "cardMode": "column",
+      "viewport": "480x180"
+    },
+    "SelectDropdown": {
+      "viewport": "480x120"
+    },
+    "ModelSelectDropdown": {
+      "viewport": "480x120"
+    },
+    "AIModelSelect": {
+      "viewport": "520x160"
+    },
+    "ExpandableTextarea": {
+      "viewport": "520x220"
+    }
+  },
+  "docsMap": {
+    "CharacterCard": "../.design-sync/docs/CharacterCard.md",
+    "RoleCard": "../.design-sync/docs/RoleCard.md",
+    "PlayerAvatar": "../.design-sync/docs/PlayerAvatar.md",
+    "SelectDropdown": "../.design-sync/docs/SelectDropdown.md",
+    "MultiSelectDropdown": "../.design-sync/docs/MultiSelectDropdown.md",
+    "ModelSelectDropdown": "../.design-sync/docs/ModelSelectDropdown.md",
+    "AIModelSelect": "../.design-sync/docs/AIModelSelect.md",
+    "ExpandableTextarea": "../.design-sync/docs/ExpandableTextarea.md"
+  },
+  "libOverrides": {
+    "source-kit.mjs": "Next.js app dirs: [id] route segments must not become component groups"
+  },
+  "dtsPropsFor": {
+    "PlayerAvatar": "name: string; size?: number /* px, default 32 */; isGM?: boolean; isDead?: boolean; className?: string; avatarUrl?: string /* themed portrait; falls back to initial-letter gradient */;",
+    "CharacterCard": "game: any /* Game object: bots, humanPlayerName, gameState, avatarsStatus, avatarVariants, ... */; name: string /* participant: bot, human player, or 'Game Master' */; onClose: () => void; isOwner?: boolean; onGameChange?: (patch: any) => void; onRegenerate?: (gameId: string) => Promise<any>; onSelectVariant?: (gameId: string, key: string, index: number) => Promise<any>; avatarUrl?: string /* REQUIRED in designs: overrides the in-app portrait route */;",
+    "RoleCard": "role: 'werewolf' | 'doctor' | 'detective' | 'maniac' | 'villager'; own?: boolean /* true = the player's own role: 'You are the …' */; onClose: () => void; imageSrc?: string /* REQUIRED in designs: overrides /roles/<role>.jpg */;",
+    "SelectDropdown": "options: { value: string; label: string }[]; value: string; onChange: (value: string) => void; placeholder?: string; className?: string; disabled?: boolean;",
+    "MultiSelectDropdown": "options: string[]; selectedOptions: string[]; onChange: (selectedOptions: string[]) => void; placeholder?: string; className?: string; disabled?: boolean; hasError?: boolean; labelFn?: (option: string) => string; optionMetaFn?: (option: string) => { tags?: string[] } | undefined;",
+    "ModelSelectDropdown": "options: { model: string; label: string; displayLabel: string; disabled: boolean }[]; value: string /* model id */; onChange: (value: string) => void; className?: string; disabled?: boolean;",
+    "AIModelSelect": "options: string[] /* model ids */; selectedOptions: string[]; onChange: (selectedOptions: string[]) => void; placeholder?: string; className?: string; disabled?: boolean; hasError?: boolean; optionMetaFn?: (option: string) => { tags?: string[] } | undefined; onFastOnlyChange?: (fastOnly: boolean) => void;",
+    "ExpandableTextarea": "value: string; onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void; className?: string; placeholder?: string; id?: string; minHeight?: number /* collapsed height px */; 'aria-label'?: string;",
+    "CheckIcon": "className?: string;",
+    "DashIcon": "className?: string;",
+    "ArrowIcon": "className?: string;",
+    "InfoIcon": "className?: string;",
+    "GoogleIcon": "className?: string;",
+    "GithubIcon": "className?: string;",
+    "DiscordIcon": "className?: string;"
+  },
+  "readmeHeader": ".design-sync/conventions.md"
+}

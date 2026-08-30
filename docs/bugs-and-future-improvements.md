@@ -1,6 +1,8 @@
 # Bugs and improvements
 
 ## Open
+- Update OpenAI Sol prices, Update DeepSeek prices (email), upgrade Qwen 3.7 -> 3.8 Flash, Add GLM 5.3 Flash
+
 - Create a welcome game for new users? Randomly create a game with free tier models in a predefined theme in the WELCOME state.
 Every new user gets one.
 
