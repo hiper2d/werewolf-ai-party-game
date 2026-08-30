@@ -25,8 +25,10 @@ numbers use JetBrains Mono (`var(--font-jetbrains-mono)`, e.g. the
 `10px uppercase tracking-wide` section headers).
 
 **Images:** components that show game art take explicit URLs in designs —
-`PlayerAvatar`/`CharacterCard` need `avatarUrl`, `RoleCard` needs `imageSrc`
-(pass a data-URI or your asset; the app's own image routes don't resolve here).
+`PlayerAvatar`/`CharacterCard`/`CharacterPoster` need `avatarUrl`, `RoleCard`
+needs `imageSrc`, `IllustrationsPanel` needs `imageUrlFn` (a `(key) => url` fn;
+the scene image asks for key `'scene-welcome'`). Pass a data-URI or your asset;
+the app's own image routes don't resolve here.
 
 **Modals:** `CharacterCard` and `RoleCard` render as fullscreen `fixed`
 overlays. To keep one inside a frame, wrap it in a container with an explicit

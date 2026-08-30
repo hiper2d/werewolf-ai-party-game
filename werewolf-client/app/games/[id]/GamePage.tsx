@@ -10,7 +10,7 @@ const btnDanger = "px-3 py-1.5 text-[13px] font-medium rounded-[var(--radius-md)
 const btnAccent = "px-3 py-1.5 text-[13px] font-medium rounded-[var(--radius-md)] bg-[var(--accent)] text-[var(--on-accent)] hover:brightness-110 transition-all duration-[120ms]";
 const btnWarn = "px-3 py-1.5 text-[13px] font-medium rounded-[var(--radius-md)] bg-[oklch(75%_0.10_65)] text-[var(--bg-0)] hover:brightness-110 transition-all duration-[120ms]";
 import { getModelDisplayName } from "@/app/ai/ai-models";
-import { GAME_STATES, GAME_ROLES, AUTO_VOTE_COEFFICIENT, BOT_SELECTION_CONFIG } from "@/app/api/game-models";
+import { GAME_STATES, GAME_ROLES, AUTO_VOTE_COEFFICIENT, BOT_SELECTION_CONFIG, FREE_TIER_AVATAR_REGENS, USER_TIERS } from "@/app/api/game-models";
 import type { Game, GameActionResponse, GameMessage } from "@/app/api/game-models";
 import type { Session } from "next-auth";
 import { welcome, vote, keepBotsGoing, manualSelectBots, cancelBotResponses } from '@/app/api/bot-actions';
@@ -71,7 +71,12 @@ function GamePageContent({
     const [showCancel, setShowCancel] = useState(false);
     const [descExpanded, setDescExpanded] = useState(false);
     const [descClamps, setDescClamps] = useState(false);
-    const [showCosts, setShowCosts] = useState(true);
+    // Owner-only portrait redraw (participants header). One flag gates the
+    // button and the banner; the server's claim transaction is the real guard
+    // against a second tab starting another paid draw.
+    const [redrawing, setRedrawing] = useState(false);
+    const [redrawError, setRedrawError] = useState<string | null>(null);
+    const isOwner = !!session?.user?.email && session.user.email === initialGame.ownerEmail;
     // Character card modal: participant name, or null when closed.
     const [characterCardFor, setCharacterCardFor] = useState<string | null>(null);
     // Role explainer card: a GAME_ROLES value (own = the human player's role,
@@ -144,6 +149,45 @@ function GamePageContent({
         return () => { cancelled = true; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [game.avatarsStatus, game.id]);
+
+    // Portraits-only redraw for the whole cast (never the scenes). Every
+    // previous portrait stays as a candidate on the character card; the new
+    // ones become the shown faces. Free games get FREE_TIER_AVATAR_REGENS of
+    // these, paid games are unlimited (billed like any image).
+    const redrawsLeft = game.createdWithTier === USER_TIERS.PAID
+        ? Infinity
+        : Math.max(0, FREE_TIER_AVATAR_REGENS - (game.avatarRegenCount ?? 0));
+    const canRedraw = isOwner && game.avatarsStatus === 'ready';
+    const redrawPortraits = async () => {
+        if (redrawing || redrawsLeft <= 0) return;
+        setRedrawing(true);
+        setRedrawError(null);
+        try {
+            const result = await regenerateGameAvatars(game.id);
+            if (!result) {
+                // Not claimable: another tab is drawing, or the allowance went
+                // in another tab. Pull the doc so the header reflects it.
+                const fresh = await getGame(game.id);
+                if (fresh) {
+                    setGame(prev => ({
+                        ...prev,
+                        avatarsStatus: fresh.avatarsStatus,
+                        avatarsVersion: fresh.avatarsVersion,
+                        avatarVariants: fresh.avatarVariants,
+                        avatarVersions: fresh.avatarVersions,
+                        avatarRegenCount: fresh.avatarRegenCount,
+                    }));
+                }
+                setRedrawError('Redraw unavailable right now.');
+                return;
+            }
+            setGame(prev => ({ ...prev, ...result }));
+        } catch (error: any) {
+            setRedrawError(error?.message ?? 'Redraw failed.');
+        } finally {
+            setRedrawing(false);
+        }
+    };
     const preActionGameRef = useRef<Game | null>(null);
     const cancelledRef = useRef(false);
     // Guards against dispatching a second game action while one is still in flight.
@@ -1093,17 +1137,41 @@ function GamePageContent({
 
             {/* Participants list */}
             <div className="flex-grow overflow-auto hide-scrollbar border-t border-[var(--line-1)] pt-3">
-                <div className="flex items-center justify-between mb-2">
-                    <h2 className="text-[10px] font-mono font-medium uppercase tracking-[0.08em] text-[var(--fg-3)]">Participants</h2>
-                    <button
-                        type="button"
-                        onClick={() => setShowCosts(v => !v)}
-                        title={showCosts ? 'Hide per-player cost' : 'Show per-player cost'}
-                        className="text-[10px] font-mono font-medium uppercase tracking-[0.08em] px-1.5 py-0.5 rounded border border-[var(--line-2)] text-[var(--fg-3)] hover:text-[var(--fg-0)] hover:border-[var(--line-3)] transition-all duration-[120ms]"
-                    >
-                        $ {showCosts ? 'on' : 'off'}
-                    </button>
+                <div className="flex items-center gap-2 mb-2">
+                    <h2 className="text-[10px] font-mono font-medium uppercase tracking-[0.08em] text-[var(--fg-2)]">Participants</h2>
+                    <span className="flex-1" />
+                    {/* Owner-only: redraw portraits for the whole cast. Global, not
+                        per character — one image call covers everyone, so the cost is
+                        the same for one bad face or all of them. */}
+                    {canRedraw && (
+                        <button
+                            type="button"
+                            onClick={redrawPortraits}
+                            disabled={redrawing || redrawsLeft <= 0}
+                            title={redrawsLeft <= 0
+                                ? 'Free games get one portrait redraw, and it has been used'
+                                : 'Redraw portraits for the whole cast'}
+                            className="flex items-center gap-[5px] px-2 py-1 rounded-[var(--radius-sm)] bg-[var(--bg-3)] border border-[var(--line-2)] text-[10px] font-mono uppercase tracking-[0.06em] text-[var(--fg-2)] hover:bg-[var(--bg-4)] hover:text-[var(--fg-0)] disabled:opacity-50 disabled:hover:bg-[var(--bg-3)] disabled:hover:text-[var(--fg-2)] disabled:cursor-not-allowed transition-all duration-[120ms]"
+                        >
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={redrawing ? 'animate-spin' : ''}>
+                                <polyline points="23 4 23 10 17 10" />
+                                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                            </svg>
+                            Redraw
+                        </button>
+                    )}
                 </div>
+                {redrawing && (
+                    <div className="flex items-center gap-2 -mx-2 mb-2 px-3 py-[9px] bg-[var(--accent-soft)] border-b border-[var(--accent-line)] text-[12px] text-[var(--accent-text)]">
+                        <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" className="animate-spin flex-shrink-0">
+                            <path d="M10 2a8 8 0 0 1 8 8" />
+                        </svg>
+                        Drawing a new set of portraits…
+                    </div>
+                )}
+                {redrawError && !redrawing && (
+                    <p className="mb-2 px-1 text-[12px] text-[var(--danger)]">{redrawError}</p>
+                )}
                 <ul className="space-y-1">
                     {participants.map((participant, index) => {
                         const isHuman = participant.isHuman;
@@ -1177,7 +1245,7 @@ function GamePageContent({
                                 ) : null}
                             </div>
                             </div>{/* end flex-1 column */}
-                            {showCosts && participant.cost !== undefined && participant.cost > 0 && (
+                            {participant.cost !== undefined && participant.cost > 0 && (
                                 <span className="text-[11px] font-mono text-[var(--fg-3)] flex-shrink-0 self-center tabular-nums">
                                     ${participant.cost.toFixed(4)}
                                 </span>
@@ -1484,9 +1552,8 @@ function GamePageContent({
                     game={game}
                     name={characterCardFor}
                     onClose={() => setCharacterCardFor(null)}
-                    isOwner={!!session?.user?.email && session.user.email === game.ownerEmail}
+                    isOwner={isOwner}
                     onGameChange={patch => setGame(prev => ({ ...prev, ...patch }))}
-                    onRegenerate={regenerateGameAvatars}
                     onSelectVariant={selectAvatarVariant}
                 />
             )}

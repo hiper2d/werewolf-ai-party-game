@@ -1,6 +1,6 @@
 # Plan: Paid-tier avatar generation in game preview (+ in-game regenerate with feedback)
 
-> Status: **planned, not implemented** (drafted 2026-08-23). All paths below are relative to `werewolf-client/`.
+> Status: **implemented 2026-08-30** from the Claude Design handoff ("Image generation in paid tier"). The plan below is the 2026-08-23 draft; the shipped version differs in a few places — see "What shipped" at the end. All paths below are relative to `werewolf-client/`.
 
 ## Context
 
@@ -70,3 +70,19 @@ Key existing pieces to reuse: the whole grid→slice→verify pipeline and its b
 - `npm run test`, `npx tsc --noEmit`, `npm run lint`.
 - Browser (localhost:3000): paid-user newgame flow — generate, click a portrait modal, type feedback + regenerate (new `?v=`), rename a bot → stale warning, create game → portraits present immediately in chat/cinematic with no "Images are loading" chip; free user → disabled button + hint; in-game regenerate → preset fallback during generation, then the new set.
 - Two-tab test: start generation in tab A, click in tab B → B bails and polls to ready, only one charge on the balance (profile balance delta ≈ cost × 1.15).
+
+
+## What shipped (2026-08-30)
+
+Implemented per the Claude Design handoff, which superseded parts of the plan:
+
+- **Draft storage** as planned: singleton per user, `avatarDrafts/{base64url(email)}` with `avatars` + `avatarVariants` subcollections (`app/utils/avatar-drafts.ts`). Every doc carries `expireAt` (7 days) — **Firestore TTL policies must be added in the console** on `avatarDrafts` and on the `avatars` / `avatarVariants` collection groups (field `expireAt`; game-owned docs have no such field and are untouched). Adoption deletes the draft eagerly; TTL is only the backstop.
+- **Draw runs off the request** (`next/server` `after()`, like the creation-time kickoff); `generateDraftIllustrations` returns the claim and the page polls `getAvatarDraft` every 3s. The claim transaction is what stops a double-click or second tab from paying twice.
+- **Redraw appends** candidates when the cast (key set) is unchanged, and starts a fresh set (old docs deleted) when it changed. Redraw also redraws the scene pair ("Redraw everything"). No per-preview switching UI: switching stays on the in-game character card.
+- **No feedback textarea** — the design dropped it; the art-style field already carries the direction.
+- **Free tier**: the block is absent (no disabled button/upsell), per the design.
+- **createGame** (`app/api/game-actions.ts`): `avatarDraftVersion` on the preview object. Ready + matching cast + matching version → docs copied before the game doc is written (`avatarsStatus: 'ready'`, cost totals include the draft). Still drawing (`AVATAR_DRAFT_IN_PROGRESS`) + matching cast → game created as `'generating'` and `adoptDraftWhenReady` copies it when it lands (falls back to drawing for the game if the draft fails). Anything else → ordinary `'pending'` flow.
+- **In-game redraw** moved from the character card to the participants header (`GamePage.tsx`), replacing the `$ ON` cost toggle (costs now always shown). Portraits only; banner while in flight. The card keeps only the candidate switcher (chevrons + dots, counter past six).
+- Shared pipeline: `drawIllustrationSet` / `portraitKeysFor` / `writeCandidates` in `app/utils/avatar-generation.ts` are used by the game generator, the reroll and the draft.
+- Draft images served by `app/api/avatar-drafts/[key]/route.ts` (draft addressed by session email, `?n=` for candidates).
+- Tests: `app/utils/avatar-drafts.test.ts`.

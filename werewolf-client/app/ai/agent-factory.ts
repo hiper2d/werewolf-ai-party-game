@@ -1,5 +1,5 @@
-import { AgentFactory as LibAgentFactory, AbstractAgent, setLlmLogger } from '@hiper2d/llm-agents';
-import type { ApiKeyMap } from '@hiper2d/llm-agents';
+import { AgentFactory as LibAgentFactory, AbstractAgent, setLlmLogger } from '@hiper2d/ai-agents';
+import type { ApiKeyMap } from '@hiper2d/ai-agents';
 import { LLM_CONSTANTS, resolveModelId } from '@/app/ai/ai-models';
 import { logger } from '@/app/utils/logger';
 

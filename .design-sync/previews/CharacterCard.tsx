@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 import { CharacterCard } from 'werewolf-client';
 
 // Inline SVG portrait stands in for the generated themed avatars (an authed
@@ -18,13 +18,14 @@ const game: any = {
     createdWithTier: 'paid',
     avatarsStatus: 'ready',
     avatarsVersion: 1,
-    avatarVariants: { Miriam: { n: 3, sel: 1 }, Jonas: { n: 3, sel: 0 } },
+    avatarVariants: { Miriam: { n: 3, sel: 1 }, Jonas: { n: 3, sel: 0 }, Greta: { n: 8, sel: 2 } },
     avatarVersions: {},
     avatarRegenCount: 0,
     gameMasterAiType: 'claude-sonnet',
     bots: [
         { name: 'Miriam', gender: 'female', isAlive: true, role: 'villager', aiType: 'claude-sonnet', playStyle: 'aggressive_provoker', story: 'The village apothecary, sharp-eyed and sharper-tongued. She knows what everyone buys, and what they are afraid of.' },
         { name: 'Jonas', gender: 'male', isAlive: false, role: 'werewolf', aiType: 'gpt-5.4', playStyle: 'aggressive_provoker', story: 'A woodcutter who came down from the high forest two winters ago and never quite explained why.' },
+        { name: 'Greta', gender: 'female', isAlive: true, role: 'villager', aiType: 'claude-sonnet', playStyle: 'aggressive_provoker', story: 'The innkeeper. Hears everything, repeats most of it, and remembers the rest.' },
     ],
 };
 
@@ -36,13 +37,13 @@ const never = () => new Promise<any>(() => {});
  * the modal to a card-sized box instead of the (harness-collapsed) viewport. */
 function Frame({ children }: { children: React.ReactNode }) {
     return (
-        <div style={{ position: 'relative', width: 396, height: 620, transform: 'scale(1)', overflow: 'hidden', borderRadius: 12 }}>
+        <div style={{ position: 'relative', width: 396, height: 560, transform: 'scale(1)', overflow: 'hidden', borderRadius: 12 }}>
             {children}
         </div>
     );
 }
 
-/** The owner's view: portrait candidates (arrows, 2/3) + the reroll button. */
+/** The owner's view: the poster in a modal, arrows + dots in the top-right chip walk the kept portrait candidates. */
 export function Owner() {
     return (
         <Frame>
@@ -52,34 +53,24 @@ export function Owner() {
                 onClose={noop}
                 isOwner
                 avatarUrl={PORTRAIT}
-                onRegenerate={never}
                 onSelectVariant={never}
             />
         </Frame>
     );
 }
 
-/** Mid-reroll: the spinner replaces the ↻, the portrait dims, status text overlays.
- * The state is internal, so the story presses the reroll button itself. */
-export function Regenerating() {
-    const ref = useRef<HTMLDivElement>(null);
-    useEffect(() => {
-        const btn = ref.current?.querySelector<HTMLButtonElement>('[aria-label="Draw new portraits"]');
-        btn?.click();
-    }, []);
+/** Past six candidates the dots give way to a numeric counter. */
+export function ManyCandidates() {
     return (
         <Frame>
-            <div ref={ref} style={{ display: 'contents' }}>
-                <CharacterCard
-                    game={game}
-                    name="Miriam"
-                    onClose={noop}
-                    isOwner
-                    avatarUrl={PORTRAIT}
-                    onRegenerate={never}
-                    onSelectVariant={never}
-                />
-            </div>
+            <CharacterCard
+                game={game}
+                name="Greta"
+                onClose={noop}
+                isOwner
+                avatarUrl={PORTRAIT}
+                onSelectVariant={never}
+            />
         </Frame>
     );
 }
@@ -89,7 +80,7 @@ export function DeadWerewolf() {
     return <Frame><CharacterCard game={game} name="Jonas" onClose={noop} avatarUrl={PORTRAIT} /></Frame>;
 }
 
-/** A spectator's read-only view: no arrows, no reroll. */
+/** A spectator's read-only view: no switcher in the chip slot. */
 export function ReadOnly() {
     return <Frame><CharacterCard game={game} name="Miriam" onClose={noop} avatarUrl={PORTRAIT} /></Frame>;
 }

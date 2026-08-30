@@ -24,6 +24,20 @@ export function isTierMismatchError(error: unknown): error is TierMismatchError 
  * put it in the error message, others (e.g. Anthropic) only in `details` — so callers
  * should test both fields of a SystemErrorMessage.
  */
+/**
+ * True when a paid-tier call was refused because the player's prepaid in-app
+ * balance can't cover it (cost-tracking, TTS/STT, image actions all throw the
+ * same "Insufficient balance…" wording). Nothing about the model or the game
+ * is wrong, so retrying or switching models can't help — only adding funds on
+ * the profile page does.
+ */
+export function isInsufficientBalanceError(text: string | undefined | null): boolean {
+    if (!text) {
+        return false;
+    }
+    return /insufficient balance/i.test(text);
+}
+
 export function isProviderBusyError(text: string | undefined | null): boolean {
     if (!text) {
         return false;

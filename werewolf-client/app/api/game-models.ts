@@ -1,16 +1,16 @@
 import { VoiceProvider } from '@/app/ai/voice-config';
-import type { TokenUsage } from '@hiper2d/llm-agents';
+import type { TokenUsage } from '@hiper2d/ai-agents';
 
-// Agent-facing core types moved to @hiper2d/llm-agents; re-exported here so the many
+// Agent-facing core types moved to @hiper2d/ai-agents; re-exported here so the many
 // existing '@/app/api/game-models' imports keep working unchanged.
-export { MESSAGE_ROLE, DEFAULT_LOGGING_CONFIG, BotResponseError } from '@hiper2d/llm-agents';
+export { MESSAGE_ROLE, DEFAULT_LOGGING_CONFIG, BotResponseError } from '@hiper2d/ai-agents';
 export type {
     AIMessage,
     TokenUsage,
     ApiKeyMap,
     AgentLoggingConfig,
     LoggingConfig,
-} from '@hiper2d/llm-agents';
+} from '@hiper2d/ai-agents';
 
 export interface GameTokenUsage {
     totalInputTokens: number;
@@ -86,7 +86,59 @@ export interface GamePreviewWithGeneratedBots extends GamePreview {
     gameMasterVoiceInstructions?: string; // Legacy: detailed voice instructions
     gameMasterThinking?: boolean;
     tokenUsage?: any; // Token usage from preview generation
+    // Paid tier only: attach the illustration set drawn on the preview page
+    // (see AvatarDraft). The version the client last saw — createGame adopts
+    // the draft only when it still matches; AVATAR_DRAFT_IN_PROGRESS means the
+    // set is still being drawn and should be adopted when it lands.
+    avatarDraftVersion?: number;
 }
+
+/**
+ * Paid-tier illustration set drawn on the new-game preview page, before a game
+ * exists. One draft per user (doc id derived from the email), living in
+ * avatarDrafts/{draftId} with the same `avatars` / `avatarVariants`
+ * subcollections a game has, so createGame can copy it over verbatim.
+ */
+export interface AvatarDraft {
+    ownerEmail: string;
+    status: 'generating' | 'ready' | 'failed';
+    // Bumped every time a set lands. The preview page sends it back with
+    // createGame so a draft that changed underneath (another tab) isn't
+    // silently attached to a game it wasn't drawn for.
+    version: number;
+    // Portrait keys the set was drawn for: sanitized bot + human names and the
+    // GM key. createGame adopts the draft only when the game's keys match
+    // exactly — a renamed character would otherwise get a stranger's face.
+    keys: string[];
+    avatarVariants: Record<string, { n: number; sel: number }>;
+    avatarVersions: Record<string, number>;
+    hasScene: boolean;
+    // Coarse progress for the preview page: the portrait grid and the scene
+    // pair are drawn in parallel and each lands as a whole.
+    stages: { portraits: boolean; scene: boolean };
+    generatingAt: number | null;
+    // Everything billed for this draft so far; moves into the game's cost
+    // totals on adoption. Billing itself happens at draw time, never again.
+    totalCostUSD: number;
+    error?: string;
+}
+
+/** What the preview page sees of its draft (plain, serializable). */
+export type AvatarDraftState = Pick<AvatarDraft, 'status' | 'version' | 'keys' | 'avatarVariants' | 'avatarVersions' | 'hasScene' | 'stages' | 'error'>;
+
+/** What the preview page sends to draw a set: the same character facts the
+ * in-game generator reads off a Game. Names are sanitized server-side. */
+export interface AvatarDraftSpec {
+    theme: string;
+    description: string;
+    artStyle?: string;
+    humanPlayerName: string;
+    bots: { name: string; gender: 'male' | 'female'; story: string }[];
+}
+
+export const AVATAR_DRAFTS_COLLECTION = 'avatarDrafts';
+// avatarDraftVersion sentinel: the set is still being drawn — adopt it when it lands.
+export const AVATAR_DRAFT_IN_PROGRESS = 0;
 
 /**
  * Role-specific knowledge stored by bots with special roles.
@@ -678,7 +730,7 @@ export interface SystemErrorMessage {
     explanation?: string;
 }
 
-// BotResponseError and MESSAGE_ROLE moved to @hiper2d/llm-agents (re-exported at the top
+// BotResponseError and MESSAGE_ROLE moved to @hiper2d/ai-agents (re-exported at the top
 // of this file). BotResponseError.explanation is carried through to
 // `SystemErrorMessage.explanation` to enrich a user-triggered Retry prompt — see
 // `app/api/retry-hint.ts`.

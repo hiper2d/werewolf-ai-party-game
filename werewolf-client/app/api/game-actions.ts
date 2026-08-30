@@ -50,13 +50,14 @@ import {
     hasCapacity,
     validateModelUsageForTier
 } from "@/app/ai/model-limit-utils";
-import {AbstractAgent} from "../ai/abstract-agent";
+import {AbstractAgent} from '@hiper2d/ai-agents';
 import {format} from "@/app/ai/prompts/utils";
 import {GameSetupZodSchema} from "@/app/ai/prompts/zod-schemas";
 import {ensureUserCanAccessGame} from "@/app/api/tier-guards";
 import {logger} from "@/app/utils/logger";
 import {after} from "next/server";
-import {runAvatarGeneration} from "@/app/utils/avatar-generation";
+import {portraitKeysFor, runAvatarGeneration} from "@/app/utils/avatar-generation";
+import {adoptDraftWhenReady, copyDraftIntoGame, deleteDraft, findAdoptableDraft} from "@/app/utils/avatar-drafts";
 
 /**
  * Counts how many games the user has created since 00:00 UTC today — mirrors the free-tier
@@ -555,6 +556,40 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
         // entirely when blank (Firestore rejects undefined field values).
         const artStyle = sanitizeArtStyle(gamePreview.artStyle);
 
+        // Generate custom game ID: theme-timestamp
+        const sanitizedTheme = sanitizeForId(gamePreview.theme);
+        const customGameId = `${sanitizedTheme}-${timestamp}`;
+        const gameRef = db.collection('games').doc(customGameId);
+        const ownerEmail = session.user.email;
+
+        // Paid tier: a set drawn on the preview page becomes this game's
+        // illustrations instead of drawing (and billing) a new one. A ready
+        // draft is copied before the game doc is written, so the player lands
+        // on a game whose art is already there; a draft still being drawn
+        // makes the game 'generating' and is copied when it lands. Any
+        // mismatch or copy failure falls back to the ordinary 'pending' flow.
+        const gameKeys = portraitKeysFor({theme: gamePreview.theme, description: gamePreview.description, humanPlayerName, bots});
+        const draftAdoption = tier === USER_TIERS.PAID
+            ? await findAdoptableDraft(ownerEmail, gamePreview.avatarDraftVersion, gameKeys).catch(error => {
+                logger.warn(`Illustration draft lookup failed for ${customGameId}`, {error: error.message});
+                return null;
+            })
+            : null;
+        let adoptedAvatars: Partial<Game> & {imagesCostUSD?: number} = {};
+        let awaitDraft = false;
+        if (draftAdoption?.mode === 'ready') {
+            try {
+                adoptedAvatars = await copyDraftIntoGame(draftAdoption.ref, gameRef);
+            } catch (error: any) {
+                logger.error(`Illustration draft copy failed for ${customGameId}; drawing a new set`, {error: error.message});
+                adoptedAvatars = {};
+            }
+        } else if (draftAdoption?.mode === 'in-progress') {
+            awaitDraft = true;
+        }
+        const {imagesCostUSD: adoptedImagesCost = 0, ...adoptedAvatarFields} = adoptedAvatars;
+        const avatarsStatus = adoptedAvatarFields.avatarsStatus ?? (awaitDraft ? 'generating' : 'pending');
+
         const game = {
             description: gamePreview.description,
             theme: gamePreview.theme,
@@ -579,8 +614,12 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
             createdAt: timestamp, // Store creation timestamp
             expireAt: expireAt, // Firestore TTL: auto-delete after 30 days
             createdWithTier: tier,
-            avatarsStatus: 'pending', // Themed avatars generate on first game-page load (avatar-actions.ts)
-            totalGameCost: previewCost, // Total cost starts with preview generation cost
+            // Themed avatars: 'pending' draws at creation (below); 'generating'
+            // waits on a preview draft; 'ready' when one was copied in above.
+            ...adoptedAvatarFields,
+            avatarsStatus,
+            totalGameCost: previewCost + adoptedImagesCost, // preview generation + any adopted illustrations
+            ...(adoptedImagesCost > 0 ? {totalImagesCost: adoptedImagesCost} : {}),
             gameMasterTokenUsage: gamePreview.tokenUsage ? {
                 inputTokens: gamePreview.tokenUsage.inputTokens || 0,
                 outputTokens: gamePreview.tokenUsage.outputTokens || 0,
@@ -598,12 +637,8 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
             }
         };
 
-        // Generate custom game ID: theme-timestamp
-        const sanitizedTheme = sanitizeForId(gamePreview.theme);
-        const customGameId = `${sanitizedTheme}-${timestamp}`;
-        
-        await db.collection('games').doc(customGameId).set(game);
-        
+        await gameRef.set(game);
+
         const gameStoryMessage: GameMessage = {
             id: null,
             recipientName: RECIPIENT_ALL,
@@ -621,12 +656,23 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
         // Kick off themed avatar generation right at creation, after the response
         // is sent so navigation isn't delayed. The transaction inside makes it
         // exactly-once; the game page's 'pending' check is only a safety net in
-        // case this background work dies before claiming the game.
-        const ownerEmail = session.user.email;
+        // case this background work dies before claiming the game. A game that
+        // adopted (or is waiting on) a preview draft doesn't draw its own set.
         try {
-            after(() => runAvatarGeneration(customGameId, ownerEmail).catch(error =>
-                logger.error(`Avatar generation kickoff failed for ${customGameId}`, { error: error.message })
-            ));
+            if (avatarsStatus === 'pending') {
+                after(() => runAvatarGeneration(customGameId, ownerEmail).catch(error =>
+                    logger.error(`Avatar generation kickoff failed for ${customGameId}`, { error: error.message })
+                ));
+            } else if (awaitDraft) {
+                after(() => adoptDraftWhenReady(customGameId, ownerEmail, gameKeys).catch(error =>
+                    logger.error(`Illustration draft follow-up failed for ${customGameId}`, { error: error.message })
+                ));
+            } else if (draftAdoption) {
+                const draftRef = draftAdoption.ref;
+                after(() => deleteDraft(draftRef).catch(error =>
+                    logger.warn(`Illustration draft cleanup failed for ${customGameId}`, { error: error.message })
+                ));
+            }
         } catch {
             // Outside a request scope (unit tests, scripts): skip the kickoff —
             // the game page's 'pending' safety net starts generation instead.

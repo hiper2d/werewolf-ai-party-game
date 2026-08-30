@@ -8,7 +8,7 @@
 import { z } from 'zod';
 import { zodTextFormat } from 'openai/helpers/zod';
 import { ZodSchemaRegistry } from './zod-schemas';
-import { ZodSchemaConverter, ProviderType } from '../zod-schema-converter';
+import { ZodSchemaConverter, ProviderType } from '@hiper2d/ai-agents';
 
 const PROVIDERS: ProviderType[] = ['openai', 'anthropic', 'google', 'mistral', 'deepseek', 'grok', 'kimi'];
 

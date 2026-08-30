@@ -1,5 +1,5 @@
 /**
- * Werewolf's model configuration: the @hiper2d/llm-agents catalog plus app policy.
+ * Werewolf's model configuration: the @hiper2d/ai-agents catalog plus app policy.
  *
  * The library owns the facts and tuning defaults (model API names, thinking dialects,
  * reasoning effort, output ceilings, prices). This module overlays what is werewolf's
@@ -14,7 +14,7 @@ import {
     MODEL_PRICING,
     isHybridThinkingModel,
     type AbstractAgent,
-} from '@hiper2d/llm-agents';
+} from '@hiper2d/ai-agents';
 
 // Generic catalog + pricing surface, re-exported so existing '@/app/ai/ai-models' imports
 // keep working unchanged.
@@ -41,7 +41,7 @@ export {
     calculateModelCost,
     getProviderSignatureFields,
     createCatalog,
-} from '@hiper2d/llm-agents';
+} from '@hiper2d/ai-agents';
 export type {
     ModelTag,
     ReasoningEffort,
@@ -49,7 +49,7 @@ export type {
     PeakPricing,
     CostCalculationOptions,
     LLMModel,
-} from '@hiper2d/llm-agents';
+} from '@hiper2d/ai-agents';
 
 // RANDOM is a picker concept, not a model — the library catalog doesn't know it.
 export const LLM_CONSTANTS = {
@@ -225,22 +225,22 @@ for (const config of Object.values(SupportedAiModels)) {
  * the model picker unusable for that whole game.
  */
 const DEPRECATED_MODEL_MAP: Record<string, string> = {
-    'gpt-5.4': LLM_CONSTANTS.GPT_5_6_TERRA,
-    'deepseek-chat': LLM_CONSTANTS.DEEPSEEK_V4_FLASH,
-    'deepseek-reasoner': LLM_CONSTANTS.DEEPSEEK_V4_FLASH,
-    'grok-fast': LLM_CONSTANTS.GROK_4_6,
-    'grok-thinking': LLM_CONSTANTS.GROK_4_6,
+    'gpt-5.4': LLM_CONSTANTS.GPT,
+    'deepseek-chat': LLM_CONSTANTS.DEEPSEEK_FLASH,
+    'deepseek-reasoner': LLM_CONSTANTS.DEEPSEEK_FLASH,
+    'grok-fast': LLM_CONSTANTS.GROK,
+    'grok-thinking': LLM_CONSTANTS.GROK,
     // Kimi collapsed to a single always-reasoning K3 entry.
     'kimi-thinking': LLM_CONSTANTS.KIMI,
     // Catalog went thinking-only 2026-08-05: the non-thinking variants were retired and the
     // thinking entries took over the plain ids. A persisted plain id ('claude-opus', 'glm', …)
     // is therefore still live — it now just always runs with reasoning enabled — while the old
     // '-thinking' ids resolve back to those plain ids here.
-    'claude-opus-thinking': LLM_CONSTANTS.CLAUDE_4_OPUS,
-    'claude-sonnet-thinking': LLM_CONSTANTS.CLAUDE_4_SONNET,
-    'claude-haiku-thinking': LLM_CONSTANTS.CLAUDE_4_HAIKU,
-    'deepseek-flash-thinking': LLM_CONSTANTS.DEEPSEEK_V4_FLASH,
-    'deepseek-pro-thinking': LLM_CONSTANTS.DEEPSEEK_V4_PRO,
+    'claude-opus-thinking': LLM_CONSTANTS.CLAUDE_OPUS,
+    'claude-sonnet-thinking': LLM_CONSTANTS.CLAUDE_SONNET,
+    'claude-haiku-thinking': LLM_CONSTANTS.CLAUDE_HAIKU,
+    'deepseek-flash-thinking': LLM_CONSTANTS.DEEPSEEK_FLASH,
+    'deepseek-pro-thinking': LLM_CONSTANTS.DEEPSEEK_PRO,
     'glm-thinking': LLM_CONSTANTS.GLM,
     // Base `fugu` retired 2026-08-04: it billed at ultra's rates anyway (see the Fugu comment in
     // the library's MODEL_PRICING), so persisted bots resolve to the model they were effectively

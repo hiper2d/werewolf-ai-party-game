@@ -6,9 +6,9 @@
  * shared-rules tier is one org-level cache entry that ANY bot's call keeps warm. Providers
  * with implicit caching benefit from the same layout automatically (longest shared prefix).
  * Must not match format()'s %word% pattern.
- * The marker itself is defined in @hiper2d/llm-agents (AbstractAgent splits on it).
+ * The marker itself is defined in @hiper2d/ai-agents (AbstractAgent splits on it).
  */
-import { CACHE_TIER_MARKER } from '@hiper2d/llm-agents';
+import { CACHE_TIER_MARKER } from '@hiper2d/ai-agents';
 export { CACHE_TIER_MARKER };
 
 export const BOT_SYSTEM_PROMPT: string = `\

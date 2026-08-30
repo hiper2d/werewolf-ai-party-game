@@ -27,13 +27,15 @@
     "GoogleIcon": "app/components/ui-icons.tsx",
     "GithubIcon": "app/components/ui-icons.tsx",
     "DiscordIcon": "app/components/ui-icons.tsx",
-    "DesignPreviewProvider": null
+    "DesignPreviewProvider": null,
+    "CharacterPoster": "app/games/[id]/components/CharacterPoster.tsx",
+    "IllustrationsPanel": "app/games/newgame/components/IllustrationsPanel.tsx"
   },
   "overrides": {
     "CharacterCard": {
       "cardMode": "single",
       "primaryStory": "Owner",
-      "viewport": "420x660"
+      "viewport": "420x600"
     },
     "RoleCard": {
       "cardMode": "single",
@@ -57,7 +59,17 @@
       "viewport": "520x160"
     },
     "ExpandableTextarea": {
+      "cardMode": "column",
       "viewport": "520x220"
+    },
+    "CharacterPoster": {
+      "cardMode": "single",
+      "primaryStory": "Crew",
+      "viewport": "360x520"
+    },
+    "IllustrationsPanel": {
+      "cardMode": "column",
+      "viewport": "760x520"
     }
   },
   "docsMap": {
@@ -68,14 +80,16 @@
     "MultiSelectDropdown": "../.design-sync/docs/MultiSelectDropdown.md",
     "ModelSelectDropdown": "../.design-sync/docs/ModelSelectDropdown.md",
     "AIModelSelect": "../.design-sync/docs/AIModelSelect.md",
-    "ExpandableTextarea": "../.design-sync/docs/ExpandableTextarea.md"
+    "ExpandableTextarea": "../.design-sync/docs/ExpandableTextarea.md",
+    "CharacterPoster": "../.design-sync/docs/CharacterPoster.md",
+    "IllustrationsPanel": "../.design-sync/docs/IllustrationsPanel.md"
   },
   "libOverrides": {
     "source-kit.mjs": "Next.js app dirs: [id] route segments must not become component groups"
   },
   "dtsPropsFor": {
     "PlayerAvatar": "name: string; size?: number /* px, default 32 */; isGM?: boolean; isDead?: boolean; className?: string; avatarUrl?: string /* themed portrait; falls back to initial-letter gradient */;",
-    "CharacterCard": "game: any /* Game object: bots, humanPlayerName, gameState, avatarsStatus, avatarVariants, ... */; name: string /* participant: bot, human player, or 'Game Master' */; onClose: () => void; isOwner?: boolean; onGameChange?: (patch: any) => void; onRegenerate?: (gameId: string) => Promise<any>; onSelectVariant?: (gameId: string, key: string, index: number) => Promise<any>; avatarUrl?: string /* REQUIRED in designs: overrides the in-app portrait route */;",
+    "CharacterCard": "game: any /* Game object: bots, humanPlayerName, gameState, avatarsStatus, avatarVariants, ... */; name: string /* participant: bot, human player, or 'Game Master' */; onClose: () => void; isOwner?: boolean; onGameChange?: (patch: any) => void; onSelectVariant?: (gameId: string, key: string, index: number) => Promise<any>; avatarUrl?: string /* REQUIRED in designs: overrides the in-app portrait route */;",
     "RoleCard": "role: 'werewolf' | 'doctor' | 'detective' | 'maniac' | 'villager'; own?: boolean /* true = the player's own role: 'You are the …' */; onClose: () => void; imageSrc?: string /* REQUIRED in designs: overrides /roles/<role>.jpg */;",
     "SelectDropdown": "options: { value: string; label: string }[]; value: string; onChange: (value: string) => void; placeholder?: string; className?: string; disabled?: boolean;",
     "MultiSelectDropdown": "options: string[]; selectedOptions: string[]; onChange: (selectedOptions: string[]) => void; placeholder?: string; className?: string; disabled?: boolean; hasError?: boolean; labelFn?: (option: string) => string; optionMetaFn?: (option: string) => { tags?: string[] } | undefined;",
@@ -88,7 +102,9 @@
     "InfoIcon": "className?: string;",
     "GoogleIcon": "className?: string;",
     "GithubIcon": "className?: string;",
-    "DiscordIcon": "className?: string;"
+    "DiscordIcon": "className?: string;",
+    "CharacterPoster": "game: any /* Game object: bots, humanPlayerName, gameState, avatarsStatus, ... */; name: string /* participant: bot, human player, or 'Game Master' */; cornerChip?: React.ReactNode /* top-right chip content, e.g. a turn counter */; cost?: number /* USD, shown in the name plate when > 0 */; hideCostOnNarrow?: boolean; avatarUrl?: string /* REQUIRED in designs: overrides the in-app portrait route */; className?: string;",
+    "IllustrationsPanel": "draft: { status: 'generating' | 'ready'; version: number; keys: string[]; avatarVariants: Record<string, number>; avatarVersions: Record<string, number>; hasScene: boolean; stages: { portraits: boolean; scene: boolean }; error?: string | null } | null /* null = nothing drawn yet */; cast: { key: string; name: string; kind: 'bot' | 'you' | 'gm' }[]; castChanged: boolean /* set was drawn for different names */; busy: boolean /* request in flight */; error: string | null; onGenerate: () => void; imageUrlFn?: (key: string) => string /* REQUIRED in designs: overrides the authed draft-image route; the scene uses key 'scene-welcome' */;"
   },
   "readmeHeader": ".design-sync/conventions.md"
 }

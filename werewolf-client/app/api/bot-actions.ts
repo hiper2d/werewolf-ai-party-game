@@ -39,7 +39,7 @@ import {
     generateEliminationMessage,
     generateVotingResultsMessage
 } from "@/app/utils/message-utils";
-import {ModelError} from "@/app/ai/errors";
+import {ModelError} from "@hiper2d/ai-agents";
 import {
     addMessageToChatAndSaveToDb,
     consumeModelOverride,
@@ -390,20 +390,24 @@ function shouldTriggerAutoVote(game: Game): boolean {
             };
             
     
+            // Bill BEFORE persisting the reply. The charge can be refused (paid
+            // tier, balance too low) and then the whole step must look like it
+            // never happened: with the messages saved first, every Retry left
+            // another intro from the same bot in the chat while the queue never
+            // advanced (four Hermiones, 2026-08-30).
+            if (tokenUsage) {
+                await recordBotTokenUsage(gameId, bot.name, tokenUsage, session.user.email);
+            }
+
             // Save the game master command to the database first
             const savedGmMessage = await addMessageToChatAndSaveToDb(gmMessage, gameId);
 
             // Then save the bot's response
             const savedBotMessage = await addMessageToChatAndSaveToDb(botMessage, gameId);
-    
-            // Update bot's token usage
-            if (tokenUsage) {
-                await recordBotTokenUsage(gameId, bot.name, tokenUsage, session.user.email);
-            }
-    
+
             // Increment day activity counter for the bot
             await incrementDayActivity(gameId, bot.name, game.currentDay);
-    
+
             // Check if this was the last bot in the queue
             if (newQueue.length === 0) {
                 // Transition to DAY_DISCUSSION state
@@ -773,16 +777,17 @@ async function processNextBotInQueue(
         cost: tokenUsage?.costUSD
     };
 
+    // Bill before persisting: a refused charge (balance too low) must leave no
+    // half-saved turn behind, or every Retry duplicates the reply in the chat.
+    if (tokenUsage) {
+        await recordBotTokenUsage(gameId, bot.name, tokenUsage, userEmail);
+    }
+
     // Save the game master command to the database first
     const savedGmMessage = await addMessageToChatAndSaveToDb(gmMessage, gameId);
 
     // Then save the bot's response
     const savedBotMessage = await addMessageToChatAndSaveToDb(botMessage, gameId);
-
-    // Update bot's token usage
-    if (tokenUsage) {
-        await recordBotTokenUsage(gameId, bot.name, tokenUsage, userEmail);
-    }
 
     // Increment day activity counter for the bot
     await incrementDayActivity(gameId, bot.name, game.currentDay);
@@ -1228,14 +1233,15 @@ async function voteImpl(gameId: string): Promise<GameActionResponse> {
                 timestamp: Date.now()
             };
 
-            // Save messages to database sequentially
-            const savedGmMsg = await addMessageToChatAndSaveToDb(gmMessage, gameId);
-            const savedVoteMsg = await addMessageToChatAndSaveToDb(voteMessage, gameId);
-
-            // Update bot's token usage
+            // Bill before persisting: a refused charge (balance too low) must
+            // leave no half-saved vote behind, or every Retry duplicates it.
             if (tokenUsage) {
                 await recordBotTokenUsage(gameId, bot.name, tokenUsage, session.user.email);
             }
+
+            // Save messages to database sequentially
+            const savedGmMsg = await addMessageToChatAndSaveToDb(gmMessage, gameId);
+            const savedVoteMsg = await addMessageToChatAndSaveToDb(voteMessage, gameId);
 
             // Remove the bot from queue and update voting results
             const newQueue = currentGame.gameStateProcessQueue.slice(1);

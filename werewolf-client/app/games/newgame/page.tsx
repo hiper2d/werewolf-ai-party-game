@@ -4,7 +4,11 @@ import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {useRouter} from 'next/navigation';
 import {useSession} from 'next-auth/react';
 import {createGame, previewGame} from '@/app/api/game-actions';
-import {GAME_ROLES, GamePreview, GamePreviewWithGeneratedBots, GENDER_OPTIONS, getVoicesForGender, getRandomVoiceForGender, PLAY_STYLES, PLAY_STYLE_CONFIGS, RANDOM_ROLE, UserTier, USER_TIERS} from "@/app/api/game-models";
+import {generateDraftIllustrations, getAvatarDraft} from '@/app/api/avatar-draft-actions';
+import {AVATAR_DRAFT_IN_PROGRESS, AVATAR_GM_KEY, AvatarDraftState, GAME_ROLES, GamePreview, GamePreviewWithGeneratedBots, GENDER_OPTIONS, getVoicesForGender, getRandomVoiceForGender, PLAY_STYLES, PLAY_STYLE_CONFIGS, RANDOM_ROLE, UserTier, USER_TIERS} from "@/app/api/game-models";
+import {sanitizePlayerName} from "@/app/utils/name-utils";
+import IllustrationsPanel, {CastEntry, draftImageUrl} from '@/app/games/newgame/components/IllustrationsPanel';
+import PlayerAvatar from '@/app/components/PlayerAvatar';
 import {LLM_CONSTANTS, SupportedAiModels, getModelDisplayName, modelHasTag, modelIsFast} from "@/app/ai/ai-models";
 import {FREE_TIER_UNLIMITED, getCandidateModelsForTier, getModelPickerOptions, getPerGameModelLimit} from "@/app/ai/model-limit-utils";
 import AIModelSelect from '@/app/components/AIModelSelect';
@@ -85,6 +89,11 @@ export default function CreateNewGamePage() {
     const [botNameErrors, setBotNameErrors] = useState<{[key: number]: string}>({});
     const [userTier, setUserTier] = useState<UserTier>('free');
     const [isTierLoaded, setIsTierLoaded] = useState(false);
+    // Paid tier: the illustration set drawn for this preview (server-side
+    // draft, polled while it draws). null until the player asks for one.
+    const [draft, setDraft] = useState<AvatarDraftState | null>(null);
+    const [draftBusy, setDraftBusy] = useState(false);
+    const [draftError, setDraftError] = useState<string | null>(null);
     const hasInitializedPlayerModels = useRef(false);
     const playerOptions = useMemo(() => {
         const maxPlayers = 12;
@@ -240,6 +249,71 @@ export default function CreateNewGamePage() {
             setGameData({ ...gameData, gameMasterVoice: getRandomVoiceForGender('male') });
         }
     }, [gameData]);
+
+    // The cast the illustrations are for, keyed the way the server keys
+    // portrait docs (sanitized names + the GM key). A draft drawn for a
+    // different key set is shown but not attached to the game.
+    const cast = useMemo<CastEntry[]>(() => {
+        if (!gameData) return [];
+        return [
+            ...gameData.bots.map(bot => ({ key: sanitizePlayerName(bot.name), name: bot.name, kind: 'bot' as const })),
+            { key: sanitizePlayerName(gameData.name), name: gameData.name, kind: 'you' as const },
+            { key: AVATAR_GM_KEY, name: 'Game Master', kind: 'gm' as const },
+        ];
+    }, [gameData]);
+    const draftMatchesCast = useMemo(() => {
+        if (!draft) return false;
+        const a = [...draft.keys].sort(), b = cast.map(c => c.key).sort();
+        return a.length === b.length && a.every((k, i) => k === b[i]);
+    }, [draft, cast]);
+    const draftReadyForCast = draft?.status === 'ready' && draftMatchesCast;
+
+    // Poll the draft while the server draws it. The draw runs off the request
+    // (like avatar generation at game creation), so this is the only way the
+    // page learns it landed. 100 × 3s outlasts the worst case; the server also
+    // reports a run that died as failed after its stale window.
+    useEffect(() => {
+        if (draft?.status !== 'generating') return;
+        let cancelled = false;
+        const poll = async () => {
+            for (let i = 0; i < 100 && !cancelled; i++) {
+                await new Promise(resolve => setTimeout(resolve, 3000));
+                if (cancelled) return;
+                try {
+                    const fresh = await getAvatarDraft();
+                    if (cancelled) return;
+                    if (fresh) {
+                        setDraft(fresh);
+                        if (fresh.status !== 'generating') return;
+                    }
+                } catch (err) {
+                    console.error('Illustration draft poll failed', err);
+                }
+            }
+        };
+        poll();
+        return () => { cancelled = true; };
+    }, [draft?.status]);
+
+    const handleGenerateIllustrations = async () => {
+        if (!gameData || draftBusy || draft?.status === 'generating') return;
+        setDraftBusy(true);
+        setDraftError(null);
+        try {
+            const state = await generateDraftIllustrations({
+                theme: gameData.theme,
+                description: gameData.description,
+                artStyle,
+                humanPlayerName: gameData.name,
+                bots: gameData.bots.map(bot => ({ name: bot.name, gender: bot.gender, story: bot.story })),
+            });
+            setDraft(state);
+        } catch (err: any) {
+            setDraftError(err?.message ?? 'Drawing failed.');
+        } finally {
+            setDraftBusy(false);
+        }
+    };
 
     // GM defaults to RANDOM, resolved during preview generation
 
@@ -430,8 +504,11 @@ export default function CreateNewGamePage() {
                 }
             });
             setBotNameErrors(initialBotNameErrors);
-            
+
             setGameData(updatedGame);
+            // A new cast: whatever was drawn belongs to the previous one.
+            setDraft(null);
+            setDraftError(null);
         } catch (err: any) {
             // Provide user-friendly error messages for common issues
             let userFriendlyError = err.message;
@@ -466,7 +543,19 @@ export default function CreateNewGamePage() {
         setIsLoading(true);
         setError(null);
         try {
-            const newGameId = await createGame({ ...gameData, artStyle });
+            // Attach the preview's illustrations when they were drawn for this
+            // exact cast: a ready set by version, a set still being drawn by
+            // the in-progress marker (createGame waits for it).
+            const avatarDraftVersion = draft && draftMatchesCast
+                ? draft.status === 'ready' ? draft.version
+                    : draft.status === 'generating' ? AVATAR_DRAFT_IN_PROGRESS
+                        : undefined
+                : undefined;
+            const newGameId = await createGame({
+                ...gameData,
+                artStyle,
+                ...(avatarDraftVersion !== undefined ? { avatarDraftVersion } : {}),
+            });
             if (newGameId) {
                 router.push(`/games/${newGameId}`);
             } else {
@@ -853,6 +942,20 @@ export default function CreateNewGamePage() {
                 <div className="mt-8 space-y-6">
                     <h2 className="text-[20px] font-semibold text-[var(--fg-0)] tracking-[-0.01em]">Preview</h2>
 
+                    {/* Illustrations — paid tier only. Free games get their set
+                        drawn automatically when the game starts, so the block is
+                        simply absent for them (no upsell, no locked button). */}
+                    {isTierLoaded && userTier === USER_TIERS.PAID && (
+                        <IllustrationsPanel
+                            draft={draft}
+                            cast={cast}
+                            castChanged={!!draft && draft.status !== 'generating' && !draftMatchesCast}
+                            busy={draftBusy}
+                            error={draftError}
+                            onGenerate={handleGenerateIllustrations}
+                        />
+                    )}
+
                     {/* Game Story */}
                     <div>
                         <label htmlFor="gameStory" className={`${labelStyle} block mb-1.5`}>Game Story</label>
@@ -930,12 +1033,18 @@ export default function CreateNewGamePage() {
                                 {/* Player head: identity capsule */}
                                 <div className="pb-4 border-b border-[var(--line-1)]">
                                     <label className={`group flex items-center gap-2.5 bg-[var(--bg-2)] border rounded-full py-1.5 pl-1.5 pr-2 transition-[border-color,box-shadow] duration-[120ms] focus-within:border-[var(--accent-line)] focus-within:shadow-[0_0_0_3px_var(--accent-soft)] ${botNameErrors[index] ? 'border-[var(--danger)]' : 'border-[var(--line-2)]'}`}>
-                                        <div
-                                            style={{'--h': avatarHue(player.name)} as React.CSSProperties}
-                                            className="w-[34px] h-[34px] shrink-0 rounded-full grid place-items-center text-[14px] font-semibold bg-[linear-gradient(150deg,oklch(42%_0.075_var(--h)),oklch(31%_0.055_var(--h)))] text-[oklch(88%_0.06_var(--h))]"
-                                        >
-                                            {player.name.charAt(0).toUpperCase()}
-                                        </div>
+                                        {/* Once a set is drawn for this cast, the initial gives
+                                            way to the character's portrait. */}
+                                        {draftReadyForCast && draft ? (
+                                            <PlayerAvatar name={player.name} size={34} avatarUrl={draftImageUrl(draft, sanitizePlayerName(player.name))} className="shrink-0" />
+                                        ) : (
+                                            <div
+                                                style={{'--h': avatarHue(player.name)} as React.CSSProperties}
+                                                className="w-[34px] h-[34px] shrink-0 rounded-full grid place-items-center text-[14px] font-semibold bg-[linear-gradient(150deg,oklch(42%_0.075_var(--h)),oklch(31%_0.055_var(--h)))] text-[oklch(88%_0.06_var(--h))]"
+                                            >
+                                                {player.name.charAt(0).toUpperCase()}
+                                            </div>
+                                        )}
                                         <input
                                             type="text"
                                             className="flex-1 min-w-0 bg-transparent border-none outline-none text-[var(--fg-0)] text-[16px] font-semibold tracking-[-0.01em] placeholder:text-[var(--fg-3)]"

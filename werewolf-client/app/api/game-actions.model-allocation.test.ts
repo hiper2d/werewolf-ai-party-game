@@ -144,8 +144,8 @@ function makePreview(
         playerCount,
         werewolfCount: 1,
         specialRoles: [],
-        gameMasterAiType: LLM_CONSTANTS.DEEPSEEK_V4_FLASH,
-        playersAiType: [LLM_CONSTANTS.DEEPSEEK_V4_FLASH],
+        gameMasterAiType: LLM_CONSTANTS.DEEPSEEK_FLASH,
+        playersAiType: [LLM_CONSTANTS.DEEPSEEK_FLASH],
         ...overrides,
     };
 }
@@ -199,7 +199,7 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 describe('previewGame model allocation — fair distribution (paid tier)', () => {
-    const TWO_MODELS = [LLM_CONSTANTS.DEEPSEEK_V4_FLASH, LLM_CONSTANTS.DEEPSEEK_V4_PRO];
+    const TWO_MODELS = [LLM_CONSTANTS.DEEPSEEK_FLASH, LLM_CONSTANTS.DEEPSEEK_PRO];
 
     it('spreads two selected models evenly when bot count divides evenly', async () => {
         mockTier(USER_TIERS.PAID);
@@ -211,8 +211,8 @@ describe('previewGame model allocation — fair distribution (paid tier)', () =>
 
         expect(result.bots).toHaveLength(6);
         expect(modelCounts(result.bots)).toEqual({
-            [LLM_CONSTANTS.DEEPSEEK_V4_FLASH]: 3,
-            [LLM_CONSTANTS.DEEPSEEK_V4_PRO]: 3,
+            [LLM_CONSTANTS.DEEPSEEK_FLASH]: 3,
+            [LLM_CONSTANTS.DEEPSEEK_PRO]: 3,
         });
     });
 
@@ -232,9 +232,9 @@ describe('previewGame model allocation — fair distribution (paid tier)', () =>
     it('spreads three selected models evenly across a divisible bot count', async () => {
         mockTier(USER_TIERS.PAID);
         const threeModels = [
-            LLM_CONSTANTS.DEEPSEEK_V4_FLASH,
-            LLM_CONSTANTS.DEEPSEEK_V4_PRO,
-            LLM_CONSTANTS.GPT_5_6_TERRA,
+            LLM_CONSTANTS.DEEPSEEK_FLASH,
+            LLM_CONSTANTS.DEEPSEEK_PRO,
+            LLM_CONSTANTS.GPT,
         ];
 
         // 10 players → 9 bots, 3 models → exactly 3 each.
@@ -244,9 +244,9 @@ describe('previewGame model allocation — fair distribution (paid tier)', () =>
 
         expect(result.bots).toHaveLength(9);
         expect(modelCounts(result.bots)).toEqual({
-            [LLM_CONSTANTS.DEEPSEEK_V4_FLASH]: 3,
-            [LLM_CONSTANTS.DEEPSEEK_V4_PRO]: 3,
-            [LLM_CONSTANTS.GPT_5_6_TERRA]: 3,
+            [LLM_CONSTANTS.DEEPSEEK_FLASH]: 3,
+            [LLM_CONSTANTS.DEEPSEEK_PRO]: 3,
+            [LLM_CONSTANTS.GPT]: 3,
         });
     });
 
@@ -258,16 +258,16 @@ describe('previewGame model allocation — fair distribution (paid tier)', () =>
         const result = await previewGame(
             makePreview(7, {
                 playersAiType: [
-                    LLM_CONSTANTS.DEEPSEEK_V4_FLASH,
-                    LLM_CONSTANTS.DEEPSEEK_V4_FLASH,
-                    LLM_CONSTANTS.DEEPSEEK_V4_PRO,
+                    LLM_CONSTANTS.DEEPSEEK_FLASH,
+                    LLM_CONSTANTS.DEEPSEEK_FLASH,
+                    LLM_CONSTANTS.DEEPSEEK_PRO,
                 ],
             })
         );
 
         expect(modelCounts(result.bots)).toEqual({
-            [LLM_CONSTANTS.DEEPSEEK_V4_FLASH]: 3,
-            [LLM_CONSTANTS.DEEPSEEK_V4_PRO]: 3,
+            [LLM_CONSTANTS.DEEPSEEK_FLASH]: 3,
+            [LLM_CONSTANTS.DEEPSEEK_PRO]: 3,
         });
     });
 });
@@ -330,18 +330,18 @@ describe('previewGame model allocation — free-tier capacity dropout', () => {
         // DeepSeek Pro is capped at 3 bots/game; the rest of the 8 bots fall to Deepseek Flash.
         const result = await previewGame(
             makePreview(9, {
-                gameMasterAiType: LLM_CONSTANTS.DEEPSEEK_V4_FLASH,
+                gameMasterAiType: LLM_CONSTANTS.DEEPSEEK_FLASH,
                 playersAiType: [
-                    LLM_CONSTANTS.DEEPSEEK_V4_PRO,
-                    LLM_CONSTANTS.DEEPSEEK_V4_FLASH,
+                    LLM_CONSTANTS.DEEPSEEK_PRO,
+                    LLM_CONSTANTS.DEEPSEEK_FLASH,
                 ],
             })
         );
 
         expect(result.bots).toHaveLength(8);
         expect(modelCounts(result.bots)).toEqual({
-            [LLM_CONSTANTS.DEEPSEEK_V4_PRO]: 3, // exactly its per-game cap
-            [LLM_CONSTANTS.DEEPSEEK_V4_FLASH]: 5,
+            [LLM_CONSTANTS.DEEPSEEK_PRO]: 3, // exactly its per-game cap
+            [LLM_CONSTANTS.DEEPSEEK_FLASH]: 5,
         });
     });
 
@@ -354,8 +354,8 @@ describe('previewGame model allocation — free-tier capacity dropout', () => {
         await expect(
             previewGame(
                 makePreview(6, {
-                    gameMasterAiType: LLM_CONSTANTS.DEEPSEEK_V4_FLASH,
-                    playersAiType: [LLM_CONSTANTS.DEEPSEEK_V4_PRO],
+                    gameMasterAiType: LLM_CONSTANTS.DEEPSEEK_FLASH,
+                    playersAiType: [LLM_CONSTANTS.DEEPSEEK_PRO],
                 })
             )
         ).rejects.toThrow(

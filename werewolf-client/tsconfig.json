@@ -24,9 +24,6 @@
     "paths": {
       "@/*": [
         "./*"
-      ],
-      "@hiper2d/llm-agents": [
-        "./packages/llm-agents/src"
       ]
     },
     "target": "ES2017"

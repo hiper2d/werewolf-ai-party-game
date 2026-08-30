@@ -269,8 +269,8 @@ export function formatMessagesForNightSummary(nightResultsCommand: string): AIMe
     return [{ role: MESSAGE_ROLE.USER, content: nightResultsCommand }];
 }
 
-// cleanResponse moved to @hiper2d/llm-agents; re-exported to keep this import path alive.
-export { cleanResponse } from '@hiper2d/llm-agents';
+// cleanResponse moved to @hiper2d/ai-agents; re-exported to keep this import path alive.
+export { cleanResponse } from '@hiper2d/ai-agents';
 
 
 /**

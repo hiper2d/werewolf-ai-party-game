@@ -16,8 +16,9 @@ import { ttsService } from "@/app/services/tts-service";
 import { sttService } from "@/app/services/stt-service";
 import { getDefaultVoiceProvider } from "@/app/ai/voice-config";
 import { getModelDisplayName, getModelProviderName } from "@/app/ai/ai-models";
-import { isProviderBusyError } from "@/app/api/errors";
+import { isInsufficientBalanceError, isProviderBusyError } from "@/app/api/errors";
 import { DISCORD_URL } from "@/app/config/external-links";
+import Link from "next/link";
 import { useUIControls } from '../context/UIControlsContext';
 
 interface GameChatProps {
@@ -1733,8 +1734,60 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                     // its own. Anthropic-shaped errors carry the status text only in `details`.
                     const providerBusy = isProviderBusyError(game.errorState.error)
                         || isProviderBusyError(game.errorState.details);
+                    // An empty prepaid balance is neither the model's nor the game's
+                    // fault: the reply was generated and the charge was refused.
+                    // Retry / model swap can't fix it — only adding funds can, so the
+                    // banner says so and points at the profile page instead.
+                    const insufficientBalance = isInsufficientBalanceError(game.errorState.error)
+                        || isInsufficientBalanceError(game.errorState.details);
                     // Hidden during NIGHT for the same reason as the model name.
                     const provider = model ? getModelProviderName(model) : undefined;
+                    if (insufficientBalance) {
+                        return (
+                            <div className="mx-2 my-2 p-3 rounded-[var(--radius-lg)] border bg-[oklch(70%_0.13_25_/_0.08)] border-[oklch(70%_0.13_25_/_0.3)]">
+                                <div className="flex items-start gap-2">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0 mt-0.5 text-[var(--danger)]">
+                                        <circle cx="12" cy="12" r="10"/>
+                                        <line x1="15" y1="9" x2="9" y2="15"/>
+                                        <line x1="9" y1="9" x2="15" y2="15"/>
+                                    </svg>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="text-[13px] font-medium text-[var(--fg-0)] break-words">
+                                            Your balance is too low to continue
+                                        </div>
+                                        <div className="text-[12px] mt-1 text-[var(--fg-1)] break-words">
+                                            Every AI turn is paid from your prepaid balance, and it can&apos;t cover
+                                            {displayWho ? ` ${displayWho}'s next reply` : ' the next reply'}. Retrying or switching the model won&apos;t help — add funds on your profile page, then come back and press Retry to pick up where the game left off.
+                                        </div>
+                                    </div>
+                                    <div className="flex-shrink-0 flex flex-col gap-1.5">
+                                        <Link
+                                            href="/profile"
+                                            className="px-3 py-1.5 rounded-[var(--radius-md)] bg-[var(--accent)] text-[var(--accent-fg)] hover:brightness-110 text-[12px] font-medium transition-all duration-[120ms] flex items-center justify-center gap-1.5"
+                                            title="Add funds on your profile page"
+                                        >
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <line x1="12" y1="5" x2="12" y2="19"/>
+                                                <line x1="5" y1="12" x2="19" y2="12"/>
+                                            </svg>
+                                            Add funds
+                                        </Link>
+                                        <button
+                                            onClick={handleDismissError}
+                                            className="px-3 py-1.5 rounded-[var(--radius-md)] bg-[var(--bg-2)] border border-[var(--line-2)] text-[var(--fg-1)] hover:bg-[var(--bg-3)] hover:text-[var(--fg-0)] text-[12px] font-medium transition-all duration-[120ms] flex items-center justify-center gap-1.5"
+                                            title="Retry after adding funds"
+                                        >
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <polyline points="23 4 23 10 17 10"/>
+                                                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                                            </svg>
+                                            Retry
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    }
                     return (
                         <div className="mx-2 my-2 p-3 rounded-[var(--radius-lg)] border bg-[oklch(70%_0.13_25_/_0.08)] border-[oklch(70%_0.13_25_/_0.3)]">
                             <div className="flex items-start gap-2">
@@ -1875,22 +1928,17 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
             })()}
 
             {/* Themed art generates in the background for ~30s after game
-                creation; without this chip players think images are missing.
-                Styled to match the "is thinking" chip above. */}
+                creation; without this banner players think images are missing.
+                Same accent banner + arc spinner as the participants panel's
+                portrait-redraw notice, so "art in progress" looks the same
+                everywhere in the game. */}
             {(game.avatarsStatus === 'pending' || game.avatarsStatus === 'generating') && (
                 <div className="flex-shrink-0 px-1 lg:px-7 pb-1">
-                    <div className="inline-flex items-center gap-2.5 rounded-full bg-[var(--bg-2)] border border-[var(--line-2)] pl-3 pr-3.5 py-1.5 shadow-subtle">
-                        <span className="w-2 h-2 rounded-full bg-[var(--accent)] animate-pulse flex-none" />
-                        <span className="text-[13px] text-[var(--fg-1)]">Images are loading</span>
-                        <span className="inline-flex gap-[3px]">
-                            {[0, 1, 2].map(i => (
-                                <span
-                                    key={i}
-                                    className="w-[5px] h-[5px] rounded-full bg-[var(--accent)] animate-bounce"
-                                    style={{ animationDelay: `${i * 0.18}s` }}
-                                />
-                            ))}
-                        </span>
+                    <div className="flex items-center gap-2 px-3 py-[9px] rounded-[var(--radius-md)] bg-[var(--accent-soft)] border border-[var(--accent-line)] text-[12px] text-[var(--accent-text)]">
+                        <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" className="animate-spin flex-shrink-0">
+                            <path d="M10 2a8 8 0 0 1 8 8" />
+                        </svg>
+                        Drawing portraits and the opening scene…
                     </div>
                 </div>
             )}

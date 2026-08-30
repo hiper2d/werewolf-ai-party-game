@@ -42,7 +42,24 @@ function firstSentence(text: string): string {
     return m ? m[0] : text.slice(0, 180);
 }
 
-function buildCells(game: Game): AvatarCell[] {
+/** The character facts the painter needs. A Game satisfies this directly; the
+ * preview page's draft (no game yet) builds one from its form state. */
+export interface AvatarSubject {
+    theme: string;
+    description: string;
+    artStyle?: string;
+    humanPlayerName: string;
+    bots: {name: string; gender: string; story: string}[];
+}
+
+/** Every portrait key a set for this subject contains, in grid order. The
+ * single source of truth for "which docs does a set write" — the preview draft
+ * compares these against the game's cast before adopting a set. */
+export function portraitKeysFor(subject: AvatarSubject): string[] {
+    return buildCells(subject).map(c => c.key);
+}
+
+function buildCells(game: AvatarSubject): AvatarCell[] {
     const cells: AvatarCell[] = game.bots.map(bot => ({
         key: bot.name,
         label: bot.name,
@@ -65,7 +82,7 @@ function buildCells(game: Game): AvatarCell[] {
     return cells;
 }
 
-function buildPrompt(game: Game, cells: AvatarCell[], cols: number, rows: number): string {
+function buildPrompt(game: AvatarSubject, cells: AvatarCell[], cols: number, rows: number): string {
     const cellLines = cells.map(
         (c, i) => `Cell ${i + 1}: ${c.prompt}. Its own distinct flat solid muted background color.`
     ).join("\n");
@@ -138,7 +155,7 @@ export async function generateImage(apiKey: string, prompt: string, aspectRatio:
 
 // Both chat scene images ride in ONE image (stacked panels, sliced in half):
 // top = the welcome establishing shot, bottom = the same place at night.
-function buildScenePrompt(game: Game): string {
+function buildScenePrompt(game: AvatarSubject): string {
     const artStyle = sanitizeArtStyle(game.artStyle);
     const styleClause = artStyle
         ? `in this art style, chosen by the player: "${artStyle}"`
@@ -290,15 +307,17 @@ export function isSystemicFailure(verdicts: SliceVerdict[]): boolean {
 /** One image call: draw the grid, slice it, judge every slice. */
 async function generateCandidateRound(
     apiKey: string,
-    game: Game,
+    game: AvatarSubject,
     sharp: any,
     cells: AvatarCell[],
     cols: number,
     rows: number,
     realCount: number,
-    gameId: string,
+    logContext: Record<string, unknown>,
+    ledger: SpendLedger,
 ): Promise<{candidates: AvatarCandidate[]; costUSD: number; systemic: boolean; problems: string[]}> {
     const grid = await generateImage(apiKey, buildPrompt(game, cells, cols, rows), "4:3");
+    ledger.spentUSD += grid.costUSD;
     const slices = await sliceGrid(sharp, grid.buffer, cells, realCount, cols);
 
     let verdicts: SliceVerdict[];
@@ -307,7 +326,7 @@ async function generateCandidateRound(
     } catch (verifyError: any) {
         // A verifier outage must never cost the player their portraits: accept
         // the crops unjudged (that is also what the old pipeline did).
-        logger.warn(`Slice verifier unavailable, accepting slices unjudged`, {gameId, error: verifyError.message});
+        logger.warn(`Slice verifier unavailable, accepting slices unjudged`, {...logContext, error: verifyError.message});
         verdicts = slices.map(() => ({hasText: false, genderMismatch: false}));
     }
 
@@ -330,14 +349,14 @@ async function generateCandidateRound(
 const AVATAR_DOC_BATCH = 8;
 
 // How long a reroll marker is trusted before another attempt may claim the game.
-const STALE_REGEN_MS = 5 * 60 * 1000;
+export const STALE_REGEN_MS = 5 * 60 * 1000;
 
-interface PendingWrite {
+export interface PendingWrite {
     ref: firestore.DocumentReference;
     data: Record<string, any>;
 }
 
-async function commitChunked(writes: PendingWrite[]): Promise<void> {
+export async function commitChunked(writes: PendingWrite[]): Promise<void> {
     for (let i = 0; i < writes.length; i += AVATAR_DOC_BATCH) {
         const batch = db!.batch();
         for (const w of writes.slice(i, i + AVATAR_DOC_BATCH)) batch.set(w.ref, w.data);
@@ -351,12 +370,15 @@ export type AvatarVariantMap = Record<string, {n: number; sel: number}>;
  * selected one into avatars/{key}, where all the existing readers look (the
  * image route, illustration reference portraits, the chat and cinematic UIs) —
  * that copy is why variants needed no changes anywhere downstream.
- * `existing` carries the counts already stored, so a reroll appends. */
-async function writeCandidates(
+ * `existing` carries the counts already stored, so a reroll appends. Works on
+ * any parent doc with those two subcollections — a game or a preview draft;
+ * `docExtras` is merged into every image doc (the draft's TTL field). */
+export async function writeCandidates(
     gameRef: firestore.DocumentReference,
     rounds: AvatarCandidate[][],
     existing: AvatarVariantMap,
     extraWrites: PendingWrite[] = [],
+    docExtras: Record<string, any> = {},
 ): Promise<{variants: AvatarVariantMap; versions: Record<string, number>}> {
     const byKey = new Map<string, AvatarCandidate[]>();
     for (const round of rounds) {
@@ -382,6 +404,7 @@ async function writeCandidates(
                 flagged: candidate.flagged,
                 ...(candidate.problem ? {problem: candidate.problem} : {}),
                 createdAt: now,
+                ...docExtras,
             },
         }));
         const localSel = chooseSelected(list);
@@ -389,7 +412,7 @@ async function writeCandidates(
         versions[key] = now;
         writes.push({
             ref: gameRef.collection('avatars').doc(key),
-            data: {data: list[localSel].jpeg.toString('base64'), mime: 'image/jpeg', createdAt: now},
+            data: {data: list[localSel].jpeg.toString('base64'), mime: 'image/jpeg', createdAt: now, ...docExtras},
         });
     }
 
@@ -399,7 +422,7 @@ async function writeCandidates(
 
 /** Paid tier pays cost + markup off the prepaid balance; free tier only records
  * the spend. Same shape as every other image call in the app. */
-async function billImages(userEmail: string, tier: UserTier, costUSD: number): Promise<void> {
+export async function billImages(userEmail: string, tier: UserTier, costUSD: number): Promise<void> {
     if (costUSD <= 0) return;
     if (tier === USER_TIERS.PAID) {
         const chargedAmount = parseFloat((costUSD * (1 + PAID_TIER_MARKUP)).toFixed(6));
@@ -440,7 +463,7 @@ function resultFrom(game: Game): AvatarGenerationResult {
 /** Cells plus the throwaway fillers that keep the grid full. The model reliably
  * fills FULL grids but sometimes ignores "leave the last cells empty", which
  * shifts every row and corrupts the slicing. */
-function buildPaddedCells(game: Game): {cells: AvatarCell[]; cols: number; rows: number; realCount: number} {
+function buildPaddedCells(game: AvatarSubject): {cells: AvatarCell[]; cols: number; rows: number; realCount: number} {
     const cells = buildCells(game);
     const {cols, rows} = gridFor(cells.length);
     const realCount = cells.length;
@@ -452,6 +475,103 @@ function buildPaddedCells(game: Game): {cells: AvatarCell[]; cols: number; rows:
         });
     }
     return {cells, cols, rows, realCount};
+}
+
+/** Running total of what a draw has paid Google for so far. Kept OUTSIDE the
+ * drawing function so a run that dies partway still reports the images it did
+ * get: that spend used to vanish entirely (the billing block sat after the
+ * throw) — roughly $0.60 of invisible spend in one 7-day sample. */
+export interface SpendLedger {
+    spentUSD: number;
+}
+
+/** A drawn illustration set, not yet stored anywhere. */
+export interface DrawnSet {
+    rounds: AvatarCandidate[][];
+    // welcome + night, or empty when scenes weren't requested or failed
+    // (scene failure never blocks portraits).
+    scenes: {key: string; jpeg: Buffer}[];
+}
+
+/**
+ * Draws a set for a subject: the portrait grid (draw → slice → judge, keeping
+ * every round's crops) and, when asked, the scene pair in parallel. Pure
+ * drawing — no Firestore, no billing — so the game generator, the in-game
+ * reroll and the preview draft all run the same pipeline and differ only in
+ * where the result lands.
+ *
+ * `maxRounds` > 1 allows another draw when a round failed as a whole image (a
+ * labeled character-card layout, or a drifted grid); a few flagged cells are
+ * shipped as-is with their alternates one arrow-click away on the character
+ * card. `onStage` fires as each half lands, for progress display.
+ */
+export async function drawIllustrationSet(
+    apiKey: string,
+    subject: AvatarSubject,
+    opts: {
+        withScenes: boolean;
+        maxRounds: number;
+        ledger: SpendLedger;
+        logContext: Record<string, unknown>;
+        onStage?: (stage: 'portraits' | 'scene') => Promise<void>;
+    },
+): Promise<DrawnSet> {
+    const {ledger, logContext} = opts;
+    const {cells, cols, rows, realCount} = buildPaddedCells(subject);
+
+    // sharp is a native module; dynamic import keeps it out of the
+    // client/server bundle graph.
+    const sharp = (await import('sharp')).default;
+
+    // Scene pair: stacked panels sliced in half → welcome (top), night
+    // (bottom). Downscale to 1024 wide — plenty for a chat bubble.
+    const scenePromise: Promise<{key: string; jpeg: Buffer}[]> = !opts.withScenes
+        ? Promise.resolve([])
+        : generateImage(apiKey, buildScenePrompt(subject), "3:4")
+            .then(async image => {
+                ledger.spentUSD += image.costUSD;
+                const scenes = image.buffer;
+                const sceneMeta = await sharp(scenes).metadata();
+                const w = sceneMeta.width || 0;
+                const halfH = Math.floor((sceneMeta.height || 0) / 2);
+                const divider = 6; // skip the divider line between panels
+                const out: {key: string; jpeg: Buffer}[] = [];
+                for (const [key, top] of [[SCENE_WELCOME_KEY, 0], [SCENE_NIGHT_KEY, halfH + divider]] as [string, number][]) {
+                    const jpeg = await sharp(scenes)
+                        .extract({left: 0, top, width: w, height: halfH - divider})
+                        .resize({width: 1024})
+                        .jpeg({quality: 80})
+                        .toBuffer();
+                    out.push({key, jpeg});
+                }
+                await opts.onStage?.('scene');
+                return out;
+            })
+            .catch(error => {
+                logger.warn(`Scene image generation failed`, {...logContext, error: error?.message});
+                return [];
+            });
+
+    const rounds: AvatarCandidate[][] = [];
+    for (let attempt = 1; attempt <= opts.maxRounds; attempt++) {
+        const round = await generateCandidateRound(apiKey, subject, sharp, cells, cols, rows, realCount, logContext, ledger);
+        rounds.push(round.candidates);
+        if (round.problems.length > 0) {
+            logger.warn(`Avatar grid slices flagged (attempt ${attempt})`, {...logContext, systemic: round.systemic, problems: round.problems});
+        }
+        if (!round.systemic) break;
+    }
+    await opts.onStage?.('portraits');
+
+    return {rounds, scenes: await scenePromise};
+}
+
+/** Scene images as writes into a parent's `avatars` subcollection. */
+export function sceneWritesFor(parentRef: firestore.DocumentReference, scenes: DrawnSet['scenes'], docExtras: Record<string, any> = {}): PendingWrite[] {
+    return scenes.map(({key, jpeg}) => ({
+        ref: parentRef.collection('avatars').doc(key),
+        data: {data: jpeg.toString('base64'), mime: 'image/jpeg', createdAt: Date.now(), ...docExtras},
+    }));
 }
 
 export async function runAvatarGeneration(gameId: string, userEmail: string): Promise<AvatarGenerationResult | null> {
@@ -475,11 +595,7 @@ export async function runAvatarGeneration(gameId: string, userEmail: string): Pr
         return snap.exists ? resultFrom(snap.data() as Game) : null;
     }
 
-    // Hoisted out of the try: a run that dies partway still spent real money on
-    // whatever images it did get, and that spend used to vanish entirely (the
-    // billing block sat after the throw) — roughly $0.60 of invisible spend in
-    // one 7-day sample.
-    let spentUSD = 0;
+    const ledger: SpendLedger = {spentUSD: 0};
     let tier: UserTier = USER_TIERS.FREE;
 
     try {
@@ -488,63 +604,10 @@ export async function runAvatarGeneration(gameId: string, userEmail: string): Pr
         const apiKey = keys.apiKeys[API_KEY_CONSTANTS.GOOGLE];
         if (!apiKey) throw new Error('No Google API key available for avatar generation');
 
-        const {cells, cols, rows, realCount} = buildPaddedCells(claimed);
+        const drawn = await drawIllustrationSet(apiKey, claimed, {withScenes: true, maxRounds: 3, ledger, logContext: {gameId}});
+        const {variants, versions} = await writeCandidates(gameRef, drawn.rounds, {}, sceneWritesFor(gameRef, drawn.scenes));
 
-        // The scene pair (optional — its failure never blocks avatars) runs in
-        // parallel with the grid work.
-        const scenePromise = generateImage(apiKey, buildScenePrompt(claimed), "3:4")
-            .then(v => ({status: 'fulfilled' as const, value: v}))
-            .catch(e => ({status: 'rejected' as const, reason: e}));
-
-        // sharp is a native module; dynamic import keeps it out of the
-        // client/server bundle graph.
-        const sharp = (await import('sharp')).default;
-
-        // Draw → slice → judge, keeping every round's crops. Another draw only
-        // happens when a round failed as a whole image (a labeled character-card
-        // layout, or a drifted grid); a few flagged cells are shipped as-is with
-        // their alternates one arrow-click away on the character card.
-        const rounds: AvatarCandidate[][] = [];
-        for (let attempt = 1; attempt <= 3; attempt++) {
-            const round = await generateCandidateRound(apiKey, claimed, sharp, cells, cols, rows, realCount, gameId);
-            spentUSD += round.costUSD;
-            rounds.push(round.candidates);
-            if (round.problems.length > 0) {
-                logger.warn(`Avatar grid slices flagged (attempt ${attempt})`, {gameId, systemic: round.systemic, problems: round.problems});
-            }
-            if (!round.systemic) break;
-        }
-
-        const sceneResult = await scenePromise;
-
-        // Scene pair: stacked panels sliced in half → welcome (top), night
-        // (bottom). Downscale to 1024 wide — plenty for a chat bubble.
-        const sceneWrites: PendingWrite[] = [];
-        if (sceneResult.status === 'fulfilled') {
-            spentUSD += sceneResult.value.costUSD;
-            const scenes = sceneResult.value.buffer;
-            const sceneMeta = await sharp(scenes).metadata();
-            const w = sceneMeta.width || 0;
-            const halfH = Math.floor((sceneMeta.height || 0) / 2);
-            const divider = 6; // skip the divider line between panels
-            for (const [key, top] of [[SCENE_WELCOME_KEY, 0], [SCENE_NIGHT_KEY, halfH + divider]] as [string, number][]) {
-                const jpeg = await sharp(scenes)
-                    .extract({left: 0, top, width: w, height: halfH - divider})
-                    .resize({width: 1024})
-                    .jpeg({quality: 80})
-                    .toBuffer();
-                sceneWrites.push({
-                    ref: gameRef.collection('avatars').doc(key),
-                    data: {data: jpeg.toString('base64'), mime: 'image/jpeg', createdAt: Date.now()},
-                });
-            }
-        } else {
-            logger.warn(`Scene image generation failed for game ${gameId}`, {gameId, error: sceneResult.reason?.message});
-        }
-
-        const {variants, versions} = await writeCandidates(gameRef, rounds, {}, sceneWrites);
-
-        const costUSD = parseFloat(spentUSD.toFixed(6));
+        const costUSD = parseFloat(ledger.spentUSD.toFixed(6));
         await gameRef.update({
             avatarsStatus: 'ready',
             avatarsVersion: Date.now(),
@@ -555,17 +618,17 @@ export async function runAvatarGeneration(gameId: string, userEmail: string): Pr
             // cost stays visible (totalImagesCost is a subset of totalGameCost).
             totalImagesCost: firestore.FieldValue.increment(costUSD),
         });
-        spentUSD = 0; // accounted for; the catch must not double-count it
+        ledger.spentUSD = 0; // accounted for; the catch must not double-count it
 
         await billImages(userEmail, tier, costUSD);
 
-        logger.info(`Avatars generated for game ${gameId}`, {gameId, cells: cells.length, rounds: rounds.length, costUSD});
+        logger.info(`Avatars generated for game ${gameId}`, {gameId, portraits: Object.keys(variants).length, rounds: drawn.rounds.length, scenes: drawn.scenes.length, costUSD});
     } catch (error: any) {
         // Avatars are decorative: never surface errorState, just mark failed so
         // the UI keeps its preset-sketch fallback and a later visit may retry.
-        logger.error(`Avatar generation failed for game ${gameId}`, {gameId, error: error.message, costUSD: spentUSD});
+        logger.error(`Avatar generation failed for game ${gameId}`, {gameId, error: error.message, costUSD: ledger.spentUSD});
         await gameRef.update({avatarsStatus: 'failed'});
-        await recordAbandonedSpend(gameRef, userEmail, tier, spentUSD, gameId);
+        await recordAbandonedSpend(gameRef, userEmail, tier, ledger.spentUSD, gameId);
     }
 
     const snap = await gameRef.get();
@@ -574,24 +637,23 @@ export async function runAvatarGeneration(gameId: string, userEmail: string): Pr
 
 /** Images a failed run already paid Google for. Recorded (and billed) rather
  * than silently eaten — the player keeps no portraits, but the spend is real
- * and has to show up in the game's cost total. */
-async function recordAbandonedSpend(
-    gameRef: firestore.DocumentReference,
+ * and has to show up in the game's cost total. `costFields` names the running
+ * totals on the parent doc (a game's two cost fields, a draft's one). */
+export async function recordAbandonedSpend(
+    parentRef: firestore.DocumentReference,
     userEmail: string,
     tier: UserTier,
     spentUSD: number,
-    gameId: string,
+    logId: string,
+    costFields: string[] = ['totalGameCost', 'totalImagesCost'],
 ): Promise<void> {
     if (spentUSD <= 0) return;
     const costUSD = parseFloat(spentUSD.toFixed(6));
     try {
-        await gameRef.update({
-            totalGameCost: firestore.FieldValue.increment(costUSD),
-            totalImagesCost: firestore.FieldValue.increment(costUSD),
-        });
+        await parentRef.update(Object.fromEntries(costFields.map(f => [f, firestore.FieldValue.increment(costUSD)])));
         await billImages(userEmail, tier, costUSD);
     } catch (billingError: any) {
-        logger.error(`Failed to record abandoned image spend for game ${gameId}`, {gameId, error: billingError.message, costUSD});
+        logger.error(`Failed to record abandoned image spend for ${logId}`, {id: logId, error: billingError.message, costUSD});
     }
 }
 
@@ -634,7 +696,7 @@ export async function runAvatarRegeneration(gameId: string, userEmail: string, m
     });
     if (!claimed) return null;
 
-    let spentUSD = 0;
+    const ledger: SpendLedger = {spentUSD: 0};
     let tier: UserTier = USER_TIERS.FREE;
 
     try {
@@ -643,25 +705,17 @@ export async function runAvatarRegeneration(gameId: string, userEmail: string, m
         const apiKey = keys.apiKeys[API_KEY_CONSTANTS.GOOGLE];
         if (!apiKey) throw new Error('No Google API key available for avatar regeneration');
 
-        const {cells, cols, rows, realCount} = buildPaddedCells(claimed);
-        const sharp = (await import('sharp')).default;
-
         // Games generated before variants existed have portraits but no
         // candidate list; adopt what they have as candidate 0 so the reroll
         // appends instead of orphaning it.
         const existing = Object.keys(claimed.avatarVariants ?? {}).length > 0
             ? claimed.avatarVariants!
-            : await adoptExistingAvatars(gameRef, cells.slice(0, realCount).map(c => c.key));
+            : await adoptExistingAvatars(gameRef, portraitKeysFor(claimed));
 
-        const round = await generateCandidateRound(apiKey, claimed, sharp, cells, cols, rows, realCount, gameId);
-        spentUSD += round.costUSD;
-        if (round.problems.length > 0) {
-            logger.warn(`Avatar reroll slices flagged`, {gameId, systemic: round.systemic, problems: round.problems});
-        }
+        const drawn = await drawIllustrationSet(apiKey, claimed, {withScenes: false, maxRounds: 1, ledger, logContext: {gameId, reroll: true}});
+        const {variants, versions} = await writeCandidates(gameRef, drawn.rounds, existing);
 
-        const {variants, versions} = await writeCandidates(gameRef, [round.candidates], existing);
-
-        const costUSD = parseFloat(spentUSD.toFixed(6));
+        const costUSD = parseFloat(ledger.spentUSD.toFixed(6));
         await gameRef.update({
             avatarsRegeneratingAt: null,
             avatarsVersion: Date.now(),
@@ -671,15 +725,15 @@ export async function runAvatarRegeneration(gameId: string, userEmail: string, m
             totalGameCost: firestore.FieldValue.increment(costUSD),
             totalImagesCost: firestore.FieldValue.increment(costUSD),
         });
-        spentUSD = 0;
+        ledger.spentUSD = 0;
 
         await billImages(userEmail, tier, costUSD);
-        logger.info(`Avatars regenerated for game ${gameId}`, {gameId, costUSD, flagged: round.problems.length});
+        logger.info(`Avatars regenerated for game ${gameId}`, {gameId, costUSD});
     } catch (error: any) {
         // A failed reroll leaves the existing portraits exactly as they were.
-        logger.error(`Avatar regeneration failed for game ${gameId}`, {gameId, error: error.message, costUSD: spentUSD});
+        logger.error(`Avatar regeneration failed for game ${gameId}`, {gameId, error: error.message, costUSD: ledger.spentUSD});
         await gameRef.update({avatarsRegeneratingAt: null});
-        await recordAbandonedSpend(gameRef, userEmail, tier, spentUSD, gameId);
+        await recordAbandonedSpend(gameRef, userEmail, tier, ledger.spentUSD, gameId);
     }
 
     const snap = await gameRef.get();

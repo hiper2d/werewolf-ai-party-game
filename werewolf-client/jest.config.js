@@ -3,7 +3,7 @@
 // run them deliberately with `npm run test:live` (after agent changes, before
 // SDK upgrades, before releases).
 const LIVE_TEST_PATTERN =
-  'app/ai/((anthropic|deepseek-v2|glm|google|gpt-5|grok|kimi|mistral)-agent|all-models|claude-thinking|google-thinking|gpt-5-6-availability|tts/tts-tiers\\.integration)\\.test\\.ts';
+  'app/ai/(all-models|tts/tts-tiers\\.integration)\\.test\\.ts';
 
 module.exports = {
   preset: 'ts-jest',
@@ -15,9 +15,7 @@ module.exports = {
   setupFiles: ['dotenv/config'],
   roots: ['<rootDir>'],
   moduleNameMapper: {
-    "^@/(.*)$": "<rootDir>/$1",
-    // Workspace package, resolved to source so ts-jest compiles it like app code.
-    "^@hiper2d/llm-agents$": "<rootDir>/packages/llm-agents/src"
+    "^@/(.*)$": "<rootDir>/$1"
   },
   testTimeout: 60000,
   // The live pattern is read by jest.live.config.js (always index 1 here).

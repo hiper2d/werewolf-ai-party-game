@@ -145,8 +145,8 @@ function makePreview(overrides: Partial<GamePreview> = {}): GamePreview {
         playerCount: 4, // 3 bots
         werewolfCount: 1,
         specialRoles: [],
-        gameMasterAiType: LLM_CONSTANTS.DEEPSEEK_V4_FLASH,
-        playersAiType: [LLM_CONSTANTS.DEEPSEEK_V4_FLASH],
+        gameMasterAiType: LLM_CONSTANTS.DEEPSEEK_FLASH,
+        playersAiType: [LLM_CONSTANTS.DEEPSEEK_FLASH],
         ...overrides,
     };
 }
@@ -169,9 +169,9 @@ function makeGeneratedPreview(
         gameMasterVoice: 'gm-voice',
         gameMasterVoiceStyle: 'calmly',
         bots: [
-            bot('Bot1', LLM_CONSTANTS.DEEPSEEK_V4_FLASH),
-            bot('Bot2', LLM_CONSTANTS.DEEPSEEK_V4_FLASH, 'female'),
-            bot('Bot3', LLM_CONSTANTS.DEEPSEEK_V4_FLASH),
+            bot('Bot1', LLM_CONSTANTS.DEEPSEEK_FLASH),
+            bot('Bot2', LLM_CONSTANTS.DEEPSEEK_FLASH, 'female'),
+            bot('Bot3', LLM_CONSTANTS.DEEPSEEK_FLASH),
         ],
         tokenUsage: { ...DEFAULT_TOKEN_USAGE },
         ...overrides,
@@ -246,9 +246,9 @@ describe('previewGame tier enforcement', () => {
             stubAgentReturning(3);
 
             await expect(
-                previewGame(makePreview({ gameMasterAiType: LLM_CONSTANTS.CLAUDE_4_OPUS }))
+                previewGame(makePreview({ gameMasterAiType: LLM_CONSTANTS.CLAUDE_OPUS }))
             ).rejects.toThrow(
-                `The AI model ${LLM_CONSTANTS.CLAUDE_4_OPUS} is not available on the free tier as the game master.`
+                `The AI model ${LLM_CONSTANTS.CLAUDE_OPUS} is not available on the free tier as the game master.`
             );
 
             // GM model is validated up-front, so no story-generation call is made.
@@ -262,9 +262,9 @@ describe('previewGame tier enforcement', () => {
             const agent = stubAgentReturning(3);
 
             await expect(
-                previewGame(makePreview({ playersAiType: [LLM_CONSTANTS.CLAUDE_4_OPUS] }))
+                previewGame(makePreview({ playersAiType: [LLM_CONSTANTS.CLAUDE_OPUS] }))
             ).rejects.toThrow(
-                `The AI model ${LLM_CONSTANTS.CLAUDE_4_OPUS} is not available on the free tier for bots. Please update your bot AI selection.`
+                `The AI model ${LLM_CONSTANTS.CLAUDE_OPUS} is not available on the free tier for bots. Please update your bot AI selection.`
             );
 
             // Validation now runs up front, so the LLM is never called and nothing is billed.
@@ -281,8 +281,8 @@ describe('previewGame tier enforcement', () => {
                 previewGame(
                     makePreview({
                         playerCount: 2, // 1 bot
-                        gameMasterAiType: LLM_CONSTANTS.CLAUDE_4_HAIKU,
-                        playersAiType: [LLM_CONSTANTS.CLAUDE_4_HAIKU],
+                        gameMasterAiType: LLM_CONSTANTS.CLAUDE_HAIKU,
+                        playersAiType: [LLM_CONSTANTS.CLAUDE_HAIKU],
                     })
                 )
             ).rejects.toThrow(
@@ -299,8 +299,8 @@ describe('previewGame tier enforcement', () => {
                 previewGame(
                     makePreview({
                         playerCount: 4, // 3 bots; GM + 3 bots = 4 > cap of 3
-                        gameMasterAiType: LLM_CONSTANTS.DEEPSEEK_V4_PRO,
-                        playersAiType: [LLM_CONSTANTS.DEEPSEEK_V4_PRO],
+                        gameMasterAiType: LLM_CONSTANTS.DEEPSEEK_PRO,
+                        playersAiType: [LLM_CONSTANTS.DEEPSEEK_PRO],
                     })
                 )
             ).rejects.toThrow(
@@ -316,16 +316,16 @@ describe('previewGame tier enforcement', () => {
             const result = await previewGame(
                 makePreview({
                     playerCount: 3, // 2 bots
-                    gameMasterAiType: LLM_CONSTANTS.DEEPSEEK_V4_PRO,
-                    playersAiType: [LLM_CONSTANTS.DEEPSEEK_V4_PRO],
+                    gameMasterAiType: LLM_CONSTANTS.DEEPSEEK_PRO,
+                    playersAiType: [LLM_CONSTANTS.DEEPSEEK_PRO],
                 })
             );
 
-            expect(result.gameMasterAiType).toBe(LLM_CONSTANTS.DEEPSEEK_V4_PRO);
+            expect(result.gameMasterAiType).toBe(LLM_CONSTANTS.DEEPSEEK_PRO);
             expect(result.bots).toHaveLength(2);
             expect(result.bots.map(b => b.playerAiType)).toEqual([
-                LLM_CONSTANTS.DEEPSEEK_V4_PRO,
-                LLM_CONSTANTS.DEEPSEEK_V4_PRO,
+                LLM_CONSTANTS.DEEPSEEK_PRO,
+                LLM_CONSTANTS.DEEPSEEK_PRO,
             ]);
         });
 
@@ -410,11 +410,11 @@ describe('previewGame tier enforcement', () => {
             const result = await previewGame(
                 makePreview({
                     gameMasterAiType: LLM_CONSTANTS.RANDOM,
-                    playersAiType: [LLM_CONSTANTS.DEEPSEEK_V4_FLASH],
+                    playersAiType: [LLM_CONSTANTS.DEEPSEEK_FLASH],
                 })
             );
 
-            expect(result.gameMasterAiType).toBe(LLM_CONSTANTS.DEEPSEEK_V4_FLASH);
+            expect(result.gameMasterAiType).toBe(LLM_CONSTANTS.DEEPSEEK_FLASH);
         });
 
         it('rejects RANDOM GM when none of the selected models has free-tier capacity', async () => {
@@ -426,7 +426,7 @@ describe('previewGame tier enforcement', () => {
                 previewGame(
                     makePreview({
                         gameMasterAiType: LLM_CONSTANTS.RANDOM,
-                        playersAiType: [LLM_CONSTANTS.CLAUDE_4_OPUS],
+                        playersAiType: [LLM_CONSTANTS.CLAUDE_OPUS],
                     })
                 )
             ).rejects.toThrow(
@@ -452,10 +452,10 @@ describe('createGame tier enforcement', () => {
 
         await expect(
             createGame(
-                makeGeneratedPreview({ gameMasterAiType: LLM_CONSTANTS.CLAUDE_4_OPUS })
+                makeGeneratedPreview({ gameMasterAiType: LLM_CONSTANTS.CLAUDE_OPUS })
             )
         ).rejects.toThrow(
-            `Failed to create game: The AI model ${LLM_CONSTANTS.CLAUDE_4_OPUS} is not available on the free tier as the game master.`
+            `Failed to create game: The AI model ${LLM_CONSTANTS.CLAUDE_OPUS} is not available on the free tier as the game master.`
         );
         expect(setGame).not.toHaveBeenCalled();
     });
@@ -465,12 +465,12 @@ describe('createGame tier enforcement', () => {
         const { setGame } = setupDbForCreate();
 
         const preview = makeGeneratedPreview({
-            gameMasterAiType: LLM_CONSTANTS.CLAUDE_4_HAIKU,
+            gameMasterAiType: LLM_CONSTANTS.CLAUDE_HAIKU,
         });
-        preview.bots[0].playerAiType = LLM_CONSTANTS.CLAUDE_4_HAIKU;
+        preview.bots[0].playerAiType = LLM_CONSTANTS.CLAUDE_HAIKU;
 
         await expect(createGame(preview)).rejects.toThrow(
-            `Failed to create game: The AI model ${LLM_CONSTANTS.CLAUDE_4_HAIKU} can only be used once per game on the free tier.`
+            `Failed to create game: The AI model ${LLM_CONSTANTS.CLAUDE_HAIKU} can only be used once per game on the free tier.`
         );
         expect(setGame).not.toHaveBeenCalled();
     });
@@ -480,14 +480,14 @@ describe('createGame tier enforcement', () => {
         const { setGame } = setupDbForCreate();
 
         const preview = makeGeneratedPreview({
-            gameMasterAiType: LLM_CONSTANTS.DEEPSEEK_V4_PRO,
+            gameMasterAiType: LLM_CONSTANTS.DEEPSEEK_PRO,
         });
         preview.bots.forEach(bot => {
-            bot.playerAiType = LLM_CONSTANTS.DEEPSEEK_V4_PRO; // GM + 3 bots = 4 > 3
+            bot.playerAiType = LLM_CONSTANTS.DEEPSEEK_PRO; // GM + 3 bots = 4 > 3
         });
 
         await expect(createGame(preview)).rejects.toThrow(
-            `Failed to create game: The AI model ${LLM_CONSTANTS.DEEPSEEK_V4_PRO} can only be used 3 times per game on the free tier.`
+            `Failed to create game: The AI model ${LLM_CONSTANTS.DEEPSEEK_PRO} can only be used 3 times per game on the free tier.`
         );
         expect(setGame).not.toHaveBeenCalled();
     });
@@ -528,7 +528,7 @@ describe('createGame tier enforcement', () => {
         expect(setGame).toHaveBeenCalledWith(
             expect.objectContaining({
                 createdWithTier: USER_TIERS.FREE,
-                gameMasterAiType: LLM_CONSTANTS.DEEPSEEK_V4_FLASH,
+                gameMasterAiType: LLM_CONSTANTS.DEEPSEEK_FLASH,
                 totalGameCost: DEFAULT_TOKEN_USAGE.costUSD,
             })
         );

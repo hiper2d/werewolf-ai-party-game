@@ -1,4 +1,4 @@
-import { isProviderBusyError } from './errors';
+import { isInsufficientBalanceError, isProviderBusyError } from './errors';
 
 describe('isProviderBusyError', () => {
     // Real messages observed in production / agent code paths.
@@ -36,5 +36,19 @@ describe('isProviderBusyError', () => {
         expect(isProviderBusyError(undefined)).toBe(false);
         expect(isProviderBusyError(null)).toBe(false);
         expect(isProviderBusyError('')).toBe(false);
+    });
+});
+
+describe('isInsufficientBalanceError', () => {
+    it('matches the shared prepaid-balance refusal wording from every paid call site', () => {
+        expect(isInsufficientBalanceError('Insufficient balance. Please add funds on your profile page to continue playing.')).toBe(true);
+        expect(isInsufficientBalanceError('Error: Insufficient balance. Please add funds on your profile page to draw illustrations.\n    at commitUsageAtomically')).toBe(true);
+    });
+
+    it('ignores provider and parsing failures, and empty input', () => {
+        expect(isInsufficientBalanceError('Failed to get response from OpenAI API: 429 Too Many Requests')).toBe(false);
+        expect(isInsufficientBalanceError('Failed to parse JSON response')).toBe(false);
+        expect(isInsufficientBalanceError(undefined)).toBe(false);
+        expect(isInsufficientBalanceError('')).toBe(false);
     });
 });

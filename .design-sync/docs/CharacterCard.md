@@ -1,16 +1,18 @@
 ---
 category: Games
 ---
-Click-to-expand character card modal: large portrait, name plate, role/status
-tags, model and play-style rows, and the character's story. Renders as a
-fullscreen fixed overlay — clicking the backdrop or pressing Escape closes it.
+Click-to-expand character card modal: the CharacterPoster (portrait, role
+chip, name plate with model / play style / STORY toggle) over a blurred scrim,
+with a round Close button top-right. Clicking the backdrop or pressing Escape
+closes it. The same poster cinematic mode shows beside the speech bubble.
 
 In designs, always pass `avatarUrl` (the app's authed portrait route is not
 reachable from a design) and wrap in a sized, `transform`ed container to keep
 the fixed overlay inside your frame.
 
-Owner-only portrait controls appear when `isOwner` is true and `onSelectVariant`
-is provided: arrows walk the character's portrait candidates (`‹ 2/3 ›`), and a
-circular-arrow button rerolls portraits for the whole cast (`onRegenerate`).
-While a reroll runs, the portrait dims, "Drawing new portraits…" overlays it,
-and every control disables — the component manages that state itself.
+Owner-only portrait switcher appears in the poster's top-right chip when
+`isOwner` is true, `onSelectVariant` is provided and the character has more
+than one kept candidate: chevrons walk the candidates, dots show the position
+(a `2/8` counter past six). Each click commits the shown face as the one used
+everywhere in the game. Drawing new portraits is not a card action — it lives
+in the participants panel and redraws the whole cast.

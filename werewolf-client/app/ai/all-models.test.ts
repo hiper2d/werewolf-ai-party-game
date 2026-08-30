@@ -229,17 +229,17 @@ describe("All models - day 2 vote with full game context", () => {
 // summaries and Magistral traces vary. Those are logged instead of asserted.
 // Haiku 4.5 still uses budget thinking, so its reasoning is always surfaced.
 const THINKING_GUARANTEED = new Set<string>([
-    LLM_CONSTANTS.CLAUDE_4_HAIKU,
-    LLM_CONSTANTS.DEEPSEEK_V4_FLASH,
-    LLM_CONSTANTS.DEEPSEEK_V4_PRO,
+    LLM_CONSTANTS.CLAUDE_HAIKU,
+    LLM_CONSTANTS.DEEPSEEK_FLASH,
+    LLM_CONSTANTS.DEEPSEEK_PRO,
 ]);
 
 // GPT-5's plain-text path cannot surface thinking (no schema-injected field, and
 // OpenAI does not expose chain-of-thought), so it must return an empty string.
 const THINKING_ALWAYS_EMPTY = new Set<string>([
-    LLM_CONSTANTS.GPT_5_6_SOL,
-    LLM_CONSTANTS.GPT_5_6_TERRA,
-    LLM_CONSTANTS.GPT_5_6_LUNA,
+    LLM_CONSTANTS.GPT_SOL,
+    LLM_CONSTANTS.GPT,
+    LLM_CONSTANTS.GPT_MINI,
 ]);
 
 // Unlike JSON compliance (a per-MODEL property — each model can fail at
@@ -248,15 +248,15 @@ const THINKING_ALWAYS_EMPTY = new Set<string>([
 // and the only axis that changes behavior is the thinking toggle (plus Claude's
 // adaptive-vs-budget thinking split). One representative per code path is enough.
 const TEXT_SWEEP_MODELS = new Set<string>([
-    LLM_CONSTANTS.CLAUDE_4_HAIKU,            // budget thinking
-    LLM_CONSTANTS.CLAUDE_4_OPUS,             // adaptive thinking (may skip thinking)
-    LLM_CONSTANTS.DEEPSEEK_V4_FLASH,
-    LLM_CONSTANTS.GPT_5_6_LUNA,              // single path: thinking never surfaces
-    LLM_CONSTANTS.GEMINI_3_FLASH,
-    LLM_CONSTANTS.GEMINI_3_FLASH_LITE,
-    LLM_CONSTANTS.MISTRAL_4_SMALL,
+    LLM_CONSTANTS.CLAUDE_HAIKU,            // budget thinking
+    LLM_CONSTANTS.CLAUDE_OPUS,             // adaptive thinking (may skip thinking)
+    LLM_CONSTANTS.DEEPSEEK_FLASH,
+    LLM_CONSTANTS.GPT_MINI,              // single path: thinking never surfaces
+    LLM_CONSTANTS.GEMINI_FLASH,
+    LLM_CONSTANTS.GEMINI_LITE,
+    LLM_CONSTANTS.MISTRAL_SMALL,
     LLM_CONSTANTS.MISTRAL_MAGISTRAL,         // structured content array (thinking)
-    LLM_CONSTANTS.GROK_4_6,
+    LLM_CONSTANTS.GROK,
     LLM_CONSTANTS.KIMI,
     LLM_CONSTANTS.GLM,
     LLM_CONSTANTS.FUGU_ULTRA,                // one representative for the Fugu askText code path
@@ -348,12 +348,12 @@ describe("All models - plain text welcome via askText", () => {
 describe("Thinking signature round-trip via askText", () => {
     const roundTripCases = [
         {
-            llmType: LLM_CONSTANTS.CLAUDE_4_HAIKU,
+            llmType: LLM_CONSTANTS.CLAUDE_HAIKU,
             signatureField: 'anthropicThinkingSignature' as const,
             signatureRequired: true,
         },
         {
-            llmType: LLM_CONSTANTS.GEMINI_3_FLASH,
+            llmType: LLM_CONSTANTS.GEMINI_FLASH,
             signatureField: 'googleThoughtSignature' as const,
             signatureRequired: false, // Gemini does not guarantee a signature on every response
         },
@@ -414,13 +414,13 @@ describe("Thinking signature round-trip via askText", () => {
 describe("Cross-provider thinking history swap via askText", () => {
     const swapCases = [
         {
-            fromType: LLM_CONSTANTS.CLAUDE_4_HAIKU,
-            toType: LLM_CONSTANTS.GEMINI_3_FLASH,
+            fromType: LLM_CONSTANTS.CLAUDE_HAIKU,
+            toType: LLM_CONSTANTS.GEMINI_FLASH,
             signatureField: 'anthropicThinkingSignature' as const,
         },
         {
-            fromType: LLM_CONSTANTS.GEMINI_3_FLASH,
-            toType: LLM_CONSTANTS.CLAUDE_4_HAIKU,
+            fromType: LLM_CONSTANTS.GEMINI_FLASH,
+            toType: LLM_CONSTANTS.CLAUDE_HAIKU,
             signatureField: 'googleThoughtSignature' as const,
         },
     ];

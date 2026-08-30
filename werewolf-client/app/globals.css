@@ -1120,3 +1120,7 @@ html {
 .hide-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
+/* Skeleton pulse for images still being drawn (new-game preview illustrations). */
+@keyframes shimmer { 0%, 100% { opacity: .35; } 50% { opacity: .9; } }
+.animate-shimmer { animation: shimmer 1.6s ease-in-out infinite; }

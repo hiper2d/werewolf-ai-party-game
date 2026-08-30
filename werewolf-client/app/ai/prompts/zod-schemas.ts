@@ -103,8 +103,8 @@ export type NightResultsStoryZod = z.infer<typeof NightResultsStoryZodSchema>;
 // VALIDATION HELPERS
 // =============================================================================
 
-// Validation helpers moved to @hiper2d/llm-agents; re-exported to keep this import path alive.
-export { validateResponse, safeValidateResponse } from '@hiper2d/llm-agents';
+// Validation helpers moved to @hiper2d/ai-agents; re-exported to keep this import path alive.
+export { validateResponse, safeValidateResponse } from '@hiper2d/ai-agents';
 
 // =============================================================================
 // SCHEMA REGISTRY (For dynamic schema selection)

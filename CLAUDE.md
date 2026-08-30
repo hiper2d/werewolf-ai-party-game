@@ -24,11 +24,11 @@ firebase deploy --only firestore:indexes    # Deploy Firestore indexes
 
 ## Architecture
 
-### AI Agent System
-- **Abstract Base**: `AbstractAgent` class provides template method pattern with logging
-- **Agent Factory**: `AgentFactory` creates agents based on AI model type and API keys
-- **Supported Models**: Each vendor has its own agent implementation (OpenAiAgent, ClaudeAgent, GoogleAgent, etc.)
-- **Structured Responses**: Uses JSON schemas for structured AI responses via `askWithSchema()`
+### AI Agent System — the `@hiper2d/ai-agents` library
+The agent layer lives in the npm package [`@hiper2d/ai-agents`](https://github.com/hiper2d/ai-agents) (repo: `~/projects/ai-agents`), extracted from this app in Aug 2026. The split:
+- **Library owns model facts**: per-provider agents (`ClaudeAgent`, `Gpt5Agent`, `GoogleAgent`, …), `AbstractAgent` (template method with logging, per-instance `maxOutputTokens` / `reasoningEffort` / `thinkingBudgetTokens`), `AgentFactory`, the model catalog (`SupportedAiModels`, `LLM_CONSTANTS` — constant name = version-free picker id in upper snake case), `MODEL_PRICING` + cost accounting, schema-validated asks via `askWithZodSchema()`, thinking extraction
+- **App owns policy** (`app/ai/ai-models.ts` overlay): free-tier bands and per-game caps, `DEPRECATED_MODEL_MAP`/`resolveModelId`, `RANDOM`, audio/image models, story-generation settings; `app/ai/agent-factory.ts` wraps the library factory and wires `setLlmLogger` to BetterStack
+- **Model updates** (new model, price change, reasoning pins) go in the LIBRARY repo's `src/catalog.ts`, then release: bump version, `git tag vX.Y.Z && git push origin main vX.Y.Z` (publishes via GitHub Actions), then `npm i @hiper2d/ai-agents@X.Y.Z` here. Never edit model facts in this repo — they don't live here anymore
 
 ### Game State Management
 - **Game States**: WELCOME → DAY_DISCUSSION → VOTE → VOTE_RESULTS → NIGHT_BEGINS → GAME_OVER
@@ -41,7 +41,7 @@ firebase deploy --only firestore:indexes    # Deploy Firestore indexes
 - **Tiers & Billing**: Two tiers — free (daily/monthly caps) and paid (prepaid USD balance via Stripe, 15% markup). All AI calls use platform keys (Firestore doc `config/freeTierApiKeys`); users never supply their own API keys
 
 ### Key Directories
-- `app/ai/`: AI agent implementations and prompts
+- `app/ai/`: prompts, model policy overlay (`ai-models.ts`), factory wrapper — agent implementations are in `@hiper2d/ai-agents`
 - `app/api/`: Server actions for game/user operations  
 - `app/games/[id]/`: Game UI and components
 - `firebase/`: Firebase configuration and rules
@@ -68,6 +68,6 @@ To investigate user bug reports, stuck games, or production errors, use the `deb
 
 ## Testing
 
-- Jest configuration in `jest.config.js`
-- AI agent tests verify response parsing and error handling
+- Jest configuration in `jest.config.js`; `npm test` runs the app suites (mocked, free)
+- Live API suites: `npm run test:live` here runs only the app-specific ones (`all-models` with real game prompts, TTS tiers). Provider-contract live tests (per-agent suites, all-providers sweep) moved to the `ai-agents` repo — run `npm run test:live` THERE after agent/SDK changes, before a library release
 - Message utility tests ensure proper conversation formatting

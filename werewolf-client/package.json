@@ -2,9 +2,6 @@
   "name": "werewolf-client",
   "version": "0.1.0",
   "private": true,
-  "workspaces": [
-    "packages/*"
-  ],
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -16,9 +13,9 @@
     "fix-stuck-welcome": "npx tsx scripts/fix-stuck-welcome.ts"
   },
   "dependencies": {
-    "@hiper2d/llm-agents": "*",
     "@anthropic-ai/sdk": "0.60.0",
     "@google/genai": "^2.15.0",
+    "@hiper2d/ai-agents": "0.1.0",
     "@logtail/node": "^0.5.6",
     "@mistralai/mistralai": "^1.10.0",
     "firebase": "^12.5.0",
