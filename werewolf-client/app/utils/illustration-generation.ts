@@ -9,6 +9,7 @@ import {
     SCENE_WELCOME_KEY,
     USER_TIERS,
     nightIllustrationKey,
+    dayIllustrationKey,
 } from "@/app/api/game-models";
 import {addMessageToChatAndSaveToDb} from "@/app/api/game-actions";
 import {getUserTierAndApiKeys} from "@/app/utils/tier-utils";
@@ -43,19 +44,19 @@ const BRIEF_OUTPUT_PRICE_PER_M = IMAGE_MODEL_PRICING[BRIEF_MODEL].outputPricePer
  * what exactly they are doing — raw narration alone yields generic mood
  * pieces. Failure falls back to the narration excerpt (never blocks).
  */
-async function writeIllustrationBrief(apiKey: string, game: Game, story: string): Promise<{brief: string; costUSD: number} | null> {
+async function writeIllustrationBrief(apiKey: string, game: Game, story: string, sourceLabel: string = "the narration of last night's events"): Promise<{brief: string; costUSD: number} | null> {
     const cast = [
         ...game.bots.map(b => `${b.name} (${b.gender}): ${b.story.slice(0, 160)}`),
         `${game.humanPlayerName}: the protagonist of this tale`,
     ].join('\n');
-    const prompt = `You are the illustrator's assistant for a social-deduction story game. Below are the setting, the cast, and the narration of last night's events. Write a concrete visual brief (2-4 sentences) for ONE illustration of the night's most dramatic moment: name the specific characters involved, describe exactly what each is doing, where in the setting it happens, and the mood. Only include characters that appear in the narration. Never reveal hidden roles beyond what the narration itself states. Reply with the brief only, no preamble.
+    const prompt = `You are the illustrator's assistant for a social-deduction story game. Below are the setting, the cast, and ${sourceLabel}. Write a concrete visual brief (2-4 sentences) for ONE illustration of its most dramatic moment: name the specific characters involved, describe exactly what each is doing, where in the setting it happens, and the mood. Only include characters that appear in the source text. Never reveal hidden roles beyond what the source text itself states. Reply with the brief only, no preamble.
 
 Setting — "${game.theme}": ${game.description}
 
 Cast:
 ${cast}
 
-Last night's narration:
+Source text (${sourceLabel}):
 ${story.slice(0, 1500)}`;
 
     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${BRIEF_MODEL}:generateContent`, {
@@ -104,6 +105,106 @@ ${characterLine}Match the illustration style and palette of the establishing-sho
 }
 
 /**
+ * Shared generation core: writes the brief, generates the image with the
+ * welcome-scene + portrait references, commits the image doc, posts the
+ * GM_ILLUSTRATION message, and bills. The claim on the image doc must already
+ * be held by the caller. Errors are logged and swallowed — an illustration is
+ * decoration, the game never learns it was attempted.
+ */
+async function generateAndPostIllustration(
+    gameId: string,
+    userEmail: string,
+    key: string,
+    sourceText: string,
+    sourceLabel: string,
+    postDay: number,
+    imageDocFields: Record<string, any>,
+): Promise<void> {
+    if (!db) return;
+    const gameRef = db.collection('games').doc(gameId);
+    const imageRef = gameRef.collection('avatars').doc(key);
+
+    const gameSnap = await gameRef.get();
+    if (!gameSnap.exists) return;
+    const game = {...(gameSnap.data() as Game), id: gameSnap.id};
+
+    const {tier, apiKeys} = await getUserTierAndApiKeys(userEmail);
+    const apiKey = apiKeys[API_KEY_CONSTANTS.GOOGLE];
+    if (!apiKey) throw new Error('No Google API key available for illustration generation');
+
+    // Concrete scene description from the brief writer; the raw source text
+    // excerpt is the fallback.
+    const briefResult = await writeIllustrationBrief(apiKey, game, sourceText, sourceLabel).catch(() => null);
+    const sceneDescription = briefResult?.brief ?? (sourceText.length > 700 ? sourceText.slice(0, 700) + '…' : sourceText);
+
+    // References: the welcome scene anchors style/location (its absence —
+    // scene pair failed at creation — degrades to unanchored but themed),
+    // and the portraits of the characters in the scene anchor their faces.
+    const references: {label: string; jpeg: Buffer}[] = [];
+    const welcomeSnap = await gameRef.collection('avatars').doc(SCENE_WELCOME_KEY).get();
+    if (welcomeSnap.exists && (welcomeSnap.data() as any)?.data) {
+        references.push({
+            label: 'Establishing-shot reference — the same story\'s setting, style and palette:',
+            jpeg: Buffer.from((welcomeSnap.data() as any).data, 'base64'),
+        });
+    }
+    const characterNames = mentionedParticipants(game, sceneDescription).slice(0, 3);
+    const portraitSnaps = await Promise.all(characterNames.map(name => gameRef.collection('avatars').doc(name).get()));
+    const portraitNames: string[] = [];
+    portraitSnaps.forEach((snap, i) => {
+        if (snap.exists && (snap.data() as any)?.data) {
+            portraitNames.push(characterNames[i]);
+            references.push({
+                label: `Reference portrait of ${characterNames[i]}:`,
+                jpeg: Buffer.from((snap.data() as any).data, 'base64'),
+            });
+        }
+    });
+
+    const image = await generateImage(apiKey, buildIllustrationPrompt(game, sceneDescription, portraitNames), "3:2", {references, imageSize: '1K'});
+
+    const sharp = (await import('sharp')).default;
+    const jpeg = await sharp(image.buffer).resize({width: 1024, withoutEnlargement: true}).jpeg({quality: 80}).toBuffer();
+
+    const costUSD = parseFloat((image.costUSD + (briefResult?.costUSD ?? 0)).toFixed(6));
+    const batch = db.batch();
+    batch.set(imageRef, {
+        data: jpeg.toString('base64'),
+        mime: 'image/jpeg',
+        createdAt: Date.now(),
+        ...imageDocFields,
+    });
+    batch.update(gameRef, {
+        totalGameCost: firestore.FieldValue.increment(costUSD),
+        totalImagesCost: firestore.FieldValue.increment(costUSD),
+    });
+    await batch.commit();
+
+    // Image bytes are in place — now the chat message can safely appear.
+    const message: GameMessage = {
+        id: null,
+        recipientName: RECIPIENT_ALL,
+        authorName: GAME_MASTER,
+        msg: {sceneKey: key},
+        messageType: MessageType.GM_ILLUSTRATION,
+        day: postDay,
+        timestamp: Date.now(),
+        cost: costUSD,
+    };
+    await addMessageToChatAndSaveToDb(message, gameId);
+
+    if (tier === USER_TIERS.PAID && costUSD > 0) {
+        const chargedAmount = parseFloat((costUSD * (1 + PAID_TIER_MARKUP)).toFixed(6));
+        await deductBalance(userEmail, chargedAmount);
+        await updateUserMonthlySpending(userEmail, chargedAmount, tier);
+    } else if (costUSD > 0) {
+        await updateUserMonthlySpending(userEmail, costUSD, tier);
+    }
+
+    logger.info(`Illustration generated for game ${gameId}`, {gameId, key, postDay, costUSD});
+}
+
+/**
  * Generates ONE illustration for an eventful night and posts it to the chat as
  * a GM_ILLUSTRATION message ({sceneKey}). Runs post-response via after(), so
  * nothing here may block or fail the night flow:
@@ -144,85 +245,43 @@ export async function runNightIllustration(
         });
         if (!claimed) return;
 
-        const gameSnap = await gameRef.get();
-        if (!gameSnap.exists) return;
-        const game = {...(gameSnap.data() as Game), id: gameSnap.id};
-
-        const {tier, apiKeys} = await getUserTierAndApiKeys(userEmail);
-        const apiKey = apiKeys[API_KEY_CONSTANTS.GOOGLE];
-        if (!apiKey) throw new Error('No Google API key available for illustration generation');
-
-        // Concrete scene description from the brief writer; the raw narration
-        // excerpt is the fallback.
-        const briefResult = await writeIllustrationBrief(apiKey, game, story).catch(() => null);
-        const sceneDescription = briefResult?.brief ?? (story.length > 700 ? story.slice(0, 700) + '…' : story);
-
-        // References: the welcome scene anchors style/location (its absence —
-        // scene pair failed at creation — degrades to unanchored but themed),
-        // and the portraits of the characters in the scene anchor their faces.
-        const references: {label: string; jpeg: Buffer}[] = [];
-        const welcomeSnap = await gameRef.collection('avatars').doc(SCENE_WELCOME_KEY).get();
-        if (welcomeSnap.exists && (welcomeSnap.data() as any)?.data) {
-            references.push({
-                label: 'Establishing-shot reference — the same story\'s setting, style and palette:',
-                jpeg: Buffer.from((welcomeSnap.data() as any).data, 'base64'),
-            });
-        }
-        const characterNames = mentionedParticipants(game, sceneDescription).slice(0, 3);
-        const portraitSnaps = await Promise.all(characterNames.map(name => gameRef.collection('avatars').doc(name).get()));
-        const portraitNames: string[] = [];
-        portraitSnaps.forEach((snap, i) => {
-            if (snap.exists && (snap.data() as any)?.data) {
-                portraitNames.push(characterNames[i]);
-                references.push({
-                    label: `Reference portrait of ${characterNames[i]}:`,
-                    jpeg: Buffer.from((snap.data() as any).data, 'base64'),
-                });
-            }
-        });
-
-        const image = await generateImage(apiKey, buildIllustrationPrompt(game, sceneDescription, portraitNames), "3:2", {references, imageSize: '1K'});
-
-        const sharp = (await import('sharp')).default;
-        const jpeg = await sharp(image.buffer).resize({width: 1024, withoutEnlargement: true}).jpeg({quality: 80}).toBuffer();
-
-        const costUSD = parseFloat((image.costUSD + (briefResult?.costUSD ?? 0)).toFixed(6));
-        const batch = db.batch();
-        batch.set(imageRef, {
-            data: jpeg.toString('base64'),
-            mime: 'image/jpeg',
-            msgId: summaryMsgId,
-            createdAt: Date.now(),
-        });
-        batch.update(gameRef, {
-            totalGameCost: firestore.FieldValue.increment(costUSD),
-            totalImagesCost: firestore.FieldValue.increment(costUSD),
-        });
-        await batch.commit();
-
-        // Image bytes are in place — now the chat message can safely appear.
-        const message: GameMessage = {
-            id: null,
-            recipientName: RECIPIENT_ALL,
-            authorName: GAME_MASTER,
-            msg: {sceneKey: key},
-            messageType: MessageType.GM_ILLUSTRATION,
-            day: postDay,
-            timestamp: Date.now(),
-            cost: costUSD,
-        };
-        await addMessageToChatAndSaveToDb(message, gameId);
-
-        if (tier === USER_TIERS.PAID && costUSD > 0) {
-            const chargedAmount = parseFloat((costUSD * (1 + PAID_TIER_MARKUP)).toFixed(6));
-            await deductBalance(userEmail, chargedAmount);
-            await updateUserMonthlySpending(userEmail, chargedAmount, tier);
-        } else if (costUSD > 0) {
-            await updateUserMonthlySpending(userEmail, costUSD, tier);
-        }
-
-        logger.info(`Night illustration generated for game ${gameId}`, {gameId, nightDay, postDay, costUSD});
+        await generateAndPostIllustration(gameId, userEmail, key, story, "the narration of last night's events", postDay, {msgId: summaryMsgId});
     } catch (error: any) {
         logger.warn(`Night illustration failed for game ${gameId} (decorative, ignored)`, {gameId, nightDay, error: error.message});
+    }
+}
+
+/**
+ * Generates ONE illustration for a dramatic mid-day discussion moment, flagged
+ * by the GM router (illustrationWorthy). Same fire-and-forget contract as the
+ * night illustration. At most one per game day, ever: the image doc's existence
+ * IS the claim — a second flag on the same day is a no-op, and there is no
+ * replay path that regenerates it.
+ */
+export async function runDayIllustration(
+    gameId: string,
+    userEmail: string,
+    day: number,
+    moment: string,
+    discussionExcerpt: string,
+): Promise<void> {
+    if (!db) return;
+    const gameRef = db.collection('games').doc(gameId);
+    const key = dayIllustrationKey(day);
+    const imageRef = gameRef.collection('avatars').doc(key);
+
+    try {
+        const claimed = await db.runTransaction(async tx => {
+            const snap = await tx.get(imageRef);
+            if (snap.exists) return false;
+            tx.set(imageRef, {generating: true, createdAt: Date.now()});
+            return true;
+        });
+        if (!claimed) return;
+
+        const sourceText = `The pivotal moment to depict: ${moment}\n\nRecent discussion:\n${discussionExcerpt}`;
+        await generateAndPostIllustration(gameId, userEmail, key, sourceText, "the latest scene from today's discussion between the players", day, {});
+    } catch (error: any) {
+        logger.warn(`Day illustration failed for game ${gameId} (decorative, ignored)`, {gameId, day, error: error.message});
     }
 }

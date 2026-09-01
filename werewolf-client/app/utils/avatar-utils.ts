@@ -1,4 +1,4 @@
-import {AVATAR_GM_KEY, Game, GAME_MASTER, SCENE_NIGHT_KEY, SCENE_WELCOME_KEY} from "@/app/api/game-models";
+import {AVATAR_GM_KEY, Game, GAME_MASTER, MANNEQUIN_VARIANT_INDEX, SCENE_NIGHT_KEY, SCENE_WELCOME_KEY} from "@/app/api/game-models";
 import {getPresetAvatarUrl} from "@/app/utils/preset-avatars";
 
 /**
@@ -6,13 +6,15 @@ import {getPresetAvatarUrl} from "@/app/utils/preset-avatars";
  * failed), bots and the GM get a universal preset sketch (static asset, instant)
  * assigned deterministically by gender — see preset-avatars.ts. The human player
  * has no gender on record and returns undefined (initial-letter fallback). When
- * avatarsStatus flips to 'ready', the same call sites swap to the themed art.
+ * avatarsStatus flips to 'ready', the same call sites swap to the themed art —
+ * unless the owner parked this character on the mannequin, which serves the
+ * same preset sketch on purpose.
  */
 export function getAvatarUrl(game: Game, name: string): string | undefined {
-    if (game.avatarsStatus !== 'ready') {
+    const key = name === GAME_MASTER ? AVATAR_GM_KEY : name;
+    if (game.avatarsStatus !== 'ready' || game.avatarVariants?.[key]?.sel === MANNEQUIN_VARIANT_INDEX) {
         return getPresetAvatarUrl(game.bots, name);
     }
-    const key = name === GAME_MASTER ? AVATAR_GM_KEY : name;
     return `/api/games/${game.id}/avatars/${encodeURIComponent(key)}?v=${avatarVersion(game, key)}`;
 }
 
@@ -23,12 +25,22 @@ export function avatarVersion(game: Game, key: string): number {
     return game.avatarVersions?.[key] ?? game.avatarsVersion ?? 0;
 }
 
-/** How many portrait candidates a character has, and which one is showing.
- * Games generated before candidates existed report a single, fixed one. */
-export function getAvatarVariantState(game: Game, name: string): {key: string; count: number; selected: number} {
+/** A character's switchable portrait candidates: the stored generated ones
+ * live at indices [first, first+count) (older draws past the cap are deleted;
+ * the ids of the kept ones never shift), `selected` may also be
+ * MANNEQUIN_VARIANT_INDEX. `hasCandidates` is false for games generated before
+ * candidates existed — they have one fixed portrait and nothing to switch. */
+export function getAvatarVariantState(game: Game, name: string): {key: string; count: number; selected: number; first: number; hasCandidates: boolean} {
     const key = name === GAME_MASTER ? AVATAR_GM_KEY : name;
     const entry = game.avatarVariants?.[key];
-    return {key, count: entry?.n ?? 1, selected: entry?.sel ?? 0};
+    const first = entry?.first ?? 0;
+    return {
+        key,
+        count: entry ? entry.n - first : 1,
+        selected: entry?.sel ?? 0,
+        first,
+        hasCandidates: !!entry,
+    };
 }
 
 /**

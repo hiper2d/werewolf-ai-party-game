@@ -215,7 +215,8 @@ export class ManiacProcessor extends BaseRoleProcessor {
 
             // Save the target to nightResults
             const currentNightResults = this.game.nightResults || {};
-            currentNightResults[GAME_ROLES.MANIAC] = { target: maniacResponse.target };
+            const maniacHint = maniacResponse.narrativeHint?.trim();
+            currentNightResults[GAME_ROLES.MANIAC] = { target: maniacResponse.target, ...(maniacHint ? { narrativeHint: maniacHint } : {}) };
 
             // Create maniac response message (sent only to the maniac role)
             const maniacMessage: GameMessage = {

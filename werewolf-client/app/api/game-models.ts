@@ -110,7 +110,7 @@ export interface AvatarDraft {
     // GM key. createGame adopts the draft only when the game's keys match
     // exactly — a renamed character would otherwise get a stranger's face.
     keys: string[];
-    avatarVariants: Record<string, { n: number; sel: number }>;
+    avatarVariants: Record<string, { n: number; sel: number; first?: number }>;
     avatarVersions: Record<string, number>;
     hasScene: boolean;
     // Coarse progress for the preview page: the portrait grid and the scene
@@ -226,6 +226,17 @@ export interface DayDiscussionSummary {
     summary: string; // GM-generated summary of the day's discussion
 }
 
+/**
+ * One entry of the GM's rolling plot memory ("the chronicle"). Written by the
+ * night-results call each night: a few sentences capturing where the main plot
+ * stands, including the state of the current narrative twist. Replay-safe: a
+ * replayed night overwrites its own day's entry.
+ */
+export interface StoryChapter {
+    day: number;
+    summary: string;
+}
+
 export interface Game {
     id: string;
     description: string;
@@ -270,6 +281,11 @@ export interface Game {
     createdWithTier: UserTier; // Store the user's tier at the time the game was created
     votingHistory?: VotingDayResult[]; // History of voting results for each day
     nightNarratives?: NightNarrativeResult[]; // GM night result narratives for each night
+    storyChapters?: StoryChapter[]; // GM plot memory: one chapter per night, drives story continuity
+    // Day-opening story written by the night-results call (nothing happens between the
+    // night summary and the next morning, so both are generated together). Posted and
+    // cleared when the new day begins; null/absent falls back to the static template.
+    pendingDayOpening?: string | null;
     dayDiscussionSummaries?: DayDiscussionSummary[]; // GM-generated summaries of day discussions
     chatResetCounts?: Record<number, number>; // game day number → reset count (free tier only)
     // Themed avatar generation lifecycle. Absent on games created before the
@@ -279,14 +295,16 @@ export interface Game {
     // Bumped on every (re)generation; getAvatarUrl appends it as ?v= so
     // immutable browser caching never serves a previous generation's images.
     avatarsVersion?: number;
-    // Portrait candidates per avatar key. Every verification round keeps its
-    // slices (they used to be discarded wholesale when one cell was flagged),
-    // so each character can carry alternates the owner flips through on the
-    // character card. `n` = how many candidates exist in the avatarVariants
-    // subcollection, `sel` = which one is copied into avatars/{key} and is
-    // therefore what every reader (chat, cinematic, illustration references)
-    // sees. Absent on games generated before variants existed = one candidate.
-    avatarVariants?: Record<string, { n: number; sel: number }>;
+    // Portrait candidates per avatar key. Every draw keeps its slices, so each
+    // character carries alternates the owner flips through on the character
+    // card (the preset mannequin is always one of the options). `n` = total
+    // candidates ever drawn; only [first, n) still exist in the avatarVariants
+    // subcollection (older ones are deleted past the cap, `first` absent = 0).
+    // `sel` = which one is copied into avatars/{key} and is therefore what
+    // every reader (chat, cinematic, illustration references) sees —
+    // MANNEQUIN_VARIANT_INDEX means the preset sketch is shown instead.
+    // Absent on games generated before variants existed = one candidate.
+    avatarVariants?: Record<string, { n: number; sel: number; first?: number }>;
     // Per-key cache-buster, bumped when that one portrait switches candidate.
     // A global avatarsVersion bump would re-download the whole cast for one
     // changed face. getAvatarUrl prefers this over avatarsVersion.
@@ -750,6 +768,10 @@ export const AVATAR_VARIANTS_COLLECTION = 'avatarVariants';
 export function avatarVariantKey(key: string, index: number): string {
     return `${key}__${index}`;
 }
+// Sentinel `sel` value: the character shows the preset mannequin sketch
+// instead of any generated candidate. The mannequin is a static asset, never a
+// stored candidate doc, so it lives outside the [first, n) index range.
+export const MANNEQUIN_VARIANT_INDEX = -1;
 // Free-tier games may reroll their portraits once; paid games are unlimited.
 export const FREE_TIER_AVATAR_REGENS = 1;
 
@@ -757,6 +779,10 @@ export const FREE_TIER_AVATAR_REGENS = 1;
 // never collide with player names (those are sanitized to [a-zA-Z0-9]).
 export function nightIllustrationKey(day: number): string {
     return `illustration-night-${day}`;
+}
+// GM-triggered mid-day illustration: at most one per day, the key doubles as the claim.
+export function dayIllustrationKey(day: number): string {
+    return `illustration-day-${day}`;
 }
 export const RECIPIENT_ALL = 'ALL';
 export const RECIPIENT_WEREWOLVES = 'WEREWOLVES';

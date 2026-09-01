@@ -300,9 +300,11 @@ export class DoctorProcessor extends BaseRoleProcessor {
 
             // Save the target to nightResults (include actionType for kill tracking)
             const currentNightResults = this.game.nightResults || {};
+            const doctorHint = doctorResponse.narrativeHint?.trim();
             currentNightResults[GAME_ROLES.DOCTOR] = {
                 target: doctorResponse.target,
-                actionType: actionType
+                actionType: actionType,
+                ...(doctorHint ? { narrativeHint: doctorHint } : {})
             };
 
             // Create doctor response message (sent only to the doctor role)

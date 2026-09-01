@@ -288,7 +288,8 @@ export class DetectiveProcessor extends BaseRoleProcessor {
 
             // Save the target and action type to nightResults
             const currentNightResults = this.game.nightResults || {};
-            currentNightResults[GAME_ROLES.DETECTIVE] = { target: detectiveResponse.target, actionType };
+            const detectiveHint = detectiveResponse.narrativeHint?.trim();
+            currentNightResults[GAME_ROLES.DETECTIVE] = { target: detectiveResponse.target, actionType, ...(detectiveHint ? { narrativeHint: detectiveHint } : {}) };
 
             // Calculate intermediate resolvedNightState to get the result
             const intermediateNightState = this.computeIntermediateNightState(currentNightResults, baseNightState);

@@ -31,9 +31,10 @@ import { AgentFactory } from "@/app/ai/agent-factory";
 import { getUserFromFirestore, getBotMessages, getGameMessages } from "@/app/api/game-actions";
 import { getApiKeysForUser } from "@/app/utils/tier-utils";
 import { selectRandomDayOpeningBots } from "@/app/api/bot-selection";
-import { GM_NIGHT_RESULTS_SYSTEM_PROMPT, GM_DAY_SUMMARY_SYSTEM_PROMPT, GM_DAY_SUMMARY_COMMAND } from "@/app/ai/prompts/gm-prompts";
+import { GM_NIGHT_RESULTS_SYSTEM_PROMPT, GM_DAY_SUMMARY_SYSTEM_PROMPT, GM_DAY_SUMMARY_COMMAND, GM_NIGHT_BEGINS_SYSTEM_PROMPT } from "@/app/ai/prompts/gm-prompts";
 import { GM_COMMAND_GENERATE_NIGHT_RESULTS } from "@/app/ai/prompts/gm-commands";
-import { NightResultsStory } from "@/app/ai/prompts/ai-schemas";
+import { NightResultsStoryZodSchema } from "@/app/ai/prompts/zod-schemas";
+import { buildStoryContext, lynchSummaryForDay, sanitizeNarrativeHint } from "@/app/utils/story-utils";
 import { BOT_DAY_SUMMARY_PROMPT, BOT_SYSTEM_PROMPT } from "@/app/ai/prompts/bot-prompts";
 import { generateBotContextSection, generateWerewolfTeammatesSection, getAlivePlayerNames, getEffectiveModel } from "@/app/utils/bot-utils";
 import { format } from "@/app/ai/prompts/utils";
@@ -101,7 +102,9 @@ async function endNightWithResults(gameId: string, game: Game): Promise<GameActi
         active_night_roles: activeNightRoles,
         humanPlayerName: game.humanPlayerName,
         currentDay: game.currentDay,
-        theme: game.theme || 'Werewolf Village'
+        theme: game.theme || 'Werewolf Village',
+        story_so_far: buildStoryContext(game),
+        lynch_summary: lynchSummaryForDay(game, game.currentDay)
     });
 
     // Build simplified GM prompt params from NightState
@@ -123,12 +126,15 @@ async function endNightWithResults(gameId: string, game: Game): Promise<GameActi
 
     const quietNight = nightState.deaths.length === 0 && !werewolfKillPrevented;
 
-    // Collect narrative hints from human player's night actions
+    // Collect narrative hints from night actions (human and bots alike). Hints are
+    // anonymous mood/imagery by contract, but sanitizeNarrativeHint strips any player
+    // name a model slipped in — a named target woven into the narrative would expose
+    // the doctor's/detective's/maniac's secret action.
     const narrativeHints: string[] = [];
     const nightResults = game.nightResults || {};
     for (const [role, result] of Object.entries(nightResults)) {
         if (result.narrativeHint) {
-            narrativeHints.push(`${role}: "${result.narrativeHint}"`);
+            narrativeHints.push(`${role}: "${sanitizeNarrativeHint(result.narrativeHint, game)}"`);
         }
     }
     const narrativeHintsSummary = narrativeHints.length > 0
@@ -154,8 +160,8 @@ async function endNightWithResults(gameId: string, game: Game): Promise<GameActi
     // For night summary, we only need the night results data (voting + night actions)
     // No need for full day conversation history
     const history = formatMessagesForNightSummary(nightResultsCommand);
-    const [storyResponse, thinking, tokenUsage, thinkingSignature] = await gmAgent.askText(history);
-    if (!storyResponse) {
+    const [nightResultsResponse, thinking, tokenUsage, thinkingSignature] = await gmAgent.askWithZodSchema(NightResultsStoryZodSchema, history);
+    if (!nightResultsResponse || !nightResultsResponse.story) {
         throw new BotResponseError(
             'Game Master failed to generate night results story',
             'GM did not respond to night results generation request',
@@ -163,7 +169,7 @@ async function endNightWithResults(gameId: string, game: Game): Promise<GameActi
             true
         );
     }
-    const nightResultsMessage = storyResponse;
+    const nightResultsMessage = nightResultsResponse.story;
 
     // Update game master's token usage
     if (tokenUsage) {
@@ -329,13 +335,24 @@ async function endNightWithResults(gameId: string, game: Game): Promise<GameActi
     const existingNightNarratives = game.nightNarratives || [];
     const updatedNightNarratives = [...existingNightNarratives, nightNarrativeResult];
 
+    // Append this night's chapter to the GM's plot memory. Replay-safe: a replayed
+    // night replaces its own day's entry instead of duplicating it.
+    const updatedStoryChapters = [
+        ...(game.storyChapters || []).filter(c => c.day !== game.currentDay),
+        { day: game.currentDay, summary: nightResultsResponse.chapterSummary || '' }
+    ].filter(c => c.summary);
+
     // 4. Update game state to NIGHT_RESULTS (don't eliminate players yet - that happens when starting next day)
     const gameUpdates: any = {
         gameState: GAME_STATES.NIGHT_RESULTS,
         gameStateProcessQueue: [],
         gameStateParamQueue: [],
         nightNarratives: updatedNightNarratives,
-        resolvedNightState: nightState
+        resolvedNightState: nightState,
+        storyChapters: updatedStoryChapters,
+        // The next morning's opening story, written together with the night results
+        // (no new events happen in between). Posted and cleared when the day begins.
+        pendingDayOpening: nightResultsResponse.dayOpening || null
     };
 
     // Update game state
@@ -458,7 +475,35 @@ async function beginNightImpl(gameId: string): Promise<GameActionResponse> {
             .map(config => `• ${config.name}: ${config.description}`)
             .join('\n');
 
-        const gmMessage = `Night falls over the village. During this phase, players with special abilities will act in this order:\n${roleDescriptions}\n\nThe night actions will be processed automatically.`;
+        // GM-written nightfall passage continuing the game's chronicle. Pure flavor:
+        // any failure falls back to the static line and never blocks the night.
+        let nightfallStory = 'Night falls over the village.';
+        try {
+            const apiKeys = await getApiKeysForUser(session.user.email);
+            const nightBeginsPrompt = format(GM_NIGHT_BEGINS_SYSTEM_PROMPT, {
+                theme: game.theme || 'Werewolf Village',
+                story_so_far: buildStoryContext(game),
+                lynch_summary: lynchSummaryForDay(game, game.currentDay),
+                currentDay: game.currentDay
+            });
+            const gmModel = getEffectiveModel(game, GAME_MASTER, game.gameMasterAiType);
+            const gmAgent = AgentFactory.createAgent(GAME_MASTER, nightBeginsPrompt, gmModel.aiType, apiKeys, gmModel.enableThinking);
+            gmAgent.gameId = gameId;
+            gmAgent.userId = session.user.email;
+            const [nightfallResponse, , tokenUsage] = await gmAgent.askText([
+                { role: MESSAGE_ROLE.USER, content: `Write the nightfall passage for Day ${game.currentDay}.` }
+            ]);
+            if (tokenUsage) {
+                await recordGameMasterTokenUsage(gameId, tokenUsage, session.user.email);
+            }
+            if (nightfallResponse && nightfallResponse.trim()) {
+                nightfallStory = nightfallResponse.trim();
+            }
+        } catch (error: any) {
+            logger.warn(`🌙 Nightfall story generation failed, using static fallback`, { gameId, error: error?.message });
+        }
+
+        const gmMessage = `🌙 ${nightfallStory}\n\nDuring this phase, players with special abilities will act in this order:\n${roleDescriptions}\n\nThe night actions will be processed automatically.`;
 
         const gameMessage: GameMessage = {
             id: null,
@@ -1194,8 +1239,12 @@ async function summarizePastDayImpl(gameId: string): Promise<GameActionResponse>
             // picks a few bots to open the discussion so the game doesn't look stuck.
             const nextDay = (currentGame.currentDay || 1) + 1;
 
-            // Create Game Master message for new day
-            const gmStory = `☀️ **Day ${nextDay} begins.**\n\nThe village awakens to a new day. The events of the night have left their mark. Now is the time to discuss what happened and decide who among you might be a threat to the village.\n\nDiscuss the night's events, share your suspicions, and prepare to vote when ready.`;
+            // Create Game Master message for new day. Prefer the story-driven opening the
+            // night-results call wrote (continuing the game's chronicle); fall back to the
+            // static template for legacy games or if the GM omitted it.
+            const dayOpening = (currentGame.pendingDayOpening || '').trim()
+                || `The village awakens to a new day. The events of the night have left their mark. Now is the time to discuss what happened and decide who among you might be a threat to the village.`;
+            const gmStory = `☀️ **Day ${nextDay} begins.**\n\n${dayOpening}\n\nDiscuss the night's events, share your suspicions, and prepare to vote when ready.`;
 
             const gameMessage: GameMessage = {
                 id: null,
@@ -1215,7 +1264,8 @@ async function summarizePastDayImpl(gameId: string): Promise<GameActionResponse>
                 gameStateProcessQueue: [],
                 gameStateParamQueue: [],
                 currentDay: nextDay,
-                dayActivityCounter: {} // Reset activity counter for new day
+                dayActivityCounter: {}, // Reset activity counter for new day
+                pendingDayOpening: null // Consumed by the day-begins message above
             });
             logger.info(`💭 All bot summaries completed, selecting responders for Day ${nextDay}`, { gameId, nextDay });
 

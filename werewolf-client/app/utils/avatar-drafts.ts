@@ -183,7 +183,6 @@ export async function runDraftGeneration(userEmail: string, subject: AvatarSubje
         const expireAt = firestore.Timestamp.fromMillis(Date.now() + DRAFT_TTL_MS);
         const drawn = await drawIllustrationSet(apiKey, subject, {
             withScenes: true,
-            maxRounds: 3,
             ledger,
             logContext,
             onStage: async stage => {
@@ -191,7 +190,7 @@ export async function runDraftGeneration(userEmail: string, subject: AvatarSubje
             },
         });
         const {variants, versions} = await writeCandidates(
-            draftRef, drawn.rounds, claim.existingVariants, sceneWritesFor(draftRef, drawn.scenes, {expireAt}), {expireAt},
+            draftRef, drawn.portraits, claim.existingVariants, sceneWritesFor(draftRef, drawn.scenes, {expireAt}), {expireAt},
         );
 
         const costUSD = round6(ledger.spentUSD);
@@ -208,7 +207,7 @@ export async function runDraftGeneration(userEmail: string, subject: AvatarSubje
         ledger.spentUSD = 0;
 
         await billImages(userEmail, tier, costUSD);
-        logger.info(`Illustration draft drawn`, {...logContext, portraits: Object.keys(variants).length, rounds: drawn.rounds.length, scenes: drawn.scenes.length, costUSD});
+        logger.info(`Illustration draft drawn`, {...logContext, portraits: Object.keys(variants).length, scenes: drawn.scenes.length, costUSD});
     } catch (error: any) {
         logger.error(`Illustration draft failed`, {...logContext, error: error.message, costUSD: ledger.spentUSD});
         // A failed redraw keeps the set the player already has; only a first

@@ -295,7 +295,8 @@ export class WerewolfProcessor extends BaseRoleProcessor {
 
                 // Save the target to nightResults
                 const currentNightResults = this.game.nightResults || {};
-                currentNightResults[GAME_ROLES.WEREWOLF] = { target: targetName };
+                const wwHint = (werewolfResponse as WerewolfActionZod).narrativeHint?.trim();
+                currentNightResults[GAME_ROLES.WEREWOLF] = { target: targetName, ...(wwHint ? { narrativeHint: wwHint } : {}) };
 
                 gameUpdates.nightResults = currentNightResults;
 

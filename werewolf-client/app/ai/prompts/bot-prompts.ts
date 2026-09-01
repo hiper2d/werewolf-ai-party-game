@@ -303,7 +303,9 @@ Consider:
 - Who has been most suspicious of werewolves during discussions?
 - Strategic value of eliminating this player
 
-Your response must be a valid JSON object with your target choice and reasoning.`;
+Your response must be a valid JSON object with your target choice and reasoning.
+
+**Optional — narrativeHint:** you may add one short in-world sentence describing how your night action looks or feels (mood and imagery only). The Game Master may weave it anonymously into the morning story. It MUST NOT name any player, describe a location tied to a player, or hint at anyone's role — including your own. Skip it if nothing evocative comes to mind.`;
 
 export const BOT_DOCTOR_ACTION_PROMPT: string = `🏥 **Night Phase - Doctor Protection**
 
@@ -326,7 +328,9 @@ Consider:
 
 **Remember:** Keep your role as Doctor completely secret. Never reveal your protection choices or role to other players during day discussions.
 
-Your response must be a valid JSON object with your target choice and reasoning.`;
+Your response must be a valid JSON object with your target choice and reasoning.
+
+**Optional — narrativeHint:** you may add one short in-world sentence describing how your night action looks or feels (mood and imagery only). The Game Master may weave it anonymously into the morning story. It MUST NOT name any player, describe a location tied to a player, or hint at anyone's role — including your own. Skip it if nothing evocative comes to mind.`;
 
 export const BOT_MANIAC_ACTION_PROMPT: string = `🎭 **Night Phase - Maniac Abduction**
 
@@ -350,7 +354,9 @@ export const BOT_MANIAC_ACTION_PROMPT: string = `🎭 **Night Phase - Maniac Abd
 
 **Your Goal:** Use your abduction strategically to help the village team win while staying alive.
 
-Your response must be a valid JSON object with your target choice and reasoning.`;
+Your response must be a valid JSON object with your target choice and reasoning.
+
+**Optional — narrativeHint:** you may add one short in-world sentence describing how your night action looks or feels (mood and imagery only). The Game Master may weave it anonymously into the morning story. It MUST NOT name any player, describe a location tied to a player, or hint at anyone's role — including your own. Skip it if nothing evocative comes to mind.`;
 
 export const BOT_DETECTIVE_ACTION_PROMPT: string = `🔍 **Night Phase - Detective Action**
 
@@ -380,7 +386,9 @@ Consider:
 
 **Remember:** Keep your role as Detective completely secret. Never directly reveal your investigation results or role to other players during day discussions. Use the information strategically to guide voting and discussions.
 
-Your response must be a valid JSON object with your target choice, action_type, and reasoning.`;
+Your response must be a valid JSON object with your target choice, action_type, and reasoning.
+
+**Optional — narrativeHint:** you may add one short in-world sentence describing how your night action looks or feels (mood and imagery only). The Game Master may weave it anonymously into the morning story. It MUST NOT name any player, describe a location tied to a player, or hint at anyone's role — including your own. Skip it if nothing evocative comes to mind.`;
 
 /**
  * Appended (in the role processors) right after the "Available targets" list so the

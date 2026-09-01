@@ -1,4 +1,5 @@
 import { Bot, Game, GAME_ROLES, PLAY_STYLES, PLAY_STYLE_CONFIGS, RoleKnowledge } from "@/app/api/game-models";
+import { latestChapterSummary } from "@/app/utils/story-utils";
 
 /**
  * Builds the comma-separated list of ALIVE players for the "Alive Players" line of
@@ -265,6 +266,16 @@ export function generateBotContextSection(bot: Bot, game: Game): string {
 
     if (dayEntries.length > 0) {
         sections.push(`## Game History\n\n${dayEntries.join('\n\n---\n\n')}`);
+    }
+
+    // 2b. The GM's chronicle — current plot state, for tone only. Strategy stays fact-based.
+    const latestChapter = latestChapterSummary(game);
+    if (latestChapter) {
+        sections.push(`## The Story So Far (Game Master's chronicle)
+
+${latestChapter}
+
+**How to use this:** let the chronicle color your tone, imagery, and small asides — nod to its events, react to its twist, push the tale a little further (about one sentence of flavor per message, never more). The chronicle is FICTION layered over the game: its twists, omens, and events imply NOTHING about any player's role and must NEVER be used as evidence, suspicion, or a reason to vote. Your reasoning and votes come only from game facts.`);
     }
 
     // 3. Bot's Personal Summary (LAST - bot's own interpretation)

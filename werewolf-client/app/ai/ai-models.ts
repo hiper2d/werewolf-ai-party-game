@@ -72,13 +72,11 @@ export const AUDIO_MODEL_CONSTANTS = {
 
 // Image pipeline models (platform-side, like the audio models above — never
 // user-selected). AVATARS draws the avatar grids, scene pairs and mid-game
-// illustrations; VERIFIER is the cheap vision model that inspects the sliced
-// avatars (no rendered text, expected gender per slot); ILLUSTRATION_BRIEF turns the GM's night narration into
+// illustrations; ILLUSTRATION_BRIEF turns the GM's night narration into
 // a concrete scene description for the image model. See
 // app/utils/avatar-generation.ts and app/utils/illustration-generation.ts.
 export const IMAGE_MODEL_CONSTANTS = {
     AVATARS: 'gemini-3.1-flash-image',
-    VERIFIER: 'gemini-3.5-flash-lite',
     ILLUSTRATION_BRIEF: 'gemini-3.5-flash-lite',
 } as const;
 

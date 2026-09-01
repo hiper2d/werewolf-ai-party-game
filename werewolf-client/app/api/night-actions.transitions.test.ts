@@ -182,8 +182,18 @@ beforeEach(() => {
     }));
     (db!.collection as jest.Mock).mockReturnValue({ doc: mockDoc });
 
-    mockAskWithZodSchema = jest.fn();
-    // GM night story and day summaries are plain-text asks now.
+    // GM night results are a structured ask: {story, chapterSummary, dayOpening}.
+    mockAskWithZodSchema = jest.fn().mockResolvedValue([
+        {
+            story: 'The night passes quietly.',
+            chapterSummary: 'The village endured a quiet night.',
+            dayOpening: 'Morning light returns to the village.',
+        },
+        '',
+        undefined,
+        undefined,
+    ]);
+    // GM day summaries and the nightfall passage are plain-text asks.
     mockAskText = jest.fn().mockResolvedValue([
         'The night passes quietly.',
         '',
@@ -335,8 +345,8 @@ describe('night queue advancement', () => {
 
         const result = await performNightAction(GAME_ID);
 
-        // GM story agent was asked once and the night ends.
-        expect(mockAskText).toHaveBeenCalledTimes(1);
+        // GM story agent was asked once (structured night-results ask) and the night ends.
+        expect(mockAskWithZodSchema).toHaveBeenCalledTimes(1);
         const endUpdate = updatesWith('gameState')[0];
         expect(endUpdate.gameState).toBe(GAME_STATES.NIGHT_RESULTS);
         expect(result.messages.length).toBeGreaterThan(0);

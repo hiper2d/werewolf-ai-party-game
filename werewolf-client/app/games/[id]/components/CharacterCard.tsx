@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Game } from '@/app/api/game-models';
+import { Game, MANNEQUIN_VARIANT_INDEX } from '@/app/api/game-models';
 import { getAvatarUrl, getAvatarVariantState } from '@/app/utils/avatar-utils';
-import { isPresetAvatarUrl } from '@/app/utils/preset-avatars';
+import { getPresetAvatarUrl } from '@/app/utils/preset-avatars';
 import CharacterPoster, { getCharacterIdentity } from './CharacterPoster';
 
 // Past this many candidates the dots stop being countable at a glance and
@@ -44,10 +44,11 @@ export default function CharacterCard({ game, name, onClose, isOwner = false, on
         return () => document.removeEventListener('keydown', onKey);
     }, [onClose]);
 
-    // Portrait candidates: every verification round the generator drew is kept,
-    // so most characters have more than one face to choose from. `viewIndex` is
-    // what the card shows; picking a different one commits it as the portrait
-    // shown everywhere else in the game.
+    // Portrait candidates: the preset mannequin plus every kept draw, so any
+    // character with a generated set has at least two faces to choose from.
+    // `viewIndex` is what the card shows (MANNEQUIN_VARIANT_INDEX for the
+    // mannequin); picking a different one commits it as the portrait shown
+    // everywhere else in the game.
     const variantState = getAvatarVariantState(game, name);
     const [viewIndex, setViewIndex] = useState(variantState.selected);
     // Arrow clicks are instant; the writes behind them run one at a time, and a
@@ -60,20 +61,28 @@ export default function CharacterCard({ game, name, onClose, isOwner = false, on
     if (!getCharacterIdentity(game, name).exists) return null;
 
     const avatarUrl = avatarUrlOverride ?? getAvatarUrl(game, name);
-    // The switcher only makes sense over a real generated portrait — while the
-    // set is still generating (or failed) the card shows a preset sketch.
-    const themedPortrait = !!avatarUrl && !isPresetAvatarUrl(avatarUrl);
-    const showSwitcher = isOwner && game.avatarsStatus === 'ready' && themedPortrait && !!onSelectVariant && variantState.count > 1;
+    // Cycle order: the mannequin sketch first, then the kept generated
+    // candidates (their stored indices, which don't start at 0 once older
+    // draws age out past the cap).
+    const positions = [MANNEQUIN_VARIANT_INDEX, ...Array.from({ length: variantState.count }, (_, i) => variantState.first + i)];
+    // Only games with a candidate record can switch — pre-variant games have
+    // one fixed portrait and no stored alternates behind it.
+    const showSwitcher = isOwner && game.avatarsStatus === 'ready' && !!onSelectVariant && variantState.hasCandidates;
     // Browsing off the committed choice is served straight from the candidate
-    // subcollection, so the new face appears on the click instead of after the
-    // selection write round-trips.
+    // subcollection (the mannequin resolves to its static preset), so the new
+    // face appears on the click instead of after the selection write round-trips.
     const portraitSrc = !avatarUrlOverride && showSwitcher && viewIndex !== variantState.selected
-        ? `/api/games/${game.id}/avatars/${encodeURIComponent(variantState.key)}?n=${viewIndex}`
+        ? (viewIndex === MANNEQUIN_VARIANT_INDEX
+            ? getPresetAvatarUrl(game.bots, name)
+            : `/api/games/${game.id}/avatars/${encodeURIComponent(variantState.key)}?n=${viewIndex}`)
         : avatarUrl;
 
+    // Where the shown face sits in the cycle; a selection that aged out of the
+    // window anchors to the mannequin.
+    const viewPosition = Math.max(0, positions.indexOf(viewIndex));
+
     const stepVariant = (delta: number) => {
-        if (variantState.count < 2) return;
-        const next = (viewIndex + delta + variantState.count) % variantState.count;
+        const next = positions[(viewPosition + delta + positions.length) % positions.length];
         setViewIndex(next);
         commitSelection(next);
     };
@@ -89,7 +98,7 @@ export default function CharacterCard({ game, name, onClose, isOwner = false, on
                 const result = await onSelectVariant!(game.id, variantState.key, next);
                 if (result) {
                     onGameChange?.({
-                        avatarVariants: { ...(game.avatarVariants ?? {}), [variantState.key]: { n: variantState.count, sel: result.sel } },
+                        avatarVariants: { ...(game.avatarVariants ?? {}), [variantState.key]: { ...game.avatarVariants![variantState.key], sel: result.sel } },
                         avatarVersions: { ...(game.avatarVersions ?? {}), [variantState.key]: result.version },
                     });
                 }
@@ -104,9 +113,9 @@ export default function CharacterCard({ game, name, onClose, isOwner = false, on
     };
 
     // Owner portrait switcher, in the poster's top-right chip slot: arrows walk
-    // this character's kept candidates and each click commits the one on
-    // screen as the face shown everywhere in the game. Dots show where you
-    // are; past six candidates a counter replaces them.
+    // the mannequin plus this character's kept candidates, and each click
+    // commits the one on screen as the face shown everywhere in the game.
+    // Dots show where you are; past six positions a counter replaces them.
     const switcher = showSwitcher ? (
         <span className="flex items-center gap-1.5 px-1.5 py-[3px] text-white">
             <button
@@ -119,17 +128,17 @@ export default function CharacterCard({ game, name, onClose, isOwner = false, on
                     <polyline points="15 18 9 12 15 6" />
                 </svg>
             </button>
-            {variantState.count <= MAX_DOT_CANDIDATES ? (
-                <span className="flex items-center gap-1" aria-label={`Portrait ${viewIndex + 1} of ${variantState.count}`}>
-                    {Array.from({ length: variantState.count }, (_, i) => (
+            {positions.length <= MAX_DOT_CANDIDATES ? (
+                <span className="flex items-center gap-1" aria-label={`Portrait ${viewPosition + 1} of ${positions.length}`}>
+                    {positions.map((_, i) => (
                         <span
                             key={i}
-                            className={`rounded-full transition-all duration-[120ms] ${i === viewIndex ? 'w-[7px] h-[7px] bg-white' : 'w-[5px] h-[5px] bg-white/40'}`}
+                            className={`rounded-full transition-all duration-[120ms] ${i === viewPosition ? 'w-[7px] h-[7px] bg-white' : 'w-[5px] h-[5px] bg-white/40'}`}
                         />
                     ))}
                 </span>
             ) : (
-                <span className="tabular-nums px-0.5 select-none">{viewIndex + 1}/{variantState.count}</span>
+                <span className="tabular-nums px-0.5 select-none">{viewPosition + 1}/{positions.length}</span>
             )}
             <button
                 onClick={() => stepVariant(1)}

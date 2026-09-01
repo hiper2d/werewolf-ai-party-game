@@ -1,6 +1,6 @@
 import {db} from "@/firebase/server";
 import {firestore} from "firebase-admin";
-import {Game, USER_TIERS, UserTier, AVATAR_GM_KEY, SCENE_WELCOME_KEY, SCENE_NIGHT_KEY, AVATAR_VARIANTS_COLLECTION, avatarVariantKey} from "@/app/api/game-models";
+import {Game, USER_TIERS, UserTier, AVATAR_GM_KEY, SCENE_WELCOME_KEY, SCENE_NIGHT_KEY, AVATAR_VARIANTS_COLLECTION, avatarVariantKey, MANNEQUIN_VARIANT_INDEX} from "@/app/api/game-models";
 import {getUserTierAndApiKeys} from "@/app/utils/tier-utils";
 import {updateUserMonthlySpending, deductBalance} from "@/app/api/user-actions";
 import {PAID_TIER_MARKUP} from "@/app/config/credit-packages";
@@ -28,9 +28,6 @@ interface AvatarCell {
     key: string;      // Firestore doc id + URL segment ([a-zA-Z0-9] names, or the GM key)
     label: string;    // Character name, for logs and prompt guidance — never drawn into the image
     prompt: string;   // One-line visual description for this cell
-    // What the slice verifier expects to see in this slot; undefined = don't
-    // check (the human player has no gender on record, fillers aren't stored).
-    expectedGender?: 'male' | 'female';
 }
 
 // Stories are narrative, not visual — one sentence is plenty of guidance for the
@@ -64,7 +61,6 @@ function buildCells(game: AvatarSubject): AvatarCell[] {
         key: bot.name,
         label: bot.name,
         prompt: `(${bot.gender}) "${bot.name}" — ${firstSentence(bot.story)}`,
-        expectedGender: bot.gender === 'male' || bot.gender === 'female' ? bot.gender : undefined,
     }));
     cells.push({
         key: game.humanPlayerName,
@@ -77,7 +73,6 @@ function buildCells(game: AvatarSubject): AvatarCell[] {
         // Male on purpose: the GM's TTS voice defaults to male (previewGame
         // falls back to a random male voice), so the portrait must match.
         prompt: `(male) "Game Master" — the omniscient narrator of this story: a male storyteller figure fitting the setting, keeper of every secret at the table, serene, impartial, faintly amused`,
-        expectedGender: 'male',
     });
     return cells;
 }
@@ -170,17 +165,9 @@ Bottom panel: the same setting at night — dark, ominous, something predatory h
 No text anywhere in the image.`;
 }
 
-// Cheap vision model that inspects every sliced avatar: no rendered text, and
-// the apparent gender matches the expected character in that slot. The gender
-// sequence doubles as the misalignment detector — a drifted grid puts the
-// wrong face in a slot (this replaced nameplate transcription 2026-08-23 when
-// nameplates were dropped so portraits carry no text at all).
-const VERIFY_MODEL = IMAGE_MODEL_CONSTANTS.VERIFIER;
-
 interface AvatarSlice {
     key: string;
     label: string;
-    expectedGender?: 'male' | 'female';
     jpeg: Buffer;
 }
 
@@ -205,142 +192,19 @@ async function sliceGrid(sharp: any, grid: Buffer, cells: AvatarCell[], count: n
             .resize(512, 512, {fit: 'cover', position: 'top'})
             .jpeg({quality: 85})
             .toBuffer();
-        slices.push({key: cells[i].key, label: cells[i].label, expectedGender: cells[i].expectedGender, jpeg});
+        slices.push({key: cells[i].key, label: cells[i].label, jpeg});
     }
     return slices;
 }
 
-/** Verdict for one crop. `hasText` = the model typeset something into the cell;
- * `genderMismatch` = the face doesn't match the character expected in that
- * slot, which is also how a drifted grid shows up (every slot holds a
- * neighbour's face). */
-export interface SliceVerdict {
-    hasText: boolean;
-    genderMismatch: boolean;
-    problem?: string;
-}
-
-/** Inspects every sliced avatar in ONE call — all crops in a single request,
- * one verdict line each — and returns those verdicts unreduced.
- *
- * It used to collapse them into a single ok/not-ok for the whole grid, which is
- * what let one lettered badge throw away twelve good portraits: 78% of the
- * re-rolls in a 7-day sample discarded a majority-good set, and a third of all
- * runs hard-failed to preset sketches (docs/avatar-slice-verification-failures.md).
- * Deciding what to keep is the caller's job now.
- *
- * Throws when the reply is unparseable — a misbehaving verifier, not a bad grid. */
-async function verifySlices(apiKey: string, slices: AvatarSlice[]): Promise<SliceVerdict[]> {
-    const parts: any[] = [{
-        text: `Each image below is a single character portrait. For each image answer two things: TEXT = YES only if clearly readable letters, words or numbers are written in the image (captions, labels, signs, writing on clothing), otherwise NO — decorative shapes, hair clips, jewelry, emblems or patterns without readable letters are NOT text. GENDER = MALE, FEMALE or OTHER for the portrait's subject (OTHER for robots, creatures, masked or ambiguous figures). Reply with exactly ${slices.length} lines, formatted "<number>: TEXT=<YES|NO> GENDER=<MALE|FEMALE|OTHER>". No other text.`,
-    }];
-    slices.forEach((sl, i) => {
-        parts.push({text: `Image ${i + 1}:`});
-        parts.push({inline_data: {mime_type: 'image/jpeg', data: sl.jpeg.toString('base64')}});
-    });
-
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${VERIFY_MODEL}:generateContent`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json', 'x-goog-api-key': apiKey},
-        body: JSON.stringify({contents: [{parts}]}),
-    });
-    if (!res.ok) throw new Error(`Slice verification failed: HTTP ${res.status}`);
-    const json = await res.json();
-    const text: string = (json.candidates?.[0]?.content?.parts || []).map((pt: any) => pt.text || '').join('\n');
-
-    const byIndex = new Map<number, {hasText: boolean; gender: string}>();
-    for (const line of text.split('\n')) {
-        const m = line.match(/^\s*(\d+)\s*[:.\-]?\s*TEXT\s*=\s*(YES|NO)\s+GENDER\s*=\s*(MALE|FEMALE|OTHER)/i);
-        if (m) byIndex.set(parseInt(m[1], 10), {hasText: m[2].toUpperCase() === 'YES', gender: m[3].toLowerCase()});
-    }
-    if (byIndex.size === 0) throw new Error('Slice verification reply was unparseable');
-
-    return slices.map((sl, i) => {
-        const verdict = byIndex.get(i + 1);
-        // A missing line is a hole in the reply, not evidence about the crop —
-        // flag it so a clean alternate wins the selection, and say why.
-        if (!verdict) return {hasText: false, genderMismatch: true, problem: `${sl.label}: no verdict`};
-        if (verdict.hasText) return {hasText: true, genderMismatch: false, problem: `${sl.label}: rendered text`};
-        // OTHER never counts: stylized, masked and non-human faces read
-        // ambiguously and would flag half a themed cast.
-        if (sl.expectedGender && verdict.gender !== 'other' && verdict.gender !== sl.expectedGender) {
-            return {hasText: false, genderMismatch: true, problem: `${sl.label}: expected ${sl.expectedGender}, saw ${verdict.gender}`};
-        }
-        return {hasText: false, genderMismatch: false};
-    });
-}
-
-/** A drawn portrait plus what the verifier thought of it. Every round's crops
- * are kept: the ones a stricter pipeline would have thrown away are exactly the
- * alternates a player wants to flip between on the character card. */
+/** A drawn portrait crop. Every round's crops are kept as candidates: the
+ * player flips between them on the character card and decides what looks
+ * right — there is no automated judge anymore (the slice verifier was removed
+ * 2026-08-30: it added a vision call plus up to two full redraws of waiting
+ * time, and the reroll button already puts quality in the player's hands). */
 export interface AvatarCandidate {
     key: string;
     jpeg: Buffer;
-    flagged: boolean;
-    problem?: string;
-}
-
-/** Which candidate to show by default: the first the verifier had no complaint
- * about, else the first drawn. A flagged portrait still beats no portrait — the
- * owner can flip to another one, and a themed face with a stray letter on its
- * collar reads better than a preset pencil sketch. */
-export function chooseSelected(candidates: {flagged: boolean}[]): number {
-    const clean = candidates.findIndex(c => !c.flagged);
-    return clean >= 0 ? clean : 0;
-}
-
-/** Whether a round failed as a whole image rather than in a few cells — the one
- * case where another draw is the right answer.
- *
- * A majority of cells carrying text means the model drew a labeled
- * character-card layout instead of portraits; more than one gender mismatch
- * means the grid drifted and the slots hold the wrong faces. A couple of
- * flagged cells is just a badge or a shop sign on one costume: the other eleven
- * portraits are fine, and re-rolling them is what used to burn ~2 extra grid
- * images per game (~$0.13) without reliably converging. */
-export function isSystemicFailure(verdicts: SliceVerdict[]): boolean {
-    const textViolations = verdicts.filter(v => v.hasText).length;
-    const genderMismatches = verdicts.filter(v => v.genderMismatch).length;
-    return textViolations > verdicts.length / 2 || genderMismatches > 1;
-}
-
-/** One image call: draw the grid, slice it, judge every slice. */
-async function generateCandidateRound(
-    apiKey: string,
-    game: AvatarSubject,
-    sharp: any,
-    cells: AvatarCell[],
-    cols: number,
-    rows: number,
-    realCount: number,
-    logContext: Record<string, unknown>,
-    ledger: SpendLedger,
-): Promise<{candidates: AvatarCandidate[]; costUSD: number; systemic: boolean; problems: string[]}> {
-    const grid = await generateImage(apiKey, buildPrompt(game, cells, cols, rows), "4:3");
-    ledger.spentUSD += grid.costUSD;
-    const slices = await sliceGrid(sharp, grid.buffer, cells, realCount, cols);
-
-    let verdicts: SliceVerdict[];
-    try {
-        verdicts = await verifySlices(apiKey, slices);
-    } catch (verifyError: any) {
-        // A verifier outage must never cost the player their portraits: accept
-        // the crops unjudged (that is also what the old pipeline did).
-        logger.warn(`Slice verifier unavailable, accepting slices unjudged`, {...logContext, error: verifyError.message});
-        verdicts = slices.map(() => ({hasText: false, genderMismatch: false}));
-    }
-
-    return {
-        candidates: slices.map((sl, i) => ({
-            key: sl.key,
-            jpeg: sl.jpeg,
-            flagged: verdicts[i].hasText || verdicts[i].genderMismatch,
-            problem: verdicts[i].problem,
-        })),
-        costUSD: grid.costUSD,
-        systemic: isSystemicFailure(verdicts),
-        problems: verdicts.map(v => v.problem).filter((p): p is string => !!p),
-    };
 }
 
 // One avatar doc is ~60-90KB of base64, and a full cast over three rounds is
@@ -364,7 +228,24 @@ export async function commitChunked(writes: PendingWrite[]): Promise<void> {
     }
 }
 
-export type AvatarVariantMap = Record<string, {n: number; sel: number}>;
+export type AvatarVariantMap = Record<string, {n: number; sel: number; first?: number}>;
+
+// How many generated candidates a character keeps. Indices are monotonic
+// (candidate ids never change, so cached ?n= URLs stay valid); past the cap
+// the oldest docs are deleted and `first` advances. The mannequin preset is
+// on top of these — it's a static asset, not a stored candidate.
+export const MAX_AVATAR_CANDIDATES = 3;
+
+/** Pure bookkeeping for appending `added` fresh candidates to a character's
+ * list: the new window, the newest candidate as the selection, and which
+ * aged-out doc indices to delete. */
+export function appendWindow(existing: {n: number; first?: number} | undefined, added: number): {n: number; sel: number; first: number; drop: {from: number; to: number}} {
+    const offset = existing?.n ?? 0;
+    const oldFirst = existing?.first ?? 0;
+    const n = offset + added;
+    const first = Math.max(oldFirst, n - MAX_AVATAR_CANDIDATES);
+    return {n, sel: offset, first, drop: {from: oldFirst, to: first}};
+}
 
 /** Stores every candidate in the avatarVariants subcollection and copies the
  * selected one into avatars/{key}, where all the existing readers look (the
@@ -375,48 +256,50 @@ export type AvatarVariantMap = Record<string, {n: number; sel: number}>;
  * `docExtras` is merged into every image doc (the draft's TTL field). */
 export async function writeCandidates(
     gameRef: firestore.DocumentReference,
-    rounds: AvatarCandidate[][],
+    candidates: AvatarCandidate[],
     existing: AvatarVariantMap,
     extraWrites: PendingWrite[] = [],
     docExtras: Record<string, any> = {},
 ): Promise<{variants: AvatarVariantMap; versions: Record<string, number>}> {
     const byKey = new Map<string, AvatarCandidate[]>();
-    for (const round of rounds) {
-        for (const candidate of round) {
-            const list = byKey.get(candidate.key) ?? [];
-            list.push(candidate);
-            byKey.set(candidate.key, list);
-        }
+    for (const candidate of candidates) {
+        const list = byKey.get(candidate.key) ?? [];
+        list.push(candidate);
+        byKey.set(candidate.key, list);
     }
 
     const now = Date.now();
     const writes: PendingWrite[] = [...extraWrites];
+    const deletes: firestore.DocumentReference[] = [];
     const variants: AvatarVariantMap = {...existing};
     const versions: Record<string, number> = {};
 
     for (const [key, list] of byKey) {
-        const offset = existing[key]?.n ?? 0;
+        const window = appendWindow(existing[key], list.length);
         list.forEach((candidate, i) => writes.push({
-            ref: gameRef.collection(AVATAR_VARIANTS_COLLECTION).doc(avatarVariantKey(key, offset + i)),
+            ref: gameRef.collection(AVATAR_VARIANTS_COLLECTION).doc(avatarVariantKey(key, window.sel + i)),
             data: {
                 data: candidate.jpeg.toString('base64'),
                 mime: 'image/jpeg',
-                flagged: candidate.flagged,
-                ...(candidate.problem ? {problem: candidate.problem} : {}),
                 createdAt: now,
                 ...docExtras,
             },
         }));
-        const localSel = chooseSelected(list);
-        variants[key] = {n: offset + list.length, sel: offset + localSel};
+        for (let i = window.drop.from; i < window.drop.to; i++) {
+            deletes.push(gameRef.collection(AVATAR_VARIANTS_COLLECTION).doc(avatarVariantKey(key, i)));
+        }
+        // The freshly drawn face is what's shown; the kept earlier candidates
+        // (and the mannequin) stay one arrow-click away on the character card.
+        variants[key] = {n: window.n, sel: window.sel, ...(window.first > 0 ? {first: window.first} : {})};
         versions[key] = now;
         writes.push({
             ref: gameRef.collection('avatars').doc(key),
-            data: {data: list[localSel].jpeg.toString('base64'), mime: 'image/jpeg', createdAt: now, ...docExtras},
+            data: {data: list[0].jpeg.toString('base64'), mime: 'image/jpeg', createdAt: now, ...docExtras},
         });
     }
 
     await commitChunked(writes);
+    await Promise.all(deletes.map(ref => ref.delete()));
     return {variants, versions};
 }
 
@@ -487,30 +370,24 @@ export interface SpendLedger {
 
 /** A drawn illustration set, not yet stored anywhere. */
 export interface DrawnSet {
-    rounds: AvatarCandidate[][];
+    portraits: AvatarCandidate[];
     // welcome + night, or empty when scenes weren't requested or failed
     // (scene failure never blocks portraits).
     scenes: {key: string; jpeg: Buffer}[];
 }
 
 /**
- * Draws a set for a subject: the portrait grid (draw → slice → judge, keeping
- * every round's crops) and, when asked, the scene pair in parallel. Pure
- * drawing — no Firestore, no billing — so the game generator, the in-game
- * reroll and the preview draft all run the same pipeline and differ only in
- * where the result lands.
- *
- * `maxRounds` > 1 allows another draw when a round failed as a whole image (a
- * labeled character-card layout, or a drifted grid); a few flagged cells are
- * shipped as-is with their alternates one arrow-click away on the character
- * card. `onStage` fires as each half lands, for progress display.
+ * Draws a set for a subject: the portrait grid (one draw, sliced into crops)
+ * and, when asked, the scene pair in parallel. Pure drawing — no Firestore, no
+ * billing — so the game generator, the in-game reroll and the preview draft
+ * all run the same pipeline and differ only in where the result lands.
+ * `onStage` fires as each half lands, for progress display.
  */
 export async function drawIllustrationSet(
     apiKey: string,
     subject: AvatarSubject,
     opts: {
         withScenes: boolean;
-        maxRounds: number;
         ledger: SpendLedger;
         logContext: Record<string, unknown>;
         onStage?: (stage: 'portraits' | 'scene') => Promise<void>;
@@ -552,18 +429,15 @@ export async function drawIllustrationSet(
                 return [];
             });
 
-    const rounds: AvatarCandidate[][] = [];
-    for (let attempt = 1; attempt <= opts.maxRounds; attempt++) {
-        const round = await generateCandidateRound(apiKey, subject, sharp, cells, cols, rows, realCount, logContext, ledger);
-        rounds.push(round.candidates);
-        if (round.problems.length > 0) {
-            logger.warn(`Avatar grid slices flagged (attempt ${attempt})`, {...logContext, systemic: round.systemic, problems: round.problems});
-        }
-        if (!round.systemic) break;
-    }
+    const grid = await generateImage(apiKey, buildPrompt(subject, cells, cols, rows), "4:3");
+    ledger.spentUSD += grid.costUSD;
+    const slices = await sliceGrid(sharp, grid.buffer, cells, realCount, cols);
     await opts.onStage?.('portraits');
 
-    return {rounds, scenes: await scenePromise};
+    return {
+        portraits: slices.map(sl => ({key: sl.key, jpeg: sl.jpeg})),
+        scenes: await scenePromise,
+    };
 }
 
 /** Scene images as writes into a parent's `avatars` subcollection. */
@@ -604,8 +478,8 @@ export async function runAvatarGeneration(gameId: string, userEmail: string): Pr
         const apiKey = keys.apiKeys[API_KEY_CONSTANTS.GOOGLE];
         if (!apiKey) throw new Error('No Google API key available for avatar generation');
 
-        const drawn = await drawIllustrationSet(apiKey, claimed, {withScenes: true, maxRounds: 3, ledger, logContext: {gameId}});
-        const {variants, versions} = await writeCandidates(gameRef, drawn.rounds, {}, sceneWritesFor(gameRef, drawn.scenes));
+        const drawn = await drawIllustrationSet(apiKey, claimed, {withScenes: true, ledger, logContext: {gameId}});
+        const {variants, versions} = await writeCandidates(gameRef, drawn.portraits, {}, sceneWritesFor(gameRef, drawn.scenes));
 
         const costUSD = parseFloat(ledger.spentUSD.toFixed(6));
         await gameRef.update({
@@ -622,7 +496,7 @@ export async function runAvatarGeneration(gameId: string, userEmail: string): Pr
 
         await billImages(userEmail, tier, costUSD);
 
-        logger.info(`Avatars generated for game ${gameId}`, {gameId, portraits: Object.keys(variants).length, rounds: drawn.rounds.length, scenes: drawn.scenes.length, costUSD});
+        logger.info(`Avatars generated for game ${gameId}`, {gameId, portraits: Object.keys(variants).length, scenes: drawn.scenes.length, costUSD});
     } catch (error: any) {
         // Avatars are decorative: never surface errorState, just mark failed so
         // the UI keeps its preset-sketch fallback and a later visit may retry.
@@ -658,11 +532,9 @@ export async function recordAbandonedSpend(
 }
 
 /**
- * Owner-triggered portrait reroll. Draws exactly ONE new grid — never the
- * three-attempt loop — because a reroll the player clicked must cost exactly
- * what the button promised. Its crops are appended to each character's
- * candidate list and become the shown portraits; the previous ones stay
- * reachable through the arrows on the character card.
+ * Owner-triggered portrait reroll. Draws ONE new grid; its crops are appended
+ * to each character's candidate list and become the shown portraits; the
+ * previous ones stay reachable through the arrows on the character card.
  *
  * The scene images are not redrawn: they cost as much again as the portraits,
  * and a player asking for new faces did not ask for a new tavern.
@@ -712,8 +584,8 @@ export async function runAvatarRegeneration(gameId: string, userEmail: string, m
             ? claimed.avatarVariants!
             : await adoptExistingAvatars(gameRef, portraitKeysFor(claimed));
 
-        const drawn = await drawIllustrationSet(apiKey, claimed, {withScenes: false, maxRounds: 1, ledger, logContext: {gameId, reroll: true}});
-        const {variants, versions} = await writeCandidates(gameRef, drawn.rounds, existing);
+        const drawn = await drawIllustrationSet(apiKey, claimed, {withScenes: false, ledger, logContext: {gameId, reroll: true}});
+        const {variants, versions} = await writeCandidates(gameRef, drawn.portraits, existing);
 
         const costUSD = parseFloat(ledger.spentUSD.toFixed(6));
         await gameRef.update({
@@ -751,7 +623,7 @@ async function adoptExistingAvatars(gameRef: firestore.DocumentReference, keys: 
         if (!data?.data) return;
         writes.push({
             ref: gameRef.collection(AVATAR_VARIANTS_COLLECTION).doc(avatarVariantKey(keys[i], 0)),
-            data: {data: data.data, mime: data.mime || 'image/jpeg', flagged: false, createdAt: data.createdAt || Date.now()},
+            data: {data: data.data, mime: data.mime || 'image/jpeg', createdAt: data.createdAt || Date.now()},
         });
         variants[keys[i]] = {n: 1, sel: 0};
     });
@@ -762,8 +634,11 @@ async function adoptExistingAvatars(gameRef: firestore.DocumentReference, keys: 
 /**
  * Switches which candidate a character shows: copies that candidate's bytes
  * into avatars/{key} (the doc every reader already looks at) and bumps only
- * this key's cache-buster. Returns the new per-key version, or null when the
- * caller isn't the owner or the index doesn't exist.
+ * this key's cache-buster. MANNEQUIN_VARIANT_INDEX selects the preset sketch
+ * instead — nothing is copied (the mannequin is a static asset the client
+ * resolves itself); avatars/{key} keeps the last generated face for readers
+ * that need real pixels, like illustration references. Returns the new per-key
+ * version, or null when the caller isn't the owner or the index doesn't exist.
  */
 export async function selectAvatarVariantFor(
     gameId: string,
@@ -781,8 +656,19 @@ export async function selectAvatarVariantFor(
     if (game.ownerEmail !== userEmail) return null;
 
     const entry = game.avatarVariants?.[key];
-    if (!entry || index < 0 || index >= entry.n) return null;
+    if (!entry) return null;
+    const inWindow = index >= (entry.first ?? 0) && index < entry.n;
+    if (index !== MANNEQUIN_VARIANT_INDEX && !inWindow) return null;
     if (entry.sel === index) return {key, sel: index, version: game.avatarVersions?.[key] ?? game.avatarsVersion ?? 0};
+
+    if (index === MANNEQUIN_VARIANT_INDEX) {
+        const version = Date.now();
+        await gameRef.update(
+            new firestore.FieldPath('avatarVariants', key, 'sel'), MANNEQUIN_VARIANT_INDEX,
+            new firestore.FieldPath('avatarVersions', key), version,
+        );
+        return {key, sel: MANNEQUIN_VARIANT_INDEX, version};
+    }
 
     const variantSnap = await gameRef.collection(AVATAR_VARIANTS_COLLECTION).doc(avatarVariantKey(key, index)).get();
     const variant = variantSnap.exists ? (variantSnap.data() as any) : null;

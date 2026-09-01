@@ -1377,6 +1377,8 @@ function gameFromFirestore(id: string, data: any): Game {
         createdWithTier: data.createdWithTier === 'paid' ? 'paid' : 'free',
         votingHistory: data.votingHistory || [],
         nightNarratives: data.nightNarratives || [],
+        storyChapters: data.storyChapters || [],
+        pendingDayOpening: data.pendingDayOpening || null,
         dayDiscussionSummaries: data.dayDiscussionSummaries || [],
         chatResetCounts: data.chatResetCounts || {},
         avatarsStatus: data.avatarsStatus, // absent on games from before themed avatars

@@ -1,60 +1,32 @@
 /**
- * Portrait candidate selection: which of a character's drawn faces is shown,
- * and when a bad round is worth redrawing at all.
- *
- * These two decisions are what replaced the old whole-set gate that discarded
- * twelve good portraits over one flagged cell
- * (docs/avatar-slice-verification-failures.md).
+ * Portrait candidate bookkeeping: how a character's drawn faces are stored,
+ * counted, capped and cache-busted. Which face is shown is the player's call —
+ * the newest draw by default, the arrows on the character card for the rest
+ * (the preset mannequin included).
  */
 
-import { chooseSelected, isSystemicFailure, SliceVerdict } from './avatar-generation';
-import { avatarVariantKey, Game } from '@/app/api/game-models';
+import { appendWindow, MAX_AVATAR_CANDIDATES } from './avatar-generation';
+import { avatarVariantKey, Game, MANNEQUIN_VARIANT_INDEX } from '@/app/api/game-models';
 import { avatarVersion, getAvatarVariantState } from './avatar-utils';
 
 jest.mock('@/firebase/server', () => ({ db: { collection: jest.fn() } }));
 jest.mock('firebase-admin', () => ({ firestore: { FieldValue: { increment: jest.fn() } } }));
 
-const clean = (): SliceVerdict => ({ hasText: false, genderMismatch: false });
-const withText = (label: string): SliceVerdict => ({ hasText: true, genderMismatch: false, problem: `${label}: rendered text` });
-const wrongGender = (label: string): SliceVerdict => ({ hasText: false, genderMismatch: true, problem: `${label}: expected male, saw female` });
-
-describe('chooseSelected', () => {
-    it('shows the first portrait the verifier had no complaint about', () => {
-        expect(chooseSelected([{ flagged: true }, { flagged: false }, { flagged: false }])).toBe(1);
+describe('appendWindow', () => {
+    it('selects the newest draw and keeps everything under the cap', () => {
+        expect(appendWindow({ n: 2 }, 1)).toEqual({ n: 3, sel: 2, first: 0, drop: { from: 0, to: 0 } });
     });
 
-    it('falls back to the first draw when every candidate is flagged', () => {
-        expect(chooseSelected([{ flagged: true }, { flagged: true }])).toBe(0);
+    it('drops the oldest candidate once the cap is exceeded', () => {
+        expect(appendWindow({ n: MAX_AVATAR_CANDIDATES }, 1)).toEqual({ n: 4, sel: 3, first: 1, drop: { from: 0, to: 1 } });
     });
 
-    it('keeps the first candidate when it is already clean', () => {
-        expect(chooseSelected([{ flagged: false }, { flagged: false }])).toBe(0);
-    });
-});
-
-describe('isSystemicFailure', () => {
-    it('does not redraw for a few lettered cells — the rest of the grid is fine', () => {
-        // The wild-west shape: a sheriff badge and a saloon sign in a cast of 13.
-        const verdicts = [withText('Hank'), withText('Clay'), ...Array(11).fill(clean())];
-        expect(isSystemicFailure(verdicts)).toBe(false);
+    it('advances an already-shifted window without re-dropping', () => {
+        expect(appendWindow({ n: 4, first: 1 }, 1)).toEqual({ n: 5, sel: 4, first: 2, drop: { from: 1, to: 2 } });
     });
 
-    it('redraws when most cells carry text — the model drew a labeled card layout', () => {
-        expect(isSystemicFailure(Array(13).fill(withText('x')))).toBe(true);
-    });
-
-    it('redraws on multiple gender mismatches — the grid drifted', () => {
-        const verdicts = [wrongGender('Misato'), wrongGender('Maya'), ...Array(11).fill(clean())];
-        expect(isSystemicFailure(verdicts)).toBe(true);
-    });
-
-    it('tolerates a single gender mismatch — stylized faces read ambiguously', () => {
-        const verdicts = [wrongGender('Maya'), ...Array(12).fill(clean())];
-        expect(isSystemicFailure(verdicts)).toBe(false);
-    });
-
-    it('accepts a clean round', () => {
-        expect(isSystemicFailure(Array(13).fill(clean()))).toBe(false);
+    it('starts a fresh character at candidate zero', () => {
+        expect(appendWindow(undefined, 1)).toEqual({ n: 1, sel: 0, first: 0, drop: { from: 0, to: 0 } });
     });
 });
 
@@ -67,16 +39,20 @@ describe('variant addressing', () => {
         id: 'western-1',
         avatarsStatus: 'ready',
         avatarsVersion: 100,
-        avatarVariants: { Hank: { n: 3, sel: 2 } },
+        avatarVariants: { Hank: { n: 3, sel: 2 }, Clay: { n: 5, sel: MANNEQUIN_VARIANT_INDEX, first: 2 } },
         avatarVersions: { Hank: 500 },
     } as unknown as Game;
 
     it('reports a character\'s candidate count and current choice', () => {
-        expect(getAvatarVariantState(game, 'Hank')).toEqual({ key: 'Hank', count: 3, selected: 2 });
+        expect(getAvatarVariantState(game, 'Hank')).toEqual({ key: 'Hank', count: 3, selected: 2, first: 0, hasCandidates: true });
     });
 
-    it('treats a character with no candidate record as having exactly one', () => {
-        expect(getAvatarVariantState(game, 'Clay')).toEqual({ key: 'Clay', count: 1, selected: 0 });
+    it('counts only the candidates still inside the window', () => {
+        expect(getAvatarVariantState(game, 'Clay')).toEqual({ key: 'Clay', count: 3, selected: MANNEQUIN_VARIANT_INDEX, first: 2, hasCandidates: true });
+    });
+
+    it('reports a pre-variants character as fixed', () => {
+        expect(getAvatarVariantState(game, 'Sal')).toEqual({ key: 'Sal', count: 1, selected: 0, first: 0, hasCandidates: false });
     });
 
     it('busts the cache per key so one changed face does not reload the cast', () => {

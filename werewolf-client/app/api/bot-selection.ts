@@ -6,6 +6,7 @@ import {
     GAME_STATES,
     GameMessage,
     MessageType,
+    RECIPIENT_ALL,
     RECIPIENT_NONE,
 } from "@/app/api/game-models";
 import { GM_ROUTER_SYSTEM_PROMPT } from "@/app/ai/prompts/gm-prompts";
@@ -19,6 +20,9 @@ import { getEffectiveModel } from "@/app/utils/bot-utils";
 import { addMessageToChatAndSaveToDb, consumeRetryHint, getGameMessages } from "@/app/api/game-actions";
 import { recordGameMasterTokenUsage } from "@/app/api/cost-tracking";
 import { logger } from "@/app/utils/logger";
+import { after } from "next/server";
+import { midGameImagesEnabled, runDayIllustration } from "@/app/utils/illustration-generation";
+import { convertMessageContent } from "@/app/utils/message-utils";
 
 /**
  * Format day activity data for the GM prompt.
@@ -164,6 +168,29 @@ export async function selectRespondingBots(
     if (tokenUsage) {
         await recordGameMasterTokenUsage(game.id, tokenUsage, userEmail);
     }
+
+    // GM flagged a dramatic discussion moment worth illustrating. Fire-and-forget —
+    // the image is decoration and must never block or fail the selection. At most
+    // one per day: runDayIllustration's image-doc claim enforces it.
+    if (!isAfterGameDiscussion && gmResponse.illustrationWorthy && gmResponse.illustrationMoment && midGameImagesEnabled(game)) {
+        const discussionExcerpt = dayMessages
+            .filter(m => m.recipientName === RECIPIENT_ALL &&
+                (m.messageType === MessageType.BOT_ANSWER || m.messageType === MessageType.HUMAN_PLAYER_MESSAGE))
+            .slice(-8)
+            .map(m => `**${m.authorName}:** ${typeof m.msg === 'string' ? m.msg : convertMessageContent(m)}`)
+            .join('\n');
+        const moment = gmResponse.illustrationMoment;
+        const day = game.currentDay;
+        const gameId = game.id;
+        try {
+            after(() => runDayIllustration(gameId, userEmail, day, moment, discussionExcerpt).catch(error =>
+                logger.warn(`Day illustration kickoff failed for ${gameId}`, { gameId, error: error.message })
+            ));
+        } catch {
+            // Outside a request scope (unit tests, scripts): no illustration.
+        }
+    }
+
     if (!gmResponse.selected_bots || !Array.isArray(gmResponse.selected_bots)) {
         throw new BotResponseError(
             'Game Master provided invalid bot selection',

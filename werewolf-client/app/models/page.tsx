@@ -136,9 +136,9 @@ export default function ModelsPage() {
                             <div className="text-[12.5px] text-[var(--fg-2)] mt-1">~$0.14 per game at creation, plus ~$0.07 per eventful night</div>
                         </div>
                         <div className="border border-[var(--line-1)] rounded-[var(--radius-lg)] bg-[var(--bg-0)] px-4 py-3.5">
-                            <div className="font-mono text-[11px] tracking-[0.06em] uppercase text-[var(--fg-3)] mb-1.5">Verification &amp; scene briefs</div>
-                            <div className="text-[14px] text-[var(--fg-0)] font-mono">{IMAGE_MODEL_CONSTANTS.VERIFIER}</div>
-                            <div className="text-[12.5px] text-[var(--fg-2)] mt-1">Checks every generated portrait and drafts illustration briefs; negligible cost</div>
+                            <div className="font-mono text-[11px] tracking-[0.06em] uppercase text-[var(--fg-3)] mb-1.5">Scene briefs</div>
+                            <div className="text-[14px] text-[var(--fg-0)] font-mono">{IMAGE_MODEL_CONSTANTS.ILLUSTRATION_BRIEF}</div>
+                            <div className="text-[12.5px] text-[var(--fg-2)] mt-1">Drafts illustration briefs from night narration; negligible cost</div>
                         </div>
                     </div>
                 </div>
