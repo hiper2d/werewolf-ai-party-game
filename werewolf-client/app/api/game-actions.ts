@@ -596,6 +596,7 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
             ...(artStyle ? {artStyle} : {}),
             werewolfCount: gamePreview.werewolfCount,
             specialRoles: gamePreview.specialRoles,
+            longReplies: gamePreview.longReplies ?? false,
             gameMasterAiType: gamePreview.gameMasterAiType,
             voiceProvider: gamePreview.voiceProvider, // TTS provider (locked at creation)
             gameMasterVoice: gamePreview.gameMasterVoice,
@@ -1347,6 +1348,8 @@ function gameFromFirestore(id: string, data: any): Game {
         theme: data.theme,
         werewolfCount: data.werewolfCount,
         specialRoles: data.specialRoles,
+        // Games from before the setting keep today's long style — that's what they were created with.
+        longReplies: data.longReplies ?? true,
         gameMasterAiType: data.gameMasterAiType,
         voiceProvider: data.voiceProvider || getDefaultVoiceProvider(), // Fallback to default for existing games
         gameMasterVoice: data.gameMasterVoice || getRandomVoiceForGender('male'), // Fallback for existing games

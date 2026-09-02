@@ -35,7 +35,7 @@ import {
 import { BotVoteZodSchema, GameSetupZodSchema } from "@/app/ai/prompts/zod-schemas";
 import { STORY_SYSTEM_PROMPT, STORY_USER_PROMPT } from "@/app/ai/prompts/story-gen-prompts";
 import { getDefaultVoiceProvider, getVoiceConfig } from "@/app/ai/voice-config";
-import { BOT_SYSTEM_PROMPT, BOT_VOTE_PROMPT, BOT_REMINDER_POSTFIX } from "@/app/ai/prompts/bot-prompts";
+import { BOT_SYSTEM_PROMPT, BOT_VOTE_PROMPT, BOT_REMINDER_POSTFIX, replyLengthInstruction } from "@/app/ai/prompts/bot-prompts";
 import { GM_COMMAND_INTRODUCE_YOURSELF } from "@/app/ai/prompts/gm-commands";
 import { format } from "@/app/ai/prompts/utils";
 import { convertToAIMessages } from "@/app/utils/message-utils";
@@ -162,6 +162,7 @@ const voteCommand: GameMessage = {
     }) + format(BOT_REMINDER_POSTFIX, {
         play_style: generatePlayStyleDescription(kenji),
         human_player_name: DAY2_VOTE_GAME.humanPlayerName,
+        reply_length_instruction: replyLengthInstruction(DAY2_VOTE_GAME.longReplies),
     }),
     messageType: MessageType.GM_COMMAND,
     day: DAY2_VOTE_GAME.currentDay,

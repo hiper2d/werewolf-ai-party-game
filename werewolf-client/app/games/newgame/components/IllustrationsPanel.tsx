@@ -25,6 +25,10 @@ interface IllustrationsPanelProps {
     // Overrides the authed draft-image route for portraits and the scene
     // (design previews can't reach it; the app never passes this).
     imageUrlFn?: (key: string) => string;
+    // When set, drawn portraits become clickable and open the character's
+    // card (same card the game shows). Absent while the draft doesn't match
+    // the current cast — a renamed character has no portrait to show.
+    onPortraitClick?: (entry: CastEntry) => void;
 }
 
 /** URL of a draft image, cache-busted per key. */
@@ -57,7 +61,7 @@ const Spinner = ({ size = 16 }: { size?: number }) => (
  * illustration draft until createGame adopts it.
  * @category Game
  */
-export default function IllustrationsPanel({ draft, cast, castChanged, busy, error, onGenerate, imageUrlFn }: IllustrationsPanelProps) {
+export default function IllustrationsPanel({ draft, cast, castChanged, busy, error, onGenerate, imageUrlFn, onPortraitClick }: IllustrationsPanelProps) {
     const [sceneFailed, setSceneFailed] = useState(false);
     const imgUrl = (key: string) => imageUrlFn ? imageUrlFn(key) : draftImageUrl(draft!, key);
     const drawing = draft?.status === 'generating';
@@ -139,14 +143,33 @@ export default function IllustrationsPanel({ draft, cast, castChanged, busy, err
                                 <div className="grid grid-cols-6 gap-x-2.5 gap-y-3">
                                     {cast.map(entry => (
                                         <div key={entry.key} className="flex flex-col items-center gap-1 min-w-0">
-                                            {/* eslint-disable-next-line @next/next/no-img-element -- authed dynamic route */}
-                                            <img
-                                                src={imgUrl(entry.key)}
-                                                alt={entry.name}
-                                                width={46}
-                                                height={46}
-                                                className="w-[46px] h-[46px] rounded-full object-cover bg-[var(--bg-2)]"
-                                            />
+                                            {onPortraitClick ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => onPortraitClick(entry)}
+                                                    aria-label={`View ${entry.name}'s card`}
+                                                    title={`View ${entry.name}'s card`}
+                                                    className="rounded-full transition-all duration-[120ms] hover:scale-[1.08] hover:shadow-[0_0_0_2px_var(--accent)] focus-visible:shadow-[0_0_0_2px_var(--accent)] outline-none"
+                                                >
+                                                    {/* eslint-disable-next-line @next/next/no-img-element -- authed dynamic route */}
+                                                    <img
+                                                        src={imgUrl(entry.key)}
+                                                        alt={entry.name}
+                                                        width={46}
+                                                        height={46}
+                                                        className="w-[46px] h-[46px] rounded-full object-cover bg-[var(--bg-2)] block"
+                                                    />
+                                                </button>
+                                            ) : (
+                                                // eslint-disable-next-line @next/next/no-img-element -- authed dynamic route
+                                                <img
+                                                    src={imgUrl(entry.key)}
+                                                    alt={entry.name}
+                                                    width={46}
+                                                    height={46}
+                                                    className="w-[46px] h-[46px] rounded-full object-cover bg-[var(--bg-2)]"
+                                                />
+                                            )}
                                             <span className={`text-[10px] leading-tight text-center truncate max-w-full ${captionColor(entry.kind)}`}>{entry.name}</span>
                                         </div>
                                     ))}

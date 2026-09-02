@@ -5,9 +5,10 @@ import {useRouter} from 'next/navigation';
 import {useSession} from 'next-auth/react';
 import {createGame, previewGame} from '@/app/api/game-actions';
 import {generateDraftIllustrations, getAvatarDraft} from '@/app/api/avatar-draft-actions';
-import {AVATAR_DRAFT_IN_PROGRESS, AVATAR_GM_KEY, AvatarDraftState, GAME_ROLES, GamePreview, GamePreviewWithGeneratedBots, GENDER_OPTIONS, getVoicesForGender, getRandomVoiceForGender, PLAY_STYLES, PLAY_STYLE_CONFIGS, RANDOM_ROLE, UserTier, USER_TIERS} from "@/app/api/game-models";
+import {AVATAR_DRAFT_IN_PROGRESS, AVATAR_GM_KEY, AvatarDraftState, Game, GAME_MASTER, GAME_ROLES, GAME_STATES, GamePreview, GamePreviewWithGeneratedBots, GENDER_OPTIONS, getVoicesForGender, getRandomVoiceForGender, PLAY_STYLES, PLAY_STYLE_CONFIGS, RANDOM_ROLE, UserTier, USER_TIERS} from "@/app/api/game-models";
 import {sanitizePlayerName} from "@/app/utils/name-utils";
 import IllustrationsPanel, {CastEntry, draftImageUrl} from '@/app/games/newgame/components/IllustrationsPanel';
+import CharacterCard from '@/app/games/[id]/components/CharacterCard';
 import PlayerAvatar from '@/app/components/PlayerAvatar';
 import {LLM_CONSTANTS, SupportedAiModels, getModelDisplayName, modelHasTag, modelIsFast} from "@/app/ai/ai-models";
 import {FREE_TIER_UNLIMITED, getCandidateModelsForTier, getModelPickerOptions, getPerGameModelLimit} from "@/app/ai/model-limit-utils";
@@ -61,6 +62,7 @@ export default function CreateNewGamePage() {
     const [werewolfCount, setWerewolfCount] = useState(3);
     const [specialRoles, setSpecialRoles] = useState<string[]>([GAME_ROLES.DOCTOR, GAME_ROLES.DETECTIVE, GAME_ROLES.MANIAC]);
     const [humanPlayerRole, setHumanPlayerRole] = useState<string>(RANDOM_ROLE);
+    const [longReplies, setLongReplies] = useState(false);
     const [gameMasterAiType, setGameMasterAiType] = useState<string>(() => {
         // Initial seed from the full catalog. Tier/key data isn't loaded yet on first
         // render — a reconciliation effect below re-picks from the user's actually-allowed
@@ -82,6 +84,7 @@ export default function CreateNewGamePage() {
     const [showPlayStyleTooltip, setShowPlayStyleTooltip] = useState<number | null>(null);
     const [showRoleTooltip, setShowRoleTooltip] = useState<string | null>(null);
     const [showWerewolfHint, setShowWerewolfHint] = useState(false);
+    const [showLongRepliesHint, setShowLongRepliesHint] = useState(false);
     const [nameError, setNameError] = useState<string | null>(null);
     const [themeError, setThemeError] = useState<string | null>(null);
     const [playersAiError, setPlayersAiError] = useState<string | null>(null);
@@ -94,6 +97,9 @@ export default function CreateNewGamePage() {
     const [draft, setDraft] = useState<AvatarDraftState | null>(null);
     const [draftBusy, setDraftBusy] = useState(false);
     const [draftError, setDraftError] = useState<string | null>(null);
+    // Portrait clicked in the illustrations grid — opens the character card
+    // (the same card the game shows) over the preview.
+    const [cardEntry, setCardEntry] = useState<CastEntry | null>(null);
     const hasInitializedPlayerModels = useRef(false);
     const playerOptions = useMemo(() => {
         const maxPlayers = 12;
@@ -267,6 +273,43 @@ export default function CreateNewGamePage() {
         return a.length === b.length && a.every((k, i) => k === b[i]);
     }, [draft, cast]);
     const draftReadyForCast = draft?.status === 'ready' && draftMatchesCast;
+
+    // A Game-shaped stub for CharacterCard/CharacterPoster, which render off a
+    // live Game. Roles aren't assigned until the game is created, so bots carry
+    // no role (chip reads CREW) and the human's chip reads plain YOU. The
+    // portrait always comes via the avatarUrl override, so none of the game's
+    // avatar routes are touched.
+    const previewCardGame = useMemo<Game | null>(() => {
+        if (!gameData) return null;
+        return {
+            id: 'preview',
+            description: gameData.description,
+            theme: gameData.theme,
+            werewolfCount: gameData.werewolfCount,
+            specialRoles: gameData.specialRoles,
+            gameMasterAiType: gameData.gameMasterAiType,
+            gameMasterVoice: gameData.gameMasterVoice,
+            story: gameData.scene,
+            bots: gameData.bots.map(bot => ({
+                name: bot.name,
+                story: bot.story,
+                role: '',
+                isAlive: true,
+                aiType: bot.playerAiType,
+                gender: bot.gender,
+                voice: bot.voice,
+                playStyle: bot.playStyle,
+            })),
+            humanPlayerName: gameData.name,
+            humanPlayerRole: '',
+            currentDay: 1,
+            gameState: GAME_STATES.WELCOME,
+            gameStateParamQueue: [],
+            gameStateProcessQueue: [],
+            ownerEmail: '',
+            createdWithTier: USER_TIERS.PAID,
+        };
+    }, [gameData]);
 
     // Poll the draft while the server draws it. The draw runs off the request
     // (like avatar generation at game creation), so this is the only way the
@@ -468,6 +511,7 @@ export default function CreateNewGamePage() {
             werewolfCount,
             specialRoles,
             humanPlayerRole,
+            longReplies,
             gameMasterAiType,
             playersAiType: selectedPlayerAiTypes.length > 0 ? selectedPlayerAiTypes : [LLM_CONSTANTS.RANDOM]
         };
@@ -512,8 +556,10 @@ export default function CreateNewGamePage() {
         } catch (err: any) {
             // Provide user-friendly error messages for common issues
             let userFriendlyError = err.message;
-            
-            if (err.message.includes('Failed to parse JSON response') || err.message.includes('JSON mode failed')) {
+
+            if (err.message.includes('failed to produce a valid response')) {
+                userFriendlyError = `The Game Master model failed to produce a valid response — the output was malformed or cut off. This happens occasionally; generate the preview again, or pick a different Game Master model.`;
+            } else if (err.message.includes('Failed to parse JSON response') || err.message.includes('JSON mode failed')) {
                 userFriendlyError = `The AI model had trouble generating a properly formatted response. This sometimes happens with certain models. Please try again, or consider using a different AI model for the Game Master.`;
             } else if (err.message.includes('Response validation failed')) {
                 userFriendlyError = `The AI model generated an invalid response format. Please try again or use a different AI model.`;
@@ -906,6 +952,54 @@ export default function CreateNewGamePage() {
                         onChange={setHumanPlayerRole}
                     />
                 </div>
+
+                {/* Row 7: Long replies */}
+                <div className="grid grid-cols-[140px_1fr] items-center gap-4">
+                    <label className={labelStyle}>Long Replies</label>
+                    <div className="relative inline-flex items-center gap-1.5 justify-self-start">
+                        <button
+                            type="button"
+                            aria-pressed={longReplies}
+                            onClick={() => setLongReplies(!longReplies)}
+                            className={`flex items-center gap-2 px-3 py-[7px] rounded-[var(--radius-md)] border text-[13px] font-medium transition-all duration-[120ms] ${
+                                longReplies
+                                    ? 'bg-[var(--accent-soft)] border-[var(--accent-line)] text-[var(--accent)]'
+                                    : 'bg-[var(--bg-2)] border-[var(--line-2)] text-[var(--fg-1)] hover:bg-[var(--bg-3)] hover:border-[var(--line-3)] hover:text-[var(--fg-0)]'
+                            }`}
+                        >
+                            {longReplies ? 'On' : 'Off'}
+                            <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-all duration-[120ms] ${
+                                longReplies
+                                    ? 'bg-[var(--accent)] border-[var(--accent)]'
+                                    : 'bg-transparent border-[var(--line-2)]'
+                            }`}>
+                                {longReplies && (
+                                    <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M1.5 4.5L3 6L6.5 2" />
+                                    </svg>
+                                )}
+                            </span>
+                        </button>
+                        <button
+                            type="button"
+                            aria-label="Long replies info"
+                            className="shrink-0 w-5 h-5 rounded-full bg-[var(--bg-3)] border border-[var(--line-2)] text-[var(--fg-2)] hover:bg-[var(--bg-4)] hover:text-[var(--fg-0)] transition-all duration-[120ms] flex items-center justify-center text-[11px] font-medium leading-none"
+                            onMouseEnter={() => setShowLongRepliesHint(true)}
+                            onMouseLeave={() => setShowLongRepliesHint(false)}
+                            onClick={(e) => {
+                                e.preventDefault();
+                                setShowLongRepliesHint(!showLongRepliesHint);
+                            }}
+                        >
+                            ?
+                        </button>
+                        {showLongRepliesHint && (
+                            <div className="absolute z-10 w-64 p-3 bg-[var(--bg-1)] border border-[var(--line-2)] rounded-[var(--radius-lg)] shadow-pop text-[13px] text-[var(--fg-1)] top-full mt-2 left-0">
+                                Off: bots keep day-discussion replies to one or two sentences. On: bots write longer, more detailed replies — more to read, more flavor.
+                            </div>
+                        )}
+                    </div>
+                </div>
             </form>
 
                 </div>{/* end card body */}
@@ -953,6 +1047,7 @@ export default function CreateNewGamePage() {
                             busy={draftBusy}
                             error={draftError}
                             onGenerate={handleGenerateIllustrations}
+                            onPortraitClick={draftReadyForCast ? setCardEntry : undefined}
                         />
                     )}
 
@@ -1180,6 +1275,18 @@ export default function CreateNewGamePage() {
                         </button>
                     </div>
                 </div>
+            )}
+
+            {/* Character card for a clicked preview portrait — the same card the
+                game shows. Read-only: no owner switcher, portrait served from
+                the illustration draft. */}
+            {cardEntry && previewCardGame && draft && (
+                <CharacterCard
+                    game={previewCardGame}
+                    name={cardEntry.kind === 'gm' ? GAME_MASTER : cardEntry.name}
+                    onClose={() => setCardEntry(null)}
+                    avatarUrl={draftImageUrl(draft, cardEntry.key)}
+                />
             )}
         </div>
     );

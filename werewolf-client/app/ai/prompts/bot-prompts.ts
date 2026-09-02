@@ -272,11 +272,27 @@ export const BOT_REMINDER_POSTFIX: string = `
 - Remember: Werewolves coordinate and often defend innocent targets to blend in - total agreement is suspicious
 - Focus on WHO targets WHOM and WHY, not character story consistency
 - Consider how relationships and alliances affect voting patterns\
+%reply_length_instruction%`;
 
+// Default: terse table talk. The strict cap keeps day discussions readable for
+// players who don't want to scroll walls of text.
+export const BOT_REPLY_LENGTH_SHORT: string = `
+**REPLY LENGTH (STRICT):**
+- Reply in ONE or TWO short sentences — never more.
+- Make your single strongest point and stop; save the rest for later turns.
+`;
+
+// The pre-setting behavior, kept for games created with "Long replies" on.
+export const BOT_REPLY_LENGTH_LONG: string = `
 **COMPACT REPLIES:**
 - Keep output lean—2 to 4 complete sentences per response.
 - Merge related points and skip filler while staying natural-sounding.
 `;
+
+/** The %reply_length_instruction% value for BOT_REMINDER_POSTFIX, per the game's longReplies setting. */
+export function replyLengthInstruction(longReplies?: boolean): string {
+    return longReplies ? BOT_REPLY_LENGTH_LONG : BOT_REPLY_LENGTH_SHORT;
+}
 
 export const BOT_WEREWOLF_DISCUSSION_PROMPT: string = `🌙 **Night Phase - Werewolf Discussion**
 

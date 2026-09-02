@@ -13,6 +13,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        id: "fable-5-1-gemini-3-8", date: "Sep 2026", tags: ["Models"],
+        title: "Claude Fable 5.1 and Gemini 3.8 Flash",
+        body: (<>Two slots move up a version, both at the <strong>same price</strong> as before. Anthropic&apos;s
+            <strong> Claude Fable 5.1</strong> replaces Claude Fable 5 for bots and the Game Master — still
+            always-on reasoning, still Anthropic&apos;s most capable model, still paid tier only. Google&apos;s
+            <strong> Gemini 3.8 Flash</strong> takes over the Flash slot from 3.7 Flash, and stays on the free
+            tier. Bots already set to either model switched over automatically; nothing to change in existing
+            lobbies.</>),
+        media: null,
+        links: [{label: "Create a game", href: "/games"}],
+    },
+    {
         id: "glm-flash-qwen-38", date: "Aug 2026", tags: ["Models"],
         title: "Two new cheap reasoners, and two price drops",
         body: (<><strong>GLM-5.3 Flash</strong> joins the picker — Z.AI&apos;s budget sibling of GLM-5.3, with

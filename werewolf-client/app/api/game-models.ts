@@ -63,6 +63,9 @@ export interface GamePreview {
     humanPlayerRole?: string; // Desired role for the human player ('random' or a GAME_ROLES value)
     gameMasterAiType: string;
     playersAiType: string | string[];
+    // False/absent = bots keep day replies to 1–2 sentences; true = the looser
+    // 2–4 sentence style for players who enjoy reading longer discussions.
+    longReplies?: boolean;
 }
 
 export interface BotPreview {
@@ -244,6 +247,9 @@ export interface Game {
     artStyle?: string; // Player-supplied art direction for image generation (locked at creation)
     werewolfCount: number;
     specialRoles: string[];
+    // Locked at creation. False/absent = bots keep day replies to 1–2 sentences;
+    // true = the looser 2–4 sentence style.
+    longReplies?: boolean;
     gameMasterAiType: string;
     voiceProvider?: VoiceProvider; // TTS provider for this game (locked at creation)
     gameMasterVoice: string;
