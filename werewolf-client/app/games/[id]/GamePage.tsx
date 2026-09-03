@@ -19,8 +19,8 @@ import { replayNight, performNightAction } from '@/app/api/night-actions';
 import PlayerAvatar from "@/app/components/PlayerAvatar";
 import CharacterCard from "@/app/games/[id]/components/CharacterCard";
 import RoleCard from "@/app/games/[id]/components/RoleCard";
-import { generateGameAvatars, regenerateGameAvatars, selectAvatarVariant } from "@/app/api/avatar-actions";
-import { getAvatarUrl, getSceneUrl } from "@/app/utils/avatar-utils";
+import { generateGameAvatars, reframeAvatar, regenerateGameAvatars, selectAvatarVariant } from "@/app/api/avatar-actions";
+import { getAvatarView, getSceneUrl } from "@/app/utils/avatar-utils";
 import { DiscordIcon } from "@/app/components/ui-icons";
 import { DISCORD_URL } from "@/app/config/external-links";
 import { checkGameEndConditions } from "@/app/utils/game-utils";
@@ -1192,7 +1192,7 @@ function GamePageContent({
                                     className="flex-none rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
                                     title={`View ${participant.name}`}
                                 >
-                                    <PlayerAvatar name={participant.name} size={32} isGM={participant.isGameMaster} isDead={isDead} avatarUrl={getAvatarUrl(game, participant.name)} />
+                                    <PlayerAvatar name={participant.name} size={32} isGM={participant.isGameMaster} isDead={isDead} avatarUrl={getAvatarView(game, participant.name)?.url} focus={getAvatarView(game, participant.name)?.focus} />
                                 </button>
                                 <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-1.5 flex-wrap">
@@ -1555,6 +1555,7 @@ function GamePageContent({
                     isOwner={isOwner}
                     onGameChange={patch => setGame(prev => ({ ...prev, ...patch }))}
                     onSelectVariant={selectAvatarVariant}
+                    onReframe={reframeAvatar}
                 />
             )}
 

@@ -13,7 +13,7 @@ import {addMessageToChatAndSaveToDb, consumeRetryHint, getBotMessages} from "@/a
 import {getApiKeysForUser} from "@/app/utils/tier-utils";
 import {auth} from "@/auth";
 import {convertToAIMessages} from "@/app/utils/message-utils";
-import {BOT_DETECTIVE_ACTION_PROMPT, BOT_SYSTEM_PROMPT, STRICT_TARGET_NAME_INSTRUCTION} from "@/app/ai/prompts/bot-prompts";
+import {BOT_DETECTIVE_ACTION_PROMPT, botSystemPrompt, STRICT_TARGET_NAME_INSTRUCTION} from "@/app/ai/prompts/bot-prompts";
 import {format} from "@/app/ai/prompts/utils";
 import {generateBotContextSection, getAlivePlayerNames, getEffectiveModel} from "@/app/utils/bot-utils";
 import {DetectiveActionZodSchema} from "@/app/ai/prompts/zod-schemas";
@@ -188,7 +188,7 @@ export class DetectiveProcessor extends BaseRoleProcessor {
             const apiKeys = await getApiKeysForUser(session.user.email);
 
             // Create detective prompt
-            const detectivePrompt = format(BOT_SYSTEM_PROMPT, {
+            const detectivePrompt = format(botSystemPrompt(this.game.gameMode), {
                 name: detectiveBot.name,
                 personal_story: detectiveBot.story,
                 play_style: "",

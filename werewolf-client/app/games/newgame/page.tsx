@@ -3,35 +3,28 @@
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {useRouter} from 'next/navigation';
 import {useSession} from 'next-auth/react';
-import {createGame, previewGame} from '@/app/api/game-actions';
-import {generateDraftIllustrations, getAvatarDraft} from '@/app/api/avatar-draft-actions';
-import {AVATAR_DRAFT_IN_PROGRESS, AVATAR_GM_KEY, AvatarDraftState, Game, GAME_MASTER, GAME_ROLES, GAME_STATES, GamePreview, GamePreviewWithGeneratedBots, GENDER_OPTIONS, getVoicesForGender, getRandomVoiceForGender, PLAY_STYLES, PLAY_STYLE_CONFIGS, RANDOM_ROLE, UserTier, USER_TIERS} from "@/app/api/game-models";
+import {createGame, getPreviewProgress, previewGame} from '@/app/api/game-actions';
+import {generateDraftIllustrations, getAvatarDraft, reframeDraftAvatar} from '@/app/api/avatar-draft-actions';
+import type {PreviewProgress} from '@/app/ai/preview-generation';
+import {AVATAR_DRAFT_IN_PROGRESS, AVATAR_GM_KEY, AvatarDraftState, AvatarFraming, avatarSheetKey, DEFAULT_GAME_MODE, GAME_MODES, GAME_ROLES, GameMode, GamePreview, GamePreviewWithGeneratedBots, getRandomVoiceForGender, RANDOM_ROLE, UserTier, USER_TIERS} from "@/app/api/game-models";
 import {sanitizePlayerName} from "@/app/utils/name-utils";
-import IllustrationsPanel, {CastEntry, draftImageUrl} from '@/app/games/newgame/components/IllustrationsPanel';
-import CharacterCard from '@/app/games/[id]/components/CharacterCard';
-import PlayerAvatar from '@/app/components/PlayerAvatar';
+import {circleFocus} from "@/app/utils/avatar-framing";
+import IllustrationsPanel, {CastEntry, draftFraming, draftImageUrl} from '@/app/games/newgame/components/IllustrationsPanel';
+import CastList, {RowPortrait} from '@/app/games/newgame/components/CastList';
+import GeneratingStatus from '@/app/games/newgame/components/GeneratingStatus';
+import {iconButton, InfoButton, inputStyle, labelStyle, monoLabel, monoMeta, PlayIcon, primaryButton, secondaryButton, SegmentedControl} from '@/app/games/newgame/components/form-ui';
+import ReframeModal from '@/app/components/ReframeModal';
 import {LLM_CONSTANTS, SupportedAiModels, getModelDisplayName, modelHasTag, modelIsFast} from "@/app/ai/ai-models";
 import {FREE_TIER_UNLIMITED, getCandidateModelsForTier, getModelPickerOptions, getPerGameModelLimit} from "@/app/ai/model-limit-utils";
 import AIModelSelect from '@/app/components/AIModelSelect';
-import ExpandableTextarea from '@/app/components/ExpandableTextarea';
 import ModelSelectDropdown from '@/app/components/ModelSelectDropdown';
 import SelectDropdown from '@/app/components/SelectDropdown';
 import {ART_STYLE_MAX_LENGTH} from "@/app/utils/art-style";
 import {ttsService} from "@/app/services/tts-service";
 import {getVoiceConfig, getDefaultVoiceProvider, VOICE_PROVIDER_DISPLAY_NAMES} from "@/app/ai/voice-config";
-import {VoiceProvider} from "@/app/ai/voice-config/voice-config";
 
 const RANDOM_NAMES = ['Bob', 'John', 'Alex', 'Sam', 'Max', 'Leo', 'Kai', 'Finn'];
 const RANDOM_THEMES = ['Dracula', 'Sherlock Holmes', 'Cthulhu Mythos', 'Treasure Island', 'Spaceship Crew', 'Wild West Town'];
-
-// 12 evenly spaced hues skipping the banned 270°–345° purple/magenta arc
-const AVATAR_HUES = [350, 14, 38, 62, 86, 110, 134, 158, 182, 206, 230, 254];
-
-function avatarHue(name: string): number {
-    let h = 0;
-    for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
-    return AVATAR_HUES[h % AVATAR_HUES.length];
-}
 
 function pickRandom<T>(arr: T[]): T {
     return arr[Math.floor(Math.random() * arr.length)];
@@ -45,6 +38,47 @@ function pickDefaultGmModel(pool: string[]): string {
     const candidates = fast.length > 0 ? fast : pool;
     return candidates.length > 0 ? pickRandom(candidates) : LLM_CONSTANTS.RANDOM;
 }
+
+// Helper function to validate names (only letters, numbers, no spaces)
+const validateName = (name: string): string | null => {
+    if (!name.trim()) {
+        return "Name cannot be empty";
+    }
+    if (!/^[a-zA-Z0-9]+$/.test(name.trim())) {
+        return "Name can only contain letters and numbers (no spaces)";
+    }
+    return null;
+};
+
+const validateTheme = (theme: string): string | null => {
+    if (!theme.trim()) {
+        return "Theme cannot be empty";
+    }
+    return null;
+};
+
+const AVAILABLE_ROLES = [GAME_ROLES.DOCTOR, GAME_ROLES.DETECTIVE, GAME_ROLES.MANIAC];
+const ROLE_TOOLTIPS: Record<string, string> = {
+    [GAME_ROLES.DOCTOR]: 'Each night, protects one player from werewolf attacks. Cannot protect the same player two nights in a row. Has a one-time ability to kill instead of protect.',
+    [GAME_ROLES.DETECTIVE]: 'Each night, investigates one player to learn if they are evil (werewolf or maniac) or innocent. Cannot investigate the same player twice. Has a one-time ability to kill a player instead of investigating.',
+    [GAME_ROLES.MANIAC]: 'Each night, abducts one player — blocking all their actions and any actions targeting them. Abductions are secret. If the maniac dies at night, the abducted victim dies too. Aligned with villagers.',
+};
+const ROLE_GLYPHS: Record<string, React.ReactNode> = {
+    doctor: (
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M7 3v8M3 7h8" /></svg>
+    ),
+    detective: (
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="5.5" cy="5.5" r="3.5" /><path d="M8.5 8.5L12.5 12.5" /></svg>
+    ),
+    maniac: (
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M7 2L12 12H2L7 2Z" /></svg>
+    ),
+};
+
+const SECTION = "px-[clamp(16px,3vw,28px)] py-5 flex gap-5 flex-wrap";
+const SECTION_LABEL = `${monoLabel} flex-[0_0_88px] pt-2`;
+const SECTION_BODY = "flex-[1_1_320px] min-w-0 flex flex-col gap-3.5";
+const CARD = "bg-[var(--bg-1)] border border-[var(--line-1)] rounded-[var(--radius-lg)] px-[clamp(14px,3vw,18px)] py-4 flex flex-col";
 
 export default function CreateNewGamePage() {
     const { data: session, status } = useSession();
@@ -63,6 +97,9 @@ export default function CreateNewGamePage() {
     const [specialRoles, setSpecialRoles] = useState<string[]>([GAME_ROLES.DOCTOR, GAME_ROLES.DETECTIVE, GAME_ROLES.MANIAC]);
     const [humanPlayerRole, setHumanPlayerRole] = useState<string>(RANDOM_ROLE);
     const [longReplies, setLongReplies] = useState(false);
+    // Role-play (default) or tactical bots — see GAME_MODES. Stays editable after the
+    // preview is generated; createGame gets the live value.
+    const [gameMode, setGameMode] = useState<GameMode>(DEFAULT_GAME_MODE);
     const [gameMasterAiType, setGameMasterAiType] = useState<string>(() => {
         // Initial seed from the full catalog. Tier/key data isn't loaded yet on first
         // render — a reconciliation effect below re-picks from the user's actually-allowed
@@ -79,16 +116,17 @@ export default function CreateNewGamePage() {
     const [isFormValid, setIsFormValid] = useState(false);
     const [gameData, setGameData] = useState<GamePreviewWithGeneratedBots | null>(null);
     const [isLoading, setIsLoading] = useState(false);
+    // isLoading also covers createGame; the status card belongs to preview runs only.
+    const [isPreviewing, setIsPreviewing] = useState(false);
+    // Stage of the running preview generation (casting → character-sheet batches), polled
+    // from the server while isLoading; null before the first poll lands.
+    const [previewProgress, setPreviewProgress] = useState<PreviewProgress | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [isSpeaking, setIsSpeaking] = useState(false);
-    const [showPlayStyleTooltip, setShowPlayStyleTooltip] = useState<number | null>(null);
-    const [showRoleTooltip, setShowRoleTooltip] = useState<string | null>(null);
-    const [showWerewolfHint, setShowWerewolfHint] = useState(false);
-    const [showLongRepliesHint, setShowLongRepliesHint] = useState(false);
     const [nameError, setNameError] = useState<string | null>(null);
     const [themeError, setThemeError] = useState<string | null>(null);
     const [playersAiError, setPlayersAiError] = useState<string | null>(null);
-    const [fastModelsOnly, setFastModelsOnly] = useState(false);
+    const [, setFastModelsOnly] = useState(false);
     const [botNameErrors, setBotNameErrors] = useState<{[key: number]: string}>({});
     const [userTier, setUserTier] = useState<UserTier>('free');
     const [isTierLoaded, setIsTierLoaded] = useState(false);
@@ -97,18 +135,15 @@ export default function CreateNewGamePage() {
     const [draft, setDraft] = useState<AvatarDraftState | null>(null);
     const [draftBusy, setDraftBusy] = useState(false);
     const [draftError, setDraftError] = useState<string | null>(null);
-    // Portrait clicked in the illustrations grid — opens the character card
-    // (the same card the game shows) over the preview.
-    const [cardEntry, setCardEntry] = useState<CastEntry | null>(null);
+    // Portrait clicked in the illustrations grid — opens its crop editor over
+    // the sheet it was cut from.
+    const [reframeEntry, setReframeEntry] = useState<CastEntry | null>(null);
     const hasInitializedPlayerModels = useRef(false);
     const playerOptions = useMemo(() => {
         const maxPlayers = 12;
         return Array.from({ length: maxPlayers - 5 }, (_, i) => i + 6);
     }, []);
     const candidateModels = useMemo(() => getCandidateModelsForTier(userTier), [userTier]);
-    const FAST_MODELS = useMemo(() => new Set(
-        Object.values(LLM_CONSTANTS).filter(m => modelIsFast(m))
-    ), []);
 
     const gmModelOptions = useMemo(() => {
         // Tested single source of truth: free tier → free-tier catalog, paid → all models.
@@ -185,25 +220,6 @@ export default function CreateNewGamePage() {
     }, [playerCount, werewolfCount]);
 
     useEffect(() => {
-        // Helper function to validate names (only letters, numbers, no spaces)
-        const validateName = (name: string): string | null => {
-            if (!name.trim()) {
-                return "Name cannot be empty";
-            }
-            if (!/^[a-zA-Z0-9]+$/.test(name.trim())) {
-                return "Name can only contain letters and numbers (no spaces)";
-            }
-            return null;
-        };
-
-        // Helper function to validate theme
-        const validateTheme = (theme: string): string | null => {
-            if (!theme.trim()) {
-                return "Theme cannot be empty";
-            }
-            return null;
-        };
-
         const nameValidationError = validateName(name);
         setNameError(nameValidationError);
 
@@ -274,44 +290,6 @@ export default function CreateNewGamePage() {
     }, [draft, cast]);
     const draftReadyForCast = draft?.status === 'ready' && draftMatchesCast;
 
-    // A Game-shaped stub for CharacterCard/CharacterPoster, which render off a
-    // live Game. Roles aren't assigned until the game is created, so bots carry
-    // no role (chip reads CREW) and the human's chip reads plain YOU. The
-    // portrait always comes via the avatarUrl override, so none of the game's
-    // avatar routes are touched.
-    const previewCardGame = useMemo<Game | null>(() => {
-        if (!gameData) return null;
-        return {
-            id: 'preview',
-            description: gameData.description,
-            theme: gameData.theme,
-            werewolfCount: gameData.werewolfCount,
-            specialRoles: gameData.specialRoles,
-            gameMasterAiType: gameData.gameMasterAiType,
-            gameMasterVoice: gameData.gameMasterVoice,
-            story: gameData.scene,
-            bots: gameData.bots.map(bot => ({
-                name: bot.name,
-                story: bot.story,
-                role: '',
-                isAlive: true,
-                aiType: bot.playerAiType,
-                gender: bot.gender,
-                voice: bot.voice,
-                playStyle: bot.playStyle,
-                visualDescription: bot.visualDescription,
-            })),
-            humanPlayerName: gameData.name,
-            humanPlayerRole: '',
-            currentDay: 1,
-            gameState: GAME_STATES.WELCOME,
-            gameStateParamQueue: [],
-            gameStateProcessQueue: [],
-            ownerEmail: '',
-            createdWithTier: USER_TIERS.PAID,
-        };
-    }, [gameData]);
-
     // Poll the draft while the server draws it. The draw runs off the request
     // (like avatar generation at game creation), so this is the only way the
     // page learns it landed. 100 × 3s outlasts the worst case; the server also
@@ -357,6 +335,25 @@ export default function CreateNewGamePage() {
         } finally {
             setDraftBusy(false);
         }
+    };
+
+    // Save a moved crop: the server re-cuts the card from the stored sheet and
+    // bumps that one key's cache-buster; the local draft picks both up so the
+    // grid and the cast rows show the new crop without a poll.
+    const handleReframeSave = async (key: string, index: number, framing: AvatarFraming) => {
+        const result = await reframeDraftAvatar(key, index, framing);
+        if (!result) throw new Error('This portrait has no sheet to reframe on.');
+        setDraft(prev => {
+            if (!prev) return prev;
+            const entry = prev.avatarVariants[key];
+            if (!entry) return prev;
+            return {
+                ...prev,
+                avatarVariants: { ...prev.avatarVariants, [key]: { ...entry, framing: { ...(entry.framing ?? {}), [String(index)]: result.framing } } },
+                avatarVersions: { ...prev.avatarVersions, [key]: result.version },
+            };
+        });
+        setReframeEntry(null);
     };
 
     // GM defaults to RANDOM, resolved during preview generation
@@ -457,38 +454,11 @@ export default function CreateNewGamePage() {
         return null;
     }
 
-
     // Helper function to check if a model has thinking capabilities
     const hasThinkingMode = (aiType: string): boolean => {
         if (aiType === LLM_CONSTANTS.RANDOM) return true; // Allow thinking mode for random (will be applied to actual model)
         const modelConfig = SupportedAiModels[aiType];
         return modelConfig?.hasThinking === true;
-    };
-
-    // Helper function to validate names (only letters, numbers, no spaces)
-    const validateName = (name: string): string | null => {
-        if (!name.trim()) {
-            return "Name cannot be empty";
-        }
-        if (!/^[a-zA-Z0-9]+$/.test(name.trim())) {
-            return "Name can only contain letters and numbers (no spaces)";
-        }
-        return null;
-    };
-
-    // Helper function to validate theme
-    const validateTheme = (theme: string): string | null => {
-        if (!theme.trim()) {
-            return "Theme cannot be empty";
-        }
-        return null;
-    };
-
-    const availableRoles = [GAME_ROLES.DOCTOR, GAME_ROLES.DETECTIVE, GAME_ROLES.MANIAC];
-    const roleTooltips: Record<string, string> = {
-        [GAME_ROLES.DOCTOR]: 'Each night, protects one player from werewolf attacks. Cannot protect the same player two nights in a row. Has a one-time ability to kill instead of protect.',
-        [GAME_ROLES.DETECTIVE]: 'Each night, investigates one player to learn if they are evil (werewolf or maniac) or innocent. Cannot investigate the same player twice. Has a one-time ability to kill a player instead of investigating.',
-        [GAME_ROLES.MANIAC]: 'Each night, abducts one player — blocking all their actions and any actions targeting them. Abductions are secret. If the maniac dies at night, the abducted victim dies too. Aligned with villagers.',
     };
 
     // "Your Role" options. Villager and Werewolf are always available; the special roles
@@ -513,14 +483,37 @@ export default function CreateNewGamePage() {
             specialRoles,
             humanPlayerRole,
             longReplies,
+            gameMode,
             gameMasterAiType,
             playersAiType: selectedPlayerAiTypes.length > 0 ? selectedPlayerAiTypes : [LLM_CONSTANTS.RANDOM]
         };
 
         setIsLoading(true);
+        setIsPreviewing(true);
         setError(null);
+        setPreviewProgress(null);
+
+        // Progress channel: the server writes the pipeline's stage under this token while
+        // previewGame runs; poll it until the action itself returns.
+        const progressId = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+            ? crypto.randomUUID()
+            : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+        let polling = true;
+        (async () => {
+            while (polling) {
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                if (!polling) return;
+                try {
+                    const fresh = await getPreviewProgress(progressId);
+                    if (polling && fresh) setPreviewProgress(fresh);
+                } catch (err) {
+                    console.error('Preview progress poll failed', err);
+                }
+            }
+        })();
+
         try {
-            const game: GamePreviewWithGeneratedBots = await previewGame(gamePreviewData);
+            const game: GamePreviewWithGeneratedBots = await previewGame(gamePreviewData, progressId);
 
             // Transliterate non-ASCII characters so old previews don't trip the validator.
             const sanitizeName = (raw: string): string => {
@@ -554,6 +547,7 @@ export default function CreateNewGamePage() {
             // A new cast: whatever was drawn belongs to the previous one.
             setDraft(null);
             setDraftError(null);
+            setReframeEntry(null);
         } catch (err: any) {
             // Provide user-friendly error messages for common issues
             let userFriendlyError = err.message;
@@ -567,10 +561,13 @@ export default function CreateNewGamePage() {
             } else if (err.message.includes('Failed to get response') || err.message.includes('API')) {
                 userFriendlyError = `Unable to connect to the AI service. Please try again.`;
             }
-            
+
             setError(userFriendlyError);
             console.error("Error previewing game:", err);
         } finally {
+            polling = false;
+            setPreviewProgress(null);
+            setIsPreviewing(false);
             setIsLoading(false);
         }
     };
@@ -601,6 +598,7 @@ export default function CreateNewGamePage() {
             const newGameId = await createGame({
                 ...gameData,
                 artStyle,
+                gameMode,
                 ...(avatarDraftVersion !== undefined ? { avatarDraftVersion } : {}),
             });
             if (newGameId) {
@@ -686,342 +684,234 @@ export default function CreateNewGamePage() {
         setIsSpeaking(false);
     };
 
-    // Common styles
-    const inputStyle = "w-full px-3 py-2 rounded-[var(--radius-md)] bg-[var(--bg-2)] border border-[var(--line-2)] text-[var(--fg-0)] text-[13px] placeholder:text-[var(--fg-3)] focus:outline-none focus:border-[var(--accent-line)] focus:shadow-[0_0_0_3px_var(--accent-soft)] transition-all duration-[120ms]";
-    const labelStyle = "text-[12px] font-medium text-[var(--fg-1)] whitespace-nowrap";
-    const flexRowStyle = "flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4";
-    const flexItemStyle = "flex-1 flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-2";
-    const buttonDisabledStyle = "opacity-50 cursor-not-allowed";
+    // A drawn portrait for a cast key (with its framed circle), once the set
+    // matches this cast; undefined keeps the initial-letter circle.
+    const portraitFor = (key: string): RowPortrait | undefined => {
+        if (!draftReadyForCast || !draft) return undefined;
+        const framing = draftFraming(draft, key);
+        return { url: draftImageUrl(draft, key), focus: framing ? circleFocus(framing.framing.circle) : undefined };
+    };
+
+    // The crop editor's source for the clicked portrait. Portraits cut before
+    // sheets were kept have nothing to reframe on and simply don't open.
+    const reframeSource = reframeEntry && draft ? draftFraming(draft, reframeEntry.key) : undefined;
+
+    const gmVoices = gameData ? getVoiceConfig(gameData.voiceProvider).getVoicesByGender('male') : [];
+    const gmVoice = gameData ? (gameData.gameMasterVoice || gmVoices[0]?.id || '') : '';
+    const werewolfPercent = playerCount > 0 ? Math.round(werewolfCount / playerCount * 100) : 0;
 
     return (
-        <div className="flex flex-col w-full h-full max-w-[1040px] mx-auto pt-6 sm:pt-10">
-            {/* Card */}
+        <div className="flex flex-col w-full h-full max-w-[1040px] mx-auto pt-6 sm:pt-10 pb-16 gap-7">
+            {/* Form card */}
             <div className="bg-[var(--bg-1)] border border-[var(--line-1)] rounded-[var(--radius-xl)] shadow-card">
-                {/* Card header */}
-                <div className="flex items-center justify-between px-5 sm:px-7 py-5 border-b border-[var(--line-1)]">
-                    <h1 className="text-lg font-semibold text-[var(--fg-0)]">Create New Game</h1>
-                    <div className="flex gap-2">
-                        <button
-                            className={`px-4 py-2 text-[13px] font-medium rounded-[var(--radius-md)] bg-[var(--bg-3)] border border-[var(--line-3)] text-[var(--fg-0)] hover:bg-[var(--bg-4)] transition-all duration-[120ms] ${(!isFormValid || isLoading) ? buttonDisabledStyle : ''}`}
-                            onClick={handleGeneratePreview}
-                            disabled={!isFormValid || isLoading}
-                        >
-                            {isLoading ? (
-                                <span className="flex items-center gap-2">
-                                    <span className="animate-spin">&#9203;</span>
-                                    <span>Generating...</span>
-                                </span>
-                            ) : (gameData ? 'Regenerate Preview' : 'Generate Preview')}
-                        </button>
-                        {gameData && (
-                            <button
-                                className={`px-4 py-2 text-[13px] font-medium rounded-[var(--radius-md)] bg-[var(--accent)] text-[var(--accent-fg)] hover:brightness-110 transition-all duration-[120ms] ${isLoading ? buttonDisabledStyle : ''}`}
-                                onClick={handleCreateGame}
-                                disabled={isLoading}
-                            >
-                                {isLoading ? 'Processing...' : 'Create Game'}
-                            </button>
-                        )}
+                <div className="flex items-center justify-between gap-3 flex-wrap px-[clamp(16px,3vw,28px)] py-[18px] border-b border-[var(--line-1)]">
+                    <div className="flex items-baseline gap-3 flex-wrap min-w-0">
+                        <h1 className="m-0 text-lg font-semibold text-[var(--fg-0)]">Create New Game</h1>
+                        <span className={monoMeta}>{playerCount} players · {werewolfCount} {werewolfCount === 1 ? 'wolf' : 'wolves'} · {specialRoles.length} special {specialRoles.length === 1 ? 'role' : 'roles'}</span>
                     </div>
+                    <button
+                        type="button"
+                        className="px-4 py-2 text-[13px] font-medium rounded-[var(--radius-md)] bg-[var(--accent)] text-[var(--accent-fg)] hover:brightness-110 whitespace-nowrap transition-all duration-[120ms] disabled:opacity-50 disabled:cursor-not-allowed"
+                        onClick={handleGeneratePreview}
+                        disabled={!isFormValid || isLoading}
+                    >
+                        {isLoading ? 'Generating…' : gameData ? 'Regenerate Preview' : 'Generate Preview'}
+                    </button>
                 </div>
 
-                {/* Card body */}
-                <div className="px-5 sm:px-7 py-6">
-
-            <form id="create-game-form" className="space-y-4">
-                {/* Row 1: Name + Theme */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                        <label className={`${labelStyle} block mb-1.5`}>Your name</label>
-                        <input
-                            className={`${inputStyle} ${nameError ? '!border-[var(--danger)]' : ''}`}
-                            type="text"
-                            placeholder="Your name"
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            required
-                        />
-                        {nameError && <p className="text-[var(--danger)] text-[12px] mt-1">{nameError}</p>}
-                    </div>
-                    <div>
-                        <label className={`${labelStyle} block mb-1.5`}>Game Title</label>
-                        <input
-                            className={`${inputStyle} ${themeError ? '!border-[var(--danger)]' : ''}`}
-                            type="text"
-                            placeholder="Theme or setting"
-                            value={theme}
-                            onChange={(e) => setTheme(e.target.value)}
-                            required
-                        />
-                        {themeError && <p className="text-[var(--danger)] text-[12px] mt-1">{themeError}</p>}
-                    </div>
-                </div>
-
-                {/* Row 2: Description */}
-                <div>
-                    <label className={`${labelStyle} block mb-1.5`}>Description <span className="text-[var(--fg-3)] font-normal">(optional)</span></label>
-                    <textarea
-                        className={`${inputStyle} min-h-[76px] resize-y`}
-                        placeholder="Describe the setting for your game..."
-                        value={description}
-                        onChange={(e) => setDescription(e.target.value)}
-                        rows={3}
-                    />
-                </div>
-
-                {/* Row 2.5: Art style — drawing direction for every generated image */}
-                <div>
-                    <label className={`${labelStyle} block mb-1.5`}>Art Style <span className="text-[var(--fg-3)] font-normal">(optional)</span></label>
-                    <input
-                        className={inputStyle}
-                        type="text"
-                        placeholder="e.g. 90s anime cel animation, muted watercolor, gritty noir comic..."
-                        value={artStyle}
-                        onChange={(e) => setArtStyle(e.target.value)}
-                        maxLength={ART_STYLE_MAX_LENGTH}
-                    />
-                    <p className="text-[var(--fg-3)] text-[12px] mt-1">
-                        How character portraits and story illustrations should be drawn. Leave empty to let the AI pick a style that fits the setting.
-                    </p>
-                </div>
-
-                {/* Row 3: Players AI */}
-                <div className="grid grid-cols-[140px_1fr] items-start gap-4">
-                    <label className={`${labelStyle} pt-2.5`}>Players AI</label>
-                    <div>
-                        <AIModelSelect
-                            options={playerModelOptions}
-                            selectedOptions={selectedPlayerAiTypes}
-                            onChange={setSelectedPlayerAiTypes}
-                            placeholder="Select AI models for bots..."
-                            className="w-full"
-                            hasError={!!playersAiError}
-                            disabled={!isTierLoaded}
-                            optionMetaFn={playerModelOptionMeta}
-                            onFastOnlyChange={setFastModelsOnly}
-                        />
-                        {playersAiError && <p className="text-[var(--danger)] text-[12px] mt-1">{playersAiError}</p>}
-                    </div>
-                </div>
-
-                {/* Row 3.5: Game Master AI */}
-                <div className="grid grid-cols-[140px_1fr] items-center gap-4">
-                    <label className={labelStyle}>Game Master AI</label>
-                    <ModelSelectDropdown
-                        options={gmModelOptions}
-                        value={gameMasterAiType}
-                        onChange={setGameMasterAiType}
-                    />
-                </div>
-
-                {/* Row 4: Counts */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="grid grid-cols-[140px_1fr] items-center gap-4">
-                        <label className={labelStyle}>Player Count</label>
-                        <SelectDropdown
-                            options={playerOptions.map(count => ({ value: String(count), label: `${count} players` }))}
-                            value={String(playerCount)}
-                            onChange={(val) => setPlayerCount(Number(val))}
-                        />
-                    </div>
-                    <div className="grid grid-cols-[140px_1fr] items-center gap-4">
-                        <label className={labelStyle}>Werewolf Count</label>
-                        <div className="flex items-center gap-2">
-                            <SelectDropdown
-                                className="flex-1"
-                                options={Array.from({length: playerCount - 1}, (_, i) => ({ value: String(i), label: `${i} werewolves` }))}
-                                value={String(werewolfCount)}
-                                onChange={(val) => setWerewolfCount(Number(val))}
-                            />
-                            <div className="relative inline-flex items-center">
-                                <button
-                                    type="button"
-                                    aria-label="Werewolf count hint"
-                                    className="shrink-0 w-5 h-5 rounded-full bg-[var(--bg-3)] border border-[var(--line-2)] text-[var(--fg-2)] hover:bg-[var(--bg-4)] hover:text-[var(--fg-0)] transition-all duration-[120ms] flex items-center justify-center text-[11px] font-medium leading-none"
-                                    onMouseEnter={() => setShowWerewolfHint(true)}
-                                    onMouseLeave={() => setShowWerewolfHint(false)}
-                                    onClick={(e) => {
-                                        e.preventDefault();
-                                        setShowWerewolfHint(!showWerewolfHint);
-                                    }}
-                                >
-                                    ?
-                                </button>
-                                {showWerewolfHint && (
-                                    <div className="absolute z-10 w-64 p-3 bg-[var(--bg-1)] border border-[var(--line-2)] rounded-[var(--radius-lg)] shadow-pop text-[13px] text-[var(--fg-1)] top-full mt-2 left-0">
-                                        For a balanced game, werewolves should be about 20–30% of all players.
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-
-                {/* Row 5: Special Roles */}
-                <div className="grid grid-cols-[140px_1fr] items-start gap-4">
-                    <label className={`${labelStyle} pt-2`}>Special Roles</label>
-                    <div className="flex flex-wrap gap-2">
-                        {availableRoles.map(role => {
-                            const isSelected = specialRoles.includes(role);
-                            const roleGlyphs: Record<string, React.ReactNode> = {
-                                doctor: (
-                                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                                        <path d="M7 3v8M3 7h8" />
-                                    </svg>
-                                ),
-                                detective: (
-                                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                                        <circle cx="5.5" cy="5.5" r="3.5" />
-                                        <path d="M8.5 8.5L12.5 12.5" />
-                                    </svg>
-                                ),
-                                maniac: (
-                                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                                        <path d="M7 2L12 12H2L7 2Z" />
-                                    </svg>
-                                ),
-                            };
-                            return (
-                                <div key={role} className="relative inline-flex items-center gap-1.5">
-                                    <button
-                                        type="button"
-                                        aria-pressed={isSelected}
-                                        onClick={() => {
-                                            if (isSelected) {
-                                                setSpecialRoles(specialRoles.filter(r => r !== role));
-                                            } else {
-                                                setSpecialRoles([...specialRoles, role]);
-                                            }
-                                        }}
-                                        className={`flex items-center gap-2 px-3 py-[7px] rounded-[var(--radius-md)] border text-[13px] font-medium transition-all duration-[120ms] ${
-                                            isSelected
-                                                ? 'bg-[var(--accent-soft)] border-[var(--accent-line)] text-[var(--accent)]'
-                                                : 'bg-[var(--bg-2)] border-[var(--line-2)] text-[var(--fg-1)] hover:bg-[var(--bg-3)] hover:border-[var(--line-3)] hover:text-[var(--fg-0)]'
-                                        }`}
-                                    >
-                                        {/* Icon container */}
-                                        <span className={`w-[22px] h-[22px] rounded-full flex items-center justify-center ${
-                                            isSelected ? 'bg-[var(--accent-line)]' : 'bg-[var(--bg-3)]'
-                                        }`}>
-                                            {roleGlyphs[role]}
-                                        </span>
-                                        {role.charAt(0).toUpperCase() + role.slice(1)}
-                                        {/* Trailing check */}
-                                        <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-all duration-[120ms] ${
-                                            isSelected
-                                                ? 'bg-[var(--accent)] border-[var(--accent)]'
-                                                : 'bg-transparent border-[var(--line-2)]'
-                                        }`}>
-                                            {isSelected && (
-                                                <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                                                    <path d="M1.5 4.5L3 6L6.5 2" />
-                                                </svg>
-                                            )}
-                                        </span>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        aria-label={`${role.charAt(0).toUpperCase() + role.slice(1)} role info`}
-                                        className="shrink-0 w-5 h-5 rounded-full bg-[var(--bg-3)] border border-[var(--line-2)] text-[var(--fg-2)] hover:bg-[var(--bg-4)] hover:text-[var(--fg-0)] transition-all duration-[120ms] flex items-center justify-center text-[11px] font-medium leading-none"
-                                        onMouseEnter={() => setShowRoleTooltip(role)}
-                                        onMouseLeave={() => setShowRoleTooltip(null)}
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            setShowRoleTooltip(showRoleTooltip === role ? null : role);
-                                        }}
-                                    >
-                                        ?
-                                    </button>
-                                    {showRoleTooltip === role && (
-                                        <div className="absolute z-10 w-64 p-3 bg-[var(--bg-1)] border border-[var(--line-2)] rounded-[var(--radius-lg)] shadow-pop text-[13px] text-[var(--fg-1)] top-full mt-2 left-0">
-                                            {roleTooltips[role]}
-                                        </div>
-                                    )}
+                <form id="create-game-form" className="flex flex-col" onSubmit={e => e.preventDefault()}>
+                    {/* Setting */}
+                    <div className={`${SECTION} border-b border-[var(--line-1)]`}>
+                        <div className={SECTION_LABEL}>Setting</div>
+                        <div className={SECTION_BODY}>
+                            <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3">
+                                <div>
+                                    <label className={labelStyle}>Your name</label>
+                                    <input
+                                        className={`${inputStyle} ${nameError ? '!border-[var(--danger)]' : ''}`}
+                                        type="text"
+                                        placeholder="Your name"
+                                        value={name}
+                                        onChange={(e) => setName(e.target.value)}
+                                        required
+                                    />
+                                    {nameError && <p className="text-[var(--danger)] text-[12px] mt-1">{nameError}</p>}
                                 </div>
-                            );
-                        })}
-                    </div>
-                </div>
-
-                {/* Row 6: Your Role */}
-                <div className="grid grid-cols-[140px_1fr] items-center gap-4">
-                    <label className={labelStyle}>Your Role</label>
-                    <SelectDropdown
-                        options={humanRoleOptions}
-                        value={humanPlayerRole}
-                        onChange={setHumanPlayerRole}
-                    />
-                </div>
-
-                {/* Row 7: Long replies */}
-                <div className="grid grid-cols-[140px_1fr] items-center gap-4">
-                    <label className={labelStyle}>Long Replies</label>
-                    <div className="relative inline-flex items-center gap-1.5 justify-self-start">
-                        <button
-                            type="button"
-                            aria-pressed={longReplies}
-                            onClick={() => setLongReplies(!longReplies)}
-                            className={`flex items-center gap-2 px-3 py-[7px] rounded-[var(--radius-md)] border text-[13px] font-medium transition-all duration-[120ms] ${
-                                longReplies
-                                    ? 'bg-[var(--accent-soft)] border-[var(--accent-line)] text-[var(--accent)]'
-                                    : 'bg-[var(--bg-2)] border-[var(--line-2)] text-[var(--fg-1)] hover:bg-[var(--bg-3)] hover:border-[var(--line-3)] hover:text-[var(--fg-0)]'
-                            }`}
-                        >
-                            {longReplies ? 'On' : 'Off'}
-                            <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-all duration-[120ms] ${
-                                longReplies
-                                    ? 'bg-[var(--accent)] border-[var(--accent)]'
-                                    : 'bg-transparent border-[var(--line-2)]'
-                            }`}>
-                                {longReplies && (
-                                    <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                                        <path d="M1.5 4.5L3 6L6.5 2" />
-                                    </svg>
-                                )}
-                            </span>
-                        </button>
-                        <button
-                            type="button"
-                            aria-label="Long replies info"
-                            className="shrink-0 w-5 h-5 rounded-full bg-[var(--bg-3)] border border-[var(--line-2)] text-[var(--fg-2)] hover:bg-[var(--bg-4)] hover:text-[var(--fg-0)] transition-all duration-[120ms] flex items-center justify-center text-[11px] font-medium leading-none"
-                            onMouseEnter={() => setShowLongRepliesHint(true)}
-                            onMouseLeave={() => setShowLongRepliesHint(false)}
-                            onClick={(e) => {
-                                e.preventDefault();
-                                setShowLongRepliesHint(!showLongRepliesHint);
-                            }}
-                        >
-                            ?
-                        </button>
-                        {showLongRepliesHint && (
-                            <div className="absolute z-10 w-64 p-3 bg-[var(--bg-1)] border border-[var(--line-2)] rounded-[var(--radius-lg)] shadow-pop text-[13px] text-[var(--fg-1)] top-full mt-2 left-0">
-                                Off: bots keep day-discussion replies to one or two sentences. On: bots write longer, more detailed replies — more to read, more flavor.
+                                <div>
+                                    <label className={labelStyle}>Game title</label>
+                                    <input
+                                        className={`${inputStyle} ${themeError ? '!border-[var(--danger)]' : ''}`}
+                                        type="text"
+                                        placeholder="Theme or setting"
+                                        value={theme}
+                                        onChange={(e) => setTheme(e.target.value)}
+                                        required
+                                    />
+                                    {themeError && <p className="text-[var(--danger)] text-[12px] mt-1">{themeError}</p>}
+                                </div>
                             </div>
-                        )}
-                    </div>
-                </div>
-            </form>
-
-                </div>{/* end card body */}
-            </div>{/* end card */}
-
-            {isLoading && (
-                <div className="mt-6 p-4 bg-[var(--accent-soft)] border border-[var(--accent-line)] rounded-[var(--radius-lg)]">
-                    <div className="flex items-center gap-3">
-                        <svg className="w-5 h-5 text-[var(--accent)] animate-spin flex-none" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                            <path d="M10 2a8 8 0 0 1 8 8" />
-                        </svg>
-                        <div>
-                            <h3 className="text-[14px] font-semibold text-[var(--fg-0)] mb-0.5">Generating Game Preview<span className="inline-block w-6 text-left animate-pulse">...</span></h3>
-                            <p className="text-[13px] text-[var(--fg-1)]">The AI is creating your game story and characters. This may take a moment.</p>
+                            <div>
+                                <div className="flex items-baseline justify-between gap-2 flex-wrap mb-1.5">
+                                    <label className="text-[12px] font-medium text-[var(--fg-1)]">Instructions for the Game Master</label>
+                                    <span className="text-[11px] text-[var(--fg-3)]">optional</span>
+                                </div>
+                                <textarea
+                                    className={`${inputStyle} min-h-[58px] resize-y leading-[1.5]`}
+                                    placeholder="A single family with old grudges. A horror twist. All characters female…"
+                                    value={description}
+                                    onChange={(e) => setDescription(e.target.value)}
+                                    rows={2}
+                                />
+                            </div>
+                            <div>
+                                <div className="flex items-baseline justify-between gap-2 flex-wrap mb-1.5">
+                                    <label className="text-[12px] font-medium text-[var(--fg-1)]">Art style</label>
+                                    <span className="text-[11px] text-[var(--fg-3)]">optional · sets how portraits and scenes are drawn</span>
+                                </div>
+                                <input
+                                    className={inputStyle}
+                                    type="text"
+                                    placeholder="90s anime cel animation, muted watercolor, gritty noir comic…"
+                                    value={artStyle}
+                                    onChange={(e) => setArtStyle(e.target.value)}
+                                    maxLength={ART_STYLE_MAX_LENGTH}
+                                />
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+
+                    {/* The table */}
+                    <div className={`${SECTION} border-b border-[var(--line-1)]`}>
+                        <div className={SECTION_LABEL}>The table</div>
+                        <div className={SECTION_BODY}>
+                            <div className="grid grid-cols-[repeat(auto-fit,minmax(140px,1fr))] gap-3">
+                                <div>
+                                    <label className={labelStyle}>Players</label>
+                                    <SelectDropdown
+                                        options={playerOptions.map(count => ({ value: String(count), label: `${count} players`, displayLabel: String(count) }))}
+                                        value={String(playerCount)}
+                                        onChange={(val) => setPlayerCount(Number(val))}
+                                    />
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-1.5 mb-1.5">
+                                        <label className="text-[12px] font-medium text-[var(--fg-1)]">Werewolves</label>
+                                        <span className={monoMeta}>{werewolfPercent}%</span>
+                                        <InfoButton label="Werewolf count hint" size={16}>For a balanced game, werewolves should be about 20–30% of all players.</InfoButton>
+                                    </div>
+                                    <SelectDropdown
+                                        options={Array.from({length: playerCount - 1}, (_, i) => ({ value: String(i), label: `${i} werewolves`, displayLabel: String(i) }))}
+                                        value={String(werewolfCount)}
+                                        onChange={(val) => setWerewolfCount(Number(val))}
+                                    />
+                                </div>
+                                <div>
+                                    <label className={labelStyle}>Your role</label>
+                                    <SelectDropdown
+                                        options={humanRoleOptions}
+                                        value={humanPlayerRole}
+                                        onChange={setHumanPlayerRole}
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label className={labelStyle}>Special roles</label>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    {AVAILABLE_ROLES.map(role => {
+                                        const isSelected = specialRoles.includes(role);
+                                        const roleName = role.charAt(0).toUpperCase() + role.slice(1);
+                                        return (
+                                            <React.Fragment key={role}>
+                                                <button
+                                                    type="button"
+                                                    aria-pressed={isSelected}
+                                                    title={ROLE_TOOLTIPS[role]}
+                                                    onClick={() => setSpecialRoles(isSelected ? specialRoles.filter(r => r !== role) : [...specialRoles, role])}
+                                                    className={`flex items-center gap-2 pl-2 pr-3 py-[7px] rounded-[var(--radius-md)] border text-[13px] font-medium whitespace-nowrap transition-all duration-[120ms] ${
+                                                        isSelected
+                                                            ? 'bg-[var(--accent-soft)] border-[var(--accent-line)] text-[var(--accent)]'
+                                                            : 'bg-[var(--bg-2)] border-[var(--line-2)] text-[var(--fg-1)] hover:bg-[var(--bg-3)] hover:border-[var(--line-3)] hover:text-[var(--fg-0)]'
+                                                    }`}
+                                                >
+                                                    <span className={`w-[22px] h-[22px] rounded-full grid place-items-center ${isSelected ? 'bg-[var(--accent-line)]' : 'bg-[var(--bg-3)]'}`}>
+                                                        {ROLE_GLYPHS[role]}
+                                                    </span>
+                                                    {roleName}
+                                                </button>
+                                                <InfoButton label={`${roleName} role info`}>{ROLE_TOOLTIPS[role]}</InfoButton>
+                                            </React.Fragment>
+                                        );
+                                    })}
+                                    <span className="text-[12px] text-[var(--fg-3)]">Click to toggle</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* The bots */}
+                    <div className={SECTION}>
+                        <div className={SECTION_LABEL}>The bots</div>
+                        <div className={SECTION_BODY}>
+                            {/* The model picker opens a search + provider-chip
+                                popover the width of its trigger, so it gets the
+                                whole row; halving it on a tablet wrapped the
+                                chips into a tall narrow list. */}
+                            <div>
+                                <label className={labelStyle}>Models bots are drawn from</label>
+                                <AIModelSelect
+                                    options={playerModelOptions}
+                                    selectedOptions={selectedPlayerAiTypes}
+                                    onChange={setSelectedPlayerAiTypes}
+                                    placeholder="Select AI models for bots..."
+                                    className="w-full"
+                                    hasError={!!playersAiError}
+                                    disabled={!isTierLoaded}
+                                    optionMetaFn={playerModelOptionMeta}
+                                    onFastOnlyChange={setFastModelsOnly}
+                                />
+                                {playersAiError && <p className="text-[var(--danger)] text-[12px] mt-1">{playersAiError}</p>}
+                            </div>
+                            <div className="max-w-[420px]">
+                                <label className={labelStyle}>Game Master model</label>
+                                <ModelSelectDropdown
+                                    options={gmModelOptions}
+                                    value={gameMasterAiType}
+                                    onChange={setGameMasterAiType}
+                                />
+                            </div>
+                            <div className="flex items-center gap-5 flex-wrap pt-0.5">
+                                <div className="flex items-center gap-2.5">
+                                    <span className="text-[12px] font-medium text-[var(--fg-1)]">Bot mode</span>
+                                    <SegmentedControl<GameMode>
+                                        value={gameMode}
+                                        options={[{ value: GAME_MODES.ROLEPLAY, label: 'Role-play' }, { value: GAME_MODES.TACTICAL, label: 'Plain' }]}
+                                        onChange={setGameMode}
+                                    />
+                                    <InfoButton label="Bot mode info">
+                                        Role-play: bots are their characters — stories, grudges and motives drive whom they trust and vote for, alongside game evidence. Plain: the character is a facade over a strategist; only votes, claims and contradictions may drive suspicion.
+                                    </InfoButton>
+                                </div>
+                                <div className="flex items-center gap-2.5">
+                                    <span className="text-[12px] font-medium text-[var(--fg-1)]">Reply length</span>
+                                    <SegmentedControl<'short' | 'long'>
+                                        value={longReplies ? 'long' : 'short'}
+                                        options={[{ value: 'short', label: 'Short' }, { value: 'long', label: 'Long' }]}
+                                        onChange={v => setLongReplies(v === 'long')}
+                                    />
+                                    <InfoButton label="Reply length info">
+                                        Short: bots keep day-discussion replies to one or two sentences. Long: bots write longer, more detailed replies — more to read, more flavor.
+                                    </InfoButton>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            {isPreviewing && <GeneratingStatus progress={previewProgress} />}
 
             {error && (
-                <div className="mt-6 p-4 bg-[oklch(70%_0.13_25_/_0.08)] border border-[oklch(70%_0.13_25_/_0.3)] rounded-[var(--radius-lg)]">
+                <div className="p-4 bg-[oklch(70%_0.13_25_/_0.08)] border border-[oklch(70%_0.13_25_/_0.3)] rounded-[var(--radius-lg)]">
                     <div className="flex items-start gap-2">
                         <span className="text-[var(--danger)] text-lg flex-none">&#9888;</span>
                         <div>
@@ -1032,15 +922,92 @@ export default function CreateNewGamePage() {
                 </div>
             )}
 
-            {/* Preview section */}
+            {/* Preview */}
             {gameData && (
-                <div className="mt-8 space-y-6">
-                    <h2 className="text-[20px] font-semibold text-[var(--fg-0)] tracking-[-0.01em]">Preview</h2>
+                <div className="flex flex-col gap-[22px]">
+                    <div className="flex items-center gap-3 flex-wrap">
+                        <h2 className="m-0 text-[20px] font-semibold tracking-[-0.01em] text-[var(--fg-0)]">Preview</h2>
+                        <span className={monoMeta}>story · {gameData.bots.length} characters · ready to start</span>
+                        <span className="flex-1" />
+                        <button type="button" className={secondaryButton} onClick={handleGeneratePreview} disabled={!isFormValid || isLoading}>
+                            {isLoading ? 'Generating…' : 'Regenerate'}
+                        </button>
+                        <button type="button" className={primaryButton} onClick={handleCreateGame} disabled={isLoading}>
+                            {isLoading ? 'Processing…' : 'Create Game'}
+                        </button>
+                    </div>
 
-                    {/* Illustrations — paid tier only. Free games get their set
-                        drawn automatically when the game starts, so the block is
-                        simply absent for them (no upsell, no locked button). */}
-                    {isTierLoaded && userTier === USER_TIERS.PAID && (
+                    <div className="grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-4 items-stretch">
+                        {/* Opening story */}
+                        <div className={`${CARD} gap-2`}>
+                            <div className="flex items-center gap-2">
+                                <span className={monoLabel}>Opening story</span>
+                                <span className="flex-1" />
+                                <button
+                                    type="button"
+                                    className={`${iconButton} !w-[26px] !h-[26px] !rounded-[var(--radius-sm)]`}
+                                    onClick={() => isSpeaking ? handleStopTTS() : handlePlayStory(gameData.scene, gmVoice, gameData.gameMasterVoiceStyle)}
+                                    disabled={!gameData.scene}
+                                    title={isSpeaking ? 'Stop speaking' : 'Play game story'}
+                                    aria-label={isSpeaking ? 'Stop speaking' : 'Play game story'}
+                                >
+                                    <PlayIcon playing={isSpeaking} />
+                                </button>
+                            </div>
+                            <textarea
+                                id="gameStory"
+                                aria-label="Opening story"
+                                className={`${inputStyle} flex-1 min-h-[132px] resize-y leading-[1.6] py-2.5`}
+                                value={gameData.scene}
+                                onChange={(e) => handleStoryChange(e.target.value)}
+                            />
+                        </div>
+
+                        {/* Game Master */}
+                        <div className={`${CARD} gap-3`}>
+                            <div className="flex items-center gap-2">
+                                <span className={`${monoLabel} !text-[var(--gm-fg)]`}>Game Master</span>
+                                <span className="flex-1" />
+                                <span className="font-mono text-[10px] uppercase text-[var(--fg-3)]">{VOICE_PROVIDER_DISPLAY_NAMES[gameData.voiceProvider] || gameData.voiceProvider} voice</span>
+                            </div>
+                            <div>
+                                <label className={labelStyle}>Model</label>
+                                <ModelSelectDropdown
+                                    options={getPreviewModelOptions(gameData.gameMasterAiType)}
+                                    value={gameData.gameMasterAiType}
+                                    onChange={(value) => handleGameMasterAiChange(value)}
+                                    className="w-full"
+                                />
+                            </div>
+                            <div className="grid grid-cols-[repeat(auto-fit,minmax(130px,1fr))] gap-2.5">
+                                <div>
+                                    <label className={labelStyle}>Voice</label>
+                                    <SelectDropdown
+                                        options={gmVoices.map(voice => ({ value: voice.id, label: voice.id, secondaryLabel: voice.gender }))}
+                                        value={gmVoice}
+                                        onChange={(val) => setGameData({ ...gameData, gameMasterVoice: val })}
+                                    />
+                                </div>
+                                {gameData.gameMasterVoiceStyle !== undefined && (
+                                    <div>
+                                        <label className={labelStyle}>Voice style</label>
+                                        <input
+                                            type="text"
+                                            className={inputStyle}
+                                            value={gameData.gameMasterVoiceStyle}
+                                            onChange={(e) => setGameData({ ...gameData, gameMasterVoiceStyle: e.target.value })}
+                                            placeholder="e.g., authoritatively, dramatically"
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Illustrations — paid tier draws them here; free games draw
+                        their own set when they start. Hidden until the tier is
+                        known so paid users never see the locked card flash. */}
+                    {isTierLoaded && (
                         <IllustrationsPanel
                             draft={draft}
                             cast={cast}
@@ -1048,257 +1015,49 @@ export default function CreateNewGamePage() {
                             busy={draftBusy}
                             error={draftError}
                             onGenerate={handleGenerateIllustrations}
-                            onPortraitClick={draftReadyForCast ? setCardEntry : undefined}
+                            locked={userTier !== USER_TIERS.PAID}
+                            upgradeHref="/profile"
+                            onPortraitClick={draftReadyForCast ? setReframeEntry : undefined}
                         />
                     )}
 
-                    {/* Game Story */}
-                    <div>
-                        <label htmlFor="gameStory" className={`${labelStyle} block mb-1.5`}>Game Story</label>
-                        <ExpandableTextarea
-                            id="gameStory"
-                            className={inputStyle}
-                            minHeight={130}
-                            value={gameData.scene}
-                            onChange={(e) => handleStoryChange(e.target.value)}
-                        />
-                    </div>
-
-                    {/* Game Master */}
-                    <div>
-                        <h3 className="text-[15px] font-semibold text-[var(--fg-0)] mb-3 flex items-center gap-3 after:content-[''] after:flex-1 after:h-px after:bg-[var(--line-1)]">Game Master</h3>
-                        <div className="p-4 bg-[var(--bg-1)] border border-[var(--line-1)] rounded-[var(--radius-lg)] space-y-3">
-                            {/* Voice Provider meta */}
-                            <div className="text-[11px] font-mono uppercase tracking-[0.06em] text-[var(--fg-2)]">
-                                Voice Provider <span className="text-[13px] font-sans font-semibold normal-case tracking-normal text-[var(--fg-0)] ml-1">{VOICE_PROVIDER_DISPLAY_NAMES[gameData.voiceProvider] || gameData.voiceProvider}</span>
-                            </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                <div>
-                                    <label className={`${labelStyle} block mb-1.5`}>AI Model</label>
-                                    <ModelSelectDropdown
-                                        options={getPreviewModelOptions(gameData.gameMasterAiType)}
-                                        value={gameData.gameMasterAiType}
-                                        onChange={(value) => handleGameMasterAiChange(value)}
-                                        className="w-full"
-                                    />
-                                </div>
-                                <div className="flex gap-2">
-                                    <div className="flex-1">
-                                        <label className={`${labelStyle} block mb-1.5`}>Voice</label>
-                                        <SelectDropdown
-                                            options={getVoiceConfig(gameData.voiceProvider).getVoicesByGender('male').map(voice => ({ value: voice.id, label: voice.id, secondaryLabel: voice.gender }))}
-                                            value={gameData.gameMasterVoice || getVoiceConfig(gameData.voiceProvider).getVoicesByGender('male')[0]?.id || ''}
-                                            onChange={(val) => setGameData({ ...gameData, gameMasterVoice: val })}
-                                        />
-                                    </div>
-                                    <div className="flex flex-col justify-end">
-                                        <button
-                                            className={`w-8 h-8 rounded-[var(--radius-md)] bg-[var(--bg-3)] border border-[var(--line-2)] text-[var(--fg-1)] hover:bg-[var(--bg-4)] hover:text-[var(--fg-0)] transition-all duration-[120ms] flex items-center justify-center ${(!gameData.scene || isSpeaking) ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                            onClick={() => isSpeaking ? handleStopTTS() : handlePlayStory(gameData.scene, gameData.gameMasterVoice || getVoiceConfig(gameData.voiceProvider).getVoicesByGender('male')[0]?.id || '', gameData.gameMasterVoiceStyle)}
-                                            disabled={!gameData.scene}
-                                            title={isSpeaking ? "Stop speaking" : "Play game story"}
-                                        >
-                                            <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><path d={isSpeaking ? "M3 3h8v8H3z" : "M4 2.5l8 4.5-8 4.5z"} /></svg>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                            {gameData.gameMasterVoiceStyle && (
-                                <div>
-                                    <label className={`${labelStyle} block mb-1.5`}>Voice Style</label>
-                                    <input
-                                        type="text"
-                                        className={inputStyle}
-                                        value={gameData.gameMasterVoiceStyle}
-                                        onChange={(e) => setGameData({ ...gameData, gameMasterVoiceStyle: e.target.value })}
-                                        placeholder="Voice style (e.g., authoritatively, dramatically)"
-                                    />
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Players */}
-                    <div>
-                        <h3 className="text-[15px] font-semibold text-[var(--fg-0)] mb-3 flex items-center gap-3 after:content-[''] after:flex-1 after:h-px after:bg-[var(--line-1)]">
-                            Players <span className="text-[var(--fg-2)] font-normal">&middot; {gameData.bots.length} of {playerCount}</span>
-                        </h3>
-                        <div className="space-y-3">
-                        {gameData.bots.map((player, index) => (
-                            <div key={index} className="p-4 bg-[var(--bg-1)] border border-[var(--line-1)] rounded-[var(--radius-lg)] space-y-3">
-                                {/* Player head: identity capsule */}
-                                <div className="pb-4 border-b border-[var(--line-1)]">
-                                    <label className={`group flex items-center gap-2.5 bg-[var(--bg-2)] border rounded-full py-1.5 pl-1.5 pr-2 transition-[border-color,box-shadow] duration-[120ms] focus-within:border-[var(--accent-line)] focus-within:shadow-[0_0_0_3px_var(--accent-soft)] ${botNameErrors[index] ? 'border-[var(--danger)]' : 'border-[var(--line-2)]'}`}>
-                                        {/* Once a set is drawn for this cast, the initial gives
-                                            way to the character's portrait. */}
-                                        {draftReadyForCast && draft ? (
-                                            <PlayerAvatar name={player.name} size={34} avatarUrl={draftImageUrl(draft, sanitizePlayerName(player.name))} className="shrink-0" />
-                                        ) : (
-                                            <div
-                                                style={{'--h': avatarHue(player.name)} as React.CSSProperties}
-                                                className="w-[34px] h-[34px] shrink-0 rounded-full grid place-items-center text-[14px] font-semibold bg-[linear-gradient(150deg,oklch(42%_0.075_var(--h)),oklch(31%_0.055_var(--h)))] text-[oklch(88%_0.06_var(--h))]"
-                                            >
-                                                {player.name.charAt(0).toUpperCase()}
-                                            </div>
-                                        )}
-                                        <input
-                                            type="text"
-                                            className="flex-1 min-w-0 bg-transparent border-none outline-none text-[var(--fg-0)] text-[16px] font-semibold tracking-[-0.01em] placeholder:text-[var(--fg-3)]"
-                                            value={player.name}
-                                            onChange={(e) => handlePlayerChange(index, 'name', e.target.value)}
-                                            placeholder="Player Name"
-                                            aria-label="Player name"
-                                        />
-                                        <span className="grid place-items-center pr-2 text-[var(--fg-3)] opacity-0 transition-opacity duration-[120ms] group-hover:opacity-100 group-focus-within:opacity-100">
-                                            <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M9.2 2.3l2.5 2.5-6.4 6.4-2.8.3.3-2.8 6.4-6.4z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/></svg>
-                                        </span>
-                                    </label>
-                                    {botNameErrors[index] && <p className="text-[var(--danger)] text-[11px] mt-1.5 px-2">{botNameErrors[index]}</p>}
-                                </div>
-
-                                {/* AI Model + Play Style */}
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    <div>
-                                        <label className={`${labelStyle} block mb-1.5`}>AI Model</label>
-                                        <ModelSelectDropdown
-                                            options={getPreviewModelOptions(player.playerAiType)}
-                                            value={player.playerAiType}
-                                            onChange={(value) => handleBotAiChange(index, value)}
-                                            className="w-full"
-                                        />
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <div className="flex-1">
-                                            <label className={`${labelStyle} block mb-1.5`}>Play Style</label>
-                                            <SelectDropdown
-                                                options={Object.values(PLAY_STYLES).map(style => ({
-                                                    value: style,
-                                                    label: style.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' '),
-                                                }))}
-                                                value={player.playStyle}
-                                                onChange={(val) => handlePlayerChange(index, 'playStyle', val)}
-                                            />
-                                        </div>
-                                        <div className="relative flex flex-col justify-end">
-                                            <button
-                                                type="button"
-                                                className="w-8 h-8 rounded-[var(--radius-md)] bg-[var(--bg-3)] border border-[var(--line-2)] text-[var(--fg-2)] hover:bg-[var(--bg-4)] hover:text-[var(--fg-0)] transition-all duration-[120ms] flex items-center justify-center text-[12px] font-medium"
-                                                onMouseEnter={() => setShowPlayStyleTooltip(index)}
-                                                onMouseLeave={() => setShowPlayStyleTooltip(null)}
-                                                onClick={(e) => {
-                                                    e.preventDefault();
-                                                    setShowPlayStyleTooltip(showPlayStyleTooltip === index ? null : index);
-                                                }}
-                                            >
-                                                ?
-                                            </button>
-                                            {showPlayStyleTooltip === index && (
-                                                <div className="absolute z-10 w-64 sm:w-72 md:w-80 p-3 bg-[var(--bg-1)] border border-[var(--line-2)] rounded-[var(--radius-lg)] shadow-pop text-[13px] top-full mt-2 right-0">
-                                                    <div className="font-semibold text-[var(--fg-0)] mb-1">
-                                                        {PLAY_STYLE_CONFIGS[player.playStyle]?.name || player.playStyle}
-                                                    </div>
-                                                    <div className="text-[var(--fg-1)]">
-                                                        {PLAY_STYLE_CONFIGS[player.playStyle]?.uiDescription || 'No description available'}
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Story */}
-                                <div>
-                                    <label className={`${labelStyle} block mb-1.5`}>Story</label>
-                                    <ExpandableTextarea
-                                        className={inputStyle}
-                                        minHeight={70}
-                                        value={player.story}
-                                        onChange={(e) => handlePlayerChange(index, 'story', e.target.value)}
-                                        placeholder="Player's story"
-                                    />
-                                </div>
-
-                                {/* Visual description — what the portrait painter is told */}
-                                <div>
-                                    <label className={`${labelStyle} block mb-1.5`}>Appearance</label>
-                                    <ExpandableTextarea
-                                        className={inputStyle}
-                                        minHeight={44}
-                                        value={player.visualDescription ?? ''}
-                                        onChange={(e) => handlePlayerChange(index, 'visualDescription', e.target.value)}
-                                        placeholder="Face, hair, build, clothing — used to draw the portrait"
-                                    />
-                                </div>
-
-                                {/* Voice Style + Voice */}
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    {player.voiceStyle !== undefined && (
-                                        <div>
-                                            <label className={`${labelStyle} block mb-1.5`}>Voice Style</label>
-                                            <input
-                                                type="text"
-                                                className={inputStyle}
-                                                value={player.voiceStyle}
-                                                onChange={(e) => handlePlayerChange(index, 'voiceStyle', e.target.value)}
-                                                placeholder="e.g., mysteriously, excitedly"
-                                            />
-                                        </div>
-                                    )}
-                                    <div className="flex gap-2">
-                                        <div className="flex-1">
-                                            <label className={`${labelStyle} block mb-1.5`}>Voice</label>
-                                            <SelectDropdown
-                                                options={getVoiceConfig(gameData.voiceProvider).getVoices().map(voice => ({ value: voice.id, label: voice.id, secondaryLabel: voice.gender }))}
-                                                value={player.voice}
-                                                onChange={(val) => handlePlayerChange(index, 'voice', val)}
-                                            />
-                                        </div>
-                                        <div className="flex flex-col justify-end">
-                                            <button
-                                                className={`w-8 h-8 rounded-[var(--radius-md)] bg-[var(--bg-3)] border border-[var(--line-2)] text-[var(--fg-1)] hover:bg-[var(--bg-4)] hover:text-[var(--fg-0)] transition-all duration-[120ms] flex items-center justify-center ${(!player.story || isSpeaking) ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                                onClick={() => isSpeaking ? handleStopTTS() : handlePlayStory(player.story, player.voice, player.voiceStyle)}
-                                                disabled={!player.story}
-                                                title={isSpeaking ? "Stop speaking" : "Play story"}
-                                            >
-                                                <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><path d={isSpeaking ? "M3 3h8v8H3z" : "M4 2.5l8 4.5-8 4.5z"} /></svg>
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                        </div>
-                    </div>
+                    <CastList
+                        bots={gameData.bots}
+                        humanName={gameData.name}
+                        botPortrait={index => portraitFor(sanitizePlayerName(gameData.bots[index].name))}
+                        humanPortrait={portraitFor(sanitizePlayerName(gameData.name))}
+                        botNameErrors={botNameErrors}
+                        onPlayerChange={handlePlayerChange}
+                        onBotAiChange={handleBotAiChange}
+                        modelOptionsFor={getPreviewModelOptions}
+                        voiceOptions={getVoiceConfig(gameData.voiceProvider).getVoices().map(voice => ({ value: voice.id, label: voice.id, secondaryLabel: voice.gender }))}
+                        isSpeaking={isSpeaking}
+                        onPlay={handlePlayStory}
+                        onStop={handleStopTTS}
+                    />
 
                     {/* Bottom actions */}
                     <div className="flex justify-end gap-3 pt-2">
-                        <button
-                            className={`px-4 py-2 text-[13px] font-medium rounded-[var(--radius-md)] bg-[var(--bg-3)] border border-[var(--line-3)] text-[var(--fg-0)] hover:bg-[var(--bg-4)] transition-all duration-[120ms] ${(!isFormValid || isLoading) ? buttonDisabledStyle : ''}`}
-                            onClick={handleGeneratePreview}
-                            disabled={!isFormValid || isLoading}
-                        >
-                            {isLoading ? 'Generating...' : 'Regenerate Preview'}
+                        <button type="button" className={secondaryButton} onClick={handleGeneratePreview} disabled={!isFormValid || isLoading}>
+                            {isLoading ? 'Generating…' : 'Regenerate'}
                         </button>
-                        <button
-                            className={`px-4 py-2 text-[13px] font-medium rounded-[var(--radius-md)] bg-[var(--accent)] text-[var(--accent-fg)] hover:brightness-110 transition-all duration-[120ms] ${isLoading ? buttonDisabledStyle : ''}`}
-                            onClick={handleCreateGame}
-                            disabled={isLoading}
-                        >
-                            {isLoading ? 'Processing...' : 'Create Game'}
+                        <button type="button" className={primaryButton} onClick={handleCreateGame} disabled={isLoading}>
+                            {isLoading ? 'Processing…' : 'Create Game'}
                         </button>
                     </div>
                 </div>
             )}
 
-            {/* Character card for a clicked preview portrait — the same card the
-                game shows. Read-only: no owner switcher, portrait served from
-                the illustration draft. */}
-            {cardEntry && previewCardGame && draft && (
-                <CharacterCard
-                    game={previewCardGame}
-                    name={cardEntry.kind === 'gm' ? GAME_MASTER : cardEntry.name}
-                    onClose={() => setCardEntry(null)}
-                    avatarUrl={draftImageUrl(draft, cardEntry.key)}
+            {/* Crop editor for a clicked preview portrait, over the sheet it
+                was cut from. */}
+            {reframeEntry && draft && reframeSource && (
+                <ReframeModal
+                    name={reframeEntry.name}
+                    sheetUrl={`/api/avatar-drafts/${avatarSheetKey(reframeSource.index)}?v=${draft.version}`}
+                    framing={reframeSource.framing}
+                    initial={reframeSource.initial}
+                    onSave={framing => handleReframeSave(reframeEntry.key, reframeSource.index, framing)}
+                    onClose={() => setReframeEntry(null)}
                 />
             )}
         </div>

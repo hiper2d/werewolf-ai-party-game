@@ -1,6 +1,9 @@
 'use client';
 
 import React, {useState, useRef, useEffect} from 'react';
+import {menuPlacementClass, useMenuPlacement} from './use-menu-placement';
+
+const MENU_HEIGHT = 240; // max-h-60
 
 interface OptionMeta {
     disabled?: boolean;
@@ -36,6 +39,7 @@ export default function MultiSelectDropdown({
 }: MultiSelectDropdownProps) {
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
+    const placement = useMenuPlacement(dropdownRef, isOpen, MENU_HEIGHT);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -100,8 +104,11 @@ export default function MultiSelectDropdown({
                 </span>
             </button>
 
+            {isOpen && placement === 'center' && (
+                <div className="fixed inset-0 z-40 bg-black/50" onMouseDown={() => setIsOpen(false)} />
+            )}
             {isOpen && (
-                <div className="absolute z-50 w-full mt-1 bg-gray-900 border border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                <div className={`${menuPlacementClass(placement, 'sm')} bg-gray-900 border border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto`}>
                     <div className="p-2 border-b border-gray-600">
                         <label className="flex items-center cursor-pointer hover:bg-gray-800 p-1 rounded">
                             <input

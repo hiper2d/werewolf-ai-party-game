@@ -3,8 +3,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Game, GameMessage, GAME_MASTER, MessageType } from '@/app/api/game-models';
-import { getAvatarUrl } from '@/app/utils/avatar-utils';
+import { getAvatarView } from '@/app/utils/avatar-utils';
 import { isPresetAvatarUrl } from '@/app/utils/preset-avatars';
+import { focusToBackground } from '@/app/utils/avatar-framing';
 import { getAvatarGradient } from '@/app/utils/color-utils';
 import { convertMessageContent } from '@/app/utils/message-utils';
 import PlayerAvatar from '@/app/components/PlayerAvatar';
@@ -314,7 +315,11 @@ export default function CinematicMode({ game, messages, onClose, startMessageId,
                     {/* pt-1 gives the active thumb's -3px lift headroom inside overflow-hidden */}
                     <div className="order-3 min-[1101px]:col-span-2 flex justify-center gap-2 flex-wrap max-h-[96px] overflow-hidden pt-1">
                         {turns.map((t, i) => {
-                            const url = getAvatarUrl(game, t.speaker);
+                            const view = getAvatarView(game, t.speaker);
+                            const url = view?.url;
+                            // A framed portrait shows its circle; the thumb is
+                            // square-ish, so the circle's focus is what fits.
+                            const thumbFocus = view?.focus ? focusToBackground(view.focus) : null;
                             const state = i === turnIndex ? 'active' : i < turnIndex ? 'done' : 'todo';
                             return (
                                 <button
@@ -330,7 +335,20 @@ export default function CinematicMode({ game, messages, onClose, startMessageId,
                                         ? {background: `linear-gradient(135deg, ${getAvatarGradient(t.speaker)[0]} 0%, ${getAvatarGradient(t.speaker)[1]} 100%)`}
                                         : undefined}
                                 >
-                                    {url ? (
+                                    {url && thumbFocus ? (
+                                        <div
+                                            role="img"
+                                            aria-label={t.speaker}
+                                            className="w-full h-full"
+                                            style={{
+                                                backgroundImage: `url(${url})`,
+                                                backgroundRepeat: 'no-repeat',
+                                                backgroundSize: thumbFocus.backgroundSize,
+                                                backgroundPosition: thumbFocus.backgroundPosition,
+                                                ...(isPresetAvatarUrl(url) ? {mixBlendMode: 'multiply' as const} : {}),
+                                            }}
+                                        />
+                                    ) : url ? (
                                         // eslint-disable-next-line @next/next/no-img-element -- authed dynamic route
                                         <img src={url} alt={t.speaker} className="w-full h-full object-cover object-top" style={isPresetAvatarUrl(url) ? {mixBlendMode: 'multiply'} : undefined} />
                                     ) : (

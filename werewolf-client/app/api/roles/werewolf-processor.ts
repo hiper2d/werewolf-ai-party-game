@@ -16,7 +16,7 @@ import {generateBotContextSection, generateWerewolfTeammatesSection, getAlivePla
 import {auth} from "@/auth";
 import {convertToAIMessages} from "@/app/utils/message-utils";
 import {
-    BOT_SYSTEM_PROMPT,
+    botSystemPrompt,
     BOT_WEREWOLF_ACTION_PROMPT,
     BOT_WEREWOLF_DISCUSSION_PROMPT,
     STRICT_TARGET_NAME_INSTRUCTION
@@ -186,7 +186,7 @@ export class WerewolfProcessor extends BaseRoleProcessor {
             const apiKeys = await getApiKeysForUser(session.user.email);
 
             // Create werewolf prompt
-            const werewolfPrompt = format(BOT_SYSTEM_PROMPT, {
+            const werewolfPrompt = format(botSystemPrompt(this.game.gameMode), {
                 name: werewolfBot.name,
                 personal_story: werewolfBot.story,
                 play_style: "",

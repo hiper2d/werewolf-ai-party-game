@@ -1,9 +1,12 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Game, MANNEQUIN_VARIANT_INDEX } from '@/app/api/game-models';
-import { getAvatarUrl, getAvatarVariantState } from '@/app/utils/avatar-utils';
-import { getPresetAvatarUrl } from '@/app/utils/preset-avatars';
+import { AvatarFraming, Game, MANNEQUIN_VARIANT_INDEX, ReframeTarget } from '@/app/api/game-models';
+import { avatarVersion, getAvatarVariantState, getReframeSource } from '@/app/utils/avatar-utils';
+import { getPresetAvatarUrl, PRESET_SHEET_SIZE, PRESET_SHEET_URL } from '@/app/utils/preset-avatars';
+import { cardFocus, ImageFocus } from '@/app/utils/avatar-framing';
+import { getAvatarGradient } from '@/app/utils/color-utils';
+import ReframeModal from '@/app/components/ReframeModal';
 import CharacterPoster, { getCharacterIdentity } from './CharacterPoster';
 
 // Past this many candidates the dots stop being countable at a glance and
@@ -24,6 +27,10 @@ interface CharacterCardProps {
     // than an import so this stays a pure presentational component — renderable
     // outside Next (tests, the design kit) without dragging in auth/Firestore.
     onSelectVariant?: (gameId: string, key: string, index: number) => Promise<{key: string; sel: number; version: number} | null>;
+    // Server action (avatar-actions.ts reframeAvatar), injected like
+    // onSelectVariant: moves the shown candidate's crop on its sheet (or the
+    // mannequin's on the preset sheet). Absent = no reframe entry.
+    onReframe?: (gameId: string, key: string, target: ReframeTarget, framing: AvatarFraming) => Promise<{key: string; target: ReframeTarget; version: number; framing: AvatarFraming} | null>;
     // Overrides the game-derived portrait URL. Only for rendering outside a
     // live game (the design kit, previews) where /api/games/... can't resolve.
     avatarUrl?: string;
@@ -37,12 +44,14 @@ interface CharacterCardProps {
  * same wherever the player meets them.
  * @category Game
  */
-export default function CharacterCard({ game, name, onClose, isOwner = false, onGameChange, onSelectVariant, avatarUrl: avatarUrlOverride }: CharacterCardProps) {
+export default function CharacterCard({ game, name, onClose, isOwner = false, onGameChange, onSelectVariant, onReframe, avatarUrl: avatarUrlOverride }: CharacterCardProps) {
+    // The reframe editor sits over the card; Escape closes the editor first.
+    const [reframing, setReframing] = useState(false);
     useEffect(() => {
-        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !reframing) onClose(); };
         document.addEventListener('keydown', onKey);
         return () => document.removeEventListener('keydown', onKey);
-    }, [onClose]);
+    }, [onClose, reframing]);
 
     // Portrait candidates: the preset mannequin plus every kept draw, so any
     // character with a generated set has at least two faces to choose from.
@@ -59,8 +68,6 @@ export default function CharacterCard({ game, name, onClose, isOwner = false, on
     const committing = useRef(false);
 
     if (!getCharacterIdentity(game, name).exists) return null;
-
-    const avatarUrl = avatarUrlOverride ?? getAvatarUrl(game, name);
     // Cycle order: the mannequin sketch first, then the kept generated
     // candidates (their stored indices, which don't start at 0 once older
     // draws age out past the cap).
@@ -69,13 +76,49 @@ export default function CharacterCard({ game, name, onClose, isOwner = false, on
     // one fixed portrait and no stored alternates behind it.
     const showSwitcher = isOwner && game.avatarsStatus === 'ready' && !!onSelectVariant && variantState.hasCandidates;
     // Browsing off the committed choice is served straight from the candidate
-    // subcollection (the mannequin resolves to its static preset), so the new
-    // face appears on the click instead of after the selection write round-trips.
-    const portraitSrc = !avatarUrlOverride && showSwitcher && viewIndex !== variantState.selected
-        ? (viewIndex === MANNEQUIN_VARIANT_INDEX
-            ? getPresetAvatarUrl(game.bots, name)
-            : `/api/games/${game.id}/avatars/${encodeURIComponent(variantState.key)}?n=${viewIndex}`)
-        : avatarUrl;
+    // subcollection (the mannequin resolves to its static preset — the sheet
+    // with the owner's card on it when one was framed), so the new face
+    // appears on the click instead of after the selection write round-trips.
+    // The committed choice is left to the poster itself (getAvatarView knows
+    // about framed mannequins and cache-busts per key); only an override or a
+    // browsed alternate is passed in. The alternate URL carries the key's
+    // version too: a reframe re-cuts that candidate doc, and an immutable
+    // cached ?n= URL would keep showing the crop from before.
+    const mannequinFraming = game.avatarVariants?.[variantState.key]?.mannequin;
+    let portraitSrc: string | undefined = avatarUrlOverride;
+    let portraitFocus: ImageFocus | undefined;
+    if (!avatarUrlOverride && showSwitcher && viewIndex !== variantState.selected) {
+        if (viewIndex === MANNEQUIN_VARIANT_INDEX) {
+            portraitSrc = mannequinFraming ? PRESET_SHEET_URL : getPresetAvatarUrl(game.bots, name);
+            portraitFocus = mannequinFraming ? cardFocus(mannequinFraming.card, PRESET_SHEET_SIZE) : undefined;
+        } else {
+            portraitSrc = `/api/games/${game.id}/avatars/${encodeURIComponent(variantState.key)}?n=${viewIndex}&v=${avatarVersion(game, variantState.key)}`;
+        }
+    }
+
+    // What the reframe editor would open on: the viewed candidate's sheet, or
+    // the preset sheet for the mannequin. Undefined = nothing to reframe
+    // (candidates drawn before sheets were kept; the human's mannequin).
+    const reframeTarget: ReframeTarget = viewIndex === MANNEQUIN_VARIANT_INDEX ? 'mannequin' : viewIndex;
+    const reframeSource = isOwner && !!onReframe && game.avatarsStatus === 'ready' && variantState.hasCandidates
+        ? getReframeSource(game, name, reframeTarget)
+        : undefined;
+
+    const saveFraming = async (framing: AvatarFraming) => {
+        const result = await onReframe!(game.id, variantState.key, reframeTarget, framing);
+        if (!result) throw new Error('This portrait has no sheet to reframe.');
+        const entry = game.avatarVariants?.[variantState.key];
+        if (!entry) return;
+        onGameChange?.({
+            avatarVariants: {
+                ...(game.avatarVariants ?? {}),
+                [variantState.key]: result.target === 'mannequin'
+                    ? { ...entry, mannequin: result.framing }
+                    : { ...entry, framing: { ...(entry.framing ?? {}), [String(result.target)]: result.framing } },
+            },
+            avatarVersions: { ...(game.avatarVersions ?? {}), [variantState.key]: result.version },
+        });
+    };
 
     // Where the shown face sits in the cycle; a selection that aged out of the
     // window anchors to the mannequin.
@@ -150,6 +193,19 @@ export default function CharacterCard({ game, name, onClose, isOwner = false, on
                     <polyline points="9 18 15 12 9 6" />
                 </svg>
             </button>
+            {reframeSource && (
+                <button
+                    onClick={() => setReframing(true)}
+                    className="flex items-center justify-center px-1 py-1 ml-0.5 rounded-full border-l border-white/20 hover:bg-white/15 transition-colors"
+                    aria-label="Reframe portrait"
+                    title="Move the crop on the drawn sheet"
+                >
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M6 2v14a2 2 0 0 0 2 2h14" />
+                        <path d="M18 22V8a2 2 0 0 0-2-2H2" />
+                    </svg>
+                </button>
+            )}
         </span>
     ) : null;
 
@@ -170,8 +226,21 @@ export default function CharacterCard({ game, name, onClose, isOwner = false, on
                 <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg>
             </button>
             <div className="w-[min(340px,calc(100vw-32px))] cine-card-enter" onClick={e => e.stopPropagation()}>
-                <CharacterPoster game={game} name={name} avatarUrl={portraitSrc} cornerChip={switcher} />
+                <CharacterPoster game={game} name={name} avatarUrl={portraitSrc} cardFocus={portraitFocus} cornerChip={switcher} />
             </div>
+            {reframing && reframeSource && (
+                <div onClick={e => e.stopPropagation()}>
+                    <ReframeModal
+                        name={name}
+                        sheetUrl={reframeSource.sheetUrl}
+                        framing={reframeSource.framing}
+                        initial={reframeSource.initial}
+                        onSave={async framing => { await saveFraming(framing); setReframing(false); }}
+                        onClose={() => setReframing(false)}
+                        blendGradient={reframeTarget === 'mannequin' ? getAvatarGradient(name) : undefined}
+                    />
+                </div>
+            )}
         </div>
     );
 }

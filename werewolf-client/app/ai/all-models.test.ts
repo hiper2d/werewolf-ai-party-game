@@ -35,7 +35,7 @@ import {
 import { BotVoteZodSchema } from "@/app/ai/prompts/zod-schemas";
 import { generateGamePreview, CHARACTER_SHEET_BATCH_SIZE } from "@/app/ai/preview-generation";
 import { getDefaultVoiceProvider, getVoiceConfig } from "@/app/ai/voice-config";
-import { BOT_SYSTEM_PROMPT, BOT_VOTE_PROMPT, BOT_REMINDER_POSTFIX, replyLengthInstruction } from "@/app/ai/prompts/bot-prompts";
+import { botSystemPrompt, BOT_VOTE_PROMPT, botReminderPostfix, replyLengthInstruction } from "@/app/ai/prompts/bot-prompts";
 import { GM_COMMAND_INTRODUCE_YOURSELF } from "@/app/ai/prompts/gm-commands";
 import { format } from "@/app/ai/prompts/utils";
 import { convertToAIMessages } from "@/app/utils/message-utils";
@@ -82,7 +82,7 @@ function buildApiKeys(): ApiKeyMap {
 
 // Shared bot system prompt
 const BOT_NAME = "TestBot";
-const systemPrompt = format(BOT_SYSTEM_PROMPT, {
+const systemPrompt = format(botSystemPrompt(DAY2_VOTE_GAME.gameMode), {
     name: BOT_NAME,
     personal_story: "A mysterious wanderer with a hidden past",
     play_style: "",
@@ -129,7 +129,7 @@ const alivePlayerNames = [
     DAY2_VOTE_GAME.humanPlayerName,
 ];
 
-const voteSystemPrompt = format(BOT_SYSTEM_PROMPT, {
+const voteSystemPrompt = format(botSystemPrompt(DAY2_VOTE_GAME.gameMode), {
     name: kenji.name,
     personal_story: kenji.story,
     play_style: "",
@@ -159,7 +159,7 @@ const voteCommand: GameMessage = {
         total_voters: "8",
         valid_targets: validTargetsList,
         werewolf_vote_note: "",
-    }) + format(BOT_REMINDER_POSTFIX, {
+    }) + format(botReminderPostfix(DAY2_VOTE_GAME.gameMode), {
         play_style: generatePlayStyleDescription(kenji),
         human_player_name: DAY2_VOTE_GAME.humanPlayerName,
         reply_length_instruction: replyLengthInstruction(DAY2_VOTE_GAME.longReplies),

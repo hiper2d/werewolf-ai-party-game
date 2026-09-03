@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { getAvatarGradient } from '@/app/utils/color-utils';
 import { isPresetAvatarUrl } from '@/app/utils/preset-avatars';
+import { focusToBackground, ImageFocus } from '@/app/utils/avatar-framing';
 
 interface PlayerAvatarProps {
     name: string;
@@ -13,6 +14,10 @@ interface PlayerAvatarProps {
     // Generated themed avatar. When absent, renders the initial-letter
     // gradient circle (legacy games, generation pending/failed).
     avatarUrl?: string;
+    // Which part of the image fills the circle (fractions of the image) — the
+    // owner's chosen circle on a portrait card, or a mannequin's circle on the
+    // preset sheet. Absent = the legacy whole-image crops below.
+    focus?: ImageFocus;
 }
 
 /**
@@ -20,7 +25,7 @@ interface PlayerAvatarProps {
  * gradient fallback otherwise. Used at every size from chat rows to cards.
  * @category Game
  */
-export default function PlayerAvatar({ name, size = 32, isGM = false, isDead = false, className = '', avatarUrl }: PlayerAvatarProps) {
+export default function PlayerAvatar({ name, size = 32, isGM = false, isDead = false, className = '', avatarUrl, focus }: PlayerAvatarProps) {
     const [c1, c2] = getAvatarGradient(name);
     const initial = name.charAt(0).toUpperCase();
     const fontSize = Math.round(size * 0.42);
@@ -44,11 +49,16 @@ export default function PlayerAvatar({ name, size = 32, isGM = false, isDead = f
     // pose studies on pure white: show the whole figure and MULTIPLY it over the
     // per-name gradient, so the white ground takes the bot's color and every
     // placeholder is distinct by pose + color.
+    // A framed portrait shows exactly its circle — the owner placed it, so no
+    // extra zoom on top.
     const preset = Boolean(avatarUrl && isPresetAvatarUrl(avatarUrl));
+    const focused = focus ? focusToBackground(focus) : null;
     const background = avatarUrl && imgLoaded
-        ? preset
-            ? `url(${avatarUrl}) center top/cover no-repeat, linear-gradient(135deg, ${c1} 0%, ${c2} 100%)`
-            : `url(${avatarUrl}) center 15%/140% auto no-repeat, linear-gradient(135deg, ${c1} 0%, ${c2} 100%)`
+        ? focused
+            ? `url(${avatarUrl}) ${focused.backgroundPosition}/${focused.backgroundSize} no-repeat, linear-gradient(135deg, ${c1} 0%, ${c2} 100%)`
+            : preset
+                ? `url(${avatarUrl}) center top/cover no-repeat, linear-gradient(135deg, ${c1} 0%, ${c2} 100%)`
+                : `url(${avatarUrl}) center 15%/140% auto no-repeat, linear-gradient(135deg, ${c1} 0%, ${c2} 100%)`
         : `linear-gradient(135deg, ${c1} 0%, ${c2} 100%)`;
 
     const showPortrait = Boolean(avatarUrl && imgLoaded);

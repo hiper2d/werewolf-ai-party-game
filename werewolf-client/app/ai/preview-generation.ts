@@ -73,6 +73,19 @@ export interface GeneratedPreview {
  * ones. previewGame wires in the user id and the story output profile here. */
 export type PreviewAgentFactory = (systemPrompt: string) => AbstractAgent;
 
+/** Where the pipeline is, for a progress indicator. Emitted as a whole state each time it
+ * advances: once at the start of casting, once when the cast is known, once per batch that
+ * lands. Batches finish in any order, so `writtenNames` grows non-contiguously. */
+export interface PreviewProgress {
+    stage: 'casting' | 'sheets';
+    cast: {name: string; gender: 'male' | 'female'}[];
+    batchesTotal: number;
+    batchesDone: number;
+    writtenNames: string[];
+}
+
+export type PreviewProgressListener = (progress: PreviewProgress) => void;
+
 interface CastEntry {
     name: string;
     gender: 'male' | 'female';
@@ -81,8 +94,12 @@ interface CastEntry {
 export async function generateGamePreview(
     createAgent: PreviewAgentFactory,
     input: PreviewGenerationInput,
+    onProgress?: PreviewProgressListener,
 ): Promise<GeneratedPreview> {
     const stages: PreviewStageUsage[] = [];
+    const progress: PreviewProgress = {stage: 'casting', cast: [], batchesTotal: 0, batchesDone: 0, writtenNames: []};
+    const report = () => onProgress?.({...progress, cast: [...progress.cast], writtenNames: [...progress.writtenNames]});
+    report();
 
     // ---- Stage 1: casting -------------------------------------------------------------
     const castingPrompt = format(CASTING_USER_PROMPT, {
@@ -107,6 +124,10 @@ export async function generateGamePreview(
     const fullCastText = cast.map(c => `${c.name} (${c.gender})`).join(', ');
     const sheetAgent = createAgent(CHARACTER_SHEET_SYSTEM_PROMPT);
     const batches = splitIntoBatches(cast, CHARACTER_SHEET_BATCH_SIZE);
+    progress.stage = 'sheets';
+    progress.cast = cast;
+    progress.batchesTotal = batches.length;
+    report();
     const batchResults = await Promise.all(batches.map(async (batch, i) => {
         const genders = new Set(batch.map(c => c.gender));
         const voices = (['male', 'female'] as const)
@@ -125,6 +146,9 @@ export async function generateGamePreview(
         if (!sheets) {
             throw new Error(`Failed to get AI response for character batch ${i + 1}`);
         }
+        progress.batchesDone += 1;
+        progress.writtenNames.push(...batch.map(c => c.name));
+        report();
         return {batch, sheets: sheets.players, usage};
     }));
     batchResults.forEach((r, i) => stages.push({label: `character sheets ${i + 1}/${batchResults.length}`, tokenUsage: r.usage}));

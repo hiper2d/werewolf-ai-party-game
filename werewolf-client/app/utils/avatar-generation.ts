@@ -1,6 +1,9 @@
 import {db} from "@/firebase/server";
 import {firestore} from "firebase-admin";
-import {Game, USER_TIERS, UserTier, AVATAR_GM_KEY, SCENE_WELCOME_KEY, SCENE_NIGHT_KEY, AVATAR_VARIANTS_COLLECTION, avatarVariantKey, MANNEQUIN_VARIANT_INDEX} from "@/app/api/game-models";
+import {Game, USER_TIERS, UserTier, AVATAR_GM_KEY, SCENE_WELCOME_KEY, SCENE_NIGHT_KEY, AVATAR_VARIANTS_COLLECTION, avatarVariantKey, avatarSheetKey, MANNEQUIN_VARIANT_INDEX, AvatarFraming, AvatarVariantEntry, CARD_HEIGHT_PX, CARD_WIDTH_PX, ImageRect, ReframeTarget} from "@/app/api/game-models";
+import {defaultFraming, fitFraming, isFramingShape} from "@/app/utils/avatar-framing";
+import {describeDividers, detectSheetGrid} from "@/app/utils/sheet-detection";
+import {PRESET_SHEET_SIZE} from "@/app/utils/preset-avatars";
 import {getUserTierAndApiKeys} from "@/app/utils/tier-utils";
 import {updateUserMonthlySpending, deductBalance} from "@/app/api/user-actions";
 import {PAID_TIER_MARKUP} from "@/app/config/credit-packages";
@@ -85,7 +88,7 @@ function buildCells(game: AvatarSubject): AvatarCell[] {
     return cells;
 }
 
-function buildPrompt(game: AvatarSubject, cells: AvatarCell[], cols: number, rows: number): string {
+export function buildPrompt(game: AvatarSubject, cells: AvatarCell[], cols: number, rows: number): string {
     const cellLines = cells.map(
         (c, i) => `Cell ${i + 1}: ${c.prompt}. Its own distinct flat solid muted background color.`
     ).join("\n");
@@ -177,32 +180,78 @@ interface AvatarSlice {
     key: string;
     label: string;
     jpeg: Buffer;
+    framing: AvatarFraming;
 }
 
-async function sliceGrid(sharp: any, grid: Buffer, cells: AvatarCell[], count: number, cols: number): Promise<AvatarSlice[]> {
-    const meta = await sharp(grid).metadata();
-    const rows = Math.ceil(cells.length / cols);
-    const cellW = Math.floor((meta.width || 0) / cols);
-    const cellH = Math.floor((meta.height || 0) / rows);
-    if (cellW < 100 || cellH < 100) throw new Error(`Avatar grid has unusable dimensions ${meta.width}x${meta.height}`);
-    const inset = 8; // skip the divider lines
+/** The kept sheet: the grid image itself (re-encoded), its size and the
+ * cells the cards were cut from. Stored as avatars/sheet-{round}. */
+export interface DrawnSheet {
+    jpeg: Buffer;
+    width: number;
+    height: number;
+    cells: ImageRect[];
+    detected: boolean;
+}
+
+// The model returns ~2.4 MB loosely-compressed JPEGs; at this width and
+// quality a sheet is ~400 KB (~530 KB as base64), comfortably under the
+// 1 MiB Firestore doc limit, with cells still ~500 px tall.
+const SHEET_MAX_WIDTH = 2400;
+const SHEET_JPEG_QUALITY = 85;
+const SHEET_MAX_BASE64_BYTES = 900_000;
+
+/**
+ * Cuts the cards out of a drawn sheet and keeps the sheet. Cells come from
+ * the divider lines (sheet-detection.ts); each card is the largest 3:4
+ * rectangle in its cell, top-anchored, with the default circle — the framing
+ * the owner can later move.
+ */
+async function sliceGrid(sharp: any, raw: Buffer, cells: AvatarCell[], count: number, cols: number, rows: number, logContext: Record<string, unknown>): Promise<{slices: AvatarSlice[]; sheet: DrawnSheet}> {
+    // Normalise the working resolution first so cells, cards and the stored
+    // sheet all share one pixel space.
+    const grid: Buffer = await sharp(raw).resize({width: SHEET_MAX_WIDTH, withoutEnlargement: true}).toBuffer();
+    const {data, info} = await sharp(grid).greyscale().raw().toBuffer({resolveWithObject: true});
+    const width: number = info.width, height: number = info.height;
+    if (width < 100 * cols || height < 100 * rows) throw new Error(`Avatar grid has unusable dimensions ${width}x${height}`);
+
+    const plane = {width, height, data: new Uint8Array(data.buffer, data.byteOffset, data.length)};
+    const gridCells = detectSheetGrid(plane, cols, rows);
+    if (!gridCells.detected) {
+        // The known failure: fewer rows drawn than asked. The equal split is
+        // wrong for those, but the sheet is kept, so the owner can reframe.
+        logger.warn(`AVATAR_GRID_MISMATCH: sheet dividers don't match the ${cols}x${rows} request; using equal split`, {
+            ...logContext, width, height, dividers: describeDividers(plane),
+        });
+    }
 
     const slices: AvatarSlice[] = [];
     for (let i = 0; i < count; i++) {
-        const col = i % cols, row = Math.floor(i / cols);
+        const framing = defaultFraming(gridCells.cells[i]);
         const jpeg = await sharp(grid)
-            .extract({
-                left: col * cellW + inset,
-                top: row * cellH + inset,
-                width: cellW - 2 * inset,
-                height: cellH - 2 * inset,
-            })
-            .resize(512, 512, {fit: 'cover', position: 'top'})
+            .extract(framing.card)
+            .resize(CARD_WIDTH_PX, CARD_HEIGHT_PX)
             .jpeg({quality: 85})
             .toBuffer();
-        slices.push({key: cells[i].key, label: cells[i].label, jpeg});
+        slices.push({key: cells[i].key, label: cells[i].label, jpeg, framing});
     }
-    return slices;
+
+    let sheetJpeg: Buffer = await sharp(grid).jpeg({quality: SHEET_JPEG_QUALITY, mozjpeg: true}).toBuffer();
+    if (sheetJpeg.length * 4 / 3 > SHEET_MAX_BASE64_BYTES) {
+        sheetJpeg = await sharp(grid).jpeg({quality: 72, mozjpeg: true}).toBuffer();
+    }
+    return {
+        slices,
+        sheet: {jpeg: sheetJpeg, width, height, cells: gridCells.cells.slice(0, count), detected: gridCells.detected},
+    };
+}
+
+/** Cuts one card out of a stored sheet at the given framing. */
+export async function cutCard(sharp: any, sheet: Buffer, card: ImageRect): Promise<Buffer> {
+    return sharp(sheet)
+        .extract(card)
+        .resize(CARD_WIDTH_PX, CARD_HEIGHT_PX)
+        .jpeg({quality: 85})
+        .toBuffer();
 }
 
 /** A drawn portrait crop. Every round's crops are kept as candidates: the
@@ -213,6 +262,9 @@ async function sliceGrid(sharp: any, grid: Buffer, cells: AvatarCell[], count: n
 export interface AvatarCandidate {
     key: string;
     jpeg: Buffer;
+    // Where on its sheet the card was cut; absent only for legacy candidates
+    // adopted from pre-sheet games.
+    framing?: AvatarFraming;
 }
 
 // One avatar doc is ~60-90KB of base64, and a full cast over three rounds is
@@ -236,7 +288,7 @@ export async function commitChunked(writes: PendingWrite[]): Promise<void> {
     }
 }
 
-export type AvatarVariantMap = Record<string, {n: number; sel: number; first?: number}>;
+export type AvatarVariantMap = Record<string, AvatarVariantEntry>;
 
 // How many generated candidates a character keeps. Indices are monotonic
 // (candidate ids never change, so cached ?n= URLs stay valid); past the cap
@@ -268,6 +320,7 @@ export async function writeCandidates(
     existing: AvatarVariantMap,
     extraWrites: PendingWrite[] = [],
     docExtras: Record<string, any> = {},
+    sheet?: DrawnSheet,
 ): Promise<{variants: AvatarVariantMap; versions: Record<string, number>}> {
     const byKey = new Map<string, AvatarCandidate[]>();
     for (const candidate of candidates) {
@@ -281,29 +334,74 @@ export async function writeCandidates(
     const deletes: firestore.DocumentReference[] = [];
     const variants: AvatarVariantMap = {...existing};
     const versions: Record<string, number> = {};
+    // Candidate index == draw round, so every key of this draw lands on the
+    // same index and the sheet is stored once under it (see game-models).
+    let round: number | null = null;
 
     for (const [key, list] of byKey) {
         const window = appendWindow(existing[key], list.length);
-        list.forEach((candidate, i) => writes.push({
-            ref: gameRef.collection(AVATAR_VARIANTS_COLLECTION).doc(avatarVariantKey(key, window.sel + i)),
-            data: {
-                data: candidate.jpeg.toString('base64'),
-                mime: 'image/jpeg',
-                createdAt: now,
-                ...docExtras,
-            },
-        }));
+        round = round === null ? window.sel : Math.max(round, window.sel);
+        const framing: Record<string, AvatarFraming> = {...(existing[key]?.framing ?? {})};
+        const drawn: Record<string, AvatarFraming> = {...(existing[key]?.drawn ?? {})};
+        list.forEach((candidate, i) => {
+            const index = window.sel + i;
+            if (candidate.framing) {
+                framing[String(index)] = candidate.framing;
+                drawn[String(index)] = candidate.framing;
+            }
+            writes.push({
+                ref: gameRef.collection(AVATAR_VARIANTS_COLLECTION).doc(avatarVariantKey(key, index)),
+                data: {
+                    data: candidate.jpeg.toString('base64'),
+                    mime: 'image/jpeg',
+                    createdAt: now,
+                    ...(candidate.framing ? {sheet: index, card: candidate.framing.card, circle: candidate.framing.circle} : {}),
+                    ...docExtras,
+                },
+            });
+        });
         for (let i = window.drop.from; i < window.drop.to; i++) {
             deletes.push(gameRef.collection(AVATAR_VARIANTS_COLLECTION).doc(avatarVariantKey(key, i)));
+            delete framing[String(i)];
+            delete drawn[String(i)];
         }
         // The freshly drawn face is what's shown; the kept earlier candidates
         // (and the mannequin) stay one arrow-click away on the character card.
-        variants[key] = {n: window.n, sel: window.sel, ...(window.first > 0 ? {first: window.first} : {})};
+        variants[key] = {
+            n: window.n,
+            sel: window.sel,
+            ...(window.first > 0 ? {first: window.first} : {}),
+            ...(Object.keys(framing).length > 0 ? {framing, drawn} : {}),
+            ...(existing[key]?.mannequin ? {mannequin: existing[key].mannequin} : {}),
+        };
         versions[key] = now;
         writes.push({
             ref: gameRef.collection('avatars').doc(key),
             data: {data: list[0].jpeg.toString('base64'), mime: 'image/jpeg', createdAt: now, ...docExtras},
         });
+    }
+
+    if (sheet && round !== null) {
+        writes.push({
+            ref: gameRef.collection('avatars').doc(avatarSheetKey(round)),
+            data: {
+                data: sheet.jpeg.toString('base64'),
+                mime: 'image/jpeg',
+                width: sheet.width,
+                height: sheet.height,
+                cells: sheet.cells,
+                detected: sheet.detected,
+                createdAt: now,
+                ...docExtras,
+            },
+        });
+    }
+    // A sheet outlives its cards only while some character still keeps a
+    // candidate from that round.
+    const minFirst = Math.min(...Object.values(variants).map(v => v.first ?? 0));
+    const oldMinFirst = Math.min(...Object.values(existing).map(v => v.first ?? 0), minFirst);
+    for (let i = oldMinFirst; i < minFirst; i++) {
+        deletes.push(gameRef.collection('avatars').doc(avatarSheetKey(i)));
     }
 
     await commitChunked(writes);
@@ -354,7 +452,7 @@ function resultFrom(game: Game): AvatarGenerationResult {
 /** Cells plus the throwaway fillers that keep the grid full. The model reliably
  * fills FULL grids but sometimes ignores "leave the last cells empty", which
  * shifts every row and corrupts the slicing. */
-function buildPaddedCells(game: AvatarSubject): {cells: AvatarCell[]; cols: number; rows: number; realCount: number} {
+export function buildPaddedCells(game: AvatarSubject): {cells: AvatarCell[]; cols: number; rows: number; realCount: number} {
     const cells = buildCells(game);
     const {cols, rows} = gridFor(cells.length);
     const realCount = cells.length;
@@ -379,6 +477,9 @@ export interface SpendLedger {
 /** A drawn illustration set, not yet stored anywhere. */
 export interface DrawnSet {
     portraits: AvatarCandidate[];
+    // The sheet the portraits were cut from — stored beside them so the
+    // owner can move any card's frame later.
+    sheet: DrawnSheet;
     // welcome + night, or empty when scenes weren't requested or failed
     // (scene failure never blocks portraits).
     scenes: {key: string; jpeg: Buffer}[];
@@ -439,11 +540,12 @@ export async function drawIllustrationSet(
 
     const grid = await generateImage(apiKey, buildPrompt(subject, cells, cols, rows), "4:3");
     ledger.spentUSD += grid.costUSD;
-    const slices = await sliceGrid(sharp, grid.buffer, cells, realCount, cols);
+    const {slices, sheet} = await sliceGrid(sharp, grid.buffer, cells, realCount, cols, rows, opts.logContext);
     await opts.onStage?.('portraits');
 
     return {
-        portraits: slices.map(sl => ({key: sl.key, jpeg: sl.jpeg})),
+        portraits: slices.map(sl => ({key: sl.key, jpeg: sl.jpeg, framing: sl.framing})),
+        sheet,
         scenes: await scenePromise,
     };
 }
@@ -487,7 +589,7 @@ export async function runAvatarGeneration(gameId: string, userEmail: string): Pr
         if (!apiKey) throw new Error('No Google API key available for avatar generation');
 
         const drawn = await drawIllustrationSet(apiKey, claimed, {withScenes: true, ledger, logContext: {gameId}});
-        const {variants, versions} = await writeCandidates(gameRef, drawn.portraits, {}, sceneWritesFor(gameRef, drawn.scenes));
+        const {variants, versions} = await writeCandidates(gameRef, drawn.portraits, {}, sceneWritesFor(gameRef, drawn.scenes), {}, drawn.sheet);
 
         const costUSD = parseFloat(ledger.spentUSD.toFixed(6));
         await gameRef.update({
@@ -593,7 +695,7 @@ export async function runAvatarRegeneration(gameId: string, userEmail: string, m
             : await adoptExistingAvatars(gameRef, portraitKeysFor(claimed));
 
         const drawn = await drawIllustrationSet(apiKey, claimed, {withScenes: false, ledger, logContext: {gameId, reroll: true}});
-        const {variants, versions} = await writeCandidates(gameRef, drawn.portraits, existing);
+        const {variants, versions} = await writeCandidates(gameRef, drawn.portraits, existing, [], {}, drawn.sheet);
 
         const costUSD = parseFloat(ledger.spentUSD.toFixed(6));
         await gameRef.update({
@@ -695,4 +797,87 @@ export async function selectAvatarVariantFor(
         new firestore.FieldPath('avatarVersions', key), version,
     );
     return {key, sel: index, version};
+}
+
+// ---------------------------------------------------------------------------
+// Reframing (portrait sheets) — implementation follows below.
+// ---------------------------------------------------------------------------
+
+export interface ReframeResult {
+    key: string;
+    target: ReframeTarget;
+    // The key's new cache-buster (avatarVersions[key]).
+    version: number;
+    // The framing as stored (snapped into the sheet's bounds).
+    framing: AvatarFraming;
+}
+
+export async function reframeGameAvatar(gameId: string, userEmail: string, key: string, target: ReframeTarget, framing: AvatarFraming): Promise<ReframeResult | null> {
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+    const gameRef = db.collection('games').doc(gameId);
+    const snap = await gameRef.get();
+    if (!snap.exists) return null;
+    const game = snap.data() as Game;
+    if (game.ownerEmail !== userEmail) return null;
+    return applyReframe(gameRef, game.avatarVariants ?? {}, key, target, framing, {});
+}
+
+/**
+ * The reframe itself, shared by games and drafts. A candidate target loads
+ * the round's sheet, snaps the framing into it, re-cuts the card (the doc
+ * every reader serves, plus the avatars/{key} copy when that candidate is
+ * the selected one) and records the framing on the parent; the mannequin
+ * target only records its framing on the preset sheet — the renderers cut
+ * the static asset client-side. Returns null when there is nothing to
+ * reframe: unknown key, index outside the kept window, no sheet stored for
+ * that round (legacy candidates).
+ */
+export async function applyReframe(
+    parentRef: firestore.DocumentReference,
+    variants: AvatarVariantMap,
+    key: string,
+    target: ReframeTarget,
+    requested: AvatarFraming,
+    docExtras: Record<string, any>,
+): Promise<ReframeResult | null> {
+    if (!isFramingShape(requested)) throw new Error('Invalid framing');
+    const entry = variants[key];
+    if (!entry) return null;
+    const version = Date.now();
+
+    if (target === 'mannequin') {
+        const framing = fitFraming(requested, PRESET_SHEET_SIZE);
+        await parentRef.update(
+            new firestore.FieldPath('avatarVariants', key, 'mannequin'), framing,
+            new firestore.FieldPath('avatarVersions', key), version,
+        );
+        return {key, target, version, framing};
+    }
+
+    const index = target;
+    if (!Number.isInteger(index) || index < (entry.first ?? 0) || index >= entry.n) return null;
+    const sheetSnap = await parentRef.collection('avatars').doc(avatarSheetKey(index)).get();
+    const sheetDoc = sheetSnap.exists ? (sheetSnap.data() as any) : null;
+    if (!sheetDoc?.data || !sheetDoc.width || !sheetDoc.height) return null;
+
+    const framing = fitFraming(requested, {width: sheetDoc.width, height: sheetDoc.height});
+    const sharp = (await import('sharp')).default;
+    const jpeg = await cutCard(sharp, Buffer.from(sheetDoc.data, 'base64'), framing.card);
+    const image = {data: jpeg.toString('base64'), mime: 'image/jpeg', createdAt: version, ...docExtras};
+
+    const writes: PendingWrite[] = [{
+        ref: parentRef.collection(AVATAR_VARIANTS_COLLECTION).doc(avatarVariantKey(key, index)),
+        data: {...image, sheet: index, card: framing.card, circle: framing.circle},
+    }];
+    if (entry.sel === index) {
+        writes.push({ref: parentRef.collection('avatars').doc(key), data: image});
+    }
+    await commitChunked(writes);
+    await parentRef.update(
+        new firestore.FieldPath('avatarVariants', key, 'framing', String(index)), framing,
+        new firestore.FieldPath('avatarVersions', key), version,
+    );
+    return {key, target, version, framing};
 }

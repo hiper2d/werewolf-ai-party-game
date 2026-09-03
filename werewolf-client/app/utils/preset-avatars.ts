@@ -1,4 +1,5 @@
-import { GAME_MASTER } from '@/app/api/game-models';
+import { AvatarFraming, GAME_MASTER, ImageRect } from '@/app/api/game-models';
+import { defaultFraming } from '@/app/utils/avatar-framing';
 
 /**
  * Universal preset avatars (public/presets/): instant placeholders shown while a
@@ -17,6 +18,46 @@ import { GAME_MASTER } from '@/app/api/game-models';
 export const PRESET_POOL_SIZES = { male: 8, female: 8 } as const;
 
 export const GM_PRESET_URL = '/presets/gm.webp';
+
+/**
+ * All presets on ONE sheet (public/presets/sheet.webp, built by
+ * scripts/build-preset-sheet.mjs): the mannequin's "map", so a placeholder can
+ * be reframed exactly like a drawn portrait. Cell order = male 1–8, female
+ * 1–8, GM; 6 columns of 512px cells. Keep in sync with the build script.
+ */
+export const PRESET_SHEET_URL = '/presets/sheet.webp';
+const PRESET_SHEET_COLS = 6;
+const PRESET_SHEET_CELL = 512;
+const PRESET_SHEET_ORDER = [
+    ...Array.from({ length: PRESET_POOL_SIZES.male }, (_, i) => `/presets/male-${i + 1}.webp`),
+    ...Array.from({ length: PRESET_POOL_SIZES.female }, (_, i) => `/presets/female-${i + 1}.webp`),
+    GM_PRESET_URL,
+];
+export const PRESET_SHEET_SIZE = {
+    width: PRESET_SHEET_COLS * PRESET_SHEET_CELL,
+    height: Math.ceil(PRESET_SHEET_ORDER.length / PRESET_SHEET_COLS) * PRESET_SHEET_CELL,
+};
+
+/** The cell a single preset file occupies on the sheet. */
+export function presetSheetCell(presetUrl: string): ImageRect | undefined {
+    const i = PRESET_SHEET_ORDER.indexOf(presetUrl);
+    if (i < 0) return undefined;
+    return {
+        left: (i % PRESET_SHEET_COLS) * PRESET_SHEET_CELL,
+        top: Math.floor(i / PRESET_SHEET_COLS) * PRESET_SHEET_CELL,
+        width: PRESET_SHEET_CELL,
+        height: PRESET_SHEET_CELL,
+    };
+}
+
+/** The mannequin's default framing on the sheet: the card that fits the
+ * character's assigned preset cell, with the default circle. Undefined for
+ * the human player (no preset). */
+export function getPresetFraming(bots: Array<{ name: string; gender?: string }>, name: string): AvatarFraming | undefined {
+    const url = getPresetAvatarUrl(bots, name);
+    const cell = url ? presetSheetCell(url) : undefined;
+    return cell ? defaultFraming(cell) : undefined;
+}
 
 const MALE_FILES = Array.from({ length: PRESET_POOL_SIZES.male }, (_, i) => `/presets/male-${i + 1}.webp`);
 const FEMALE_FILES = Array.from({ length: PRESET_POOL_SIZES.female }, (_, i) => `/presets/female-${i + 1}.webp`);

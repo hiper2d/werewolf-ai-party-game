@@ -28,11 +28,14 @@ import {
     SystemErrorMessage,
     User,
     USER_TIERS,
-    AVATAR_VARIANTS_COLLECTION
+    AVATAR_VARIANTS_COLLECTION,
+    DEFAULT_GAME_MODE,
+    GAME_MODES
 } from "@/app/api/game-models";
 import {auth} from "@/auth";
 import {AgentFactory} from "@/app/ai/agent-factory";
-import {generateGamePreview} from "@/app/ai/preview-generation";
+import {generateGamePreview, PreviewProgress} from "@/app/ai/preview-generation";
+import {deletePreviewProgress, isValidProgressId, previewProgressWriter, readPreviewProgress} from "@/app/utils/preview-progress";
 import {getUserTierAndApiKeys} from "@/app/utils/tier-utils";
 import {sanitizePlayerName} from "@/app/utils/name-utils";
 import {sanitizeArtStyle} from "@/app/utils/art-style";
@@ -169,7 +172,28 @@ export async function getGameMessages(gameId: string): Promise<GameMessage[]> {
     }));
 }
 
-export async function previewGame(gamePreview: GamePreview): Promise<GamePreviewWithGeneratedBots> {
+/**
+ * Reads the progress of a running previewGame call. `progressId` is the token the client
+ * passed to previewGame; only the run's owner can read it, and it disappears when the run
+ * ends (null then means "finished or never started" — the caller stops polling on the
+ * previewGame result itself, not on this).
+ */
+export async function getPreviewProgress(progressId: string): Promise<PreviewProgress | null> {
+    const session = await auth();
+    if (!session || !session.user?.email) {
+        throw new Error('Not authenticated');
+    }
+    if (!isValidProgressId(progressId)) {
+        return null;
+    }
+    return readPreviewProgress(progressId, session.user.email);
+}
+
+/**
+ * Generates the game preview. `progressId` (optional, client-generated) enables the progress
+ * indicator: the pipeline's stage transitions are written under that id while this runs.
+ */
+export async function previewGame(gamePreview: GamePreview, progressId?: string): Promise<GamePreviewWithGeneratedBots> {
     const session = await auth();
     if (!session || !session.user?.email) {
         throw new Error('Not authenticated');
@@ -286,21 +310,32 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
 
     // Two-stage generation (casting, then character sheets in parallel batches) — see
     // generateGamePreview. Each stage gets its own GM agent with the story output profile.
-    const aiResponse = await generateGamePreview((systemPrompt) => {
-        const agent: AbstractAgent = AgentFactory.createAgent(GAME_MASTER, systemPrompt, resolvedGmAiType, apiKeys, false);
-        agent.userId = session.user!.email!;
-        configureStoryAgent(agent);
-        return agent;
-    }, {
-        theme: gamePreview.theme,
-        description: gamePreview.description,
-        excludedName: gamePreview.name,
-        botCount,
-        werewolfCount: gamePreview.werewolfCount,
-        gameRolesText,
-        playStylesText,
-        voiceConfig,
-    });
+    const trackProgress = isValidProgressId(progressId);
+    const onProgress = trackProgress ? previewProgressWriter(progressId, session.user.email) : undefined;
+    let aiResponse;
+    try {
+        aiResponse = await generateGamePreview((systemPrompt) => {
+            const agent: AbstractAgent = AgentFactory.createAgent(GAME_MASTER, systemPrompt, resolvedGmAiType, apiKeys, false);
+            agent.userId = session.user!.email!;
+            configureStoryAgent(agent);
+            return agent;
+        }, {
+            theme: gamePreview.theme,
+            description: gamePreview.description,
+            excludedName: gamePreview.name,
+            botCount,
+            werewolfCount: gamePreview.werewolfCount,
+            gameRolesText,
+            playStylesText,
+            voiceConfig,
+        }, onProgress);
+    } finally {
+        if (trackProgress) {
+            // The doc only exists to be polled during the run; nothing should outlive it.
+            deletePreviewProgress(progressId).catch(err =>
+                logger.warn(`Preview progress cleanup failed for ${progressId}: ${err instanceof Error ? err.message : String(err)}`));
+        }
+    }
     const tokenUsage = aiResponse.tokenUsage;
 
     logger.info(`Preview token usage: ${JSON.stringify(tokenUsage)}, tier: ${tier}`);
@@ -545,6 +580,7 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
             werewolfCount: gamePreview.werewolfCount,
             specialRoles: gamePreview.specialRoles,
             longReplies: gamePreview.longReplies ?? false,
+            gameMode: gamePreview.gameMode ?? DEFAULT_GAME_MODE,
             gameMasterAiType: gamePreview.gameMasterAiType,
             voiceProvider: gamePreview.voiceProvider, // TTS provider (locked at creation)
             gameMasterVoice: gamePreview.gameMasterVoice,
@@ -1298,6 +1334,8 @@ function gameFromFirestore(id: string, data: any): Game {
         specialRoles: data.specialRoles,
         // Games from before the setting keep today's long style — that's what they were created with.
         longReplies: data.longReplies ?? true,
+        // Pre-setting games were played as strategists wearing personas — keep them that way.
+        gameMode: data.gameMode ?? GAME_MODES.TACTICAL,
         gameMasterAiType: data.gameMasterAiType,
         voiceProvider: data.voiceProvider || getDefaultVoiceProvider(), // Fallback to default for existing games
         gameMasterVoice: data.gameMasterVoice || getRandomVoiceForGender('male'), // Fallback for existing games

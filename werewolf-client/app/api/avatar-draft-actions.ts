@@ -2,9 +2,10 @@
 
 import {after} from "next/server";
 import {auth} from "@/auth";
-import {AvatarDraftSpec, AvatarDraftState, USER_TIERS} from "@/app/api/game-models";
+import {AvatarDraftSpec, AvatarDraftState, AvatarFraming, ReframeTarget, USER_TIERS} from "@/app/api/game-models";
 import {getUserBalance, getUserTier} from "@/app/api/user-actions";
-import {getDraftState, normalizeDraftSpec, runDraftGeneration, startDraftGeneration} from "@/app/utils/avatar-drafts";
+import {getDraftState, normalizeDraftSpec, reframeDraftAvatarFor, runDraftGeneration, startDraftGeneration} from "@/app/utils/avatar-drafts";
+import {ReframeResult} from "@/app/utils/avatar-generation";
 import {logger} from "@/app/utils/logger";
 
 /**
@@ -57,4 +58,19 @@ export async function getAvatarDraft(): Promise<AvatarDraftState | null> {
         throw new Error('Not authenticated');
     }
     return getDraftState(session.user.email);
+}
+
+/**
+ * Moves one portrait's crop on the sheet it was drawn from, in the current
+ * user's draft (see reframeAvatar for the in-game twin). The draft's
+ * `version` is untouched — it is the createGame adoption handshake — only
+ * the per-key cache-buster moves. Returns null when the candidate has no
+ * sheet or doesn't exist.
+ */
+export async function reframeDraftAvatar(key: string, target: ReframeTarget, framing: AvatarFraming): Promise<ReframeResult | null> {
+    const session = await auth();
+    if (!session || !session.user?.email) {
+        throw new Error('Not authenticated');
+    }
+    return reframeDraftAvatarFor(session.user.email, key, target, framing);
 }

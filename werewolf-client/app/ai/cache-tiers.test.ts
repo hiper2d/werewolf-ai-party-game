@@ -3,7 +3,8 @@
  * byte-identical across bots (no placeholders), so provider prompt caches hit across the
  * lobby. The marker/agent plumbing itself is tested in @hiper2d/ai-agents.
  */
-import { BOT_SYSTEM_PROMPT, CACHE_TIER_MARKER } from './prompts/bot-prompts';
+import { botSystemPrompt, CACHE_TIER_MARKER } from './prompts/bot-prompts';
+import { GAME_MODES, GameMode } from '@/app/api/game-models';
 import { format } from './prompts/utils';
 
 const IDENTITY_PARAMS = {
@@ -17,7 +18,9 @@ const IDENTITY_PARAMS = {
     bot_context: ''
 };
 
-describe('BOT_SYSTEM_PROMPT cache tiers', () => {
+describe.each(Object.values(GAME_MODES))('botSystemPrompt(%s) cache tiers', (mode: GameMode) => {
+    const BOT_SYSTEM_PROMPT = botSystemPrompt(mode);
+
     it('keeps all placeholders below the cache tier marker', () => {
         const [sharedTier, ...rest] = BOT_SYSTEM_PROMPT.split(CACHE_TIER_MARKER);
         expect(rest.length).toBe(1); // exactly one marker
@@ -31,5 +34,25 @@ describe('BOT_SYSTEM_PROMPT cache tiers', () => {
         const promptB = format(BOT_SYSTEM_PROMPT, { ...IDENTITY_PARAMS, name: 'OtherBot', personal_story: 'Another story' });
         expect(promptA.split(CACHE_TIER_MARKER)[0]).toBe(promptB.split(CACHE_TIER_MARKER)[0]);
         expect(promptA.split(CACHE_TIER_MARKER)[1]).not.toBe(promptB.split(CACHE_TIER_MARKER)[1]);
+    });
+});
+
+describe('game modes', () => {
+    it('roleplay drops the facade doctrine; tactical keeps it', () => {
+        const roleplay = botSystemPrompt(GAME_MODES.ROLEPLAY);
+        const tactical = botSystemPrompt(GAME_MODES.TACTICAL);
+        expect(tactical).toContain('PERSONA CANNOT DRIVE SUSPICIONS OR VOTES');
+        expect(roleplay).not.toContain('PERSONA CANNOT DRIVE SUSPICIONS OR VOTES');
+        expect(roleplay).not.toMatch(/stories are just flavor/i);
+        expect(roleplay).toContain('you ARE the character');
+        // Both keep the rules and the identity tail
+        for (const p of [roleplay, tactical]) {
+            expect(p).toContain('**Victory Conditions:**');
+            expect(p).toContain('## Character Identity');
+        }
+    });
+
+    it('defaults to roleplay for games without the setting', () => {
+        expect(botSystemPrompt(undefined)).toBe(botSystemPrompt(GAME_MODES.ROLEPLAY));
     });
 });

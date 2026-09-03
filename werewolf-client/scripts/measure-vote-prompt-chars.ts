@@ -1,5 +1,5 @@
 // One-off: character count of the day-2 vote prompt exactly as all-models.test.ts builds it.
-import { BOT_SYSTEM_PROMPT, BOT_VOTE_PROMPT, BOT_REMINDER_POSTFIX } from '../app/ai/prompts/bot-prompts';
+import { botSystemPrompt, BOT_VOTE_PROMPT, botReminderPostfix } from '../app/ai/prompts/bot-prompts';
 import { format } from '../app/ai/prompts/utils';
 import { convertToAIMessages } from '../app/utils/message-utils';
 import { GAME_MASTER, GameMessage } from '../app/api/game-models';
@@ -16,7 +16,7 @@ const alivePlayerNames = [
     DAY2_VOTE_GAME.humanPlayerName,
 ];
 
-const voteSystemPrompt = format(BOT_SYSTEM_PROMPT, {
+const voteSystemPrompt = format(botSystemPrompt(DAY2_VOTE_GAME.gameMode), {
     name: kenji.name,
     personal_story: kenji.story,
     play_style: "",
@@ -36,7 +36,7 @@ const voteCommand: GameMessage = {
     msg: format(BOT_VOTE_PROMPT, {
         bot_name: kenji.name, vote_position: "6", total_voters: "8",
         valid_targets: validTargetsList, werewolf_vote_note: "",
-    }) + format(BOT_REMINDER_POSTFIX, {
+    }) + format(botReminderPostfix(DAY2_VOTE_GAME.gameMode), {
         play_style: generatePlayStyleDescription(kenji),
         human_player_name: DAY2_VOTE_GAME.humanPlayerName,
     }),

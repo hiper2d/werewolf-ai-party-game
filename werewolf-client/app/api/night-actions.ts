@@ -35,7 +35,7 @@ import { GM_NIGHT_RESULTS_SYSTEM_PROMPT, GM_DAY_SUMMARY_SYSTEM_PROMPT, GM_DAY_SU
 import { GM_COMMAND_GENERATE_NIGHT_RESULTS } from "@/app/ai/prompts/gm-commands";
 import { NightResultsStoryZodSchema } from "@/app/ai/prompts/zod-schemas";
 import { buildStoryContext, lynchSummaryForDay, sanitizeNarrativeHint } from "@/app/utils/story-utils";
-import { BOT_DAY_SUMMARY_PROMPT, BOT_SYSTEM_PROMPT } from "@/app/ai/prompts/bot-prompts";
+import { BOT_DAY_SUMMARY_PROMPT, botSystemPrompt } from "@/app/ai/prompts/bot-prompts";
 import { generateBotContextSection, generateWerewolfTeammatesSection, getAlivePlayerNames, getEffectiveModel } from "@/app/utils/bot-utils";
 import { format } from "@/app/ai/prompts/utils";
 import { convertToAIMessages, convertMessageContent, formatMessagesForNightSummary } from "@/app/utils/message-utils";
@@ -1388,7 +1388,7 @@ async function summarizePastDayImpl(gameId: string): Promise<GameActionResponse>
         const apiKeys = await getApiKeysForUser(session.user.email);
 
         // Create bot system prompt
-        const botPrompt = format(BOT_SYSTEM_PROMPT, {
+        const botPrompt = format(botSystemPrompt(currentGame.gameMode), {
             name: bot.name,
             personal_story: bot.story,
             play_style: "",

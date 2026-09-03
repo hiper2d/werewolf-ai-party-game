@@ -27,7 +27,7 @@ import {
     GM_COMMAND_INTRODUCE_YOURSELF,
     GM_COMMAND_REPLY_TO_DISCUSSION
 } from "@/app/ai/prompts/gm-commands";
-import {BOT_REMINDER_POSTFIX, BOT_SYSTEM_PROMPT, BOT_VOTE_PROMPT, BOT_AFTER_GAME_SYSTEM_PROMPT_ADDITION, replyLengthInstruction} from "@/app/ai/prompts/bot-prompts";
+import {botReminderPostfix, botSystemPrompt, BOT_VOTE_PROMPT, BOT_AFTER_GAME_SYSTEM_PROMPT_ADDITION, replyLengthInstruction} from "@/app/ai/prompts/bot-prompts";
 import {HUMAN_SUGGESTION_PROMPT} from "@/app/ai/prompts/gm-prompts";
 import {BotVoteZodSchema} from "@/app/ai/prompts/zod-schemas";
 import {invalidTargetExplanation, selfSelectionExplanation} from "@/app/api/retry-hint";
@@ -97,7 +97,7 @@ function parseIndividualVotes(raw: string): IndividualVote[] {
  * Helper function to generate bot system prompt with after-game addition if needed
  */
 function generateBotSystemPrompt(bot: Bot, game: Game): string {
-    const basePrompt = format(BOT_SYSTEM_PROMPT, {
+    const basePrompt = format(botSystemPrompt(game.gameMode), {
         name: bot.name,
         personal_story: bot.story,
         play_style: "",
@@ -364,7 +364,7 @@ function shouldTriggerAutoVote(game: Game): boolean {
             // reminder rides as its own trailing message (never persisted) so the GM
             // command block stays byte-stable for prompt caches; providers that need
             // alternating roles merge it back in prepareMessages.
-            const playStyleReminder = format(BOT_REMINDER_POSTFIX, { play_style: generatePlayStyleDescription(bot), human_player_name: game.humanPlayerName, reply_length_instruction: replyLengthInstruction(game.longReplies) });
+            const playStyleReminder = format(botReminderPostfix(game.gameMode), { play_style: generatePlayStyleDescription(bot), human_player_name: game.humanPlayerName, reply_length_instruction: replyLengthInstruction(game.longReplies) });
             const history = convertToAIMessages(bot.name, [...botMessages, gmMessage]);
             history.push({ role: MESSAGE_ROLE.USER, content: playStyleReminder.trim() });
             const [answer, thinking, tokenUsage, thinkingSignature] = await agent.askText(history);
@@ -754,7 +754,7 @@ async function processNextBotInQueue(
     // rides as its own trailing message (never persisted) so the GM command block stays
     // byte-stable for prompt caches; providers that need alternating roles merge it back
     // in prepareMessages.
-    const playStyleReminder = format(BOT_REMINDER_POSTFIX, { play_style: generatePlayStyleDescription(bot), human_player_name: game.humanPlayerName, reply_length_instruction: replyLengthInstruction(game.longReplies) });
+    const playStyleReminder = format(botReminderPostfix(game.gameMode), { play_style: generatePlayStyleDescription(bot), human_player_name: game.humanPlayerName, reply_length_instruction: replyLengthInstruction(game.longReplies) });
     const history = convertToAIMessages(bot.name, [...botMessages, gmMessage]);
     history.push({ role: MESSAGE_ROLE.USER, content: playStyleReminder.trim() });
     const [botReply, thinking, tokenUsage, thinkingSignature] = await agent.askText(history);
@@ -1081,7 +1081,7 @@ async function voteImpl(gameId: string): Promise<GameActionResponse> {
             const apiKeys = await getApiKeysForUser(session.user!.email!);
             
             const botPrompt = format(
-                BOT_SYSTEM_PROMPT,
+                botSystemPrompt(currentGame.gameMode),
                 {
                     name: bot.name,
                     personal_story: bot.story,
@@ -1147,7 +1147,7 @@ async function voteImpl(gameId: string): Promise<GameActionResponse> {
             // Create history including the voting command; the playstyle reminder rides
             // as its own trailing message (never persisted) so the GM command block stays
             // byte-stable for prompt caches.
-            const playStyleReminder = format(BOT_REMINDER_POSTFIX, { play_style: generatePlayStyleDescription(bot), human_player_name: currentGame.humanPlayerName, reply_length_instruction: replyLengthInstruction(currentGame.longReplies) });
+            const playStyleReminder = format(botReminderPostfix(currentGame.gameMode), { play_style: generatePlayStyleDescription(bot), human_player_name: currentGame.humanPlayerName, reply_length_instruction: replyLengthInstruction(currentGame.longReplies) });
             const history = convertToAIMessages(bot.name, [...botMessages, gmMessage]);
             history.push({ role: MESSAGE_ROLE.USER, content: playStyleReminder.trim() });
             

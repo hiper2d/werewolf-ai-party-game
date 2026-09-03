@@ -6,7 +6,7 @@ import { humanPlayerTalkWerewolves } from "@/app/api/night-actions";
 import { GAME_STATES, MessageType, RECIPIENT_ALL, RECIPIENT_WEREWOLVES, RECIPIENT_DOCTOR, RECIPIENT_DETECTIVE, RECIPIENT_MANIAC, GameMessage, Game, GameActionResponse, SystemErrorMessage, BotResponseError, GAME_MASTER, ROLE_CONFIGS, GAME_ROLES, FREE_TIER_LIMITS } from "@/app/api/game-models";
 import PlayerAvatar from "@/app/components/PlayerAvatar";
 import { clearGameErrorState } from "@/app/api/game-actions";
-import { getAvatarUrl, getIllustrationUrl, getSceneUrl } from "@/app/utils/avatar-utils";
+import { getAvatarView, getIllustrationUrl, getSceneUrl } from "@/app/utils/avatar-utils";
 import VotingModal from "./VotingModal";
 import NightActionModal from "./NightActionModal";
 import MentionDropdown from "./MentionDropdown";
@@ -321,7 +321,7 @@ function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcludin
                     className="flex-none self-start mt-0.5 w-9 h-9 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
                     title={`View ${message.authorName}`}
                 >
-                    <PlayerAvatar name={message.authorName} size={48} isGM={isGameMaster} className="-mt-1.5 -ml-1.5 relative z-[1]" avatarUrl={getAvatarUrl(game, isGameMaster ? GAME_MASTER : message.authorName)} />
+                    <PlayerAvatar name={message.authorName} size={48} isGM={isGameMaster} className="-mt-1.5 -ml-1.5 relative z-[1]" avatarUrl={getAvatarView(game, isGameMaster ? GAME_MASTER : message.authorName)?.url} focus={getAvatarView(game, isGameMaster ? GAME_MASTER : message.authorName)?.focus} />
                 </button>
                 <div className="flex-1 min-w-0 text-left">
             <div className="flex items-center justify-between mb-1">
@@ -434,7 +434,7 @@ function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcludin
                     if (!elimName) return null;
                     return (
                         <span className="flex items-center gap-3 mb-2">
-                            <PlayerAvatar name={elimName} size={48} isDead avatarUrl={getAvatarUrl(game, elimName)} />
+                            <PlayerAvatar name={elimName} size={48} isDead avatarUrl={getAvatarView(game, elimName)?.url} focus={getAvatarView(game, elimName)?.focus} />
                             <span className="text-[15px] font-semibold line-through text-[var(--fg-2)]">{elimName}</span>
                         </span>
                     );
@@ -472,7 +472,7 @@ function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcludin
                         <span className="flex items-center gap-4 flex-wrap mt-3">
                             {deadNames.map(n => (
                                 <span key={n} className="flex items-center gap-2.5">
-                                    <PlayerAvatar name={n} size={48} isDead avatarUrl={getAvatarUrl(game, n)} />
+                                    <PlayerAvatar name={n} size={48} isDead avatarUrl={getAvatarView(game, n)?.url} focus={getAvatarView(game, n)?.focus} />
                                     <span className="text-[15px] font-semibold line-through text-[var(--fg-2)]">{n}</span>
                                 </span>
                             ))}
@@ -1904,7 +1904,7 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                         <div className={`inline-flex items-center gap-2.5 rounded-full bg-[var(--bg-2)] border border-[var(--line-2)] ${name ? 'pl-1 py-1' : 'pl-3 py-1.5'} pr-3.5 shadow-subtle`}>
                             {name ? (
                                 <span className="animate-pulse rounded-full">
-                                    <PlayerAvatar name={name} size={28} avatarUrl={getAvatarUrl(game, name)} />
+                                    <PlayerAvatar name={name} size={28} avatarUrl={getAvatarView(game, name)?.url} focus={getAvatarView(game, name)?.focus} />
                                 </span>
                             ) : (
                                 <span className="w-2 h-2 rounded-full bg-[var(--accent)] animate-pulse flex-none" />

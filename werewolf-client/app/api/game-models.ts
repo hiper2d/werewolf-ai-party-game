@@ -66,7 +66,23 @@ export interface GamePreview {
     // False/absent = bots keep day replies to 1–2 sentences; true = the looser
     // 2–4 sentence style for players who enjoy reading longer discussions.
     longReplies?: boolean;
+    // How bots relate to their characters — see GAME_MODES. Absent = roleplay (the default).
+    gameMode?: GameMode;
 }
+
+/**
+ * How a bot relates to its character.
+ * - roleplay (default): the bot IS the character. Its loyalties, grudges and in-world
+ *   reasoning decide whom it trusts and votes for, alongside game evidence.
+ * - tactical: the character is a persona over a strategist. Only game evidence (votes,
+ *   contradictions, claims) may drive suspicion; stories are flavor.
+ */
+export const GAME_MODES = {
+    ROLEPLAY: 'roleplay',
+    TACTICAL: 'tactical',
+} as const;
+export type GameMode = typeof GAME_MODES[keyof typeof GAME_MODES];
+export const DEFAULT_GAME_MODE: GameMode = GAME_MODES.ROLEPLAY;
 
 export interface BotPreview {
     name: string;
@@ -114,7 +130,7 @@ export interface AvatarDraft {
     // GM key. createGame adopts the draft only when the game's keys match
     // exactly — a renamed character would otherwise get a stranger's face.
     keys: string[];
-    avatarVariants: Record<string, { n: number; sel: number; first?: number }>;
+    avatarVariants: Record<string, AvatarVariantEntry>;
     avatarVersions: Record<string, number>;
     hasScene: boolean;
     // Coarse progress for the preview page: the portrait grid and the scene
@@ -252,6 +268,9 @@ export interface Game {
     // Locked at creation. False/absent = bots keep day replies to 1–2 sentences;
     // true = the looser 2–4 sentence style.
     longReplies?: boolean;
+    // Locked at creation. Absent on games created before the setting existed — those
+    // were played under the tactical prompt, so gameFromFirestore defaults them to tactical.
+    gameMode?: GameMode;
     gameMasterAiType: string;
     voiceProvider?: VoiceProvider; // TTS provider for this game (locked at creation)
     gameMasterVoice: string;
@@ -312,7 +331,11 @@ export interface Game {
     // every reader (chat, cinematic, illustration references) sees —
     // MANNEQUIN_VARIANT_INDEX means the preset sketch is shown instead.
     // Absent on games generated before variants existed = one candidate.
-    avatarVariants?: Record<string, { n: number; sel: number; first?: number }>;
+    // Since the portrait sheets ship (2026-09), every candidate also records
+    // its framing on the sheet it was cut from (`framing`, keyed by candidate
+    // index) and the mannequin may carry a custom framing on the preset sheet
+    // (`mannequin`) — see AvatarVariantEntry.
+    avatarVariants?: Record<string, AvatarVariantEntry>;
     // Per-key cache-buster, bumped when that one portrait switches candidate.
     // A global avatarsVersion bump would re-download the whole cast for one
     // changed face. getAvatarUrl prefers this over avatarsVersion.
@@ -780,6 +803,78 @@ export function avatarVariantKey(key: string, index: number): string {
 // instead of any generated candidate. The mannequin is a static asset, never a
 // stored candidate doc, so it lives outside the [first, n) index range.
 export const MANNEQUIN_VARIANT_INDEX = -1;
+
+// ---------------------------------------------------------------------------
+// Portrait sheets and framing
+//
+// Every portrait draw returns ONE sheet (the grid image) that the app cuts
+// into per-character cards. Since 2026-09 the sheet is kept — as
+// avatars/sheet-{round} in the same subcollection as the scenes and mid-game
+// illustrations (dashed keys never collide with player names, and the
+// existing image routes, draft copy and draft cleanup all cover it for free).
+// Candidate index == draw round: every draw appends exactly one candidate per
+// character, so candidate i of any character was cut from sheet-{i}.
+//
+// A candidate's framing is where its card sits on the sheet plus where the
+// round avatar sits inside the card. The owner may move both ("reframe"): the
+// card is re-cut from the stored sheet — no model call — and the circle is
+// applied client-side by the avatar renderer, so nothing else is stored.
+// ---------------------------------------------------------------------------
+
+/** A rectangle on an image, in that image's pixels. */
+export interface ImageRect {
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+}
+
+/** The round avatar inside a card. `x` and `d` are fractions of the card's
+ * width, `y` a fraction of its height (the design's coordinate system). */
+export interface AvatarCircle {
+    x: number;
+    y: number;
+    d: number;
+}
+
+/** Where a portrait comes from on its sheet: the card cut and the circle in it. */
+export interface AvatarFraming {
+    card: ImageRect;
+    circle: AvatarCircle;
+}
+
+export interface AvatarVariantEntry {
+    n: number;
+    sel: number;
+    first?: number;
+    // Framing per candidate index (string keys: Firestore maps). Absent for
+    // candidates drawn before sheets were kept — those cannot be reframed.
+    framing?: Record<string, AvatarFraming>;
+    // The framing the slicer chose per candidate, written once at draw time —
+    // what "Reset to the drawn crop" restores after the owner reframed.
+    drawn?: Record<string, AvatarFraming>;
+    // Custom framing on the preset mannequin sheet; absent = the character's
+    // assigned preset cell with the default circle.
+    mannequin?: AvatarFraming;
+}
+
+// Cards are portrait 3:4 (the poster's shape), stored at this size.
+export const CARD_ASPECT = 3 / 4; // width / height
+export const CARD_WIDTH_PX = 600;
+export const CARD_HEIGHT_PX = 800;
+// Where the circle starts on a freshly cut card: 72% of its width, near the top.
+export const DEFAULT_AVATAR_CIRCLE: AvatarCircle = {x: 0.14, y: 0.03, d: 0.72};
+// A card narrower than this fraction of the sheet's height upscales too much.
+export const MIN_CARD_HEIGHT_FRACTION = 0.12;
+
+export function avatarSheetKey(round: number): string {
+    return `sheet-${round}`;
+}
+export function isAvatarSheetKey(key: string): boolean {
+    return /^sheet-\d+$/.test(key);
+}
+/** The reframe target: a stored candidate (by index) or the mannequin. */
+export type ReframeTarget = number | 'mannequin';
 // Free-tier games may reroll their portraits once; paid games are unlimited.
 export const FREE_TIER_AVATAR_REGENS = 1;
 

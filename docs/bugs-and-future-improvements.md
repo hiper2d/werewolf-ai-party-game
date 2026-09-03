@@ -28,29 +28,26 @@ Every new user gets one.
 - **Change bots prompting to explain that random voting is not something suspicious.** People do
   this. Maybe add it to personalities.
 
-- **Image generation has no retry on 5xx; one Google 504 aborts a whole illustration set.**
-  `generateImage` (`app/utils/avatar-generation.ts:122`) is a bare `fetch` with no retry and no
-  explicit timeout - any non-2xx throws at `:138`, which unwinds the entire `drawIllustrationSet`
+- **Image generation: one Google 504 aborts a whole illustration set.**
+  `generateImage` (`app/utils/avatar-generation.ts:122`) is a bare `fetch` with no explicit
+  timeout - any non-2xx throws at `:138`, which unwinds the entire `drawIllustrationSet`
   call in `avatar-drafts.ts:186`. Images already paid for in that set are written off through
   `recordAbandonedSpend` (`:223`). Observed 2026-09-02: three `HTTP 504 / deadline_exceeded` from
   `generativelanguage.googleapis.com` inside 30 minutes (19:27:13, 19:32:18, 19:56:02 UTC). Two hit
   the scene path, which degrades gracefully (completes with `scenes: 0`, logged `warn`); the middle
   one hit the portrait path and killed the draft with $0.067 abandoned. It self-recovered on the
   next attempt, and `hadSet` was true so the player kept the previous set. First occurrence in 30
-  days of logs, and it was a local dev session rather than a paying user - but a paying user is who
-  eats the abandoned spend when it happens for real. `deadline_exceeded` is the most retryable
-  error Google returns. Fix: retry 5xx and 429 once or twice with short backoff inside
-  `generateImage`, and set an explicit timeout so a hung call fails on our clock, not Google's.
+  days of logs, and it was a local dev session rather than a paying user.
+  **Decision 2026-09-02: NO automatic retries** - same rule as LLM calls: the failure surfaces
+  and the user triggers the redraw themselves (the draft UI already allows it). What may still
+  be worth doing: an explicit timeout on the fetch so a hung call fails on our clock rather than
+  Google's, and making sure the abandoned-spend path is the exception, not the rule.
 
-- **Local dev ships logs into the production BetterStack source, untagged.**
-  `logger.ts:20` reads `BETTER_STACK_SOURCE_TOKEN` straight from `.env` with no environment check,
-  so `npm run dev` writes into the same source as production. After the fact the only way to tell
-  them apart is `context.runtime.file` / `context.system.main_file`: production is `/var/task/...`
-  plus `/opt/rust/nodejs.js`, dev is the local
-  `node_modules/next/dist/server/lib/start-server.js`. This makes any error watcher on the source
-  noisy - the 504 above paged as a production app error when it was a laptop. Fix: attach a
-  constant `env` field to every line so queries can filter on it. Preferred over skipping Logtail
-  outside production, since local dev errors are still worth keeping.
+- ~~**Local dev ships logs into the production BetterStack source, untagged.**~~ Done
+  2026-09-02: `logger.ts` stamps `env` (`VERCEL_ENV` → `NODE_ENV` → `development`) on every
+  line shipped to Better Stack; the debugging skill's recipes filter on
+  `JSONExtractString(raw,'env') = 'production'`. Lines from before that date have no `env` —
+  tell them apart by `context.runtime.file` (`/var/task/...` = production).
 
 ## Reference: prompt-cache semantics per provider (researched 2026-08-04, from live docs)
 

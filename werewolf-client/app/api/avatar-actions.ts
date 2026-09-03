@@ -1,8 +1,8 @@
 'use server'
 
 import {auth} from "@/auth";
-import {AvatarGenerationResult, runAvatarGeneration, runAvatarRegeneration, selectAvatarVariantFor} from "@/app/utils/avatar-generation";
-import {FREE_TIER_AVATAR_REGENS, USER_TIERS} from "@/app/api/game-models";
+import {AvatarGenerationResult, ReframeResult, reframeGameAvatar, runAvatarGeneration, runAvatarRegeneration, selectAvatarVariantFor} from "@/app/utils/avatar-generation";
+import {AvatarFraming, FREE_TIER_AVATAR_REGENS, ReframeTarget, USER_TIERS} from "@/app/api/game-models";
 import {getUserBalance, getUserTier} from "@/app/api/user-actions";
 
 /**
@@ -67,4 +67,19 @@ export async function selectAvatarVariant(gameId: string, key: string, index: nu
         throw new Error('Not authenticated');
     }
     return selectAvatarVariantFor(gameId, session.user.email, key, index);
+}
+
+/**
+ * Moves one character's crop on the sheet it was drawn from — or, for the
+ * mannequin target, on the preset sheet. Nothing is redrawn: a drawn card is
+ * re-cut from the stored sheet (one sharp crop, no model call, no billing),
+ * the mannequin just records its framing. Owner only. Returns the new per-key
+ * version, or null when the target has no sheet or the caller isn't the owner.
+ */
+export async function reframeAvatar(gameId: string, key: string, target: ReframeTarget, framing: AvatarFraming): Promise<ReframeResult | null> {
+    const session = await auth();
+    if (!session || !session.user?.email) {
+        throw new Error('Not authenticated');
+    }
+    return reframeGameAvatar(gameId, session.user.email, key, target, framing);
 }

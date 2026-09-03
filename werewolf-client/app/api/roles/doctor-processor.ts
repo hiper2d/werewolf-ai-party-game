@@ -6,7 +6,7 @@ import { addMessageToChatAndSaveToDb, consumeRetryHint, getBotMessages, getUserF
 import { getApiKeysForUser } from "@/app/utils/tier-utils";
 import { auth } from "@/auth";
 import { convertToAIMessages } from "@/app/utils/message-utils";
-import { BOT_SYSTEM_PROMPT, BOT_DOCTOR_ACTION_PROMPT, STRICT_TARGET_NAME_INSTRUCTION } from "@/app/ai/prompts/bot-prompts";
+import { botSystemPrompt, BOT_DOCTOR_ACTION_PROMPT, STRICT_TARGET_NAME_INSTRUCTION } from "@/app/ai/prompts/bot-prompts";
 import { format } from "@/app/ai/prompts/utils";
 import { generateBotContextSection, getAlivePlayerNames, getEffectiveModel } from "@/app/utils/bot-utils";
 import { DoctorActionZodSchema } from "@/app/ai/prompts/zod-schemas";
@@ -152,7 +152,7 @@ export class DoctorProcessor extends BaseRoleProcessor {
             const apiKeys = await getApiKeysForUser(session.user.email);
 
             // Create doctor prompt
-            const doctorPrompt = format(BOT_SYSTEM_PROMPT, {
+            const doctorPrompt = format(botSystemPrompt(this.game.gameMode), {
                 name: doctorBot.name,
                 personal_story: doctorBot.story,
                 play_style: "",

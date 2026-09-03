@@ -1,6 +1,9 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import { menuPlacementClass, useMenuPlacement } from './use-menu-placement';
+
+const MENU_HEIGHT = 240; // desktop max-h-60
 import { getModelTags, type ModelTag } from '@/app/ai/ai-models';
 
 const TAG_STYLES: Record<ModelTag, { text: string; border: string; bg: string; label: string }> = {
@@ -42,6 +45,7 @@ export default function ModelSelectDropdown({
     const [isOpen, setIsOpen] = useState(false);
     const [isMobile, setIsMobile] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
+    const placement = useMenuPlacement(dropdownRef, isOpen && !isMobile, MENU_HEIGHT);
 
     useEffect(() => {
         const mq = window.matchMedia('(max-width: 639px)');
@@ -101,7 +105,7 @@ export default function ModelSelectDropdown({
             </button>
 
             {/* Panel — full-width bottom sheet on mobile, anchored dropdown on desktop */}
-            {isOpen && isMobile && (
+            {isOpen && (isMobile || placement === 'center') && (
                 <div
                     className="fixed inset-0 z-40 bg-black/50"
                     onMouseDown={() => setIsOpen(false)}
@@ -112,7 +116,7 @@ export default function ModelSelectDropdown({
                     className={
                         isMobile
                             ? 'fixed inset-x-0 bottom-0 z-50 flex flex-col max-h-[85vh] bg-[var(--bg-1)] border-t border-[var(--line-2)] rounded-t-[var(--radius-xl)] shadow-pop'
-                            : 'absolute z-50 w-full mt-1.5 bg-[var(--bg-1)] border border-[var(--line-2)] rounded-[var(--radius-lg)] shadow-pop max-h-60 overflow-y-auto'
+                            : `${menuPlacementClass(placement, 'md')} bg-[var(--bg-1)] border border-[var(--line-2)] rounded-[var(--radius-lg)] shadow-pop max-h-60 overflow-y-auto`
                     }
                 >
                     {/* Drag affordance (mobile only) — tapping it closes the sheet */}

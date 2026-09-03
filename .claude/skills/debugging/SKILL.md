@@ -41,11 +41,13 @@ BetterStack is tiered ClickHouse: a hot table `remote(t507167_ai_werewolf_2_logs
 
 ### Schema
 
-No flat columns besides `dt` — each row's `raw` is the full JSON log line. Extract fields with `JSONExtractString`. Known structured fields the app logs: `level`, `message`, `gameId`, `botName`, `model`, `gameState`, `error`, `details` (stack trace), `recoverable`, `function`. `dt` is UTC.
+No flat columns besides `dt` — each row's `raw` is the full JSON log line. Extract fields with `JSONExtractString`. Known structured fields the app logs: `level`, `message`, `gameId`, `botName`, `model`, `gameState`, `error`, `details` (stack trace), `recoverable`, `function`, `env`. `dt` is UTC.
+
+**Local dev and production share this source.** Since 2026-09-02 every line carries `env` (`production` / `preview` on Vercel, `development` on a laptop) — filter on it, otherwise a dev-session error reads as a production incident. Lines older than that have no `env`; tell them apart by `context.runtime.file` (`/var/task/...` = production, `node_modules/next/dist/server/lib/start-server.js` = dev).
 
 ### Recipes
 
-Recent errors/warnings:
+Recent production errors/warnings:
 
 ```sql
 SELECT dt, JSONExtractString(raw,'level') AS lvl,
@@ -53,6 +55,7 @@ SELECT dt, JSONExtractString(raw,'level') AS lvl,
 FROM s3Cluster(primary, t507167_ai_werewolf_2_s3)
 WHERE dt > now() - INTERVAL 48 HOUR
   AND JSONExtractString(raw,'level') IN ('error','warn')
+  AND JSONExtractString(raw,'env') = 'production'
 ORDER BY dt DESC LIMIT 50 FORMAT JSONEachRow
 ```
 

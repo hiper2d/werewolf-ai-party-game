@@ -278,3 +278,22 @@ describe('generateGamePreview', () => {
         expect(n).toBe(2); // both batches were attempted once, nothing re-issued
     });
 });
+
+describe('generateGamePreview progress', () => {
+    it('reports casting, then the cast, then each batch as it lands', async () => {
+        const cast = castOf(6);
+        const { createAgent } = fakeAgents(cast);
+        const seen: any[] = [];
+
+        await generateGamePreview(createAgent, input(6), p => seen.push(p));
+
+        expect(seen[0]).toEqual({ stage: 'casting', cast: [], batchesTotal: 0, batchesDone: 0, writtenNames: [] });
+        expect(seen[1]).toMatchObject({ stage: 'sheets', batchesTotal: 2, batchesDone: 0, writtenNames: [] });
+        expect(seen[1].cast.map((c: any) => c.name)).toEqual(cast.map(c => c.name));
+        expect(seen[2]).toMatchObject({ stage: 'sheets', batchesDone: 1 });
+        expect(seen[3]).toMatchObject({ stage: 'sheets', batchesDone: 2 });
+        expect([...seen[3].writtenNames].sort()).toEqual(cast.map(c => c.name).sort());
+        // Snapshots, not a shared mutable object
+        expect(seen[2].writtenNames.length).toBe(3);
+    });
+});

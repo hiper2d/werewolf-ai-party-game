@@ -49,7 +49,13 @@
   image-override prop — `imageUrlFn?: (key) => string` (the app never passes it;
   scene image asks for key `scene-welcome`). If the app's draft-image route
   changes shape, only the in-app default path needs touching.
-- Known render warns: none currently (17/17 clean, 0 flagged).
+- Known render warns: none currently (17/17 clean, 0 flagged). Build-log
+  informational lines that are expected every run: `[DOCS_UNMAPPED]` for the 7
+  icons (they group via `@category` JSDoc, no docs on purpose).
+- **Sandboxed Claude Code sessions**: the validate stage's render check and
+  `storybook/http-serve.mjs` both `listen` on 127.0.0.1, which the Bash sandbox
+  denies (`listen EPERM`). Run the driver / serve with the sandbox disabled for
+  that one command (static checks pass either way; only the render check needs it).
 
 ## Re-sync risks
 
@@ -74,3 +80,17 @@ components. ExpandableTextarea moved to `cardMode: column` after a
 - Component code changed → the next `/design-sync` needs a full package-build (preview-rebuild alone keeps the old bundle). Until then the kit's CharacterCard still shows the reroll button.
 - New app-only pieces not in the kit: `app/games/newgame/components/IllustrationsPanel.tsx` (paid-tier preview block). Consider adding it to `werewolf-client/design-kit/index.ts` on the next sync.
 - 2026-08-30 (later): the two character cards were unified. New `CharacterPoster` (cinematic look: 3:4.35 portrait, role chip, glow ring, name plate, STORY toggle) is exported from the kit entry with its own preview/doc/config entries; `CharacterCard` is now a modal around it (switcher lives in the poster's top-right chip). Both need the next full package-build to reach the kit.
+
+## 2026-09-02 — re-sync (config-only drift)
+
+- App changes since 2026-08-30 touching kit components: `CharacterCard` switched to a
+  mannequin-first candidate cycle (`MANNEQUIN_VARIANT_INDEX`, `getAvatarVariantState().hasCandidates`)
+  — no prop change, the authored preview's `avatarVariants: {n, sel}` still drives the
+  switcher (now "1 of 4": mannequin + 3); `IllustrationsPanel` gained
+  `onPortraitClick?: (entry: CastEntry) => void` — added to `dtsPropsFor.IllustrationsPanel`
+  (the drift `dtsPropsFor` can't detect on its own; found by `git log` on the kit sources).
+- Driver verdict: 17 verified-by-upload, 0 to grade, render check 17/17 clean; upload =
+  IllustrationsPanel `.d.ts` + bundle + styling, 0 deletes.
+- `.design-sync/overrides/source-kit.mjs` vs the 2.1.258 upstream: only the `[param]` filter
+  line and the `../../.ds-sync/lib/` import paths differ — nothing to merge.
+

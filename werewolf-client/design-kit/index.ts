@@ -19,5 +19,6 @@ export { default as ModelSelectDropdown } from '@/app/components/ModelSelectDrop
 export { default as AIModelSelect } from '@/app/components/AIModelSelect';
 export { default as ExpandableTextarea } from '@/app/components/ExpandableTextarea';
 export { default as IllustrationsPanel } from '@/app/games/newgame/components/IllustrationsPanel';
+export { default as ReframeModal } from '@/app/components/ReframeModal';
 export { CheckIcon, DashIcon, ArrowIcon, InfoIcon, GoogleIcon, GithubIcon, DiscordIcon } from '@/app/components/ui-icons';
 export { DesignPreviewProvider } from './preview-provider';

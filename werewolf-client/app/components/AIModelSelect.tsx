@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { menuPlacementClass, useMenuPlacement } from './use-menu-placement';
 import { SupportedAiModels, SupportedAiKeyNames, getModelDisplayName, getModelTags, modelIsFast, type ModelTag } from '@/app/ai/ai-models';
 
 interface OptionMeta {
@@ -86,6 +87,8 @@ export default function AIModelSelect({
     const [isMobile, setIsMobile] = useState(false);
     const panelRef = useRef<HTMLDivElement>(null);
     const searchRef = useRef<HTMLInputElement>(null);
+    // Search + filter chips + a 280px list: what the desktop panel needs.
+    const placement = useMenuPlacement(panelRef, isOpen && !isMobile, 460);
 
     useEffect(() => {
         const mq = window.matchMedia('(max-width: 639px)');
@@ -276,7 +279,7 @@ export default function AIModelSelect({
             </button>
 
             {/* Popover panel — full-width bottom sheet on mobile, anchored dropdown on desktop */}
-            {isOpen && isMobile && (
+            {isOpen && (isMobile || placement === 'center') && (
                 <div
                     className="fixed inset-0 z-40 bg-black/50"
                     onMouseDown={() => setIsOpen(false)}
@@ -287,7 +290,7 @@ export default function AIModelSelect({
                     className={
                         isMobile
                             ? 'fixed inset-x-0 bottom-0 z-50 flex flex-col max-h-[85vh] bg-[var(--bg-1)] border-t border-[var(--line-2)] rounded-t-[var(--radius-xl)] shadow-pop'
-                            : 'absolute z-20 w-full mt-1.5 bg-[var(--bg-1)] border border-[var(--line-2)] rounded-[var(--radius-lg)] shadow-pop animate-in fade-in slide-in-from-top-1 duration-[140ms]'
+                            : `${menuPlacementClass(placement)} ${placement === 'center' ? 'max-h-[85vh] flex flex-col' : 'min-w-[min(520px,calc(100vw-32px))]'} bg-[var(--bg-1)] border border-[var(--line-2)] rounded-[var(--radius-lg)] shadow-pop animate-in fade-in slide-in-from-top-1 duration-[140ms]`
                     }
                     style={isMobile ? undefined : { animation: 'pop 140ms ease-out' }}
                 >

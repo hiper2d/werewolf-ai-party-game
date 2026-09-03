@@ -1,6 +1,10 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import { menuPlacementClass, useMenuPlacement } from './use-menu-placement';
+
+// The menu's max height (max-h-60), the room the placement rule needs.
+const MENU_HEIGHT = 240;
 
 export interface SelectOption {
     value: string;
@@ -33,6 +37,7 @@ export default function SelectDropdown({
 }: SelectDropdownProps) {
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
+    const placement = useMenuPlacement(dropdownRef, isOpen, MENU_HEIGHT);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -78,8 +83,11 @@ export default function SelectDropdown({
                 </svg>
             </button>
 
+            {isOpen && placement === 'center' && (
+                <div className="fixed inset-0 z-40 bg-black/50" onMouseDown={() => setIsOpen(false)} />
+            )}
             {isOpen && (
-                <div className="absolute z-50 w-full mt-1.5 bg-[var(--bg-1)] border border-[var(--line-2)] rounded-[var(--radius-lg)] shadow-pop max-h-60 overflow-y-auto">
+                <div className={`${menuPlacementClass(placement, 'sm')} bg-[var(--bg-1)] border border-[var(--line-2)] rounded-[var(--radius-lg)] shadow-pop max-h-60 overflow-y-auto`}>
                     {options.map((opt) => (
                         <button
                             key={opt.value}

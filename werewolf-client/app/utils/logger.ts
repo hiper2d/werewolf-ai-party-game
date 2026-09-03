@@ -15,6 +15,10 @@ class Logger {
     private config = DEFAULT_LOGGING_CONFIG;
     private flushTimer: ReturnType<typeof setTimeout> | null = null;
     private minLevel: LogLevel;
+    // Stamped on every line shipped to Better Stack so production and local dev — which
+    // share one source — can be told apart in queries (`env = 'production'`). Vercel sets
+    // VERCEL_ENV to production/preview/development; a laptop only has NODE_ENV.
+    private readonly env: string = process.env.VERCEL_ENV || process.env.NODE_ENV || 'development';
 
     constructor() {
         const sourceToken = process.env.BETTER_STACK_SOURCE_TOKEN || process.env.NEXT_PUBLIC_BETTER_STACK_SOURCE_TOKEN;
@@ -62,27 +66,35 @@ class Logger {
         return this.logtail || console;
     }
 
+    /** Structured fields for one line: the caller's args plus the env tag. Console output
+     * (no Better Stack) is left untouched so local logs don't grow a noisy `{ env }`. */
+    private tagged(args?: any): any {
+        if (!this.logtail) return args;
+        const fields = args && typeof args === 'object' && !Array.isArray(args) ? args : (args === undefined ? {} : { args });
+        return { ...fields, env: this.env };
+    }
+
     info(message: string, args?: any) {
         if (!this.shouldLog('info')) return;
-        this.logger.info(message, args);
+        this.logger.info(message, this.tagged(args));
         this.scheduleFlush();
     }
 
     warn(message: string, args?: any) {
         if (!this.shouldLog('warn')) return;
-        this.logger.warn(message, args);
+        this.logger.warn(message, this.tagged(args));
         this.scheduleFlush();
     }
 
     error(message: string, args?: any) {
         if (!this.shouldLog('error')) return;
-        this.logger.error(message, args);
+        this.logger.error(message, this.tagged(args));
         this.scheduleFlush();
     }
 
     debug(message: string, args?: any) {
         if (!this.shouldLog('debug')) return;
-        this.logger.debug(message, args);
+        this.logger.debug(message, this.tagged(args));
         this.scheduleFlush();
     }
 

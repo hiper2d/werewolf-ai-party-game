@@ -3,9 +3,10 @@
 import React, { useState } from 'react';
 import { Game, GAME_MASTER, GAME_ROLES, GAME_STATES, PLAY_STYLE_CONFIGS } from '@/app/api/game-models';
 import { getModelDisplayName } from '@/app/ai/ai-models';
-import { getAvatarUrl } from '@/app/utils/avatar-utils';
+import { getAvatarView } from '@/app/utils/avatar-utils';
 import { isPresetAvatarUrl } from '@/app/utils/preset-avatars';
 import { getAvatarGradient } from '@/app/utils/color-utils';
+import { focusToBackground, ImageFocus } from '@/app/utils/avatar-framing';
 import PlayerAvatar from '@/app/components/PlayerAvatar';
 
 /**
@@ -49,6 +50,9 @@ interface CharacterPosterProps {
     // Overrides the game-derived portrait URL: the design kit (no authed route
     // to hit) and the character card while browsing an alternate candidate.
     avatarUrl?: string;
+    // With avatarUrl: show only this part of the image (a card framed on a
+    // sheet). Without it the image is shown whole, cover-fitted, top-anchored.
+    cardFocus?: ImageFocus;
     className?: string;
 }
 
@@ -60,7 +64,7 @@ interface CharacterPosterProps {
  * it beside the speech bubble, clicking any avatar opens it in a modal.
  * @category Game
  */
-export default function CharacterPoster({ game, name, cornerChip, cost, hideCostOnNarrow = false, avatarUrl: avatarUrlOverride, className = '' }: CharacterPosterProps) {
+export default function CharacterPoster({ game, name, cornerChip, cost, hideCostOnNarrow = false, avatarUrl: avatarUrlOverride, cardFocus: cardFocusOverride, className = '' }: CharacterPosterProps) {
     const [storyOpen, setStoryOpen] = useState(false);
     const id = getCharacterIdentity(game, name);
     const { isGM, isHuman, isDead, role, roleVisible, story, modelName, playStyleName } = id;
@@ -72,7 +76,10 @@ export default function CharacterPoster({ game, name, cornerChip, cost, hideCost
         : roleVisible && role === GAME_ROLES.WEREWOLF
             ? { line: 'var(--danger-line)', glow: 'color-mix(in oklch, var(--danger) 32%, transparent)', text: 'var(--werewolf-fg)' }
             : { line: 'var(--line-3)', glow: 'color-mix(in oklch, var(--line-3) 40%, transparent)', text: 'var(--fg-1)' };
-    const avatarUrl = avatarUrlOverride ?? getAvatarUrl(game, name);
+    const view = avatarUrlOverride ? undefined : getAvatarView(game, name);
+    const avatarUrl = avatarUrlOverride ?? view?.url;
+    const cardFocus = avatarUrlOverride ? cardFocusOverride : view?.cardFocus;
+    const focused = cardFocus ? focusToBackground(cardFocus) : null;
     const showCost = cost !== undefined && cost > 0;
 
     return (
@@ -88,7 +95,22 @@ export default function CharacterPoster({ game, name, cornerChip, cost, hideCost
                     : 'var(--bg-2)',
             }}
         >
-            {avatarUrl ? (
+            {avatarUrl && focused ? (
+                // A card framed on a sheet (a reframed mannequin): the sheet
+                // is positioned so exactly the card shows.
+                <div
+                    role="img"
+                    aria-label={name}
+                    className={`absolute inset-0 ${isDead ? 'grayscale brightness-[.6]' : ''}`}
+                    style={{
+                        backgroundImage: `url(${avatarUrl})`,
+                        backgroundRepeat: 'no-repeat',
+                        backgroundSize: focused.backgroundSize,
+                        backgroundPosition: focused.backgroundPosition,
+                        ...(isPresetAvatarUrl(avatarUrl) ? {mixBlendMode: 'multiply' as const} : {}),
+                    }}
+                />
+            ) : avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element -- authed dynamic route
                 <img
                     src={avatarUrl}

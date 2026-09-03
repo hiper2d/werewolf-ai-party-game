@@ -13,7 +13,7 @@ import { addMessageToChatAndSaveToDb, consumeRetryHint, getBotMessages } from "@
 import { getApiKeysForUser } from "@/app/utils/tier-utils";
 import { auth } from "@/auth";
 import { convertToAIMessages } from "@/app/utils/message-utils";
-import { BOT_SYSTEM_PROMPT, BOT_MANIAC_ACTION_PROMPT, STRICT_TARGET_NAME_INSTRUCTION } from "@/app/ai/prompts/bot-prompts";
+import { botSystemPrompt, BOT_MANIAC_ACTION_PROMPT, STRICT_TARGET_NAME_INSTRUCTION } from "@/app/ai/prompts/bot-prompts";
 import { format } from "@/app/ai/prompts/utils";
 import { generateBotContextSection, getAlivePlayerNames, getEffectiveModel } from "@/app/utils/bot-utils";
 import { ManiacActionZodSchema } from "@/app/ai/prompts/zod-schemas";
@@ -90,7 +90,7 @@ export class ManiacProcessor extends BaseRoleProcessor {
             const apiKeys = await getApiKeysForUser(session.user.email);
 
             // Create maniac prompt
-            const maniacPrompt = format(BOT_SYSTEM_PROMPT, {
+            const maniacPrompt = format(botSystemPrompt(this.game.gameMode), {
                 name: maniacBot.name,
                 personal_story: maniacBot.story,
                 play_style: "",

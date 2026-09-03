@@ -27,11 +27,12 @@ You are an AI agent casting a chat-based version of the party game Werewolf: you
     - **Examples**: "Medieval Village", "Space Station", "Enchanted Forest", "Pirate Crew".
   </Theme>
 
-  <OptionalDescription>
-    - **Definition**: An optional description that provides additional details or customizations to the theme.
-    - **Examples**: "All characters should be females", "Add a horror element into the original setting".
-    - **Note**: This may be empty.
-  </OptionalDescription>
+  <GameMasterInstructions>
+    - **Definition**: The player's instructions to you, the Game Master, on how to generate this game: what the story should be about, what kind of characters to create, and what to pay attention to.
+    - **Authority**: These instructions OVERRIDE the defaults in this prompt wherever they conflict. Follow them for the scene, the cast, and every character. Only the hard constraints below (player count, name format, JSON format) cannot be overridden.
+    - **Examples**: "All characters should be females", "Add a horror element into the original setting", "Make the cast a single family with old grudges", "Set it in the crew's final night before the mutiny".
+    - **Note**: This may be empty — then use your own judgement within the theme.
+  </GameMasterInstructions>
 
   <NumberOfPlayers>
     - **Definition**: The number of characters to cast.
@@ -63,7 +64,7 @@ You are an AI agent casting a chat-based version of the party game Werewolf: you
     <SceneGeneration>
       Create a vivid and immersive scene description (2-3 sentences) that:
       - Sets the mood for the game within the provided <Theme>Theme</Theme>
-      - Incorporates elements from the <OptionalDescription>OptionalDescription</OptionalDescription> if given
+      - Follows the <GameMasterInstructions>GameMasterInstructions</GameMasterInstructions>, if given
       - **Explicitly mentions the game mechanics**: Reference that this is a deadly game where hidden enemies lurk among the group, and different sides must eliminate each other to survive
       - **Clearly references the roles from GameRoles**: Organically weave in mentions of the specific roles (werewolves, doctors, detectives, etc.) that will be present among the players
         * For evil-aligned roles: Mention werewolves or other threats hiding in plain sight
@@ -95,7 +96,7 @@ You are an AI agent casting a chat-based version of the party game Werewolf: you
       - A unique, single-word <Name>name</Name> appropriate to the theme, following the Character Sourcing Rule above. Do not use the <ExcludedName>ExcludedName</ExcludedName> or any similar names. **The name MUST contain only English ASCII letters (A-Z, a-z) and digits (0-9) — no spaces, accents, diacritics, apostrophes, hyphens, or non-Latin characters. Transliterate any names with non-ASCII characters (e.g., "Zoë" → "Zoe", "François" → "Francois", "Müller" → "Muller").**
       - A <Gender>gender</Gender> (male or female) that fits the character
 
-      Aim for a mix of genders, ages and social positions that gives the story room for conflict — unless the OptionalDescription asks otherwise.
+      Aim for a mix of genders, ages and social positions that gives the story room for conflict — unless the GameMasterInstructions ask otherwise.
     </Casting>
   </Task2>
 
@@ -147,7 +148,7 @@ You are an AI agent casting a chat-based version of the party game Werewolf: you
 export const CASTING_USER_PROMPT: string = `
 <Parameters>
   <Theme>%theme%</Theme>
-  <OptionalDescription>%description%</OptionalDescription>
+  <GameMasterInstructions>%description%</GameMasterInstructions>
   <NumberOfPlayers>%number_of_players%</NumberOfPlayers>
   <ExcludedName>%excluded_name%</ExcludedName>
   <GameRoles>%game_roles%</GameRoles>
@@ -176,7 +177,7 @@ You are an AI agent writing character sheets for a chat-based version of the par
 
 <Parameters>
   <Theme>The overarching theme or setting for the game.</Theme>
-  <OptionalDescription>Optional extra details or customizations to the theme. May be empty.</OptionalDescription>
+  <GameMasterInstructions>The player's instructions to the Game Master on what story and characters to generate and what to pay attention to. They override the defaults below wherever they conflict. May be empty.</GameMasterInstructions>
   <Scene>The opening scene of this game. Every sheet must fit inside it.</Scene>
   <FullCast>Every character in the game, in order. Use it for coherence — sheets may reference other cast members (a rival, a sibling, an old debt) — but write sheets ONLY for the characters listed in <Batch>.</FullCast>
   <Batch>The characters to write sheets for in this response: name and gender each. Write exactly one sheet per listed character, copying the name verbatim.</Batch>
@@ -258,7 +259,7 @@ You are an AI agent writing character sheets for a chat-based version of the par
 export const CHARACTER_SHEET_USER_PROMPT: string = `
 <Parameters>
   <Theme>%theme%</Theme>
-  <OptionalDescription>%description%</OptionalDescription>
+  <GameMasterInstructions>%description%</GameMasterInstructions>
   <Scene>%scene%</Scene>
   <FullCast>%full_cast%</FullCast>
   <Batch>

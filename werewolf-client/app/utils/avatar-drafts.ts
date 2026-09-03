@@ -7,11 +7,14 @@ import {
     AvatarDraft,
     AvatarDraftSpec,
     AvatarDraftState,
+    AvatarFraming,
     Game,
+    ReframeTarget,
     USER_TIERS,
     UserTier,
 } from "@/app/api/game-models";
 import {
+    applyReframe,
     AvatarSubject,
     AvatarVariantMap,
     billImages,
@@ -20,6 +23,7 @@ import {
     PendingWrite,
     portraitKeysFor,
     recordAbandonedSpend,
+    ReframeResult,
     runAvatarGeneration,
     sceneWritesFor,
     SpendLedger,
@@ -192,7 +196,7 @@ export async function runDraftGeneration(userEmail: string, subject: AvatarSubje
             },
         });
         const {variants, versions} = await writeCandidates(
-            draftRef, drawn.portraits, claim.existingVariants, sceneWritesFor(draftRef, drawn.scenes, {expireAt}), {expireAt},
+            draftRef, drawn.portraits, claim.existingVariants, sceneWritesFor(draftRef, drawn.scenes, {expireAt}), {expireAt}, drawn.sheet,
         );
 
         const costUSD = round6(ledger.spentUSD);
@@ -384,4 +388,16 @@ export async function adoptDraftWhenReady(gameId: string, userEmail: string, gam
         logger.warn(`Illustration draft not adopted; drawing for the game instead`, {gameId});
         await runAvatarGeneration(gameId, userEmail);
     }
+}
+
+/** Reframes one portrait in the user's draft — see applyReframe. The draft
+ * is addressed by the session's email, so ownership is implicit. */
+export async function reframeDraftAvatarFor(userEmail: string, key: string, target: ReframeTarget, framing: AvatarFraming): Promise<ReframeResult | null> {
+    const draftRef = draftRefFor(userEmail);
+    const snap = await draftRef.get();
+    if (!snap.exists) return null;
+    const draft = snap.data() as AvatarDraft;
+    if (draft.ownerEmail !== userEmail || draft.status !== 'ready') return null;
+    const expireAt = firestore.Timestamp.fromMillis(Date.now() + DRAFT_TTL_MS);
+    return applyReframe(draftRef, draft.avatarVariants ?? {}, key, target, framing, {expireAt});
 }
