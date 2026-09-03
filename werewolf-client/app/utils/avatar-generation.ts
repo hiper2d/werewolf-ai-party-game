@@ -46,7 +46,15 @@ export interface AvatarSubject {
     description: string;
     artStyle?: string;
     humanPlayerName: string;
-    bots: {name: string; gender: string; story: string}[];
+    bots: {name: string; gender: string; story: string; visualDescription?: string}[];
+}
+
+/** What the painter is told a character looks like: the dedicated visual description
+ * when the game has one, else the story's first sentence (legacy games — stories are
+ * written for role ambiguity, not appearance, so this is the weaker direction). */
+export function portraitDirection(bot: {story: string; visualDescription?: string}): string {
+    const visual = bot.visualDescription?.trim();
+    return visual ? visual : firstSentence(bot.story);
 }
 
 /** Every portrait key a set for this subject contains, in grid order. The
@@ -60,7 +68,7 @@ function buildCells(game: AvatarSubject): AvatarCell[] {
     const cells: AvatarCell[] = game.bots.map(bot => ({
         key: bot.name,
         label: bot.name,
-        prompt: `(${bot.gender}) "${bot.name}" — ${firstSentence(bot.story)}`,
+        prompt: `(${bot.gender}) "${bot.name}" — ${portraitDirection(bot)}`,
     }));
     cells.push({
         key: game.humanPlayerName,

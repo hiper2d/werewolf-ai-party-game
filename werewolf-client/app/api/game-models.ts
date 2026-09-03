@@ -77,6 +77,7 @@ export interface BotPreview {
     voiceStyle?: string; // Style instruction like "mysteriously", "excitedly"
     voiceInstructions?: string; // Legacy: detailed voice instructions (OpenAI format)
     playStyle: string;
+    visualDescription?: string; // Appearance only — the portrait/illustration reference (absent on legacy games)
     enableThinking?: boolean;
 }
 
@@ -136,7 +137,7 @@ export interface AvatarDraftSpec {
     description: string;
     artStyle?: string;
     humanPlayerName: string;
-    bots: { name: string; gender: 'male' | 'female'; story: string }[];
+    bots: { name: string; gender: 'male' | 'female'; story: string; visualDescription?: string }[];
 }
 
 export const AVATAR_DRAFTS_COLLECTION = 'avatarDrafts';
@@ -193,6 +194,7 @@ export interface Bot {
     voiceStyle?: string; // Style instruction like "mysteriously", "excitedly"
     voiceInstructions?: string; // Legacy: detailed voice instructions (OpenAI format)
     playStyle: string;
+    visualDescription?: string; // Appearance only — the portrait/illustration reference (absent on legacy games)
     eliminationDay?: number; // Track which day this bot was eliminated (undefined if alive)
     summary?: string; // Single consolidated summary that bot rewrites each day
     daySummaries?: string[]; // @deprecated Legacy: array of summaries for backward compatibility

@@ -299,6 +299,7 @@ export default function CreateNewGamePage() {
                 gender: bot.gender,
                 voice: bot.voice,
                 playStyle: bot.playStyle,
+                visualDescription: bot.visualDescription,
             })),
             humanPlayerName: gameData.name,
             humanPlayerRole: '',
@@ -348,7 +349,7 @@ export default function CreateNewGamePage() {
                 description: gameData.description,
                 artStyle,
                 humanPlayerName: gameData.name,
-                bots: gameData.bots.map(bot => ({ name: bot.name, gender: bot.gender, story: bot.story })),
+                bots: gameData.bots.map(bot => ({ name: bot.name, gender: bot.gender, story: bot.story, visualDescription: bot.visualDescription })),
             });
             setDraft(state);
         } catch (err: any) {
@@ -1214,6 +1215,18 @@ export default function CreateNewGamePage() {
                                         value={player.story}
                                         onChange={(e) => handlePlayerChange(index, 'story', e.target.value)}
                                         placeholder="Player's story"
+                                    />
+                                </div>
+
+                                {/* Visual description — what the portrait painter is told */}
+                                <div>
+                                    <label className={`${labelStyle} block mb-1.5`}>Appearance</label>
+                                    <ExpandableTextarea
+                                        className={inputStyle}
+                                        minHeight={44}
+                                        value={player.visualDescription ?? ''}
+                                        onChange={(e) => handlePlayerChange(index, 'visualDescription', e.target.value)}
+                                        placeholder="Face, hair, build, clothing — used to draw the portrait"
                                     />
                                 </div>
 

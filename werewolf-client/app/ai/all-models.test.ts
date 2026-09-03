@@ -32,8 +32,8 @@ import {
     ApiKeyMap, AIMessage, GAME_MASTER, GAME_ROLES, GameMessage, MessageType,
     PLAY_STYLE_CONFIGS, ROLE_CONFIGS,
 } from "@/app/api/game-models";
-import { BotVoteZodSchema, GameSetupZodSchema } from "@/app/ai/prompts/zod-schemas";
-import { STORY_SYSTEM_PROMPT, STORY_USER_PROMPT } from "@/app/ai/prompts/story-gen-prompts";
+import { BotVoteZodSchema } from "@/app/ai/prompts/zod-schemas";
+import { generateGamePreview, CHARACTER_SHEET_BATCH_SIZE } from "@/app/ai/preview-generation";
 import { getDefaultVoiceProvider, getVoiceConfig } from "@/app/ai/voice-config";
 import { BOT_SYSTEM_PROMPT, BOT_VOTE_PROMPT, BOT_REMINDER_POSTFIX, replyLengthInstruction } from "@/app/ai/prompts/bot-prompts";
 import { GM_COMMAND_INTRODUCE_YOURSELF } from "@/app/ai/prompts/gm-commands";
@@ -475,23 +475,22 @@ describe("Cross-provider thinking history swap via askText", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Story generation, built with the same code path as game-actions.ts
-// createGameWithPreview(): AgentFactory + STORY_SYSTEM_PROMPT, the story cap
-// raised to STORY_MAX_OUTPUT_TOKENS, and STORY_USER_PROMPT filled from the real
-// role/playstyle/voice config.
+// Story generation, through the exact production pipeline: generateGamePreview
+// (casting call, then character-sheet batches in parallel) with the same agent
+// factory closure previewGame uses — GM agent + configureStoryAgent output cap.
 //
-// This is the one call that emits a character object per bot, so it is where an
-// output cap actually binds — and it produced no requestStats rows to size from,
-// because the story path bills directly instead of going through
-// recordGameMasterTokenUsage. The per-agent live suites cover story generation
-// for 8 providers only, construct agents directly rather than through the
-// factory (so they never exercise the production cap), and use 3-4 bots. This
-// runs every model in the catalog at the largest lobby the UI allows.
+// The single-call version of this suite existed to find the model whose
+// 15-character JSON hit the output cap. The split pipeline makes every call small,
+// so what this now measures per model is: wall time for the whole pipeline, cost,
+// and whether the parallel batch burst trips a provider rate limit — the failure
+// mode that replaced truncation. Runs every model in the catalog at the largest
+// lobby the UI allows.
 // ---------------------------------------------------------------------------
 
 // 16-player lobby (the API-tier maximum in games/newgame) minus the human. The
-// point of the test is the worst case: a smaller count clears any sane cap.
+// point of the test is the worst case: the most parallel batches a lobby produces.
 const STORY_BOT_COUNT = 15;
+const HUMAN_NAME = "TestPlayer";
 
 const storyRolesText = [
     ROLE_CONFIGS[GAME_ROLES.WEREWOLF],
@@ -504,18 +503,7 @@ const storyPlayStylesText = Object.entries(PLAY_STYLE_CONFIGS)
     .map(([key, cfg]) => `* ${key}: ${cfg.name} - ${cfg.uiDescription}`)
     .join('\n');
 
-const storyUserPrompt = format(STORY_USER_PROMPT, {
-    theme: "Victorian Manor Mystery",
-    description: "A grand estate harbors dark secrets during a stormy night",
-    excluded_name: "TestPlayer",
-    number_of_players: STORY_BOT_COUNT,
-    game_roles: storyRolesText,
-    werewolf_count: 3,
-    play_styles: storyPlayStylesText,
-    available_voices: getVoiceConfig(getDefaultVoiceProvider()).getPromptDescription(),
-});
-
-const storyMessages: AIMessage[] = [{ role: 'user', content: storyUserPrompt }];
+const storyVoiceConfig = getVoiceConfig(getDefaultVoiceProvider());
 
 describe("All models - story generation at max lobby size", () => {
     for (const { key, llmType } of allModels) {
@@ -531,51 +519,73 @@ describe("All models - story generation at max lobby size", () => {
             continue;
         }
 
-        it(`${config.displayName} (${llmType}) should generate ${STORY_BOT_COUNT} characters without truncating`, async () => {
-            const agent = AgentFactory.createAgent(GAME_MASTER, STORY_SYSTEM_PROMPT, llmType, apiKeys, false);
-            // Same profile as game-actions.ts. Asserted rather than assumed: if the override is
-            // ever dropped, story generation silently falls back to the turn-sized defaults.
-            configureStoryAgent(agent);
-            expect(agent.maxOutputTokens).toBe(STORY_MAX_OUTPUT_TOKENS);
-            // Reasoning deliberately stays at the catalog default — see configureStoryAgent.
-            expect(agent.reasoningEffort).toBe(SupportedAiModels[llmType].reasoningEffort);
-            expect(agent.thinkingBudgetTokens).toBe(SupportedAiModels[llmType].thinkingBudgetTokens);
+        it(`${config.displayName} (${llmType}) should generate ${STORY_BOT_COUNT} characters through the split pipeline`, async () => {
+            const agents: any[] = [];
+            const createAgent = (systemPrompt: string) => {
+                const agent = AgentFactory.createAgent(GAME_MASTER, systemPrompt, llmType, apiKeys, false);
+                // Same profile as game-actions.ts. Asserted rather than assumed: if the override is
+                // ever dropped, story generation silently falls back to the turn-sized defaults.
+                configureStoryAgent(agent);
+                expect(agent.maxOutputTokens).toBe(STORY_MAX_OUTPUT_TOKENS);
+                // Reasoning deliberately stays at the catalog default — see configureStoryAgent.
+                expect(agent.reasoningEffort).toBe(SupportedAiModels[llmType].reasoningEffort);
+                expect(agent.thinkingBudgetTokens).toBe(SupportedAiModels[llmType].thinkingBudgetTokens);
+                agents.push(agent);
+                return agent;
+            };
 
-            const [setup, , tokenUsage] = await withPerf(
-                `Story generation (${STORY_BOT_COUNT} bots)`,
+            const [preview, , tokenUsage] = await withPerf(
+                `Story pipeline (${STORY_BOT_COUNT} bots)`,
                 config.displayName,
-                // A truncated response cuts the JSON mid-object, so schema parsing throwing
-                // here IS the truncation signal — there is no partial-success path.
-                () => agent.askWithZodSchema(GameSetupZodSchema, storyMessages),
+                async () => {
+                    const result = await generateGamePreview(createAgent, {
+                        theme: "Victorian Manor Mystery",
+                        description: "A grand estate harbors dark secrets during a stormy night",
+                        excludedName: HUMAN_NAME,
+                        botCount: STORY_BOT_COUNT,
+                        werewolfCount: 3,
+                        gameRolesText: storyRolesText,
+                        playStylesText: storyPlayStylesText,
+                        voiceConfig: storyVoiceConfig,
+                    });
+                    return [result, '', result.tokenUsage] as [typeof result, string, typeof result.tokenUsage];
+                },
             );
 
-            expect(setup).toBeDefined();
-            expect(typeof setup.scene).toBe('string');
-            expect(setup.scene.length).toBeGreaterThan(50);
-            expect(Array.isArray(setup.players)).toBe(true);
-            expect(setup.players.length).toBe(STORY_BOT_COUNT);
+            // One casting agent + one character-sheet agent, exactly as previewGame builds them
+            expect(agents.length).toBe(2);
+            expect(preview.stages.length).toBe(1 + Math.ceil(STORY_BOT_COUNT / CHARACTER_SHEET_BATCH_SIZE));
+
+            expect(typeof preview.scene).toBe('string');
+            expect(preview.scene.length).toBeGreaterThan(50);
+            expect(storyVoiceConfig.getVoiceById(preview.gameMasterVoice)).toBeDefined();
+            expect(preview.players.length).toBe(STORY_BOT_COUNT);
 
             const validPlayStyles = Object.keys(PLAY_STYLE_CONFIGS);
-            for (const player of setup.players) {
-                expect(typeof player.name).toBe('string');
+            for (const player of preview.players) {
                 expect(player.name.length).toBeGreaterThan(0);
+                expect(player.name).not.toBe(HUMAN_NAME);
                 expect(player.story.length).toBeGreaterThan(0);
+                expect(player.visualDescription.length).toBeGreaterThan(0);
                 expect(validPlayStyles).toContain(player.playStyle);
+                // Voice is real and matches the character's gender (assignUniqueVoices guarantees it)
+                expect(storyVoiceConfig.getVoiceById(player.voice)?.gender).toBe(player.gender);
             }
             // Names must be unique — the game keys bots by name.
-            expect(new Set(setup.players.map(p => p.name)).size).toBe(STORY_BOT_COUNT);
-
-            // The measurement this test exists to produce: how close the worst realistic
-            // story runs to the cap. Anything near 1.0 means STORY_MAX_OUTPUT_TOKENS is
-            // too tight for this model and needs a catalog override.
-            if (tokenUsage?.outputTokens) {
-                const used = tokenUsage.outputTokens / STORY_MAX_OUTPUT_TOKENS;
-                console.log(
-                    `${config.displayName}: ${tokenUsage.outputTokens} output tokens ` +
-                    `(${(used * 100).toFixed(1)}% of the ${STORY_MAX_OUTPUT_TOKENS} story cap)`
-                );
-                expect(tokenUsage.outputTokens).toBeLessThan(STORY_MAX_OUTPUT_TOKENS);
+            expect(new Set(preview.players.map(p => p.name)).size).toBe(STORY_BOT_COUNT);
+            // Voices are unique until a gender's pool runs out; beyond that, reuse is expected.
+            for (const gender of ['male', 'female'] as const) {
+                const voices = preview.players.filter(p => p.gender === gender).map(p => p.voice);
+                const poolSize = storyVoiceConfig.getVoicesByGender(gender).length;
+                expect(new Set(voices).size).toBe(Math.min(voices.length, poolSize));
             }
-        }, 240000);
+
+            // Per-stage breakdown: the number to watch is the slowest single call, since the
+            // batches run in parallel and the pipeline's wall time is casting + max(batch).
+            const stageLine = preview.stages
+                .map(s => `${s.label}: ${s.tokenUsage?.outputTokens ?? '?'} out / ${s.tokenUsage?.durationMs ?? '?'}ms`)
+                .join('; ');
+            console.log(`${config.displayName}: ${tokenUsage?.totalTokens} tokens, $${tokenUsage?.costUSD.toFixed(4)} — ${stageLine}`);
+        }, 300000);
     }
 });

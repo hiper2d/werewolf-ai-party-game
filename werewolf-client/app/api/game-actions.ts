@@ -32,7 +32,7 @@ import {
 } from "@/app/api/game-models";
 import {auth} from "@/auth";
 import {AgentFactory} from "@/app/ai/agent-factory";
-import {STORY_SYSTEM_PROMPT, STORY_USER_PROMPT} from "@/app/ai/prompts/story-gen-prompts";
+import {generateGamePreview} from "@/app/ai/preview-generation";
 import {getUserTierAndApiKeys} from "@/app/utils/tier-utils";
 import {sanitizePlayerName} from "@/app/utils/name-utils";
 import {sanitizeArtStyle} from "@/app/utils/art-style";
@@ -40,7 +40,6 @@ import {getUserTier, getUserBalance, getVoiceProvider, updateUserMonthlySpending
 import {PAID_TIER_MARKUP} from "@/app/config/credit-packages";
 import {getDefaultVoiceProvider, getVoiceConfig} from "@/app/ai/voice-config";
 import {normalizeSpendings} from "@/app/utils/spending-utils";
-import {convertToAIMessage} from "@/app/utils/message-utils";
 import {serializeMessageForFirestore} from "@/app/api/message-serialization";
 import {LLM_CONSTANTS, configureStoryAgent, SupportedAiModels} from "@/app/ai/ai-models";
 import {
@@ -51,8 +50,6 @@ import {
     validateModelUsageForTier
 } from "@/app/ai/model-limit-utils";
 import {AbstractAgent} from '@hiper2d/ai-agents';
-import {format} from "@/app/ai/prompts/utils";
-import {GameSetupZodSchema} from "@/app/ai/prompts/zod-schemas";
 import {ensureUserCanAccessGame} from "@/app/api/tier-guards";
 import {logger} from "@/app/utils/logger";
 import {after} from "next/server";
@@ -258,15 +255,6 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
         }
     }
 
-    const storyTellAgent: AbstractAgent = AgentFactory.createAgent(
-        GAME_MASTER, STORY_SYSTEM_PROMPT, resolvedGmAiType, apiKeys, false
-    );
-    storyTellAgent.userId = session.user.email;
-    // One response carries the whole game setup — a character object per bot — so this is the
-    // one call that needs far more output room than a turn (see configureStoryAgent).
-    // Reasoning depth stays at the catalog default, same as every other call.
-    configureStoryAgent(storyTellAgent);
-
     // Gather role configurations for the story generation
     const gameRoleConfigs = [];
     
@@ -296,34 +284,24 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
         `* ${key}: ${config.name} - ${config.uiDescription}`
     ).join('\n');
 
-    // Get available voices for the prompt
-    const availableVoicesText = voiceConfig.getPromptDescription();
-
-    const userPrompt = format(STORY_USER_PROMPT, {
+    // Two-stage generation (casting, then character sheets in parallel batches) — see
+    // generateGamePreview. Each stage gets its own GM agent with the story output profile.
+    const aiResponse = await generateGamePreview((systemPrompt) => {
+        const agent: AbstractAgent = AgentFactory.createAgent(GAME_MASTER, systemPrompt, resolvedGmAiType, apiKeys, false);
+        agent.userId = session.user!.email!;
+        configureStoryAgent(agent);
+        return agent;
+    }, {
         theme: gamePreview.theme,
         description: gamePreview.description,
-        excluded_name: gamePreview.name,
-        number_of_players: botCount,
-        game_roles: gameRolesText,
-        werewolf_count: gamePreview.werewolfCount,
-        play_styles: playStylesText,
-        available_voices: availableVoicesText
+        excludedName: gamePreview.name,
+        botCount,
+        werewolfCount: gamePreview.werewolfCount,
+        gameRolesText,
+        playStylesText,
+        voiceConfig,
     });
-
-    const storyMessage: GameMessage = {
-        id: null,
-        recipientName: RECIPIENT_ALL,
-        authorName: GAME_MASTER,
-        msg: userPrompt,
-        messageType: MessageType.GM_COMMAND,
-        day: 1,
-        timestamp: null
-    };
-
-    const [aiResponse, , tokenUsage] = await storyTellAgent.askWithZodSchema(GameSetupZodSchema, [convertToAIMessage(storyMessage)]);
-    if (!aiResponse) {
-        throw new Error('Failed to get AI response');
-    }
+    const tokenUsage = aiResponse.tokenUsage;
 
     logger.info(`Preview token usage: ${JSON.stringify(tokenUsage)}, tier: ${tier}`);
     if (tokenUsage) {
@@ -376,7 +354,7 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
         }
     }
 
-    const bots: BotPreview[] = aiResponse.players.map((bot: { name: string; gender: string; story: string; playStyle?: string; voice?: string; voiceStyle?: string }) => {
+    const bots: BotPreview[] = aiResponse.players.map((bot) => {
         let aiType: string;
 
         // Filter currently available candidates based on capacity
@@ -407,27 +385,6 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
 
         consumeModelUsage(aiType, tier, usageCounts, 'for bots');
 
-        // Assign gender and voice (AI-selected or fallback)
-        const gender = bot.gender as 'male' | 'female';
-        // Use AI-selected voice if provided and valid, otherwise fallback to random
-        let voice = bot.voice;
-        if (!voice || !voiceConfig.getVoiceById(voice)) {
-            // Fallback to random voice for the gender
-            const availableVoices = voiceConfig.getVoicesByGender(gender);
-            voice = availableVoices.length > 0
-                ? availableVoices[Math.floor(Math.random() * availableVoices.length)].id
-                : getRandomVoiceForGender(gender); // Ultimate fallback
-        }
-        const voiceStyle = bot.voiceStyle || undefined;
-
-        // Use AI-selected playstyle if available, otherwise fallback to random
-        let playStyle = bot.playStyle;
-        if (!playStyle || !Object.values(PLAY_STYLES).includes(playStyle as any)) {
-            // Fallback to random if AI didn't provide a valid playstyle
-            const availablePlayStyles = Object.values(PLAY_STYLES);
-            playStyle = availablePlayStyles[Math.floor(Math.random() * availablePlayStyles.length)];
-        }
-
         return {
             // Names act as identifiers throughout the game (vote targets, GM bot
             // selection, message routing). Sanitize the GM-generated name to the
@@ -438,32 +395,22 @@ export async function previewGame(gamePreview: GamePreview): Promise<GamePreview
             name: sanitizePlayerName(bot.name) || bot.name,
             story: bot.story,
             playerAiType: aiType,
-            gender: gender,
-            voice: voice,
-            voiceStyle: voiceStyle,
-            playStyle: playStyle
+            gender: bot.gender,
+            voice: bot.voice,
+            voiceStyle: bot.voiceStyle,
+            playStyle: bot.playStyle,
+            visualDescription: bot.visualDescription,
         };
     });
 
     validateModelUsageForTier(tier, resolvedGmAiType, bots.map(bot => bot.playerAiType));
 
-    // Game Master voice selection (AI-selected or fallback)
-    let gameMasterVoice = aiResponse.gameMasterVoice;
-    if (!gameMasterVoice || !voiceConfig.getVoiceById(gameMasterVoice)) {
-        // Fallback to random male voice for Game Master
-        const availableMaleVoices = voiceConfig.getVoicesByGender('male');
-        gameMasterVoice = availableMaleVoices.length > 0
-            ? availableMaleVoices[Math.floor(Math.random() * availableMaleVoices.length)].id
-            : getRandomVoiceForGender('male'); // Ultimate fallback
-    }
-    const gameMasterVoiceStyle = aiResponse.gameMasterVoiceStyle || undefined;
-
     return {
         ...gamePreview,
         gameMasterAiType: resolvedGmAiType,
         voiceProvider: voiceProvider,
-        gameMasterVoice: gameMasterVoice,
-        gameMasterVoiceStyle: gameMasterVoiceStyle,
+        gameMasterVoice: aiResponse.gameMasterVoice,
+        gameMasterVoiceStyle: aiResponse.gameMasterVoiceStyle,
         scene: aiResponse.scene,
         bots: bots,
         tokenUsage: tokenUsage
@@ -544,6 +491,7 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
                 voice: bot.voice,
                 voiceStyle: bot.voiceStyle,
                 playStyle: bot.playStyle,
+                ...(bot.visualDescription?.trim() ? {visualDescription: bot.visualDescription.trim()} : {}),
             };
         });
 

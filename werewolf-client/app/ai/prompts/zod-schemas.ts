@@ -15,19 +15,30 @@ export const BotAnswerZodSchema = z.object({
   reply: z.string().describe("The bot's response message")
 });
 
-// Game setup schema for story generation
-export const GameSetupZodSchema = z.object({
-  scene: z.string().describe("The vivid scene description"),
+// Story generation runs in two stages (see app/ai/preview-generation.ts):
+// stage 1 casts the lobby, stage 2 writes character sheets in parallel batches.
+
+// Stage 1 — scene, Game Master voice, and the cast list (names + genders only)
+export const GameCastingZodSchema = z.object({
+  scene: z.string().describe("The vivid scene description (2-3 sentences)"),
   gameMasterVoice: z.string().describe("Voice ID for the Game Master (from available voices)"),
   gameMasterVoiceStyle: z.string().describe("Style instruction for Game Master (e.g., 'authoritatively', 'dramatically')"),
+  cast: z.array(z.object({
+    name: z.string().describe("Single-word unique name (ASCII letters and digits only)"),
+    gender: z.string().describe("male or female")
+  })).describe("The cast list: one entry per player, names unique")
+});
+
+// Stage 2 — one batch of character sheets for a slice of the cast
+export const CharacterSheetBatchZodSchema = z.object({
   players: z.array(z.object({
-    name: z.string().describe("Single-word unique name"),
-    gender: z.string().describe("male or female"),
-    story: z.string().describe("1-2 sentence character background"),
+    name: z.string().describe("The character's name, copied verbatim from the batch"),
+    story: z.string().describe("3-5 sentence character background"),
     playStyle: z.string().describe("The playstyle identifier for this character (e.g., aggressive_provoker, protective_team_player, etc.)"),
     voice: z.string().describe("Voice ID for this character (from available voices, matching character gender)"),
-    voiceStyle: z.string().describe("Style instruction (1-3 words, e.g., 'mysteriously', 'excitedly')")
-  })).describe("Array of player characters")
+    voiceStyle: z.string().describe("Style instruction (1-3 words, e.g., 'mysteriously', 'excitedly')"),
+    visualDescription: z.string().describe("1-2 sentences of physical appearance only: face, hair, build, clothing, one distinguishing detail")
+  })).describe("One character sheet per name in the batch")
 });
 
 
@@ -90,7 +101,8 @@ export const NightResultsStoryZodSchema = z.object({
 // =============================================================================
 
 export type BotAnswerZod = z.infer<typeof BotAnswerZodSchema>;
-export type GameSetupZod = z.infer<typeof GameSetupZodSchema>;
+export type GameCastingZod = z.infer<typeof GameCastingZodSchema>;
+export type CharacterSheetBatchZod = z.infer<typeof CharacterSheetBatchZodSchema>;
 export type GmBotSelectionZod = z.infer<typeof GmBotSelectionZodSchema>;
 export type BotVoteZod = z.infer<typeof BotVoteZodSchema>;
 export type WerewolfActionZod = z.infer<typeof WerewolfActionZodSchema>;
@@ -120,7 +132,8 @@ export { validateResponse, safeValidateResponse } from '@hiper2d/ai-agents';
 
 export const ZodSchemaRegistry = {
   bot_answer: BotAnswerZodSchema,
-  game_setup: GameSetupZodSchema,
+  game_casting: GameCastingZodSchema,
+  character_sheet_batch: CharacterSheetBatchZodSchema,
   gm_bot_selection: GmBotSelectionZodSchema,
   bot_vote: BotVoteZodSchema,
   werewolf_action: WerewolfActionZodSchema,

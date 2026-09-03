@@ -17,6 +17,7 @@
  */
 
 import { previewGame } from './game-actions';
+import { GameCastingZodSchema } from '@/app/ai/prompts/zod-schemas';
 import { db } from '@/firebase/server';
 import { auth } from '@/auth';
 import { AgentFactory } from '@/app/ai/agent-factory';
@@ -105,9 +106,8 @@ const fakeVoiceConfig = {
         gender === 'male' ? [{ id: 'm-voice' }] : [{ id: 'f-voice' }],
 };
 
-/** Agent whose generated story returns exactly `botCount` players. */
-function stubAgentReturning(botCount: number) {
-    const setup = {
+function makeGameSetup(botCount: number) {
+    return {
         scene: 'A deterministic test scene',
         gameMasterVoice: 'gm-voice',
         gameMasterVoiceStyle: 'calmly',
@@ -118,14 +118,32 @@ function stubAgentReturning(botCount: number) {
             playStyle: 'normal',
             voice: i % 2 === 0 ? 'm-voice' : 'f-voice',
             voiceStyle: 'softly',
+            visualDescription: `Look of bot ${i + 1}`,
         })),
     };
+}
+
+/** Agent whose generated story returns exactly `botCount` players. */
+function stubAgentReturning(botCount: number) {
+    const setup = makeGameSetup(botCount);
     (AgentFactory.createAgent as jest.Mock).mockReturnValue({
         userId: '',
-        askWithZodSchema: jest
-            .fn()
-            .mockResolvedValue([setup, 'raw-response', DEFAULT_TOKEN_USAGE]),
+        askWithZodSchema: jest.fn().mockImplementation(async (schema: unknown) =>
+            [splitSetupForSchema(setup, schema), 'raw-response', DEFAULT_TOKEN_USAGE]),
     });
+}
+
+/**
+ * The pipeline makes a casting call (scene + cast list) and then character-sheet
+ * batch calls; answer each with the matching slice of the single fake setup. A batch
+ * call gets every sheet — the pipeline picks out the names it asked for.
+ */
+function splitSetupForSchema(setup: ReturnType<typeof makeGameSetup>, schema: unknown) {
+    if (schema === GameCastingZodSchema) {
+        const { players, ...casting } = setup;
+        return { ...casting, cast: players.map(p => ({ name: p.name, gender: p.gender })) };
+    }
+    return { players: setup.players };
 }
 
 /**

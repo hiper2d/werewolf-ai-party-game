@@ -9,6 +9,7 @@
  */
 
 import { previewGame, createGame } from './game-actions';
+import { GameCastingZodSchema } from '@/app/ai/prompts/zod-schemas';
 import { db } from '@/firebase/server';
 import { auth } from '@/auth';
 import { AgentFactory } from '@/app/ai/agent-factory';
@@ -122,16 +123,28 @@ function makeGameSetup(botCount: number) {
             playStyle: 'normal',
             voice: i % 2 === 0 ? 'm-voice' : 'f-voice',
             voiceStyle: 'softly',
+            visualDescription: `Look of bot ${i + 1}`,
         })),
     };
 }
 
+/**
+ * The pipeline makes a casting call (scene + cast list) and then character-sheet
+ * batch calls; answer each with the matching slice of the single fake setup. A batch
+ * call gets every sheet — the pipeline picks out the names it asked for. Only the
+ * casting call reports usage, so the summed preview usage equals `tokenUsage`.
+ */
 function stubAgentReturning(botCount: number, tokenUsage: any = DEFAULT_TOKEN_USAGE) {
+    const setup = makeGameSetup(botCount);
     const agent = {
         userId: '',
-        askWithZodSchema: jest
-            .fn()
-            .mockResolvedValue([makeGameSetup(botCount), 'raw-response', tokenUsage]),
+        askWithZodSchema: jest.fn().mockImplementation(async (schema: unknown) => {
+            if (schema === GameCastingZodSchema) {
+                const { players, ...casting } = setup;
+                return [{ ...casting, cast: players.map(p => ({ name: p.name, gender: p.gender })) }, 'raw-response', tokenUsage];
+            }
+            return [{ players: setup.players }, 'raw-response', undefined];
+        }),
     };
     (AgentFactory.createAgent as jest.Mock).mockReturnValue(agent);
     return agent;

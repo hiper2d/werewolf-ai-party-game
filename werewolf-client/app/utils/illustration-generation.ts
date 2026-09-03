@@ -46,7 +46,7 @@ const BRIEF_OUTPUT_PRICE_PER_M = IMAGE_MODEL_PRICING[BRIEF_MODEL].outputPricePer
  */
 async function writeIllustrationBrief(apiKey: string, game: Game, story: string, sourceLabel: string = "the narration of last night's events"): Promise<{brief: string; costUSD: number} | null> {
     const cast = [
-        ...game.bots.map(b => `${b.name} (${b.gender}): ${b.story.slice(0, 160)}`),
+        ...game.bots.map(b => `${b.name} (${b.gender}): ${b.visualDescription?.trim() || b.story.slice(0, 160)}`),
         `${game.humanPlayerName}: the protagonist of this tale`,
     ].join('\n');
     const prompt = `You are the illustrator's assistant for a social-deduction story game. Below are the setting, the cast, and ${sourceLabel}. Write a concrete visual brief (2-4 sentences) for ONE illustration of its most dramatic moment: name the specific characters involved, describe exactly what each is doing, where in the setting it happens, and the mood. Only include characters that appear in the source text. Never reveal hidden roles beyond what the source text itself states. Reply with the brief only, no preamble.

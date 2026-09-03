@@ -80,10 +80,12 @@ export function normalizeDraftSpec(spec: AvatarDraftSpec): {subject: AvatarSubje
     const bots = spec.bots.map(bot => {
         const name = sanitizePlayerName(String(bot?.name ?? ''));
         if (!name) throw new Error(`Player name "${bot?.name}" must contain at least one letter or number.`);
+        const visualDescription = String(bot?.visualDescription ?? '').trim().slice(0, 600);
         return {
             name,
             gender: bot?.gender === 'female' ? 'female' : 'male',
             story: String(bot?.story ?? '').trim().slice(0, 1000),
+            ...(visualDescription ? {visualDescription} : {}),
         };
     });
     const artStyle = sanitizeArtStyle(spec.artStyle);
