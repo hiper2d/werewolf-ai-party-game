@@ -13,6 +13,25 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        id: "reframe-portraits", date: "Sep 2026", tags: ["Design"],
+        title: "Reframe any portrait",
+        body: (<>Every cast is drawn on <strong>one sheet</strong>, and the game cuts each character out of it.
+            When a cut lands badly — half a forehead, a neighbour&apos;s shoulder — you can now fix it yourself:
+            open a portrait, <strong>move and resize the card frame</strong> on the sheet, then place the
+            <strong> round avatar</strong> inside the card. Nothing is redrawn and nothing is charged; the
+            new crop shows up everywhere the character appears. It works on the new-game preview and on
+            character cards during a game, and the preset mannequins get their own sheet to reframe too.
+            The preview page itself was redesigned along the way, with grouped settings and a compact cast
+            list. Portraits drawn before this update keep their original crop.</>),
+        media: {
+            label: "reframing a portrait",
+            images: [
+                {src: "/news/reframe-portrait.jpg", alt: "The reframe editor: Dracula's card frame on the drawn sheet, the avatar circle inside the card, and the resulting card and avatar"},
+            ],
+        },
+        links: [{label: "Create a game", href: "/games"}],
+    },
+    {
         id: "fable-5-1-gemini-3-8", date: "Sep 2026", tags: ["Models"],
         title: "Claude Fable 5.1 and Gemini 3.8 Flash",
         body: (<>Two slots move up a version, both at the <strong>same price</strong> as before. Anthropic&apos;s
