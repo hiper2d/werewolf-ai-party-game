@@ -31,6 +31,14 @@ describe('findDividers', () => {
         expect(findDividers(plane).rows).toEqual([{ start: 140, end: 145 }]);
     });
 
+    it('treats a dark name plate hugging a line as part of the boundary', () => {
+        const plane = sheet(400, 400, [200], [100, 200, 300]);
+        for (let y = 180; y < 200; y++) for (let x = 0; x < 400; x++) plane.data[y * 400 + x] = 15; // plate above the line
+        const grid = detectSheetGrid(plane, 4, 2);
+        expect(findDividers(plane).rows).toEqual([{ start: 180, end: 205 }]);
+        expect(grid.cells[0].top + grid.cells[0].height).toBeLessThanOrEqual(180);
+    });
+
     it('does not take a dark portrait for a line', () => {
         const plane = sheet(400, 300, [], []);
         // A dark 60%-wide band: clothing across most of a row, never a divider.
@@ -53,17 +61,54 @@ describe('detectSheetGrid', () => {
         expect(grid.cells[8].top + grid.cells[8].height).toBe(396);
     });
 
-    it('falls back to the equal split when fewer rows were drawn than asked', () => {
-        const plane = sheet(400, 400, [200], [100, 200, 300]); // 4x2 drawn, 4x4 asked
+    it('uses the drawn grid even when it is not the one requested', () => {
+        const plane = sheet(600, 400, [200], [100, 200, 300, 400, 500]); // 6x2 drawn, 4x4 asked
         const grid = detectSheetGrid(plane, 4, 4);
-        expect(grid.detected).toBe(false);
-        expect(grid.cells).toEqual(equalSplitGrid(400, 400, 4, 4).cells);
+        expect(grid.detected).toBe(true);
+        expect(grid.cols).toBe(6);
+        expect(grid.rows).toBe(2);
+        expect(grid.cells).toHaveLength(12);
         expect(describeDividers(plane)).toContain('rows@200-205');
     });
 
-    it('falls back when the lines make cells too thin to hold a face', () => {
-        const plane = sheet(400, 300, [20, 40], [100, 200, 300]);
-        expect(detectSheetGrid(plane, 4, 3).detected).toBe(false);
+    it('falls back to the equal split when no column lines are found', () => {
+        const plane = sheet(400, 400, [200], []);
+        const grid = detectSheetGrid(plane, 4, 4);
+        expect(grid.detected).toBe(false);
+        expect(grid.cells).toEqual(equalSplitGrid(400, 400, 4, 4).cells);
+    });
+
+    it('ignores lines that would leave a sliver instead of a cell', () => {
+        const plane = sheet(400, 300, [10, 30], [100, 200, 300]);
+        const grid = detectSheetGrid(plane, 4, 3);
+        expect(grid.detected).toBe(true);
+        expect(grid.rows).toBe(1);
+        expect(grid.cells).toHaveLength(4);
+    });
+
+    it('ignores hairline specks thinner than a drawn line', () => {
+        const plane = sheet(400, 400, [200], [100, 200, 300], 6);
+        for (let x = 0; x < 400; x++) plane.data[300 * 400 + x] = 10; // one dark pixel row
+        expect(findDividers(plane).rows).toEqual([{ start: 200, end: 205 }]);
+    });
+
+    it('reads column lines per row band, so rows may differ', () => {
+        // Top band: 2 columns (line at 200). Bottom band: 4 columns.
+        const plane = sheet(400, 400, [200], []);
+        for (let y = 0; y < 200; y++) for (let t = 0; t < 6; t++) plane.data[y * 400 + 200 + t] = 20;
+        for (let y = 206; y < 400; y++) for (const x of [100, 200, 300]) for (let t = 0; t < 6; t++) plane.data[y * 400 + x + t] = 20;
+        const grid = detectSheetGrid(plane, 4, 2);
+        expect(grid.detected).toBe(true);
+        expect(grid.cells).toHaveLength(6);
+        expect(grid.cells[0].width).toBeGreaterThan(150);
+        expect(grid.cells[2].width).toBeLessThan(100);
+    });
+
+    it('lets a band without lines borrow the layout above it', () => {
+        const plane = sheet(400, 400, [200], []);
+        for (let y = 0; y < 200; y++) for (let t = 0; t < 6; t++) plane.data[y * 400 + 200 + t] = 20;
+        const grid = detectSheetGrid(plane, 2, 2);
+        expect(grid.cells).toHaveLength(4);
     });
 });
 

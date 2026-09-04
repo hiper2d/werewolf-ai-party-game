@@ -121,3 +121,13 @@ Where the code differs from the draft above:
 - Mannequin sheet: `public/presets/sheet.webp` (3072x1536, 6 columns of 512 px cells: male 1–8, female 1–8, GM) built by `scripts/build-preset-sheet.mjs`; `PRESET_SHEET_URL`, `PRESET_SHEET_SIZE`, `presetSheetCell`, `getPresetFraming` in `preset-avatars.ts`.
 - UI: `ReframeModal` (`app/components/`), the redesigned new-game page and `IllustrationsPanel` per the handoff; the in-game `CharacterCard` gets a reframe entry for the viewed candidate or the mannequin.
 - Tests: `sheet-detection.test.ts`, `avatar-framing.test.ts`, `avatar-sheets.test.ts` (sheet write, framing bookkeeping, retention).
+
+### Detection hardening and the 5x3 grid (evening of 2026-09-03)
+
+Three more real sheets showed the model's grid habits: 6x3 for a 4x4 request (Dracula draft 1), an irregular sheet with two clean rows of 4 and a third row of 6 line-less cells (Dracula draft 2), and — once asked for 5x3 — two compliant 5x3 sheets, one of them with dark name plates under every portrait despite the no-text rule.
+
+- `detectSheetGrid` now trusts whatever grid the lines form (the request is only the equal-split fallback); row lines are found over the full width, column lines **per row band** (a band with no lines borrows the layout above); lines must be 3 px to 8 % of the sheet thick (specks out, name plates in — a plate then sits outside its cell, which is what we want), and a line that would leave a span under 12 % of the sheet is ignored.
+- `gridFor`: 13–15 cells → **5x3** (480x597 cells on the 4:3 canvas). Every deviation the model made was towards square-to-portrait cells; both 5x3 test draws complied. 4x4 (landscape cells) stays only for >15, which a 12-player table never reaches.
+- Re-detection on all five stored sheets: 5x3 ✓, 5x3 ✓, 4x4 ✓, 6x3 ✓, and the irregular sheet as 4+4+2 (its third row has no lines to find; reframe by hand).
+- `scripts/recut-sheet.ts` re-cuts a stored round with the current slicer (game or draft) — used to repair the first Dracula draft without a redraw.
+- Preview pipeline: model failures are now logged with the stage (`casting the lobby` / `writing character sheets, batch i of n`), the model and the truncation flag, and the page appends the stage to its message.

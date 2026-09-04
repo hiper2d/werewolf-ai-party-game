@@ -551,6 +551,9 @@ export default function CreateNewGamePage() {
         } catch (err: any) {
             // Provide user-friendly error messages for common issues
             let userFriendlyError = err.message;
+            // The server tags model failures with the pipeline stage ("(while
+            // casting the lobby)"); keep that tail on whatever friendly text follows.
+            const stageTail = /\(while [^)]+\)\s*$/.exec(err.message)?.[0];
 
             if (err.message.includes('failed to produce a valid response')) {
                 userFriendlyError = `The Game Master model failed to produce a valid response — the output was malformed or cut off. This happens occasionally; generate the preview again, or pick a different Game Master model.`;
@@ -562,6 +565,9 @@ export default function CreateNewGamePage() {
                 userFriendlyError = `Unable to connect to the AI service. Please try again.`;
             }
 
+            if (stageTail && !userFriendlyError.includes(stageTail)) {
+                userFriendlyError = `${userFriendlyError} Failed ${stageTail.slice(1, -1)}.`;
+            }
             setError(userFriendlyError);
             console.error("Error previewing game:", err);
         } finally {

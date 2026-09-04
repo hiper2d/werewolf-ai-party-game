@@ -25,7 +25,7 @@ Pick any model for the Game Master and for each individual bot:
 
 | Provider | Models                                                                         |
 |----------|--------------------------------------------------------------------------------|
-| **OpenAI** | GPT-5.5, GPT-5.4-mini                                                          |
+| **OpenAI** | GPT-5.6 Sol, GPT-5.6 Terra, GPT-5.6 Luna (always-on reasoning)   |
 | **Anthropic** | Claude Fable 5.1 (always-on reasoning), Claude 5 Opus, Claude 5 Sonnet, Claude 4.5 Haiku |
 | **Google** | Gemini 3.1 Pro Preview, Gemini 3.8 Flash, Gemini 3.5 Flash Lite |
 | **DeepSeek** | DeepSeek V4 Flash, DeepSeek V4 Pro (with or without Thinking)                  |

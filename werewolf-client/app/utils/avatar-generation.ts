@@ -2,7 +2,7 @@ import {db} from "@/firebase/server";
 import {firestore} from "firebase-admin";
 import {Game, USER_TIERS, UserTier, AVATAR_GM_KEY, SCENE_WELCOME_KEY, SCENE_NIGHT_KEY, AVATAR_VARIANTS_COLLECTION, avatarVariantKey, avatarSheetKey, MANNEQUIN_VARIANT_INDEX, AvatarFraming, AvatarVariantEntry, CARD_HEIGHT_PX, CARD_WIDTH_PX, ImageRect, ReframeTarget} from "@/app/api/game-models";
 import {defaultFraming, fitFraming, isFramingShape} from "@/app/utils/avatar-framing";
-import {describeDividers, detectSheetGrid} from "@/app/utils/sheet-detection";
+import {describeDividers, detectSheetGrid, equalSplitGrid} from "@/app/utils/sheet-detection";
 import {PRESET_SHEET_SIZE} from "@/app/utils/preset-avatars";
 import {getUserTierAndApiKeys} from "@/app/utils/tier-utils";
 import {updateUserMonthlySpending, deductBalance} from "@/app/api/user-actions";
@@ -17,13 +17,17 @@ const AVATAR_MODEL = IMAGE_MODEL_CONSTANTS.AVATARS;
 const IMAGE_OUTPUT_PRICE_PER_M = IMAGE_MODEL_PRICING[AVATAR_MODEL].imageOutputPricePerM;
 const TEXT_INPUT_PRICE_PER_M = IMAGE_MODEL_PRICING[AVATAR_MODEL].textInputPricePerM;
 
-// Grid dimensions by cell count (bots + human player + Game Master).
-// The model reliably fills row-major grids up to 4x4 in one 2K image.
+// Grid dimensions by cell count (bots + human player + Game Master) on the
+// 4:3 canvas. Cells must come out square-to-portrait: asked for 4x4
+// (landscape 600x448 cells) the model redrew the sheet as 4x3, 6x3 and once
+// as an irregular two-layout sheet (2026-09-03) — every time towards taller
+// cells. 5x3 keeps 480x597 cells for the 13-15 a full table needs.
 function gridFor(cells: number): { cols: number; rows: number } {
     if (cells <= 6) return {cols: 3, rows: 2};
     if (cells <= 8) return {cols: 4, rows: 2};
     if (cells <= 9) return {cols: 3, rows: 3};
     if (cells <= 12) return {cols: 4, rows: 3};
+    if (cells <= 15) return {cols: 5, rows: 3};
     return {cols: 4, rows: 4};
 }
 
@@ -217,16 +221,23 @@ async function sliceGrid(sharp: any, raw: Buffer, cells: AvatarCell[], count: nu
     const plane = {width, height, data: new Uint8Array(data.buffer, data.byteOffset, data.length)};
     const gridCells = detectSheetGrid(plane, cols, rows);
     if (!gridCells.detected) {
-        // The known failure: fewer rows drawn than asked. The equal split is
-        // wrong for those, but the sheet is kept, so the owner can reframe.
-        logger.warn(`AVATAR_GRID_MISMATCH: sheet dividers don't match the ${cols}x${rows} request; using equal split`, {
+        logger.warn(`AVATAR_GRID_MISMATCH: no divider lines found on the ${cols}x${rows} sheet; using equal split`, {
             ...logContext, width, height, dividers: describeDividers(plane),
         });
+    } else if (gridCells.cols !== cols || gridCells.rows !== rows) {
+        // The model drew a different grid than asked (4x3 and 6x3 have both
+        // happened for a 4x4 request). Its cells are still in row-major
+        // order, so they are used as drawn; only characters past the last
+        // drawn cell fall back to the equal split — and can be reframed.
+        logger.warn(`AVATAR_GRID_MISMATCH: sheet drawn as ${gridCells.cols}x${gridCells.rows}, requested ${cols}x${rows}; using the drawn cells`, {
+            ...logContext, width, height, drawnCells: gridCells.cells.length, needed: count,
+        });
     }
+    const fallback = equalSplitGrid(width, height, cols, rows).cells;
 
     const slices: AvatarSlice[] = [];
     for (let i = 0; i < count; i++) {
-        const framing = defaultFraming(gridCells.cells[i]);
+        const framing = defaultFraming(gridCells.cells[i] ?? fallback[i]);
         const jpeg = await sharp(grid)
             .extract(framing.card)
             .resize(CARD_WIDTH_PX, CARD_HEIGHT_PX)
@@ -880,4 +891,66 @@ export async function applyReframe(
         new firestore.FieldPath('avatarVersions', key), version,
     );
     return {key, target, version, framing};
+}
+
+/**
+ * Re-cuts every character's candidate of one round from the stored sheet
+ * with the CURRENT slicer (detection + default framing), overwriting the
+ * cards and their drawn framing. For sheets cut before a slicer fix — a
+ * detector improvement makes yesterday's bad cuts recoverable without a
+ * redraw. `keys` must be the sheet's row-major order (portraitKeysFor /
+ * the draft's `keys`). Returns how many cards were re-cut.
+ */
+export async function recutRoundFromSheet(
+    parentRef: firestore.DocumentReference,
+    variants: AvatarVariantMap,
+    keys: string[],
+    round: number,
+    docExtras: Record<string, any> = {},
+    requested?: {cols: number; rows: number},
+): Promise<number> {
+    const sheetSnap = await parentRef.collection('avatars').doc(avatarSheetKey(round)).get();
+    const sheetDoc = sheetSnap.exists ? (sheetSnap.data() as any) : null;
+    if (!sheetDoc?.data) throw new Error(`No sheet stored for round ${round}`);
+    const sharp = (await import('sharp')).default;
+    const sheet = Buffer.from(sheetDoc.data, 'base64');
+    const {data, info} = await sharp(sheet).greyscale().raw().toBuffer({resolveWithObject: true});
+    const plane = {width: info.width, height: info.height, data: new Uint8Array(data.buffer, data.byteOffset, data.length)};
+    const {cols, rows} = requested ?? gridFor(keys.length);
+    const grid = detectSheetGrid(plane, cols, rows);
+    const fallback = equalSplitGrid(info.width, info.height, cols, rows).cells;
+
+    const now = Date.now();
+    const writes: PendingWrite[] = [];
+    const updates: [firestore.FieldPath, unknown][] = [];
+    let cut = 0;
+    for (let i = 0; i < keys.length; i++) {
+        const key = keys[i];
+        const entry = variants[key];
+        if (!entry || round < (entry.first ?? 0) || round >= entry.n) continue;
+        const framing = defaultFraming(grid.cells[i] ?? fallback[i]);
+        const jpeg = await cutCard(sharp, sheet, framing.card);
+        const image = {data: jpeg.toString('base64'), mime: 'image/jpeg', createdAt: now, ...docExtras};
+        writes.push({
+            ref: parentRef.collection(AVATAR_VARIANTS_COLLECTION).doc(avatarVariantKey(key, round)),
+            data: {...image, sheet: round, card: framing.card, circle: framing.circle},
+        });
+        if (entry.sel === round) writes.push({ref: parentRef.collection('avatars').doc(key), data: image});
+        updates.push(
+            [new firestore.FieldPath('avatarVariants', key, 'framing', String(round)), framing],
+            [new firestore.FieldPath('avatarVariants', key, 'drawn', String(round)), framing],
+            [new firestore.FieldPath('avatarVersions', key), now],
+        );
+        cut++;
+    }
+    writes.push({
+        ref: parentRef.collection('avatars').doc(avatarSheetKey(round)),
+        data: {...sheetDoc, cells: grid.cells.slice(0, keys.length), detected: grid.detected},
+    });
+    await commitChunked(writes);
+    if (updates.length > 0) {
+        const [first, ...rest] = updates;
+        await parentRef.update(first[0], first[1], ...rest.flat());
+    }
+    return cut;
 }

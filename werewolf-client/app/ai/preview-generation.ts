@@ -13,7 +13,8 @@
  * story test (app/ai/all-models.test.ts) runs the same function so it cannot drift from
  * previewGame.
  */
-import {AbstractAgent, AIMessage, TokenUsage} from '@hiper2d/ai-agents';
+import {AbstractAgent, AIMessage, ModelInvalidResponseError, TokenUsage} from '@hiper2d/ai-agents';
+import {logger} from '@/app/utils/logger';
 import {getRandomVoiceForGender, PLAY_STYLES} from '@/app/api/game-models';
 import {VoiceConfig, VoiceMetadata} from '@/app/ai/voice-config';
 import {format} from '@/app/ai/prompts/utils';
@@ -112,7 +113,8 @@ export async function generateGamePreview(
         available_voices: input.voiceConfig.getPromptDescription(),
     });
     const castingAgent = createAgent(CASTING_SYSTEM_PROMPT);
-    const [casting, , castingUsage] = await castingAgent.askWithZodSchema(GameCastingZodSchema, [userMessage(castingPrompt)]);
+    const [casting, , castingUsage] = await askStage(castingAgent, 'casting the lobby', {theme: input.theme}, () =>
+        castingAgent.askWithZodSchema(GameCastingZodSchema, [userMessage(castingPrompt)]));
     if (!casting) {
         throw new Error('Failed to get AI response');
     }
@@ -142,7 +144,9 @@ export async function generateGamePreview(
             play_styles: input.playStylesText,
             available_voices: describeVoices(voices),
         });
-        const [sheets, , usage] = await sheetAgent.askWithZodSchema(CharacterSheetBatchZodSchema, [userMessage(prompt)]);
+        const stageLabel = `writing character sheets, batch ${i + 1} of ${batches.length}`;
+        const [sheets, , usage] = await askStage(sheetAgent, stageLabel, {theme: input.theme, batch: batch.map(c => c.name)}, () =>
+            sheetAgent.askWithZodSchema(CharacterSheetBatchZodSchema, [userMessage(prompt)]));
         if (!sheets) {
             throw new Error(`Failed to get AI response for character batch ${i + 1}`);
         }
@@ -186,6 +190,32 @@ export async function generateGamePreview(
         tokenUsage: sumTokenUsage(stages.map(s => s.tokenUsage)),
         stages,
     };
+}
+
+/**
+ * Runs one model call of the pipeline and, when it fails, records WHICH stage
+ * and model failed before rethrowing. Without this a "malformed or cut off"
+ * error reached the player with no trace of whether casting or a sheet batch
+ * broke — nothing was logged at all (2026-09-03). The stage is appended to the
+ * message in a fixed form the page can show; the original text stays intact so
+ * its error mapping keeps matching.
+ */
+async function askStage<T>(agent: AbstractAgent, stage: string, context: Record<string, unknown>, ask: () => Promise<T>): Promise<T> {
+    try {
+        return await ask();
+    } catch (error: any) {
+        const truncated = error instanceof ModelInvalidResponseError ? error.truncated : undefined;
+        logger.error(`Preview generation failed while ${stage}`, {
+            ...context,
+            stage,
+            model: agent.name,
+            error: error?.message,
+            ...(truncated !== undefined ? {truncated} : {}),
+        });
+        const wrapped = new Error(`${error?.message ?? 'Unknown error'} (while ${stage})`);
+        wrapped.cause = error;
+        throw wrapped;
+    }
 }
 
 function userMessage(content: string): AIMessage {
