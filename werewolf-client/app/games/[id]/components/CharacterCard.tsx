@@ -8,6 +8,7 @@ import { cardFocus, ImageFocus } from '@/app/utils/avatar-framing';
 import { getAvatarGradient } from '@/app/utils/color-utils';
 import ReframeModal from '@/app/components/ReframeModal';
 import CharacterPoster, { getCharacterIdentity } from './CharacterPoster';
+import CharacterVoicePanel, { VoiceSelection } from './CharacterVoicePanel';
 
 // Past this many candidates the dots stop being countable at a glance and
 // the switcher shows a numeric counter instead.
@@ -34,6 +35,14 @@ interface CharacterCardProps {
     // Overrides the game-derived portrait URL. Only for rendering outside a
     // live game (the design kit, previews) where /api/games/... can't resolve.
     avatarUrl?: string;
+    // Server action (game-actions.ts updateCharacterVoice), injected like
+    // onSelectVariant: the owner changes a bot's or the Game Master's voice
+    // (within the game's voice set) and style. Absent = the voice line is read-only.
+    onUpdateVoice?: (gameId: string, name: string, selection: VoiceSelection) => Promise<Game>;
+    // Auditions an unsaved voice selection with a sample line (the chat's TTS
+    // pipeline, injected so this component stays free of the audio singleton).
+    onSpeakSample?: (text: string, selection: VoiceSelection) => Promise<void>;
+    onStopSample?: () => void;
 }
 
 /**
@@ -44,7 +53,7 @@ interface CharacterCardProps {
  * same wherever the player meets them.
  * @category Game
  */
-export default function CharacterCard({ game, name, onClose, isOwner = false, onGameChange, onSelectVariant, onReframe, avatarUrl: avatarUrlOverride }: CharacterCardProps) {
+export default function CharacterCard({ game, name, onClose, isOwner = false, onGameChange, onSelectVariant, onReframe, avatarUrl: avatarUrlOverride, onUpdateVoice, onSpeakSample, onStopSample }: CharacterCardProps) {
     // The reframe editor sits over the card; Escape closes the editor first.
     const [reframing, setReframing] = useState(false);
     useEffect(() => {
@@ -67,7 +76,20 @@ export default function CharacterCard({ game, name, onClose, isOwner = false, on
     const pendingSelection = useRef<number | null>(null);
     const committing = useRef(false);
 
-    if (!getCharacterIdentity(game, name).exists) return null;
+    const identity = getCharacterIdentity(game, name);
+    if (!identity.exists) return null;
+    // Humans have no voice; anyone else shows theirs, the owner may change it.
+    const showVoice = !identity.isHuman;
+    const saveVoice = isOwner && onUpdateVoice
+        ? async (selection: VoiceSelection) => {
+            const updated = await onUpdateVoice(game.id, name, selection);
+            onGameChange?.({
+                bots: updated.bots,
+                gameMasterVoice: updated.gameMasterVoice,
+                gameMasterVoiceStyle: updated.gameMasterVoiceStyle,
+            });
+        }
+        : undefined;
     // Cycle order: the mannequin sketch first, then the kept generated
     // candidates (their stored indices, which don't start at 0 once older
     // draws age out past the cap).
@@ -225,8 +247,17 @@ export default function CharacterCard({ game, name, onClose, isOwner = false, on
             >
                 <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg>
             </button>
-            <div className="w-[min(340px,calc(100vw-32px))] cine-card-enter" onClick={e => e.stopPropagation()}>
+            <div className="w-[min(340px,calc(100vw-32px))] max-h-[calc(100vh-24px)] overflow-y-auto cine-card-enter" onClick={e => e.stopPropagation()}>
                 <CharacterPoster game={game} name={name} avatarUrl={portraitSrc} cardFocus={portraitFocus} cornerChip={switcher} />
+                {showVoice && (
+                    <CharacterVoicePanel
+                        game={game}
+                        name={name}
+                        onSave={saveVoice}
+                        onSpeakSample={saveVoice ? onSpeakSample : undefined}
+                        onStopSample={onStopSample}
+                    />
+                )}
             </div>
             {reframing && reframeSource && (
                 <div onClick={e => e.stopPropagation()}>

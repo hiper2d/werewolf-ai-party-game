@@ -1,8 +1,34 @@
 import { GoogleGenAI } from "@google/genai";
+import { AUDIO_MODEL_CONSTANTS } from "@/app/ai/ai-models";
 
 export interface GoogleTtsAudioOptions {
   voiceName: string;       // e.g., "Kore", "Puck"
-  voiceStyle?: string;     // e.g., "mysteriously", "excitedly"
+  voiceStyle?: string;     // e.g., "mysteriously", "excitedly", or a longer direction
+}
+
+export interface GoogleTtsResult {
+  audio: ArrayBuffer;      // WAV, 24kHz mono 16-bit
+  usage: { inputTokens: number; outputTokens: number }; // text prompt tokens / audio tokens
+}
+
+// Gemini reports ~32 audio tokens per second of speech (measured 2026-09-05:
+// 267-304 tokens for 8-10s). Used only when the response carries no usage.
+const AUDIO_TOKENS_PER_SECOND = 32;
+const PCM_BYTES_PER_SECOND = 24000 * 2;
+
+/**
+ * Gemini TTS has no instruction field: delivery is directed in the text itself,
+ * "Say cheerfully: Have a wonderful day!" in the docs. A short style (the 1-3
+ * word adverb the story generator writes for every character) becomes that
+ * "Say X:" prefix; a longer direction is used as written, ending in the colon
+ * that separates the direction from the line to read. The same voiceStyle
+ * field feeds OpenAI's `instructions`, so one value works for both providers.
+ */
+export function buildGoogleTtsPrompt(text: string, voiceStyle?: string): string {
+  const style = voiceStyle?.trim().replace(/[:.!,;\s]+$/, '');
+  if (!style) return text;
+  const isShort = style.split(/\s+/).length <= 3 && !/[.!?,;]/.test(style);
+  return isShort ? `Say ${style}: ${text}` : `${style}:\n${text}`;
 }
 
 /**
@@ -57,24 +83,22 @@ function writeString(view: DataView, offset: number, str: string): void {
 
 /**
  * Core Google TTS call: text + API key in, WAV audio bytes out.
- * No auth, tier, or cost logic — that lives in app/api/google-tts-actions.ts.
+ * No auth, tier, or cost logic — that lives in app/api/tts-actions.ts (via the voice agent factory).
  */
 export async function generateGoogleTtsAudio(
   text: string,
   apiKey: string,
   options: GoogleTtsAudioOptions
-): Promise<ArrayBuffer> {
+): Promise<GoogleTtsResult> {
   const client = new GoogleGenAI({ apiKey });
 
-  // Prepare the text with style instruction if provided
-  let inputText = text;
-  if (options.voiceStyle) {
-    inputText = `Say ${options.voiceStyle}: ${text}`;
-  }
+  const inputText = buildGoogleTtsPrompt(text, options.voiceStyle);
 
-  // Generate speech using Gemini TTS model
+  // generateContent (not the newer interactions API): both serve the 3.1 TTS
+  // model (verified 2026-09-05), and this one is typed in the installed SDK
+  // and reports usageMetadata, which the billing below needs.
   const response = await client.models.generateContent({
-    model: "gemini-2.5-flash-preview-tts",
+    model: AUDIO_MODEL_CONSTANTS.GOOGLE_TTS,
     contents: [{ parts: [{ text: inputText }] }],
     config: {
       responseModalities: ['AUDIO'],
@@ -117,5 +141,15 @@ export async function generateGoogleTtsAudio(
     pcmData[i] = binaryString.charCodeAt(i);
   }
 
-  return pcmToWav(pcmData);
+  // Token usage drives billing ($/1M text in, $/1M audio out). Audio tokens
+  // are the candidates count; if the response carries none, estimate from the
+  // audio length rather than bill zero.
+  const usageMetadata = (response as any).usageMetadata ?? {};
+  const inputTokens: number = usageMetadata.promptTokenCount ?? 0;
+  const reportedOutput: number | undefined = usageMetadata.candidatesTokenCount;
+  const outputTokens = reportedOutput && reportedOutput > 0
+    ? reportedOutput
+    : Math.ceil((pcmData.length / PCM_BYTES_PER_SECOND) * AUDIO_TOKENS_PER_SECOND);
+
+  return { audio: pcmToWav(pcmData), usage: { inputTokens, outputTokens } };
 }

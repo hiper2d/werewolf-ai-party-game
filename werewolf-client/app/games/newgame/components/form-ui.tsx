@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useCallback, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 /** Small building blocks the new-game form and its preview share. */
 
@@ -14,12 +15,48 @@ export const secondaryButton = "px-3.5 py-[7px] text-[12px] font-medium rounded-
 export const primaryButton = "px-4 py-[7px] text-[12px] font-semibold rounded-[var(--radius-md)] bg-[var(--accent)] text-[var(--accent-fg)] hover:brightness-110 whitespace-nowrap transition-all duration-[120ms] disabled:opacity-50 disabled:cursor-not-allowed";
 export const iconButton = "w-8 h-8 rounded-[var(--radius-md)] bg-[var(--bg-3)] border border-[var(--line-2)] text-[var(--fg-1)] hover:bg-[var(--bg-4)] hover:text-[var(--fg-0)] transition-all duration-[120ms] flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed";
 
-/** The "?" hint: a popover that opens on hover and toggles on click (touch). */
+/** The "?" hint: a popover that opens on hover and toggles on click (touch).
+ *  Rendered in a portal with fixed positioning so it flips above the button and
+ *  clamps to the viewport instead of running off the bottom or the sides. */
 export function InfoButton({ label, children, size = 20, align = 'left' }: { label: string; children: React.ReactNode; size?: number; align?: 'left' | 'right' }) {
     const [open, setOpen] = useState(false);
+    const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+    const buttonRef = useRef<HTMLButtonElement>(null);
+    const popoverRef = useRef<HTMLSpanElement>(null);
+
+    const place = useCallback(() => {
+        const button = buttonRef.current, popover = popoverRef.current;
+        if (!button || !popover) return;
+        const rect = button.getBoundingClientRect();
+        const { offsetWidth: width, offsetHeight: height } = popover;
+        const margin = 8, gap = 8;
+        // Below the button by default; above it when that would overflow the bottom.
+        let top = rect.bottom + gap;
+        if (top + height > window.innerHeight - margin) {
+            const above = rect.top - gap - height;
+            top = above >= margin ? above : Math.max(margin, window.innerHeight - margin - height);
+        }
+        let left = align === 'right' ? rect.right - width : rect.left;
+        left = Math.min(Math.max(margin, left), Math.max(margin, window.innerWidth - margin - width));
+        setPos({ top, left });
+    }, [align]);
+
+    useLayoutEffect(() => {
+        if (!open) { setPos(null); return; }
+        place();
+        // Follow the button while anything under it scrolls, and on resize.
+        window.addEventListener('scroll', place, true);
+        window.addEventListener('resize', place);
+        return () => {
+            window.removeEventListener('scroll', place, true);
+            window.removeEventListener('resize', place);
+        };
+    }, [open, place]);
+
     return (
         <span className="relative inline-flex items-center">
             <button
+                ref={buttonRef}
                 type="button"
                 aria-label={label}
                 className="flex-none rounded-full bg-[var(--bg-3)] border border-[var(--line-2)] text-[var(--fg-2)] hover:bg-[var(--bg-4)] hover:text-[var(--fg-0)] transition-all duration-[120ms] grid place-items-center text-[11px] font-medium leading-none"
@@ -30,26 +67,32 @@ export function InfoButton({ label, children, size = 20, align = 'left' }: { lab
             >
                 ?
             </button>
-            {open && (
-                <span className={`absolute z-10 w-64 sm:w-72 p-3 bg-[var(--bg-1)] border border-[var(--line-2)] rounded-[var(--radius-lg)] shadow-pop text-[13px] text-[var(--fg-1)] top-full mt-2 ${align === 'right' ? 'right-0' : 'left-0'}`}>
+            {open && typeof document !== 'undefined' && createPortal(
+                <span
+                    ref={popoverRef}
+                    className="fixed z-50 w-64 sm:w-72 max-w-[calc(100vw-16px)] max-h-[70vh] overflow-y-auto p-3 bg-[var(--bg-1)] border border-[var(--line-2)] rounded-[var(--radius-lg)] shadow-pop text-[13px] text-[var(--fg-1)] pointer-events-none"
+                    style={{ top: pos?.top ?? 0, left: pos?.left ?? 0, visibility: pos ? 'visible' : 'hidden' }}
+                >
                     {children}
-                </span>
+                </span>,
+                document.body
             )}
         </span>
     );
 }
 
 /** Two-way pill toggle (Role-play | Plain, Short | Long). */
-export function SegmentedControl<T extends string>({ value, options, onChange }: { value: T; options: { value: T; label: string }[]; onChange: (value: T) => void }) {
+export function SegmentedControl<T extends string>({ value, options, onChange, disabled = false }: { value: T; options: { value: T; label: string }[]; onChange: (value: T) => void; disabled?: boolean }) {
     return (
-        <span className="flex bg-[var(--bg-2)] border border-[var(--line-2)] rounded-[var(--radius-md)] p-[2px]">
+        <span className={`flex bg-[var(--bg-2)] border border-[var(--line-2)] rounded-[var(--radius-md)] p-[2px] ${disabled ? 'opacity-60' : ''}`}>
             {options.map(o => (
                 <button
                     key={o.value}
                     type="button"
                     aria-pressed={o.value === value}
+                    disabled={disabled}
                     onClick={() => onChange(o.value)}
-                    className={`px-3 py-[5px] rounded-[6px] text-[12px] font-medium whitespace-nowrap transition-all duration-[120ms] ${
+                    className={`px-3 py-[5px] rounded-[6px] text-[12px] font-medium whitespace-nowrap transition-all duration-[120ms] disabled:cursor-not-allowed ${
                         o.value === value ? 'bg-[var(--accent-soft)] text-[var(--accent)]' : 'bg-transparent text-[var(--fg-2)] hover:text-[var(--fg-0)]'}`}
                 >
                     {o.label}

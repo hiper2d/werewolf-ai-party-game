@@ -6,3 +6,5 @@ export {
     calculateOpenAITtsCost,
     calculateOpenAISttCost,
 } from './openai-audio-pricing';
+export { calculateGoogleTtsCost, calculateGoogleSttCost } from './google-audio-pricing';
+export type { GoogleTtsUsage, GoogleSttUsage } from './google-audio-pricing';

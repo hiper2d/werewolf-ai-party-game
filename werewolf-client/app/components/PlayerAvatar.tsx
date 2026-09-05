@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { getAvatarGradient } from '@/app/utils/color-utils';
 import { isPresetAvatarUrl } from '@/app/utils/preset-avatars';
 import { focusToBackground, ImageFocus } from '@/app/utils/avatar-framing';
+import { useSettledImage } from '@/app/utils/use-settled-image';
 
 interface PlayerAvatarProps {
     name: string;
@@ -32,17 +33,12 @@ export default function PlayerAvatar({ name, size = 32, isGM = false, isDead = f
 
     // The portrait streams through an authed route; until it arrives the circle
     // shows the classic gradient + initial, then the image fades in over it.
-    // Image() instances share the browser cache, so many avatars of the same
-    // player cost one request.
-    const [imgLoaded, setImgLoaded] = useState(false);
-    useEffect(() => {
-        if (!avatarUrl) { setImgLoaded(false); return; }
-        let cancelled = false;
-        const img = new Image();
-        img.onload = () => { if (!cancelled) setImgLoaded(true); };
-        img.src = avatarUrl;
-        return () => { cancelled = true; };
-    }, [avatarUrl]);
+    // When the portrait changes (a new candidate picked, a reframe), the
+    // previous one stays on — with its own crop and blend — until the new one
+    // has loaded. Image() instances share the browser cache, so many avatars
+    // of the same player cost one request.
+    const shown = useSettledImage(avatarUrl ? { url: avatarUrl, focus } : undefined);
+    const shownUrl = shown?.url;
 
     // Generated portraits are head-and-shoulders busts: anchor near the top and
     // zoom slightly so the face fills the circle. Preset mannequins are waist-up
@@ -51,17 +47,17 @@ export default function PlayerAvatar({ name, size = 32, isGM = false, isDead = f
     // placeholder is distinct by pose + color.
     // A framed portrait shows exactly its circle — the owner placed it, so no
     // extra zoom on top.
-    const preset = Boolean(avatarUrl && isPresetAvatarUrl(avatarUrl));
-    const focused = focus ? focusToBackground(focus) : null;
-    const background = avatarUrl && imgLoaded
+    const preset = Boolean(shownUrl && isPresetAvatarUrl(shownUrl));
+    const focused = shown?.focus ? focusToBackground(shown.focus) : null;
+    const background = shownUrl
         ? focused
-            ? `url(${avatarUrl}) ${focused.backgroundPosition}/${focused.backgroundSize} no-repeat, linear-gradient(135deg, ${c1} 0%, ${c2} 100%)`
+            ? `url(${shownUrl}) ${focused.backgroundPosition}/${focused.backgroundSize} no-repeat, linear-gradient(135deg, ${c1} 0%, ${c2} 100%)`
             : preset
-                ? `url(${avatarUrl}) center top/cover no-repeat, linear-gradient(135deg, ${c1} 0%, ${c2} 100%)`
-                : `url(${avatarUrl}) center 15%/140% auto no-repeat, linear-gradient(135deg, ${c1} 0%, ${c2} 100%)`
+                ? `url(${shownUrl}) center top/cover no-repeat, linear-gradient(135deg, ${c1} 0%, ${c2} 100%)`
+                : `url(${shownUrl}) center 15%/140% auto no-repeat, linear-gradient(135deg, ${c1} 0%, ${c2} 100%)`
         : `linear-gradient(135deg, ${c1} 0%, ${c2} 100%)`;
 
-    const showPortrait = Boolean(avatarUrl && imgLoaded);
+    const showPortrait = Boolean(shownUrl);
 
     return (
         <div
@@ -70,7 +66,7 @@ export default function PlayerAvatar({ name, size = 32, isGM = false, isDead = f
                 width: size,
                 height: size,
                 background,
-                ...(preset && imgLoaded ? { backgroundBlendMode: 'multiply, normal' } : {}),
+                ...(preset ? { backgroundBlendMode: 'multiply, normal' } : {}),
                 fontSize,
                 color: 'white',
                 border: '1px solid rgba(0,0,0,0.2)',

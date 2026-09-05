@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { getGame, updateBotModel, updateGameMasterModel, clearGameErrorState, setGameErrorState, afterGameDiscussion, retryWithModelOverride } from "@/app/api/game-actions";
+import { getGame, updateBotModel, updateGameMasterModel, updateCharacterVoice, clearGameErrorState, setGameErrorState, afterGameDiscussion, retryWithModelOverride } from "@/app/api/game-actions";
+import { ttsService } from "@/app/services/tts-service";
 import { startNewDay, summarizePastDay, selectDayResponders } from "@/app/api/night-actions";
 import GameChat, { type PhaseControls } from "@/app/games/[id]/components/GameChat";
 import { btnFlowPrimary, btnFlowPrimaryStyle, btnFlowDanger, btnFlowSecondary, btnRailCancel, MoonIcon, SunriseIcon, ReplayIcon, MaskIcon, ExitIcon } from "@/app/games/[id]/components/PhaseStrip";
@@ -157,7 +158,9 @@ function GamePageContent({
     // previous portrait stays as a candidate on the character card; the new
     // ones become the shown faces. Free games get FREE_TIER_AVATAR_REGENS of
     // these, paid games are unlimited (billed like any image).
-    const redrawsLeft = game.createdWithTier === USER_TIERS.PAID
+    const isPaidGame = game.createdWithTier === USER_TIERS.PAID;
+
+    const redrawsLeft = isPaidGame
         ? Infinity
         : Math.max(0, FREE_TIER_AVATAR_REGENS - (game.avatarRegenCount ?? 0));
     const canRedraw = isOwner && game.avatarsStatus === 'ready';
@@ -271,7 +274,7 @@ function GamePageContent({
     // Calculate vote urgency based on message count vs threshold
     const voteUrgency = useMemo(() => {
         if (game.gameState !== GAME_STATES.DAY_DISCUSSION) {
-            return { percentage: 0, isUrgent: false, isWarning: false, messagesLeft: 0 };
+            return { percentage: 0, remainingPct: 100, isUrgent: false, isWarning: false, messagesLeft: 0 };
         }
         const alivePlayersCount = game.bots.filter(bot => bot.isAlive).length + 1; // +1 for human
         const threshold = alivePlayersCount * AUTO_VOTE_COEFFICIENT;
@@ -280,6 +283,8 @@ function GamePageContent({
         const messagesLeft = Math.max(0, threshold - currentMessages);
         return {
             percentage: Math.min(percentage, 100),
+            // Discussion budget still on the table, shown on the Vote button.
+            remainingPct: Math.max(0, Math.round(100 - percentage)),
             isUrgent: percentage >= 90,
             isWarning: percentage >= 70,
             messagesLeft
@@ -900,9 +905,11 @@ function GamePageContent({
                         onClick={() => setVoteConfirmOpen(true)}
                         title={voteUrgency.isUrgent
                             ? `Vote now! Auto-voting in ${Math.ceil(voteUrgency.messagesLeft)} messages`
-                            : `Start the voting phase (${Math.round(voteUrgency.percentage)}% to auto-vote)`}
+                            : `Start the voting phase \u2014 ${voteUrgency.remainingPct}% of the discussion left (~${Math.ceil(voteUrgency.messagesLeft)} messages until auto-vote)`}
                     >
-                        Vote {(voteUrgency.isUrgent || voteUrgency.isWarning) && '\u26A0\uFE0F'}
+                        Vote
+                        <span className="ml-1.5 text-[11px] tabular-nums opacity-60">{voteUrgency.remainingPct}%</span>
+                        {(voteUrgency.isUrgent || voteUrgency.isWarning) && ' \u26A0\uFE0F'}
                     </button>
                     <button
                         className={`${btnGhost} ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
@@ -1007,22 +1014,25 @@ function GamePageContent({
                 note: showNightGameOverCTA ? pendingGameOverReason : undefined,
                 actions: (
                     <>
-                        <button
-                            className={btnFlowSecondary}
-                            disabled={!areControlsEnabled}
-                            onClick={async () => {
-                                setClearNightMessages(true);
-                                const result = await runGameAction(() => replayNight(game.id));
-                                if (result) {
-                                    applyActionResult(result);
-                                }
-                                setTimeout(() => setClearNightMessages(false), 100);
-                            }}
-                            title="Clear night messages and replay the night phase actions"
-                        >
-                            <ReplayIcon />
-                            Replay Night
-                        </button>
+                        {/* A replay re-runs the whole night (all paid LLM calls), so it is paid-tier only. */}
+                        {isPaidGame && (
+                            <button
+                                className={btnFlowSecondary}
+                                disabled={!areControlsEnabled}
+                                onClick={async () => {
+                                    setClearNightMessages(true);
+                                    const result = await runGameAction(() => replayNight(game.id));
+                                    if (result) {
+                                        applyActionResult(result);
+                                    }
+                                    setTimeout(() => setClearNightMessages(false), 100);
+                                }}
+                                title="Clear night messages and replay the night phase actions"
+                            >
+                                <ReplayIcon />
+                                Replay Night
+                            </button>
+                        )}
                         {showNightGameOverCTA ? gameOverButton : (
                             <button
                                 className={btnFlowPrimary}
@@ -1365,13 +1375,15 @@ function GamePageContent({
                             disabled={!areControlsEnabled || isKeepGoingLoading}
                             title={voteUrgency.isUrgent
                                 ? `Vote now! Auto-voting in ${Math.ceil(voteUrgency.messagesLeft)} messages`
-                                : `Start the voting phase (${Math.round(voteUrgency.percentage)}% to auto-vote)`}
+                                : `Start the voting phase \u2014 ${voteUrgency.remainingPct}% of the discussion left (~${Math.ceil(voteUrgency.messagesLeft)} messages until auto-vote)`}
                         >
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <polyline points="9 11 12 14 22 4"/>
                                 <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
                             </svg>
-                            Vote {(voteUrgency.isUrgent || voteUrgency.isWarning) && '⚠️'}
+                            Vote
+                            <span className="text-[11px] tabular-nums opacity-60">{voteUrgency.remainingPct}%</span>
+                            {(voteUrgency.isUrgent || voteUrgency.isWarning) && '⚠️'}
                         </button>
                     )}
                 </div>
@@ -1530,6 +1542,9 @@ function GamePageContent({
                     onGameChange={patch => setGame(prev => ({ ...prev, ...patch }))}
                     onSelectVariant={selectAvatarVariant}
                     onReframe={reframeAvatar}
+                    onUpdateVoice={updateCharacterVoice}
+                    onSpeakSample={(text, sel) => ttsService.speakText(text, { voice: sel.voice, voiceStyle: sel.voiceStyle || undefined, voiceProvider: game.voiceProvider, gameId: game.id })}
+                    onStopSample={() => ttsService.stopSpeaking()}
                 />
             )}
 

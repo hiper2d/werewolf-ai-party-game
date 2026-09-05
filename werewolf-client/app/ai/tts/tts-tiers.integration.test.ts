@@ -9,6 +9,7 @@
 import { generateOpenAiTtsAudio } from "./openai-tts";
 import { generateGoogleTtsAudio } from "./google-tts";
 import { transcribeWithOpenAi } from "./openai-stt";
+import { transcribeWithGemini } from "./google-stt";
 import { getFreeTierApiKeys } from "@/app/api/free-tier-actions";
 import { API_KEY_CONSTANTS } from "@/app/ai/ai-models";
 
@@ -26,11 +27,14 @@ describe("Voice with personal keys (api tier path)", () => {
     expectWavAudio(audio);
   });
 
-  it("Google TTS generates playable WAV audio", async () => {
-    const audio = await generateGoogleTtsAudio(SAMPLE_TEXT, process.env.GOOGLE_K!, {
+  it("Google TTS generates playable WAV audio and reports token usage", async () => {
+    const { audio, usage } = await generateGoogleTtsAudio(SAMPLE_TEXT, process.env.GOOGLE_K!, {
       voiceName: 'Kore',
+      voiceStyle: 'mysteriously',
     });
     expectWavAudio(audio);
+    expect(usage.inputTokens).toBeGreaterThan(0);
+    expect(usage.outputTokens).toBeGreaterThan(0);
   });
 
   it("TTS → STT roundtrip returns the spoken text", async () => {
@@ -57,9 +61,19 @@ describe("Voice with platform keys (free/paid tier path)", () => {
     expectWavAudio(audio);
   });
 
+  it("Gemini TTS → Gemini Transcribe roundtrip returns the spoken text with token usage", async () => {
+    const keys = await getFreeTierApiKeys();
+    const { audio } = await generateGoogleTtsAudio(SAMPLE_TEXT, keys[API_KEY_CONSTANTS.GOOGLE], { voiceName: 'Kore' });
+    const { text, durationSeconds, usage } = await transcribeWithGemini(audio, keys[API_KEY_CONSTANTS.GOOGLE], { mimeType: 'audio/wav' });
+    expect(text.toLowerCase()).toContain('werewolf');
+    expect(durationSeconds).toBeGreaterThan(0);
+    expect(usage.inputTokens).toBeGreaterThan(0);
+    expect(usage.outputTokens).toBeGreaterThan(0);
+  });
+
   it("Google TTS works with the platform key (incl. TTS model access)", async () => {
     const keys = await getFreeTierApiKeys();
-    const audio = await generateGoogleTtsAudio(SAMPLE_TEXT, keys[API_KEY_CONSTANTS.GOOGLE], {
+    const { audio } = await generateGoogleTtsAudio(SAMPLE_TEXT, keys[API_KEY_CONSTANTS.GOOGLE], {
       voiceName: 'Kore',
     });
     expectWavAudio(audio);

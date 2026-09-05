@@ -8,6 +8,7 @@ export {
   SUPPORTED_VOICE_PROVIDERS,
   VOICE_PROVIDER_DISPLAY_NAMES,
   VOICE_PROVIDER_DESCRIPTIONS,
+  isVoiceOfProvider,
 } from './voice-config-factory';
 
 export { OpenAIVoiceConfig } from './openai-voice-config';

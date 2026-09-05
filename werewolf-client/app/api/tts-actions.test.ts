@@ -6,7 +6,7 @@
 import { API_KEY_CONSTANTS } from "@/app/ai/ai-models";
 import { USER_TIERS } from "@/app/api/game-models";
 import { PAID_TIER_MARKUP } from "@/app/config/credit-packages";
-import { calculateOpenAITtsCost } from "@/app/utils/pricing";
+import { calculateGoogleTtsCost, calculateOpenAITtsCost } from "@/app/utils/pricing";
 
 jest.mock("@/auth", () => ({ auth: jest.fn() }));
 jest.mock("@/app/utils/tier-utils", () => ({ getUserTierAndApiKeys: jest.fn() }));
@@ -28,12 +28,18 @@ import { generateOpenAiTtsAudio } from "@/app/ai/tts/openai-tts";
 import { generateGoogleTtsAudio } from "@/app/ai/tts/google-tts";
 import { updateUserMonthlySpending, deductBalance, assertFreeTierSpendWithinLimit } from "@/app/api/user-actions";
 import { recordGameCost, getGameTier } from "@/app/api/cost-tracking";
-import { generateSpeech } from "@/app/api/tts-actions";
-import { generateGoogleSpeech } from "@/app/api/google-tts-actions";
+import { generateSpeechWithProvider, UnifiedTTSOptions } from "@/app/api/tts-actions";
+
+// The two providers through the one billed path (the factory picks the agent).
+const generateSpeech = (text: string, options: Partial<UnifiedTTSOptions> = {}) =>
+  generateSpeechWithProvider(text, { voice: 'alloy', ...options }, 'openai');
+const generateGoogleSpeech = (text: string, options: { voiceName: string; voiceStyle?: string; gameId?: string }) =>
+  generateSpeechWithProvider(text, { voice: options.voiceName, voiceStyle: options.voiceStyle, gameId: options.gameId }, 'google');
 
 const USER_EMAIL = 'player@example.com';
 const TEXT = 'The night falls over the village.';
 const FAKE_AUDIO = new ArrayBuffer(8);
+const FAKE_GOOGLE_USAGE = { inputTokens: 20, outputTokens: 300 };
 
 const mockAuth = auth as jest.Mock;
 const mockTierKeys = getUserTierAndApiKeys as jest.Mock;
@@ -47,7 +53,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockAuth.mockResolvedValue({ user: { email: USER_EMAIL } });
   mockOpenAiTts.mockResolvedValue(FAKE_AUDIO);
-  mockGoogleTts.mockResolvedValue(FAKE_AUDIO);
+  mockGoogleTts.mockResolvedValue({ audio: FAKE_AUDIO, usage: FAKE_GOOGLE_USAGE });
   mockGetGameTier.mockResolvedValue(USER_TIERS.FREE);
   mockDeductBalance.mockResolvedValue(true);
   mockAssertFreeTierSpend.mockResolvedValue(undefined);
@@ -154,5 +160,22 @@ describe('generateGoogleSpeech tier-aware key resolution', () => {
     const error = await generateGoogleSpeech(TEXT, { voiceName: 'Kore' }).catch(e => e);
     expect(error.message).toContain('Voice generation is temporarily unavailable');
     expect(error.message).not.toContain('profile');
+  });
+
+  it('bills by reported tokens, not characters: paid game deducts token cost with markup', async () => {
+    mockTierKeys.mockResolvedValue({
+      tier: USER_TIERS.PAID,
+      apiKeys: { [API_KEY_CONSTANTS.GOOGLE]: 'platform-google-key' },
+    });
+    mockGetGameTier.mockResolvedValue(USER_TIERS.PAID);
+
+    await generateGoogleSpeech(TEXT, { voiceName: 'Kore', gameId: 'game-1' });
+
+    const cost = calculateGoogleTtsCost(FAKE_GOOGLE_USAGE);
+    expect(cost).toBeCloseTo(20 / 1e6 * 1 + 300 / 1e6 * 20, 10);
+    const charged = parseFloat((cost * (1 + PAID_TIER_MARKUP)).toFixed(6));
+    expect(mockDeductBalance).toHaveBeenCalledWith(USER_EMAIL, charged);
+    expect(updateUserMonthlySpending).toHaveBeenCalledWith(USER_EMAIL, cost, USER_TIERS.PAID);
+    expect(recordGameCost).toHaveBeenCalledWith('game-1', cost);
   });
 });

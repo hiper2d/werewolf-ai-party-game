@@ -354,8 +354,14 @@ const DECISION_REMINDER_ROLEPLAY: string = `**DECISION-MAKING REMINDER:**
  * %human_player_name% and %reply_length_instruction% with format()). */
 export function botReminderPostfix(mode: GameMode | undefined = DEFAULT_GAME_MODE): string {
     const roleplay = mode !== GAME_MODES.TACTICAL;
-    return BOT_REMINDER_HEAD + (roleplay ? DECISION_REMINDER_ROLEPLAY : DECISION_REMINDER_TACTICAL) + '%reply_length_instruction%';
+    return BOT_REMINDER_HEAD + (roleplay ? DECISION_REMINDER_ROLEPLAY : DECISION_REMINDER_TACTICAL) + '%reply_length_instruction%' + BOT_REPLY_FORMAT;
 }
+
+// The prompt's examples sit in quotation marks so they read as examples; some
+// models mirror that and quote their own line. The chat strips a wrapping pair
+// anyway (text-format.ts), this just asks for it not to be there.
+const BOT_REPLY_FORMAT: string = `- Your reply is your character speaking directly: plain text, NOT wrapped in quotation marks.
+`;
 
 // Default: terse table talk. The strict cap keeps day discussions readable for
 // players who don't want to scroll walls of text.

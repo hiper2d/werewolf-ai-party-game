@@ -8,6 +8,7 @@ import { isPresetAvatarUrl } from '@/app/utils/preset-avatars';
 import { focusToBackground } from '@/app/utils/avatar-framing';
 import { getAvatarGradient } from '@/app/utils/color-utils';
 import { convertMessageContent } from '@/app/utils/message-utils';
+import { formatReplyForDisplay } from '@/app/utils/text-format';
 import PlayerAvatar from '@/app/components/PlayerAvatar';
 import CharacterPoster from './CharacterPoster';
 
@@ -19,10 +20,13 @@ import CharacterPoster from './CharacterPoster';
  * The turn list is derived from the live `messages` prop, so while the overlay
  * is open, newly arriving bot messages (SSE) extend the show — reaching the
  * end while bots are still thinking shows a waiting state instead of closing.
- * Advancing is always manual: Next / Space / a click anywhere that isn't a
- * button. A line that arrives while the reader is parked never steals the
- * stage — it just re-enables Next.
+ * Advancing is always manual: Next / Space / a click on the empty stage or the
+ * scrim — the bubble and the portrait themselves never advance, so you can click
+ * into a line to re-read it. A line that arrives while the reader is parked never
+ * steals the stage — it just re-enables Next.
  */
+
+const AUTO_VOICE_KEY = 'cinematicAutoVoice';
 
 // Message types that read as "someone speaking" — everything with real prose.
 export const SPEECH_TYPES = new Set<MessageType>([
@@ -49,7 +53,9 @@ interface Turn {
 // Newlines survive as-is: the bubble is `whitespace-pre-wrap`, so a multi-line
 // message (vote tallies, a bot's list) keeps its lines like it does in chat.
 function toSpeechHtml(text: string): string {
-    const escaped = text
+    // Display-only cleanup (wrapping quotes, dash spacing): `turn.text` itself
+    // stays raw for TTS.
+    const escaped = formatReplyForDisplay(text)
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
@@ -71,12 +77,21 @@ interface CinematicModeProps {
     // Message id to open on (auto-open on a newly arrived line); default turn 0.
     startMessageId?: string;
     // Chat's TTS pipeline: play/pause the current line with the speaker's voice.
-    onSpeak?: (messageId: string, text: string) => void;
+    // `silent` suppresses the failure alert — an auto-played line that a browser's
+    // autoplay policy blocks must not throw a dialog at someone who never clicked.
+    onSpeak?: (messageId: string, text: string, opts?: { silent?: boolean }) => void;
+    // Voices muted in the header: the pipeline ignores requests, so the scene
+    // shows that rather than offering buttons that would do nothing.
+    voiceMuted?: boolean;
+    // The game is blocked on the player (their vote, their night action). The
+    // scene says so and turns its primary button into the way out, because the
+    // modal that asks for it opens behind this overlay.
+    pendingHumanAction?: 'vote' | 'night' | null;
     speakingMessageId?: string | null;
     loadingMessageId?: string | null;
 }
 
-export default function CinematicMode({ game, messages, onClose, startMessageId, onSpeak, speakingMessageId, loadingMessageId }: CinematicModeProps) {
+export default function CinematicMode({ game, messages, onClose, startMessageId, onSpeak, voiceMuted, pendingHumanAction, speakingMessageId, loadingMessageId }: CinematicModeProps) {
     const turns = useMemo<Turn[]>(() =>
         messages
             .filter(m => SPEECH_TYPES.has(m.messageType as MessageType))
@@ -107,6 +122,27 @@ export default function CinematicMode({ game, messages, onClose, startMessageId,
     });
     const [typedCount, setTypedCount] = useState(0);
     const typingTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+    // Auto-voice: read each line aloud as the scene reaches it. Off by default —
+    // audio that starts on its own is intrusive, and a browser blocks autoplay
+    // until the page has been interacted with. Remembered per browser.
+    const [autoVoice, setAutoVoice] = useState(false);
+    useEffect(() => {
+        try {
+            if (localStorage.getItem(AUTO_VOICE_KEY) === '1') setAutoVoice(true);
+        } catch { /* ignore */ }
+    }, []);
+    const toggleAutoVoice = () => {
+        const next = !autoVoice;
+        setAutoVoice(next);
+        try { localStorage.setItem(AUTO_VOICE_KEY, next ? '1' : '0'); } catch { /* ignore */ }
+    };
+    // Lines already read aloud by the switch, and whether the last move was
+    // backwards. Together they make auto-voice strictly forward-going: stepping
+    // back with Previous or the rail is for re-reading, so it stays quiet rather
+    // than restarting the audio — and re-billing the TTS call — on every glance.
+    const autoSpokenRef = useRef<Set<string>>(new Set());
+    const wentBackRef = useRef(false);
 
     // A line that slid out of the window (10+ arrivals while parked) resolves
     // to the oldest line still shown.
@@ -142,10 +178,31 @@ export default function CinematicMode({ game, messages, onClose, startMessageId,
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [turn?.key]);
 
+    // Voice, fired on the same key change as the typewriter above: the request
+    // goes out as the first words appear, so the audio is being generated while
+    // the line types itself instead of after the reader asks for it. Playback
+    // starts when the request returns — the manual button drives the identical
+    // path, so it shows the same loading/pause state either way.
+    useEffect(() => {
+        if (!autoVoice || !onSpeak || !turn || voiceMuted) return;
+        if (wentBackRef.current) { wentBackRef.current = false; return; }
+        // The player's own lines are never auto-read: they have no assigned voice
+        // (the lookup falls through to the default), so it costs a TTS call to
+        // recite what the player just typed, in a voice they never picked. The
+        // speaker button still works if they want to hear it.
+        if (turn.speaker === game.humanPlayerName) return;
+        if (autoSpokenRef.current.has(turn.key)) return;
+        autoSpokenRef.current.add(turn.key);
+        onSpeak(turn.key, turn.text, { silent: true });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [turn?.key, autoVoice, voiceMuted, game.humanPlayerName]);
+
     const goTo = useCallback((index: number) => {
         clearTimers();
-        setTurnKey(turns[Math.max(0, Math.min(index, turns.length - 1))]?.key);
-    }, [clearTimers, turns]);
+        const target = Math.max(0, Math.min(index, turns.length - 1));
+        if (target < turnIndex) wentBackRef.current = true;
+        setTurnKey(turns[target]?.key);
+    }, [clearTimers, turns, turnIndex]);
 
     const next = useCallback(() => {
         if (!typingDone) { setTypedCount(tokens.length); return; }
@@ -157,12 +214,20 @@ export default function CinematicMode({ game, messages, onClose, startMessageId,
 
     const prev = useCallback(() => { if (turnIndex > 0) goTo(turnIndex - 1); }, [turnIndex, goTo]);
 
-    // Click-to-advance: the scrim and any non-button spot on the stage act as
-    // Next, minus its end-of-scene close — a stray click must never dismiss
-    // the overlay; that's what Close/Esc are for.
+    // Click-to-advance: the scrim and the empty parts of the stage act as Next,
+    // minus its end-of-scene close — a stray click must never dismiss the
+    // overlay; that's what Close/Esc are for.
+    //
+    // The speech bubble and the portrait are marked `data-cine-hold` and never
+    // advance: they are the things you actually look at, and clicking a line to
+    // re-read a name should not skip past the speaker. They still finish the
+    // typewriter, since revealing the rest of the line is the opposite of
+    // leaving it.
     const advanceOnClick = useCallback((e: React.MouseEvent) => {
-        if ((e.target as HTMLElement).closest('button, a')) return;
+        const target = e.target as HTMLElement;
+        if (target.closest('button, a')) return;
         if (!typingDone) { setTypedCount(tokens.length); return; }
+        if (target.closest('[data-cine-hold]')) return;
         if (!atLastTurn) goTo(turnIndex + 1);
     }, [typingDone, tokens.length, atLastTurn, goTo, turnIndex]);
 
@@ -180,11 +245,23 @@ export default function CinematicMode({ game, messages, onClose, startMessageId,
     if (!turn) return null;
 
     const typedHtml = tokens.slice(0, typedCount).join('');
-    const waiting = atLastTurn && typingDone && botsStillTalking;
+    // "The game needs you" outranks "bots are still talking": when both are true
+    // the player is the one holding things up, and that is what must be said.
+    // The notice shows wherever the reader is parked — being three lines back is
+    // no reason to leave them unaware the table is waiting — while the primary
+    // button only becomes the way out at the end, so Next keeps navigating.
+    const needsYou = !!pendingHumanAction;
+    const yourTurn = atLastTurn && typingDone && needsYou;
+    const waiting = atLastTurn && typingDone && botsStillTalking && !yourTurn;
     // Scene over: the dedicated Close button becomes the primary action —
     // Next never doubles as a second, differently-styled "Close".
-    const sceneOver = atLastTurn && typingDone && !botsStillTalking;
-    const nextLabel = !typingDone ? 'Skip' : waiting ? 'Waiting…' : 'Next speaker';
+    const sceneOver = atLastTurn && typingDone && !botsStillTalking && !yourTurn;
+    const yourTurnLabel = pendingHumanAction === 'night' ? 'Your night action' : 'Your vote';
+    const nextLabel = !typingDone
+        ? 'Skip'
+        : yourTurn
+            ? `Close and cast ${pendingHumanAction === 'night' ? 'your action' : 'your vote'}`
+            : waiting ? 'Waiting…' : 'Next speaker';
 
     // Portal to <body>: rendered inside the chat column, the overlay lives in
     // that column's stacking context and the side panels (later DOM siblings)
@@ -200,27 +277,63 @@ export default function CinematicMode({ game, messages, onClose, startMessageId,
                 onClick={advanceOnClick}
             />
 
-            {/* Voice — plays the current line with the speaker's voice */}
+            {/* Voice — press to read the current line; the switch beside it decides
+                whether each new line reads itself as the scene moves forward. */}
             {onSpeak && (
-                <button
-                    onClick={() => onSpeak(turn.key, turn.text)}
-                    aria-label="Read this line aloud"
-                    title={speakingMessageId === turn.key ? 'Pause' : 'Read aloud'}
-                    className={`fixed top-4 right-[68px] z-30 w-[42px] h-[42px] flex items-center justify-center rounded-full border transition-colors ${
-                        speakingMessageId === turn.key
-                            ? 'border-[var(--accent-line)] text-[var(--accent)]'
-                            : 'border-[var(--line-3)] text-[var(--fg-1)] hover:text-[var(--fg-0)]'
+                <div
+                    className={`fixed top-4 right-[68px] z-30 h-[42px] flex items-center gap-2 rounded-full border pl-2.5 pr-3 transition-colors ${
+                        autoVoice && !voiceMuted ? 'border-[var(--accent-line)]' : 'border-[var(--line-3)]'
                     }`}
                     style={{background: 'var(--cine-panel)', backdropFilter: 'blur(8px)'}}
                 >
-                    {loadingMessageId === turn.key ? (
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg>
-                    ) : speakingMessageId === turn.key ? (
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
-                    ) : (
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5,6 9,2 9,2 15,6 15,11 19"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
-                    )}
-                </button>
+                    <button
+                        onClick={() => onSpeak(turn.key, turn.text)}
+                        disabled={voiceMuted}
+                        aria-label="Read this line aloud"
+                        title={voiceMuted
+                            ? 'Voices are muted — unmute in the chat header'
+                            : speakingMessageId === turn.key ? 'Pause' : 'Read aloud'}
+                        className={`w-[26px] h-[26px] flex items-center justify-center transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                            speakingMessageId === turn.key
+                                ? 'text-[var(--accent)]'
+                                : 'text-[var(--fg-1)] hover:text-[var(--fg-0)]'
+                        }`}
+                    >
+                        {loadingMessageId === turn.key ? (
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg>
+                        ) : speakingMessageId === turn.key ? (
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
+                        ) : (
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5,6 9,2 9,2 15,6 15,11 19"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                        )}
+                    </button>
+                    <button
+                        type="button"
+                        role="switch"
+                        aria-checked={autoVoice}
+                        aria-label="Read new lines aloud automatically"
+                        onClick={toggleAutoVoice}
+                        disabled={voiceMuted}
+                        title={voiceMuted
+                            ? 'Voices are muted — unmute in the chat header'
+                            : autoVoice
+                                ? 'Each new line reads itself aloud. Click to read only on demand.'
+                                : 'Lines are read only when you press the speaker. Click to read each new line automatically.'}
+                        className={`relative h-[15px] w-[27px] rounded-full border transition-colors duration-[160ms] flex-shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ${
+                            autoVoice && !voiceMuted
+                                ? 'bg-[var(--accent)] border-[var(--accent-line)]'
+                                : 'bg-[var(--bg-4)] border-[var(--line-3)]'
+                        }`}
+                    >
+                        <span
+                            className={`absolute top-[2px] h-[9px] w-[9px] rounded-full transition-all duration-[160ms] ${
+                                autoVoice
+                                    ? 'left-[15px] bg-[var(--accent-fg)]'
+                                    : 'left-[2px] bg-[var(--fg-2)]'
+                            }`}
+                        />
+                    </button>
+                </div>
             )}
 
             {/* Close — top-right corner */}
@@ -242,7 +355,7 @@ export default function CinematicMode({ game, messages, onClose, startMessageId,
                 >
 
                     {/* Portrait card — order 2 on small screens (bubble first) */}
-                    <div className="order-2 min-[1101px]:order-1 justify-self-center min-[1101px]:justify-self-stretch w-[min(300px,58vw)] min-[1101px]:w-full">
+                    <div data-cine-hold className="order-2 min-[1101px]:order-1 justify-self-center min-[1101px]:justify-self-stretch w-[min(300px,58vw)] min-[1101px]:w-full">
                         <CharacterPoster
                             key={turn.key}
                             game={game}
@@ -257,6 +370,7 @@ export default function CinematicMode({ game, messages, onClose, startMessageId,
                     {/* Speech bubble + controls */}
                     <div className="order-1 min-[1101px]:order-2 w-full">
                         <div
+                            data-cine-hold
                             className="relative rounded-[20px] border border-[var(--line-2)]"
                             style={{background: 'var(--cine-panel)', backdropFilter: 'blur(10px)', boxShadow: 'var(--cine-panel-shadow)', padding: 'clamp(18px,2vw,26px) clamp(18px,2.2vw,30px)'}}
                         >
@@ -271,6 +385,18 @@ export default function CinematicMode({ game, messages, onClose, startMessageId,
                                 <span dangerouslySetInnerHTML={{__html: typedHtml}} />
                                 {!typingDone && <span className="cine-caret" />}
                             </div>
+                            {needsYou && (
+                                <div
+                                    role="status"
+                                    className="mt-3 flex items-center gap-2.5 rounded-[12px] border border-[var(--accent-line)] px-3.5 py-2.5 text-[13.5px] text-[var(--fg-0)]"
+                                    style={{background: 'var(--accent-soft)'}}
+                                >
+                                    <span className="w-[7px] h-[7px] rounded-full bg-[var(--accent)] flex-none animate-pulse" />
+                                    <span>
+                                        <strong>{yourTurnLabel}</strong> — the table is waiting on you. Close the scene to answer.
+                                    </span>
+                                </div>
+                            )}
                         </div>
 
                         {/* Controls */}
@@ -285,17 +411,21 @@ export default function CinematicMode({ game, messages, onClose, startMessageId,
                                     Previous
                                 </button>
                                 <button
-                                    onClick={next}
+                                    onClick={yourTurn ? onClose : next}
                                     disabled={waiting || sceneOver}
-                                    className={`rounded-[11px] border border-[var(--line-2)] px-5 py-3 text-[13.5px] font-medium transition-all inline-flex items-center gap-2 ${
-                                        (waiting || sceneOver)
-                                            ? 'text-[var(--fg-2)] cursor-not-allowed opacity-70'
-                                            : 'text-[var(--fg-1)] hover:border-[var(--line-3)] hover:bg-[var(--cine-panel-hover)]'
+                                    className={`rounded-[11px] border px-5 py-3 text-[13.5px] font-medium transition-all inline-flex items-center gap-2 ${
+                                        yourTurn
+                                            ? 'border-[var(--accent-line)] text-[var(--fg-0)] hover:brightness-110'
+                                            : (waiting || sceneOver)
+                                                ? 'border-[var(--line-2)] text-[var(--fg-2)] cursor-not-allowed opacity-70'
+                                                : 'border-[var(--line-2)] text-[var(--fg-1)] hover:border-[var(--line-3)] hover:bg-[var(--cine-panel-hover)]'
                                     }`}
-                                    style={{background: 'var(--cine-panel)', backdropFilter: 'blur(8px)'}}
+                                    style={yourTurn
+                                        ? {background: 'var(--accent-soft)', backdropFilter: 'blur(8px)'}
+                                        : {background: 'var(--cine-panel)', backdropFilter: 'blur(8px)'}}
                                 >
                                     {nextLabel}
-                                    {!waiting && <span className="hidden sm:inline-block font-mono text-[10px] px-1.5 py-0.5 rounded border border-[var(--line-2)] text-[var(--fg-2)]">SPACE</span>}
+                                    {!waiting && !yourTurn && <span className="hidden sm:inline-block font-mono text-[10px] px-1.5 py-0.5 rounded border border-[var(--line-2)] text-[var(--fg-2)]">SPACE</span>}
                                     {waiting && (
                                         <span className="inline-flex gap-[3px]">
                                             {[0, 1, 2].map(i => (

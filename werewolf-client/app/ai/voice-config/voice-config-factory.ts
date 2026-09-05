@@ -39,13 +39,18 @@ export const SUPPORTED_VOICE_PROVIDERS: VoiceProvider[] = ['openai', 'google'];
  */
 export const VOICE_PROVIDER_DISPLAY_NAMES: Record<VoiceProvider, string> = {
   openai: 'OpenAI',
-  google: 'Google',
+  google: 'Gemini',
 };
 
 /**
  * Descriptions for voice providers (for UI).
  */
 export const VOICE_PROVIDER_DESCRIPTIONS: Record<VoiceProvider, string> = {
-  openai: '10 voices with detailed voice instruction support. Best for nuanced character voices.',
-  google: '30 prebuilt voices with distinct personalities. Best for variety and natural speech.',
+  openai: '10 voices that follow style instructions closely. The cheaper set.',
+  google: '30 voices with more natural, expressive speech. Roughly 3-5x the OpenAI price per line.',
 };
+
+/** True when `voice` is a real voice id of `provider`. */
+export function isVoiceOfProvider(provider: VoiceProvider, voice: string): boolean {
+  return !!voice && !!getVoiceConfig(provider).getVoiceById(voice);
+}

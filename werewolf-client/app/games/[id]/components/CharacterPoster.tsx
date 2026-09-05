@@ -8,6 +8,7 @@ import { isPresetAvatarUrl } from '@/app/utils/preset-avatars';
 import { getAvatarGradient } from '@/app/utils/color-utils';
 import { focusToBackground, ImageFocus } from '@/app/utils/avatar-framing';
 import PlayerAvatar from '@/app/components/PlayerAvatar';
+import { useSettledImage } from '@/app/utils/use-settled-image';
 
 /**
  * Who a participant is, and only the role knowledge the human player
@@ -77,9 +78,16 @@ export default function CharacterPoster({ game, name, cornerChip, cost, hideCost
             ? { line: 'var(--danger-line)', glow: 'color-mix(in oklch, var(--danger) 32%, transparent)', text: 'var(--werewolf-fg)' }
             : { line: 'var(--line-3)', glow: 'color-mix(in oklch, var(--line-3) 40%, transparent)', text: 'var(--fg-1)' };
     const view = avatarUrlOverride ? undefined : getAvatarView(game, name);
-    const avatarUrl = avatarUrlOverride ?? view?.url;
-    const cardFocus = avatarUrlOverride ? cardFocusOverride : view?.cardFocus;
-    const focused = cardFocus ? focusToBackground(cardFocus) : null;
+    const requestedUrl = avatarUrlOverride ?? view?.url;
+    const requestedFocus = avatarUrlOverride ? cardFocusOverride : view?.cardFocus;
+    // Browsing candidates swaps the portrait URL while the previous picture is
+    // still on screen; every derived value below (mannequin blend, gradient
+    // ground, crop) follows the image that has actually loaded, so the old
+    // face stays whole until the new one arrives. The first view renders at
+    // once, like a plain <img>.
+    const shown = useSettledImage(requestedUrl ? { url: requestedUrl, cardFocus: requestedFocus } : undefined, true);
+    const avatarUrl = shown?.url;
+    const focused = shown?.cardFocus ? focusToBackground(shown.cardFocus) : null;
     const showCost = cost !== undefined && cost > 0;
 
     return (

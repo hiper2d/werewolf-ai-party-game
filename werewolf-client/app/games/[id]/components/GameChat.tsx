@@ -15,12 +15,14 @@ import CinematicMode, { SPEECH_TYPES } from "./CinematicMode";
 
 // localStorage key for the cinematic on/off switch (browser-wide, not per game).
 const CINEMATIC_ENABLED_KEY = 'cinematicEnabled';
+const VOICE_MUTED_KEY = 'voiceMuted';
 import { LoadingRail, PhaseBar, StreamPill, stripChromeClass, stripChromeStyle, type LoadingRailProps, type PhaseTone, type RailActor } from "./PhaseStrip";
 import { ttsService } from "@/app/services/tts-service";
 import { sttService } from "@/app/services/stt-service";
 import { getDefaultVoiceProvider } from "@/app/ai/voice-config";
 import { getModelDisplayName, getModelProviderName } from "@/app/ai/ai-models";
 import { isInsufficientBalanceError, isProviderBudgetDepletedError, isProviderBusyError } from "@/app/api/errors";
+import { formatReplyForDisplay } from "@/app/utils/text-format";
 import { DISCORD_URL } from "@/app/config/external-links";
 import Link from "next/link";
 import { useUIControls } from '../context/UIControlsContext';
@@ -133,7 +135,11 @@ function ErrorBanner({ error, onDismiss }: ErrorBannerProps) {
     );
 }
 
-function renderMessageContent(content: string) {
+function renderMessageContent(rawContent: string) {
+    // Display-only cleanup: drop quotes wrapping the whole reply, open closed
+    // em dashes (stored text and the TTS input keep the raw form — see
+    // text-format.ts).
+    const content = formatReplyForDisplay(rawContent);
     // Detect voting results and render as a formatted table
     const voteMatch = content.match(/^Voting results(?:\s*\(tie\))?:\n([\s\S]+?)\n\n(.+)$/);
     if (voteMatch) {
@@ -557,6 +563,28 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
     const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
     const [loadingMessageId, setLoadingMessageId] = useState<string | null>(null);
     const [pausedMessageId, setPausedMessageId] = useState<string | null>(null);
+    // Mute is a hard stop on the whole voice pipeline, not a volume control:
+    // muting cuts whatever is playing AND blocks generation, so a muted session
+    // never spends a cent on TTS. It also answers "I closed the scene and the
+    // voice kept going" — the header button reaches audio the closed overlay
+    // can no longer stop. Remembered per browser.
+    const [voiceMuted, setVoiceMuted] = useState(false);
+    useEffect(() => {
+        try {
+            if (localStorage.getItem(VOICE_MUTED_KEY) === '1') setVoiceMuted(true);
+        } catch { /* ignore */ }
+    }, []);
+    const toggleVoiceMuted = () => {
+        const next = !voiceMuted;
+        setVoiceMuted(next);
+        try { localStorage.setItem(VOICE_MUTED_KEY, next ? '1' : '0'); } catch { /* ignore */ }
+        if (next) {
+            ttsService.stopSpeaking();
+            setSpeakingMessageId(null);
+            setPausedMessageId(null);
+            setLoadingMessageId(null);
+        }
+    };
     const [isRecording, setIsRecording] = useState(false);
     const [isTranscribing, setIsTranscribing] = useState(false);
     const [composerExpanded, setComposerExpanded] = useState(false);
@@ -1330,7 +1358,17 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
         }
     };
 
-    const handleSpeak = async (messageId: string, text: string) => {
+    // `silent`: the caller started this playback on its own (cinematic auto-voice),
+    // so a failure must not raise an alert — a browser that blocks autoplay would
+    // otherwise pop a dialog for something the player never asked for.
+    const handleSpeak = async (messageId: string, text: string, opts?: { silent?: boolean }) => {
+        const reportFailure = (message: string) => {
+            if (opts?.silent) { console.warn('TTS playback failed:', message); return; }
+            alert(message);
+        };
+        // Muted: no request, no spend. Checked before the pause/resume branches
+        // too — muting already stopped playback, so there is nothing to resume.
+        if (voiceMuted) return;
         try {
             // If clicking on currently playing message, pause it
             if (speakingMessageId === messageId) {
@@ -1355,7 +1393,7 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                 setPausedMessageId(null);
             }
 
-            // Get voice provider from game (with fallback to default)
+            // The game's voice set (fixed at creation; legacy games read as the default)
             const voiceProvider = game.voiceProvider || getDefaultVoiceProvider();
 
             // Find the message to get the author name
@@ -1390,7 +1428,7 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                 // Playback failures (autoplay policy, codec) fire after this await
                 // resolves, so surface them through the same alert + reset path.
                 onPlaybackError: (error) => {
-                    alert(`Failed to play audio: ${error.message}`);
+                    reportFailure(`Failed to play audio: ${error.message}`);
                     setLoadingMessageId(null);
                     setSpeakingMessageId(null);
                     setPausedMessageId(null);
@@ -1412,7 +1450,7 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
 
         } catch (error) {
             console.error('TTS Error:', error);
-            alert(`Failed to play audio: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            reportFailure(`Failed to play audio: ${error instanceof Error ? error.message : 'Unknown error'}`);
             setLoadingMessageId(null);
             setSpeakingMessageId(null);
             setPausedMessageId(null);
@@ -1469,7 +1507,7 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
             // Only now set recording to false after we've actually stopped
             setIsRecording(false);
             
-            const transcription = await sttService.transcribeRecording(audioBlob, { gameId });
+            const transcription = await sttService.transcribeRecording(audioBlob, { gameId, voiceProvider: game.voiceProvider });
             
             // Add transcribed text to current message
             setNewMessage(prev => {
@@ -1745,6 +1783,20 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
         return { tone: 'neutral', label: getInputPlaceholder().replace(/\.{3}$/, '') };
     })();
 
+    // What the game is waiting on the player for, if anything. The scene is a
+    // portal over the whole page, so a modal that opens behind it is invisible:
+    // without this the overlay just says "Waiting…" while the game sits blocked
+    // on a vote that the player cannot see they were asked for.
+    const pendingHumanAction: 'vote' | 'night' | null = (() => {
+        const queue = game.gameStateProcessQueue;
+        if (queue.length === 0) return null;
+        if (game.gameState === GAME_STATES.VOTE && queue[0] === game.humanPlayerName) return 'vote';
+        if (game.gameState === GAME_STATES.NIGHT &&
+            queue[0] === game.humanPlayerRole &&
+            game.gameStateParamQueue[0] === game.humanPlayerName) return 'night';
+        return null;
+    })();
+
     const showComposer = isInputEnabled() || isRecording || isTranscribing;
     const artInProgress = game.avatarsStatus === 'pending' || game.avatarsStatus === 'generating';
 
@@ -1807,6 +1859,28 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                             />
                         </button>
                     </div>
+                    {/* Mute — reaches audio that outlived the overlay it started in,
+                        and keeps a muted session from generating any speech at all. */}
+                    <button
+                        type="button"
+                        onClick={toggleVoiceMuted}
+                        aria-pressed={voiceMuted}
+                        aria-label={voiceMuted ? 'Unmute voices' : 'Mute voices'}
+                        title={voiceMuted
+                            ? 'Voices are muted — nothing plays and no audio is generated. Click to unmute.'
+                            : 'Mute voices: stops what is playing and blocks new audio.'}
+                        className={`w-[32px] h-[32px] flex items-center justify-center rounded-full border transition-colors duration-[120ms] max-[720px]:w-[28px] max-[720px]:h-[28px] ${
+                            voiceMuted
+                                ? 'border-[var(--line-3)] bg-[var(--bg-3)] text-[var(--fg-3)] hover:text-[var(--fg-1)]'
+                                : 'border-[var(--line-3)] bg-[var(--bg-3)] text-[var(--fg-1)] hover:text-[var(--fg-0)]'
+                        }`}
+                    >
+                        {voiceMuted ? (
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5,6 9,2 9,2 15,6 15,11 19"/><path d="M22 9l-6 6M16 9l6 6"/></svg>
+                        ) : (
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5,6 9,2 9,2 15,6 15,11 19"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                        )}
+                    </button>
                     {shouldShowMessageCount && (
                         <span className="msg-count text-[12px] font-mono text-[var(--fg-2)] max-[720px]:hidden">
                             {messageCountLabel}
@@ -2265,6 +2339,8 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                     messages={messages}
                     startMessageId={cinematicStartId}
                     onSpeak={handleSpeak}
+                    voiceMuted={voiceMuted}
+                    pendingHumanAction={pendingHumanAction}
                     speakingMessageId={speakingMessageId}
                     loadingMessageId={loadingMessageId}
                     onClose={() => {

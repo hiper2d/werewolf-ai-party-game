@@ -2,7 +2,30 @@ import React from 'react';
 import type { Metadata } from 'next';
 import ModelsCatalog from './ModelsCatalog';
 import { InfoIcon } from '@/app/components/ui-icons';
-import { API_KEY_CONSTANTS, AUDIO_MODEL_CONSTANTS, IMAGE_MODEL_CONSTANTS } from '@/app/ai/ai-models';
+import { AUDIO_MODEL_CONSTANTS, AUDIO_MODEL_PRICING, IMAGE_MODEL_CONSTANTS } from '@/app/ai/ai-models';
+import { VOICE_PROVIDER_DISPLAY_NAMES } from '@/app/ai/voice-config';
+
+// The two voice sets a game can be cast from, with the models behind each
+// (see app/ai/voice). Prices read from the same table billing uses.
+const P = AUDIO_MODEL_PRICING;
+const VOICE_SETS = [
+    {
+        name: VOICE_PROVIDER_DISPLAY_NAMES.openai,
+        blurb: '10 voices that follow style instructions closely. The cheaper set.',
+        tts: AUDIO_MODEL_CONSTANTS.TTS,
+        ttsPrice: `$${P[AUDIO_MODEL_CONSTANTS.TTS].pricePerMillionCharacters} per 1M characters`,
+        stt: AUDIO_MODEL_CONSTANTS.STT,
+        sttPrice: `$${P[AUDIO_MODEL_CONSTANTS.STT].pricePerMinute} per audio minute`,
+    },
+    {
+        name: VOICE_PROVIDER_DISPLAY_NAMES.google,
+        blurb: '30 voices with more natural, expressive speech. Roughly 3-5x the OpenAI price per spoken line.',
+        tts: AUDIO_MODEL_CONSTANTS.GOOGLE_TTS,
+        ttsPrice: `$${P[AUDIO_MODEL_CONSTANTS.GOOGLE_TTS].textInputPricePerM} per 1M text tokens in, $${P[AUDIO_MODEL_CONSTANTS.GOOGLE_TTS].audioOutputPricePerM} per 1M audio tokens out (about $0.04 per minute of speech)`,
+        stt: AUDIO_MODEL_CONSTANTS.GOOGLE_STT,
+        sttPrice: `$${P[AUDIO_MODEL_CONSTANTS.GOOGLE_STT].audioInputPricePerM} per 1M audio tokens in, $${P[AUDIO_MODEL_CONSTANTS.GOOGLE_STT].textOutputPricePerM} per 1M text tokens out (about $0.005 per audio minute)`,
+    },
+];
 
 export const metadata: Metadata = {
     title: 'Models — Werewolf AI',
@@ -98,22 +121,30 @@ export default function ModelsPage() {
                 </div>
                 <div className="border border-[var(--line-1)] rounded-[var(--radius-xl)] bg-[var(--bg-1)] p-6 sm:p-7">
                     <p className="m-0 mb-4 text-[13.5px] text-[var(--fg-2)] leading-[1.55] max-w-[70ch]">
-                        Text-to-speech and speech-to-text are available on every tier when you provide your own OpenAI key. Usage is recorded
-                        in your monthly spendings.
+                        Each game is cast from one voice set, picked on the new-game form: {VOICE_PROVIDER_DISPLAY_NAMES.openai} or {VOICE_PROVIDER_DISPLAY_NAMES.google}.
+                        The set decides both how characters speak and which model transcribes your microphone. Voice runs on platform keys on every
+                        tier; usage is recorded in your monthly spendings.
                     </p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div className="border border-[var(--line-1)] rounded-[var(--radius-lg)] bg-[var(--bg-0)] px-4 py-3.5">
-                            <div className="font-mono text-[11px] tracking-[0.06em] uppercase text-[var(--fg-3)] mb-1.5">Text-to-speech</div>
-                            <div className="text-[14px] text-[var(--fg-0)] font-mono">{AUDIO_MODEL_CONSTANTS.TTS}</div>
-                            <div className="text-[12.5px] text-[var(--fg-2)] mt-1">$15 per 1M characters</div>
-                        </div>
-                        <div className="border border-[var(--line-1)] rounded-[var(--radius-lg)] bg-[var(--bg-0)] px-4 py-3.5">
-                            <div className="font-mono text-[11px] tracking-[0.06em] uppercase text-[var(--fg-3)] mb-1.5">Speech-to-text</div>
-                            <div className="text-[14px] text-[var(--fg-0)] font-mono">{AUDIO_MODEL_CONSTANTS.STT}</div>
-                            <div className="text-[12.5px] text-[var(--fg-2)] mt-1">$0.006 per audio minute</div>
-                        </div>
+                        {VOICE_SETS.map(set => (
+                            <div key={set.name} className="border border-[var(--line-1)] rounded-[var(--radius-lg)] bg-[var(--bg-0)] px-4 py-3.5 flex flex-col gap-3">
+                                <div>
+                                    <div className="text-[14px] font-semibold text-[var(--fg-0)]">{set.name} voice set</div>
+                                    <div className="text-[12.5px] text-[var(--fg-2)] mt-0.5">{set.blurb}</div>
+                                </div>
+                                <div>
+                                    <div className="font-mono text-[11px] tracking-[0.06em] uppercase text-[var(--fg-3)] mb-1">Text-to-speech</div>
+                                    <div className="text-[13.5px] text-[var(--fg-0)] font-mono">{set.tts}</div>
+                                    <div className="text-[12.5px] text-[var(--fg-2)] mt-0.5">{set.ttsPrice}</div>
+                                </div>
+                                <div>
+                                    <div className="font-mono text-[11px] tracking-[0.06em] uppercase text-[var(--fg-3)] mb-1">Speech-to-text</div>
+                                    <div className="text-[13.5px] text-[var(--fg-0)] font-mono">{set.stt}</div>
+                                    <div className="text-[12.5px] text-[var(--fg-2)] mt-0.5">{set.sttPrice}</div>
+                                </div>
+                            </div>
+                        ))}
                     </div>
-                    <p className="m-0 mt-3 text-[12px] text-[var(--fg-3)] font-mono">Requires: {API_KEY_CONSTANTS.OPENAI}</p>
                 </div>
             </section>
 

@@ -57,6 +57,8 @@ export interface GamePreview {
     // (avatars, the welcome/night scenes, mid-game illustrations). Never used
     // by story/LLM prompts — see app/utils/art-style.ts.
     artStyle?: string;
+    // Voice set the cast is drawn from (picked on the form). Absent = the user's stored preference.
+    voiceProvider?: VoiceProvider;
     playerCount: number;
     werewolfCount: number;
     specialRoles: string[];
@@ -283,7 +285,7 @@ export interface Game {
     // were played under the tactical prompt, so gameFromFirestore defaults them to tactical.
     gameMode?: GameMode;
     gameMasterAiType: string;
-    voiceProvider?: VoiceProvider; // TTS provider for this game (locked at creation)
+    voiceProvider?: VoiceProvider; // The game's voice set, picked on the form and fixed at creation (voice ids belong to it)
     gameMasterVoice: string;
     gameMasterVoiceStyle?: string; // Style instruction for Game Master
     gameMasterVoiceInstructions?: string; // Legacy: detailed voice instructions

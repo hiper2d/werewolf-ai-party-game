@@ -54,7 +54,7 @@ describe('replayNight', () => {
             id: mockGameId,
             gameState: GAME_STATES.NIGHT_RESULTS,
             currentDay: currentDay,
-            createdWithTier: 'free',
+            createdWithTier: 'paid',
             nightNarratives: [
                 { day: 1, narrative: "Day 1 narrative" },
                 { day: 2, narrative: "Day 2 narrative (to be cleared)" }
@@ -115,5 +115,27 @@ describe('replayNight', () => {
             resolvedNightState: null,
             nightNarratives: [{ day: 1, narrative: "Day 1 narrative" }] // Day 2 should be removed
         }));
+    });
+
+    it('refuses to replay a free-tier game', async () => {
+        const mockGame: Partial<Game> = {
+            id: mockGameId,
+            gameState: GAME_STATES.NIGHT_RESULTS,
+            currentDay: currentDay,
+            createdWithTier: 'free',
+            nightNarratives: []
+        };
+        (getGame as jest.Mock).mockResolvedValue(mockGame);
+
+        const mockUpdate = jest.fn();
+        (db!.collection as jest.Mock).mockReturnValue({
+            doc: jest.fn().mockReturnValue({ collection: jest.fn(), update: mockUpdate, get: jest.fn() })
+        });
+
+        const result = await replayNight(mockGameId);
+
+        // The guard rejects before anything is deleted or reset.
+        expect(mockUpdate).not.toHaveBeenCalled();
+        expect(result.game.errorState?.error).toContain('paid tier');
     });
 });

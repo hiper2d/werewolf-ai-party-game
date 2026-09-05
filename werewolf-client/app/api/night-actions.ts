@@ -21,7 +21,8 @@ import {
     DetectiveInvestigation,
     DoctorProtection,
     ManiacAbduction,
-    WerewolfAttack
+    WerewolfAttack,
+    USER_TIERS
 } from "@/app/api/game-models";
 import { auth } from "@/auth";
 import { getGame, addMessageToChatAndSaveToDb, consumeModelOverride } from "./game-actions";
@@ -534,6 +535,13 @@ async function replayNightImpl(gameId: string): Promise<GameActionResponse> {
     const game = await getGame(gameId);
     if (!game) {
         throw new Error('Game not found');
+    }
+
+    await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: game.createdWithTier });
+
+    // A replay re-runs every night action from scratch, so it is a paid-tier feature.
+    if (game.createdWithTier !== USER_TIERS.PAID) {
+        throw new Error('Replaying the night is available on the paid tier only');
     }
 
     // Stale call (e.g. double-clicked "Replay Night" — the first click already

@@ -39,9 +39,9 @@ import {deletePreviewProgress, isValidProgressId, previewProgressWriter, readPre
 import {getUserTierAndApiKeys} from "@/app/utils/tier-utils";
 import {sanitizePlayerName} from "@/app/utils/name-utils";
 import {sanitizeArtStyle} from "@/app/utils/art-style";
-import {getUserTier, getUserBalance, getVoiceProvider, updateUserMonthlySpending, deductBalance} from "@/app/api/user-actions";
+import {getUserTier, getUserBalance, getVoiceProvider, updateVoiceProvider, updateUserMonthlySpending, deductBalance} from "@/app/api/user-actions";
 import {PAID_TIER_MARKUP} from "@/app/config/credit-packages";
-import {getDefaultVoiceProvider, getVoiceConfig} from "@/app/ai/voice-config";
+import {getDefaultVoiceProvider, getVoiceConfig, isVoiceOfProvider, SUPPORTED_VOICE_PROVIDERS, VoiceProvider} from "@/app/ai/voice-config";
 import {normalizeSpendings} from "@/app/utils/spending-utils";
 import {serializeMessageForFirestore} from "@/app/api/message-serialization";
 import {LLM_CONSTANTS, configureStoryAgent, SupportedAiModels} from "@/app/ai/ai-models";
@@ -233,9 +233,18 @@ export async function previewGame(gamePreview: GamePreview, progressId?: string)
 
     const usageCounts: Record<string, number> = {};
 
-    // Get user's voice provider preference
-    const voiceProvider = await getVoiceProvider(session.user.email);
+    // The voice set the cast is drawn from: picked on the form, else the
+    // user's stored preference. A pick is remembered as the new preference.
+    const requestedProvider = gamePreview.voiceProvider;
+    if (requestedProvider !== undefined && !SUPPORTED_VOICE_PROVIDERS.includes(requestedProvider)) {
+        throw new Error(`Unknown voice provider: ${requestedProvider}`);
+    }
+    const voiceProvider = requestedProvider ?? await getVoiceProvider(session.user.email);
     const voiceConfig = getVoiceConfig(voiceProvider);
+    if (requestedProvider !== undefined) {
+        updateVoiceProvider(session.user.email, requestedProvider).catch(err =>
+            logger.warn(`Could not remember voice provider preference: ${err instanceof Error ? err.message : String(err)}`));
+    }
 
     const botCount = gamePreview.playerCount - 1; // exclude human player
 
@@ -790,6 +799,63 @@ export async function updateBotModel(gameId: string, botName: string, newAiType:
     } catch (error: any) {
         console.error("Error updating bot model: ", error);
         throw new Error(`Failed to update bot model: ${error.message}`);
+    }
+}
+
+export interface CharacterVoicePatch {
+    voice: string;
+    voiceStyle?: string;
+}
+
+const VOICE_STYLE_MAX_LENGTH = 300;
+
+/**
+ * Owner changes a character's voice from its card mid-game: the voice (within
+ * the game's voice set — the set itself is decided at preview time and fixed)
+ * and the style direction. `name` is a bot or GAME_MASTER.
+ */
+export async function updateCharacterVoice(gameId: string, name: string, patch: CharacterVoicePatch): Promise<Game> {
+    const session = await auth();
+    if (!session || !session.user?.email) {
+        throw new Error('Not authenticated');
+    }
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+    const voiceStyle = (patch.voiceStyle ?? '').trim().slice(0, VOICE_STYLE_MAX_LENGTH);
+
+    try {
+        const gameRef = db.collection('games').doc(gameId);
+        const gameSnap = await gameRef.get();
+        if (!gameSnap.exists) {
+            throw new Error('Game not found');
+        }
+        const gameData = gameSnap.data();
+        await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: (gameData?.createdWithTier ?? 'free') });
+
+        // Voice ids are provider-specific: the new voice must belong to this game's set.
+        const voiceProvider: VoiceProvider = gameData?.voiceProvider || getDefaultVoiceProvider();
+        if (!isVoiceOfProvider(voiceProvider, patch.voice)) {
+            throw new Error(`"${patch.voice}" is not a voice of this game's ${voiceProvider} voice set.`);
+        }
+
+        let update: Record<string, unknown>;
+        if (name === GAME_MASTER) {
+            update = { gameMasterVoice: patch.voice, gameMasterVoiceStyle: voiceStyle };
+        } else {
+            const bots = (gameData?.bots || []) as Bot[];
+            if (!bots.some(bot => bot.name === name)) {
+                throw new Error(`No character named "${name}" in this game.`);
+            }
+            update = {
+                bots: bots.map(bot => bot.name === name ? { ...bot, voice: patch.voice, voiceStyle } : bot),
+            };
+        }
+        await gameRef.update(update);
+        return gameFromFirestore(gameId, { ...gameData, ...update });
+    } catch (error: any) {
+        logger.error("Error updating character voice", { error: error.message, gameId, name });
+        throw new Error(`Failed to update voice: ${error.message}`);
     }
 }
 

@@ -2,23 +2,12 @@
 
 import { auth } from "@/auth";
 import { getUserTierAndApiKeys } from "@/app/utils/tier-utils";
-import { API_KEY_CONSTANTS } from "@/app/ai/ai-models";
-import { generateOpenAiTtsAudio, OpenAiTtsVoice } from "@/app/ai/tts/openai-tts";
-import { calculateOpenAITtsCost } from "@/app/utils/pricing";
 import { updateUserMonthlySpending, deductBalance, assertFreeTierSpendWithinLimit } from "@/app/api/user-actions";
 import { recordGameCost, getGameTier } from "@/app/api/cost-tracking";
 import { USER_TIERS } from "@/app/api/game-models";
 import { PAID_TIER_MARKUP } from "@/app/config/credit-packages";
-import { VoiceProvider } from "@/app/ai/voice-config";
-import { generateGoogleSpeech, GoogleTTSOptions } from "@/app/api/google-tts-actions";
-
-export interface TTSOptions {
-  voice?: OpenAiTtsVoice;
-  instructions?: string;
-  speed?: number;
-  format?: 'mp3' | 'wav' | 'opus' | 'aac' | 'flac' | 'pcm';
-  gameId?: string;
-}
+import { SUPPORTED_VOICE_PROVIDERS, VoiceProvider } from "@/app/ai/voice-config";
+import { createVoiceAgent, VOICE_PROVIDER_API_KEY } from "@/app/ai/voice";
 
 /**
  * Unified TTS options that work with both providers
@@ -31,57 +20,33 @@ export interface UnifiedTTSOptions {
 }
 
 /**
- * Unified speech generation function that routes to the appropriate provider.
- * This is the preferred function for new code.
+ * Speech for any voice provider: resolve the platform key, pick the agent
+ * through the factory, bill what it reports. The one path every spoken line
+ * takes (chat playback, cinematic mode, the preview page, card auditions).
  */
 export async function generateSpeechWithProvider(
   text: string,
   options: UnifiedTTSOptions,
   voiceProvider: VoiceProvider
 ): Promise<ArrayBuffer> {
-  switch (voiceProvider) {
-    case 'openai':
-      return generateSpeech(text, {
-        voice: options.voice as TTSOptions['voice'],
-        instructions: options.voiceInstructions || options.voiceStyle,
-        gameId: options.gameId,
-      });
-    case 'google':
-      return generateGoogleSpeech(text, {
-        voiceName: options.voice,
-        voiceStyle: options.voiceStyle,
-        gameId: options.gameId,
-      });
-    default:
-      throw new Error(`Unknown voice provider: ${voiceProvider}`);
-  }
-}
-
-/**
- * Generate speech using OpenAI TTS.
- * For backward compatibility - prefer generateSpeechWithProvider for new code.
- */
-export async function generateSpeech(
-  text: string,
-  options: TTSOptions = {}
-): Promise<ArrayBuffer> {
   const session = await auth();
   if (!session || !session.user?.email) {
     throw new Error('Not authenticated');
   }
-
   if (!text.trim()) {
     throw new Error('Text cannot be empty');
+  }
+  if (!SUPPORTED_VOICE_PROVIDERS.includes(voiceProvider)) {
+    throw new Error(`Unknown voice provider: ${voiceProvider}`);
   }
 
   try {
     // All tiers run on platform keys (config/freeTierApiKeys)
     const { apiKeys } = await getUserTierAndApiKeys(session.user.email);
-    const openaiApiKey = apiKeys[API_KEY_CONSTANTS.OPENAI];
-
-    if (!openaiApiKey) {
+    const apiKey = apiKeys[VOICE_PROVIDER_API_KEY[voiceProvider]];
+    if (!apiKey) {
       // A missing platform key is our misconfiguration, not the user's
-      console.error(`TTS: platform OpenAI API key is missing (user ${session.user.email})`);
+      console.error(`TTS: platform ${voiceProvider} API key is missing (user ${session.user.email})`);
       throw new Error('Voice generation is temporarily unavailable. Please try again later.');
     }
 
@@ -90,29 +55,30 @@ export async function generateSpeech(
       await assertFreeTierSpendWithinLimit(session.user.email);
     }
 
-    const audioBuffer = await generateOpenAiTtsAudio(text, openaiApiKey, {
+    const agent = createVoiceAgent(voiceProvider, apiKey);
+    const { audio, costUSD } = await agent.speak({
+      text,
       voice: options.voice,
-      instructions: options.instructions,
-      speed: options.speed,
-      format: options.format,
+      // A legacy long instruction wins over the short style; each agent turns
+      // either into its provider's form of direction.
+      voiceStyle: options.voiceInstructions || options.voiceStyle,
     });
 
-    const cost = calculateOpenAITtsCost(text.length);
-    if (cost > 0) {
+    if (costUSD > 0) {
       if (gameTier === USER_TIERS.PAID) {
-        const chargedAmount = parseFloat((cost * (1 + PAID_TIER_MARKUP)).toFixed(6));
+        const chargedAmount = parseFloat((costUSD * (1 + PAID_TIER_MARKUP)).toFixed(6));
         const success = await deductBalance(session.user.email, chargedAmount);
         if (!success) {
           throw new Error('Insufficient balance. Please add funds on your profile page to continue playing.');
         }
       }
-      await updateUserMonthlySpending(session.user.email, cost, gameTier);
+      await updateUserMonthlySpending(session.user.email, costUSD, gameTier);
       if (options.gameId) {
-        await recordGameCost(options.gameId, cost);
+        await recordGameCost(options.gameId, costUSD);
       }
     }
 
-    return audioBuffer;
+    return audio;
   } catch (error) {
     console.error('TTS Error:', error);
     if (error instanceof Error) {

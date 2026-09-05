@@ -1,6 +1,6 @@
 import {NextResponse} from 'next/server';
 import {auth} from '@/auth';
-import {getUserTier} from '@/app/api/user-actions';
+import {getUserTier, getVoiceProvider} from '@/app/api/user-actions';
 
 export async function GET() {
     const session = await auth();
@@ -9,8 +9,11 @@ export async function GET() {
     }
 
     try {
-        const tier = await getUserTier(session.user.email);
-        return NextResponse.json({ tier });
+        const [tier, voiceProvider] = await Promise.all([
+            getUserTier(session.user.email),
+            getVoiceProvider(session.user.email).catch(() => undefined),
+        ]);
+        return NextResponse.json({ tier, voiceProvider });
     } catch (error: any) {
         console.error('Failed to retrieve user tier', error);
         return NextResponse.json({ tier: 'free' }, { status: 200 });

@@ -67,7 +67,11 @@ export interface ModelConfig extends LibModelConfig {
 
 export const AUDIO_MODEL_CONSTANTS = {
     TTS: 'gpt-4o-mini-tts',
+    // Gemini speech model behind the 'google' voice provider (ai.google.dev/gemini-api/docs/speech-generation).
+    GOOGLE_TTS: 'gemini-3.1-flash-tts-preview',
     STT: 'whisper-1',
+    // Gemini transcription (ai.google.dev/gemini-api/docs/transcribe); Interactions API only.
+    GOOGLE_STT: 'gemini-3.5-transcribe',
 } as const;
 
 // Image pipeline models (platform-side, like the audio models above — never
@@ -105,6 +109,12 @@ export function configureStoryAgent(agent: AbstractAgent): void {
 export interface AudioModelPricing {
     pricePerMillionCharacters?: number;
     pricePerMinute?: number;
+    // Token-billed speech (Gemini TTS): text prompt in, audio tokens out.
+    textInputPricePerM?: number;
+    audioOutputPricePerM?: number;
+    // Token-billed transcription (Gemini): audio tokens in, text tokens out.
+    audioInputPricePerM?: number;
+    textOutputPricePerM?: number;
 }
 
 export const AUDIO_MODEL_PRICING: Record<string, AudioModelPricing> = {
@@ -112,9 +122,23 @@ export const AUDIO_MODEL_PRICING: Record<string, AudioModelPricing> = {
         // OpenAI pricing as of Feb 2025: $15 per 1M characters for gpt-4o-mini-tts
         pricePerMillionCharacters: 15,
     },
+    [AUDIO_MODEL_CONSTANTS.GOOGLE_TTS]: {
+        // Gemini TTS paid tier (2026-09): $1 per 1M text input tokens, $20 per 1M
+        // audio output tokens. Measured 2026-09-05: ~32 audio tokens per second
+        // of speech, so a 15-second line is ~$0.01 — about 3-5x an OpenAI line.
+        textInputPricePerM: 1,
+        audioOutputPricePerM: 20,
+    },
     [AUDIO_MODEL_CONSTANTS.STT]: {
         // Whisper (whisper-1) pricing: $0.006 per minute of audio
         pricePerMinute: 0.006,
+    },
+    [AUDIO_MODEL_CONSTANTS.GOOGLE_STT]: {
+        // Gemini 3.5 Transcribe paid tier (2026-09): $2 per 1M audio input tokens
+        // (~25 tokens per second) and $12 per 1M text output tokens (~175 per
+        // minute of speech) — about $0.005 per minute, vs Whisper's $0.006.
+        audioInputPricePerM: 2,
+        textOutputPricePerM: 12,
     },
 };
 

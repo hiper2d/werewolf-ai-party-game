@@ -22,7 +22,7 @@ import ModelSelectDropdown from '@/app/components/ModelSelectDropdown';
 import SelectDropdown from '@/app/components/SelectDropdown';
 import {ART_STYLE_MAX_LENGTH} from "@/app/utils/art-style";
 import {ttsService} from "@/app/services/tts-service";
-import {getVoiceConfig, getDefaultVoiceProvider, VOICE_PROVIDER_DISPLAY_NAMES} from "@/app/ai/voice-config";
+import {getVoiceConfig, getDefaultVoiceProvider, SUPPORTED_VOICE_PROVIDERS, VOICE_PROVIDER_DESCRIPTIONS, VOICE_PROVIDER_DISPLAY_NAMES, VoiceProvider} from "@/app/ai/voice-config";
 
 const RANDOM_NAMES = ['Bob', 'John', 'Alex', 'Sam', 'Max', 'Leo', 'Kai', 'Finn'];
 const RANDOM_THEMES = ['Dracula', 'Sherlock Holmes', 'Cthulhu Mythos', 'Treasure Island', 'Spaceship Crew', 'Wild West Town'];
@@ -131,6 +131,10 @@ export default function CreateNewGamePage() {
     const [botNameErrors, setBotNameErrors] = useState<{[key: number]: string}>({});
     const [userTier, setUserTier] = useState<UserTier>('free');
     const [isTierLoaded, setIsTierLoaded] = useState(false);
+    // Voice set the cast is drawn from. Seeded from the user's last pick and
+    // fixed once a preview exists: its voice ids belong to this set, and the
+    // game keeps it for life (only voices within the set change in-game).
+    const [voiceProvider, setVoiceProvider] = useState<VoiceProvider>(getDefaultVoiceProvider());
     // Paid tier: the illustration set drawn for this preview (server-side
     // draft, polled while it draws). null until the player asks for one.
     const [draft, setDraft] = useState<AvatarDraftState | null>(null);
@@ -197,6 +201,7 @@ export default function CreateNewGamePage() {
                 if (!cancelled && response?.ok) {
                     const data = await response.json();
                     setUserTier(data.tier as UserTier);
+                    if (SUPPORTED_VOICE_PROVIDERS.includes(data.voiceProvider)) setVoiceProvider(data.voiceProvider as VoiceProvider);
                 }
             } catch (err) {
                 console.error('Failed to load user tier for model selection', err);
@@ -494,6 +499,7 @@ export default function CreateNewGamePage() {
             longReplies,
             gameMode,
             gameMasterAiType,
+            voiceProvider,
             playersAiType: selectedPlayerAiTypes.length > 0 ? selectedPlayerAiTypes : [LLM_CONSTANTS.RANDOM]
         };
 
@@ -918,6 +924,19 @@ export default function CreateNewGamePage() {
                                     />
                                     <InfoButton label="Bot mode info">
                                         Role-play: bots are their characters — stories, grudges and motives drive whom they trust and vote for, alongside game evidence. Plain: the character is a facade over a strategist; only votes, claims and contradictions may drive suspicion.
+                                    </InfoButton>
+                                </div>
+                                <div className="flex items-center gap-2.5">
+                                    <span className="text-[12px] font-medium text-[var(--fg-1)]">Voices</span>
+                                    <SegmentedControl<VoiceProvider>
+                                        value={voiceProvider}
+                                        options={SUPPORTED_VOICE_PROVIDERS.map(p => ({ value: p, label: VOICE_PROVIDER_DISPLAY_NAMES[p] }))}
+                                        onChange={setVoiceProvider}
+                                        disabled={!!gameData}
+                                    />
+                                    <InfoButton label="Voices info">
+                                        The voice set every character is cast from. {VOICE_PROVIDER_DISPLAY_NAMES.openai}: {VOICE_PROVIDER_DESCRIPTIONS.openai} {VOICE_PROVIDER_DISPLAY_NAMES.google}: {VOICE_PROVIDER_DESCRIPTIONS.google}
+                                        {' '}Fixed for the game once the preview is generated — regenerate to switch. Individual voices and styles stay editable on each character card in the game.
                                     </InfoButton>
                                 </div>
                                 <div className="flex items-center gap-2.5">

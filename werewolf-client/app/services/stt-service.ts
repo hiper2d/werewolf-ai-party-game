@@ -1,10 +1,12 @@
 import { transcribeAudio } from "@/app/api/stt-actions";
+import { VoiceProvider } from "@/app/ai/voice-config/voice-config";
 
 export interface STTOptions {
   language?: string;
   prompt?: string;
   temperature?: number;
   gameId?: string;
+  voiceProvider?: VoiceProvider; // the game's voice set picks the transcription model
 }
 
 export class STTService {
@@ -76,7 +78,7 @@ export class STTService {
   ): Promise<string> {
     try {
       const audioBuffer = await audioBlob.arrayBuffer();
-      return await transcribeAudio(audioBuffer, options);
+      return await transcribeAudio(audioBuffer, { ...options, mimeType: audioBlob.type || 'audio/webm' });
     } catch (error) {
       console.error('STT Error:', error);
       throw new Error(`Failed to transcribe audio: ${error instanceof Error ? error.message : 'Unknown error'}`);
