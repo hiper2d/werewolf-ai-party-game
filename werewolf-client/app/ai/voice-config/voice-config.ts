@@ -5,7 +5,11 @@
  * that can be extended to support multiple TTS providers.
  */
 
-export type VoiceProvider = 'openai' | 'google';
+import type { VoiceProvider } from '@hiper2d/ai-agents';
+
+// The provider id is the library's (it names the VoiceAgentFactory agent); the
+// voice lists below are this app's own casting metadata.
+export type { VoiceProvider };
 
 export interface VoiceMetadata {
   /** Voice identifier (e.g., "echo", "Kore") */

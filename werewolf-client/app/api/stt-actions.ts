@@ -7,7 +7,7 @@ import { recordGameCost, getGameTier } from "@/app/api/cost-tracking";
 import { USER_TIERS } from "@/app/api/game-models";
 import { PAID_TIER_MARKUP } from "@/app/config/credit-packages";
 import { getDefaultVoiceProvider, SUPPORTED_VOICE_PROVIDERS, VoiceProvider } from "@/app/ai/voice-config";
-import { createVoiceAgent, VOICE_PROVIDER_API_KEY } from "@/app/ai/voice";
+import { createVoiceAgent, VOICE_PROVIDER_API_KEY } from "@hiper2d/ai-agents";
 
 export interface STTOptions {
   language?: string;

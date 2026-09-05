@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Game, GameMessage, GAME_MASTER, MessageType } from '@/app/api/game-models';
-import { getAvatarView } from '@/app/utils/avatar-utils';
+import { getAvatarView, getIllustrationUrl, getSceneUrl } from '@/app/utils/avatar-utils';
 import { isPresetAvatarUrl } from '@/app/utils/preset-avatars';
 import { focusToBackground } from '@/app/utils/avatar-framing';
 import { getAvatarGradient } from '@/app/utils/color-utils';
@@ -27,6 +27,7 @@ import CharacterPoster from './CharacterPoster';
  */
 
 const AUTO_VOICE_KEY = 'cinematicAutoVoice';
+const ILLUSTRATION_ALT = 'A scene from the story';
 
 // Message types that read as "someone speaking" — everything with real prose.
 export const SPEECH_TYPES = new Set<MessageType>([
@@ -47,6 +48,32 @@ interface Turn {
     day: number;
     msgNo: string;     // e.g. "41" from the message id counter, or ordinal
     cost?: number;
+    image?: { url: string; alt: string }; // the picture this line carries in chat
+}
+
+/**
+ * A GM illustration, shown above the line it belongs to. The image doc is
+ * committed before its message exists, but it can still be gone (deleted
+ * messages, an old game) — a 404 just hides the picture.
+ */
+function CineIllustration({ src, alt }: { src: string; alt: string }) {
+    const [loaded, setLoaded] = useState(false);
+    const [failed, setFailed] = useState(false);
+    if (failed) return null;
+    return (
+        <div
+            className={`mb-3 w-full max-w-[460px] overflow-hidden rounded-[14px] border border-[var(--line-2)] aspect-[3/2] ${loaded ? '' : 'animate-pulse bg-[var(--bg-3)]'}`}
+        >
+            {/* eslint-disable-next-line @next/next/no-img-element -- authed dynamic route */}
+            <img
+                src={src}
+                alt={alt}
+                className={`block w-full h-full object-cover transition-opacity duration-500 ${loaded ? 'opacity-100' : 'opacity-0'}`}
+                onLoad={() => setLoaded(true)}
+                onError={() => setFailed(true)}
+            />
+        </div>
+    );
 }
 
 // Escape HTML, then re-introduce the two markdown-isms the bots actually use.
@@ -92,24 +119,57 @@ interface CinematicModeProps {
 }
 
 export default function CinematicMode({ game, messages, onClose, startMessageId, onSpeak, voiceMuted, pendingHumanAction, speakingMessageId, loadingMessageId }: CinematicModeProps) {
-    const turns = useMemo<Turn[]>(() =>
-        messages
-            .filter(m => SPEECH_TYPES.has(m.messageType as MessageType))
-            .map((m, i) => {
-                const text = convertMessageContent(m).trim();
-                return {
-                    key: m.id ?? `t-${i}`,
-                    speaker: m.authorName,
-                    text,
-                    day: m.day,
-                    msgNo: m.id?.match(/^0*(\d+)/)?.[1] ?? String(i + 1),
-                    cost: m.cost,
-                };
-            })
-            .filter(t => t.text.length > 0)
-            // A scene, not an archive: only the 10 most recent lines play.
-            .slice(-10),
-        [messages]);
+    // Every line carries the same picture it carries in chat: the day's opening
+    // GM message its establishing shot, each "night falls" the night scene, and
+    // a GM illustration the drawing it was posted with. An illustration is an
+    // image-only message with no line of its own, so it rides on the GM turn it
+    // belongs to — the last GM line before it, or, when the async image lands
+    // above the day's opening story (chat normalizes that case by moving it
+    // down), the first line after it. It replaces a stock scene on that turn:
+    // the drawing of this game's own moment beats the reused establishing shot.
+    const turns = useMemo<Turn[]>(() => {
+        const welcomeUrl = getSceneUrl(game, 'welcome');
+        const nightUrl = getSceneUrl(game, 'night');
+        const isGmText = (m: GameMessage) => m.authorName === GAME_MASTER && m.messageType !== MessageType.GM_ILLUSTRATION;
+        const firstGmIndex = messages.findIndex(isGmText);
+        const built: Turn[] = [];
+        let lastGmTurn = -1;              // index into `built`, an illustration's anchor
+        let pendingIllustration: string | undefined;
+        messages.forEach((m, i) => {
+            if (m.messageType === MessageType.GM_ILLUSTRATION) {
+                const sceneKey = (m.msg as { sceneKey?: string })?.sceneKey;
+                if (!sceneKey) return;
+                const url = getIllustrationUrl(game, sceneKey);
+                const anchor = built[lastGmTurn] ?? built[built.length - 1];
+                if (anchor) anchor.image = {url, alt: ILLUSTRATION_ALT};
+                else pendingIllustration = url;
+                return;
+            }
+            if (!SPEECH_TYPES.has(m.messageType as MessageType)) return;
+            const text = convertMessageContent(m).trim();
+            if (!text) return;
+            const image = pendingIllustration
+                ? {url: pendingIllustration, alt: ILLUSTRATION_ALT}
+                : m.messageType === MessageType.NIGHT_BEGINS && nightUrl
+                    ? {url: nightUrl, alt: 'The setting at night'}
+                    : i === firstGmIndex && welcomeUrl
+                        ? {url: welcomeUrl, alt: 'The setting of this game'}
+                        : undefined;
+            built.push({
+                key: m.id ?? `t-${i}`,
+                speaker: m.authorName,
+                text,
+                day: m.day,
+                msgNo: m.id?.match(/^0*(\d+)/)?.[1] ?? String(built.length + 1),
+                cost: m.cost,
+                image,
+            });
+            pendingIllustration = undefined;
+            if (isGmText(m)) lastGmTurn = built.length - 1;
+        });
+        // A scene, not an archive: only the 10 most recent lines play.
+        return built.slice(-10);
+    }, [messages, game]);
 
     // Auto-open lands on the line that just arrived; manual open starts at the
     // NEWEST line (the scene is "what's happening now" — Previous/rail go back).
@@ -377,6 +437,9 @@ export default function CinematicMode({ game, messages, onClose, startMessageId,
                             {/* Tail: points left at the card on desktop, down on small screens */}
                             <span aria-hidden className="absolute w-4 h-4 rotate-45 border-[var(--line-2)] hidden min-[1101px]:block min-[1101px]:left-[-9px] min-[1101px]:top-16 min-[1101px]:border-l min-[1101px]:border-b" style={{background: 'var(--cine-panel-solid)'}} />
                             <span aria-hidden className="absolute w-4 h-4 rotate-45 border-[var(--line-2)] block min-[1101px]:hidden left-1/2 -ml-2 bottom-[-9px] border-r border-b" style={{background: 'var(--cine-panel-solid)'}} />
+                            {turn.image && (
+                                <CineIllustration key={turn.image.url} src={turn.image.url} alt={turn.image.alt} />
+                            )}
                             <div className="flex items-baseline justify-between gap-3 mb-2">
                                 <span className="text-[15px] font-semibold text-[var(--fg-0)]">{turn.speaker}</span>
                                 <span className="font-mono text-[10.5px] text-[var(--fg-3)] whitespace-nowrap">DAY {turn.day} · MESSAGE {turn.msgNo}</span>

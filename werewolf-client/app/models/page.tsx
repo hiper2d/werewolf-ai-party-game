@@ -2,28 +2,29 @@ import React from 'react';
 import type { Metadata } from 'next';
 import ModelsCatalog from './ModelsCatalog';
 import { InfoIcon } from '@/app/components/ui-icons';
-import { AUDIO_MODEL_CONSTANTS, AUDIO_MODEL_PRICING, IMAGE_MODEL_CONSTANTS } from '@/app/ai/ai-models';
+import { IMAGE_MODEL_CONSTANTS } from '@/app/ai/ai-models';
+import { VOICE_MODEL_CONSTANTS, VOICE_MODEL_PRICING } from '@hiper2d/ai-agents';
 import { VOICE_PROVIDER_DISPLAY_NAMES } from '@/app/ai/voice-config';
 
 // The two voice sets a game can be cast from, with the models behind each
-// (see app/ai/voice). Prices read from the same table billing uses.
-const P = AUDIO_MODEL_PRICING;
+// (VoiceAgentFactory in @hiper2d/ai-agents). Prices read from the same table billing uses.
+const P = VOICE_MODEL_PRICING;
 const VOICE_SETS = [
     {
         name: VOICE_PROVIDER_DISPLAY_NAMES.openai,
         blurb: '10 voices that follow style instructions closely. The cheaper set.',
-        tts: AUDIO_MODEL_CONSTANTS.TTS,
-        ttsPrice: `$${P[AUDIO_MODEL_CONSTANTS.TTS].pricePerMillionCharacters} per 1M characters`,
-        stt: AUDIO_MODEL_CONSTANTS.STT,
-        sttPrice: `$${P[AUDIO_MODEL_CONSTANTS.STT].pricePerMinute} per audio minute`,
+        tts: VOICE_MODEL_CONSTANTS.OPENAI_TTS,
+        ttsPrice: `$${P[VOICE_MODEL_CONSTANTS.OPENAI_TTS].pricePerMillionCharacters} per 1M characters`,
+        stt: VOICE_MODEL_CONSTANTS.OPENAI_STT,
+        sttPrice: `$${P[VOICE_MODEL_CONSTANTS.OPENAI_STT].pricePerMinute} per audio minute`,
     },
     {
         name: VOICE_PROVIDER_DISPLAY_NAMES.google,
         blurb: '30 voices with more natural, expressive speech. Roughly 3-5x the OpenAI price per spoken line.',
-        tts: AUDIO_MODEL_CONSTANTS.GOOGLE_TTS,
-        ttsPrice: `$${P[AUDIO_MODEL_CONSTANTS.GOOGLE_TTS].textInputPricePerM} per 1M text tokens in, $${P[AUDIO_MODEL_CONSTANTS.GOOGLE_TTS].audioOutputPricePerM} per 1M audio tokens out (about $0.04 per minute of speech)`,
-        stt: AUDIO_MODEL_CONSTANTS.GOOGLE_STT,
-        sttPrice: `$${P[AUDIO_MODEL_CONSTANTS.GOOGLE_STT].audioInputPricePerM} per 1M audio tokens in, $${P[AUDIO_MODEL_CONSTANTS.GOOGLE_STT].textOutputPricePerM} per 1M text tokens out (about $0.005 per audio minute)`,
+        tts: VOICE_MODEL_CONSTANTS.GOOGLE_TTS,
+        ttsPrice: `$${P[VOICE_MODEL_CONSTANTS.GOOGLE_TTS].textInputPricePerM} per 1M text tokens in, $${P[VOICE_MODEL_CONSTANTS.GOOGLE_TTS].audioOutputPricePerM} per 1M audio tokens out (about $0.04 per minute of speech)`,
+        stt: VOICE_MODEL_CONSTANTS.GOOGLE_STT,
+        sttPrice: `$${P[VOICE_MODEL_CONSTANTS.GOOGLE_STT].audioInputPricePerM} per 1M audio tokens in, $${P[VOICE_MODEL_CONSTANTS.GOOGLE_STT].textOutputPricePerM} per 1M text tokens out (about $0.005 per audio minute)`,
     },
 ];
 

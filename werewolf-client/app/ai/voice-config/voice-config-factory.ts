@@ -29,10 +29,8 @@ export function getDefaultVoiceProvider(): VoiceProvider {
   return 'openai';
 }
 
-/**
- * List of all supported voice providers.
- */
-export const SUPPORTED_VOICE_PROVIDERS: VoiceProvider[] = ['openai', 'google'];
+/** The providers the library's VoiceAgentFactory serves — the same list this app casts from. */
+export { SUPPORTED_VOICE_PROVIDERS } from '@hiper2d/ai-agents';
 
 /**
  * Display names for voice providers (for UI).

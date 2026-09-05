@@ -1,52 +1,16 @@
 /**
- * Real-API integration tests for the voice (TTS/STT) cores — the voice
- * equivalent of the agent tests. Costs a fraction of a cent per run.
- *
- * All tiers run on the platform keys from Firestore config/freeTierApiKeys
- * (see app/utils/tier-utils.ts), read with the same Firebase Admin credentials
- * prod uses.
+ * Real-API check that the PLATFORM keys (Firestore config/freeTierApiKeys, the
+ * keys every tier runs on) work with the library's voice agents for both
+ * providers — speech and transcription. The provider contracts themselves are
+ * tested in the ai-agents repo; this pins our key store + model access.
+ * Costs a fraction of a cent per run.
  */
-import { generateOpenAiTtsAudio } from "./openai-tts";
-import { generateGoogleTtsAudio } from "./google-tts";
-import { transcribeWithOpenAi } from "./openai-stt";
-import { transcribeWithGemini } from "./google-stt";
+import { VoiceAgentFactory, SUPPORTED_VOICE_PROVIDERS } from "@hiper2d/ai-agents";
 import { getFreeTierApiKeys } from "@/app/api/free-tier-actions";
 import { API_KEY_CONSTANTS } from "@/app/ai/ai-models";
 
 const SAMPLE_TEXT = "The werewolf hides among the villagers.";
-
-function expectWavAudio(audio: ArrayBuffer) {
-  expect(audio.byteLength).toBeGreaterThan(1000);
-  const header = Buffer.from(audio.slice(0, 4)).toString('ascii');
-  expect(header).toBe('RIFF');
-}
-
-describe("Voice with personal keys (api tier path)", () => {
-  it("OpenAI TTS generates playable WAV audio", async () => {
-    const audio = await generateOpenAiTtsAudio(SAMPLE_TEXT, process.env.OPENAI_K!);
-    expectWavAudio(audio);
-  });
-
-  it("Google TTS generates playable WAV audio and reports token usage", async () => {
-    const { audio, usage } = await generateGoogleTtsAudio(SAMPLE_TEXT, process.env.GOOGLE_K!, {
-      voiceName: 'Kore',
-      voiceStyle: 'mysteriously',
-    });
-    expectWavAudio(audio);
-    expect(usage.inputTokens).toBeGreaterThan(0);
-    expect(usage.outputTokens).toBeGreaterThan(0);
-  });
-
-  it("TTS → STT roundtrip returns the spoken text", async () => {
-    const audio = await generateOpenAiTtsAudio(SAMPLE_TEXT, process.env.OPENAI_K!);
-    const { text, durationSeconds } = await transcribeWithOpenAi(audio, process.env.OPENAI_K!, {
-      fileName: 'audio.wav',
-      mimeType: 'audio/wav',
-    });
-    expect(text.toLowerCase()).toContain('werewolf');
-    expect(durationSeconds).toBeGreaterThan(0);
-  });
-});
+const SAMPLE_VOICE = { openai: 'onyx', google: 'Kore' } as const;
 
 describe("Voice with platform keys (free/paid tier path)", () => {
   it("platform key store has both voice provider keys", async () => {
@@ -55,27 +19,16 @@ describe("Voice with platform keys (free/paid tier path)", () => {
     expect(keys[API_KEY_CONSTANTS.GOOGLE]).toBeTruthy();
   });
 
-  it("OpenAI TTS works with the platform key (incl. TTS model access)", async () => {
-    const keys = await getFreeTierApiKeys();
-    const audio = await generateOpenAiTtsAudio(SAMPLE_TEXT, keys[API_KEY_CONSTANTS.OPENAI]);
-    expectWavAudio(audio);
-  });
+  for (const provider of SUPPORTED_VOICE_PROVIDERS) {
+    it(`${provider}: platform key speaks and transcribes (incl. model access)`, async () => {
+      const agent = VoiceAgentFactory.createAgentFromKeys(provider, await getFreeTierApiKeys());
+      const { audio, costUSD } = await agent.speak({ text: SAMPLE_TEXT, voice: SAMPLE_VOICE[provider], voiceStyle: 'mysteriously' });
+      expect(audio.byteLength).toBeGreaterThan(1000);
+      expect(Buffer.from(audio.slice(0, 4)).toString('ascii')).toBe('RIFF');
+      expect(costUSD).toBeGreaterThan(0);
 
-  it("Gemini TTS → Gemini Transcribe roundtrip returns the spoken text with token usage", async () => {
-    const keys = await getFreeTierApiKeys();
-    const { audio } = await generateGoogleTtsAudio(SAMPLE_TEXT, keys[API_KEY_CONSTANTS.GOOGLE], { voiceName: 'Kore' });
-    const { text, durationSeconds, usage } = await transcribeWithGemini(audio, keys[API_KEY_CONSTANTS.GOOGLE], { mimeType: 'audio/wav' });
-    expect(text.toLowerCase()).toContain('werewolf');
-    expect(durationSeconds).toBeGreaterThan(0);
-    expect(usage.inputTokens).toBeGreaterThan(0);
-    expect(usage.outputTokens).toBeGreaterThan(0);
-  });
-
-  it("Google TTS works with the platform key (incl. TTS model access)", async () => {
-    const keys = await getFreeTierApiKeys();
-    const { audio } = await generateGoogleTtsAudio(SAMPLE_TEXT, keys[API_KEY_CONSTANTS.GOOGLE], {
-      voiceName: 'Kore',
+      const { text } = await agent.transcribe({ audio, mimeType: 'audio/wav', fileName: 'audio.wav' });
+      expect(text.toLowerCase()).toContain('werewolf');
     });
-    expectWavAudio(audio);
-  });
+  }
 });
