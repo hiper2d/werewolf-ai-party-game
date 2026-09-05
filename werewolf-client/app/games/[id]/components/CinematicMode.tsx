@@ -14,11 +14,14 @@ import CharacterPoster from './CharacterPoster';
 /**
  * Cinematic Speaker Mode — plays the day's discussion back one speaker at a
  * time: portrait card left, typewriter speech bubble right, Next/Prev/rail
- * navigation, optional auto-advance. Design: design_handoff_cinematic_mode.
+ * navigation. Design: design_handoff_cinematic_mode.
  *
  * The turn list is derived from the live `messages` prop, so while the overlay
  * is open, newly arriving bot messages (SSE) extend the show — reaching the
  * end while bots are still thinking shows a waiting state instead of closing.
+ * Advancing is always manual: Next / Space / a click anywhere that isn't a
+ * button. A line that arrives while the reader is parked never steals the
+ * stage — it just re-enables Next.
  */
 
 // Message types that read as "someone speaking" — everything with real prose.
@@ -43,6 +46,8 @@ interface Turn {
 }
 
 // Escape HTML, then re-introduce the two markdown-isms the bots actually use.
+// Newlines survive as-is: the bubble is `whitespace-pre-wrap`, so a multi-line
+// message (vote tallies, a bot's list) keeps its lines like it does in chat.
 function toSpeechHtml(text: string): string {
     const escaped = text
         .replace(/&/g, '&amp;')
@@ -93,20 +98,20 @@ export default function CinematicMode({ game, messages, onClose, startMessageId,
 
     // Auto-open lands on the line that just arrived; manual open starts at the
     // NEWEST line (the scene is "what's happening now" — Previous/rail go back).
-    const [turnIndex, setTurnIndex] = useState(() => {
-        if (startMessageId) {
-            const i = turns.findIndex(t => t.key === startMessageId);
-            if (i >= 0) return i;
-        }
-        return Math.max(0, turns.length - 1);
+    // The position is the line's KEY, not an index: the turn list is a sliding
+    // last-10 window, so a live message shifts every index by one — anchoring
+    // on the key keeps the reader on the same line when that happens.
+    const [turnKey, setTurnKey] = useState<string | undefined>(() => {
+        if (startMessageId && turns.some(t => t.key === startMessageId)) return startMessageId;
+        return turns[turns.length - 1]?.key;
     });
     const [typedCount, setTypedCount] = useState(0);
-    // Bot story on the portrait card: collapsed by default, and the choice
-    // persists across turns — expand once and every speaker shows their story.
     const typingTimer = useRef<ReturnType<typeof setInterval> | null>(null);
-    const prevTurnCount = useRef(turns.length);
 
-    const turn = turns[Math.min(turnIndex, turns.length - 1)];
+    // A line that slid out of the window (10+ arrivals while parked) resolves
+    // to the oldest line still shown.
+    const turnIndex = Math.max(0, turns.findIndex(t => t.key === turnKey));
+    const turn = turns[turnIndex];
     const tokens = useMemo(() => turn ? tokenize(toSpeechHtml(turn.text)) : [], [turn]);
     const typingDone = typedCount >= tokens.length;
     const botsStillTalking = game.gameStateProcessQueue.length > 0;
@@ -139,27 +144,27 @@ export default function CinematicMode({ game, messages, onClose, startMessageId,
 
     const goTo = useCallback((index: number) => {
         clearTimers();
-        setTurnIndex(Math.max(0, Math.min(index, turns.length - 1)));
-    }, [clearTimers, turns.length]);
+        setTurnKey(turns[Math.max(0, Math.min(index, turns.length - 1))]?.key);
+    }, [clearTimers, turns]);
 
     const next = useCallback(() => {
         if (!typingDone) { setTypedCount(tokens.length); return; }
         if (!atLastTurn) { goTo(turnIndex + 1); return; }
         if (!botsStillTalking) onClose();
         // At the last turn with bots still talking: hold — the next SSE
-        // message extends `turns` and the effect below advances.
+        // message extends `turns`, which re-enables Next for the reader.
     }, [typingDone, tokens.length, atLastTurn, botsStillTalking, goTo, turnIndex, onClose]);
 
     const prev = useCallback(() => { if (turnIndex > 0) goTo(turnIndex - 1); }, [turnIndex, goTo]);
 
-    // Live feed: parked at the old last turn with typing finished → advance
-    // into freshly arrived turns.
-    useEffect(() => {
-        if (turns.length > prevTurnCount.current && typingDone && turnIndex === prevTurnCount.current - 1) {
-            setTurnIndex(prevTurnCount.current);
-        }
-        prevTurnCount.current = turns.length;
-    }, [turns.length, typingDone, turnIndex]);
+    // Click-to-advance: the scrim and any non-button spot on the stage act as
+    // Next, minus its end-of-scene close — a stray click must never dismiss
+    // the overlay; that's what Close/Esc are for.
+    const advanceOnClick = useCallback((e: React.MouseEvent) => {
+        if ((e.target as HTMLElement).closest('button, a')) return;
+        if (!typingDone) { setTypedCount(tokens.length); return; }
+        if (!atLastTurn) goTo(turnIndex + 1);
+    }, [typingDone, tokens.length, atLastTurn, goTo, turnIndex]);
 
     // Keyboard, active only while open.
     useEffect(() => {
@@ -186,13 +191,13 @@ export default function CinematicMode({ game, messages, onClose, startMessageId,
     // paint OVER its edges — which buried the close button under the right panel.
     return createPortal(
         <div className="fixed inset-0 z-50 transition-opacity duration-300">
-            {/* Scrim: blurs and dims the chat behind; click exits. The scrim
+            {/* Scrim: blurs and dims the chat behind; click advances. The scrim
                 gradient token carries the per-theme dimming, so no brightness
                 filter (it muddies the light theme). */}
             <div
                 className="absolute inset-0 backdrop-blur-[3px] backdrop-saturate-[.7]"
                 style={{background: 'var(--cine-scrim)'}}
-                onClick={onClose}
+                onClick={advanceOnClick}
             />
 
             {/* Voice — plays the current line with the speaker's voice */}
@@ -233,7 +238,7 @@ export default function CinematicMode({ game, messages, onClose, startMessageId,
             <div className="absolute inset-0 grid place-items-center p-6 sm:p-[48px_56px] overflow-auto pointer-events-none">
                 <div
                     className="pointer-events-auto w-full grid items-center gap-[clamp(20px,3vw,40px)] grid-cols-1 max-w-[540px] min-[1101px]:max-w-[1320px] min-[1101px]:[grid-template-columns:clamp(240px,26vw,400px)_minmax(0,1fr)]"
-                    onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+                    onClick={advanceOnClick}
                 >
 
                     {/* Portrait card — order 2 on small screens (bubble first) */}
@@ -262,7 +267,7 @@ export default function CinematicMode({ game, messages, onClose, startMessageId,
                                 <span className="text-[15px] font-semibold text-[var(--fg-0)]">{turn.speaker}</span>
                                 <span className="font-mono text-[10.5px] text-[var(--fg-3)] whitespace-nowrap">DAY {turn.day} · MESSAGE {turn.msgNo}</span>
                             </div>
-                            <div className="cine-speech text-[clamp(15px,1.15vw,18px)] leading-[1.65] text-[var(--fg-0)] min-h-[92px] sm:min-h-[132px]">
+                            <div className="cine-speech whitespace-pre-wrap text-[clamp(15px,1.15vw,18px)] leading-[1.65] text-[var(--fg-0)] min-h-[92px] sm:min-h-[132px]">
                                 <span dangerouslySetInnerHTML={{__html: typedHtml}} />
                                 {!typingDone && <span className="cine-caret" />}
                             </div>

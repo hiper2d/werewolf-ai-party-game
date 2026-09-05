@@ -1,7 +1,11 @@
 # Bugs and improvements
 
 ## Open
-- Update OpenAI Sol prices, Update DeepSeek prices (email), upgrade Qwen 3.7 -> 3.8 Flash, Add GLM 5.3 Flash
+- Improve buttons and summary loder: 
+  - Start Night, Next Day, Replay Night (hide it to PAID tier only)
+  - Summary in-progress notification is ugly
+
+- Cinematic mode should be on/off
 
 - Create a welcome game for new users? Randomly create a game with free tier models in a predefined theme in the WELCOME state.
 Every new user gets one.
@@ -42,12 +46,6 @@ Every new user gets one.
   and the user triggers the redraw themselves (the draft UI already allows it). What may still
   be worth doing: an explicit timeout on the fetch so a hung call fails on our clock rather than
   Google's, and making sure the abandoned-spend path is the exception, not the rule.
-
-- ~~**Local dev ships logs into the production BetterStack source, untagged.**~~ Done
-  2026-09-02: `logger.ts` stamps `env` (`VERCEL_ENV` → `NODE_ENV` → `development`) on every
-  line shipped to Better Stack; the debugging skill's recipes filter on
-  `JSONExtractString(raw,'env') = 'production'`. Lines from before that date have no `env` —
-  tell them apart by `context.runtime.file` (`/var/task/...` = production).
 
 ## Reference: prompt-cache semantics per provider (researched 2026-08-04, from live docs)
 

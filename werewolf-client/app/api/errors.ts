@@ -38,6 +38,22 @@ export function isInsufficientBalanceError(text: string | undefined | null): boo
     return /insufficient balance/i.test(text);
 }
 
+/**
+ * True when the AI provider refused the call because the PLATFORM's account with
+ * that provider is out of money — OpenAI "You have no credits remaining" /
+ * insufficient_quota, Anthropic "credit balance is too low", DeepSeek / xAI
+ * 402 "Insufficient Balance" / spending-limit wording. All tiers run on platform
+ * keys, so this is our budget, not the player's: retrying the same provider
+ * can't help until it is topped up, but another provider's model still works.
+ * Check this BEFORE isProviderBusyError — these come as 429s too.
+ */
+export function isProviderBudgetDepletedError(text: string | undefined | null): boolean {
+    if (!text) {
+        return false;
+    }
+    return /no credits remaining|insufficient_quota|exceeded your current quota|credit balance is too low|used all available credits|spending limit|billing hard limit|\b402\b.*insufficient balance|insufficient balance.*\b402\b/i.test(text);
+}
+
 export function isProviderBusyError(text: string | undefined | null): boolean {
     if (!text) {
         return false;

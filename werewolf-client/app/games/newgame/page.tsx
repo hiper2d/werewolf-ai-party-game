@@ -1,6 +1,7 @@
 'use client';
 
 import React, {useEffect, useMemo, useRef, useState} from 'react';
+import { isProviderBudgetDepletedError } from '@/app/api/errors';
 import {useRouter} from 'next/navigation';
 import {useSession} from 'next-auth/react';
 import {createGame, getPreviewProgress, previewGame} from '@/app/api/game-actions';
@@ -140,8 +141,9 @@ export default function CreateNewGamePage() {
     const [reframeEntry, setReframeEntry] = useState<CastEntry | null>(null);
     const hasInitializedPlayerModels = useRef(false);
     const playerOptions = useMemo(() => {
-        const maxPlayers = 12;
-        return Array.from({ length: maxPlayers - 5 }, (_, i) => i + 6);
+        // 8–16 players. 12 was a leftover of the API-tier removal; a full table is 16.
+        const minPlayers = 8, maxPlayers = 16;
+        return Array.from({ length: maxPlayers - minPlayers + 1 }, (_, i) => i + minPlayers);
     }, []);
     const candidateModels = useMemo(() => getCandidateModelsForTier(userTier), [userTier]);
 
@@ -317,17 +319,19 @@ export default function CreateNewGamePage() {
         return () => { cancelled = true; };
     }, [draft?.status]);
 
-    const handleGenerateIllustrations = async () => {
-        if (!gameData || draftBusy || draft?.status === 'generating') return;
+    // Takes the preview explicitly: the auto-draw right after a preview lands
+    // runs before React has committed that preview to gameData.
+    const drawIllustrations = async (preview: GamePreviewWithGeneratedBots) => {
+        if (draftBusy) return;
         setDraftBusy(true);
         setDraftError(null);
         try {
             const state = await generateDraftIllustrations({
-                theme: gameData.theme,
-                description: gameData.description,
+                theme: preview.theme,
+                description: preview.description,
                 artStyle,
-                humanPlayerName: gameData.name,
-                bots: gameData.bots.map(bot => ({ name: bot.name, gender: bot.gender, story: bot.story, visualDescription: bot.visualDescription })),
+                humanPlayerName: preview.name,
+                bots: preview.bots.map(bot => ({ name: bot.name, gender: bot.gender, story: bot.story, visualDescription: bot.visualDescription })),
             });
             setDraft(state);
         } catch (err: any) {
@@ -335,6 +339,11 @@ export default function CreateNewGamePage() {
         } finally {
             setDraftBusy(false);
         }
+    };
+
+    const handleGenerateIllustrations = async () => {
+        if (!gameData || draft?.status === 'generating') return;
+        await drawIllustrations(gameData);
     };
 
     // Save a moved crop: the server re-cuts the card from the stored sheet and
@@ -548,6 +557,14 @@ export default function CreateNewGamePage() {
             setDraft(null);
             setDraftError(null);
             setReframeEntry(null);
+            // Paid tier: start drawing this cast right away instead of waiting
+            // for a click. Create Game adopts a set that is still in progress,
+            // so the player never has to wait for it; the panel keeps its
+            // button for redraws. Not awaited: a draw failure (no balance,
+            // provider down) shows in the panel and must not fail the preview.
+            if (userTier === USER_TIERS.PAID) {
+                void drawIllustrations(updatedGame);
+            }
         } catch (err: any) {
             // Provide user-friendly error messages for common issues
             let userFriendlyError = err.message;
@@ -561,6 +578,12 @@ export default function CreateNewGamePage() {
                 userFriendlyError = `The AI model had trouble generating a properly formatted response. This sometimes happens with certain models. Please try again, or consider using a different AI model for the Game Master.`;
             } else if (err.message.includes('Response validation failed')) {
                 userFriendlyError = `The AI model generated an invalid response format. Please try again or use a different AI model.`;
+            } else if (isProviderBudgetDepletedError(err.message)) {
+                // Platform keys serve every tier, so an empty provider balance is
+                // our outage, not the player's. Name the provider so they can
+                // sidestep it with a Game Master from another one.
+                const provider = /from (\w+) API/.exec(err.message)?.[1];
+                userFriendlyError = `${provider ?? 'The AI provider'} has stopped serving requests: the platform's ${provider ?? 'provider'} budget is depleted. This is on our side and retrying won't help until it is topped up. Pick a Game Master model from a different provider, or try again later.`;
             } else if (err.message.includes('Failed to get response') || err.message.includes('API')) {
                 userFriendlyError = `Unable to connect to the AI service. Please try again.`;
             }

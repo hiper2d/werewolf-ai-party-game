@@ -1124,3 +1124,15 @@ html {
 /* Skeleton pulse for images still being drawn (new-game preview illustrations). */
 @keyframes shimmer { 0%, 100% { opacity: .35; } 50% { opacity: .9; } }
 .animate-shimmer { animation: shimmer 1.6s ease-in-out infinite; }
+
+/* ── Chat footer loading rail (design: Phase Controls 2a) ───────────────── */
+/* Indeterminate 3px track: a soft accent sweep crossing the rail. */
+@keyframes rail-sweep { from { transform: translateX(-100%); } to { transform: translateX(320%); } }
+.rail-sweep { animation: rail-sweep 1.8s linear infinite; }
+/* The busy actor's avatar breathes instead of spinning. */
+@keyframes rail-pulse { 50% { opacity: .45; } }
+.rail-pulse { animation: rail-pulse 1.6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .rail-sweep { animation-duration: 3.6s; }
+  .rail-pulse { animation: none; }
+}

@@ -21,14 +21,17 @@ const TEXT_INPUT_PRICE_PER_M = IMAGE_MODEL_PRICING[AVATAR_MODEL].textInputPriceP
 // 4:3 canvas. Cells must come out square-to-portrait: asked for 4x4
 // (landscape 600x448 cells) the model redrew the sheet as 4x3, 6x3 and once
 // as an irregular two-layout sheet (2026-09-03) — every time towards taller
-// cells. 5x3 keeps 480x597 cells for the 13-15 a full table needs.
+// cells. 5x3 keeps 480x597 cells for 13-15; a 16-player table is 17 cells and
+// gets 6x3 (400x600, 2:3 — one of the shapes the model volunteered above).
+// Never 4x4: it silently cut a 17-cell cast to 16 (the GM lost its card).
 function gridFor(cells: number): { cols: number; rows: number } {
     if (cells <= 6) return {cols: 3, rows: 2};
     if (cells <= 8) return {cols: 4, rows: 2};
     if (cells <= 9) return {cols: 3, rows: 3};
     if (cells <= 12) return {cols: 4, rows: 3};
     if (cells <= 15) return {cols: 5, rows: 3};
-    return {cols: 4, rows: 4};
+    if (cells <= 18) return {cols: 6, rows: 3};
+    throw new Error(`Avatar sheet cannot hold ${cells} cells (max 18)`);
 }
 
 interface AvatarCell {

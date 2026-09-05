@@ -146,7 +146,7 @@ export function generateRoleKnowledgeSection(bot: Bot): string {
         const protectionLines = bot.roleKnowledge.protections.map(prot => {
             // Handle unsuccessful protections (blocked by some future role)
             if (prot.success === false) {
-                return `- **Night ${prot.day}:** Tried to protect **${prot.target}** → ❌ Protection failed/blocked (target was abducted)`;
+                return `- **Night ${prot.day}:** Tried to protect **${prot.target}** → ❌ Protection failed`;
             }
             // Handle kill actions
             if (prot.actionType === 'kill') {
@@ -186,6 +186,19 @@ export function generateRoleKnowledgeSection(bot: Bot): string {
         }
 
         sections.push(summary);
+    }
+
+    // Werewolf attacks (the pack's shared history)
+    if (bot.role === GAME_ROLES.WEREWOLF && bot.roleKnowledge.attacks && bot.roleKnowledge.attacks.length > 0) {
+        const attackLines = bot.roleKnowledge.attacks.map(atk => {
+            const outcome = atk.outcome === 'killed'
+                ? `💀 ${atk.target} died`
+                : atk.outcome === 'survived'
+                    ? `❌ ${atk.target} survived (the doctor protected them)`
+                    : '❌ Attack failed';
+            return `- **Night ${atk.day}:** Attacked **${atk.target}** → ${outcome}`;
+        }).join('\n');
+        sections.push(`## 🐺 Your Pack's Attack History\n\n${attackLines}`);
     }
 
     return sections.length > 0 ? sections.join('\n\n') : '';
@@ -231,7 +244,8 @@ export function generateBotContextSection(bot: Bot, game: Game): string {
             if (vote.votes && vote.votes.length > 0) {
                 const sortedVotes = [...vote.votes].sort((a, b) => a.order - b.order);
                 sortedVotes.forEach(v => {
-                    voteText += `  ${v.order}. ${v.voter} → ${v.target}\n`;
+                    const reason = v.reason?.trim();
+                    voteText += `  ${v.order}. ${v.voter} → ${v.target}${reason ? `: "${reason}"` : ''}\n`;
                 });
             } else {
                 const voteStr = Object.entries(vote.voteCounts)
@@ -246,17 +260,11 @@ export function generateBotContextSection(bot: Bot, game: Game): string {
             dayParts.push(voteText);
         }
 
-        // Night narrative + factual summary for this day
+        // Night story for this day — the GM's public narrative only. Private
+        // outcomes reach each role through its own role-knowledge section.
         const night = (game.nightNarratives || []).find(n => n.day === day);
         if (night) {
-            let nightText = `**Night ${day} Story:**\n${night.narrative}`;
-
-            // Append chronological night events if available
-            if (night.events && night.events.length > 0) {
-                const eventLines = night.events.map(e => `${e.order + 1}. [${e.role}] ${e.description}`);
-                nightText += `\n**Night ${day} Events (in order):**\n${eventLines.join('\n')}`;
-            }
-            dayParts.push(nightText);
+            dayParts.push(`**Night ${day} Story:**\n${night.narrative}`);
         }
 
         if (dayParts.length > 0) {

@@ -20,7 +20,8 @@ import {
     RECIPIENT_DETECTIVE,
     DetectiveInvestigation,
     DoctorProtection,
-    ManiacAbduction
+    ManiacAbduction,
+    WerewolfAttack
 } from "@/app/api/game-models";
 import { auth } from "@/auth";
 import { getGame, addMessageToChatAndSaveToDb, consumeModelOverride } from "./game-actions";
@@ -118,8 +119,10 @@ async function endNightWithResults(gameId: string, game: Game): Promise<GameActi
             : 'BLOCKED')
         : 'INACTIVE';
 
+    // Roles only, never player names: the GM is told to keep blocked actions out of
+    // the story, and a name here is one model slip away from the public narrative.
     const actionsPreventedSummary = nightState.actionsPrevented && nightState.actionsPrevented.length > 0
-        ? nightState.actionsPrevented.map(ap => `${ap.role} (${ap.player}) blocked by ${ap.reason}`).join('; ')
+        ? nightState.actionsPrevented.map(ap => `${ap.role} blocked by ${ap.reason}`).join('; ')
         : 'NONE';
 
     const werewolfKillPrevented = nightState.actionsPrevented.some(ap => ap.role === GAME_ROLES.WEREWOLF && ap.reason === 'doctor_save');
@@ -204,11 +207,23 @@ async function endNightWithResults(gameId: string, game: Game): Promise<GameActi
     const gameEndChecker = new GameEndChecker();
     const endGameCheck = gameEndChecker.check(tempGame);
 
+    // The detective's result is public by rule, but the GM only hints at it in
+    // prose ("shadows clung deep"), and the wording drifts. One fixed line makes
+    // it explicit for bots and humans alike. Nothing is added when there is no
+    // detective — the prose already stays silent in that case.
+    const detectiveLine = detectiveResultSummary === 'FOUND_EVIL'
+        ? "\n\n🔍 *The detective's investigation revealed evil.*"
+        : detectiveResultSummary === 'FOUND_INNOCENT'
+            ? "\n\n🔍 *The detective's investigation found an innocent.*"
+            : detectiveResultSummary === 'BLOCKED'
+                ? "\n\n🔍 *The detective's investigation revealed nothing.*"
+                : '';
+
     // Append end game message to night results if game is ending
-    let finalNightResultsMessage = nightResultsMessage;
+    let finalNightResultsMessage = nightResultsMessage + detectiveLine;
     if (endGameCheck.isEnded) {
         const endGameMessage = gameEndChecker.getEndGameMessage(tempGame);
-        finalNightResultsMessage = nightResultsMessage + endGameMessage;
+        finalNightResultsMessage = nightResultsMessage + detectiveLine + endGameMessage;
         logger.info(`🎮 GAME END DETECTED: ${endGameCheck.reason}`, { gameId, reason: endGameCheck.reason });
     }
 
@@ -253,84 +268,13 @@ async function endNightWithResults(gameId: string, game: Game): Promise<GameActi
         }
     }
 
-    // Build chronological night events following action order: Maniac(0) → Werewolves(1) → Doctor(2) → Detective(3)
-    const nightEvents: Array<{ order: number; role: string; description: string }> = [];
 
-    // Order 0: Maniac
-    if (nightState.abductedPlayer) {
-        nightEvents.push({ order: 0, role: 'maniac', description: `Abducted ${nightState.abductedPlayer} for the night, blocking all actions involving them` });
-    }
-    const maniacPrevented = nightState.actionsPrevented.filter(a => a.role === 'maniac');
-    maniacPrevented.forEach(a => {
-        nightEvents.push({ order: 0, role: 'maniac', description: `Maniac's action failed — ${a.reason === 'death' ? 'maniac died' : a.reason}` });
-    });
-
-    // Order 1: Werewolves
-    const werewolfDeaths = nightState.deaths.filter(d => d.cause === 'werewolf_attack');
-    const maniacCollateral = nightState.deaths.filter(d => d.cause === 'maniac_collateral');
-    const doctorSaved = nightState.actionsPrevented.some(a => a.reason === 'doctor_save');
-    if (werewolfDeaths.length > 0) {
-        werewolfDeaths.forEach(d => {
-            nightEvents.push({ order: 1, role: 'werewolves', description: `Killed ${d.player} (${d.role})` });
-        });
-    } else if (doctorSaved) {
-        nightEvents.push({ order: 1, role: 'werewolves', description: 'Attacked a player, but the doctor saved them' });
-    } else {
-        // Check if werewolf attack was blocked by abduction
-        const werewolfBlocked = nightState.actionsPrevented.filter(a => a.role === 'werewolf');
-        if (werewolfBlocked.length > 0) {
-            nightEvents.push({ order: 1, role: 'werewolves', description: 'Attack failed — target was abducted by the maniac' });
-        } else if (nightState.deaths.length === 0 && !doctorSaved) {
-            nightEvents.push({ order: 1, role: 'werewolves', description: 'No kill occurred' });
-        }
-    }
-    // Maniac collateral deaths happen as consequence of werewolf killing maniac
-    maniacCollateral.forEach(d => {
-        nightEvents.push({ order: 1, role: 'werewolves', description: `${d.player} (${d.role}) died as maniac collateral — maniac was killed and their abducted victim perished` });
-    });
-
-    // Order 2: Doctor
-    const doctorKill = nightState.deaths.filter(d => d.cause === 'doctor_kill');
-    const doctorPrevented = nightState.actionsPrevented.filter(a => a.role === 'doctor');
-    if (doctorKill.length > 0) {
-        doctorKill.forEach(d => {
-            nightEvents.push({ order: 2, role: 'doctor', description: `Used Doctor's Mistake to kill ${d.player} (${d.role})` });
-        });
-    } else if (doctorSaved) {
-        nightEvents.push({ order: 2, role: 'doctor', description: 'Successfully protected a player from werewolf attack' });
-    } else if (doctorPrevented.length > 0) {
-        doctorPrevented.forEach(a => {
-            nightEvents.push({ order: 2, role: 'doctor', description: `Protection failed — ${a.reason === 'abduction' ? 'target was abducted' : a.reason}` });
-        });
-    }
-
-    // Order 3: Detective
-    const detectiveKillDeaths = nightState.deaths.filter(d => d.cause === 'detective_kill');
-    if (detectiveKillDeaths.length > 0) {
-        detectiveKillDeaths.forEach(d => {
-            nightEvents.push({ order: 3, role: 'detective', description: `Used one-time kill ability on ${d.player} (${d.role})` });
-        });
-    } else if (nightState.detectiveResult) {
-        if (nightState.detectiveResult.success) {
-            const result = nightState.detectiveResult.isEvil ? 'found evil (werewolf or maniac)' : 'found innocent';
-            nightEvents.push({ order: 3, role: 'detective', description: `Investigated a player — ${result}` });
-        } else {
-            nightEvents.push({ order: 3, role: 'detective', description: 'Investigation failed — target was abducted' });
-        }
-    }
-    const detectivePrevented = nightState.actionsPrevented.filter(a => a.role === 'detective' && !nightState.detectiveResult);
-    detectivePrevented.forEach(a => {
-        nightEvents.push({ order: 3, role: 'detective', description: `Investigation failed — ${a.reason === 'abduction' ? 'target was abducted' : a.reason === 'death' ? 'detective died' : a.reason}` });
-    });
-
-    // Sort by order to ensure chronological display
-    nightEvents.sort((a, b) => a.order - b.order);
-
-    // Store night narrative for bot context
+    // Store the night story for bot context. Only the public narrative is kept:
+    // the per-night factual event list that used to sit beside it named the
+    // maniac's victim to every bot.
     const nightNarrativeResult: NightNarrativeResult = {
         day: game.currentDay,
-        narrative: finalNightResultsMessage,
-        events: nightEvents
+        narrative: finalNightResultsMessage
     };
     const existingNightNarratives = game.nightNarratives || [];
     const updatedNightNarratives = [...existingNightNarratives, nightNarrativeResult];
@@ -1132,6 +1076,32 @@ async function startNewDayImpl(gameId: string): Promise<GameActionResponse> {
                     return bot;
                 });
             }
+        }
+
+        // Werewolf knowledge: the pack's attack and its outcome, recorded on every
+        // werewolf bot. The night chat is day-scoped and drops out of context the
+        // next morning, so without this the pack forgets who it attacked.
+        if (nightResults.werewolf?.target) {
+            const target = nightResults.werewolf.target;
+            const killed = (nightState?.deaths || []).some(d => d.player === target && d.cause === 'werewolf_attack');
+            const savedByDoctor = (nightState?.actionsPrevented || []).some(
+                ap => ap.role === GAME_ROLES.WEREWOLF && ap.reason === 'doctor_save'
+            );
+            const attack: WerewolfAttack = {
+                day: currentGame.currentDay,
+                target,
+                outcome: killed ? 'killed' : savedByDoctor ? 'survived' : 'failed'
+            };
+            updatedBots = updatedBots.map(bot => {
+                if (bot.role !== GAME_ROLES.WEREWOLF) return bot;
+                return {
+                    ...bot,
+                    roleKnowledge: {
+                        ...bot.roleKnowledge,
+                        attacks: [...(bot.roleKnowledge?.attacks || []), attack]
+                    }
+                };
+            });
         }
 
         // Get all alive bot names for the processing queue

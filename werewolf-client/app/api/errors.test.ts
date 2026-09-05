@@ -1,4 +1,30 @@
-import { isInsufficientBalanceError, isProviderBusyError } from './errors';
+import { isInsufficientBalanceError, isProviderBudgetDepletedError, isProviderBusyError } from './errors';
+
+describe('isProviderBudgetDepletedError', () => {
+    const depletedSamples = [
+        // OpenAI, observed 2026-09-05 (preview casting failed on an empty org balance)
+        'Failed to get response from OpenAI API: 429 You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.',
+        'Failed to get response from OpenAI API: 429 You exceeded your current quota, please check your plan and billing details. insufficient_quota',
+        // Anthropic
+        '400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."}}',
+        // DeepSeek
+        'Failed to get response from DeepSeek API: 402 Insufficient Balance',
+        // xAI
+        'Failed to get response from Grok API: 403 "Your team has either used all available credits or reached its monthly spending limit."',
+    ];
+
+    it.each(depletedSamples)('detects an exhausted platform budget: %s', (msg) => {
+        expect(isProviderBudgetDepletedError(msg)).toBe(true);
+    });
+
+    it('does not fire on ordinary throttling, the player\'s own prepaid balance, or empty input', () => {
+        expect(isProviderBudgetDepletedError('Failed to get response from OpenAI API: 429 Too Many Requests')).toBe(false);
+        expect(isProviderBudgetDepletedError('Failed to get response from Google API: got status: 429. RESOURCE_EXHAUSTED: Quota exceeded for quota metric')).toBe(false);
+        expect(isProviderBudgetDepletedError('Insufficient balance. Please add funds on your profile page to continue playing.')).toBe(false);
+        expect(isProviderBudgetDepletedError(undefined)).toBe(false);
+        expect(isProviderBudgetDepletedError('')).toBe(false);
+    });
+});
 
 describe('isProviderBusyError', () => {
     // Real messages observed in production / agent code paths.

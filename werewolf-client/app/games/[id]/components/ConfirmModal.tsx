@@ -8,6 +8,9 @@ interface ConfirmModalProps {
     message: string;
     confirmLabel?: string;
     cancelLabel?: string;
+    // Confirm button colour: red for destructive actions (default), accent
+    // for a consequential-but-normal step like starting the vote.
+    confirmVariant?: 'danger' | 'accent';
     onConfirm: () => void;
     onCancel: () => void;
 }
@@ -18,6 +21,7 @@ export default function ConfirmModal({
     message,
     confirmLabel = 'Delete',
     cancelLabel = 'Cancel',
+    confirmVariant = 'danger',
     onConfirm,
     onCancel,
 }: ConfirmModalProps) {
@@ -40,7 +44,9 @@ export default function ConfirmModal({
                             {cancelLabel}
                         </button>
                         <button
-                            className="px-4 py-2 text-[13px] font-medium rounded-[var(--radius-md)] bg-[var(--danger)] text-white hover:brightness-110 transition-all duration-[120ms]"
+                            className={`px-4 py-2 text-[13px] font-medium rounded-[var(--radius-md)] hover:brightness-110 transition-all duration-[120ms] ${
+                                confirmVariant === 'accent' ? 'bg-[var(--accent)] text-[var(--on-accent)]' : 'bg-[var(--danger)] text-white'
+                            }`}
                             onClick={onConfirm}
                         >
                             {confirmLabel}

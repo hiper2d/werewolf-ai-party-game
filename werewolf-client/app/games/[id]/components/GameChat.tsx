@@ -12,11 +12,15 @@ import NightActionModal from "./NightActionModal";
 import MentionDropdown from "./MentionDropdown";
 import ConfirmModal from "./ConfirmModal";
 import CinematicMode, { SPEECH_TYPES } from "./CinematicMode";
+
+// localStorage key for the cinematic on/off switch (browser-wide, not per game).
+const CINEMATIC_ENABLED_KEY = 'cinematicEnabled';
+import { LoadingRail, PhaseBar, StreamPill, stripChromeClass, stripChromeStyle, type LoadingRailProps, type PhaseTone, type RailActor } from "./PhaseStrip";
 import { ttsService } from "@/app/services/tts-service";
 import { sttService } from "@/app/services/stt-service";
 import { getDefaultVoiceProvider } from "@/app/ai/voice-config";
 import { getModelDisplayName, getModelProviderName } from "@/app/ai/ai-models";
-import { isInsufficientBalanceError, isProviderBusyError } from "@/app/api/errors";
+import { isInsufficientBalanceError, isProviderBudgetDepletedError, isProviderBusyError } from "@/app/api/errors";
 import { DISCORD_URL } from "@/app/config/external-links";
 import Link from "next/link";
 import { useUIControls } from '../context/UIControlsContext';
@@ -40,12 +44,21 @@ interface GameChatProps {
     // cannot resume the game (the process queue was never written).
     onRetryBotSelection?: () => void;
     isExternalLoading?: boolean;
-    gameControls?: React.ReactNode;
+    // Flow actions for the phase bar that replaces the disabled composer
+    // (Start Night, Next Day, Exit Game…) plus the phase context shown next to them.
+    phaseControls?: PhaseControls | null;
     chatControls?: React.ReactNode;
     onBeforeAction?: () => void;
     cancelButton?: React.ReactNode;
     // Opens the character card for a participant (avatar clicks in messages).
     onAvatarClick?: (name: string) => void;
+}
+
+export interface PhaseControls {
+    tone: PhaseTone;
+    label: string;
+    note?: string;
+    actions: React.ReactNode;
 }
 
 interface BotAnswer {
@@ -486,7 +499,7 @@ function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcludin
     );
 }
 
-export default function GameChat({ gameId, game, runGameAction, onGameStateChange, pendingMessages, onPendingMessagesConsumed, clearNightMessages, onErrorHandled, onRetryWithModel, onRetryBotSelection, isExternalLoading, gameControls, chatControls, onBeforeAction, cancelButton, onAvatarClick }: GameChatProps) {
+export default function GameChat({ gameId, game, runGameAction, onGameStateChange, pendingMessages, onPendingMessagesConsumed, clearNightMessages, onErrorHandled, onRetryWithModel, onRetryBotSelection, isExternalLoading, phaseControls, chatControls, onBeforeAction, cancelButton, onAvatarClick }: GameChatProps) {
     // Without a parent-provided lock, run actions directly (standalone use).
     const runAction = useMemo(
         () => runGameAction ?? (<T,>(action: () => Promise<T>) => action()),
@@ -495,6 +508,30 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
     const [messages, setMessages] = useState<GameMessage[]>([]);
     const [cinematicOpen, setCinematicOpen] = useState(false);
     const [cinematicStartId, setCinematicStartId] = useState<string | undefined>(undefined);
+    // Playing a scene and auto-playing new ones are separate controls (the header
+    // pill holds both): `cinematicEnabled` governs ONLY whether fresh speech pops
+    // the overlay open, so it can be turned off while still replaying on demand,
+    // and turned on without interrupting the current read. Remembered per browser
+    // across games.
+    const [cinematicEnabled, setCinematicEnabled] = useState(true);
+    useEffect(() => {
+        try {
+            if (localStorage.getItem(CINEMATIC_ENABLED_KEY) === '0') setCinematicEnabled(false);
+        } catch { /* ignore */ }
+    }, []);
+    // Explicit play: always opens, whatever the switch says. It also lifts the
+    // "let me read the chat" suppression — asking for the scene is the opposite
+    // of dismissing it.
+    const playCinematic = () => {
+        cinematicDismissedRef.current = false;
+        setCinematicStartId(undefined);
+        setCinematicOpen(true);
+    };
+    const toggleCinematicAuto = () => {
+        const next = !cinematicEnabled;
+        setCinematicEnabled(next);
+        try { localStorage.setItem(CINEMATIC_ENABLED_KEY, next ? '1' : '0'); } catch { /* ignore */ }
+    };
     // Ids already in the chat when we last looked — arrivals beyond this set
     // are "someone just spoke" events that auto-open cinematic mode. Starts
     // null so the initial day load never triggers it.
@@ -581,7 +618,7 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
         const seen = seenMsgIdsRef.current;
         const fresh = messages.filter(m => m.id && !seen.has(m.id));
         fresh.forEach(m => seen.add(m.id!));
-        if (cinematicOpen || cinematicDismissedRef.current || !isCurrentDaySelected) return;
+        if (!cinematicEnabled || cinematicOpen || cinematicDismissedRef.current || !isCurrentDaySelected) return;
         const spoken = fresh.find(m =>
             SPEECH_TYPES.has(m.messageType as MessageType) &&
             m.authorName !== game.humanPlayerName
@@ -590,7 +627,7 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
             setCinematicStartId(spoken.id!);
             setCinematicOpen(true);
         }
-    }, [messages, isLoadingMessages, cinematicOpen, isCurrentDaySelected, game.humanPlayerName]);
+    }, [messages, isLoadingMessages, cinematicEnabled, cinematicOpen, isCurrentDaySelected, game.humanPlayerName]);
 
     // A finished speaking burst lifts the "stop popping up" suppression.
     useEffect(() => {
@@ -1589,6 +1626,128 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
         return "Type a message...";
     };
 
+    // ── Footer strip state ─────────────────────────────────────────────
+    // The footer never jumps: when the composer is disabled its strip is
+    // reused for the loading rail (someone is busy) or the phase bar (a flow
+    // action is waiting). Queue lengths are known for votes, intros, night
+    // roles and summaries, so those rails are determinate.
+    const playerActor = (name: string): RailActor => ({
+        kind: 'player',
+        name,
+        avatar: getAvatarView(game, name),
+        isGM: name === GAME_MASTER,
+    });
+    const pronounsFor = (name: string) => {
+        const gender = game.bots.find(b => b.name === name)?.gender;
+        if (gender === 'female') return { reflexive: 'herself', possessive: 'her' };
+        if (gender === 'male') return { reflexive: 'himself', possessive: 'his' };
+        return { reflexive: 'themself', possessive: 'their' };
+    };
+    const aliveBotCount = game.bots.filter(b => b.isAlive).length;
+    // Mirrors the server's night-role set (night-actions.ts): roles with a night
+    // action among alive bots, plus the human's role.
+    const nightRoleTotal = (() => {
+        const roles = new Set<string>();
+        game.bots.filter(b => b.isAlive && ROLE_CONFIGS[b.role]).forEach(b => roles.add(b.role));
+        if (ROLE_CONFIGS[game.humanPlayerRole]) roles.add(game.humanPlayerRole);
+        return roles.size;
+    })();
+    const nightVerb = (role: string, you: boolean) => {
+        switch (role) {
+            case GAME_ROLES.WEREWOLF: return you ? 'are choosing your prey' : 'are choosing their prey';
+            case GAME_ROLES.DOCTOR: return you ? 'are choosing who to protect' : 'is choosing who to protect';
+            case GAME_ROLES.DETECTIVE: return you ? 'are investigating someone' : 'is investigating someone';
+            case GAME_ROLES.MANIAC: return you ? 'are choosing who to abduct' : 'is choosing who to abduct';
+            default: return you ? 'are taking your night action' : 'is taking a night action';
+        }
+    };
+    const nightSubject = (role: string) => role === GAME_ROLES.WEREWOLF ? 'The werewolves' : `The ${role}`;
+
+    const railState = ((): LoadingRailProps | null => {
+        if (game.errorState || !isCurrentDaySelected) return null;
+        const queue = game.gameStateProcessQueue;
+        const params = game.gameStateParamQueue;
+        switch (game.gameState) {
+            case GAME_STATES.WELCOME:
+                if (params.length > 0) {
+                    const name = params[0];
+                    const total = game.bots.length;
+                    return {
+                        actor: playerActor(name),
+                        subject: name,
+                        verb: `is introducing ${pronounsFor(name).reflexive}`,
+                        progress: { done: Math.max(0, total - params.length), total },
+                    };
+                }
+                break;
+            case GAME_STATES.VOTE:
+                if (queue.length > 0) {
+                    const name = queue[0];
+                    const you = name === game.humanPlayerName;
+                    const total = aliveBotCount + 1; // the human always votes
+                    return {
+                        actor: playerActor(name),
+                        subject: you ? 'You' : name,
+                        verb: you ? 'are casting your vote' : 'is casting a vote',
+                        progress: { done: Math.max(0, total - queue.length), total },
+                    };
+                }
+                break;
+            case GAME_STATES.NIGHT:
+                if (queue.length > 0) {
+                    const role = queue[0];
+                    const you = role === game.humanPlayerRole && params[0] === game.humanPlayerName;
+                    return {
+                        actor: { kind: 'moon' },
+                        subject: you ? 'You' : nightSubject(role),
+                        verb: nightVerb(role, you),
+                        dots: true,
+                        progress: { done: Math.max(0, nightRoleTotal - queue.length), total: nightRoleTotal, unit: 'roles' },
+                    };
+                }
+                return { actor: { kind: 'moon' }, subject: 'Night in progress' };
+            case GAME_STATES.NIGHT_IMPRESSION:
+                return { actor: { kind: 'dot' }, subject: 'Starting the day' };
+            case GAME_STATES.NEW_DAY_BOT_SUMMARIES:
+                if (queue.length > 0) {
+                    const head = queue[0];
+                    const total = aliveBotCount + 1; // GM's own recap comes first
+                    const progress = { done: Math.max(0, total - queue.length), total };
+                    if (head === '__GM_DAY_SUMMARY__') {
+                        return { actor: playerActor(GAME_MASTER), subject: GAME_MASTER, verb: 'is recounting yesterday', dots: true, progress };
+                    }
+                    return { actor: playerActor(head), subject: head, verb: `is writing ${pronounsFor(head).possessive} summary`, dots: true, progress };
+                }
+                break;
+            case GAME_STATES.DAY_DISCUSSION:
+            case GAME_STATES.AFTER_GAME_DISCUSSION:
+                if (queue.length > 0) {
+                    const name = queue[0];
+                    return { actor: playerActor(name), subject: name, verb: 'is thinking', dots: true, trailing: cancelButton };
+                }
+                break;
+        }
+        if (isExternalLoading) {
+            return { actor: { kind: 'dot' }, subject: 'Choosing who speaks next', trailing: cancelButton };
+        }
+        if (isProcessing) {
+            return { actor: { kind: 'dot' }, subject: 'Sending your message' };
+        }
+        return null;
+    })();
+
+    // Quiet status for the strip when nothing is busy and no flow action is
+    // waiting (history view, a paused error, a phase the client kicks off).
+    const idleStatus = ((): { tone: PhaseTone; label: string; note?: string } => {
+        if (!isCurrentDaySelected) return { tone: 'neutral', label: `Day ${selectedDay} · history`, note: 'Read-only' };
+        if (game.errorState) return { tone: 'danger', label: 'Paused', note: 'Resolve the error above to continue' };
+        if (game.gameState === GAME_STATES.GAME_OVER) return { tone: 'danger', label: 'Game over' };
+        return { tone: 'neutral', label: getInputPlaceholder().replace(/\.{3}$/, '') };
+    })();
+
+    const showComposer = isInputEnabled() || isRecording || isTranscribing;
+    const artInProgress = game.avatarsStatus === 'pending' || game.avatarsStatus === 'generating';
+
     return (
         <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
             <div className="flex items-center justify-between mb-3 pt-2 flex-shrink-0 px-1 lg:px-7 max-[720px]:gap-2 max-[720px]:px-3 max-[720px]:py-[10px]">
@@ -1601,16 +1760,53 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                     </span>
                 </div>
                 <div className="flex items-center gap-3 max-[720px]:gap-2 max-[720px]:flex-shrink-0">
-                    <button
-                        type="button"
-                        onClick={() => { setCinematicStartId(undefined); setCinematicOpen(true); }}
-                        disabled={messages.length === 0}
-                        title="Play the last messages as a scene"
-                        className="flex items-center gap-1.5 text-[13px] px-3 py-1.5 rounded-full border border-[var(--accent-line)] bg-[var(--accent-soft)] text-[var(--fg-0)] hover:brightness-110 transition-all duration-[120ms] disabled:opacity-40 disabled:cursor-not-allowed max-[720px]:text-[12px] max-[720px]:px-2 max-[720px]:py-1"
+                    {/* One pill, two controls: press the label to play the last exchange now,
+                        flick the switch to decide whether new speech opens by itself. */}
+                    <div
+                        className={`inline-flex items-center gap-2 rounded-full border pl-3 pr-2 py-1.5 transition-all duration-[120ms] max-[720px]:gap-1.5 max-[720px]:pl-2 max-[720px]:pr-1.5 max-[720px]:py-1 ${
+                            cinematicEnabled
+                                ? 'border-[var(--accent-line)] bg-[var(--accent-soft)]'
+                                : 'border-[var(--line-3)] bg-[var(--bg-3)]'
+                        }`}
                     >
-                        <svg width="10" height="10" viewBox="0 0 12 12" fill="currentColor"><path d="M2 1.5v9l8-4.5z"/></svg>
-                        <span className="max-[720px]:hidden">Cinematic</span>
-                    </button>
+                        <button
+                            type="button"
+                            onClick={playCinematic}
+                            disabled={messages.length === 0}
+                            title="Play the last exchange as a scene"
+                            className={`flex items-center gap-1.5 text-[13px] transition-colors duration-[120ms] disabled:opacity-40 disabled:cursor-not-allowed max-[720px]:text-[12px] ${
+                                cinematicEnabled
+                                    ? 'text-[var(--fg-0)] hover:brightness-110'
+                                    : 'text-[var(--fg-2)] hover:text-[var(--fg-0)]'
+                            }`}
+                        >
+                            <svg width="10" height="10" viewBox="0 0 12 12" fill="currentColor"><path d="M2 1.5v9l8-4.5z"/></svg>
+                            <span className="max-[720px]:hidden">Cinematic</span>
+                        </button>
+                        <button
+                            type="button"
+                            role="switch"
+                            aria-checked={cinematicEnabled}
+                            aria-label="Play new speeches automatically"
+                            onClick={toggleCinematicAuto}
+                            title={cinematicEnabled
+                                ? 'New speeches play automatically. Click to stop them opening on their own.'
+                                : 'New speeches stay in the chat. Click to play them automatically.'}
+                            className={`relative h-[15px] w-[27px] rounded-full border transition-colors duration-[160ms] flex-shrink-0 ${
+                                cinematicEnabled
+                                    ? 'bg-[var(--accent)] border-[var(--accent-line)]'
+                                    : 'bg-[var(--bg-4)] border-[var(--line-3)]'
+                            }`}
+                        >
+                            <span
+                                className={`absolute top-[2px] h-[9px] w-[9px] rounded-full transition-all duration-[160ms] ${
+                                    cinematicEnabled
+                                        ? 'left-[15px] bg-[var(--accent-fg)]'
+                                        : 'left-[2px] bg-[var(--fg-2)]'
+                                }`}
+                            />
+                        </button>
+                    </div>
                     {shouldShowMessageCount && (
                         <span className="msg-count text-[12px] font-mono text-[var(--fg-2)] max-[720px]:hidden">
                             {messageCountLabel}
@@ -1655,9 +1851,7 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
             {/* Messages area - grows to fill space, scrolls internally */}
             <div ref={messagesContainerRef} className="flex-1 mb-3 px-3 lg:px-7 py-2 overflow-y-auto">
                 {isLoadingMessages ? (
-                    <div className="text-center text-[var(--fg-2)] text-[13px] py-4">
-                        Loading Day {selectedDay}...
-                    </div>
+                    <StreamPill>Loading Day {selectedDay}</StreamPill>
                 ) : messages.length === 0 ? (
                     <div className="text-center text-[var(--fg-2)] text-[13px] py-4">
                         No messages for Day {selectedDay} yet.
@@ -1710,12 +1904,10 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                     })()
                 )}
                 {isDeleting && !isLoadingMessages && (
-                    <div className="text-center text-[var(--fg-2)] text-[13px] py-2">
-                        Deleting messages...
-                    </div>
+                    <StreamPill tone="danger">Deleting messages</StreamPill>
                 )}
-                {/* In-stream activity indicator removed: the avatar chip above
-                    the composer is the single "someone is busy" signal now. */}
+                {/* No in-stream activity indicator: the footer's loading rail is
+                    the single "someone is busy" signal. */}
                 {!isProcessing && game.errorState && !isLoadingMessages && (() => {
                     const failedBot = game.gameState === GAME_STATES.WELCOME
                         ? game.gameStateParamQueue[0]
@@ -1732,8 +1924,12 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                     // Provider throttling (429 "at capacity", rate limits, …) deserves its own
                     // wording: it's the AI provider's outage, not a game bug, and it clears on
                     // its own. Anthropic-shaped errors carry the status text only in `details`.
-                    const providerBusy = isProviderBusyError(game.errorState.error)
-                        || isProviderBusyError(game.errorState.details);
+                    // An exhausted PLATFORM balance with the provider arrives as a 429 too,
+                    // but it won't clear on its own — it wins over the "busy" reading.
+                    const budgetDepleted = isProviderBudgetDepletedError(game.errorState.error)
+                        || isProviderBudgetDepletedError(game.errorState.details);
+                    const providerBusy = !budgetDepleted && (isProviderBusyError(game.errorState.error)
+                        || isProviderBusyError(game.errorState.details));
                     // An empty prepaid balance is neither the model's nor the game's
                     // fault: the reply was generated and the charge was refused.
                     // Retry / model swap can't fix it — only adding funds can, so the
@@ -1798,12 +1994,19 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                                 </svg>
                                 <div className="flex-1 min-w-0">
                                     <div className="text-[13px] font-medium text-[var(--fg-0)] break-words">
-                                        {providerBusy
-                                            ? (displayWho ? `${displayWho}'s AI provider is overloaded` : 'The AI provider is overloaded')
-                                            : (displayWho ? `${displayWho}'s AI model call failed` : 'An AI model call failed')}
+                                        {budgetDepleted
+                                            ? (displayWho ? `${displayWho}'s AI provider budget is depleted` : 'The AI provider budget is depleted')
+                                            : providerBusy
+                                                ? (displayWho ? `${displayWho}'s AI provider is overloaded` : 'The AI provider is overloaded')
+                                                : (displayWho ? `${displayWho}'s AI model call failed` : 'An AI model call failed')}
                                     </div>
                                     <div className="text-[12px] mt-1 text-[var(--fg-1)] break-words">
-                                        {providerBusy ? (
+                                        {budgetDepleted ? (
+                                            <>
+                                                The platform&apos;s account with {provider ?? 'this AI provider'} has run out of credits
+                                                {model ? ` (${getModelDisplayName(model)})` : ''} — this is on our side, not yours, and retrying the same model won&apos;t help until the budget is topped up. Retry this one action with a model from a different provider, or come back later — that won&apos;t change anyone&apos;s model permanently.
+                                            </>
+                                        ) : providerBusy ? (
                                             <>
                                                 {provider ?? 'The provider'} is temporarily rate-limited or at capacity
                                                 {model ? ` (${getModelDisplayName(model)})` : ''} — this is an issue on the AI provider&apos;s side, not with the game, and it usually clears within a minute or two. You can wait and retry the same model, or retry this one action with a different model — that won&apos;t change anyone&apos;s model permanently.
@@ -1873,83 +2076,43 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                 </button>
             )}
 
-            {/* Game controls bar — always visible outside the composer */}
-            {gameControls && (
-                <div className="flex-shrink-0 flex items-center gap-2 px-1 lg:px-7 py-1.5">
-                    {gameControls}
-                </div>
-            )}
-
-            {/* Activity chip — the ONLY "someone is busy" indicator. Shows the
-                current actor with their themed avatar; covers thinking, voting,
-                welcome intros and day-start processing. */}
-            {(() => {
-                if (game.errorState) return null;
-                let name: string | null = null;
-                let label: string | null = null;
-                if (game.gameState === GAME_STATES.VOTE && game.gameStateProcessQueue.length > 0) {
-                    name = game.gameStateProcessQueue[0]; label = 'is voting';
-                } else if (game.gameState === GAME_STATES.WELCOME && game.gameStateParamQueue.length > 0) {
-                    name = game.gameStateParamQueue[0]; label = 'is thinking';
-                } else if (game.gameState === GAME_STATES.NIGHT_IMPRESSION) {
-                    label = 'Starting the day';
-                } else if ((game.gameState === GAME_STATES.DAY_DISCUSSION || game.gameState === GAME_STATES.AFTER_GAME_DISCUSSION) && game.gameStateProcessQueue.length > 0) {
-                    name = game.gameStateProcessQueue[0]; label = 'is thinking';
-                } else if (isProcessing || isExternalLoading) {
-                    label = 'Processing';
-                }
-                if (!label) return null;
-                return (
-                    <div className="flex-shrink-0 px-1 lg:px-7 pb-1">
-                        <div className={`inline-flex items-center gap-2.5 rounded-full bg-[var(--bg-2)] border border-[var(--line-2)] ${name ? 'pl-1 py-1' : 'pl-3 py-1.5'} pr-3.5 shadow-subtle`}>
-                            {name ? (
-                                <span className="animate-pulse rounded-full">
-                                    <PlayerAvatar name={name} size={28} avatarUrl={getAvatarView(game, name)?.url} focus={getAvatarView(game, name)?.focus} />
-                                </span>
-                            ) : (
-                                <span className="w-2 h-2 rounded-full bg-[var(--accent)] animate-pulse flex-none" />
-                            )}
-                            <span className="text-[13px] text-[var(--fg-1)]">
-                                {name && <><span className="font-semibold text-[var(--fg-0)]">{name}</span>{' '}</>}
-                                {label}
-                            </span>
-                            <span className="inline-flex gap-[3px]">
-                                {[0, 1, 2].map(i => (
-                                    <span
-                                        key={i}
-                                        className="w-[5px] h-[5px] rounded-full bg-[var(--accent)] animate-bounce"
-                                        style={{ animationDelay: `${i * 0.18}s` }}
-                                    />
-                                ))}
-                            </span>
-                        </div>
-                    </div>
-                );
-            })()}
-
+            {/* Footer strip — one translucent strip over the ambient backdrop
+                (design .composer-wrap: border-top, blur, bg-0 at 78%). It holds
+                the composer when the player can type; otherwise the same chrome
+                carries the loading rail or the phase bar, so nothing jumps. */}
+            <div className={stripChromeClass} style={stripChromeStyle}>
             {/* Themed art generates in the background for ~30s after game
-                creation; without this banner players think images are missing.
-                Same accent banner + arc spinner as the participants panel's
-                portrait-redraw notice, so "art in progress" looks the same
-                everywhere in the game. */}
-            {(game.avatarsStatus === 'pending' || game.avatarsStatus === 'generating') && (
-                <div className="flex-shrink-0 px-1 lg:px-7 pb-1">
-                    <div className="flex items-center gap-2 px-3 py-[9px] rounded-[var(--radius-md)] bg-[var(--accent-soft)] border border-[var(--accent-line)] text-[12px] text-[var(--accent-text)]">
-                        <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" className="animate-spin flex-shrink-0">
-                            <path d="M10 2a8 8 0 0 1 8 8" />
-                        </svg>
-                        Drawing portraits and the opening scene…
-                    </div>
-                </div>
+                creation; without this rail players think images are missing.
+                The one accent-tinted rail. */}
+            {artInProgress && (
+                <LoadingRail
+                    actor={{ kind: 'art' }}
+                    subject="Drawing portraits and the opening scene"
+                    counter="~30s"
+                    tone="accent"
+                    className="border-b border-[var(--line-1)]"
+                />
             )}
-
-            {/* Input area — a translucent strip over the ambient backdrop, per
-                the design's .composer-wrap (border-top, blur, bg-0 at 78%). */}
+            {/* A waiting flow action while the composer is still open (after-game
+                discussion's Exit Game) sits above the composer. */}
+            {showComposer && phaseControls && (
+                <PhaseBar tone={phaseControls.tone} label={phaseControls.label} note={phaseControls.note} className="border-b border-[var(--line-1)]">
+                    {phaseControls.actions}
+                </PhaseBar>
+            )}
+            {!showComposer && railState ? (
+                <LoadingRail {...railState} />
+            ) : !showComposer && phaseControls ? (
+                <PhaseBar tone={phaseControls.tone} label={phaseControls.label} note={phaseControls.note}>
+                    {phaseControls.actions}
+                </PhaseBar>
+            ) : !showComposer ? (
+                <PhaseBar tone={idleStatus.tone} label={idleStatus.label} note={idleStatus.note} />
+            ) : (
             <form
                 ref={composerRef}
                 onSubmit={sendMessage}
-                className="flex-shrink-0 z-10 mt-1 lg:px-7 pt-3 pb-2 border-t border-[var(--line-1)] backdrop-blur-[10px]"
-                style={{background: 'color-mix(in oklch, var(--bg-0) 78%, transparent)'}}
+                className="lg:px-7 pt-3 pb-2"
             >
                 <div
                     className={`relative rounded-[var(--radius-lg)] bg-[var(--bg-1)] border transition-[border-color,box-shadow,opacity] duration-200 ${!isInputEnabled() ? 'opacity-50 border-[var(--line-2)] pointer-events-none' : composerExpanded ? 'border-[var(--accent-line)] shadow-[0_0_0_3px_var(--accent-soft)]' : 'border-[var(--line-2)] cursor-text'}`}
@@ -1977,12 +2140,6 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                         } ${!isInputEnabled() ? 'cursor-not-allowed' : ''}`}
                         placeholder={getInputPlaceholder()}
                     />
-                    {cancelButton && (
-                        <div className="absolute top-1 right-1">
-                            {cancelButton}
-                        </div>
-                    )}
-
                 {/* Toolbar row inside composer — hidden when collapsed */}
                 <div className={`flex items-center justify-between px-3 overflow-hidden transition-all duration-200 ${composerExpanded ? 'max-h-[60px] opacity-100 pb-2' : 'max-h-0 opacity-0 pb-0'}`}>
                     {/* Left group: text buttons (Send + game controls) */}
@@ -2079,6 +2236,8 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                 </div>
                 </div>{/* end composer wrapper */}
             </form>
+            )}
+            </div>{/* end footer strip */}
             <VotingModal
                 game={game}
                 onVote={handleVote}

@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getGame, updateBotModel, updateGameMasterModel, clearGameErrorState, setGameErrorState, afterGameDiscussion, retryWithModelOverride } from "@/app/api/game-actions";
 import { startNewDay, summarizePastDay, selectDayResponders } from "@/app/api/night-actions";
-import GameChat from "@/app/games/[id]/components/GameChat";
+import GameChat, { type PhaseControls } from "@/app/games/[id]/components/GameChat";
+import { btnFlowPrimary, btnFlowPrimaryStyle, btnFlowDanger, btnFlowSecondary, btnRailCancel, MoonIcon, SunriseIcon, ReplayIcon, MaskIcon, ExitIcon } from "@/app/games/[id]/components/PhaseStrip";
 import ModelSelectionDialog from "@/app/games/[id]/components/ModelSelectionDialog";
 const btnGhost = "px-3 py-1.5 text-[13px] font-medium rounded-[var(--radius-md)] bg-[var(--bg-3)] border border-[var(--line-3)] text-[var(--fg-0)] hover:bg-[var(--bg-4)] transition-all duration-[120ms]";
 const btnDanger = "px-3 py-1.5 text-[13px] font-medium rounded-[var(--radius-md)] bg-[var(--danger)] text-white hover:brightness-110 transition-all duration-[120ms]";
@@ -15,6 +16,7 @@ import type { Game, GameActionResponse, GameMessage } from "@/app/api/game-model
 import type { Session } from "next-auth";
 import { welcome, vote, keepBotsGoing, manualSelectBots, cancelBotResponses } from '@/app/api/bot-actions';
 import BotSelectionDialog from '@/app/games/[id]/components/BotSelectionDialog';
+import ConfirmModal from '@/app/games/[id]/components/ConfirmModal';
 import { replayNight, performNightAction } from '@/app/api/night-actions';
 import PlayerAvatar from "@/app/components/PlayerAvatar";
 import CharacterCard from "@/app/games/[id]/components/CharacterCard";
@@ -68,6 +70,7 @@ function GamePageContent({
     const [modelDialogMode, setModelDialogMode] = useState<'change' | 'retry'>('change');
     const [clearNightMessages, setClearNightMessages] = useState(false);
     const [isKeepGoingLoading, setIsKeepGoingLoading] = useState(false);
+    const [voteConfirmOpen, setVoteConfirmOpen] = useState(false);
     const [showCancel, setShowCancel] = useState(false);
     const [descExpanded, setDescExpanded] = useState(false);
     const [descClamps, setDescClamps] = useState(false);
@@ -849,23 +852,23 @@ function GamePageContent({
     const flowControlsElement = buildFlowControls();
     const chatControlsElement = buildChatControls();
 
-    // Cancel button shown in the top-right corner of the input area after 10s
+    // Cancel sits at the right end of the chat's loading rail, after 10s of bot processing
     const cancelButtonElement = showCancel ? (
         <button
             type="button"
             onClick={handleCancelBotResponses}
-            className="w-7 h-7 flex items-center justify-center rounded-full bg-[var(--danger)] text-white hover:brightness-110 transition-all duration-[120ms]"
+            className={btnRailCancel}
             title="Cancel bot responses"
         >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18"/>
-                <line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
+            Cancel
         </button>
     ) : null;
 
     // Shared by the composer toolbar (Vote / Go on) and the right-panel duplicates.
+    // Both Vote buttons open a confirmation first: ending the discussion is
+    // one click away from the composer and can't be undone.
     async function handleVoteAction() {
+        setVoteConfirmOpen(false);
         const result = await runGameAction(() => vote(game.id));
         if (result) {
             applyActionResult(result);
@@ -894,7 +897,7 @@ function GamePageContent({
                     <button
                         className={`${voteUrgency.isUrgent ? btnDanger + ' animate-pulse' : voteUrgency.isWarning ? btnWarn : btnGhost} ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                         disabled={!areControlsEnabled}
-                        onClick={handleVoteAction}
+                        onClick={() => setVoteConfirmOpen(true)}
                         title={voteUrgency.isUrgent
                             ? `Vote now! Auto-voting in ${Math.ceil(voteUrgency.messagesLeft)} messages`
                             : `Start the voting phase (${Math.round(voteUrgency.percentage)}% to auto-vote)`}
@@ -930,97 +933,82 @@ function GamePageContent({
         return null;
     }
 
-    // Flow controls: Start Night, Game Over, Next Day, etc. — shown in standalone bar above composer
-    function buildFlowControls(): React.ReactNode {
-        const showControls = isGameOver || game.gameState === GAME_STATES.VOTE_RESULTS || game.gameState === GAME_STATES.NIGHT || game.gameState === GAME_STATES.NIGHT_RESULTS || (game.gameState === GAME_STATES.NEW_DAY_BOT_SUMMARIES && game.gameStateProcessQueue.length > 0);
-
-        if (!showControls) return null;
+    // Flow controls: Start Night, Next Day, Game Over, Exit Game — rendered by
+    // GameChat as the phase bar that takes the disabled composer's strip
+    // (design "Phase Controls" 1a: context left, action right). Busy phases
+    // (NIGHT, NEW_DAY_BOT_SUMMARIES) are the chat's loading rail instead.
+    function buildFlowControls(): PhaseControls | null {
+        const exitButton = (
+            <button
+                className={btnFlowSecondary}
+                onClick={handleExitGame}
+                disabled={!areControlsEnabled}
+                title="Return to the games list"
+            >
+                <ExitIcon size={14} />
+                Exit Game
+            </button>
+        );
+        const gameOverButton = (
+            <button
+                className={btnFlowDanger}
+                disabled={!areControlsEnabled}
+                onClick={async () => {
+                    const result = await runGameAction(() => afterGameDiscussion(game.id));
+                    if (result) {
+                        applyActionResult(result);
+                    }
+                }}
+                title="End the game and move to after-game discussion"
+            >
+                <MaskIcon />
+                Game Over
+            </button>
+        );
 
         if (game.gameState === GAME_STATES.AFTER_GAME_DISCUSSION) {
             if (game.gameStateProcessQueue.length > 0 || isKeepGoingLoading) return null;
-            return (
-                <div className="flex items-center gap-2">
-                    <button
-                        className={`${btnDanger} ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        onClick={handleExitGame}
-                        disabled={!areControlsEnabled}
-                        title="Return to the games list"
-                    >
-                        Exit Game
-                    </button>
-                </div>
-            );
+            return { tone: 'danger', label: 'Game over · discussion', actions: exitButton };
         }
 
         if (isGameOver) {
-            return (
-                <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-[var(--danger)]">Game Over</span>
-                    <button
-                        className={`${btnDanger} ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        onClick={handleExitGame}
-                        disabled={!areControlsEnabled}
-                        title="Return to the games list"
-                    >
-                        Exit Game
-                    </button>
-                </div>
-            );
+            return { tone: 'danger', label: 'Game over', actions: exitButton };
         }
 
-        return (
-            <div className="flex items-center gap-2 flex-wrap">
-                {game.gameState === GAME_STATES.VOTE_RESULTS && (
+        if (game.gameState === GAME_STATES.VOTE_RESULTS) {
+            return {
+                tone: showVoteGameOverCTA ? 'danger' : 'amber',
+                label: `Day ${game.currentDay} · vote results`,
+                note: showVoteGameOverCTA ? pendingGameOverReason : undefined,
+                actions: showVoteGameOverCTA ? gameOverButton : (
+                    <button
+                        className={btnFlowPrimary}
+                        style={btnFlowPrimaryStyle}
+                        disabled={!areControlsEnabled}
+                        onClick={async () => {
+                            const result = await runGameAction(() => performNightAction(game.id));
+                            if (result) {
+                                applyActionResult(result);
+                            }
+                        }}
+                        title="Begin the night phase where werewolves and special roles take their actions"
+                    >
+                        <MoonIcon />
+                        Start Night
+                    </button>
+                ),
+            };
+        }
+
+        if (game.gameState === GAME_STATES.NIGHT_RESULTS) {
+            return {
+                tone: showNightGameOverCTA ? 'danger' : 'good',
+                label: 'Night complete',
+                note: showNightGameOverCTA ? pendingGameOverReason : undefined,
+                actions: (
                     <>
-                        {showVoteGameOverCTA && pendingGameOverReason && (
-                            <span className="text-sm text-[var(--danger)]">
-                                {pendingGameOverReason}
-                            </span>
-                        )}
-                        {!showVoteGameOverCTA && (
-                            <button
-                                className={`${btnGhost} ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                disabled={!areControlsEnabled}
-                                onClick={async () => {
-                                    const result = await runGameAction(() => performNightAction(game.id));
-                                    if (result) {
-                                        applyActionResult(result);
-                                    }
-                                }}
-                                title="Begin the night phase where werewolves and special roles take their actions"
-                            >
-                                🌙 Start Night
-                            </button>
-                        )}
-                        {showVoteGameOverCTA && (
-                            <button
-                                className={`${btnDanger} ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                disabled={!areControlsEnabled}
-                                onClick={async () => {
-                                    const result = await runGameAction(() => afterGameDiscussion(game.id));
-                                    if (result) {
-                                        applyActionResult(result);
-                                    }
-                                }}
-                                title="End the game and move to after-game discussion"
-                            >
-                                🎭 Game Over
-                            </button>
-                        )}
-                    </>
-                )}
-                {game.gameState === GAME_STATES.NIGHT && (
-                    <span className="text-sm text-[var(--fg-2)]">Night in progress...</span>
-                )}
-                {game.gameState === GAME_STATES.NIGHT_RESULTS && (
-                    <>
-                        {showNightGameOverCTA && pendingGameOverReason && (
-                            <span className="text-sm text-[var(--danger)]">
-                                {pendingGameOverReason}
-                            </span>
-                        )}
                         <button
-                            className={`${btnGhost} ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            className={btnFlowSecondary}
                             disabled={!areControlsEnabled}
                             onClick={async () => {
                                 setClearNightMessages(true);
@@ -1032,25 +1020,13 @@ function GamePageContent({
                             }}
                             title="Clear night messages and replay the night phase actions"
                         >
+                            <ReplayIcon />
                             Replay Night
                         </button>
-                        {showNightGameOverCTA ? (
+                        {showNightGameOverCTA ? gameOverButton : (
                             <button
-                                className={`${btnDanger} ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                disabled={!areControlsEnabled}
-                                onClick={async () => {
-                                    const result = await runGameAction(() => afterGameDiscussion(game.id));
-                                    if (result) {
-                                        applyActionResult(result);
-                                    }
-                                }}
-                                title="End the game and move to after-game discussion"
-                            >
-                                Game Over
-                            </button>
-                        ) : (
-                            <button
-                                className={`${btnGhost} ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                className={btnFlowPrimary}
+                                style={btnFlowPrimaryStyle}
                                 disabled={!areControlsEnabled}
                                 onClick={async () => {
                                     const result = await runGameAction(() => startNewDay(game.id));
@@ -1060,18 +1036,16 @@ function GamePageContent({
                                 }}
                                 title="Continue to apply night results and start new day"
                             >
+                                <SunriseIcon />
                                 Next Day
                             </button>
                         )}
                     </>
-                )}
-                {game.gameState === GAME_STATES.NEW_DAY_BOT_SUMMARIES && (
-                    <span className="text-[13px] text-[var(--fg-2)]">
-                        💭 {game.gameStateProcessQueue[0]} is generating summary... ({game.gameStateProcessQueue.length} remaining)
-                    </span>
-                )}
-            </div>
-        );
+                ),
+            };
+        }
+
+        return null;
     }
 
     // Left panel content (reused in desktop sidebar and mobile overlay)
@@ -1387,7 +1361,7 @@ function GamePageContent({
                                         ? 'bg-[oklch(75%_0.10_65)] border-[oklch(75%_0.10_65)] text-[var(--bg-0)] hover:brightness-110'
                                         : 'bg-[var(--bg-3)] border-[var(--line-3)] text-[var(--fg-0)] hover:bg-[var(--bg-4)]'
                             } ${!areControlsEnabled || isKeepGoingLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            onClick={handleVoteAction}
+                            onClick={() => setVoteConfirmOpen(true)}
                             disabled={!areControlsEnabled || isKeepGoingLoading}
                             title={voteUrgency.isUrgent
                                 ? `Vote now! Auto-voting in ${Math.ceil(voteUrgency.messagesLeft)} messages`
@@ -1500,7 +1474,7 @@ function GamePageContent({
                         openModelDialog(displayName, currentModel ?? '', undefined, 'retry');
                     }}
                     isExternalLoading={isKeepGoingLoading}
-                    gameControls={flowControlsElement}
+                    phaseControls={flowControlsElement}
                     chatControls={chatControlsElement}
                     onBeforeAction={() => { preActionGameRef.current = game; }}
                     cancelButton={cancelButtonElement}
@@ -1565,6 +1539,15 @@ function GamePageContent({
             )}
 
             {/* Model Selection Dialog */}
+            <ConfirmModal
+                isOpen={voteConfirmOpen}
+                title="Start the vote?"
+                message="This ends the day's discussion. Everyone votes on who to eliminate, and there is no going back to talking."
+                confirmLabel="Start voting"
+                confirmVariant="accent"
+                onConfirm={handleVoteAction}
+                onCancel={() => setVoteConfirmOpen(false)}
+            />
             <ModelSelectionDialog
                 onClose={() => {
                     closeModal('modelSelection');

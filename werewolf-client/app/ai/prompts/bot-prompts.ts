@@ -503,53 +503,58 @@ export const STRICT_TARGET_NAME_INSTRUCTION: string = `
 
 export const BOT_DAY_SUMMARY_PROMPT: string = `**End of Day %day_number% - Update Your Personal Summary**
 
-%bot_name%, the day has ended. You must now UPDATE your personal summary to incorporate Day %day_number%'s events.
+%bot_name%, the day has ended. Everything you saw today is in this conversation: the public discussion, the vote, the night, and (if you have a night role) your private night messages. Rewrite your personal summary so it carries forward what you will need tomorrow.
 
 **YOUR PREVIOUS SUMMARY:**
 %previous_summary%
 
-**INSTRUCTIONS:**
-- Read your previous summary above carefully
-- ADD new insights, relationships, and events from Day %day_number%
-- KEEP important information from previous days that remains relevant
-- CONSOLIDATE and update any information that has changed
-- REMOVE outdated information that is no longer relevant
-- Create ONE comprehensive summary that captures everything you need to remember
+**WHAT IS RECORDED FOR YOU SEPARATELY - do NOT restate it:**
+- Every vote (who voted for whom, in what order, and why)
+- Who was eliminated and their role
+- The Game Master's night story
+- Your own night actions and their results (if you have a night role)
+These facts are injected into your context on every turn. Spend your summary on what only you can capture.
 
-**REQUIRED SECTIONS in your summary:**
+**WHAT TO CAPTURE:**
 
-**1. FRIENDS & ALLIES** - Who do you trust and why?
-- Players who have defended you or supported your positions
-- Players whose behavior consistently aligns with village goals (if you're a villager)
-- Your werewolf teammates and coordination (if you're a werewolf)
-- Rate each ally: Strong ally / Tentative ally / Uncertain
+**1. THE ARGUMENTS** - What was actually claimed today?
+- Who accused whom, on what grounds, and how the accusation landed
+- Who defended whom, and whether it looked like loyalty or cover
+- Claims about roles or night events, and who made them
+- Contradictions: anyone whose story shifted between messages
 
-**2. SUSPECTS & ENEMIES** - Who do you suspect and why?
-- Players showing suspicious voting patterns
-- Players who have targeted you or your allies unfairly
-- Players with contradictory statements about game mechanics
-- Rate each suspect: Highly suspicious / Somewhat suspicious / Worth watching
+**2. THE VOTE** - The vote itself is recorded for you; your reading of it is not
+- Good votes: who voted early against a player who turned out to be a werewolf? An early, correct vote is a strong sign of a villager, quite possibly one with a special role
+- Bad votes: who voted against a player who turned out innocent, who piled on late once the outcome was clear, who switched targets and why
+- Who voted together, and who never seems to vote against whom
 
-**3. ROLE-SPECIFIC KNOWLEDGE** (CRITICAL - review the data provided above your previous summary)
-- **DETECTIVE:** Your investigation results are tracked for you. Summarize: CONFIRMED WEREWOLVES to eliminate, CLEARED PLAYERS to trust/protect, WHO TO INVESTIGATE NEXT, and whether your one-time kill ability is still available
-- **WEREWOLF:** Coordination with teammates, which innocents are threats, who suspects you
-- **DOCTOR:** Your protection history is tracked. Note: who seems most at risk, protection priorities. Remember your one-time kill ability if not yet used.
-- **MANIAC:** Your abduction history is tracked. Note: who you've blocked, patterns in werewolf targets, strategic opportunities to disrupt werewolves or protect key players
-- **VILLAGER:** Patterns noticed, deductions from night events and votes
+**3. THE NIGHT** - Reconstruct what each role did tonight from what is public
+- Werewolves: who did they attack (the death, or the survived attack)? What does that choice say about who they fear or want silenced?
+- Doctor: if someone survived an attack, the doctor guessed right. Who would a doctor protect, and does anyone act like they know they were saved?
+- Detective: the night story states the result explicitly — found evil, found an innocent, or nothing. Combine it with today's accusations: who spoke like they already knew?
+- Maniac: works in silence. A quiet night with no death can be their doing
+- Your own role: what your action revealed, and what it means for tomorrow's choice
 
-**4. ROLE-PLAY & SOCIAL CONNECTIONS**
-- Memorable character moments and conversations
-- Ongoing stories or interactions you want to continue
-- How your character relates to others in the game world
-- Interesting narrative hooks from %human_player_name% to respond to
+**4. PEOPLE** - Where does everyone stand with you, and what might they be?
+- Allies: who backed you or shares your read, and how firmly (Strong / Tentative / Uncertain)
+- Suspects: who you distrust and the specific behavior behind it (Highly suspicious / Somewhat / Worth watching)
+- Likely roles: what each player's behavior suggests. Someone insisting hard that a player is a werewolf may be the detective, but ONLY if the Game Master's night story reported that the detective found evil; without that, it is just an accusation. Someone who was attacked and survived tells you where the doctor was. Update these guesses, do not restate old ones
+- Who is pushing suspicion onto you, and how you answered
 
-**5. STRATEGIC PLANS**
-- Your goals for the next day
-- Who you plan to push suspicion on (and why)
-- Who you plan to defend or ally with
-- Unfinished discussions that need follow-up
+**5. YOUR OWN WORDS** - What did you say and commit to?
+- Claims you made about yourself or others that you must stay consistent with
+- Promises, deals, or public positions you took
+- Werewolves: what the pack discussed and agreed on tonight, and who each packmate is worried about
 
-**Format:** Write a comprehensive personal diary entry (4-6 paragraphs) covering ALL five sections above. This is your memory for future days - make it complete and actionable.`;
+**6. CHARACTER & STORY** - Moments worth continuing
+- Memorable exchanges, running jokes, rivalries, and how your character relates to others
+- Hooks from %human_player_name% or anyone else that you want to pick up tomorrow
+
+**7. PLAN FOR TOMORROW**
+- Who to push on, who to protect or ally with, and why
+- Questions you want answered and discussions left unfinished
+
+**Format:** A compact diary entry in your own voice, 3-5 short paragraphs. Keep what is still relevant from your previous summary, drop what is stale, and make every line something you would act on tomorrow.`;
 
 export const BOT_AFTER_GAME_SYSTEM_PROMPT_ADDITION: string = `
 

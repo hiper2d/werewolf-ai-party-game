@@ -13,6 +13,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        id: "gpt-6-astra", date: "Sep 2026", tags: ["Models"],
+        title: "GPT-6 Astra joins the picker",
+        body: (<>OpenAI&apos;s new flagship <strong>GPT-6 Astra</strong> is available for bots and the Game
+            Master, one step above GPT-5.6 Sol. It reasons on every turn like the rest of the GPT-5.6 family,
+            and it is the most expensive OpenAI option in the game — $10 / $50 per million tokens — so it is
+            <strong> paid tier only</strong>. The rest of the family stays exactly as it was:
+            <strong> Sol</strong>, <strong>Terra</strong> and <strong>Luna</strong> keep their slots and their
+            prices, and no existing bot changes model.</>),
+        media: null,
+        links: [{label: "Create a game", href: "/games"}],
+    },
+    {
         id: "reframe-portraits", date: "Sep 2026", tags: ["Design"],
         title: "Reframe any portrait",
         body: (<>Every cast is drawn on <strong>one sheet</strong>, and the game cuts each character out of it.

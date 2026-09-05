@@ -188,6 +188,15 @@ export interface ManiacAbduction {
     maniacDied?: boolean;  // If true, victim died with maniac
 }
 
+// The pack's attack for one night. `failed` covers every block that isn't the
+// doctor (only an abduction, under the rules) — the cause is deliberately not
+// recorded so the pack's prompt never mentions the maniac.
+export interface WerewolfAttack {
+    day: number;
+    target: string;
+    outcome: 'killed' | 'survived' | 'failed';
+}
+
 export interface RoleKnowledge {
     // Detective-specific: history of investigations
     investigations?: DetectiveInvestigation[];
@@ -195,6 +204,8 @@ export interface RoleKnowledge {
     protections?: DoctorProtection[];
     // Maniac-specific: history of abductions
     abductions?: ManiacAbduction[];
+    // Werewolf-specific: the pack's attack history (same record on every werewolf)
+    attacks?: WerewolfAttack[];
     // Extensible: future roles can add their own fields here
     [key: string]: any;
 }
@@ -237,8 +248,8 @@ export interface VotingDayResult {
 export interface NightNarrativeResult {
     day: number;
     narrative: string; // The atmospheric GM story from night results
-    // Chronological night events in action order: Maniac → Werewolves → Doctor → Detective
-    // (optional for backward compat with older games)
+    // @deprecated No longer written or read. Older games carry a per-night factual
+    // event list here; it leaked secret actions (the maniac's target) to every bot.
     events?: Array<{ order: number; role: string; description: string }>;
 }
 

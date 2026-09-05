@@ -49,7 +49,7 @@ import {logger} from "@/app/utils/logger";
 
 const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 // The grid tops out at 4x4 cells: bots + the human + the Game Master.
-const MAX_DRAFT_BOTS = 14;
+const MAX_DRAFT_BOTS = 15; // 16-player lobby minus the human
 const round6 = (n: number) => parseFloat(n.toFixed(6));
 
 export function avatarDraftIdFor(email: string): string {
