@@ -1,4 +1,11 @@
+import type {Metadata} from "next";
 import DocFooter from "@/app/components/DocFooter";
+
+export const metadata: Metadata = {
+    title: "Terms of Service — Werewolf AI",
+    description: "Terms for using AIWerewolf.net.",
+    alternates: { canonical: "/terms" },
+};
 
 export default function TermsOfService() {
   return (

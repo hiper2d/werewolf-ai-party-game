@@ -6,6 +6,12 @@ import LoginCta from "@/app/components/LoginCta";
 import BuyMeACoffee from "@/app/components/BuyMeACoffee";
 import { CheckIcon, DiscordIcon } from "@/app/components/ui-icons";
 import { DISCORD_URL } from "@/app/config/external-links";
+import type { Metadata } from "next";
+
+// Title/description come from the root layout; only the canonical is per-route.
+export const metadata: Metadata = {
+    alternates: { canonical: "/" },
+};
 
 const MODELS = [
   'Claude 5 Opus', 'GPT-5.5', 'Gemini Flash 3.5', 'DeepSeek V4 Pro',

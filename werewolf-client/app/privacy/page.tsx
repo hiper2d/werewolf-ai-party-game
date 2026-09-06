@@ -1,4 +1,11 @@
+import type {Metadata} from "next";
 import DocFooter from "@/app/components/DocFooter";
+
+export const metadata: Metadata = {
+    title: "Privacy Policy — Werewolf AI",
+    description: "What AIWerewolf.net collects, why, and what it never does with your data.",
+    alternates: { canonical: "/privacy" },
+};
 
 export default function PrivacyPolicy() {
   return (

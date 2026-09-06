@@ -5,6 +5,7 @@ import RulesTutorials from "@/app/rules/RulesTutorials";
 export const metadata: Metadata = {
     title: "Rules — Werewolf AI",
     description: "How to play Werewolf AI — roles, night actions, phases, and strategy.",
+    alternates: { canonical: "/rules" },
 };
 
 export default function RulesPage() {

@@ -1,6 +1,13 @@
 import Image from "next/image";
+import type {Metadata} from "next";
 import DocFooter from "@/app/components/DocFooter";
 import BuyMeACoffee from "@/app/components/BuyMeACoffee";
+
+export const metadata: Metadata = {
+    title: "About — Werewolf AI",
+    description: "What Werewolf AI is, which AI providers sit at the table, and who built it.",
+    alternates: { canonical: "/about" },
+};
 
 const PROVIDERS = ["OpenAI", "Anthropic", "Google", "DeepSeek", "Mistral", "xAI", "Moonshot", "Z.AI", "Qwen", "MiniMax", "Sakana"];
 

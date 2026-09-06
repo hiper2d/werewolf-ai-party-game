@@ -4,6 +4,7 @@ import NewsTimeline from "@/app/news/NewsTimeline";
 export const metadata: Metadata = {
     title: "News — Werewolf AI",
     description: "Every new model, theme, and feature we ship to the table — newest first.",
+    alternates: { canonical: "/news" },
 };
 
 export default function NewsPage() {

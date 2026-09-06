@@ -31,6 +31,7 @@ const VOICE_SETS = [
 export const metadata: Metadata = {
     title: 'Models — Werewolf AI',
     description: 'Every model you can seat at the table — what it costs to run and where it is available.',
+    alternates: { canonical: '/models' },
 };
 
 const PRICE_BANDS: { range: string; cap: string; pill: string }[] = [
