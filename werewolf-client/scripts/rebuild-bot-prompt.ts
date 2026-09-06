@@ -1,5 +1,8 @@
-// One-off: rebuild Draco's day-2 discussion-reply prompt exactly as
-// processNextBotInQueue (bot-actions.ts) builds it, from live Firestore data.
+// Rebuild a bot's CURRENT discussion-reply prompt exactly as processNextBotInQueue
+// (bot-actions.ts) builds it, from live Firestore data, and write it to logs/.
+// Usage: npx tsx --env-file=.env scripts/rebuild-bot-prompt.ts <gameId> <botName>
+// Output: logs/<botName>-day<N>-prompt.txt with the system prompt (tier 1, the
+// CACHE_TIER_BREAK marker, tier 2) followed by every history turn with sizes.
 import { db } from '../firebase/server';
 import { botSystemPrompt, botReminderPostfix, replyLengthInstruction } from '../app/ai/prompts/bot-prompts';
 import { GM_COMMAND_REPLY_TO_DISCUSSION } from '../app/ai/prompts/gm-commands';
@@ -13,9 +16,11 @@ import {
 import * as fs from 'fs';
 
 (async () => {
-  const gameId = 'harry-potter-1788636958352';
+  const [gameId, botName] = process.argv.slice(2);
+  if (!gameId || !botName) { console.error('usage: rebuild-bot-prompt.ts <gameId> <botName>'); process.exit(1); }
   const game = await getGame(gameId) as Game;
-  const bot = game.bots.find(b => b.name === 'Draco')!;
+  const bot = game.bots.find(b => b.name === botName);
+  if (!bot) { console.error(`bot ${botName} not in game ${gameId}: ${game.bots.map(b => b.name).join(', ')}`); process.exit(1); }
   const alive = [...game.bots.filter(b => b.isAlive && b.name !== bot.name).map(b => b.name), game.humanPlayerName].join(', ');
 
   const systemPrompt = format(botSystemPrompt(game.gameMode), {
@@ -40,13 +45,13 @@ import * as fs from 'fs';
   const history = convertToAIMessages(bot.name, [...botMessages, gmMessage]);
   history.push({ role: 'user' as any, content: reminder.trim() });
 
-  let out = `# Draco day-${game.currentDay} discussion-reply prompt (rebuilt ${new Date().toISOString()})\n`;
+  let out = `# ${bot.name} day-${game.currentDay} discussion-reply prompt (rebuilt ${new Date().toISOString()})\n`;
   out += `# model: ${bot.aiType}   gameState: ${game.gameState}   botMessages: ${botMessages.length}   history turns: ${history.length}\n\n`;
   out += `==================== SYSTEM PROMPT (${systemPrompt.length} chars) ====================\n\n${systemPrompt}\n\n`;
   out += `==================== HISTORY (${history.length} messages) ====================\n\n`;
   history.forEach((m, i) => { out += `----- [${i}] role=${m.role} (${String(m.content).length} chars) -----\n${m.content}\n\n`; });
   fs.mkdirSync('logs', { recursive: true });
-  const path = `logs/draco-day2-prompt.txt`;
+  const path = `logs/${bot.name.toLowerCase()}-day${game.currentDay}-prompt.txt`;
   fs.writeFileSync(path, out);
   console.log(`WROTE ${path}`);
   console.log(`system=${systemPrompt.length} chars, history=${history.length} msgs, total=${out.length} chars`);
