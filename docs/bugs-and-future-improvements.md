@@ -90,3 +90,51 @@ Other findings worth keeping:
   byte-stable from the start of a day through the end of its night. The churn is three back-to-back
   invalidations at the day boundary: vote resolution (`bot-actions.ts:952-986`), `startNewDay`,
   then each bot appending its own summary to `bot_context`.
+
+## `Game action failed: <single letter>` - minified function name in error logs (found 2026-09-11)
+
+**Symptom.** BetterStack shows a steady stream of *new* error fingerprints with messages like
+`Game action failed: t`, `Game action failed: e`. On 2026-09-11 it logged 22 new fingerprints in
+90 minutes across 6 game turns. Marlow's monitor pages urgent on every fresh fingerprint, so this
+generates alerts continuously and had been written off in her working memory as a
+"presence-model design gap, noisy by construction."
+
+**It isn't a design gap, it's a two-line logging bug.** `withErrorHandling`
+(`app/utils/server-action-wrapper.ts:67`) derives the log label from the function object:
+
+```ts
+const fnName = fn.name || 'anonymousAction';
+```
+
+The existing comment anticipates an *empty* `fn.name` for anonymous arrows. What it does not
+anticipate is a **minified** one: in a production Next.js build these wrapped server actions come
+through as single letters. So `fn.name` is truthy, the fallback never fires, and the letter lands
+in both the log message (`Game action failed: ${fnName}`, `:119`) and the `function:` context field.
+
+Two consequences, both bad:
+
+1. **The alert stream is garbage.** BetterStack fingerprints on message text, so every distinct
+   minified letter is a brand-new signature, and letters get reshuffled on each deploy. A handful
+   of real failures presents as dozens of novel error types.
+2. **The logs are unattributable.** `function: "t"` cannot be traced back to `vote`, `talkToAll` or
+   `summarizing current day`. The paired `console.error` on `:131` has the same value, so the only
+   way to identify the failing action today is the stack in `details`.
+
+**Fix.** Add an explicit name rather than relying on a runtime identifier that the bundler owns:
+
+```ts
+export function withErrorHandling<T extends any[]>(
+  fn: (...args: T) => Promise<GameActionResponse>,
+  gameIdExtractor: (...args: T) => string,
+  actionName?: string,
+) { ... const fnName = actionName ?? fn.name ?? 'anonymousAction'; }
+```
+
+then pass the literal at each wrap site. A cheaper stopgap that fixes the alerting but not the
+attribution: treat a `fn.name` of length 1-2 as unusable and fall back to `'gameAction'`, which at
+least collapses the fingerprints into one.
+
+**Note on severity.** Marlow's read that the underlying failures are the known recoverable,
+single-game-scoped class looks right, and this bug does not change that. What it changes is that
+the noise was blamed on the game's design when the cause is the log label, so the alerting was
+accepted as unfixable when it is a small change.

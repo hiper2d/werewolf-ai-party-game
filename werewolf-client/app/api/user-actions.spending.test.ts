@@ -1,6 +1,12 @@
-import { updateUserMonthlySpending, deductBalance, addBalance, assertFreeTierSpendWithinLimit } from './user-actions';
+import { updateUserMonthlySpending, deductBalance, addBalance, assertFreeSpendWithinLimit } from './user-actions';
 import { db } from "@/firebase/server";
-import { FREE_TIER_LIMITS, UserMonthlySpending } from "@/app/api/game-models";
+import { UserMonthlySpending } from "@/app/api/game-models";
+import { getFreeTierLimits } from "@/app/api/limits-actions";
+import { FreeSpendLimitError } from "@/app/api/errors";
+
+jest.mock('@/app/api/limits-actions', () => ({
+    getFreeTierLimits: jest.fn(async () => ({ gamesPerDay: 5, dailySpendUSD: 5, monthlySpendUSD: 20 })),
+}));
 
 // Mock dependencies (same pattern as night-replay.test.ts)
 jest.mock("@/firebase/server", () => ({
@@ -132,7 +138,8 @@ describe('updateUserMonthlySpending', () => {
                     freeAmountUSD: 1,
                     apiAmountUSD: 0.5,
                     paidAmountUSD: 0.25
-                }]
+                }],
+                dailySpend: { period: '2026-06-10', totalUSD: 0.25, buckets: { paid: 0.25 }, limitHits: 0 }
             });
             expect(txn.set).not.toHaveBeenCalled();
         });
@@ -173,7 +180,8 @@ describe('updateUserMonthlySpending', () => {
                         freeAmountUSD: 0,
                         apiAmountUSD: 0,
                         paidAmountUSD: 0.5
-                    }]
+                    }],
+                    dailySpend: { period: '2026-06-10', totalUSD: 0.5, buckets: { paid: 0.5 }, limitHits: 0 }
                 },
                 { merge: true }
             );
@@ -345,68 +353,105 @@ describe('addBalance', () => {
     });
 });
 
-describe('assertFreeTierSpendWithinLimit', () => {
+describe('assertFreeSpendWithinLimit', () => {
     const userId = 'player@example.com';
+    // 2026-06-10 12:00 UTC → day '2026-06-10', month '2026-06'.
     const JUNE_2026 = Date.UTC(2026, 5, 10, 12, 0, 0);
 
-    // Wires db.collection('users').doc(id).get() to resolve with the given data.
-    function setupDocGet(userData: any | null) {
+    // Wires db.collection('users').doc(id) to a ref whose get() resolves with the given
+    // data and whose set() (the limitHits counter write) is captured.
+    function setupDoc(userData: any | null) {
+        const set = jest.fn().mockResolvedValue(undefined);
         (db!.collection as jest.Mock).mockReturnValue({
             doc: jest.fn().mockReturnValue({
-                get: jest.fn().mockResolvedValue({
-                    exists: userData !== null,
-                    data: () => userData
-                })
+                get: jest.fn().mockResolvedValue({ exists: userData !== null, data: () => userData }),
+                set
             })
         });
+        return { set };
     }
+
+    const dayLedger = (free: number, extra: Record<string, any> = {}) =>
+        ({ period: '2026-06-10', totalUSD: free, buckets: { free }, limitHits: 0, ...extra });
 
     beforeEach(() => {
         jest.clearAllMocks();
+        jest.spyOn(console, 'warn').mockImplementation(() => {});
     });
 
-    it('passes when there is no spending for the current month', async () => {
-        setupDocGet({ spendings: [] });
-        await expect(assertFreeTierSpendWithinLimit(userId, JUNE_2026)).resolves.toBeUndefined();
+    it('passes a user with no spend at all', async () => {
+        const { set } = setupDoc({ tier: 'free' });
+        await expect(assertFreeSpendWithinLimit(userId, JUNE_2026)).resolves.toBeUndefined();
+        expect(set).not.toHaveBeenCalled();
     });
 
-    it('passes when free-tier spend is below the cap', async () => {
-        setupDocGet({ spendings: [{ period: '2026-06', amountUSD: 1, freeAmountUSD: 1 }] });
-        await expect(assertFreeTierSpendWithinLimit(userId, JUNE_2026)).resolves.toBeUndefined();
+    it('passes below both caps', async () => {
+        setupDoc({ tier: 'free', dailySpend: dayLedger(4.99), spendings: [{ period: '2026-06', amountUSD: 19.99, freeAmountUSD: 19.99 }] });
+        await expect(assertFreeSpendWithinLimit(userId, JUNE_2026)).resolves.toBeUndefined();
     });
 
-    it('throws once free-tier spend reaches the monthly cap', async () => {
-        setupDocGet({
-            spendings: [{
-                period: '2026-06',
-                amountUSD: FREE_TIER_LIMITS.MONTHLY_SPEND_USD,
-                freeAmountUSD: FREE_TIER_LIMITS.MONTHLY_SPEND_USD
-            }]
+    it('refuses at the daily cap with the money-worded message and counts the hit', async () => {
+        const { set } = setupDoc({ tier: 'free', dailySpend: dayLedger(5, { limitHits: 2 }) });
+
+        const error = await assertFreeSpendWithinLimit(userId, JUNE_2026).catch(e => e);
+        expect(error).toBeInstanceOf(FreeSpendLimitError);
+        expect(error.message).toBe("You've used today's free $5 of AI. Come back after midnight UTC, or add funds on your profile page to keep playing now.");
+        expect(error.verdict).toEqual(expect.objectContaining({ window: 'day', limitUSD: 5, spentUSD: 5, resetsAt: Date.UTC(2026, 5, 11) }));
+        expect(set).toHaveBeenCalledWith({ dailySpend: dayLedger(5, { limitHits: 3 }) }, { merge: true });
+    });
+
+    it('refuses at the monthly cap even when today is under the daily cap', async () => {
+        const { set } = setupDoc({
+            tier: 'free',
+            dailySpend: dayLedger(1),
+            spendings: [{ period: '2026-06', amountUSD: 20, freeAmountUSD: 20 }]
         });
-        await expect(assertFreeTierSpendWithinLimit(userId, JUNE_2026)).rejects.toThrow(/free-tier voice limit/);
+
+        const error = await assertFreeSpendWithinLimit(userId, JUNE_2026).catch(e => e);
+        expect(error).toBeInstanceOf(FreeSpendLimitError);
+        expect(error.message).toBe("You've used this month's free $20 of AI. It resets on the 1st, or add funds on your profile page to keep playing now.");
+        expect(error.verdict.window).toBe('month');
+        expect(set).toHaveBeenCalledWith({ dailySpend: dayLedger(1, { limitHits: 1 }) }, { merge: true });
     });
 
-    it('only counts the free bucket, not paid/api spend in the same month', async () => {
-        setupDocGet({
-            spendings: [{
-                period: '2026-06',
-                amountUSD: 100,
-                freeAmountUSD: 0.5,
-                paidAmountUSD: 99.5
-            }]
+    it('a stale daily ledger counts as zero today (and the hit lands on a fresh ledger)', async () => {
+        const { set } = setupDoc({
+            tier: 'free',
+            dailySpend: { period: '2026-06-09', totalUSD: 5, buckets: { free: 5 }, limitHits: 4 },
+            spendings: [{ period: '2026-06', amountUSD: 20, freeAmountUSD: 20 }]
         });
-        await expect(assertFreeTierSpendWithinLimit(userId, JUNE_2026)).resolves.toBeUndefined();
+        await expect(assertFreeSpendWithinLimit(userId, JUNE_2026)).rejects.toThrow(/this month's/);
+        expect(set).toHaveBeenCalledWith({ dailySpend: { period: '2026-06-10', totalUSD: 0, buckets: {}, limitHits: 1 } }, { merge: true });
+    });
+
+    it('only the free bucket counts, not paid spend in the same windows', async () => {
+        setupDoc({
+            tier: 'free',
+            dailySpend: { period: '2026-06-10', totalUSD: 100.5, buckets: { free: 0.5, paid: 100 } },
+            spendings: [{ period: '2026-06', amountUSD: 100.5, freeAmountUSD: 0.5, paidAmountUSD: 100 }]
+        });
+        await expect(assertFreeSpendWithinLimit(userId, JUNE_2026)).resolves.toBeUndefined();
     });
 
     it('ignores spend from other months', async () => {
-        setupDocGet({
-            spendings: [{ period: '2026-05', amountUSD: 100, freeAmountUSD: 100 }]
-        });
-        await expect(assertFreeTierSpendWithinLimit(userId, JUNE_2026)).resolves.toBeUndefined();
+        setupDoc({ tier: 'free', spendings: [{ period: '2026-05', amountUSD: 100, freeAmountUSD: 100 }] });
+        await expect(assertFreeSpendWithinLimit(userId, JUNE_2026)).resolves.toBeUndefined();
+    });
+
+    it('paid tier is exempt no matter what the free ledgers say', async () => {
+        setupDoc({ tier: 'paid', dailySpend: dayLedger(50), spendings: [{ period: '2026-06', amountUSD: 500, freeAmountUSD: 500 }] });
+        await expect(assertFreeSpendWithinLimit(userId, JUNE_2026)).resolves.toBeUndefined();
+        expect(getFreeTierLimits).not.toHaveBeenCalled();
+    });
+
+    it('reads the caps from config, not the constants', async () => {
+        (getFreeTierLimits as jest.Mock).mockResolvedValueOnce({ gamesPerDay: 5, dailySpendUSD: 0.5, monthlySpendUSD: 20 });
+        setupDoc({ tier: 'free', dailySpend: dayLedger(0.5) });
+        await expect(assertFreeSpendWithinLimit(userId, JUNE_2026)).rejects.toThrow(/today's free \$0\.50 of AI/);
     });
 
     it('passes when the user doc does not exist', async () => {
-        setupDocGet(null);
-        await expect(assertFreeTierSpendWithinLimit(userId, JUNE_2026)).resolves.toBeUndefined();
+        setupDoc(null);
+        await expect(assertFreeSpendWithinLimit(userId, JUNE_2026)).resolves.toBeUndefined();
     });
 });

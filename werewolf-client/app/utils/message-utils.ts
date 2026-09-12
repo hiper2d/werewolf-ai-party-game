@@ -1,4 +1,5 @@
 import {AIMessage, GAME_MASTER, GameMessage, MESSAGE_ROLE, MessageType} from "@/app/api/game-models";
+import {unwrapJsonReply} from "@/app/utils/text-format";
 
 /**
  * Converts message content to a human-readable string format
@@ -17,7 +18,7 @@ export function convertMessageContent(message: GameMessage): string {
         case MessageType.BOT_ANSWER:
         case MessageType.BOT_WELCOME:
             const botMsg = message.msg as { reply: string };
-            return botMsg.reply;
+            return unwrapJsonReply(botMsg.reply);
         
         case MessageType.WEREWOLF_ACTION:
             const werewolfMsg = message.msg as { target: string; reasoning: string };
@@ -158,7 +159,7 @@ export function convertToAIMessages(currentBotName: string, messages: GameMessag
 
             // Prepare own message (assistant type)
             if (message.messageType === MessageType.BOT_ANSWER || message.messageType === MessageType.BOT_WELCOME) {
-                content = (message.msg as { reply: string }).reply;
+                content = unwrapJsonReply((message.msg as { reply: string }).reply);
             } else if (message.messageType === MessageType.WEREWOLF_ACTION) {
                 const werewolfMsg = message.msg as { target: string; reasoning: string };
                 content = `Selected ${werewolfMsg.target} for elimination. Reasoning: ${werewolfMsg.reasoning}`;
@@ -191,14 +192,16 @@ export function convertToAIMessages(currentBotName: string, messages: GameMessag
             let anthropicThinkingSignature: string | undefined;
             let googleThoughtSignature: string | undefined;
             let grokEncryptedReasoning: string | undefined;
+            let metaEncryptedReasoning: string | undefined;
             if (message.msg && typeof message.msg === 'object') {
-                const signedMsg = message.msg as { thinking?: string; anthropicThinkingSignature?: string; googleThoughtSignature?: string; grokEncryptedReasoning?: string };
+                const signedMsg = message.msg as { thinking?: string; anthropicThinkingSignature?: string; googleThoughtSignature?: string; grokEncryptedReasoning?: string; metaEncryptedReasoning?: string };
                 thinking = signedMsg.thinking;
                 anthropicThinkingSignature = signedMsg.anthropicThinkingSignature;
                 googleThoughtSignature = signedMsg.googleThoughtSignature;
                 grokEncryptedReasoning = signedMsg.grokEncryptedReasoning;
+                metaEncryptedReasoning = signedMsg.metaEncryptedReasoning;
             }
-            const aiMessage: AIMessage = { role: MESSAGE_ROLE.ASSISTANT, content: content, thinking, anthropicThinkingSignature, googleThoughtSignature, grokEncryptedReasoning };
+            const aiMessage: AIMessage = { role: MESSAGE_ROLE.ASSISTANT, content: content, thinking, anthropicThinkingSignature, googleThoughtSignature, grokEncryptedReasoning, metaEncryptedReasoning };
             aiMessages.push(aiMessage);
         } else {
             // Use convertMessageContent to properly handle all message types

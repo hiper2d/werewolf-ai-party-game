@@ -20,7 +20,8 @@ const VALID_KEY_NAMES = [
     'Z_AI_API_KEY',
     'FUGU_API_KEY',
     'QWEN_API_KEY',
-    'MINIMAX_API_KEY'
+    'MINIMAX_API_KEY',
+    'META_API_KEY'
 ];
 
 async function updateFreeTierKey(keyName: string, keyValue: string) {
@@ -47,11 +48,13 @@ async function updateFreeTierKey(keyName: string, keyValue: string) {
             throw new Error('Free tier API keys document does not exist. Run init-free-tier-keys.ts first.');
         }
 
-        // Update the specific key
-        await configRef.set({
+        // Update the specific key. Must be update(), not set({merge}): set() treats a dotted
+        // field name as a literal top-level field ("keys.X"), while update() resolves it as a
+        // path into the `keys` map that the app actually reads.
+        await configRef.update({
             [`keys.${keyName}`]: keyValue,
             lastUpdated: new Date().toISOString()
-        }, { merge: true });
+        });
 
         console.log(`✅ Successfully updated ${keyName}`);
         console.log(`   Value: ${keyValue.substring(0, 10)}...${keyValue.substring(keyValue.length - 4)}`);

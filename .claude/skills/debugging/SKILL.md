@@ -37,7 +37,7 @@ curl -s -u "$BS_USER:$BS_PASS" "$BS_HOST?output_format_pretty_row_numbers=0" \
 
 ### Storage model — query the S3 table
 
-BetterStack is tiered ClickHouse: a hot table `remote(t507167_ai_werewolf_2_logs)` plus an S3 archive `s3Cluster(primary, t507167_ai_werewolf_2_s3)`. For this source the S3 flush is aggressive and holds effectively everything including near-real-time rows, so **query the S3 table**. (Only the freshest ~2 minutes may still be unflushed in hot.)
+BetterStack is tiered ClickHouse: a hot table `remote(t507167_ai_werewolf_2_logs)` plus an S3 archive `s3Cluster(primary, t507167_ai_werewolf_2_s3)`. **As of 2026-09-07 the S3 table returns an empty body (HTTP 200, no rows, even for `count()`) - query the hot table `remote(t507167_ai_werewolf_2_logs)`.** It held the last ~4 days (~2k rows). Earlier (pre-09) the S3 flush was aggressive and the S3 table was the one to query; if hot comes back short, try S3 again.
 
 ### Schema
 
@@ -52,7 +52,7 @@ Recent production errors/warnings:
 ```sql
 SELECT dt, JSONExtractString(raw,'level') AS lvl,
        substring(JSONExtractString(raw,'message'),1,300) AS msg
-FROM s3Cluster(primary, t507167_ai_werewolf_2_s3)
+FROM remote(t507167_ai_werewolf_2_logs)
 WHERE dt > now() - INTERVAL 48 HOUR
   AND JSONExtractString(raw,'level') IN ('error','warn')
   AND JSONExtractString(raw,'env') = 'production'
@@ -62,7 +62,7 @@ ORDER BY dt DESC LIMIT 50 FORMAT JSONEachRow
 Everything about one game (full raw lines — `message` is often truncated/useless, `error`/`details` carry the substance):
 
 ```sql
-SELECT raw FROM s3Cluster(primary, t507167_ai_werewolf_2_s3)
+SELECT raw FROM remote(t507167_ai_werewolf_2_logs)
 WHERE dt > now() - INTERVAL 7 DAY
   AND JSONExtractString(raw,'gameId') = '<gameId>'
 ORDER BY dt DESC LIMIT 200 FORMAT JSONEachRow

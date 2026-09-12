@@ -1,13 +1,57 @@
-import {UserMonthlySpending, UserTier} from "@/app/api/game-models";
+import {FreeTierLimits, UserDailySpend, UserMonthlySpending, UserTier, USER_TIERS} from "@/app/api/game-models";
+import {applySpend, evaluateBudget, ledgerSpend, periodKey} from "@hiper2d/ai-agents";
+import type {BudgetVerdict} from "@hiper2d/ai-agents";
 
 /**
  * Format a UTC timestamp into the `YYYY-MM` period key used for monthly spending.
  */
 export function formatPeriod(timestamp: number): string {
-    const date = new Date(timestamp);
-    const year = date.getUTCFullYear();
-    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-    return `${year}-${month}`;
+    return periodKey(timestamp, 'month');
+}
+
+/**
+ * Pure reducer for the user's daily ledger: adds `amountUSD` to today's total and to the
+ * tier bucket, starting a fresh ledger (and zeroing `limitHits`) when the UTC day has
+ * rolled since the stored one. Delegates to the ai-agents ledger; this wrapper only
+ * carries the app's `limitHits` counter across same-day updates.
+ */
+export function applyDailySpend(
+    dailySpend: UserDailySpend | undefined | null,
+    timestamp: number,
+    amountUSD: number,
+    tier?: UserTier
+): UserDailySpend {
+    const next = applySpend(dailySpend, { window: 'day', amountUSD, bucket: tier, timestamp });
+    const sameDay = !!dailySpend && dailySpend.period === next.period;
+    return { ...next, limitHits: sameDay ? (Number(dailySpend?.limitHits) || 0) : 0 };
+}
+
+/** Free-tier spend recorded for the UTC day containing `timestamp`; 0 when absent or stale. */
+export function getFreeDailySpend(dailySpend: UserDailySpend | undefined | null, timestamp: number): number {
+    return ledgerSpend(dailySpend, 'day', timestamp, USER_TIERS.FREE);
+}
+
+/**
+ * The two free-tier budget verdicts — day, then month — for a user doc's ledgers. Pure:
+ * both the pre-call guard (user-actions) and the profile page read the same answer.
+ */
+export function freeSpendVerdicts(
+    user: { spendings?: any[]; dailySpend?: UserDailySpend | null } | undefined,
+    limits: FreeTierLimits,
+    timestamp: number = Date.now()
+): BudgetVerdict[] {
+    return [
+        evaluateBudget(
+            getFreeDailySpend(user?.dailySpend, timestamp),
+            { window: 'day', limitUSD: limits.dailySpendUSD, bucket: USER_TIERS.FREE },
+            timestamp
+        ),
+        evaluateBudget(
+            getFreeSpendForPeriod(user?.spendings, formatPeriod(timestamp)),
+            { window: 'month', limitUSD: limits.monthlySpendUSD, bucket: USER_TIERS.FREE },
+            timestamp
+        ),
+    ];
 }
 
 /**

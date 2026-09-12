@@ -37,7 +37,8 @@ async function initializeFreeTierKeys() {
                 Z_AI_API_KEY: '',
                 FUGU_API_KEY: '',
                 QWEN_API_KEY: '',
-                MINIMAX_API_KEY: ''
+                MINIMAX_API_KEY: '',
+                META_API_KEY: ''
             },
             createdAt: new Date().toISOString(),
             lastUpdated: new Date().toISOString()

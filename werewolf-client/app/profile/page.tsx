@@ -1,10 +1,13 @@
 import React from 'react';
 import { redirect } from 'next/navigation';
 import Image from 'next/image';
-import { getUser } from '@/app/api/user-actions';
+import { getUser, getFreeSpendStatus } from '@/app/api/user-actions';
 import { getGamesCreatedTodayCount } from '@/app/api/game-actions';
-import { UserTier, USER_TIERS, FREE_TIER_LIMITS } from '@/app/api/game-models';
+import { getFreeTierLimits, DEFAULT_FREE_TIER_LIMITS } from '@/app/api/limits-actions';
+import { UserTier, USER_TIERS, FreeTierLimits } from '@/app/api/game-models';
+import { formatLimitUSD } from '@/app/api/errors';
 import { getFreeTierModels } from '@/app/ai/ai-models';
+import LocalTime from './components/LocalTime';
 import { auth } from '@/auth';
 import { GoogleIcon, GithubIcon } from '@/app/components/ui-icons';
 import ProfileTierCards from './components/ProfileTierCards';
@@ -69,19 +72,48 @@ export default async function UserProfilePage({ searchParams }: PageProps) {
     const monthAmount = thisMonth?.amountUSD ?? 0;
 
     const freeModelCount = getFreeTierModels().length;
-    const gamesPerDay = FREE_TIER_LIMITS.GAMES_PER_CALENDAR_DAY;
 
+    // Free-tier allowance: the live limits (config/limits over the defaults) and the
+    // spend already counted against the day / month windows. A read failure shows the
+    // limits with nothing spent rather than hiding the tiles.
+    let limits: FreeTierLimits = DEFAULT_FREE_TIER_LIMITS;
+    let daySpent = 0;
+    let monthSpent = 0;
+    let dayResetsAt: number | undefined;
     let gamesToday = 0;
     if (!isPaid) {
+        try {
+            const status = await getFreeSpendStatus(email);
+            limits = status.limits;
+            daySpent = status.day.spentUSD;
+            monthSpent = status.month.spentUSD;
+            dayResetsAt = status.day.resetsAt;
+        } catch (error) {
+            console.error('Error fetching free spend status:', error);
+            try {
+                limits = await getFreeTierLimits();
+            } catch {
+                limits = DEFAULT_FREE_TIER_LIMITS;
+            }
+        }
         try {
             gamesToday = await getGamesCreatedTodayCount();
         } catch {
             gamesToday = 0;
         }
     }
+    const gamesPerDay = limits.gamesPerDay;
     const gamesLeft = Math.max(0, gamesPerDay - gamesToday);
-    const gamesPct = Math.min(100, (gamesToday / gamesPerDay) * 100);
-    const meterWarn = gamesLeft <= 1;
+    const meter = (spent: number, limit: number) => {
+        const remaining = Math.max(0, limit - spent);
+        return {
+            remaining,
+            pct: limit > 0 ? Math.min(100, (spent / limit) * 100) : 100,
+            warn: remaining < limit * 0.2,
+        };
+    };
+    const dayMeter = meter(daySpent, limits.dailySpendUSD);
+    const monthMeter = meter(monthSpent, limits.monthlySpendUSD);
 
     const provider = detectProvider(session.user?.image);
     const initials = initialsFrom(session.user?.name);
@@ -100,6 +132,7 @@ export default async function UserProfilePage({ searchParams }: PageProps) {
     const miniBadge = 'font-mono text-[10px] tracking-[0.04em] uppercase px-[7px] py-0.5 rounded-full border';
     const miniBadgeNeutral = `${miniBadge} text-[var(--fg-2)] border-[var(--line-2)] bg-[var(--bg-0)]`;
     const miniBadgeGood = `${miniBadge} text-[var(--good-fg)] border-[var(--good-line)] bg-[var(--good-soft)]`;
+    const miniBadgeWarn = `${miniBadge} text-[var(--warn-fg)] border-[var(--warn-line)] bg-[var(--warn-soft)]`;
 
     return (
         <div className="max-w-[1040px] mx-auto w-full text-[var(--fg-0)] pb-16">
@@ -193,17 +226,23 @@ export default async function UserProfilePage({ searchParams }: PageProps) {
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
                         <div className={statCard}>
-                            <div className={statLabel}><span>Games today</span><span className={miniBadgeNeutral}>{gamesLeft} left</span></div>
-                            <div className={statValue}>{gamesToday}<span className={statUnit}>/ {gamesPerDay} per day</span></div>
+                            <div className={statLabel}><span>AI today</span><span className={dayMeter.warn ? miniBadgeWarn : miniBadgeNeutral}>{formatCurrency(dayMeter.remaining)} left</span></div>
+                            <div className={statValue}>{formatCurrency(daySpent)}<span className={statUnit}>of {formatLimitUSD(limits.dailySpendUSD)} today</span></div>
                             <div className="h-[7px] rounded-full bg-[var(--bg-3)] overflow-hidden border border-[var(--line-1)]">
-                                <div className={`h-full rounded-full ${meterWarn ? 'bg-[var(--warn-fg)]' : 'bg-[var(--accent)]'}`} style={{ width: `${gamesPct}%` }} />
+                                <div className={`h-full rounded-full ${dayMeter.warn ? 'bg-[var(--warn-fg)]' : 'bg-[var(--accent)]'}`} style={{ width: `${dayMeter.pct}%` }} />
                             </div>
-                            <div className={statSub}>Free starts up to <b>{gamesPerDay} games per calendar day</b>. Resets at midnight.</div>
+                            <div className={statSub}>
+                                Resets at <b><LocalTime at={dayResetsAt ?? Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1)} /></b> (midnight UTC).
+                            </div>
+                            <div className={statSub}>Games today <b>{gamesToday} / {gamesPerDay}</b> · {gamesLeft} left</div>
                         </div>
                         <div className={statCard}>
-                            <div className={statLabel}><span>This month</span><span className={miniBadgeGood}>No charge</span></div>
-                            <div className={statValue}>{formatCurrency(monthAmount)}</div>
-                            <div className={statSub}>Usage is <b>logged but not billed</b> — the platform covers Free-tier play.</div>
+                            <div className={statLabel}><span>AI this month</span><span className={monthMeter.warn ? miniBadgeWarn : miniBadgeGood}>{monthMeter.warn ? `${formatCurrency(monthMeter.remaining)} left` : 'No charge'}</span></div>
+                            <div className={statValue}>{formatCurrency(monthSpent)}<span className={statUnit}>of {formatLimitUSD(limits.monthlySpendUSD)} this month</span></div>
+                            <div className="h-[7px] rounded-full bg-[var(--bg-3)] overflow-hidden border border-[var(--line-1)]">
+                                <div className={`h-full rounded-full ${monthMeter.warn ? 'bg-[var(--warn-fg)]' : 'bg-[var(--accent)]'}`} style={{ width: `${monthMeter.pct}%` }} />
+                            </div>
+                            <div className={statSub}>Resets on the 1st. Turns, previews, portraits, illustrations and voices all count — <b>on the platform&apos;s keys, never charged</b>.</div>
                         </div>
                         <div className={statCard}>
                             <div className={statLabel}><span>Models available</span></div>
@@ -235,7 +274,7 @@ export default async function UserProfilePage({ searchParams }: PageProps) {
                     <h2 className="m-0 font-mono text-[13px] font-semibold tracking-[0.08em] uppercase text-[var(--fg-2)]">Free vs Paid</h2>
                     <span className="text-[13px] text-[var(--fg-3)]">Same platform keys — the difference is the limits and who pays.</span>
                 </div>
-                <ProfileTierCards currentTier={userTier} userId={email} />
+                <ProfileTierCards currentTier={userTier} userId={email} limits={limits} />
             </section>
         </div>
     );

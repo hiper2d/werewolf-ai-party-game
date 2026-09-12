@@ -395,7 +395,7 @@ Discuss:
 
 This is a private werewolf-only discussion. Share your thoughts, analysis, and suggestions with your fellow werewolves.
 
-Your response must be a valid JSON object with your discussion message.`;
+Your response must be a valid JSON object with your discussion message as plain prose in the "reply" field — not another JSON object inside it.`;
 
 export const BOT_WEREWOLF_ACTION_PROMPT: string = `🌙 **Night Phase - Werewolf Final Decision**
 

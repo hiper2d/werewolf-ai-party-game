@@ -3,7 +3,7 @@
 import {auth} from "@/auth";
 import {AvatarGenerationResult, ReframeResult, reframeGameAvatar, runAvatarGeneration, runAvatarRegeneration, selectAvatarVariantFor} from "@/app/utils/avatar-generation";
 import {AvatarFraming, FREE_TIER_AVATAR_REGENS, ReframeTarget, USER_TIERS} from "@/app/api/game-models";
-import {getUserBalance, getUserTier} from "@/app/api/user-actions";
+import {assertFreeSpendWithinLimit, getUserBalance, getUserTier} from "@/app/api/user-actions";
 
 /**
  * Generates the full themed avatar set for a game in ONE image-model call:
@@ -22,6 +22,7 @@ export async function generateGameAvatars(gameId: string): Promise<AvatarGenerat
     if (!session || !session.user?.email) {
         throw new Error('Not authenticated');
     }
+    await assertFreeSpendWithinLimit(session.user.email);
     return runAvatarGeneration(gameId, session.user.email);
 }
 
@@ -52,6 +53,7 @@ export async function regenerateGameAvatars(gameId: string): Promise<AvatarGener
             throw new Error('Insufficient balance. Please add funds on your profile page to reroll portraits.');
         }
     }
+    await assertFreeSpendWithinLimit(session.user.email);
     const maxRegens = tier === USER_TIERS.PAID ? Number.MAX_SAFE_INTEGER : FREE_TIER_AVATAR_REGENS;
     return runAvatarRegeneration(gameId, session.user.email, maxRegens);
 }

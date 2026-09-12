@@ -2,8 +2,9 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { UserTier } from '@/app/api/game-models';
+import { UserTier, FreeTierLimits } from '@/app/api/game-models';
 import { updateUserTier } from '@/app/api/user-actions';
+import { formatLimitUSD } from '@/app/api/errors';
 import { CheckIcon, DashIcon, ArrowIcon } from '@/app/components/ui-icons';
 
 type TierId = 'free' | 'paid';
@@ -13,41 +14,45 @@ interface Feat {
     node: React.ReactNode;
 }
 
-const TIER_INFO: Record<TierId, { name: string; cost: [string, string]; blurb: string; feats: Feat[] }> = {
-    free: {
-        name: 'Free',
-        cost: ['$0', 'platform pays'],
-        blurb: "Zero-cost play on the platform's shared keys — capped so it stays free.",
-        feats: [
-            { ok: true, node: <span><b>Shared platform keys</b> — nothing to bring or configure.</span> },
-            { ok: false, node: <span>Max <b>5 games per calendar day</b>.</span> },
-            { ok: true, node: <span>A <b>price-banded model subset</b>, each with a per-game bot cap.</span> },
-            { ok: false, node: <span>Per-model limits: <b>unlimited, 3, or 1 bot</b> per game by price.</span> },
-            { ok: true, node: <span>Voices (TTS / STT) work free via the platform key.</span> },
-            { ok: true, node: <span>Usage logged to monthly spendings — <b>never charged</b>.</span> },
-        ],
-    },
-    paid: {
-        name: 'Paid',
-        cost: ['Pay as you go', 'cost + 15%'],
-        blurb: 'Unlock the whole catalog with no per-game limits. Pre-load a balance; pay only for what you use.',
-        feats: [
-            { ok: true, node: <span><b>Full model catalog</b> — every model, no per-game bot caps.</span> },
-            { ok: true, node: <span><b>No daily game limit</b> — play as long as the balance is positive.</span> },
-            { ok: true, node: <span>Actual cost <b>+ 15% markup</b> deducted from balance per action.</span> },
-            { ok: true, node: <span>Prepaid <b>balance</b> you top up anytime.</span> },
-            { ok: true, node: <span>Voices (TTS / STT) work, billed to balance.</span> },
-            { ok: false, node: <span>Games are gated on <b>balance &gt; 0</b> (else &ldquo;Insufficient balance&rdquo;).</span> },
-        ],
-    },
-};
+function tierInfo(limits: FreeTierLimits): Record<TierId, { name: string; cost: [string, string]; blurb: string; feats: Feat[] }> {
+    const daily = formatLimitUSD(limits.dailySpendUSD);
+    const monthly = formatLimitUSD(limits.monthlySpendUSD);
+    return {
+        free: {
+            name: 'Free',
+            cost: ['$0', 'platform pays'],
+            blurb: "Zero-cost play on the platform's shared keys — capped so it stays free.",
+            feats: [
+                { ok: true, node: <span><b>{daily} of AI a day</b> on us, up to <b>{monthly} a month</b> — resets at midnight UTC.</span> },
+                { ok: false, node: <span>Up to <b>{limits.gamesPerDay} games a day</b>.</span> },
+                { ok: true, node: <span>A <Link href="/models" className="text-[var(--accent-text)] hover:underline">curated set of models</Link> with per-game bot caps.</span> },
+                { ok: false, node: <span>One <b>portrait reroll</b> per game.</span> },
+                { ok: true, node: <span>Voices and mid-game illustrations included.</span> },
+                { ok: true, node: <span><b>Never charged</b>, no card.</span> },
+            ],
+        },
+        paid: {
+            name: 'Paid',
+            cost: ['Pay as you go', 'cost + 15%'],
+            blurb: 'Unlock the whole catalog with no per-game limits. Pre-load a balance; pay only for what you use.',
+            feats: [
+                { ok: true, node: <span><b>Every model</b>, including Claude Fable 5.1 and GPT-6 Astra.</span> },
+                { ok: true, node: <span><b>No daily or monthly cap</b>, no game limit, no bot caps — play while the balance is positive.</span> },
+                { ok: true, node: <span><b>Unlimited portrait rerolls.</b></span> },
+                { ok: true, node: <span><b>Replay a night.</b></span> },
+                { ok: true, node: <span>Prepaid <b>balance</b> you top up anytime — model base price <b>+ 15%</b>.</span> },
+                { ok: false, node: <span>Games are gated on <b>balance &gt; 0</b> (else &ldquo;Insufficient balance&rdquo;).</span> },
+            ],
+        },
+    };
+}
 
 function scrollToAddBalance() {
     document.getElementById('add-balance')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-function TierCard({ id, currentTier, userId }: { id: TierId; currentTier: UserTier; userId: string }) {
-    const info = TIER_INFO[id];
+function TierCard({ id, currentTier, userId, limits }: { id: TierId; currentTier: UserTier; userId: string; limits: FreeTierLimits }) {
+    const info = tierInfo(limits)[id];
     const isCurrent = currentTier === id;
     const [switching, setSwitching] = useState(false);
 
@@ -139,11 +144,11 @@ function TierCard({ id, currentTier, userId }: { id: TierId; currentTier: UserTi
     );
 }
 
-export default function ProfileTierCards({ currentTier, userId }: { currentTier: UserTier; userId: string }) {
+export default function ProfileTierCards({ currentTier, userId, limits }: { currentTier: UserTier; userId: string; limits: FreeTierLimits }) {
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-[18px] items-stretch">
-            <TierCard id="free" currentTier={currentTier} userId={userId} />
-            <TierCard id="paid" currentTier={currentTier} userId={userId} />
+            <TierCard id="free" currentTier={currentTier} userId={userId} limits={limits} />
+            <TierCard id="paid" currentTier={currentTier} userId={userId} limits={limits} />
         </div>
     );
 }

@@ -18,7 +18,7 @@
  * Run:  npm test -- --testPathPattern=all-models
  *
  * Env vars (set the ones you have):
- *   OPENAI_K, ANTHROPIC_K, GOOGLE_K, MISTRAL_K, DEEP_SEEK_K, GROK_K, MOONSHOT_K, Z_K, FUGU_K, GW_K, MX_K
+ *   OPENAI_K, ANTHROPIC_K, GOOGLE_K, MISTRAL_K, DEEP_SEEK_K, GROK_K, MOONSHOT_K, Z_K, FUGU_K, GW_K, MX_K, M_K
  */
 
 import dotenv from "dotenv";
@@ -66,6 +66,7 @@ const ENV_KEY_MAP: Record<string, string> = {
     [API_KEY_CONSTANTS.FUGU]: 'FUGU_K',
     [API_KEY_CONSTANTS.QWEN]: 'GW_K',
     [API_KEY_CONSTANTS.MINIMAX]: 'MX_K',
+    [API_KEY_CONSTANTS.META]: 'M_K',
 };
 
 // Build ApiKeyMap from environment

@@ -1,4 +1,4 @@
-import { isInsufficientBalanceError, isProviderBudgetDepletedError, isProviderBusyError } from './errors';
+import { isInsufficientBalanceError, isProviderBudgetDepletedError, isProviderBusyError, FreeSpendLimitError, freeSpendLimitMessage, freeSpendLimitWindow, isFreeSpendLimitError } from './errors';
 
 describe('isProviderBudgetDepletedError', () => {
     const depletedSamples = [
@@ -76,5 +76,38 @@ describe('isInsufficientBalanceError', () => {
         expect(isInsufficientBalanceError('Failed to parse JSON response')).toBe(false);
         expect(isInsufficientBalanceError(undefined)).toBe(false);
         expect(isInsufficientBalanceError('')).toBe(false);
+    });
+});
+
+describe('free spend limit errors', () => {
+    const dayVerdict = { allowed: false, window: 'day' as const, limitUSD: 5, spentUSD: 5, remainingUSD: 0, resetsAt: Date.UTC(2026, 8, 12) };
+    const monthVerdict = { ...dayVerdict, window: 'month' as const, limitUSD: 20, spentUSD: 20, resetsAt: Date.UTC(2026, 9, 1) };
+
+    it('words the daily and monthly refusals with the configured amount', () => {
+        expect(freeSpendLimitMessage(dayVerdict)).toBe("You've used today's free $5 of AI. Come back after midnight UTC, or add funds on your profile page to keep playing now.");
+        expect(freeSpendLimitMessage(monthVerdict)).toBe("You've used this month's free $20 of AI. It resets on the 1st, or add funds on your profile page to keep playing now.");
+        expect(freeSpendLimitMessage({ window: 'day', limitUSD: 2.5 })).toContain("today's free $2.50 of AI");
+    });
+
+    it('the error carries the verdict and a stable code', () => {
+        const error = new FreeSpendLimitError(dayVerdict);
+        expect(error.code).toBe('FREE_SPEND_LIMIT');
+        expect(error.verdict).toBe(dayVerdict);
+        expect(error.name).toBe('FreeSpendLimitError');
+        expect(isFreeSpendLimitError(error.message)).toBe(true);
+    });
+
+    it('is recognized after the string round trip, including when wrapped by a caller', () => {
+        expect(isFreeSpendLimitError(`Failed to generate speech: ${freeSpendLimitMessage(dayVerdict)}`)).toBe(true);
+        expect(freeSpendLimitWindow(freeSpendLimitMessage(dayVerdict))).toBe('day');
+        expect(freeSpendLimitWindow(freeSpendLimitMessage(monthVerdict))).toBe('month');
+    });
+
+    it('does not fire on provider budget, prepaid balance, or the games-per-day message', () => {
+        expect(isFreeSpendLimitError('Insufficient balance. Please add funds on your profile page.')).toBe(false);
+        expect(isFreeSpendLimitError('Free tier limit reached: you can create up to 5 games per day.')).toBe(false);
+        expect(isFreeSpendLimitError('429 You have no credits remaining')).toBe(false);
+        expect(isFreeSpendLimitError('')).toBe(false);
+        expect(freeSpendLimitWindow(undefined)).toBeUndefined();
     });
 });

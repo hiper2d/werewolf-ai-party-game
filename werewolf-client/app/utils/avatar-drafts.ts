@@ -212,7 +212,7 @@ export async function runDraftGeneration(userEmail: string, subject: AvatarSubje
         });
         ledger.spentUSD = 0;
 
-        await billImages(userEmail, tier, costUSD);
+        await billImages(userEmail, costUSD);
         logger.info(`Illustration draft drawn`, {...logContext, portraits: Object.keys(variants).length, scenes: drawn.scenes.length, costUSD});
     } catch (error: any) {
         logger.error(`Illustration draft failed`, {...logContext, error: error.message, costUSD: ledger.spentUSD});

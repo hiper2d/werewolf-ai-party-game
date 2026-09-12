@@ -38,7 +38,7 @@ The agent layer lives in the npm package [`@hiper2d/ai-agents`](https://github.c
 ### Authentication & Data
 - **NextAuth v5**: GitHub and Google OAuth providers
 - **Firebase**: Firestore for data persistence, Firebase Auth integration
-- **Tiers & Billing**: Two tiers — free (daily/monthly caps) and paid (prepaid USD balance via Stripe, 15% markup). All AI calls use platform keys (Firestore doc `config/freeTierApiKeys`); users never supply their own API keys
+- **Tiers & Billing**: Two tiers — free (capped: $5/UTC day and $20/month of platform-key AI spend across ALL paths, plus 5 games/day; live values in Firestore doc `config/limits` read by `app/api/limits-actions.ts`) and paid (prepaid USD balance via Stripe, 15% markup, no caps). All AI calls use platform keys (Firestore doc `config/freeTierApiKeys`); users never supply their own API keys. Every spend goes through `recordSpend` (`app/api/cost-tracking.ts`), which charges, updates `users.spendings` (monthly) + `users.dailySpend` and writes a `requestStats` row in one transaction; the free-tier guard `assertFreeSpendWithinLimit` runs before every LLM ask via the agent-factory `setBeforeAskHook` and explicitly before images/voice. Design: `docs/plan-user-spend-tracking-and-daily-cap.md`
 
 ### Key Directories
 - `app/ai/`: prompts, model policy overlay (`ai-models.ts`), factory wrapper — agent implementations are in `@hiper2d/ai-agents`

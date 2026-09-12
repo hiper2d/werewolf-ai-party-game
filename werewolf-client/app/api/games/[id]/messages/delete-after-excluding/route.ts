@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/firebase/server';
-import {GAME_STATES, Bot, Game, FREE_TIER_LIMITS} from "@/app/api/game-models";
+import {GAME_STATES, Bot, Game} from "@/app/api/game-models";
 import {recalculateDayActivity} from "@/app/api/bot-actions";
 import {auth} from "@/auth";
 
@@ -78,16 +78,8 @@ export async function DELETE(
 
         const currentDay = gameData.currentDay;
 
-        // Enforce chat reset limit for free-tier games
-        if (gameData.createdWithTier === 'free') {
-            const currentResets = gameData.chatResetCounts?.[currentDay] ?? 0;
-            if (currentResets >= FREE_TIER_LIMITS.CHAT_RESETS_PER_GAME_DAY) {
-                return NextResponse.json(
-                    { error: `Free tier limit reached: you can reset chat up to ${FREE_TIER_LIMITS.CHAT_RESETS_PER_GAME_DAY} times per game day. Switch to API tier for unlimited resets.` },
-                    { status: 429 }
-                );
-            }
-        }
+        // No per-day reset limit: resets re-run bot turns, which cost money, and the
+        // free-tier spend caps already meter that. `chatResetCounts` stays informational.
 
         // Reset bots that were eliminated on the current day
         // Preserve token usage costs even when resetting bots

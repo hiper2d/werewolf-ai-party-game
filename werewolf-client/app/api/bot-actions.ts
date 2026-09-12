@@ -1,5 +1,6 @@
 'use server';
 
+import {unwrapJsonReply} from "@/app/utils/text-format";
 import {db} from "@/firebase/server";
 import {
     AUTO_VOTE_COEFFICIENT,
@@ -367,7 +368,8 @@ function shouldTriggerAutoVote(game: Game): boolean {
             const playStyleReminder = format(botReminderPostfix(game.gameMode), { play_style: generatePlayStyleDescription(bot), human_player_name: game.humanPlayerName, reply_length_instruction: replyLengthInstruction(game.longReplies) });
             const history = convertToAIMessages(bot.name, [...botMessages, gmMessage]);
             history.push({ role: MESSAGE_ROLE.USER, content: playStyleReminder.trim() });
-            const [answer, thinking, tokenUsage, thinkingSignature] = await agent.askText(history);
+            const [rawAnswer, thinking, tokenUsage, thinkingSignature] = await agent.askText(history);
+            const answer = unwrapJsonReply(rawAnswer);
 
             if (!answer) {
                 throw new BotResponseError(
@@ -757,7 +759,8 @@ async function processNextBotInQueue(
     const playStyleReminder = format(botReminderPostfix(game.gameMode), { play_style: generatePlayStyleDescription(bot), human_player_name: game.humanPlayerName, reply_length_instruction: replyLengthInstruction(game.longReplies) });
     const history = convertToAIMessages(bot.name, [...botMessages, gmMessage]);
     history.push({ role: MESSAGE_ROLE.USER, content: playStyleReminder.trim() });
-    const [botReply, thinking, tokenUsage, thinkingSignature] = await agent.askText(history);
+    const [rawBotReply, thinking, tokenUsage, thinkingSignature] = await agent.askText(history);
+    const botReply = unwrapJsonReply(rawBotReply);
     if (!botReply) {
         throw new BotResponseError(
             'Bot failed to respond to discussion',

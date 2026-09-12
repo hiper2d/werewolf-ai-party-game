@@ -1,4 +1,4 @@
-import { formatReplyForDisplay, spaceEmDashes, unwrapQuotedReply } from './text-format';
+import { unwrapJsonReply, formatReplyForDisplay, spaceEmDashes, unwrapQuotedReply } from './text-format';
 
 describe('spaceEmDashes', () => {
     it('opens a closed em dash', () => {
@@ -61,5 +61,25 @@ describe('unwrapQuotedReply', () => {
 describe('formatReplyForDisplay', () => {
     it('unwraps and then spaces dashes', () => {
         expect(formatReplyForDisplay('“three—I’d say.”')).toBe('three — I’d say.');
+    });
+});
+
+describe('unwrapJsonReply', () => {
+    it('unwraps a single-field JSON object into its string', () => {
+        expect(unwrapJsonReply('{"message":"Gandalf is the cleanest target."}')).toBe('Gandalf is the cleanest target.');
+        expect(unwrapJsonReply('  {"reply": "Fine by me."}  ')).toBe('Fine by me.');
+    });
+    it('leaves prose, arrays, multi-field and non-string objects alone', () => {
+        expect(unwrapJsonReply('Gandalf is the cleanest target.')).toBe('Gandalf is the cleanest target.');
+        expect(unwrapJsonReply('{"a":"x","b":"y"}')).toBe('{"a":"x","b":"y"}');
+        expect(unwrapJsonReply('{"n": 3}')).toBe('{"n": 3}');
+        expect(unwrapJsonReply('["x"]')).toBe('["x"]');
+        expect(unwrapJsonReply('{"message": ""}')).toBe('{"message": ""}');
+    });
+    it('leaves a reply that merely starts and ends with braces but is not JSON', () => {
+        expect(unwrapJsonReply('{not json}')).toBe('{not json}');
+    });
+    it('is applied by formatReplyForDisplay before the quote unwrap', () => {
+        expect(formatReplyForDisplay('{"message":"\u201cGo.\u201d"}')).toBe('Go.');
     });
 });

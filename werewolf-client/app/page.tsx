@@ -6,6 +6,9 @@ import LoginCta from "@/app/components/LoginCta";
 import BuyMeACoffee from "@/app/components/BuyMeACoffee";
 import { CheckIcon, DiscordIcon } from "@/app/components/ui-icons";
 import { DISCORD_URL } from "@/app/config/external-links";
+import { getFreeTierLimits } from "@/app/api/limits-actions";
+import { formatLimitUSD } from "@/app/api/errors";
+import type { FreeTierLimits } from "@/app/api/game-models";
 import type { Metadata } from "next";
 
 // Title/description come from the root layout; only the canonical is per-route.
@@ -15,49 +18,55 @@ export const metadata: Metadata = {
 
 const MODELS = [
   'Claude 5 Opus', 'GPT-5.5', 'Gemini Flash 3.5', 'DeepSeek V4 Pro',
-  'Mistral 3.5 Medium', 'GLM 5.2', 'Kimi K3', 'Grok 4.5', 'Qwen3.8 Max', 'MiniMax M3', 'Sakana Fugu Ultra',
+  'Mistral 3.5 Medium', 'GLM 5.2', 'Kimi K3', 'Grok 4.5', 'Qwen3.8 Max', 'MiniMax M3', 'Sakana Fugu Ultra', 'Meta Muse Spark 1.3',
 ];
 
 // Real plans: Free (platform-paid, capped) vs Paid (pay-as-you-go, no subscription).
-const TIERS = [
-  {
-    name: 'Free',
-    amt: '$0',
-    amtSmall: false,
-    per: 'forever',
-    billed: 'No card — the platform pays',
-    blurb: 'Everything you need to start outsmarting the bots — on the house.',
-    cta: 'Start playing free',
-    ctaUrl: '/games',
-    featured: false,
-    features: [
-      'Up to 5 games per day',
-      'A curated, price-banded model set',
-      'Per-game bot caps — unlimited, 3, or 1 by model',
-      'Voice acting (TTS & STT) included',
-      'Usage logged but never charged',
-    ],
-  },
-  {
-    name: 'Paid',
-    amt: 'Pay as you go',
-    amtSmall: true,
-    per: '',
-    billed: 'Prepaid balance · only pay for what you use',
-    blurb: 'The whole table — every model, no per-game limits.',
-    cta: 'Add a balance',
-    ctaUrl: '/profile#add-balance',
-    featured: true,
-    badge: 'No subscription',
-    features: [
-      'The full model catalog — every model, reasoning always on',
-      'No per-game bot caps — mix freely',
-      'No daily game limit',
-      'Prepaid balance — top up anytime',
-      'Pay only for what you use',
-    ],
-  },
-];
+// The free caps come from config, so the copy is built per render.
+function tiersFor(limits: FreeTierLimits) {
+  const daily = formatLimitUSD(limits.dailySpendUSD);
+  const monthly = formatLimitUSD(limits.monthlySpendUSD);
+  return [
+    {
+      name: 'Free',
+      amt: '$0',
+      amtSmall: false,
+      per: 'forever',
+      billed: 'No card — the platform pays',
+      blurb: 'Everything you need to start outsmarting the bots — on the house.',
+      cta: 'Start playing free',
+      ctaUrl: '/games',
+      featured: false,
+      badge: undefined as string | undefined,
+      features: [
+        `${daily} of AI a day on us — up to ${monthly} a month`,
+        `Up to ${limits.gamesPerDay} games a day`,
+        'A curated, price-banded model set',
+        'Voice acting and illustrations included',
+        'No card, never charged',
+      ],
+    },
+    {
+      name: 'Paid',
+      amt: 'Pay as you go',
+      amtSmall: true,
+      per: '',
+      billed: 'Prepaid balance · only pay for what you use',
+      blurb: 'The whole table — every model, no per-game limits.',
+      cta: 'Add a balance',
+      ctaUrl: '/profile#add-balance',
+      featured: true,
+      badge: 'No subscription' as string | undefined,
+      features: [
+        'The full catalog — every model, including Fable 5.1 and GPT-6 Astra',
+        'No daily or monthly cap, no game limit, no bot caps',
+        'Unlimited portrait rerolls and night replays',
+        'Prepaid balance — top up anytime',
+        'Pay only for what you use, base price + 15%',
+      ],
+    },
+  ];
+}
 
 function PlayersIcon({ className }: { className?: string }) {
   return (
@@ -91,6 +100,8 @@ function GaugeIcon({ className }: { className?: string }) {
 
 export default async function Home() {
   const session = await auth();
+  const limits = await getFreeTierLimits();
+  const tiers = tiersFor(limits);
 
   return (
     <div className="w-full max-w-[1040px] mx-auto px-4 sm:px-7 flex flex-col">
@@ -182,7 +193,7 @@ export default async function Home() {
             </div>
             <h3 className="mt-0.5 m-0 text-[17px] font-semibold tracking-[-0.01em] text-[var(--fg-0)]">All Top AI Models Together</h3>
             <p className="m-0 text-[14px] text-[var(--fg-2)] leading-[1.6] [text-wrap:pretty]">
-              Mix models from 11 providers in the same game. Watch them argue, deceive, and form alliances against each other — and you.
+              Mix models from 12 providers in the same game. Watch them argue, deceive, and form alliances against each other — and you.
             </p>
             <div className="flex flex-wrap gap-[7px] mt-1">
               {MODELS.map((m) => (
@@ -230,7 +241,7 @@ export default async function Home() {
             role, stay in character, and still be fun to play against took real engineering.
           </p>
           <p className="m-0 text-[15px] text-[var(--fg-2)] leading-[1.7] [text-wrap:pretty]">
-            After a lot of games, the answer is yes. The best models from all eleven providers form
+            After a lot of games, the answer is yes. The best models from all twelve providers form
             alliances, make strategic accusations, defend themselves under pressure, and sometimes
             pull off a bluff good enough to win. Mixing providers at one table is the most
             interesting part, because each has its own temperament: some aggressive, some cautious,
@@ -255,13 +266,13 @@ export default async function Home() {
             Play free. Go Paid for the whole table.
           </h2>
           <p className="m-0 text-[15px] text-[var(--fg-2)] leading-[1.6] [text-wrap:pretty]">
-            Start with five games a day on a curated set of models — no card, never charged. Switch to pay-as-you-go for the
+            Start with {formatLimitUSD(limits.dailySpendUSD)} of AI a day on a curated set of models — no card, never charged. Switch to pay-as-you-go for the
             full catalog with no per-game limits. No subscription: pre-load a balance and pay only for what you use.
           </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-[18px] max-w-[760px] mx-auto items-start">
-          {TIERS.map((tier) => {
+          {tiers.map((tier) => {
             const btnClass = `inline-flex items-center justify-center gap-2 w-full font-semibold text-[15px] px-6 py-[13px] rounded-[var(--radius-md)] transition-all duration-[120ms] ${
               tier.featured
                 ? 'bg-[var(--accent)] text-[var(--accent-fg)] border border-transparent shadow-[var(--shadow-1)] hover:bg-[var(--accent-strong)]'

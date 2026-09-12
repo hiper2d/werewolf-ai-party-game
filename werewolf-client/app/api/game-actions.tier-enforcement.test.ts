@@ -19,9 +19,11 @@ import {
     getVoiceProvider,
     updateUserMonthlySpending,
     deductBalance,
+    assertFreeSpendWithinLimit,
 } from '@/app/api/user-actions';
 import { getVoiceConfig } from '@/app/ai/voice-config';
 import { API_KEY_CONSTANTS, LLM_CONSTANTS } from '@/app/ai/ai-models';
+import { recordSpend } from '@/app/api/cost-tracking';
 import {
     GamePreview,
     GamePreviewWithGeneratedBots,
@@ -55,13 +57,20 @@ jest.mock('@/app/utils/tier-utils', () => ({
     getApiKeysForUser: jest.fn(),
 }));
 
-// Spending / cost module
+// Spending / cost modules
 jest.mock('@/app/api/user-actions', () => ({
     getUserTier: jest.fn(),
     getUserBalance: jest.fn(),
     getVoiceProvider: jest.fn(),
     updateUserMonthlySpending: jest.fn(),
     deductBalance: jest.fn(),
+    assertFreeSpendWithinLimit: jest.fn(),
+}));
+jest.mock('@/app/api/cost-tracking', () => ({
+    recordSpend: jest.fn(),
+}));
+jest.mock('@/app/api/limits-actions', () => ({
+    getFreeTierLimits: jest.fn(async () => ({ gamesPerDay: 5, dailySpendUSD: 5, monthlySpendUSD: 20 })),
 }));
 
 jest.mock('@/app/ai/agent-factory', () => ({
@@ -355,35 +364,32 @@ describe('previewGame tier enforcement', () => {
     });
 
     describe('paid tier charging', () => {
-        it('charges the preview cost plus the 15% markup and records spending', async () => {
+        it('bills the preview through recordSpend (kind: preview, no game yet) with the raw cost', async () => {
             mockTier(USER_TIERS.PAID);
             stubAgentReturning(3, { ...DEFAULT_TOKEN_USAGE, costUSD: 0.5 });
 
             const result = await previewGame(makePreview());
 
-            // 0.5 * (1 + 0.15) = 0.575
-            expect(deductBalance).toHaveBeenCalledTimes(1);
-            expect(deductBalance).toHaveBeenCalledWith(
-                USER_EMAIL,
-                expect.closeTo(0.575, 6)
-            );
-            // Monthly spending records the marked-up amount actually charged (0.575).
-            expect(updateUserMonthlySpending).toHaveBeenCalledWith(
-                USER_EMAIL,
-                expect.closeTo(0.575, 6),
-                USER_TIERS.PAID
-            );
+            // The markup is applied inside recordSpend off the user's CURRENT tier; the
+            // caller hands over the raw model cost and the model for the stats row.
+            expect(recordSpend).toHaveBeenCalledTimes(1);
+            expect(recordSpend).toHaveBeenCalledWith(expect.objectContaining({
+                userEmail: USER_EMAIL,
+                costUSD: 0.5,
+                kind: 'preview',
+                modelId: LLM_CONSTANTS.DEEPSEEK_FLASH,
+            }));
+            expect(deductBalance).not.toHaveBeenCalled();
+            expect(updateUserMonthlySpending).not.toHaveBeenCalled();
             expect(result.tokenUsage.costUSD).toBe(0.5);
         });
 
-        it('fails when the balance deduction is rejected', async () => {
+        it('fails when the balance cannot cover the charge', async () => {
             mockTier(USER_TIERS.PAID);
             stubAgentReturning(3);
-            (deductBalance as jest.Mock).mockResolvedValue(false);
+            (recordSpend as jest.Mock).mockRejectedValueOnce(new Error('Insufficient balance. Please add funds on your profile page to continue playing.'));
 
-            await expect(previewGame(makePreview())).rejects.toThrow(
-                'Insufficient balance. Please add funds on your profile page before starting a game.'
-            );
+            await expect(previewGame(makePreview())).rejects.toThrow('Insufficient balance');
         });
 
         it('blocks paid-tier users with zero balance before any story generation', async () => {
@@ -395,22 +401,33 @@ describe('previewGame tier enforcement', () => {
                 'Insufficient balance. Please add funds on your profile page before starting a game.'
             );
             expect(AgentFactory.createAgent).not.toHaveBeenCalled();
-            expect(deductBalance).not.toHaveBeenCalled();
+            expect(recordSpend).not.toHaveBeenCalled();
         });
 
-        it('does not deduct balance for free-tier previews', async () => {
+        it('free-tier previews are recorded through the same chokepoint, after the spend guard', async () => {
             mockTier(USER_TIERS.FREE);
             setupDbForPreview(0);
             stubAgentReturning(3);
 
             await previewGame(makePreview());
 
-            expect(deductBalance).not.toHaveBeenCalled();
-            expect(updateUserMonthlySpending).toHaveBeenCalledWith(
-                USER_EMAIL,
-                DEFAULT_TOKEN_USAGE.costUSD,
-                USER_TIERS.FREE
-            );
+            expect(assertFreeSpendWithinLimit).toHaveBeenCalledWith(USER_EMAIL);
+            expect(recordSpend).toHaveBeenCalledWith(expect.objectContaining({
+                userEmail: USER_EMAIL,
+                costUSD: DEFAULT_TOKEN_USAGE.costUSD,
+                kind: 'preview',
+            }));
+        });
+
+        it('a free user at the spend cap is refused before the story agent runs', async () => {
+            mockTier(USER_TIERS.FREE);
+            setupDbForPreview(0);
+            stubAgentReturning(3);
+            (assertFreeSpendWithinLimit as jest.Mock).mockRejectedValueOnce(new Error("You've used today's free $5 of AI. Come back after midnight UTC, or add funds on your profile page to keep playing now."));
+
+            await expect(previewGame(makePreview())).rejects.toThrow(/today's free \$5 of AI/);
+            expect(AgentFactory.createAgent).not.toHaveBeenCalled();
+            expect(recordSpend).not.toHaveBeenCalled();
         });
     });
 

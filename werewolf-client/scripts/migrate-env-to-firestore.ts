@@ -27,7 +27,8 @@ async function migrateKeysToFirestore() {
         'FUGU_API_KEY': process.env.FUGU_K,
         'Z_AI_API_KEY': process.env.Z_K,
         'QWEN_API_KEY': process.env.GW_K,
-        'MINIMAX_API_KEY': process.env.MX_K
+        'MINIMAX_API_KEY': process.env.MX_K,
+        'META_API_KEY': process.env.M_K
     };
 
     console.log('🔄 Migrating API keys from .env to Firestore...\n');

@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { talkToAll, humanPlayerVote, getSuggestion } from "@/app/api/bot-actions";
 import { humanPlayerTalkWerewolves } from "@/app/api/night-actions";
-import { GAME_STATES, MessageType, RECIPIENT_ALL, RECIPIENT_WEREWOLVES, RECIPIENT_DOCTOR, RECIPIENT_DETECTIVE, RECIPIENT_MANIAC, GameMessage, Game, GameActionResponse, SystemErrorMessage, BotResponseError, GAME_MASTER, ROLE_CONFIGS, GAME_ROLES, FREE_TIER_LIMITS } from "@/app/api/game-models";
+import { GAME_STATES, MessageType, RECIPIENT_ALL, RECIPIENT_WEREWOLVES, RECIPIENT_DOCTOR, RECIPIENT_DETECTIVE, RECIPIENT_MANIAC, GameMessage, Game, GameActionResponse, SystemErrorMessage, BotResponseError, GAME_MASTER, ROLE_CONFIGS, GAME_ROLES } from "@/app/api/game-models";
 import PlayerAvatar from "@/app/components/PlayerAvatar";
 import { clearGameErrorState } from "@/app/api/game-actions";
 import { getAvatarView, getIllustrationUrl, getSceneUrl } from "@/app/utils/avatar-utils";
@@ -21,7 +21,7 @@ import { ttsService } from "@/app/services/tts-service";
 import { sttService } from "@/app/services/stt-service";
 import { getDefaultVoiceProvider } from "@/app/ai/voice-config";
 import { getModelDisplayName, getModelProviderName } from "@/app/ai/ai-models";
-import { isInsufficientBalanceError, isProviderBudgetDepletedError, isProviderBusyError } from "@/app/api/errors";
+import { freeSpendLimitWindow, isFreeSpendLimitError, isInsufficientBalanceError, isProviderBudgetDepletedError, isProviderBusyError } from "@/app/api/errors";
 import { formatReplyForDisplay } from "@/app/utils/text-format";
 import { DISCORD_URL } from "@/app/config/external-links";
 import Link from "next/link";
@@ -220,14 +220,13 @@ interface GameMessageItemProps {
     speakingMessageId: string | null;
     loadingMessageId: string | null;
     pausedMessageId: string | null;
-    resetsRemaining: number | null; // null = unlimited (api tier)
     onAvatarClick?: (name: string) => void;
     // True on the first Game-Master message of the rendered day: that message
     // (game story on day 1, "Day N begins" later) carries the day scene image.
     showDayScene?: boolean;
 }
 
-function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcluding, game, onSpeak, speakingMessageId, loadingMessageId, pausedMessageId, resetsRemaining, onAvatarClick, showDayScene }: GameMessageItemProps) {
+function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcluding, game, onSpeak, speakingMessageId, loadingMessageId, pausedMessageId, onAvatarClick, showDayScene }: GameMessageItemProps) {
     const [showDeleteMenu, setShowDeleteMenu] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
 
@@ -365,9 +364,8 @@ function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcludin
                             <div className="relative" ref={menuRef}>
                                 <button
                                     onClick={() => setShowDeleteMenu(!showDeleteMenu)}
-                                    className={`p-1 rounded-[var(--radius-sm)] hover:bg-[var(--bg-3)] transition-colors duration-[120ms] ${showDeleteMenu ? 'bg-[var(--bg-3)]' : ''} ${resetsRemaining === 0 ? 'opacity-30 cursor-not-allowed' : ''}`}
-                                    title={resetsRemaining === 0 ? 'Reset limit reached for today' : 'Delete options'}
-                                    disabled={resetsRemaining === 0}
+                                    className={`p-1 rounded-[var(--radius-sm)] hover:bg-[var(--bg-3)] transition-colors duration-[120ms] ${showDeleteMenu ? 'bg-[var(--bg-3)]' : ''}`}
+                                    title="Delete options"
                                 >
                                     <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--fg-2)] hover:text-[var(--danger)]">
                                         <path d="M3.5 3.5l7 7M10.5 3.5l-7 7" />
@@ -375,13 +373,6 @@ function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcludin
                                 </button>
                                 {showDeleteMenu && (
                                     <div className="absolute right-0 top-full mt-1 w-56 bg-[var(--bg-1)] border border-[var(--line-2)] rounded-[var(--radius-lg)] shadow-pop z-50 flex flex-col overflow-hidden">
-                                        {resetsRemaining !== null && (
-                                            <div className="px-3 py-1.5 text-[11px] text-[var(--fg-2)] border-b border-[var(--line-1)]">
-                                                {resetsRemaining > 0
-                                                    ? `${resetsRemaining} reset${resetsRemaining === 1 ? '' : 's'} left today`
-                                                    : 'Reset limit reached for today'}
-                                            </div>
-                                        )}
                                         <button
                                             onClick={() => { onDeleteAfter(message.id!); setShowDeleteMenu(false); }}
                                             className="px-3 py-2 text-left text-[13px] hover:bg-[var(--bg-3)] text-[var(--danger)] flex items-center gap-2 transition-colors duration-[120ms]"
@@ -616,12 +607,6 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
         () => Array.from({ length: game.currentDay }, (_, idx) => game.currentDay - idx),
         [game.currentDay]
     );
-
-    const resetsRemaining = useMemo(() => {
-        if (game.createdWithTier !== 'free') return null; // unlimited for api tier
-        const used = game.chatResetCounts?.[game.currentDay] ?? 0;
-        return Math.max(0, FREE_TIER_LIMITS.CHAT_RESETS_PER_GAME_DAY - used);
-    }, [game.createdWithTier, game.chatResetCounts, game.currentDay]);
 
     const currentDayPublicMessageCount = useMemo(() => {
         return messages.filter(message =>
@@ -1472,7 +1457,9 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
             }
         } catch (error) {
             console.error('Error getting suggestion:', error);
-            alert('Failed to get suggestion. Please try again.');
+            const message = error instanceof Error ? error.message : '';
+            // The free-tier cap refusal is already player-worded; don't bury it.
+            alert(isFreeSpendLimitError(message) ? message : 'Failed to get suggestion. Please try again.');
         } finally {
             setIsGettingSuggestion(false);
         }
@@ -1969,7 +1956,6 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                                 speakingMessageId={speakingMessageId}
                                 loadingMessageId={loadingMessageId}
                                 pausedMessageId={pausedMessageId}
-                                resetsRemaining={resetsRemaining}
                                 onAvatarClick={onAvatarClick}
                                 showDayScene={index === firstGmIndex}
                             />
@@ -2010,8 +1996,71 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                     // banner says so and points at the profile page instead.
                     const insufficientBalance = isInsufficientBalanceError(game.errorState.error)
                         || isInsufficientBalanceError(game.errorState.details);
+                    // A free-tier spend cap is a pause, not a failure: nothing was sent to a
+                    // provider, and the same Retry resumes the game once the window resets
+                    // (or right away after adding funds). Checked first — its message also
+                    // arrives wrapped in other errors' prefixes.
+                    const freeSpendText = isFreeSpendLimitError(game.errorState.error)
+                        ? game.errorState.error
+                        : isFreeSpendLimitError(game.errorState.details) ? game.errorState.details : undefined;
+                    const freeSpendWindow = freeSpendLimitWindow(freeSpendText);
                     // Hidden during NIGHT for the same reason as the model name.
                     const provider = model ? getModelProviderName(model) : undefined;
+                    if (freeSpendWindow) {
+                        // The cap amount comes from config and is only known through the message.
+                        const capAmount = /free (\$[\d.]+) of AI/i.exec(freeSpendText ?? '')?.[1];
+                        // The windows are UTC-aligned; show the rollover in the viewer's clock.
+                        const now = new Date();
+                        const resetsAt = freeSpendWindow === 'day'
+                            ? new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1))
+                            : new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+                        const resetLabel = resetsAt.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+                        return (
+                            <div className="mx-2 my-2 p-3 rounded-[var(--radius-lg)] border bg-[var(--warn-soft)] border-[var(--warn-line)]">
+                                <div className="flex items-start gap-2">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 mt-0.5 text-[var(--warn-fg)]">
+                                        <circle cx="12" cy="12" r="10"/>
+                                        <polyline points="12 6 12 12 16 14"/>
+                                    </svg>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="text-[13px] font-medium text-[var(--fg-0)] break-words">
+                                            {freeSpendWindow === 'day' ? "Today's free AI allowance is used up" : "This month's free AI allowance is used up"}
+                                        </div>
+                                        <div className="text-[12px] mt-1 text-[var(--fg-1)] break-words">
+                                            The game is paused, not broken — the free tier includes a daily and a monthly amount of AI on the platform&apos;s keys, and {freeSpendWindow === 'day' ? "today's" : "this month's"}{capAmount ? ` ${capAmount}` : ''} is spent. Adding funds on your profile page lifts the cap immediately; otherwise come back after the reset and press Retry to pick up where the game left off.
+                                        </div>
+                                        <div className="text-[12px] mt-1 text-[var(--fg-2)] break-words">
+                                            Resets {resetLabel} (your local time){freeSpendWindow === 'day' ? ', midnight UTC' : ', the 1st at midnight UTC'}.
+                                        </div>
+                                    </div>
+                                    <div className="flex-shrink-0 flex flex-col gap-1.5">
+                                        <Link
+                                            href="/profile"
+                                            className="px-3 py-1.5 rounded-[var(--radius-md)] bg-[var(--accent)] text-[var(--accent-fg)] hover:brightness-110 text-[12px] font-medium transition-all duration-[120ms] flex items-center justify-center gap-1.5"
+                                            title="See your allowance or add funds on your profile page"
+                                        >
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <line x1="12" y1="5" x2="12" y2="19"/>
+                                                <line x1="5" y1="12" x2="19" y2="12"/>
+                                            </svg>
+                                            Add funds
+                                        </Link>
+                                        <button
+                                            onClick={handleDismissError}
+                                            className="px-3 py-1.5 rounded-[var(--radius-md)] bg-[var(--bg-2)] border border-[var(--line-2)] text-[var(--fg-1)] hover:bg-[var(--bg-3)] hover:text-[var(--fg-0)] text-[12px] font-medium transition-all duration-[120ms] flex items-center justify-center gap-1.5"
+                                            title="Retry after the reset or after adding funds"
+                                        >
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <polyline points="23 4 23 10 17 10"/>
+                                                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                                            </svg>
+                                            Retry
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    }
                     if (insufficientBalance) {
                         return (
                             <div className="mx-2 my-2 p-3 rounded-[var(--radius-lg)] border bg-[oklch(70%_0.13_25_/_0.08)] border-[oklch(70%_0.13_25_/_0.3)]">

@@ -5,8 +5,8 @@ import {defaultFraming, fitFraming, isFramingShape} from "@/app/utils/avatar-fra
 import {describeDividers, detectSheetGrid, equalSplitGrid} from "@/app/utils/sheet-detection";
 import {PRESET_SHEET_SIZE} from "@/app/utils/preset-avatars";
 import {getUserTierAndApiKeys} from "@/app/utils/tier-utils";
-import {updateUserMonthlySpending, deductBalance} from "@/app/api/user-actions";
-import {PAID_TIER_MARKUP} from "@/app/config/credit-packages";
+import {recordSpend} from "@/app/api/cost-tracking";
+import {isInsufficientBalanceError} from "@/app/api/errors";
 import {API_KEY_CONSTANTS, IMAGE_MODEL_CONSTANTS, IMAGE_MODEL_PRICING} from "@/app/ai/ai-models";
 import {logger} from "@/app/utils/logger";
 import {sanitizeArtStyle} from "@/app/utils/art-style";
@@ -423,16 +423,32 @@ export async function writeCandidates(
     return {variants, versions};
 }
 
-/** Paid tier pays cost + markup off the prepaid balance; free tier only records
- * the spend. Same shape as every other image call in the app. */
-export async function billImages(userEmail: string, tier: UserTier, costUSD: number): Promise<void> {
+/** Bills an image draw through the one chokepoint (recordSpend): the user's current
+ * tier is charged (paid: cost + markup off the balance), both spend ledgers move, and
+ * a `kind: 'image'` stats row is written. The game's own cost fields are updated by the
+ * caller alongside its avatar fields, so no gameUpdate here; `gameId` only attributes
+ * the stats row (drafts have none).
+ *
+ * A paid balance that cannot cover an already-drawn set is logged, not thrown: the
+ * images exist and the run must not read as failed because of the charge. */
+export async function billImages(userEmail: string, costUSD: number, context: {gameId?: string; imageCount?: number} = {}): Promise<void> {
     if (costUSD <= 0) return;
-    if (tier === USER_TIERS.PAID) {
-        const chargedAmount = parseFloat((costUSD * (1 + PAID_TIER_MARKUP)).toFixed(6));
-        await deductBalance(userEmail, chargedAmount);
-        await updateUserMonthlySpending(userEmail, chargedAmount, tier);
-    } else {
-        await updateUserMonthlySpending(userEmail, costUSD, tier);
+    try {
+        await recordSpend({
+            userEmail,
+            costUSD,
+            kind: 'image',
+            modelId: IMAGE_MODEL_CONSTANTS.AVATARS,
+            apiKeyName: API_KEY_CONSTANTS.GOOGLE,
+            gameId: context.gameId,
+            imageCount: context.imageCount,
+        });
+    } catch (error: any) {
+        if (isInsufficientBalanceError(error?.message)) {
+            logger.error(`Image spend not charged: balance too low for ${userEmail}`, {gameId: context.gameId, costUSD, error: error.message});
+            return;
+        }
+        throw error;
     }
 }
 
@@ -618,7 +634,7 @@ export async function runAvatarGeneration(gameId: string, userEmail: string): Pr
         });
         ledger.spentUSD = 0; // accounted for; the catch must not double-count it
 
-        await billImages(userEmail, tier, costUSD);
+        await billImages(userEmail, costUSD, {gameId});
 
         logger.info(`Avatars generated for game ${gameId}`, {gameId, portraits: Object.keys(variants).length, scenes: drawn.scenes.length, costUSD});
     } catch (error: any) {
@@ -649,7 +665,7 @@ export async function recordAbandonedSpend(
     const costUSD = parseFloat(spentUSD.toFixed(6));
     try {
         await parentRef.update(Object.fromEntries(costFields.map(f => [f, firestore.FieldValue.increment(costUSD)])));
-        await billImages(userEmail, tier, costUSD);
+        await billImages(userEmail, costUSD, {gameId: costFields.includes('totalGameCost') ? parentRef.id : undefined});
     } catch (billingError: any) {
         logger.error(`Failed to record abandoned image spend for ${logId}`, {id: logId, error: billingError.message, costUSD});
     }
@@ -723,7 +739,7 @@ export async function runAvatarRegeneration(gameId: string, userEmail: string, m
         });
         ledger.spentUSD = 0;
 
-        await billImages(userEmail, tier, costUSD);
+        await billImages(userEmail, costUSD, {gameId});
         logger.info(`Avatars regenerated for game ${gameId}`, {gameId, costUSD});
     } catch (error: any) {
         // A failed reroll leaves the existing portraits exactly as they were.

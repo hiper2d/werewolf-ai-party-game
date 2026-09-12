@@ -33,9 +33,24 @@ export interface User {
     email: string;
     tier: UserTier;
     spendings?: UserMonthlySpending[];
+    dailySpend?: UserDailySpend;
     voiceProvider?: VoiceProvider; // User's preferred TTS voice provider
     balance?: number; // USD balance for paid tier users
     stripeCustomerId?: string; // Stripe customer ID for paid tier users
+}
+
+/**
+ * Spend in the CURRENT UTC day, overwritten (not appended) when the day rolls, so the
+ * user doc stays O(1); history lives in `requestStats`. Shape is the ai-agents
+ * `SpendLedger` (`period` = YYYY-MM-DD, `buckets` keyed by tier) plus `limitHits`, the
+ * number of times the daily/monthly guard refused this user today — the only record
+ * that a user was turned away.
+ */
+export interface UserDailySpend {
+    period: string;
+    totalUSD: number;
+    buckets: Record<string, number>;
+    limitHits?: number;
 }
 
 export interface UserMonthlySpending {
@@ -327,7 +342,7 @@ export interface Game {
     // cleared when the new day begins; null/absent falls back to the static template.
     pendingDayOpening?: string | null;
     dayDiscussionSummaries?: DayDiscussionSummary[]; // GM-generated summaries of day discussions
-    chatResetCounts?: Record<number, number>; // game day number → reset count (free tier only)
+    chatResetCounts?: Record<number, number>; // game day number → reset count. Informational only since the dollar cap replaced the reset limit (2026-09).
     // Themed avatar generation lifecycle. Absent on games created before the
     // feature — those never generate and keep the initial-letter avatars.
     // 'pending' (set at creation) → 'generating' → 'ready' | 'failed'.
@@ -400,16 +415,27 @@ export const BOT_SELECTION_CONFIG = {
 } as const;
 
 /**
- * Rate limits for free-tier users
+ * Free-tier limits — the DEFAULTS. The live values come from the Firestore doc
+ * `config/limits` (see app/api/limits-actions.ts) so a cap can be changed during a
+ * traffic spike without a deploy; these apply when the doc or a field is missing.
+ *
+ * The spend caps apply to ALL free-tier AI spend on platform keys — bot and Game
+ * Master turns, previews, images, voice — with no exceptions: once a UTC day's (or
+ * month's) free spend reaches the cap, every further spending call is refused until
+ * the window resets. Paid tier is exempt; its prepaid balance is the limit.
  */
 export const FREE_TIER_LIMITS = {
-    CHAT_RESETS_PER_GAME_DAY: 5,
     GAMES_PER_CALENDAR_DAY: 5,
-    // Monthly platform-key spend cap (USD). Voice/STT on free tier runs on our
-    // platform keys with no per-call limit; once a calendar month's free-tier
-    // spend reaches this, further platform-key voice calls are refused.
-    MONTHLY_SPEND_USD: 5,
+    DAILY_SPEND_USD: 5,
+    MONTHLY_SPEND_USD: 20,
 } as const;
+
+/** Resolved free-tier limits (defaults overlaid with `config/limits`). */
+export interface FreeTierLimits {
+    gamesPerDay: number;
+    dailySpendUSD: number;
+    monthlySpendUSD: number;
+}
 
 export interface RoleConfig {
     name: string;

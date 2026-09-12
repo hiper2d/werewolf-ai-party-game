@@ -51,7 +51,30 @@ export function unwrapQuotedReply(text: string): string {
     return inner.trim();
 }
 
+/**
+ * Unwraps a reply the model double-wrapped: the schema asks for `{reply}` and some
+ * models (seen with GPT-6 Terra on the werewolf night prompt) put another JSON object
+ * with a single string field — `{"message": "…"}` — inside it. Only a bare object with
+ * exactly one non-empty string value is unwrapped; anything else is returned as is.
+ * Unlike the typography helpers this also runs where a reply is STORED, since a stray
+ * JSON wrapper is a malformed reply, not a style choice: leaving it in would feed JSON
+ * back into every bot's history and read it aloud in TTS.
+ */
+export function unwrapJsonReply(text: string): string {
+    const trimmed = text.trim();
+    if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) return text;
+    try {
+        const parsed = JSON.parse(trimmed);
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return text;
+        const values = Object.values(parsed);
+        if (values.length !== 1 || typeof values[0] !== 'string' || !values[0].trim()) return text;
+        return values[0].trim();
+    } catch {
+        return text;
+    }
+}
+
 /** Everything the chat and the cinematic bubble do to a reply before showing it. */
 export function formatReplyForDisplay(text: string): string {
-    return spaceEmDashes(unwrapQuotedReply(text));
+    return spaceEmDashes(unwrapQuotedReply(unwrapJsonReply(text)));
 }

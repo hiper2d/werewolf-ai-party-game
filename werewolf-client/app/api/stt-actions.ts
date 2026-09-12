@@ -2,12 +2,10 @@
 
 import { auth } from "@/auth";
 import { getUserTierAndApiKeys } from "@/app/utils/tier-utils";
-import { updateUserMonthlySpending, deductBalance, assertFreeTierSpendWithinLimit } from "@/app/api/user-actions";
-import { recordGameCost, getGameTier } from "@/app/api/cost-tracking";
-import { USER_TIERS } from "@/app/api/game-models";
-import { PAID_TIER_MARKUP } from "@/app/config/credit-packages";
+import { assertFreeSpendWithinLimit } from "@/app/api/user-actions";
+import { incrementGameCost, recordSpend } from "@/app/api/cost-tracking";
 import { getDefaultVoiceProvider, SUPPORTED_VOICE_PROVIDERS, VoiceProvider } from "@/app/ai/voice-config";
-import { createVoiceAgent, VOICE_PROVIDER_API_KEY } from "@hiper2d/ai-agents";
+import { createVoiceAgent, VOICE_MODEL_CONSTANTS, VOICE_PROVIDER_API_KEY } from "@hiper2d/ai-agents";
 
 export interface STTOptions {
   language?: string;
@@ -47,10 +45,8 @@ export async function transcribeAudio(
       throw new Error('Voice transcription is temporarily unavailable. Please try again later.');
     }
 
-    const gameTier = await getGameTier(options.gameId);
-    if (gameTier === USER_TIERS.FREE) {
-      await assertFreeTierSpendWithinLimit(session.user.email);
-    }
+    // Free-tier spend caps, on the user's CURRENT tier (paid users pass straight through).
+    await assertFreeSpendWithinLimit(session.user.email);
 
     const agent = createVoiceAgent(voiceProvider, apiKey);
     const { text, costUSD } = await agent.transcribe({
@@ -61,17 +57,18 @@ export async function transcribeAudio(
     });
 
     if (costUSD > 0) {
-      if (gameTier === USER_TIERS.PAID) {
-        const chargedAmount = parseFloat((costUSD * (1 + PAID_TIER_MARKUP)).toFixed(6));
-        const success = await deductBalance(session.user.email, chargedAmount);
-        if (!success) {
-          throw new Error('Insufficient balance. Please add funds on your profile page to continue playing.');
-        }
-      }
-      await updateUserMonthlySpending(session.user.email, costUSD, gameTier);
-      if (options.gameId) {
-        await recordGameCost(options.gameId, costUSD);
-      }
+      // One chokepoint: charges the current tier (paid: cost + markup, throwing on an
+      // insufficient balance), moves both spend ledgers, writes the stats row, and adds
+      // the cost to the game's total when the transcription belongs to a game.
+      await recordSpend({
+        userEmail: session.user.email,
+        costUSD,
+        kind: 'stt',
+        modelId: voiceProvider === 'google' ? VOICE_MODEL_CONSTANTS.GOOGLE_STT : VOICE_MODEL_CONSTANTS.OPENAI_STT,
+        apiKeyName: VOICE_PROVIDER_API_KEY[voiceProvider],
+        gameId: options.gameId,
+        gameUpdate: options.gameId ? incrementGameCost(costUSD) : undefined,
+      });
     }
 
     return text;

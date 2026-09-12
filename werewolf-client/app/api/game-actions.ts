@@ -39,8 +39,9 @@ import {deletePreviewProgress, isValidProgressId, previewProgressWriter, readPre
 import {getUserTierAndApiKeys} from "@/app/utils/tier-utils";
 import {sanitizePlayerName} from "@/app/utils/name-utils";
 import {sanitizeArtStyle} from "@/app/utils/art-style";
-import {getUserTier, getUserBalance, getVoiceProvider, updateVoiceProvider, updateUserMonthlySpending, deductBalance} from "@/app/api/user-actions";
-import {PAID_TIER_MARKUP} from "@/app/config/credit-packages";
+import {getUserTier, getUserBalance, getVoiceProvider, updateVoiceProvider, assertFreeSpendWithinLimit} from "@/app/api/user-actions";
+import {recordSpend} from "@/app/api/cost-tracking";
+import {getFreeTierLimits} from "@/app/api/limits-actions";
 import {getDefaultVoiceProvider, getVoiceConfig, isVoiceOfProvider, SUPPORTED_VOICE_PROVIDERS, VoiceProvider} from "@/app/ai/voice-config";
 import {normalizeSpendings} from "@/app/utils/spending-utils";
 import {serializeMessageForFirestore} from "@/app/api/message-serialization";
@@ -213,8 +214,10 @@ export async function previewGame(gamePreview: GamePreview, progressId?: string)
         }
     }
 
-    // Enforce daily game creation limit for free-tier users
+    // Free-tier caps: the games-per-day count (a cheap burst brake) and the daily /
+    // monthly spend caps (the real meter). Both refuse before anything is spent.
     if (tier === USER_TIERS.FREE) {
+        const limits = await getFreeTierLimits();
         const startOfTodayUTC = new Date();
         startOfTodayUTC.setUTCHours(0, 0, 0, 0);
         const todayTimestamp = startOfTodayUTC.getTime();
@@ -224,11 +227,12 @@ export async function previewGame(gamePreview: GamePreview, progressId?: string)
             .where('createdAt', '>=', todayTimestamp)
             .get();
 
-        if (todaysGamesSnapshot.size >= FREE_TIER_LIMITS.GAMES_PER_CALENDAR_DAY) {
+        if (todaysGamesSnapshot.size >= limits.gamesPerDay) {
             throw new Error(
-                `Free tier limit reached: you can create up to ${FREE_TIER_LIMITS.GAMES_PER_CALENDAR_DAY} games per day. Please try again tomorrow or add funds on your profile page.`
+                `Free tier limit reached: you can create up to ${limits.gamesPerDay} games per day. Please try again tomorrow or add funds on your profile page.`
             );
         }
+        await assertFreeSpendWithinLimit(session.user.email);
     }
 
     const usageCounts: Record<string, number> = {};
@@ -349,20 +353,16 @@ export async function previewGame(gamePreview: GamePreview, progressId?: string)
 
     logger.info(`Preview token usage: ${JSON.stringify(tokenUsage)}, tier: ${tier}`);
     if (tokenUsage) {
-        // For paid tier, deduct preview cost + markup from user balance
-        if (tier === USER_TIERS.PAID && tokenUsage.costUSD > 0) {
-            const chargedAmount = parseFloat((tokenUsage.costUSD * (1 + PAID_TIER_MARKUP)).toFixed(6));
-            logger.info(`Paid tier preview: deducting ${chargedAmount} from balance for user ${session.user.email}`);
-            const success = await deductBalance(session.user.email, chargedAmount);
-            if (!success) {
-                throw new Error('Insufficient balance. Please add funds on your profile page before starting a game.');
-            }
-            // Record the billed amount (cost + markup), not the raw model cost, so
-            // paid-tier spending history matches what was actually charged.
-            await updateUserMonthlySpending(session.user.email, chargedAmount, tier);
-        } else {
-            await updateUserMonthlySpending(session.user.email, tokenUsage.costUSD, tier);
-        }
+        // No game exists yet, so the preview's cost belongs to the user alone. recordSpend
+        // charges the current tier (paid: cost + markup off the balance, throwing on an
+        // insufficient balance) and writes the stats row the old ad-hoc path never did.
+        await recordSpend({
+            userEmail: session.user.email,
+            costUSD: tokenUsage.costUSD,
+            kind: 'preview',
+            modelId: resolvedGmAiType,
+            usage: tokenUsage,
+        });
     }
     const defaultPlayerCandidates = getCandidateModelsForTier(tier);
 
@@ -472,6 +472,11 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
     try {
         const { tier, apiKeys } = await getUserTierAndApiKeys(session.user.email);
         validateModelUsageForTier(tier, gamePreview.gameMasterAiType, gamePreview.bots.map(bot => bot.playerAiType));
+        // The preview was guarded too, but the avatar draw that follows creation is
+        // image spend of its own; refuse here rather than draw past the cap.
+        if (tier === USER_TIERS.FREE) {
+            await assertFreeSpendWithinLimit(session.user.email);
+        }
 
         const totalPlayers = gamePreview.playerCount;
         const werewolfCount = gamePreview.werewolfCount;

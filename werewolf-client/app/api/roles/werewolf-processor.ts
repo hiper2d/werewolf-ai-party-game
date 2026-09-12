@@ -26,6 +26,7 @@ import {BotAnswerZodSchema, WerewolfActionZod, WerewolfActionZodSchema} from "@/
 import { invalidTargetExplanation, repeatTargetExplanation, selfSelectionExplanation } from "@/app/api/retry-hint";
 import {recordBotTokenUsage} from "@/app/api/cost-tracking";
 import {getProviderSignatureFields} from "@/app/ai/ai-models";
+import {unwrapJsonReply} from "@/app/utils/text-format";
 
 /**
  * Werewolf role processor
@@ -310,7 +311,7 @@ export class WerewolfProcessor extends BaseRoleProcessor {
             // Add thinking content and signature to the response object
             const msgWithThinking = isLastWerewolf
                 ? { ...(werewolfResponse as WerewolfActionZod), thinking: thinking || "", ...getProviderSignatureFields(werewolfModel.aiType, thinkingSignature) }
-                : { ...(werewolfResponse as any), thinking: thinking || "", ...getProviderSignatureFields(werewolfModel.aiType, thinkingSignature) };
+                : { ...(werewolfResponse as any), reply: unwrapJsonReply((werewolfResponse as { reply: string }).reply), thinking: thinking || "", ...getProviderSignatureFields(werewolfModel.aiType, thinkingSignature) };
 
             const werewolfMessage: GameMessage = {
                 id: null,

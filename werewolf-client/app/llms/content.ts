@@ -27,7 +27,7 @@ const url = (path: string) => `${SITE_URL}${path}`;
 
 const SUMMARY =
     'Play the classic Werewolf (Mafia) social-deduction game against AI bots powered by frontier ' +
-    'language models from OpenAI, Anthropic, Google, DeepSeek, Mistral, xAI, Moonshot, Z.AI, Qwen, ' +
+    'language models from OpenAI, Anthropic, Google, Meta, DeepSeek, Mistral, xAI, Moonshot, Z.AI, Qwen, ' +
     'MiniMax, and Sakana. Every bot has a secret role, a backstory, and its own voice — and none of ' +
     'them know which other players are AI.';
 

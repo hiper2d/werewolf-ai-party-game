@@ -2,9 +2,13 @@
 
 import {db} from "@/firebase/server";
 import {firestore} from "firebase-admin";
-import {FREE_TIER_LIMITS, User, UserMonthlySpending, UserTier, USER_TIERS} from "@/app/api/game-models";
+import {FreeTierLimits, User, UserMonthlySpending, UserTier, USER_TIERS} from "@/app/api/game-models";
 import {VoiceProvider, getDefaultVoiceProvider} from "@/app/ai/voice-config";
-import {applySpending, formatPeriod, getFreeSpendForPeriod, normalizeSpendings} from "@/app/utils/spending-utils";
+import {applyDailySpend, applySpending, formatPeriod, freeSpendVerdicts, normalizeSpendings} from "@/app/utils/spending-utils";
+import {getFreeTierLimits} from "@/app/api/limits-actions";
+import {FreeSpendLimitError} from "@/app/api/errors";
+import {firstRefusal} from "@hiper2d/ai-agents";
+import type {BudgetVerdict} from "@hiper2d/ai-agents";
 import FieldValue = firestore.FieldValue;
 
 const ZERO_SPENDINGS: UserMonthlySpending[] = [];
@@ -50,6 +54,13 @@ export async function upsertUser(user: any): Promise<boolean> {
     }
 }
 
+/**
+ * NOT the way to bill a user. Every AI spend goes through `recordSpend`
+ * (app/api/cost-tracking.ts), which charges, updates both ledgers and writes the
+ * `requestStats` row in one transaction. This only bumps the user's ledgers and exists
+ * for admin corrections and backfills; it writes no stats row, so anything recorded
+ * through it is invisible to every cost report.
+ */
 export async function updateUserMonthlySpending(
     userId: string,
     amountUSD: number,
@@ -77,11 +88,12 @@ export async function updateUserMonthlySpending(
         const userSnap = await transaction.get(userRef);
         const currentData = userSnap.exists ? userSnap.data() : {};
         const updatedSpendings = applySpending(currentData?.spendings, period, normalizedAmount, tier);
+        const updatedDaily = applyDailySpend(currentData?.dailySpend, timestamp, normalizedAmount, tier);
 
         if (userSnap.exists) {
-            transaction.update(userRef, { spendings: updatedSpendings });
+            transaction.update(userRef, { spendings: updatedSpendings, dailySpend: updatedDaily });
         } else {
-            transaction.set(userRef, { spendings: updatedSpendings }, { merge: true });
+            transaction.set(userRef, { spendings: updatedSpendings, dailySpend: updatedDaily }, { merge: true });
         }
     });
 }
@@ -135,6 +147,7 @@ export async function getUser(userId: string): Promise<User> {
             email: userData?.email || userId,
             tier: userData?.tier === USER_TIERS.PAID ? USER_TIERS.PAID : USER_TIERS.FREE,
             spendings: normalizeSpendings(userData?.spendings),
+            ...(userData?.dailySpend ? { dailySpend: userData.dailySpend } : {}),
             voiceProvider: userData?.voiceProvider || getDefaultVoiceProvider(),
             balance: userData?.balance || 0,
             stripeCustomerId: userData?.stripeCustomerId
@@ -223,22 +236,69 @@ export async function addBalance(userId: string, amountUSD: number): Promise<voi
 }
 
 /**
- * Throws when the user's free-tier (platform-key) spend for the current month has
- * reached FREE_TIER_LIMITS.MONTHLY_SPEND_USD. Free/voice features run on our keys
- * with no per-call limit, so this caps unbounded platform-key spend per month.
+ * The free-tier spend guard. Refuses — by throwing FreeSpendLimitError — when the user's
+ * free-tier (platform-key) spend has reached the daily or the monthly cap from
+ * `config/limits` / FREE_TIER_LIMITS. Applies to EVERY spending path with no exceptions
+ * (bot and GM turns via the agent pre-ask hook in agent-factory.ts; previews, images and
+ * voice call it directly), so a running game stops at its next AI turn and resumes when
+ * the window resets. Paid tier is exempt: its prepaid balance is the limit.
+ *
+ * Gates on the user's CURRENT tier, not the game's creation tier. Runs before the AI
+ * call, so it can only see spend already committed; parallel calls that each pass can
+ * overrun the cap by the calls in flight — cents, not dollars — and that spend is still
+ * recorded (recordSpend never refuses money that was spent).
+ *
+ * A refusal bumps `dailySpend.limitHits`: the only record that a user was turned away.
  */
-export async function assertFreeTierSpendWithinLimit(userId: string, timestamp: number = Date.now()): Promise<void> {
+export async function assertFreeSpendWithinLimit(userId: string, timestamp: number = Date.now()): Promise<void> {
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+    const userRef = db.collection('users').doc(userId);
+    const userDoc = await userRef.get();
+    if (!userDoc.exists) {
+        return;
+    }
+    const userData = userDoc.data() || {};
+    if (userData.tier === USER_TIERS.PAID) {
+        return;
+    }
+    const limits = await getFreeTierLimits();
+    const refused = firstRefusal(freeSpendVerdicts(userData, limits, timestamp));
+    if (!refused) {
+        return;
+    }
+    // Count the refusal on today's ledger (rolling it to today first if it is stale).
+    // Best effort: a failed counter write must not turn a refusal into a different error.
+    const todayLedger = applyDailySpend(userData.dailySpend, timestamp, 0, USER_TIERS.FREE);
+    const counted = { ...todayLedger, limitHits: (todayLedger.limitHits ?? 0) + 1 };
+    try {
+        await userRef.set({ dailySpend: counted }, { merge: true });
+    } catch (error: any) {
+        console.error(`FREE_SPEND_LIMIT: could not record limit hit for ${userId}: ${error?.message ?? error}`);
+    }
+    // Expected behaviour, not an incident: warn with a fixed tag, never error.
+    console.warn(`FREE_SPEND_LIMIT: refused ${userId} — ${refused.window} cap $${refused.limitUSD} reached ($${refused.spentUSD} spent, hit #${counted.limitHits}, resets ${new Date(refused.resetsAt).toISOString()})`);
+    throw new FreeSpendLimitError(refused);
+}
+
+/**
+ * The free-tier budget picture for the profile page: both verdicts (day, month) plus
+ * the limits they were judged against. Paid users get the verdicts too (they are
+ * informational there); a missing user doc reads as nothing spent.
+ */
+export async function getFreeSpendStatus(userId: string, timestamp: number = Date.now()): Promise<{
+    limits: FreeTierLimits;
+    day: BudgetVerdict;
+    month: BudgetVerdict;
+}> {
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
     const userDoc = await db.collection('users').doc(userId).get();
-    if (!userDoc.exists) {
-        return;
-    }
-    const spent = getFreeSpendForPeriod(userDoc.data()?.spendings, formatPeriod(timestamp));
-    if (spent >= FREE_TIER_LIMITS.MONTHLY_SPEND_USD) {
-        throw new Error('Monthly free-tier voice limit reached. Add funds on your profile page to keep using voice features.');
-    }
+    const limits = await getFreeTierLimits();
+    const [day, month] = freeSpendVerdicts(userDoc.exists ? userDoc.data() : undefined, limits, timestamp);
+    return { limits, day, month };
 }
 
 export async function deductBalance(userId: string, amountUSD: number): Promise<boolean> {

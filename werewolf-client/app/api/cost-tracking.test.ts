@@ -1,11 +1,17 @@
 import {
     recordGameMasterTokenUsage,
     recordBotTokenUsage,
-    recordGameCost,
+    recordSpend,
+    incrementGameCost,
     getGameTier
 } from './cost-tracking';
 import { db } from "@/firebase/server";
 import { PAID_TIER_MARKUP } from "@/app/config/credit-packages";
+import { SupportedAiModels } from "@/app/ai/ai-models";
+
+jest.mock('@/app/utils/logger', () => ({
+    logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
+}));
 
 // Mock Firestore. Charging is now done INSIDE the same transaction as the game
 // cost commit (atomic), so there is no longer any delegation to user-actions to
@@ -389,31 +395,116 @@ describe('cost-tracking', () => {
         });
     });
 
-    describe('recordGameCost', () => {
-        it('adds a normalized positive amount to totalGameCost', async () => {
-            const { txn, gameRef } = setupTransaction({ totalGameCost: 0.1 });
+    describe('recordSpend (the one chokepoint for non-turn spend)', () => {
+        // 2026-09-11T15:00Z → day ledger period '2026-09-11', month '2026-09'.
+        const T = Date.UTC(2026, 8, 11, 15, 0, 0);
+        const [knownModelId, knownConfig] = Object.entries(SupportedAiModels)[0];
 
-            await recordGameCost(gameId, 0.2);
+        it('preview (no game): charges the user, moves both ledgers, writes a kind-tagged stats row', async () => {
+            const { txn, userRef, statRef } = setupTransaction(null, { tier: 'free', spendings: [] });
+
+            await recordSpend({
+                userEmail, costUSD: 0.5, kind: 'preview', modelId: knownModelId,
+                usage: { inputTokens: 100, outputTokens: 50 }
+            }, T);
+
+            const user = userWrite(txn, userRef);
+            expect(user.spendings).toEqual([{ period: '2026-09', amountUSD: 0.5, freeAmountUSD: 0.5, apiAmountUSD: 0, paidAmountUSD: 0 }]);
+            expect(user.dailySpend).toEqual({ period: '2026-09-11', totalUSD: 0.5, buckets: { free: 0.5 }, limitHits: 0 });
+            // No game to touch.
+            expect(txn.update.mock.calls.filter(c => c[0] !== userRef)).toHaveLength(0);
+            const stat = statWrite(txn, statRef);
+            expect(stat).toEqual(expect.objectContaining({
+                userId: userEmail, tier: 'free', kind: 'preview', modelId: knownModelId,
+                modelApiName: knownConfig.modelApiName, apiKeyName: knownConfig.apiKeyName,
+                inputTokens: 100, outputTokens: 50, totalTokens: 150, costUSD: 0.5, status: 'ok'
+            }));
+            expect(stat.actor).toBeUndefined();
+            expect(stat.gameId).toBeUndefined();
+        });
+
+        it('voice with a game: adds the cost to the game total in the same transaction', async () => {
+            const { txn, gameRef, statRef } = setupTransaction({ totalGameCost: 0.1 }, { tier: 'free' });
+
+            await recordSpend({
+                userEmail, costUSD: 0.2, kind: 'tts', gameId, modelId: 'gpt-4o-mini-tts', apiKeyName: 'OPENAI_API_KEY',
+                gameUpdate: incrementGameCost(0.2)
+            }, T);
 
             expect(txn.update).toHaveBeenCalledWith(gameRef, { totalGameCost: 0.3 });
+            expect(statWrite(txn, statRef)).toEqual(expect.objectContaining({
+                gameId, kind: 'tts', modelId: 'gpt-4o-mini-tts', modelApiName: 'gpt-4o-mini-tts', apiKeyName: 'OPENAI_API_KEY', costUSD: 0.2
+            }));
         });
 
-        it('ignores zero, negative and NaN amounts', async () => {
-            setupTransaction({ totalGameCost: 0.1 });
+        it('images: carries imageCount and the caller-supplied provider key name', async () => {
+            const { txn, statRef } = setupTransaction(null, { tier: 'free' });
 
-            await recordGameCost(gameId, 0);
-            await recordGameCost(gameId, -5);
-            await recordGameCost(gameId, NaN);
+            await recordSpend({ userEmail, costUSD: 0.08, kind: 'image', modelId: 'gemini-3.1-flash-image', apiKeyName: 'GOOGLE_API_KEY', gameId, imageCount: 1 }, T);
+
+            expect(statWrite(txn, statRef)).toEqual(expect.objectContaining({ kind: 'image', gameId, imageCount: 1, apiKeyName: 'GOOGLE_API_KEY', inputTokens: 0, outputTokens: 0 }));
+        });
+
+        it('rolls a stale daily ledger to today instead of adding to yesterday', async () => {
+            const { txn, userRef } = setupTransaction(null, {
+                tier: 'free',
+                dailySpend: { period: '2026-09-10', totalUSD: 4.99, buckets: { free: 4.99 }, limitHits: 3 }
+            });
+
+            await recordSpend({ userEmail, costUSD: 0.01, kind: 'preview', modelId: knownModelId }, T);
+
+            expect(userWrite(txn, userRef).dailySpend).toEqual({ period: '2026-09-11', totalUSD: 0.01, buckets: { free: 0.01 }, limitHits: 0 });
+        });
+
+        it('paid tier: charges cost + markup off the balance and records the charged amount in both ledgers', async () => {
+            const { txn, userRef } = setupTransaction(null, { tier: 'paid', balance: 10 });
+
+            await recordSpend({ userEmail, costUSD: 1, kind: 'preview', modelId: knownModelId }, T);
+
+            const user = userWrite(txn, userRef);
+            const charged = parseFloat((1 * (1 + PAID_TIER_MARKUP)).toFixed(6));
+            expect(user.balance).toBeCloseTo(10 - charged, 6);
+            expect(user.spendings[0].paidAmountUSD).toBeCloseTo(charged, 6);
+            expect(user.dailySpend.buckets.paid).toBeCloseTo(charged, 6);
+        });
+
+        it('paid tier with an insufficient balance: throws before any write', async () => {
+            const { txn } = setupTransaction(null, { tier: 'paid', balance: 0.01 });
+
+            await expect(recordSpend({ userEmail, costUSD: 1, kind: 'tts', modelId: 'gpt-4o-mini-tts' }, T))
+                .rejects.toThrow('Insufficient balance');
+            expect(txn.update).not.toHaveBeenCalled();
+            expect(txn.set).not.toHaveBeenCalled();
+        });
+
+        it('zero cost with nothing to attribute to a game: no transaction at all', async () => {
+            setupTransaction(null, { tier: 'free' });
+
+            await recordSpend({ userEmail, costUSD: 0, kind: 'preview', modelId: knownModelId }, T);
+            await recordSpend({ userEmail: undefined, costUSD: 0.5, kind: 'tts', modelId: 'whisper-1' }, T);
 
             expect(db!.runTransaction).not.toHaveBeenCalled();
         });
 
-        it('ignores missing gameId', async () => {
-            setupTransaction({ totalGameCost: 0.1 });
+        it('still commits the money when the stats row cannot name a model', async () => {
+            const { txn, userRef, statRef } = setupTransaction(null, { tier: 'free' });
 
-            await recordGameCost(undefined, 1);
+            await recordSpend({ userEmail, costUSD: 0.5, kind: 'preview' }, T);
 
-            expect(db!.runTransaction).not.toHaveBeenCalled();
+            expect(userWrite(txn, userRef).dailySpend.totalUSD).toBe(0.5);
+            expect(statWrite(txn, statRef)).toBeUndefined();
+        });
+
+        it('refuses a gameUpdate without a gameId', async () => {
+            await expect(recordSpend({ userEmail, costUSD: 0.5, kind: 'tts', gameUpdate: incrementGameCost(0.5) }, T))
+                .rejects.toThrow('gameUpdate requires a gameId');
+        });
+    });
+
+    describe('incrementGameCost', () => {
+        it('adds to totalGameCost and any extra running-total fields, rounding to 6dp', () => {
+            const update = incrementGameCost(0.2, ['totalImagesCost'])({ totalGameCost: 0.1, totalImagesCost: 0.05 } as any);
+            expect(update).toEqual({ totalGameCost: 0.3, totalImagesCost: 0.25 });
         });
     });
 

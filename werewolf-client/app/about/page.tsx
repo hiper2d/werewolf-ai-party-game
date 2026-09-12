@@ -9,7 +9,7 @@ export const metadata: Metadata = {
     alternates: { canonical: "/about" },
 };
 
-const PROVIDERS = ["OpenAI", "Anthropic", "Google", "DeepSeek", "Mistral", "xAI", "Moonshot", "Z.AI", "Qwen", "MiniMax", "Sakana"];
+const PROVIDERS = ["OpenAI", "Anthropic", "Google", "DeepSeek", "Mistral", "xAI", "Moonshot", "Z.AI", "Qwen", "MiniMax", "Meta", "Sakana"];
 
 function PlayersIcon() {
   return (

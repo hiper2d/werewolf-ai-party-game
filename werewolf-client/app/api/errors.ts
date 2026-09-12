@@ -1,3 +1,5 @@
+import type { BudgetVerdict } from '@hiper2d/ai-agents';
+
 export class TierMismatchError extends Error {
     code = 'TIER_MISMATCH' as const;
     readonly gameId: string;
@@ -59,4 +61,50 @@ export function isProviderBusyError(text: string | undefined | null): boolean {
         return false;
     }
     return /\b429\b|\b529\b|rate[\s_-]?limit|too many requests|at capacity|overloaded|resource[\s_-]?exhausted|quota/i.test(text);
+}
+
+/**
+ * Free-tier spend cap refusal (the $/day and $/month caps on platform-key spend, see
+ * FREE_TIER_LIMITS). Thrown by the pre-call guard before anything is sent to a
+ * provider, so nothing was spent and nothing is retryable until `verdict.resetsAt`.
+ * The message is what the player sees; `isFreeSpendLimitError` recognizes it after the
+ * string round trip through `game.errorState`, so keep the wording in
+ * `freeSpendLimitMessage` and the regex in sync.
+ */
+export class FreeSpendLimitError extends Error {
+    code = 'FREE_SPEND_LIMIT' as const;
+    readonly verdict: BudgetVerdict;
+
+    constructor(verdict: BudgetVerdict) {
+        super(freeSpendLimitMessage(verdict));
+        this.name = 'FreeSpendLimitError';
+        this.verdict = verdict;
+    }
+}
+
+/** "$5" for whole dollars, "$2.50" otherwise — the free-tier cap as it reads in copy. */
+export function formatLimitUSD(amount: number): string {
+    return `$${Number.isInteger(amount) ? String(amount) : amount.toFixed(2)}`;
+}
+
+export function freeSpendLimitMessage(verdict: Pick<BudgetVerdict, 'window' | 'limitUSD'>): string {
+    const limit = formatLimitUSD(verdict.limitUSD);
+    return verdict.window === 'day'
+        ? `You've used today's free ${limit} of AI. Come back after midnight UTC, or add funds on your profile page to keep playing now.`
+        : `You've used this month's free ${limit} of AI. It resets on the 1st, or add funds on your profile page to keep playing now.`;
+}
+
+export function isFreeSpendLimitError(text: string | undefined | null): boolean {
+    if (!text) {
+        return false;
+    }
+    return /(today's|this month's) free \$[\d.]+ of AI/i.test(text);
+}
+
+/** Which cap refused, for copy that differs by window; undefined when the text is not a cap refusal. */
+export function freeSpendLimitWindow(text: string | undefined | null): 'day' | 'month' | undefined {
+    if (!isFreeSpendLimitError(text)) {
+        return undefined;
+    }
+    return /today's free/i.test(text!) ? 'day' : 'month';
 }

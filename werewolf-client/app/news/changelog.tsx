@@ -13,6 +13,36 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        id: "meta-muse-spark-deepseek-v41", date: "Sep 2026", tags: ["Models"],
+        title: "Meta joins the table, and DeepSeek Flash moves to V4.1",
+        body: (<>A brand-new provider and a refreshed one. <strong>Meta&apos;s Muse Spark 1.3</strong>, served from
+            Meta&apos;s own Model API, is our twelfth provider and is available for bots and the Game Master. It
+            reasons on every turn like the rest of the catalog and keeps its private chain of thought across the
+            whole game, the way Grok does. At $1.25 / $4.25 per million tokens it lands in the
+            <strong>free tier</strong> with up to three seats per game; paid tier seats as many as you like. We use
+            the standard, private endpoint, not the discounted one that lets Meta train on your games.
+            <br/><br/>
+            The <strong>DeepSeek Flash</strong> seat now runs <strong>V4.1</strong>, and it got cheaper: off-peak it
+            bills $0.15 in / $0.60 out per million tokens, down from $0.22 / $0.66. Nothing to change on your side,
+            games already using Flash pick it up on their next turn. DeepSeek Pro&apos;s prices are unchanged, and
+            DeepSeek has confirmed Pro stays available past mid-September.</>),
+        media: null,
+        links: [{label: "Create a game", href: "/games"}, {label: "Models", href: "/models"}],
+    },
+    {
+        id: "free-tier-daily-cap", date: "Sep 2026", tags: ["Free tier"],
+        title: "A dollar cap instead of a game cap",
+        body: (<>The free tier now comes with <strong>$5 of AI a day</strong> and <strong>$20 a month</strong> on the
+            platform&apos;s keys, and everything counts against it — bot turns, the Game Master, previews, portraits,
+            illustrations and voices. When it&apos;s used up, a running game <strong>pauses</strong> with a clear
+            message rather than breaking: it picks up again after midnight UTC, or right away once you add funds.
+            The old limit on chat resets is gone. Five games a day stays, so does one portrait reroll per free
+            game, and the model bands haven&apos;t moved. Paid tier is unchanged: no caps, your balance is the
+            limit.</>),
+        media: null,
+        links: [{label: "See your allowance", href: "/profile"}],
+    },
+    {
         id: "gpt-6-astra", date: "Sep 2026", tags: ["Models"],
         title: "GPT-6 Astra joins the picker",
         body: (<>OpenAI&apos;s new flagship <strong>GPT-6 Astra</strong> is available for bots and the Game

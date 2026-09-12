@@ -3,7 +3,7 @@
 import {after} from "next/server";
 import {auth} from "@/auth";
 import {AvatarDraftSpec, AvatarDraftState, AvatarFraming, ReframeTarget, USER_TIERS} from "@/app/api/game-models";
-import {getUserBalance, getUserTier} from "@/app/api/user-actions";
+import {assertFreeSpendWithinLimit, getUserBalance, getUserTier} from "@/app/api/user-actions";
 import {getDraftState, normalizeDraftSpec, reframeDraftAvatarFor, runDraftGeneration, startDraftGeneration} from "@/app/utils/avatar-drafts";
 import {ReframeResult} from "@/app/utils/avatar-generation";
 import {logger} from "@/app/utils/logger";
@@ -34,6 +34,7 @@ export async function generateDraftIllustrations(spec: AvatarDraftSpec): Promise
     if (balance <= 0) {
         throw new Error('Insufficient balance. Please add funds on your profile page to draw illustrations.');
     }
+    await assertFreeSpendWithinLimit(userEmail);
 
     const {subject, keys} = normalizeDraftSpec(spec);
     const claim = await startDraftGeneration(userEmail, subject, keys);

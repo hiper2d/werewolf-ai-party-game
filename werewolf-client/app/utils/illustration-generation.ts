@@ -13,10 +13,10 @@ import {
 } from "@/app/api/game-models";
 import {addMessageToChatAndSaveToDb} from "@/app/api/game-actions";
 import {getUserTierAndApiKeys} from "@/app/utils/tier-utils";
-import {updateUserMonthlySpending, deductBalance} from "@/app/api/user-actions";
-import {PAID_TIER_MARKUP} from "@/app/config/credit-packages";
+import {assertFreeSpendWithinLimit} from "@/app/api/user-actions";
+import {isFreeSpendLimitError} from "@/app/api/errors";
 import {API_KEY_CONSTANTS, IMAGE_MODEL_CONSTANTS, IMAGE_MODEL_PRICING} from "@/app/ai/ai-models";
-import {generateImage} from "@/app/utils/avatar-generation";
+import {billImages, generateImage} from "@/app/utils/avatar-generation";
 import {logger} from "@/app/utils/logger";
 import {sanitizeArtStyle} from "@/app/utils/art-style";
 
@@ -128,9 +128,21 @@ async function generateAndPostIllustration(
     if (!gameSnap.exists) return;
     const game = {...(gameSnap.data() as Game), id: gameSnap.id};
 
-    const {tier, apiKeys} = await getUserTierAndApiKeys(userEmail);
+    const {apiKeys} = await getUserTierAndApiKeys(userEmail);
     const apiKey = apiKeys[API_KEY_CONSTANTS.GOOGLE];
     if (!apiKey) throw new Error('No Google API key available for illustration generation');
+
+    // The free-tier spend caps apply here like everywhere else. An illustration is
+    // decoration, so a refusal is a quiet skip (warn log), never a game error.
+    try {
+        await assertFreeSpendWithinLimit(userEmail);
+    } catch (error: any) {
+        if (isFreeSpendLimitError(error?.message)) {
+            logger.warn(`FREE_SPEND_LIMIT: illustration skipped for game ${gameId}`, {gameId, key, userEmail});
+            return;
+        }
+        throw error;
+    }
 
     // Concrete scene description from the brief writer; the raw source text
     // excerpt is the fallback.
@@ -193,13 +205,9 @@ async function generateAndPostIllustration(
     };
     await addMessageToChatAndSaveToDb(message, gameId);
 
-    if (tier === USER_TIERS.PAID && costUSD > 0) {
-        const chargedAmount = parseFloat((costUSD * (1 + PAID_TIER_MARKUP)).toFixed(6));
-        await deductBalance(userEmail, chargedAmount);
-        await updateUserMonthlySpending(userEmail, chargedAmount, tier);
-    } else if (costUSD > 0) {
-        await updateUserMonthlySpending(userEmail, costUSD, tier);
-    }
+    // The game's cost fields were bumped in the batch above; this charges the user and
+    // writes the stats row (kind: image) in one transaction.
+    await billImages(userEmail, costUSD, {gameId, imageCount: 1});
 
     logger.info(`Illustration generated for game ${gameId}`, {gameId, key, postDay, costUSD});
 }

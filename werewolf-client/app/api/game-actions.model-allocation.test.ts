@@ -60,6 +60,13 @@ jest.mock('@/app/api/user-actions', () => ({
     getVoiceProvider: jest.fn(),
     updateUserMonthlySpending: jest.fn(),
     deductBalance: jest.fn(),
+    assertFreeSpendWithinLimit: jest.fn(),
+}));
+jest.mock('@/app/api/cost-tracking', () => ({
+    recordSpend: jest.fn(),
+}));
+jest.mock('@/app/api/limits-actions', () => ({
+    getFreeTierLimits: jest.fn(async () => ({ gamesPerDay: 5, dailySpendUSD: 5, monthlySpendUSD: 20 })),
 }));
 
 jest.mock('@/app/ai/agent-factory', () => ({
