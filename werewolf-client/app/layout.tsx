@@ -6,6 +6,7 @@ import React from "react";
 import AuthProvider from "@/components/auth-provider";
 import { ThemeProvider } from "@/app/providers/ThemeProvider";
 import { LoginDialogProvider } from "@/app/providers/LoginDialogProvider";
+import DeviceProvider from "@/app/providers/DeviceProvider";
 import LoginDialog from "@/components/login-dialog";
 import WhatsNewPopup from "@/app/news/WhatsNewPopup";
 import { DISCORD_URL, SITE_URL } from "@/app/config/external-links";
@@ -119,6 +120,9 @@ export default function RootLayout(
           <body suppressHydrationWarning className="font-inter m-0 p-0 min-h-full">
             <ThemeProvider>
               <AuthProvider>
+                {/* Renders nothing; keeps this browser's device id in sync. Inside
+                    AuthProvider because it links the signed-in email to the device. */}
+                <DeviceProvider />
                 <LoginDialogProvider>
                   <div className="flex flex-col h-[100dvh]">
                     <NavBar />

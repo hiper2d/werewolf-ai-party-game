@@ -1467,6 +1467,9 @@ function GamePageContent({
                     gameId={game.id}
                     game={game}
                     onAvatarClick={setCharacterCardFor}
+                    isOwner={isOwner}
+                    onGameChange={patch => setGame(prev => ({ ...prev, ...patch }))}
+                    onUpdateVoice={updateCharacterVoice}
                     runGameAction={runGameAction}
                     onGameStateChange={applyActionResult}
                     pendingMessages={pendingMessages}

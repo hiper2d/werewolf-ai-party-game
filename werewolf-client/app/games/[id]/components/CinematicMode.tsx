@@ -11,6 +11,7 @@ import { convertMessageContent } from '@/app/utils/message-utils';
 import { formatReplyForDisplay } from '@/app/utils/text-format';
 import PlayerAvatar from '@/app/components/PlayerAvatar';
 import CharacterPoster from './CharacterPoster';
+import CharacterVoicePanel, { VoiceSelection } from './CharacterVoicePanel';
 
 /**
  * Cinematic Speaker Mode — plays the day's discussion back one speaker at a
@@ -116,9 +117,17 @@ interface CinematicModeProps {
     pendingHumanAction?: 'vote' | 'night' | null;
     speakingMessageId?: string | null;
     loadingMessageId?: string | null;
+    // The speaker's voice line under the portrait, editable by the owner — the
+    // same panel as the character card, injected the same way so this stays a
+    // presentational component (see CharacterCard's onUpdateVoice).
+    isOwner?: boolean;
+    onGameChange?: (patch: Partial<Game>) => void;
+    onUpdateVoice?: (gameId: string, name: string, selection: VoiceSelection) => Promise<Game>;
+    onSpeakSample?: (text: string, selection: VoiceSelection) => Promise<void>;
+    onStopSample?: () => void;
 }
 
-export default function CinematicMode({ game, messages, onClose, startMessageId, onSpeak, voiceMuted, pendingHumanAction, speakingMessageId, loadingMessageId }: CinematicModeProps) {
+export default function CinematicMode({ game, messages, onClose, startMessageId, onSpeak, voiceMuted, pendingHumanAction, speakingMessageId, loadingMessageId, isOwner = false, onGameChange, onUpdateVoice, onSpeakSample, onStopSample }: CinematicModeProps) {
     // Every line carries the same picture it carries in chat: the day's opening
     // GM message its establishing shot, each "night falls" the night scene, and
     // a GM illustration the drawing it was posted with. An illustration is an
@@ -295,12 +304,28 @@ export default function CinematicMode({ game, messages, onClose, startMessageId,
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
             if (e.key === 'Escape') { onClose(); return; }
+            // Typing in the voice panel (style field, voice picker) must not page the scene.
+            const target = e.target as HTMLElement | null;
+            if (target?.closest?.('input, textarea, select, [contenteditable="true"]')) return;
             if (e.key === ' ' || e.key === 'ArrowRight') { e.preventDefault(); next(); }
             if (e.key === 'ArrowLeft') { e.preventDefault(); prev(); }
         };
         document.addEventListener('keydown', onKey);
         return () => document.removeEventListener('keydown', onKey);
     }, [next, prev, onClose]);
+
+    // Persists a voice change and patches the game so the poster, the chat and
+    // the next auto-read line all pick it up — mirrors CharacterCard.saveVoice.
+    const saveVoice = isOwner && onUpdateVoice
+        ? async (selection: VoiceSelection) => {
+            const updated = await onUpdateVoice(game.id, turn!.speaker, selection);
+            onGameChange?.({
+                bots: updated.bots,
+                gameMasterVoice: updated.gameMasterVoice,
+                gameMasterVoiceStyle: updated.gameMasterVoiceStyle,
+            });
+        }
+        : undefined;
 
     if (!turn) return null;
 
@@ -425,6 +450,17 @@ export default function CinematicMode({ game, messages, onClose, startMessageId,
                             cornerChip={<span className="px-[9px] py-[4px]">{turnIndex + 1} / {turns.length}</span>}
                             className="cine-card-swap"
                         />
+                        {/* Humans have no voice; anyone else shows theirs, the owner may change it. */}
+                        {turn.speaker !== game.humanPlayerName && (
+                            <CharacterVoicePanel
+                                key={`${turn.key}-voice`}
+                                game={game}
+                                name={turn.speaker}
+                                onSave={saveVoice}
+                                onSpeakSample={saveVoice ? onSpeakSample : undefined}
+                                onStopSample={onStopSample}
+                            />
+                        )}
                     </div>
 
                     {/* Speech bubble + controls */}

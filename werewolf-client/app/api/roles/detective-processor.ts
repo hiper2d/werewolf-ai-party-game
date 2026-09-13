@@ -36,13 +36,37 @@ export class DetectiveProcessor extends BaseRoleProcessor {
      * to detective results — the detective can't be 100% sure an "evil"
      * result means werewolf.
      */
+    /** Living holders of the detective role: bots plus the human when they hold it. */
+    private aliveDetectiveNames(): string[] {
+        const names = this.game.bots
+            .filter((bot: any) => bot.isAlive && bot.role === GAME_ROLES.DETECTIVE)
+            .map((bot: any) => bot.name);
+        if (this.game.humanPlayerRole === GAME_ROLES.DETECTIVE && (this.game.humanPlayerIsAlive ?? true)) {
+            names.push(this.game.humanPlayerName);
+        }
+        return names;
+    }
+
     private readsAsEvil(role: string): boolean {
         return role === GAME_ROLES.WEREWOLF || role === GAME_ROLES.MANIAC;
     }
 
     computeIntermediateNightState(nightResults: Record<string, any>, state: NightState): NightState {
-        // No detective action was recorded (detective didn't act or was abducted/dead — handled in processNightAction)
-        if (!nightResults.detective) return state;
+        // No detective action was recorded: the detective didn't act, is dead, or was abducted.
+        // An abducted detective's turn is skipped in processNightAction without an AI call, and
+        // the night-end recomputes state from nightResults alone, so the block has to be derived
+        // here — the night story must still give the detective a beat ("cut short, found nothing").
+        if (!nightResults.detective) {
+            if (state.abductedPlayer && this.aliveDetectiveNames().includes(state.abductedPlayer)) {
+                this.logNightAction(`Detective ${state.abductedPlayer} was abducted by Maniac — investigation blocked`);
+                state.actionsPrevented.push({
+                    role: GAME_ROLES.DETECTIVE,
+                    reason: 'abduction',
+                    player: null
+                });
+            }
+            return state;
+        }
 
         const detectiveTarget = nightResults.detective.target;
         const actionType = nightResults.detective.actionType || 'investigate';

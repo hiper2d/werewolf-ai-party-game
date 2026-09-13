@@ -3,6 +3,7 @@ import {Game, TokenUsage, UserTier, USER_TIERS} from "@/app/api/game-models";
 import {SupportedAiModels, resolveModelId} from "@/app/ai/ai-models";
 import {PAID_TIER_MARKUP} from "@/app/config/credit-packages";
 import {applyDailySpend, applySpending, formatPeriod} from "@/app/utils/spending-utils";
+import {deviceSpendRef, globalSpendRef} from "@/app/api/spend-ledgers";
 import {logger} from "@/app/utils/logger";
 
 type TokenUsageInput = Partial<TokenUsage> | null | undefined;
@@ -198,6 +199,20 @@ export async function recordSpend(input: RecordSpendInput, timestamp: number = D
 
         const userSnap = shouldCharge ? await transaction.get(userRef!) : null;
 
+        // The two shared free-tier ledgers (see spend-ledgers.ts). Read here because
+        // Firestore requires every read before the first write in a transaction; only
+        // free-tier spend touches them, so paid charges skip both entirely.
+        const chargesFreeTier = shouldCharge
+            && (userSnap ? userSnap.data()?.tier : undefined) !== USER_TIERS.PAID;
+        const globalRef = chargesFreeTier ? globalSpendRef() : null;
+        const globalSnap = globalRef ? await transaction.get(globalRef) : null;
+        // Metered on the device the charged user was last seen from. Absent for a browser
+        // that keeps neither a cookie nor localStorage, which simply means no device
+        // ledger for this spend rather than a refusal.
+        const deviceId = chargesFreeTier ? userSnap?.data()?.lastDeviceId : undefined;
+        const deviceRef = deviceId ? deviceSpendRef(deviceId) : null;
+        const deviceSnap = deviceRef ? await transaction.get(deviceRef) : null;
+
         // The tier that actually billed: the user's current tier when charging, the game's
         // creation tier otherwise (zero-cost calls, platform-key games with no user email).
         // Coerced, not cast: a stray legacy tier string (e.g. the retired 'api') must bill
@@ -232,6 +247,21 @@ export async function recordSpend(input: RecordSpendInput, timestamp: number = D
             } else {
                 transaction.set(userRef!, userUpdate, { merge: true });
             }
+        }
+
+        // ---- commit the shared free-tier ledgers ----
+        // Same transaction as the user charge, so the platform counter can never drift
+        // from the sum of what users were actually charged. Both use the user ledger's
+        // own reducer, so the UTC-day rollover behaves identically in all three places.
+        if (globalRef && billedTier === USER_TIERS.FREE && costUSD > 0) {
+            transaction.set(globalRef, {
+                dailySpend: applyDailySpend(globalSnap?.data()?.dailySpend, timestamp, costUSD, USER_TIERS.FREE)
+            }, { merge: true });
+        }
+        if (deviceRef && billedTier === USER_TIERS.FREE && costUSD > 0) {
+            transaction.set(deviceRef, {
+                dailySpend: applyDailySpend(deviceSnap?.data()?.dailySpend, timestamp, costUSD, USER_TIERS.FREE)
+            }, { merge: true });
         }
 
         // ---- commit the game cost ----

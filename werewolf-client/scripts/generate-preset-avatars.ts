@@ -14,7 +14,7 @@
  * Re-running overwrites public/presets/. Curate by eye afterwards; rerun until happy.
  */
 
-import { generateImage } from '../app/utils/avatar-generation';
+import {generateImage} from '@hiper2d/ai-agents/images';
 import { mkdirSync, writeFileSync } from 'fs';
 import path from 'path';
 

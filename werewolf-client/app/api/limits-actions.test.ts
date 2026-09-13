@@ -15,7 +15,7 @@ describe('limitsFromConfig', () => {
     it('overlays present fields on the defaults', () => {
         expect(limitsFromConfig({ freeDailySpendUSD: 2 })).toEqual({ ...DEFAULT_FREE_TIER_LIMITS, dailySpendUSD: 2 });
         expect(limitsFromConfig({ freeDailySpendUSD: 0, freeMonthlySpendUSD: 50, freeGamesPerDay: 3 }))
-            .toEqual({ dailySpendUSD: 0, monthlySpendUSD: 50, gamesPerDay: 3 });
+            .toEqual({ ...DEFAULT_FREE_TIER_LIMITS, dailySpendUSD: 0, monthlySpendUSD: 50, gamesPerDay: 3 });
     });
 
     it('falls back per field on garbage', () => {

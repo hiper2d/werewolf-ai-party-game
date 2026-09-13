@@ -1,4 +1,4 @@
-import { isInsufficientBalanceError, isProviderBudgetDepletedError, isProviderBusyError, FreeSpendLimitError, freeSpendLimitMessage, freeSpendLimitWindow, isFreeSpendLimitError } from './errors';
+import { isInsufficientBalanceError, isProviderBudgetDepletedError, isProviderBusyError, FreeSpendLimitError, freeSpendLimitMessage, freeSpendLimitScope, freeSpendLimitWindow, isFreeSpendLimitError } from './errors';
 
 describe('isProviderBudgetDepletedError', () => {
     const depletedSamples = [
@@ -109,5 +109,73 @@ describe('free spend limit errors', () => {
         expect(isFreeSpendLimitError('429 You have no credits remaining')).toBe(false);
         expect(isFreeSpendLimitError('')).toBe(false);
         expect(freeSpendLimitWindow(undefined)).toBeUndefined();
+    });
+});
+
+describe('scoped spend limit refusals', () => {
+    const day = { window: 'day' as const, limitUSD: 5 };
+    const month = { window: 'month' as const, limitUSD: 20 };
+    const global = { window: 'day' as const, limitUSD: 40 };
+
+    it('shows the device ceilings as an ordinary daily limit, leaking no axis', () => {
+        // THE POINT: copy that named the browser would tell a farmer which axis to change
+        // ("use a different browser"). Both device ceilings must be indistinguishable from
+        // the player's own daily cap. If someone reworded them, this fails.
+        const accountDay = freeSpendLimitMessage(day, 'account');
+        expect(freeSpendLimitMessage(day, 'device')).toBe(accountDay);
+        expect(freeSpendLimitMessage(day, 'device-shared')).toBe(accountDay);
+        for (const scope of ['account', 'device', 'device-shared'] as const) {
+            expect(freeSpendLimitMessage(day, scope)).not.toMatch(/browser|device|another account|incognito/i);
+        }
+    });
+
+    it('the player-visible scope is only account or global', () => {
+        expect(freeSpendLimitScope(freeSpendLimitMessage(day, 'account'))).toBe('account');
+        expect(freeSpendLimitScope(freeSpendLimitMessage(month, 'account'))).toBe('account');
+        expect(freeSpendLimitScope(freeSpendLimitMessage(day, 'device'))).toBe('account');
+        expect(freeSpendLimitScope(freeSpendLimitMessage(day, 'device-shared'))).toBe('account');
+        expect(freeSpendLimitScope(freeSpendLimitMessage(global, 'global'))).toBe('global');
+    });
+
+    it('the server still knows which ceiling refused, even though the player does not', () => {
+        // The distinction moved to the log, it was not deleted: ops needs it to tell a
+        // farm from an ordinary cap hit.
+        expect(new FreeSpendLimitError(day as any, 'device-shared').scope).toBe('device-shared');
+        expect(new FreeSpendLimitError(day as any, 'device').scope).toBe('device');
+    });
+
+    it('every scope is still recognised as a spend-limit refusal', () => {
+        for (const scope of ['account', 'device', 'device-shared', 'global'] as const) {
+            expect(isFreeSpendLimitError(freeSpendLimitMessage(day, scope))).toBe(true);
+        }
+    });
+
+    it('survives being wrapped in another error prefix', () => {
+        const wrapped = `Failed to generate speech: ${freeSpendLimitMessage(global, 'global')}`;
+        expect(isFreeSpendLimitError(wrapped)).toBe(true);
+        expect(freeSpendLimitScope(wrapped)).toBe('global');
+        expect(freeSpendLimitWindow(wrapped)).toBe('day');
+    });
+
+    it('the global refusal never quotes the platform budget to the player', () => {
+        const msg = freeSpendLimitMessage(global, 'global');
+        expect(msg).not.toContain('$40');
+        expect(msg).toMatch(/paused for today/i);
+    });
+
+    it('no refusal ever accuses the player of anything', () => {
+        for (const scope of ['account', 'device', 'device-shared', 'global'] as const) {
+            expect(freeSpendLimitMessage(day, scope)).not.toMatch(/abuse|cheat|bypass|violat|fraud/i);
+        }
+    });
+
+    it('a non-refusal has no scope', () => {
+        expect(freeSpendLimitScope('Insufficient balance.')).toBeUndefined();
+        expect(freeSpendLimitScope(undefined)).toBeUndefined();
+    });
+
+    it('carries the scope on the thrown error', () => {
+        expect(new FreeSpendLimitError(global as any, 'global').scope).toBe('global');
+        expect(new FreeSpendLimitError(day as any).scope).toBe('account');
     });
 });

@@ -7,6 +7,7 @@
  * deprecated-id migration for persisted game docs, and the audio/image pipeline models.
  */
 
+import {IMAGE_MODEL_CONSTANTS as LIB_IMAGE_MODELS, IMAGE_MODEL_PRICING as LIB_IMAGE_PRICING} from "@hiper2d/ai-agents/images";
 import {
     LLM_CONSTANTS as LIB_LLM_CONSTANTS,
     ModelConfig as LibModelConfig,
@@ -73,7 +74,7 @@ export interface ModelConfig extends LibModelConfig {
 // a concrete scene description for the image model. See
 // app/utils/avatar-generation.ts and app/utils/illustration-generation.ts.
 export const IMAGE_MODEL_CONSTANTS = {
-    AVATARS: 'gemini-3.1-flash-image',
+    AVATARS: LIB_IMAGE_MODELS.GEMINI_FLASH_IMAGE,
     ILLUSTRATION_BRIEF: 'gemini-3.5-flash-lite',
 } as const;
 
@@ -99,14 +100,10 @@ export function configureStoryAgent(agent: AbstractAgent): void {
     agent.maxOutputTokens = STORY_MAX_OUTPUT_TOKENS;
 }
 
-// Prices per 1M tokens, from ai.google.dev/gemini-api/docs/pricing (2026-08).
-// Image output bills ~1120 tokens per image regardless of resolution, so one
-// image ≈ $0.067 — fewer calls, not lower resolution, is what minimizes cost.
+// The image model's price is a library fact (see its image-catalog); the brief model is
+// a text model priced here because it is not in the LLM catalog.
 export const IMAGE_MODEL_PRICING = {
-    [IMAGE_MODEL_CONSTANTS.AVATARS]: {
-        imageOutputPricePerM: 60,
-        textInputPricePerM: 0.5,
-    },
+    [IMAGE_MODEL_CONSTANTS.AVATARS]: LIB_IMAGE_PRICING[LIB_IMAGE_MODELS.GEMINI_FLASH_IMAGE],
     [IMAGE_MODEL_CONSTANTS.ILLUSTRATION_BRIEF]: {
         inputPricePerM: 0.30,
         outputPricePerM: 2.50,

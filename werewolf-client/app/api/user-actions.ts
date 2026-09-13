@@ -4,9 +4,14 @@ import {db} from "@/firebase/server";
 import {firestore} from "firebase-admin";
 import {FreeTierLimits, User, UserMonthlySpending, UserTier, USER_TIERS} from "@/app/api/game-models";
 import {VoiceProvider, getDefaultVoiceProvider} from "@/app/ai/voice-config";
-import {applyDailySpend, applySpending, formatPeriod, freeSpendVerdicts, normalizeSpendings} from "@/app/utils/spending-utils";
+import {
+    applyDailySpend, applySpending, deviceSpendVerdict, formatPeriod, freeSpendVerdicts,
+    globalSpendVerdict, normalizeSpendings
+} from "@/app/utils/spending-utils";
 import {getFreeTierLimits} from "@/app/api/limits-actions";
 import {FreeSpendLimitError} from "@/app/api/errors";
+import type {SpendLimitScope} from "@/app/api/errors";
+import {readDeviceRecord, readGlobalDailySpend} from "@/app/api/spend-ledgers";
 import {firstRefusal} from "@hiper2d/ai-agents";
 import type {BudgetVerdict} from "@hiper2d/ai-agents";
 import FieldValue = firestore.FieldValue;
@@ -264,7 +269,39 @@ export async function assertFreeSpendWithinLimit(userId: string, timestamp: numb
         return;
     }
     const limits = await getFreeTierLimits();
-    const refused = firstRefusal(freeSpendVerdicts(userData, limits, timestamp));
+
+    // Three ceilings, cheapest read first. The per-account verdicts come free with the
+    // user doc we already have; the global and device ledgers each cost one more read, so
+    // they are only fetched while the account itself is still inside its own caps.
+    let scope: SpendLimitScope = 'account';
+    let refused = firstRefusal(freeSpendVerdicts(userData, limits, timestamp));
+
+    if (!refused) {
+        const verdict = globalSpendVerdict(await readGlobalDailySpend(), limits, timestamp);
+        if (verdict && !verdict.allowed) {
+            refused = verdict;
+            scope = 'global';
+        }
+    }
+
+    if (!refused) {
+        // Metered on the device the user was last seen from, stamped by registerDevice.
+        // Absent for a browser that blocks both cookies and localStorage, in which case
+        // the per-account and global caps stand alone rather than refusing a real user.
+        const deviceId = userData.lastDeviceId;
+        if (deviceId) {
+            const device = await readDeviceRecord(deviceId);
+            const verdict = deviceSpendVerdict(device.dailySpend, limits, timestamp);
+            if (verdict && !verdict.allowed) {
+                refused = verdict;
+                // More than one account on this browser means the budget was (at least
+                // partly) spent by a DIFFERENT account, which is the case worth explaining.
+                // One account is just this player's own daily cap under another name.
+                scope = device.userCount > 1 ? 'device-shared' : 'device';
+            }
+        }
+    }
+
     if (!refused) {
         return;
     }
@@ -278,8 +315,8 @@ export async function assertFreeSpendWithinLimit(userId: string, timestamp: numb
         console.error(`FREE_SPEND_LIMIT: could not record limit hit for ${userId}: ${error?.message ?? error}`);
     }
     // Expected behaviour, not an incident: warn with a fixed tag, never error.
-    console.warn(`FREE_SPEND_LIMIT: refused ${userId} — ${refused.window} cap $${refused.limitUSD} reached ($${refused.spentUSD} spent, hit #${counted.limitHits}, resets ${new Date(refused.resetsAt).toISOString()})`);
-    throw new FreeSpendLimitError(refused);
+    console.warn(`FREE_SPEND_LIMIT: refused ${userId} — ${scope} ${refused.window} cap $${refused.limitUSD} reached ($${refused.spentUSD} spent, hit #${counted.limitHits}, resets ${new Date(refused.resetsAt).toISOString()})`);
+    throw new FreeSpendLimitError(refused, scope);
 }
 
 /**

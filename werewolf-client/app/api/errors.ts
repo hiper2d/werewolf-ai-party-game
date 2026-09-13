@@ -74,21 +74,50 @@ export function isProviderBusyError(text: string | undefined | null): boolean {
 export class FreeSpendLimitError extends Error {
     code = 'FREE_SPEND_LIMIT' as const;
     readonly verdict: BudgetVerdict;
+    readonly scope: SpendLimitScope;
 
-    constructor(verdict: BudgetVerdict) {
-        super(freeSpendLimitMessage(verdict));
+    constructor(verdict: BudgetVerdict, scope: SpendLimitScope = 'account') {
+        super(freeSpendLimitMessage(verdict, scope));
         this.name = 'FreeSpendLimitError';
         this.verdict = verdict;
+        this.scope = scope;
     }
 }
+
+/**
+ * Which ceiling refused. All three are the same class of refusal to the caller (nothing
+ * was spent, retry after `resetsAt`), but the player-facing copy has to differ: telling
+ * someone who spent 40 cents that they "used today's free $40" would read as a bug.
+ */
+export type SpendLimitScope = 'account' | 'device' | 'device-shared' | 'global';
 
 /** "$5" for whole dollars, "$2.50" otherwise — the free-tier cap as it reads in copy. */
 export function formatLimitUSD(amount: number): string {
     return `$${Number.isInteger(amount) ? String(amount) : amount.toFixed(2)}`;
 }
 
-export function freeSpendLimitMessage(verdict: Pick<BudgetVerdict, 'window' | 'limitUSD'>): string {
+export function freeSpendLimitMessage(
+    verdict: Pick<BudgetVerdict, 'window' | 'limitUSD'>,
+    scope: SpendLimitScope = 'account'
+): string {
     const limit = formatLimitUSD(verdict.limitUSD);
+    if (scope === 'global') {
+        // Deliberately does not quote the platform budget or the player's own spend:
+        // this refusal is not about them, and naming the number invites probing it.
+        return `Free play is paused for today - the shared daily AI budget is used up. It resets at midnight UTC, or add funds on your profile page to keep playing now.`;
+    }
+    // 'device' and 'device-shared' deliberately fall through to the ACCOUNT day wording.
+    //
+    // Naming the browser would hand a farmer the bypass: "this browser has used..." tells
+    // them precisely which axis to change, turning "why am I blocked" into "open
+    // incognito" with no experiment needed. The honest version was written first and
+    // rejected on 2026-09-13 - it was protecting a hypothetical shared-computer user
+    // against a confirmed farmer, and every multi-account device on record so far is the
+    // latter. Revisit if the data ever shows real shared machines.
+    //
+    // The distinction is NOT lost, it moves to the log: the thrown FreeSpendLimitError
+    // still carries `scope`, and assertFreeSpendWithinLimit warns with it, so ops can
+    // tell the three apart even though the player cannot.
     return verdict.window === 'day'
         ? `You've used today's free ${limit} of AI. Come back after midnight UTC, or add funds on your profile page to keep playing now.`
         : `You've used this month's free ${limit} of AI. It resets on the 1st, or add funds on your profile page to keep playing now.`;
@@ -98,7 +127,23 @@ export function isFreeSpendLimitError(text: string | undefined | null): boolean 
     if (!text) {
         return false;
     }
-    return /(today's|this month's) free \$[\d.]+ of AI/i.test(text);
+    return /(today's|this month's) free \$[\d.]+ of AI|free play is paused for today/i.test(text);
+}
+
+/**
+ * What the PLAYER should be shown, recovered from the message text. The error only
+ * reaches the UI as a string (it round-trips through `game.errorState`), so this is all
+ * the UI can know - keep it in sync with `freeSpendLimitMessage`.
+ *
+ * Only 'account' and 'global' are ever returned, by design: the device ceilings render as
+ * an ordinary daily limit so the copy never names the axis a farmer would change. The
+ * true scope is on the thrown error and in the server log, not here.
+ */
+export function freeSpendLimitScope(text: string | undefined | null): 'account' | 'global' | undefined {
+    if (!isFreeSpendLimitError(text)) {
+        return undefined;
+    }
+    return /free play is paused for today/i.test(text!) ? 'global' : 'account';
 }
 
 /** Which cap refused, for copy that differs by window; undefined when the text is not a cap refusal. */
@@ -106,5 +151,5 @@ export function freeSpendLimitWindow(text: string | undefined | null): 'day' | '
     if (!isFreeSpendLimitError(text)) {
         return undefined;
     }
-    return /today's free/i.test(text!) ? 'day' : 'month';
+    return /today's free|paused for today/i.test(text!) ? 'day' : 'month';
 }

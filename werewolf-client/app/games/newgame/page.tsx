@@ -2,6 +2,7 @@
 
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import { isFreeSpendLimitError, isProviderBudgetDepletedError } from '@/app/api/errors';
+import SpendLimitModal from '@/app/components/SpendLimitModal';
 import {useRouter} from 'next/navigation';
 import {useSession} from 'next-auth/react';
 import {createGame, getPreviewProgress, previewGame} from '@/app/api/game-actions';
@@ -123,6 +124,8 @@ export default function CreateNewGamePage() {
     // from the server while isLoading; null before the first poll lands.
     const [previewProgress, setPreviewProgress] = useState<PreviewProgress | null>(null);
     const [error, setError] = useState<string | null>(null);
+    // Spend-cap refusal popup. The inline banner below keeps the same text after dismissal.
+    const [spendLimitNotice, setSpendLimitNotice] = useState<string | null>(null);
     const [isSpeaking, setIsSpeaking] = useState(false);
     const [nameError, setNameError] = useState<string | null>(null);
     const [themeError, setThemeError] = useState<string | null>(null);
@@ -582,6 +585,10 @@ export default function CreateNewGamePage() {
                 // The free-tier spend cap refusal is already player-worded (and names the
                 // profile page); the generic "API" branches below must not overwrite it.
                 userFriendlyError = err.message;
+                // Announce it up front too: on this page the inline banner sits below the
+                // fold after a long form, and a player who just waited on a preview should
+                // not have to hunt for why nothing happened.
+                setSpendLimitNotice(err.message);
             } else if (err.message.includes('failed to produce a valid response')) {
                 userFriendlyError = `The Game Master model failed to produce a valid response — the output was malformed or cut off. This happens occasionally; generate the preview again, or pick a different Game Master model.`;
             } else if (err.message.includes('Failed to parse JSON response') || err.message.includes('JSON mode failed')) {
@@ -961,6 +968,10 @@ export default function CreateNewGamePage() {
             </div>
 
             {isPreviewing && <GeneratingStatus progress={previewProgress} />}
+
+            {spendLimitNotice && (
+                <SpendLimitModal message={spendLimitNotice} onClose={() => setSpendLimitNotice(null)} />
+            )}
 
             {error && (() => {
                 // Free-tier limits (the $/day, $/month spend caps and the games-per-day cap)

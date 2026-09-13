@@ -34,8 +34,8 @@ export const GM_COMMAND_GENERATE_NIGHT_RESULTS: string = `Generate the night res
    - If detective found evil (FOUND_EVIL): Use "shadows clung deep" or similar dark language
    - If detective found innocent (FOUND_INNOCENT): Use "bore no stain of evil" or similar pure language
    - NEVER reveal the target's name or identity unless they died
-   - If investigation was blocked (BLOCKED): The detective found nothing (action failed silently)
-   - If detective was inactive (INACTIVE): Do not mention the detective at all
+   - If investigation was blocked (BLOCKED): Say plainly that the detective's investigation was cut short and yielded nothing tonight. This beat is REQUIRED — never skip the detective when the value is BLOCKED. Do not say why it failed
+   - If there is no living detective (INACTIVE): Do not mention the detective at all
 5. **All other activities must be described anonymously**
 
 **Understanding Deaths:**
@@ -63,7 +63,7 @@ export const GM_COMMAND_GENERATE_NIGHT_RESULTS: string = `Generate the night res
 - If maniac collateral deaths occurred: Both deaths should be revealed dramatically, but never mention abduction
 - If WerewolfKillPrevented is TRUE: Create suspense about the near-death experience (doctor saved someone)
 - If QuietNight is TRUE: Create mysterious atmosphere about a quiet night where nothing happened
-- Detective findings: Follow DetectiveResult value (FOUND_EVIL, FOUND_INNOCENT, BLOCKED, INACTIVE)
+- Detective findings: Follow DetectiveResult value (FOUND_EVIL, FOUND_INNOCENT, BLOCKED, INACTIVE). Whenever the value is anything but INACTIVE, the story MUST contain a detective beat
 - Always maintain game balance and fairness in information revelation
 - NEVER reveal maniac activity or abductions - this is secret information
 

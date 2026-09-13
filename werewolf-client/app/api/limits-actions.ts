@@ -6,7 +6,11 @@ import {FREE_TIER_LIMITS, FreeTierLimits} from "@/app/api/game-models";
  * FREE_TIER_LIMITS defaults, cached in-process for a minute. Editing the doc is how a
  * cap gets lowered during a spike without a deploy. Doc shape (every field optional):
  *
- *   { freeDailySpendUSD: 5, freeMonthlySpendUSD: 20, freeGamesPerDay: 5 }
+ *   { freeDailySpendUSD: 5, freeMonthlySpendUSD: 20, freeGamesPerDay: 5,
+ *     freeGlobalDailySpendUSD: 40, freeDeviceDailySpendUSD: 5 }
+ *
+ * Setting `freeDeviceDailySpendUSD` to 0 turns the per-device cap off without a deploy,
+ * which is the escape hatch if it ever starts refusing legitimate shared-computer users.
  *
  * A missing doc, a missing field, or an unreadable value falls back to the default for
  * that field; a read failure falls back to the defaults entirely (and is logged), so a
@@ -19,6 +23,8 @@ export const DEFAULT_FREE_TIER_LIMITS: FreeTierLimits = {
     gamesPerDay: FREE_TIER_LIMITS.GAMES_PER_CALENDAR_DAY,
     dailySpendUSD: FREE_TIER_LIMITS.DAILY_SPEND_USD,
     monthlySpendUSD: FREE_TIER_LIMITS.MONTHLY_SPEND_USD,
+    globalDailySpendUSD: FREE_TIER_LIMITS.GLOBAL_DAILY_SPEND_USD,
+    deviceDailySpendUSD: FREE_TIER_LIMITS.DEVICE_DAILY_SPEND_USD,
 };
 
 let cache: { value: FreeTierLimits; expiresAt: number } | null = null;
@@ -36,6 +42,8 @@ export function limitsFromConfig(data: Record<string, any> | undefined | null): 
         gamesPerDay: numberOr(data?.freeGamesPerDay, DEFAULT_FREE_TIER_LIMITS.gamesPerDay),
         dailySpendUSD: numberOr(data?.freeDailySpendUSD, DEFAULT_FREE_TIER_LIMITS.dailySpendUSD),
         monthlySpendUSD: numberOr(data?.freeMonthlySpendUSD, DEFAULT_FREE_TIER_LIMITS.monthlySpendUSD),
+        globalDailySpendUSD: numberOr(data?.freeGlobalDailySpendUSD, DEFAULT_FREE_TIER_LIMITS.globalDailySpendUSD),
+        deviceDailySpendUSD: numberOr(data?.freeDeviceDailySpendUSD, DEFAULT_FREE_TIER_LIMITS.deviceDailySpendUSD),
     };
 }
 

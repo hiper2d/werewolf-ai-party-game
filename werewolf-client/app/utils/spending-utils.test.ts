@@ -1,8 +1,8 @@
-import { applyDailySpend, freeSpendVerdicts, getFreeDailySpend, formatPeriod } from './spending-utils';
+import { applyDailySpend, deviceSpendVerdict, freeSpendVerdicts, getFreeDailySpend, formatPeriod, globalSpendVerdict } from './spending-utils';
 
 // 2026-09-11T15:30Z
 const T = Date.UTC(2026, 8, 11, 15, 30, 0);
-const LIMITS = { gamesPerDay: 5, dailySpendUSD: 5, monthlySpendUSD: 20 };
+const LIMITS = { gamesPerDay: 5, dailySpendUSD: 5, monthlySpendUSD: 20, globalDailySpendUSD: 40, deviceDailySpendUSD: 5 };
 
 describe('formatPeriod', () => {
     it('is the UTC YYYY-MM key', () => {
@@ -73,5 +73,56 @@ describe('freeSpendVerdicts', () => {
     it('an empty or missing user reads as nothing spent', () => {
         expect(freeSpendVerdicts(undefined, LIMITS, T).every(v => v.allowed && v.spentUSD === 0)).toBe(true);
         expect(freeSpendVerdicts({}, LIMITS, T).every(v => v.allowed)).toBe(true);
+    });
+});
+
+describe('globalSpendVerdict', () => {
+    it('judges the shared ledger against the platform cap', () => {
+        const v = globalSpendVerdict({ period: '2026-09-11', totalUSD: 30, buckets: { free: 30 } }, LIMITS, T);
+        expect(v).toEqual(expect.objectContaining({ allowed: true, window: 'day', spentUSD: 30, remainingUSD: 10, limitUSD: 40 }));
+    });
+
+    it('refuses at exactly the platform cap', () => {
+        const v = globalSpendVerdict({ period: '2026-09-11', totalUSD: 40, buckets: { free: 40 } }, LIMITS, T);
+        expect(v!.allowed).toBe(false);
+    });
+
+    it('ignores a stale day, so the cap resets at UTC midnight', () => {
+        const v = globalSpendVerdict({ period: '2026-09-10', totalUSD: 40, buckets: { free: 40 } }, LIMITS, T);
+        expect(v).toEqual(expect.objectContaining({ allowed: true, spentUSD: 0 }));
+    });
+
+    it('a missing ledger reads as nothing spent', () => {
+        expect(globalSpendVerdict(undefined, LIMITS, T)!.allowed).toBe(true);
+    });
+
+    it('a cap of 0 disables it entirely (the kill switch)', () => {
+        const off = { ...LIMITS, globalDailySpendUSD: 0 };
+        expect(globalSpendVerdict({ period: '2026-09-11', totalUSD: 999, buckets: { free: 999 } }, off, T)).toBeUndefined();
+    });
+
+    it('counts only the free bucket - paid spend never trips the free-tier cap', () => {
+        const v = globalSpendVerdict({ period: '2026-09-11', totalUSD: 100, buckets: { free: 1, paid: 99 } }, LIMITS, T);
+        expect(v).toEqual(expect.objectContaining({ allowed: true, spentUSD: 1 }));
+    });
+});
+
+describe('deviceSpendVerdict', () => {
+    it('refuses a browser that has drawn its whole daily budget', () => {
+        const v = deviceSpendVerdict({ period: '2026-09-11', totalUSD: 5, buckets: { free: 5 } }, LIMITS, T);
+        expect(v!.allowed).toBe(false);
+    });
+
+    it('shares one budget across accounts: the second account sees the first one spend', () => {
+        // Both accounts resolve to the same device ledger, so account #2 starts at $4.80.
+        const shared = { period: '2026-09-11', totalUSD: 4.8, buckets: { free: 4.8 } };
+        expect(deviceSpendVerdict(shared, LIMITS, T)).toEqual(
+            expect.objectContaining({ allowed: true, remainingUSD: expect.closeTo(0.2, 6) })
+        );
+    });
+
+    it('a cap of 0 disables it entirely (the shared-computer escape hatch)', () => {
+        const off = { ...LIMITS, deviceDailySpendUSD: 0 };
+        expect(deviceSpendVerdict({ period: '2026-09-11', totalUSD: 999, buckets: { free: 999 } }, off, T)).toBeUndefined();
     });
 });

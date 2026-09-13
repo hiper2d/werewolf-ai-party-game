@@ -16,7 +16,8 @@ import {getUserTierAndApiKeys} from "@/app/utils/tier-utils";
 import {assertFreeSpendWithinLimit} from "@/app/api/user-actions";
 import {isFreeSpendLimitError} from "@/app/api/errors";
 import {API_KEY_CONSTANTS, IMAGE_MODEL_CONSTANTS, IMAGE_MODEL_PRICING} from "@/app/ai/ai-models";
-import {billImages, generateImage} from "@/app/utils/avatar-generation";
+import {billImages} from "@/app/utils/avatar-generation";
+import {generateImage} from "@hiper2d/ai-agents/images";
 import {logger} from "@/app/utils/logger";
 import {sanitizeArtStyle} from "@/app/utils/art-style";
 

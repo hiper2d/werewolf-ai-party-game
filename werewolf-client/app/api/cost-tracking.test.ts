@@ -37,31 +37,55 @@ type FakeTransaction = {
  */
 function setupTransaction(
     gameData: any | null,
-    userData: any | null | undefined = undefined
-): { txn: FakeTransaction; gameRef: any; userRef: any; statRef: any } {
+    userData: any | null | undefined = undefined,
+    globalLedger: any | undefined = undefined,
+    deviceLedger: any | undefined = undefined
+): { txn: FakeTransaction; gameRef: any; userRef: any; statRef: any; globalRef: any; deviceRef: any } {
     const gameSnapshot = { exists: gameData !== null, data: () => gameData };
     const userSnapshot = { exists: userData !== null && userData !== undefined, data: () => userData };
 
     const gameRef = { id: 'games/fake', get: jest.fn().mockResolvedValue(gameSnapshot) };
     const userRef = { id: 'users/fake', get: jest.fn().mockResolvedValue(userSnapshot) };
     const statRef = { id: 'requestStats/fake' };
+    // The two shared free-tier ledgers (config/globalSpend and devices/{id}). They must
+    // be distinct refs, otherwise their writes land on gameRef and every assertion about
+    // the game doc silently starts matching a ledger write instead.
+    const globalRef = { id: 'config/globalSpend' };
+    const deviceRef = { id: 'devices/fake' };
+    const globalSnapshot = { exists: globalLedger !== undefined, data: () => globalLedger };
+    const deviceSnapshot = { exists: deviceLedger !== undefined, data: () => deviceLedger };
 
     (db!.collection as jest.Mock).mockImplementation((name: string) => ({
         doc: jest.fn().mockReturnValue(
-            name === 'users' ? userRef : name === 'requestStats' ? statRef : gameRef
+            name === 'users' ? userRef
+                : name === 'requestStats' ? statRef
+                    : name === 'config' ? globalRef
+                        : name === 'devices' ? deviceRef
+                            : gameRef
         )
     }));
 
     const txn: FakeTransaction = {
         get: jest.fn().mockImplementation((ref: any) =>
-            Promise.resolve(ref === userRef ? userSnapshot : gameSnapshot)
+            Promise.resolve(
+                ref === userRef ? userSnapshot
+                    : ref === globalRef ? globalSnapshot
+                        : ref === deviceRef ? deviceSnapshot
+                            : gameSnapshot
+            )
         ),
         set: jest.fn(),
         update: jest.fn()
     };
     (db!.runTransaction as jest.Mock).mockImplementation(async (cb: any) => cb(txn));
 
-    return { txn, gameRef, userRef, statRef };
+    return { txn, gameRef, userRef, statRef, globalRef, deviceRef };
+}
+
+/** The ledger document written against `ref` by the transaction, if any. */
+function ledgerWrite(txn: FakeTransaction, ref: any): any | undefined {
+    const call = txn.set.mock.calls.find(c => c[0] === ref);
+    return call ? call[1] : undefined;
 }
 
 /** Find the requestStats document written by the transaction, if any. */
@@ -636,5 +660,85 @@ describe('requestStats recording (per-request statistics doc)', () => {
         }, userEmail);
 
         expect(statWrite(txn, statRef)).toBeUndefined();
+    });
+
+    describe('shared free-tier ledgers (global + device)', () => {
+        const TODAY = '2026-09-13';
+        const at = Date.UTC(2026, 8, 13, 12, 0, 0);
+
+        it('adds free-tier spend to the platform ledger, in the same transaction', async () => {
+            const { txn, globalRef } = setupTransaction(
+                { totalGameCost: 0 },
+                { tier: 'free' },
+                { dailySpend: { period: TODAY, totalUSD: 10, buckets: { free: 10 } } }
+            );
+
+            await recordSpend({
+                userEmail, costUSD: 0.5, kind: 'preview', usage: { costUSD: 0.5 },
+            } as any, at);
+
+            const write = ledgerWrite(txn, globalRef);
+            expect(write.dailySpend).toEqual(expect.objectContaining({
+                period: TODAY, totalUSD: 10.5, buckets: expect.objectContaining({ free: 10.5 })
+            }));
+        });
+
+        it('meters the device the user was last seen from', async () => {
+            const { txn, deviceRef } = setupTransaction(
+                { totalGameCost: 0 },
+                { tier: 'free', lastDeviceId: 'dev-1' },
+                undefined,
+                { dailySpend: { period: TODAY, totalUSD: 4, buckets: { free: 4 } } }
+            );
+
+            await recordSpend({ userEmail, costUSD: 0.25, kind: 'preview', usage: { costUSD: 0.25 } } as any, at);
+
+            expect(ledgerWrite(txn, deviceRef).dailySpend).toEqual(expect.objectContaining({
+                period: TODAY, totalUSD: 4.25
+            }));
+        });
+
+        it('writes no device ledger when the user has no device id', async () => {
+            const { txn, deviceRef } = setupTransaction({ totalGameCost: 0 }, { tier: 'free' });
+
+            await recordSpend({ userEmail, costUSD: 0.25, kind: 'preview', usage: { costUSD: 0.25 } } as any, at);
+
+            expect(ledgerWrite(txn, deviceRef)).toBeUndefined();
+        });
+
+        it('PAID spend touches neither ledger - they are free-tier ceilings', async () => {
+            const { txn, globalRef, deviceRef } = setupTransaction(
+                { totalGameCost: 0 },
+                { tier: 'paid', balance: 100, lastDeviceId: 'dev-1' }
+            );
+
+            await recordSpend({ userEmail, costUSD: 0.5, kind: 'preview', usage: { costUSD: 0.5 } } as any, at);
+
+            expect(ledgerWrite(txn, globalRef)).toBeUndefined();
+            expect(ledgerWrite(txn, deviceRef)).toBeUndefined();
+        });
+
+        it('a stale ledger day is replaced, not added to - the cap resets at UTC midnight', async () => {
+            const { txn, globalRef } = setupTransaction(
+                { totalGameCost: 0 },
+                { tier: 'free' },
+                { dailySpend: { period: '2026-09-12', totalUSD: 40, buckets: { free: 40 } } }
+            );
+
+            await recordSpend({ userEmail, costUSD: 0.5, kind: 'preview', usage: { costUSD: 0.5 } } as any, at);
+
+            // Yesterday's $40 must not carry into today, or the cap would never reopen.
+            expect(ledgerWrite(txn, globalRef).dailySpend).toEqual(expect.objectContaining({
+                period: TODAY, totalUSD: 0.5
+            }));
+        });
+
+        it('a zero-cost call writes no ledger row', async () => {
+            const { txn, globalRef } = setupTransaction({ totalGameCost: 0 }, { tier: 'free' });
+
+            await recordSpend({ userEmail, costUSD: 0, kind: 'preview', usage: { costUSD: 0 } } as any, at);
+
+            expect(ledgerWrite(txn, globalRef)).toBeUndefined();
+        });
     });
 });

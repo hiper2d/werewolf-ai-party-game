@@ -232,7 +232,9 @@ describe("RoleProcessorFactory ordering and registration", () => {
             const state = resolve(makeGame({ nightResults }));
             expect(state.deaths).toEqual([]);
             expect(state.actionsPrevented).toEqual([
-                { role: GAME_ROLES.WEREWOLF, reason: "doctor_save", player: null }
+                { role: GAME_ROLES.WEREWOLF, reason: "doctor_save", player: null },
+                // Sherlock (the detective) was abducted and never acted: surfaced as a block.
+                { role: GAME_ROLES.DETECTIVE, reason: "abduction", player: null }
             ]);
         });
     });
@@ -368,6 +370,38 @@ describe("Maniac abduction", () => {
         expect(state.actionsPrevented).toEqual([
             { role: GAME_ROLES.DETECTIVE, reason: "abduction", player: null }
         ]);
+    });
+
+    it("records the detective as blocked when the DETECTIVE was abducted and never acted", () => {
+        // The abducted detective's turn is skipped without an AI call, so there is no
+        // detective entry at all; the resolver must still surface the block so the night
+        // story gives the detective a beat instead of falling silent (INACTIVE).
+        const state = resolve(makeGame({
+            nightResults: {
+                [GAME_ROLES.MANIAC]: { target: "Sherlock" },
+                [GAME_ROLES.WEREWOLF]: { target: "Vicky" }
+            }
+        }));
+        expect(state.detectiveResult).toBeNull();
+        expect(state.actionsPrevented).toContainEqual(
+            { role: GAME_ROLES.DETECTIVE, reason: "abduction", player: null }
+        );
+    });
+
+    it("records the block for a human detective too, and nothing when no detective was abducted", () => {
+        const human = resolve(makeGame({
+            humanPlayerRole: GAME_ROLES.DETECTIVE,
+            bots: [makeBot("Wolfgang", GAME_ROLES.WEREWOLF), makeBot("Mandy", GAME_ROLES.MANIAC), makeBot("Vicky", GAME_ROLES.VILLAGER)],
+            nightResults: { [GAME_ROLES.MANIAC]: { target: "Hero" } }
+        }));
+        expect(human.actionsPrevented).toContainEqual(
+            { role: GAME_ROLES.DETECTIVE, reason: "abduction", player: null }
+        );
+
+        const other = resolve(makeGame({
+            nightResults: { [GAME_ROLES.MANIAC]: { target: "Vicky" } }
+        }));
+        expect(other.actionsPrevented.some(ap => ap.role === GAME_ROLES.DETECTIVE)).toBe(false);
     });
 
     it("blocks the detective's KILL on an abducted player (records success: false, no death)", () => {

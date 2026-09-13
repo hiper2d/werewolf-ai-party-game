@@ -59,7 +59,7 @@ Feature ONLY the roles listed in ActiveNightRoles. These are the roles whose hol
 
 - **Werewolves:** Describe hunt/kill with atmospheric language. Reveal victim's identity and role.
 - **Doctor** (only if listed): Always describe a healing attempt. If successful: a life preserved. If failed: a vigilant watch that missed its target. Keep success/failure ambiguous so the doctor is not exposed.
-- **Detective** (only if listed): Always describe the investigation. Reveal findings: "bore no stain of evil" (innocent) or "shadows clung deep" (werewolf).
+- **Detective** (only if listed): Always describe the investigation — a listed detective must never be absent from the chapter. Reveal findings: "bore no stain of evil" (innocent) or "shadows clung deep" (werewolf). If the investigation was blocked, say it was cut short and yielded nothing, without saying why.
 
 ## Information Rules
 

@@ -353,6 +353,37 @@ describe('night queue advancement', () => {
         expect(setGameErrorState).not.toHaveBeenCalled();
     });
 
+    test('an abducted detective still gets a beat: the GM is told BLOCKED, not INACTIVE', async () => {
+        const game = makeGame({
+            specialRoles: [GAME_ROLES.DOCTOR, GAME_ROLES.DETECTIVE, GAME_ROLES.MANIAC],
+            bots: [
+                makeBot('Wolf', { role: GAME_ROLES.WEREWOLF }),
+                makeBot('Doc', { role: GAME_ROLES.DOCTOR }),
+                makeBot('Det', { role: GAME_ROLES.DETECTIVE }),
+                makeBot('Man', { role: GAME_ROLES.MANIAC }),
+                makeBot('Vil'),
+            ],
+            gameStateProcessQueue: [],
+            gameStateParamQueue: [],
+            // The maniac took the detective, so the detective's turn was skipped: no detective entry.
+            nightResults: {
+                [GAME_ROLES.MANIAC]: { target: 'Det' },
+                [GAME_ROLES.WEREWOLF]: { target: 'Det' },
+                [GAME_ROLES.DOCTOR]: { target: 'Det', actionType: 'protect' },
+            },
+        });
+        (getGame as jest.Mock).mockResolvedValue(game);
+
+        await performNightAction(GAME_ID);
+
+        expect(mockAskWithZodSchema).toHaveBeenCalledTimes(1);
+        const history = mockAskWithZodSchema.mock.calls[0][1] as Array<{ content: string }>;
+        const command = history.map(m => m.content).join('\n');
+        expect(command).toContain('<DetectiveResult>BLOCKED</DetectiveResult>');
+        expect(command).not.toContain('<DetectiveResult>INACTIVE</DetectiveResult>');
+        expect(setGameErrorState).not.toHaveBeenCalled();
+    });
+
     test('bot action finishing after the night ended is a benign no-op (summaries queue left alone)', async () => {
         // The doctor's LLM call is slow; while it runs, a concurrent duplicate
         // request finishes the night and startNewDay moves the game to

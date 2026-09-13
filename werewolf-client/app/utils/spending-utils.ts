@@ -55,6 +55,49 @@ export function freeSpendVerdicts(
 }
 
 /**
+ * Verdict for the platform-wide daily ceiling. Separate from freeSpendVerdicts because
+ * the spend it judges lives in one shared counter doc, not on the user.
+ *
+ * A limit of 0 or less disables the cap (evaluateBudget would otherwise refuse
+ * everything), which is what makes `freeGlobalDailySpendUSD: 0` a working kill switch.
+ */
+export function globalSpendVerdict(
+    globalDaily: UserDailySpend | undefined | null,
+    limits: FreeTierLimits,
+    timestamp: number = Date.now()
+): BudgetVerdict | undefined {
+    if (!(limits.globalDailySpendUSD > 0)) {
+        return undefined;
+    }
+    return evaluateBudget(
+        getFreeDailySpend(globalDaily, timestamp),
+        { window: 'day', limitUSD: limits.globalDailySpendUSD, bucket: USER_TIERS.FREE },
+        timestamp
+    );
+}
+
+/**
+ * Verdict for one browser's daily ceiling. Undefined when the cap is off or when no
+ * device id was resolved for the request - an unknown device must fall through to the
+ * per-account caps, never be refused, or anyone whose cookie and localStorage both fail
+ * (private mode, a locked-down browser) would be locked out of a free game.
+ */
+export function deviceSpendVerdict(
+    deviceDaily: UserDailySpend | undefined | null,
+    limits: FreeTierLimits,
+    timestamp: number = Date.now()
+): BudgetVerdict | undefined {
+    if (!(limits.deviceDailySpendUSD > 0)) {
+        return undefined;
+    }
+    return evaluateBudget(
+        getFreeDailySpend(deviceDaily, timestamp),
+        { window: 'day', limitUSD: limits.deviceDailySpendUSD, bucket: USER_TIERS.FREE },
+        timestamp
+    );
+}
+
+/**
  * Pure reducer: add `amountUSD` to the spending record for `period` (creating it
  * if absent) and to the tier-specific bucket, returning a fresh, sorted array.
  * Shared by updateUserMonthlySpending and the atomic charge transaction so the

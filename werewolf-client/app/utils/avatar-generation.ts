@@ -1,44 +1,20 @@
 import {db} from "@/firebase/server";
 import {firestore} from "firebase-admin";
-import {Game, USER_TIERS, UserTier, AVATAR_GM_KEY, SCENE_WELCOME_KEY, SCENE_NIGHT_KEY, AVATAR_VARIANTS_COLLECTION, avatarVariantKey, avatarSheetKey, MANNEQUIN_VARIANT_INDEX, AvatarFraming, AvatarVariantEntry, CARD_HEIGHT_PX, CARD_WIDTH_PX, ImageRect, ReframeTarget} from "@/app/api/game-models";
-import {defaultFraming, fitFraming, isFramingShape} from "@/app/utils/avatar-framing";
-import {describeDividers, detectSheetGrid, equalSplitGrid} from "@/app/utils/sheet-detection";
+import {Game, USER_TIERS, UserTier, AVATAR_GM_KEY, SCENE_WELCOME_KEY, SCENE_NIGHT_KEY, AVATAR_VARIANTS_COLLECTION, avatarVariantKey, avatarSheetKey, MANNEQUIN_VARIANT_INDEX, AvatarFraming, AvatarVariantEntry, ImageRect, ReframeTarget} from "@/app/api/game-models";
+import {buildPortraitSheetPrompt, cutCard, defaultFraming, detectSheetGrid, equalSplitGrid, fitFraming, generateImage, gridFor, isFramingShape, padCells, PortraitCell, sliceSheet} from "@hiper2d/ai-agents/images";
+import type {DrawnSheet} from "@hiper2d/ai-agents/images";
 import {PRESET_SHEET_SIZE} from "@/app/utils/preset-avatars";
 import {getUserTierAndApiKeys} from "@/app/utils/tier-utils";
 import {recordSpend} from "@/app/api/cost-tracking";
 import {isInsufficientBalanceError} from "@/app/api/errors";
-import {API_KEY_CONSTANTS, IMAGE_MODEL_CONSTANTS, IMAGE_MODEL_PRICING} from "@/app/ai/ai-models";
+import {API_KEY_CONSTANTS, IMAGE_MODEL_CONSTANTS} from "@/app/ai/ai-models";
 import {logger} from "@/app/utils/logger";
 import {sanitizeArtStyle} from "@/app/utils/art-style";
 
-// One grid image covers the whole cast; models and pricing live in
-// IMAGE_MODEL_CONSTANTS / IMAGE_MODEL_PRICING (ai-models.ts).
-const AVATAR_MODEL = IMAGE_MODEL_CONSTANTS.AVATARS;
-const IMAGE_OUTPUT_PRICE_PER_M = IMAGE_MODEL_PRICING[AVATAR_MODEL].imageOutputPricePerM;
-const TEXT_INPUT_PRICE_PER_M = IMAGE_MODEL_PRICING[AVATAR_MODEL].textInputPricePerM;
-
-// Grid dimensions by cell count (bots + human player + Game Master) on the
-// 4:3 canvas. Cells must come out square-to-portrait: asked for 4x4
-// (landscape 600x448 cells) the model redrew the sheet as 4x3, 6x3 and once
-// as an irregular two-layout sheet (2026-09-03) — every time towards taller
-// cells. 5x3 keeps 480x597 cells for 13-15; a 16-player table is 17 cells and
-// gets 6x3 (400x600, 2:3 — one of the shapes the model volunteered above).
-// Never 4x4: it silently cut a 17-cell cast to 16 (the GM lost its card).
-function gridFor(cells: number): { cols: number; rows: number } {
-    if (cells <= 6) return {cols: 3, rows: 2};
-    if (cells <= 8) return {cols: 4, rows: 2};
-    if (cells <= 9) return {cols: 3, rows: 3};
-    if (cells <= 12) return {cols: 4, rows: 3};
-    if (cells <= 15) return {cols: 5, rows: 3};
-    if (cells <= 18) return {cols: 6, rows: 3};
-    throw new Error(`Avatar sheet cannot hold ${cells} cells (max 18)`);
-}
-
-interface AvatarCell {
-    key: string;      // Firestore doc id + URL segment ([a-zA-Z0-9] names, or the GM key)
-    label: string;    // Character name, for logs and prompt guidance — never drawn into the image
-    prompt: string;   // One-line visual description for this cell
-}
+// The portrait pipeline (grid layout, sheet prompt, divider detection, card cutting)
+// lives in @hiper2d/ai-agents/images; this file supplies the Werewolf subject — who
+// is on the sheet and how each character is described — and everything Firestore.
+type AvatarCell = PortraitCell;
 
 // Stories are narrative, not visual — one sentence is plenty of guidance for the
 // painter. Feeding the full three-sentence story per cell is what made the model
@@ -96,75 +72,17 @@ function buildCells(game: AvatarSubject): AvatarCell[] {
 }
 
 export function buildPrompt(game: AvatarSubject, cells: AvatarCell[], cols: number, rows: number): string {
-    const cellLines = cells.map(
-        (c, i) => `Cell ${i + 1}: ${c.prompt}. Its own distinct flat solid muted background color.`
-    ).join("\n");
-
-    // The player's art direction replaces the model's free choice of style; it
-    // stays style-only guidance, and the no-text rule below still has the last word.
-    const artStyle = sanitizeArtStyle(game.artStyle);
-    const styleLine = artStyle
-        ? `Render every portrait in this art style, chosen by the player: "${artStyle}". Apply it consistently to every portrait: same rendering technique, same palette family, same lighting.`
-        : `Choose ONE cohesive illustration style that fits this setting and apply it consistently to every portrait: same rendering technique, same palette family, same lighting.`;
-
-    return `A character portrait sheet for a social deduction game, drawn as a single image: a precise grid of exactly ${cells.length} rectangular cells, ${cols} columns and ${rows} rows, all cells exactly equal size, separated by thin dark divider lines. Each cell contains one bust portrait (head and shoulders) of a different character, centered in its cell.
-
-Setting — "${game.theme}": ${game.description}
-
-${styleLine} Every face must be distinct and memorable, and match its character description. No character may span more than one cell. Give each cell its own flat solid muted desaturated background color, different from its neighbors. Row-major order, left to right, top to bottom:
-
-${cellLines}
-
-The character descriptions above are guidance for the drawing only — NEVER render them as text. Absolutely no text anywhere in the image: no names, no labels, no captions, no letters, no writing of any kind — and no lettering on clothing, equipment, insignia or logos.`;
-}
-
-
-export interface GeneratedImage {
-    buffer: Buffer;
-    costUSD: number;
-}
-
-/** One image-model call. Cost is per IMAGE, not per pixel (a 1K and a 2K image
- * both bill ~1120 output tokens), so fewer calls — not lower resolution — is
- * what minimizes cost. Optional labeled reference JPEGs (the game's welcome
- * scene, character portraits) anchor mid-game illustrations to the established
- * style, location and faces. */
-export async function generateImage(apiKey: string, prompt: string, aspectRatio: string, opts?: {references?: {label: string; jpeg: Buffer}[]; imageSize?: '1K' | '2K'}): Promise<GeneratedImage> {
-    const input: any[] = [{type: "text", text: prompt}];
-    for (const ref of opts?.references ?? []) {
-        input.push({type: "text", text: ref.label});
-        input.push({type: "image", mime_type: "image/jpeg", data: ref.jpeg.toString('base64')});
-    }
-    const res = await fetch("https://generativelanguage.googleapis.com/v1beta/interactions", {
-        method: "POST",
-        headers: {"Content-Type": "application/json", "x-goog-api-key": apiKey},
-        body: JSON.stringify({
-            model: AVATAR_MODEL,
-            input,
-            response_format: {type: "image", mime_type: "image/jpeg", aspect_ratio: aspectRatio, image_size: opts?.imageSize ?? "2K"},
-        }),
+    return buildPortraitSheetPrompt({
+        cells, cols, rows,
+        purpose: 'a social deduction game',
+        setting: {title: game.theme, description: game.description},
+        // The player's art direction replaces the model's free choice of style; it
+        // stays style-only guidance, and the prompt's no-text rule has the last word.
+        artStyle: sanitizeArtStyle(game.artStyle),
     });
-    if (!res.ok) {
-        throw new Error(`Image request failed: HTTP ${res.status} ${(await res.text()).slice(0, 300)}`);
-    }
-    const json = await res.json();
-    const b64 = (json.steps || [])
-        .flatMap((s: any) => s.content || [])
-        .find((c: any) => c.type === "image" && c.data)?.data;
-    if (!b64) throw new Error('Image response contained no image data');
-
-    const usage = json.usage || {};
-    const imageTokens = (usage.output_tokens_by_modality || [])
-        .filter((m: any) => m.modality === 'image')
-        .reduce((sum: number, m: any) => sum + (m.tokens || 0), 0);
-    const inputTokens = usage.total_input_tokens || 0;
-    const costUSD = parseFloat((
-        imageTokens / 1_000_000 * IMAGE_OUTPUT_PRICE_PER_M +
-        inputTokens / 1_000_000 * TEXT_INPUT_PRICE_PER_M
-    ).toFixed(6));
-
-    return {buffer: Buffer.from(b64, 'base64'), costUSD};
 }
+
+
 
 // Both chat scene images ride in ONE image (stacked panels, sliced in half):
 // top = the welcome establishing shot, bottom = the same place at night.
@@ -183,90 +101,8 @@ Bottom panel: the same setting at night — dark, ominous, something predatory h
 No text anywhere in the image.`;
 }
 
-interface AvatarSlice {
-    key: string;
-    label: string;
-    jpeg: Buffer;
-    framing: AvatarFraming;
-}
-
-/** The kept sheet: the grid image itself (re-encoded), its size and the
- * cells the cards were cut from. Stored as avatars/sheet-{round}. */
-export interface DrawnSheet {
-    jpeg: Buffer;
-    width: number;
-    height: number;
-    cells: ImageRect[];
-    detected: boolean;
-}
-
-// The model returns ~2.4 MB loosely-compressed JPEGs; at this width and
-// quality a sheet is ~400 KB (~530 KB as base64), comfortably under the
-// 1 MiB Firestore doc limit, with cells still ~500 px tall.
-const SHEET_MAX_WIDTH = 2400;
-const SHEET_JPEG_QUALITY = 85;
-const SHEET_MAX_BASE64_BYTES = 900_000;
-
-/**
- * Cuts the cards out of a drawn sheet and keeps the sheet. Cells come from
- * the divider lines (sheet-detection.ts); each card is the largest 3:4
- * rectangle in its cell, top-anchored, with the default circle — the framing
- * the owner can later move.
- */
-async function sliceGrid(sharp: any, raw: Buffer, cells: AvatarCell[], count: number, cols: number, rows: number, logContext: Record<string, unknown>): Promise<{slices: AvatarSlice[]; sheet: DrawnSheet}> {
-    // Normalise the working resolution first so cells, cards and the stored
-    // sheet all share one pixel space.
-    const grid: Buffer = await sharp(raw).resize({width: SHEET_MAX_WIDTH, withoutEnlargement: true}).toBuffer();
-    const {data, info} = await sharp(grid).greyscale().raw().toBuffer({resolveWithObject: true});
-    const width: number = info.width, height: number = info.height;
-    if (width < 100 * cols || height < 100 * rows) throw new Error(`Avatar grid has unusable dimensions ${width}x${height}`);
-
-    const plane = {width, height, data: new Uint8Array(data.buffer, data.byteOffset, data.length)};
-    const gridCells = detectSheetGrid(plane, cols, rows);
-    if (!gridCells.detected) {
-        logger.warn(`AVATAR_GRID_MISMATCH: no divider lines found on the ${cols}x${rows} sheet; using equal split`, {
-            ...logContext, width, height, dividers: describeDividers(plane),
-        });
-    } else if (gridCells.cols !== cols || gridCells.rows !== rows) {
-        // The model drew a different grid than asked (4x3 and 6x3 have both
-        // happened for a 4x4 request). Its cells are still in row-major
-        // order, so they are used as drawn; only characters past the last
-        // drawn cell fall back to the equal split — and can be reframed.
-        logger.warn(`AVATAR_GRID_MISMATCH: sheet drawn as ${gridCells.cols}x${gridCells.rows}, requested ${cols}x${rows}; using the drawn cells`, {
-            ...logContext, width, height, drawnCells: gridCells.cells.length, needed: count,
-        });
-    }
-    const fallback = equalSplitGrid(width, height, cols, rows).cells;
-
-    const slices: AvatarSlice[] = [];
-    for (let i = 0; i < count; i++) {
-        const framing = defaultFraming(gridCells.cells[i] ?? fallback[i]);
-        const jpeg = await sharp(grid)
-            .extract(framing.card)
-            .resize(CARD_WIDTH_PX, CARD_HEIGHT_PX)
-            .jpeg({quality: 85})
-            .toBuffer();
-        slices.push({key: cells[i].key, label: cells[i].label, jpeg, framing});
-    }
-
-    let sheetJpeg: Buffer = await sharp(grid).jpeg({quality: SHEET_JPEG_QUALITY, mozjpeg: true}).toBuffer();
-    if (sheetJpeg.length * 4 / 3 > SHEET_MAX_BASE64_BYTES) {
-        sheetJpeg = await sharp(grid).jpeg({quality: 72, mozjpeg: true}).toBuffer();
-    }
-    return {
-        slices,
-        sheet: {jpeg: sheetJpeg, width, height, cells: gridCells.cells.slice(0, count), detected: gridCells.detected},
-    };
-}
-
-/** Cuts one card out of a stored sheet at the given framing. */
-export async function cutCard(sharp: any, sheet: Buffer, card: ImageRect): Promise<Buffer> {
-    return sharp(sheet)
-        .extract(card)
-        .resize(CARD_WIDTH_PX, CARD_HEIGHT_PX)
-        .jpeg({quality: 85})
-        .toBuffer();
-}
+/** The kept sheet (library type): stored as avatars/sheet-{round}. */
+export type {DrawnSheet} from "@hiper2d/ai-agents/images";
 
 /** A drawn portrait crop. Every round's crops are kept as candidates: the
  * player flips between them on the character card and decides what looks
@@ -483,17 +319,7 @@ function resultFrom(game: Game): AvatarGenerationResult {
  * fills FULL grids but sometimes ignores "leave the last cells empty", which
  * shifts every row and corrupts the slicing. */
 export function buildPaddedCells(game: AvatarSubject): {cells: AvatarCell[]; cols: number; rows: number; realCount: number} {
-    const cells = buildCells(game);
-    const {cols, rows} = gridFor(cells.length);
-    const realCount = cells.length;
-    for (let i = cells.length; i < cols * rows; i++) {
-        cells.push({
-            key: `__filler${i}`,
-            label: 'Stranger',
-            prompt: `"Stranger" — an anonymous hooded figure fitting the setting, face hidden in shadow`,
-        });
-    }
-    return {cells, cols, rows, realCount};
+    return padCells(buildCells(game));
 }
 
 /** Running total of what a draw has paid Google for so far. Kept OUTSIDE the
@@ -570,7 +396,9 @@ export async function drawIllustrationSet(
 
     const grid = await generateImage(apiKey, buildPrompt(subject, cells, cols, rows), "4:3");
     ledger.spentUSD += grid.costUSD;
-    const {slices, sheet} = await sliceGrid(sharp, grid.buffer, cells, realCount, cols, rows, opts.logContext);
+    const {slices, sheet} = await sliceSheet(sharp, grid.buffer, cells, realCount, cols, rows, {
+        onMismatch: m => logger.warn(`AVATAR_GRID_MISMATCH: ${m.message}`, {...logContext, ...m.detail}),
+    });
     await opts.onStage?.('portraits');
 
     return {

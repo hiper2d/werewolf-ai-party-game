@@ -5,6 +5,8 @@ import { talkToAll, humanPlayerVote, getSuggestion } from "@/app/api/bot-actions
 import { humanPlayerTalkWerewolves } from "@/app/api/night-actions";
 import { GAME_STATES, MessageType, RECIPIENT_ALL, RECIPIENT_WEREWOLVES, RECIPIENT_DOCTOR, RECIPIENT_DETECTIVE, RECIPIENT_MANIAC, GameMessage, Game, GameActionResponse, SystemErrorMessage, BotResponseError, GAME_MASTER, ROLE_CONFIGS, GAME_ROLES } from "@/app/api/game-models";
 import PlayerAvatar from "@/app/components/PlayerAvatar";
+import ImageLightbox from "@/app/components/ImageLightbox";
+import type { VoiceSelection } from "./CharacterVoicePanel";
 import { clearGameErrorState } from "@/app/api/game-actions";
 import { getAvatarView, getIllustrationUrl, getSceneUrl } from "@/app/utils/avatar-utils";
 import VotingModal from "./VotingModal";
@@ -21,7 +23,8 @@ import { ttsService } from "@/app/services/tts-service";
 import { sttService } from "@/app/services/stt-service";
 import { getDefaultVoiceProvider } from "@/app/ai/voice-config";
 import { getModelDisplayName, getModelProviderName } from "@/app/ai/ai-models";
-import { freeSpendLimitWindow, isFreeSpendLimitError, isInsufficientBalanceError, isProviderBudgetDepletedError, isProviderBusyError } from "@/app/api/errors";
+import { freeSpendLimitScope, freeSpendLimitWindow, isFreeSpendLimitError, isInsufficientBalanceError, isProviderBudgetDepletedError, isProviderBusyError } from "@/app/api/errors";
+import SpendLimitModal from "@/app/components/SpendLimitModal";
 import { formatReplyForDisplay } from "@/app/utils/text-format";
 import { DISCORD_URL } from "@/app/config/external-links";
 import Link from "next/link";
@@ -54,6 +57,11 @@ interface GameChatProps {
     cancelButton?: React.ReactNode;
     // Opens the character card for a participant (avatar clicks in messages).
     onAvatarClick?: (name: string) => void;
+    // Cinematic mode's voice line under the speaker's portrait (see CinematicMode):
+    // the owner may change a bot's or the GM's voice from there too.
+    isOwner?: boolean;
+    onGameChange?: (patch: Partial<Game>) => void;
+    onUpdateVoice?: (gameId: string, name: string, selection: VoiceSelection) => Promise<Game>;
 }
 
 export interface PhaseControls {
@@ -195,18 +203,32 @@ function renderMessageContent(rawContent: string) {
 function ChatSceneImage({ src, alt, standalone = false }: { src: string; alt: string; standalone?: boolean }) {
     const [loaded, setLoaded] = useState(false);
     const [failed, setFailed] = useState(false);
+    const [expanded, setExpanded] = useState(false);
+    const close = useCallback(() => setExpanded(false), []);
     if (failed) return null;
+    // The thumbnail is cropped to 3:2 for a stable chat layout; the click shows
+    // the whole stored image (1024px wide) letterboxed in a lightbox.
     return (
-        <span className={`block w-full max-w-[560px] rounded-[var(--radius-md)] border border-[var(--line-1)] ${standalone ? '' : 'mb-2'} overflow-hidden aspect-[3/2] ${loaded ? '' : 'animate-pulse bg-[var(--bg-3)]'}`}>
-            {/* eslint-disable-next-line @next/next/no-img-element -- authed dynamic route; next/image can't optimize it */}
-            <img
-                src={src}
-                alt={alt}
-                className={`block w-full h-full object-cover transition-opacity duration-500 ${loaded ? 'opacity-100' : 'opacity-0'}`}
-                onLoad={() => setLoaded(true)}
-                onError={() => setFailed(true)}
-            />
-        </span>
+        <>
+            <button
+                type="button"
+                aria-label={`${alt} — view full size`}
+                title="View full size"
+                disabled={!loaded}
+                onClick={() => setExpanded(true)}
+                className={`block w-full max-w-[560px] p-0 text-left rounded-[var(--radius-md)] border border-[var(--line-1)] ${standalone ? '' : 'mb-2'} overflow-hidden aspect-[3/2] ${loaded ? 'cursor-zoom-in' : 'animate-pulse bg-[var(--bg-3)] cursor-default'}`}
+            >
+                {/* eslint-disable-next-line @next/next/no-img-element -- authed dynamic route; next/image can't optimize it */}
+                <img
+                    src={src}
+                    alt={alt}
+                    className={`block w-full h-full object-cover transition-opacity duration-500 ${loaded ? 'opacity-100' : 'opacity-0'}`}
+                    onLoad={() => setLoaded(true)}
+                    onError={() => setFailed(true)}
+                />
+            </button>
+            {expanded && <ImageLightbox src={src} alt={alt} onClose={close} />}
+        </>
     );
 }
 
@@ -496,13 +518,37 @@ function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcludin
     );
 }
 
-export default function GameChat({ gameId, game, runGameAction, onGameStateChange, pendingMessages, onPendingMessagesConsumed, clearNightMessages, onErrorHandled, onRetryWithModel, onRetryBotSelection, isExternalLoading, phaseControls, chatControls, onBeforeAction, cancelButton, onAvatarClick }: GameChatProps) {
+export default function GameChat({ gameId, game, runGameAction, onGameStateChange, pendingMessages, onPendingMessagesConsumed, clearNightMessages, onErrorHandled, onRetryWithModel, onRetryBotSelection, isExternalLoading, phaseControls, chatControls, onBeforeAction, cancelButton, onAvatarClick, isOwner, onGameChange, onUpdateVoice }: GameChatProps) {
     // Without a parent-provided lock, run actions directly (standalone use).
     const runAction = useMemo(
         () => runGameAction ?? (<T,>(action: () => Promise<T>) => action()),
         [runGameAction]
     );
     const [messages, setMessages] = useState<GameMessage[]>([]);
+    // The spend-cap popup. Keyed on the refusal TEXT so it opens once per distinct
+    // refusal: dismissing it must not re-open on the next render, but a different cap
+    // (or the same one tomorrow) should still be announced. The persistent banner below
+    // carries the same explanation after this is dismissed.
+    const [spendLimitNotice, setSpendLimitNotice] = useState<string | undefined>(undefined);
+    const dismissedSpendNoticeRef = useRef<string | undefined>(undefined);
+    // Open the popup whenever the game stops on a spend-cap refusal. The message can
+    // arrive on `error` or wrapped inside `details`, the same two places the persistent
+    // banner below looks. Clearing the error resets the dismissal, so tomorrow's refusal
+    // is announced again rather than silently suppressed.
+    useEffect(() => {
+        const err = game.errorState;
+        const text = isFreeSpendLimitError(err?.error)
+            ? err?.error
+            : isFreeSpendLimitError(err?.details) ? err?.details : undefined;
+        if (!text) {
+            dismissedSpendNoticeRef.current = undefined;
+            return;
+        }
+        if (dismissedSpendNoticeRef.current !== text) {
+            setSpendLimitNotice(text);
+        }
+    }, [game.errorState]);
+
     const [cinematicOpen, setCinematicOpen] = useState(false);
     const [cinematicStartId, setCinematicStartId] = useState<string | undefined>(undefined);
     // Playing a scene and auto-playing new ones are separate controls (the header
@@ -2004,6 +2050,10 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                         ? game.errorState.error
                         : isFreeSpendLimitError(game.errorState.details) ? game.errorState.details : undefined;
                     const freeSpendWindow = freeSpendLimitWindow(freeSpendText);
+                    // Which ceiling refused. The global and shared-device cases must not
+                    // render as "you used your allowance" - one is nothing to do with this
+                    // player, the other was spent by a different account.
+                    const freeSpendScope = freeSpendLimitScope(freeSpendText);
                     // Hidden during NIGHT for the same reason as the model name.
                     const provider = model ? getModelProviderName(model) : undefined;
                     if (freeSpendWindow) {
@@ -2024,10 +2074,20 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                                     </svg>
                                     <div className="flex-1 min-w-0">
                                         <div className="text-[13px] font-medium text-[var(--fg-0)] break-words">
-                                            {freeSpendWindow === 'day' ? "Today's free AI allowance is used up" : "This month's free AI allowance is used up"}
+                                            {freeSpendScope === 'global'
+                                                ? 'Free play is paused for today'
+                                                : freeSpendWindow === 'day' ? "Today's free AI allowance is used up" : "This month's free AI allowance is used up"}
                                         </div>
                                         <div className="text-[12px] mt-1 text-[var(--fg-1)] break-words">
-                                            The game is paused, not broken — the free tier includes a daily and a monthly amount of AI on the platform&apos;s keys, and {freeSpendWindow === 'day' ? "today's" : "this month's"}{capAmount ? ` ${capAmount}` : ''} is spent. Adding funds on your profile page lifts the cap immediately; otherwise come back after the reset and press Retry to pick up where the game left off.
+                                            {freeSpendScope === 'global' ? (
+                                                <>
+                                                    The game is paused, not broken — everyone on the free tier shares a daily pool of AI on the platform&apos;s keys, and today&apos;s pool is spent. This is not about your account; you still have allowance left. Adding funds on your profile page lifts it immediately; otherwise come back after the reset and press Retry to pick up where the game left off.
+                                                </>
+                                            ) : (
+                                                <>
+                                                    The game is paused, not broken — the free tier includes a daily and a monthly amount of AI on the platform&apos;s keys, and {freeSpendWindow === 'day' ? "today's" : "this month's"}{capAmount ? ` ${capAmount}` : ''} is spent. Adding funds on your profile page lifts the cap immediately; otherwise come back after the reset and press Retry to pick up where the game left off.
+                                                </>
+                                            )}
                                         </div>
                                         <div className="text-[12px] mt-1 text-[var(--fg-2)] break-words">
                                             Resets {resetLabel} (your local time){freeSpendWindow === 'day' ? ', midnight UTC' : ', the 1st at midnight UTC'}.
@@ -2361,6 +2421,15 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
             </form>
             )}
             </div>{/* end footer strip */}
+            {spendLimitNotice && (
+                <SpendLimitModal
+                    message={spendLimitNotice}
+                    onClose={() => {
+                        dismissedSpendNoticeRef.current = spendLimitNotice;
+                        setSpendLimitNotice(undefined);
+                    }}
+                />
+            )}
             <VotingModal
                 game={game}
                 onVote={handleVote}
@@ -2392,6 +2461,11 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                     pendingHumanAction={pendingHumanAction}
                     speakingMessageId={speakingMessageId}
                     loadingMessageId={loadingMessageId}
+                    isOwner={isOwner}
+                    onGameChange={onGameChange}
+                    onUpdateVoice={onUpdateVoice}
+                    onSpeakSample={(text, sel) => ttsService.speakText(text, { voice: sel.voice, voiceStyle: sel.voiceStyle || undefined, voiceProvider: game.voiceProvider, gameId: game.id })}
+                    onStopSample={() => ttsService.stopSpeaking()}
                     onClose={() => {
                         // Manual close mid-burst = "let me read the chat":
                         // suppress auto-reopen until this burst finishes.

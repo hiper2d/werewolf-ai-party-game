@@ -428,6 +428,16 @@ export const FREE_TIER_LIMITS = {
     GAMES_PER_CALENDAR_DAY: 5,
     DAILY_SPEND_USD: 5,
     MONTHLY_SPEND_USD: 20,
+    // Platform-wide free-tier ceiling for one UTC day, across ALL free users combined.
+    // The per-user caps above answer "how much can one account spend"; this answers
+    // "how much can the platform lose in a day", which is the only question whose answer
+    // cannot be changed by creating more accounts. Added 2026-09-13 after one user ran
+    // four accounts (see docs/plan-user-spend-tracking-and-daily-cap.md).
+    GLOBAL_DAILY_SPEND_USD: 40,
+    // Per-BROWSER daily ceiling, metered on the device id (see device-actions.ts).
+    // Shared by every account signed in from that browser, so a farm of accounts on one
+    // machine draws down one budget instead of one each. Set to 0 to disable entirely.
+    DEVICE_DAILY_SPEND_USD: 5,
 } as const;
 
 /** Resolved free-tier limits (defaults overlaid with `config/limits`). */
@@ -435,6 +445,31 @@ export interface FreeTierLimits {
     gamesPerDay: number;
     dailySpendUSD: number;
     monthlySpendUSD: number;
+    globalDailySpendUSD: number;
+    deviceDailySpendUSD: number;
+}
+
+/**
+ * One browser's identity record (`devices/{deviceId}`). The id is minted server-side and
+ * kept in BOTH an httpOnly cookie and localStorage, each restoring the other, so it
+ * survives clearing either one alone (see device-actions.ts for why that matters).
+ *
+ * This is a soft signal on purpose. It is client-held, so it is defeated by an incognito
+ * window; and a shared family or library computer is one device with several legitimate
+ * users. It exists to make casual account-farming cost something, NOT as a security
+ * boundary - the global cap is the boundary.
+ */
+export interface DeviceRecord {
+    deviceId: string;
+    createdAt: any;
+    lastSeenAt: any;
+    /** Emails seen signing in from this browser, newest last. Capped at DEVICE_USER_CAP. */
+    users: string[];
+    /** Most recent client IPs, newest last. Capped at DEVICE_IP_CAP. */
+    ips: string[];
+    /** Coarse geo from the edge, for the farm-clustering view only. */
+    geo?: { country?: string; region?: string; city?: string; timezone?: string };
+    dailySpend?: UserDailySpend;
 }
 
 export interface RoleConfig {
@@ -860,27 +895,10 @@ export const MANNEQUIN_VARIANT_INDEX = -1;
 // applied client-side by the avatar renderer, so nothing else is stored.
 // ---------------------------------------------------------------------------
 
-/** A rectangle on an image, in that image's pixels. */
-export interface ImageRect {
-    left: number;
-    top: number;
-    width: number;
-    height: number;
-}
-
-/** The round avatar inside a card. `x` and `d` are fractions of the card's
- * width, `y` a fraction of its height (the design's coordinate system). */
-export interface AvatarCircle {
-    x: number;
-    y: number;
-    d: number;
-}
-
-/** Where a portrait comes from on its sheet: the card cut and the circle in it. */
-export interface AvatarFraming {
-    card: ImageRect;
-    circle: AvatarCircle;
-}
+// The geometry (a card on its sheet, the circle in it) lives in the library's images
+// entry, shared with the slicer, the reframe editor and any other host of portrait sheets.
+import type {AvatarFraming} from "@hiper2d/ai-agents/images";
+export type {ImageRect, AvatarCircle, AvatarFraming} from "@hiper2d/ai-agents/images";
 
 export interface AvatarVariantEntry {
     n: number;
@@ -897,14 +915,7 @@ export interface AvatarVariantEntry {
     mannequin?: AvatarFraming;
 }
 
-// Cards are portrait 3:4 (the poster's shape), stored at this size.
-export const CARD_ASPECT = 3 / 4; // width / height
-export const CARD_WIDTH_PX = 600;
-export const CARD_HEIGHT_PX = 800;
-// Where the circle starts on a freshly cut card: 72% of its width, near the top.
-export const DEFAULT_AVATAR_CIRCLE: AvatarCircle = {x: 0.14, y: 0.03, d: 0.72};
-// A card narrower than this fraction of the sheet's height upscales too much.
-export const MIN_CARD_HEIGHT_FRACTION = 0.12;
+export {CARD_ASPECT, CARD_WIDTH_PX, CARD_HEIGHT_PX, DEFAULT_AVATAR_CIRCLE, MIN_CARD_HEIGHT_FRACTION} from "@hiper2d/ai-agents/images";
 
 export function avatarSheetKey(round: number): string {
     return `sheet-${round}`;

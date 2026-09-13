@@ -114,11 +114,16 @@ async function endNightWithResults(gameId: string, game: Game): Promise<GameActi
         ? nightState.deaths.map(d => `${d.player} (${d.role}) — ${d.cause.replace(/_/g, ' ')}`).join('; ')
         : 'NONE';
 
+    // A living detective must always get a beat in the story. An abducted detective never
+    // acts (the processor skips the turn and only records the block), so there is no
+    // detectiveResult — that case is BLOCKED, not INACTIVE. INACTIVE is reserved for
+    // "no living detective", which the system prompt already keeps out of the narrative.
+    const detectiveBlocked = nightState.actionsPrevented.some(ap => ap.role === GAME_ROLES.DETECTIVE);
     const detectiveResultSummary = nightState.detectiveResult
         ? (nightState.detectiveResult.success
             ? (nightState.detectiveResult.isEvil ? 'FOUND_EVIL' : 'FOUND_INNOCENT')
             : 'BLOCKED')
-        : 'INACTIVE';
+        : (detectiveBlocked ? 'BLOCKED' : 'INACTIVE');
 
     // Roles only, never player names: the GM is told to keep blocked actions out of
     // the story, and a name here is one model slip away from the public narrative.
