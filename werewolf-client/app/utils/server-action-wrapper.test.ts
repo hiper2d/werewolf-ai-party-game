@@ -13,12 +13,15 @@ import {
   SystemErrorMessage,
 } from '@/app/api/game-models';
 import { TierMismatchError } from '@/app/api/errors';
-import { setGameErrorState, getGame } from '@/app/api/game-actions';
+import { ModelRefusalError } from '@hiper2d/ai-agents';
+import { setGameErrorState, getGame, recordProviderBlock } from '@/app/api/game-actions';
+import { ProviderBlockedError } from '@/app/api/provider-blocks';
 import { logger } from '@/app/utils/logger';
 
 jest.mock('@/app/api/game-actions', () => ({
   setGameErrorState: jest.fn(),
   getGame: jest.fn(),
+  recordProviderBlock: jest.fn(),
 }));
 
 jest.mock('@/app/utils/logger', () => ({
@@ -32,6 +35,7 @@ jest.mock('@/app/utils/logger', () => ({
 
 const mockSetGameErrorState = setGameErrorState as jest.MockedFunction<typeof setGameErrorState>;
 const mockGetGame = getGame as jest.MockedFunction<typeof getGame>;
+const mockRecordProviderBlock = recordProviderBlock as jest.MockedFunction<typeof recordProviderBlock>;
 
 const GAME_ID = 'game-123';
 
@@ -460,6 +464,78 @@ describe('withErrorHandling', () => {
       expect(gameId).toBe('extracted-id');
       expect(systemError.context.gameId).toBe('extracted-id');
     });
+  });
+});
+
+describe('content-filter refusals', () => {
+  it('types a ModelRefusalError as MODEL_REFUSAL with the provider reason in context and the log', async () => {
+    const err = new ModelRefusalError('gemini-3.8-flash', 'gemini-3.8-flash refused the prompt (blockReason: PROHIBITED_CONTENT)', 'PROHIBITED_CONTENT');
+    const wrapped = withErrorHandling(async function talkToAll() { throw err; }, () => GAME_ID);
+
+    await wrapped();
+
+    const { systemError } = lastErrorStateCall();
+    expect(systemError.code).toBe('MODEL_REFUSAL');
+    expect(systemError.context.refusalReason).toBe('PROHIBITED_CONTENT');
+    expect(systemError.error).toBe('gemini-3.8-flash refused the prompt (blockReason: PROHIBITED_CONTENT)');
+    expect(systemError.recoverable).toBe(true);
+    expect(logger.error).toHaveBeenCalledWith(
+      'Game action failed: talkToAll',
+      expect.objectContaining({ code: 'MODEL_REFUSAL', refusalReason: 'PROHIBITED_CONTENT' })
+    );
+  });
+
+  it('puts the refusing model\'s provider on the game\'s block list, attributed to the failing bot', async () => {
+    mockGetGame.mockResolvedValue(makeGame({ gameStateProcessQueue: ['Alice'], currentDay: 2 }));
+    const err = new ModelRefusalError('gemini-3.8-flash', 'gemini-3.8-flash refused the prompt (blockReason: PROHIBITED_CONTENT)', 'PROHIBITED_CONTENT');
+    const wrapped = withErrorHandling(async () => { throw err; }, () => GAME_ID);
+
+    await wrapped();
+
+    expect(mockRecordProviderBlock).toHaveBeenCalledWith(GAME_ID, 'model-alice', 'PROHIBITED_CONTENT', 'Alice', 2);
+    // A failed block write must not mask the refusal itself.
+    mockRecordProviderBlock.mockRejectedValueOnce(new Error('firestore down'));
+    await withErrorHandling(async () => { throw err; }, () => GAME_ID)();
+    expect(mockSetGameErrorState).toHaveBeenCalledTimes(2);
+  });
+
+  it('types a server-side block (provider already refused this game) as PROVIDER_BLOCKED and records nothing new', async () => {
+    const err = new ProviderBlockedError('GOOGLE_API_KEY', { provider: 'Google', reason: 'PROHIBITED_CONTENT', model: 'gemini-flash', day: 1, at: 1 });
+    const wrapped = withErrorHandling(async () => { throw err; }, () => GAME_ID);
+
+    await wrapped();
+
+    const { systemError } = lastErrorStateCall();
+    expect(systemError.code).toBe('PROVIDER_BLOCKED');
+    expect(systemError.error).toMatch(/Google is blocked in this game/);
+    expect(mockRecordProviderBlock).not.toHaveBeenCalled();
+  });
+
+  it('types the vote path\'s BotResponseError wrapper the same way', async () => {
+    const err = new BotResponseError(
+      'gemini-3.1-pro-preview refused the prompt (blockReason: PROHIBITED_CONTENT)',
+      'Bot Solana (gemini-pro) encountered an error during voting',
+      { botName: 'Solana', aiType: 'gemini-pro', action: 'vote', originalError: 'ModelRefusalError' },
+      true
+    );
+    const wrapped = withErrorHandling(async () => { throw err; }, () => GAME_ID);
+
+    await wrapped();
+
+    const { systemError } = lastErrorStateCall();
+    expect(systemError.code).toBe('MODEL_REFUSAL');
+    expect(systemError.context.refusalReason).toBe('PROHIBITED_CONTENT');
+    expect(systemError.context.botName).toBe('Solana');
+  });
+
+  it('leaves an ordinary failure untyped', async () => {
+    const wrapped = withErrorHandling(async () => { throw new Error('Empty response from Google API (finishReason=STOP)'); }, () => GAME_ID);
+
+    await wrapped();
+
+    const { systemError } = lastErrorStateCall();
+    expect(systemError.code).toBeUndefined();
+    expect(systemError.context.refusalReason).toBeUndefined();
   });
 });
 

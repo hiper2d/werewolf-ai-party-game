@@ -1,5 +1,6 @@
 'use server';
 
+import { assertProviderNotBlocked } from '@/app/api/provider-blocks';
 import {unwrapJsonReply} from "@/app/utils/text-format";
 import {db} from "@/firebase/server";
 import {
@@ -1655,6 +1656,7 @@ async function getSuggestionImpl(gameId: string): Promise<string> {
         });
 
         // Use the game master AI to generate suggestion
+        assertProviderNotBlocked(game, game.gameMasterAiType);
         const agent = AgentFactory.createAgent('SuggestionBot', suggestionPrompt, game.gameMasterAiType, apiKeys, false);
         agent.gameId = gameId;
         agent.userId = session.user.email;

@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { LLM_CONSTANTS, SupportedAiModels, getModelDisplayName, getModelTags, type ModelTag } from '@/app/ai/ai-models';
 import { getModelPickerOptions } from '@/app/ai/model-limit-utils';
-import { UserTier, USER_TIERS } from '@/app/api/game-models';
+import { UserTier, USER_TIERS, type ProviderBlock } from '@/app/api/game-models';
+import { providerBlockMessage } from '@/app/api/provider-blocks';
 import { useUIControls } from '../context/UIControlsContext';
 
 const TAG_STYLES: Record<ModelTag, { text: string; border: string; bg: string; label: string }> = {
@@ -25,8 +26,13 @@ interface ModelSelectionDialogProps {
     gameTier: UserTier;
     usageCounts: Record<string, number>;
     // 'change' (default) permanently switches the bot's model; 'retry' applies the
-    // chosen model to the failed request only, leaving the bot's model untouched.
-    mode?: 'change' | 'retry';
+    // chosen model to the failed request only, leaving the bot's model untouched;
+    // 'reassign' moves every player on a blocked provider to the chosen model.
+    mode?: 'change' | 'retry' | 'reassign';
+    // Providers whose content filter refused this game (Game.providerBlocks): their models
+    // are left out of the list entirely and named in a notice, so the player is never
+    // offered the option the server would reject.
+    blockedProviders?: Record<string, ProviderBlock>;
 }
 
 export default function ModelSelectionDialog({
@@ -36,7 +42,8 @@ export default function ModelSelectionDialog({
     botName,
     gameTier,
     usageCounts,
-    mode = 'change'
+    mode = 'change',
+    blockedProviders
 }: ModelSelectionDialogProps) {
     const { isModalOpen } = useUIControls();
     const isOpen = isModalOpen('modelSelection');
@@ -51,8 +58,14 @@ export default function ModelSelectionDialog({
             currentModel,
         })
             .map(({ model, disabled }) => ({ model, disabled }))
-            .filter(option => !(option.disabled && option.model !== currentModel));
-    }, [gameTier, usageCounts, currentModel]);
+            .filter(option => !(option.disabled && option.model !== currentModel))
+            .filter(option => {
+                const apiKeyName = SupportedAiModels[option.model]?.apiKeyName;
+                return !(apiKeyName && blockedProviders?.[apiKeyName]);
+            });
+    }, [gameTier, usageCounts, currentModel, blockedProviders]);
+
+    const blockedNotices = useMemo(() => Object.values(blockedProviders ?? {}).map(providerBlockMessage), [blockedProviders]);
 
     // Group by provider
     const groupedModels = useMemo(() => {
@@ -127,12 +140,14 @@ export default function ModelSelectionDialog({
                 <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--line-1)]">
                     <div>
                         <h3 className="text-[16px] font-semibold text-[var(--fg-0)]">
-                            {mode === 'retry' ? 'Retry with a Different Model' : 'Change AI Model'}
+                            {mode === 'retry' ? 'Retry with a Different Model' : mode === 'reassign' ? `Reassign ${botName} Players` : 'Change AI Model'}
                         </h3>
                         <p className="text-[12px] text-[var(--fg-2)] mt-0.5">
                             {mode === 'retry'
                                 ? <>{botName ? <>{botName} &middot; </> : null}one-time retry &mdash; no player&apos;s model is changed</>
-                                : <>{botName} &middot; Currently: <span className="font-mono">{getModelDisplayName(currentModel)}</span></>}
+                                : mode === 'reassign'
+                                    ? <>every player still on {botName} moves to the model you pick, for the rest of the game</>
+                                    : <>{botName} &middot; Currently: <span className="font-mono">{getModelDisplayName(currentModel)}</span></>}
                         </p>
                     </div>
                     <button onClick={onClose} className="w-8 h-8 rounded-[var(--radius-md)] hover:bg-[var(--bg-3)] text-[var(--fg-2)] flex items-center justify-center transition-colors duration-[120ms]">
@@ -152,6 +167,11 @@ export default function ModelSelectionDialog({
                     />
                 </div>
 
+                {blockedNotices.length > 0 && (
+                    <div className="mx-4 mb-1 px-3 py-2 rounded-[var(--radius-md)] bg-[oklch(70%_0.13_25_/_0.08)] border border-[oklch(70%_0.13_25_/_0.3)] text-[12px] text-[var(--fg-1)]">
+                        {blockedNotices.map(notice => <div key={notice}>{notice}</div>)}
+                    </div>
+                )}
                 {/* Model list */}
                 <div className="max-h-[340px] overflow-y-auto px-2 py-2">
                     {filteredGroups.map(([provider, models]) => (
@@ -223,8 +243,8 @@ export default function ModelSelectionDialog({
                         className={`px-4 py-2 text-[13px] font-medium rounded-[var(--radius-md)] bg-[var(--accent)] text-[var(--on-accent)] hover:brightness-110 transition-all duration-[120ms] ${isUpdating || selectedModel === currentModel ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                         {isUpdating
-                            ? (mode === 'retry' ? 'Retrying...' : 'Updating...')
-                            : (mode === 'retry' ? 'Retry' : 'Apply')}
+                            ? (mode === 'retry' ? 'Retrying...' : mode === 'reassign' ? 'Reassigning...' : 'Updating...')
+                            : (mode === 'retry' ? 'Retry' : mode === 'reassign' ? 'Reassign' : 'Apply')}
                     </button>
                 </div>
             </div>

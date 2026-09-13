@@ -23,7 +23,8 @@ import { ttsService } from "@/app/services/tts-service";
 import { sttService } from "@/app/services/stt-service";
 import { getDefaultVoiceProvider } from "@/app/ai/voice-config";
 import { getModelDisplayName, getModelProviderName } from "@/app/ai/ai-models";
-import { freeSpendLimitScope, freeSpendLimitWindow, isFreeSpendLimitError, isInsufficientBalanceError, isProviderBudgetDepletedError, isProviderBusyError } from "@/app/api/errors";
+import { freeSpendLimitScope, freeSpendLimitWindow, isFreeSpendLimitError, isInsufficientBalanceError, isModelRefusalError, isProviderBudgetDepletedError, isProviderBusyError, modelRefusalReason } from "@/app/api/errors";
+import { actorsOnProvider, isProviderBlockedError, providerDisplayName, providerKeyOf, refusalReasonLabel } from "@/app/api/provider-blocks";
 import SpendLimitModal from "@/app/components/SpendLimitModal";
 import { formatReplyForDisplay } from "@/app/utils/text-format";
 import { DISCORD_URL } from "@/app/config/external-links";
@@ -45,6 +46,8 @@ interface GameChatProps {
     // request only (never changes the bot's stored model). failedName may be a role
     // name (night hidden roles) or undefined — the server resolves the real target.
     onRetryWithModel?: (failedName?: string) => void;
+    // Refusal banner: move every player still on the blocked provider to one new model.
+    onReassignProvider?: (providerKey: string) => void;
     // Re-runs the GM bot-selection step after a router failure, where clearing the error alone
     // cannot resume the game (the process queue was never written).
     onRetryBotSelection?: () => void;
@@ -518,7 +521,7 @@ function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcludin
     );
 }
 
-export default function GameChat({ gameId, game, runGameAction, onGameStateChange, pendingMessages, onPendingMessagesConsumed, clearNightMessages, onErrorHandled, onRetryWithModel, onRetryBotSelection, isExternalLoading, phaseControls, chatControls, onBeforeAction, cancelButton, onAvatarClick, isOwner, onGameChange, onUpdateVoice }: GameChatProps) {
+export default function GameChat({ gameId, game, runGameAction, onGameStateChange, pendingMessages, onPendingMessagesConsumed, clearNightMessages, onErrorHandled, onRetryWithModel, onReassignProvider, onRetryBotSelection, isExternalLoading, phaseControls, chatControls, onBeforeAction, cancelButton, onAvatarClick, isOwner, onGameChange, onUpdateVoice }: GameChatProps) {
     // Without a parent-provided lock, run actions directly (standalone use).
     const runAction = useMemo(
         () => runGameAction ?? (<T,>(action: () => Promise<T>) => action()),
@@ -2056,6 +2059,20 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                     const freeSpendScope = freeSpendLimitScope(freeSpendText);
                     // Hidden during NIGHT for the same reason as the model name.
                     const provider = model ? getModelProviderName(model) : undefined;
+                    // A content-filter refusal (Gemini PROHIBITED_CONTENT / SAFETY, Anthropic
+                    // stop_reason refusal). The server types it as `code`; the text check covers
+                    // an error state written before the code existed. Retrying the same model
+                    // refuses again, so the primary action is the model swap.
+                    const refusal = game.errorState.code === 'MODEL_REFUSAL'
+                        || isModelRefusalError(game.errorState.error)
+                        || isModelRefusalError(game.errorState.details);
+                    // The call was stopped server-side because the provider was already blocked in
+                    // this game — same banner, different first line.
+                    const providerBlocked = !refusal && (game.errorState.code === 'PROVIDER_BLOCKED'
+                        || isProviderBlockedError(game.errorState.error));
+                    const refusalReason = (game.errorState.context?.refusalReason as string | undefined)
+                        ?? modelRefusalReason(game.errorState.error)
+                        ?? modelRefusalReason(game.errorState.details);
                     if (freeSpendWindow) {
                         // The cap amount comes from config and is only known through the message.
                         const capAmount = /free (\$[\d.]+) of AI/i.exec(freeSpendText ?? '')?.[1];
@@ -2116,6 +2133,76 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                                             </svg>
                                             Retry
                                         </button>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    }
+                    if (refusal || providerBlocked) {
+                        const blockedKey = providerKeyOf(model);
+                        const blockedProvider = blockedKey ? providerDisplayName(blockedKey) : (provider ?? 'The AI provider');
+                        const storedBlock = blockedKey ? game.providerBlocks?.[blockedKey] : undefined;
+                        const reasonLabel = refusalReasonLabel(refusalReason ?? storedBlock?.reason);
+                        // Hidden during NIGHT (no model, no key): naming the others would leak roles.
+                        const others = blockedKey ? actorsOnProvider(game, blockedKey, who) : [];
+                        const whoLine = displayWho ?? 'this player';
+                        return (
+                            <div className="mx-2 my-2 p-3 rounded-[var(--radius-lg)] border bg-[oklch(70%_0.13_25_/_0.08)] border-[oklch(70%_0.13_25_/_0.3)]">
+                                <div className="flex items-start gap-2">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 mt-0.5 text-[var(--danger)]">
+                                        <circle cx="12" cy="12" r="10"/>
+                                        <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+                                    </svg>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="text-[13px] font-medium text-[var(--fg-0)] break-words">
+                                            {providerBlocked
+                                                ? `${blockedProvider} is blocked in this game`
+                                                : `${blockedProvider} blocked ${whoLine}'s turn${reasonLabel ? `: ${reasonLabel}` : ''}`}
+                                        </div>
+                                        <div className="text-[12px] mt-1 text-[var(--fg-1)] break-words">
+                                            {providerBlocked ? (
+                                                <>
+                                                    {blockedProvider}&apos;s content filter refused this game&apos;s story earlier{storedBlock ? ` (day ${storedBlock.day}${refusalReasonLabel(storedBlock.reason) ? `, ${refusalReasonLabel(storedBlock.reason)}` : ''})` : ''}, so nothing is sent to it again in this game — {whoLine}{model ? ` (${getModelDisplayName(model)})` : ''} still runs on it. Pick a model from another provider.
+                                                </>
+                                            ) : (
+                                                <>
+                                                    {blockedProvider}&apos;s content filter{model ? ` (${getModelDisplayName(model)})` : ''} rejected the request and returned nothing. This is the provider&apos;s policy on the game&apos;s story, not a glitch: the same model would refuse again, so {blockedProvider} is now blocked for the rest of this game and the next turn has to use a different provider.
+                                                </>
+                                            )}
+                                        </div>
+                                        {others.length > 0 && (
+                                            <div className="text-[12px] mt-1 text-[var(--fg-2)] break-words">
+                                                Also on {blockedProvider}: {others.join(', ')} — they will hit the same wall on their next turn unless reassigned.
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="flex-shrink-0 flex flex-col gap-1.5">
+                                        {onRetryWithModel && (
+                                            <button
+                                                onClick={() => onRetryWithModel(who)}
+                                                className="px-3 py-1.5 rounded-[var(--radius-md)] bg-[var(--accent)] text-[var(--accent-fg)] hover:brightness-110 text-[12px] font-medium transition-all duration-[120ms] flex items-center justify-center gap-1.5"
+                                                title="Retry this action once with a model from another provider (doesn't change the bot's model)"
+                                            >
+                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
+                                                    <path d="M12 20h9"/>
+                                                    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+                                                </svg>
+                                                <span className="text-left leading-tight">Retry with<br/>different model</span>
+                                            </button>
+                                        )}
+                                        {onReassignProvider && blockedKey && (
+                                            <button
+                                                onClick={() => onReassignProvider(blockedKey)}
+                                                className="px-3 py-1.5 rounded-[var(--radius-md)] bg-[var(--bg-2)] border border-[var(--line-2)] text-[var(--fg-1)] hover:bg-[var(--bg-3)] hover:text-[var(--fg-0)] text-[12px] font-medium transition-all duration-[120ms] flex items-center justify-center gap-1.5"
+                                                title={`Move every player still on ${blockedProvider} to one model of your choice, for the rest of the game`}
+                                            >
+                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
+                                                    <path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+                                                    <path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+                                                </svg>
+                                                <span className="text-left leading-tight">Reassign all<br/>{blockedProvider} players</span>
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                             </div>

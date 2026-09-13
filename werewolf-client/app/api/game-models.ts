@@ -323,6 +323,9 @@ export interface Game {
     // by the next AI call for that actor. Same lifecycle as modelOverride. Never set by
     // "Retry with different model".
     retryHint?: { botName: string; hint: string } | null;
+    // Providers whose content filter refused this game's story; see ProviderBlock. Survives
+    // Retry and error clearing. Empty for games that never hit a refusal.
+    providerBlocks?: Record<string, ProviderBlock>;
     nightResults?: Record<string, { target: string; actionType?: string; narrativeHint?: string }>; // Dynamic night results for each role that has night actions
     previousNightResults?: Record<string, { target: string; actionType?: string; narrativeHint?: string }>; // Previous night's results for reference
     messageCounter?: number; // Counter for generating incremental message IDs
@@ -851,6 +854,29 @@ export interface SystemErrorMessage {
     // to the rebuilt prompt when the user presses Retry; absent for failures with nothing useful
     // to tell the model (timeouts, 5xx). Not shown in the UI — `details` is the user-facing text.
     explanation?: string;
+    // Machine-readable kind for failures the UI treats differently from "the model hiccuped".
+    // MODEL_REFUSAL: a content filter refused the prompt (Gemini blockReason / finishReason,
+    // Anthropic stop_reason refusal). The same model refuses again on Retry — the fix is a
+    // different model; `context.refusalReason` carries the provider's label (PROHIBITED_CONTENT…).
+    // PROVIDER_BLOCKED: the call was stopped BEFORE reaching the provider because an earlier
+    // refusal put that provider on the game's block list (`Game.providerBlocks`).
+    code?: 'MODEL_REFUSAL' | 'PROVIDER_BLOCKED';
+}
+
+/**
+ * One provider's content-filter verdict on this game, keyed in `Game.providerBlocks` by the
+ * provider's api-key name (GOOGLE_API_KEY, QWEN_API_KEY, …). Written by the action wrapper the
+ * first time a model of that provider refuses (MODEL_REFUSAL); read by getEffectiveModel before
+ * every AI call and by the model-change actions, so nothing from that provider is sent this
+ * story again. Per game by design — the block is about this content, not the provider.
+ */
+export interface ProviderBlock {
+    provider: string;   // display name ("Google")
+    reason: string;     // provider's label: PROHIBITED_CONTENT, SAFETY, DataInspectionFailed, refusal
+    model: string;      // picker id of the model that refused
+    botName?: string;   // whose turn it was
+    day: number;
+    at: number;         // epoch ms
 }
 
 // BotResponseError and MESSAGE_ROLE moved to @hiper2d/ai-agents (re-exported at the top

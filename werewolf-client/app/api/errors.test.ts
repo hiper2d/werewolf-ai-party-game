@@ -1,4 +1,5 @@
-import { isInsufficientBalanceError, isProviderBudgetDepletedError, isProviderBusyError, FreeSpendLimitError, freeSpendLimitMessage, freeSpendLimitScope, freeSpendLimitWindow, isFreeSpendLimitError } from './errors';
+import { isInsufficientBalanceError, isModelRefusalError, isProviderBudgetDepletedError, isProviderBusyError, FreeSpendLimitError, freeSpendLimitMessage, freeSpendLimitScope, freeSpendLimitWindow, isFreeSpendLimitError, modelRefusalReason, refusalOf } from './errors';
+import { BotResponseError, ModelRefusalError } from '@hiper2d/ai-agents';
 
 describe('isProviderBudgetDepletedError', () => {
     const depletedSamples = [
@@ -177,5 +178,40 @@ describe('scoped spend limit refusals', () => {
     it('carries the scope on the thrown error', () => {
         expect(new FreeSpendLimitError(global as any, 'global').scope).toBe('global');
         expect(new FreeSpendLimitError(day as any).scope).toBe('account');
+    });
+});
+
+describe('model refusal detection', () => {
+    // Exact production message of 2026-09-13 (Gemini 3.8 Flash, explicit roleplay game).
+    const gemini = 'gemini-3.8-flash refused the prompt (blockReason: PROHIBITED_CONTENT)';
+    const geminiCandidate = 'gemini-3.1-pro-preview refused to answer (finishReason: SAFETY; safetyRatings: HARM_CATEGORY_SEXUALLY_EXPLICIT=HIGH)';
+    const anthropic = 'claude-fable-5-1 refused to answer (stop_reason: refusal)';
+    const qwen = 'qwen-flash refused the prompt (refusalReason: DataInspectionFailed; Input text data may contain inappropriate content.)';
+
+    it.each([gemini, geminiCandidate, anthropic, qwen])('recognizes the library wording: %s', (msg) => {
+        expect(isModelRefusalError(msg)).toBe(true);
+    });
+
+    it('extracts the provider label', () => {
+        expect(modelRefusalReason(gemini)).toBe('PROHIBITED_CONTENT');
+        expect(modelRefusalReason(geminiCandidate)).toBe('SAFETY');
+        expect(modelRefusalReason(anthropic)).toBe('refusal');
+        expect(modelRefusalReason(qwen)).toBe('DataInspectionFailed');
+    });
+
+    it('does not fire on ordinary failures, an old-style empty response, or empty input', () => {
+        expect(isModelRefusalError('Empty response from Google API (finishReason=STOP)')).toBe(false);
+        expect(isModelRefusalError('Failed to get response from Qwen API: 400 InternalError.Algo.DataInspectionFailed: Input text data may contain inappropriate content.')).toBe(false);
+        expect(isModelRefusalError('Invalid vote target: Tom')).toBe(false);
+        expect(isModelRefusalError(undefined)).toBe(false);
+        expect(modelRefusalReason('')).toBeUndefined();
+    });
+
+    it('refusalOf sees the typed error, the vote path\'s BotResponseError wrapper, and a plain Error', () => {
+        expect(refusalOf(new ModelRefusalError('gemini-3.8-flash', gemini, 'PROHIBITED_CONTENT'))).toEqual({ reason: 'PROHIBITED_CONTENT' });
+        expect(refusalOf(new BotResponseError(gemini, 'Bot Marina (gemini-flash) encountered an error during voting', { originalError: 'ModelRefusalError' }, true))).toEqual({ reason: 'PROHIBITED_CONTENT' });
+        expect(refusalOf(new Error(anthropic))).toEqual({ reason: 'refusal' });
+        expect(refusalOf(new Error('Empty response from Google API'))).toBeUndefined();
+        expect(refusalOf(null)).toBeUndefined();
     });
 });

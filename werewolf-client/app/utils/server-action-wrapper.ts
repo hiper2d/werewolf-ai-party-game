@@ -1,7 +1,8 @@
-import { setGameErrorState, getGame } from '@/app/api/game-actions';
+import { setGameErrorState, getGame, recordProviderBlock } from '@/app/api/game-actions';
 import { SystemErrorMessage, BotResponseError, GameActionResponse, GAME_STATES, Game } from '@/app/api/game-models';
 import { invalidJsonExplanation, isResponseFormatFailure } from '@/app/api/retry-hint';
-import { isTierMismatchError } from '@/app/api/errors';
+import { isTierMismatchError, refusalOf } from '@/app/api/errors';
+import { isProviderBlockedError } from '@/app/api/provider-blocks';
 import { logger } from '@/app/utils/logger';
 
 /**
@@ -105,10 +106,34 @@ export function withErrorHandling<T extends any[]>(
         ? error.explanation ?? (isResponseFormatFailure(error.details) ? invalidJsonExplanation() : undefined)
         : isResponseFormatFailure(errorMessage) ? invalidJsonExplanation() : undefined;
 
+      // A content-filter refusal is not a hiccup: the same model refuses the same prompt
+      // again, so the UI has to steer the player to a different model. Typed on the
+      // error state (`code`) rather than left for the banner to regex out of the message.
+      const refusal = refusalOf(error);
+      // The call never left the server: getEffectiveModel stopped it because the provider
+      // was blocked by an earlier refusal in this game.
+      const providerBlocked = !refusal && ((error as any)?.code === 'PROVIDER_BLOCKED' || isProviderBlockedError(errorMessage));
+      const code: SystemErrorMessage['code'] | undefined = refusal ? 'MODEL_REFUSAL' : providerBlocked ? 'PROVIDER_BLOCKED' : undefined;
+
+      // Put the provider on this game's block list so no call from it goes out again —
+      // best effort, the error state below is written regardless.
+      if (refusal && model) {
+        try {
+          await recordProviderBlock(gameId, model, refusal.reason ?? 'refusal', botName, game?.currentDay);
+        } catch (blockError) {
+          logger.error(`Failed to record provider block for ${fnName}`, {
+            gameId,
+            model,
+            blockError: blockError instanceof Error ? blockError.message : String(blockError),
+          });
+        }
+      }
+
       const context: Record<string, any> = {
         ...baseContext,
         function: fnName,
         gameId,
+        ...(refusal?.reason ? { refusalReason: refusal.reason } : {}),
         ...(botName ? { botName } : {}),
         ...(model ? { model } : {}),
         ...(gameState ? { gameState } : {}),
@@ -124,6 +149,8 @@ export function withErrorHandling<T extends any[]>(
         gameState,
         apiProvider: baseContext.apiProvider,
         recoverable,
+        ...(code ? { code } : {}),
+        ...(refusal?.reason ? { refusalReason: refusal.reason } : {}),
         error: errorMessage,
         details: errorDetails,
       });
@@ -140,6 +167,7 @@ export function withErrorHandling<T extends any[]>(
         recoverable,
         timestamp: Date.now(),
         ...(explanation ? { explanation } : {}),
+        ...(code ? { code } : {}),
       };
 
       // Update game with error state and return it wrapped in GameActionResponse.

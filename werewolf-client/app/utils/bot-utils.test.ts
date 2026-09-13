@@ -112,3 +112,24 @@ describe('generateBotContextSection — night secrecy', () => {
         expect(ctx).not.toMatch(/abduct/i);
     });
 });
+
+describe('getEffectiveModel — blocked providers', () => {
+    const blocked = {
+        modelOverride: null,
+        providerBlocks: { GOOGLE_API_KEY: { provider: 'Google', reason: 'PROHIBITED_CONTENT', model: 'gemini-flash', day: 1, at: 1 } },
+    } as unknown as Game;
+
+    it('throws before any call when the stored model is on a blocked provider', () => {
+        expect(() => getEffectiveModel(blocked, 'Marina', 'gemini-flash')).toThrow(/Google is blocked in this game/);
+    });
+
+    it('also refuses a one-shot override that lands on the blocked provider', () => {
+        const withOverride = { ...blocked, modelOverride: { botName: 'Marina', model: 'gemini-pro' } } as unknown as Game;
+        expect(() => getEffectiveModel(withOverride, 'Marina', 'muse-spark')).toThrow(/Google is blocked/);
+    });
+
+    it('passes other providers through, block list or not', () => {
+        expect(getEffectiveModel(blocked, 'Marina', 'muse-spark')).toEqual({ aiType: 'muse-spark', enableThinking: false });
+        expect(getEffectiveModel({ modelOverride: null } as unknown as Game, 'Marina', 'gemini-flash').aiType).toBe('gemini-flash');
+    });
+});

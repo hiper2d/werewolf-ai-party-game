@@ -1,5 +1,6 @@
 import { Bot, Game, GAME_ROLES, PLAY_STYLES, PLAY_STYLE_CONFIGS, RoleKnowledge } from "@/app/api/game-models";
 import { latestChapterSummary } from "@/app/utils/story-utils";
+import { assertProviderNotBlocked } from "@/app/api/provider-blocks";
 
 /**
  * Builds the comma-separated list of ALIVE players for the "Alive Players" line of
@@ -25,6 +26,12 @@ export function getAlivePlayerNames(game: Game, excludeName?: string): string {
  * Resolves the model to use for a player's next AI request, honoring a pending
  * one-shot modelOverride ("Retry with different model" on the error banner).
  * Works for bots and the Game Master alike; falls back to the stored model.
+ *
+ * Every AI call in the game resolves its model here right before creating the agent, so
+ * this is also where a provider the game has blocked (see provider-blocks.ts) is stopped:
+ * it throws ProviderBlockedError before anything is sent. A plain Retry on a refused bot,
+ * another bot of the same provider whose turn comes later, the Game Master's narration and
+ * the night role calls all go through this one check.
  */
 export function getEffectiveModel(
     game: Game,
@@ -33,10 +40,11 @@ export function getEffectiveModel(
     baseThinking?: boolean
 ): { aiType: string; enableThinking: boolean } {
     const override = game.modelOverride;
-    if (override && override.botName === playerName && override.model) {
-        return { aiType: override.model, enableThinking: override.enableThinking ?? false };
-    }
-    return { aiType: baseModel, enableThinking: baseThinking ?? false };
+    const resolved = override && override.botName === playerName && override.model
+        ? { aiType: override.model, enableThinking: override.enableThinking ?? false }
+        : { aiType: baseModel, enableThinking: baseThinking ?? false };
+    assertProviderNotBlocked(game, resolved.aiType);
+    return resolved;
 }
 
 /**

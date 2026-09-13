@@ -1,4 +1,4 @@
-import type { BudgetVerdict } from '@hiper2d/ai-agents';
+import { ModelRefusalError, type BudgetVerdict } from '@hiper2d/ai-agents';
 
 export class TierMismatchError extends Error {
     code = 'TIER_MISMATCH' as const;
@@ -152,4 +152,44 @@ export function freeSpendLimitWindow(text: string | undefined | null): 'day' | '
         return undefined;
     }
     return /today's free|paused for today/i.test(text!) ? 'day' : 'month';
+}
+
+/**
+ * A content-filter refusal, recognized from the message text after the string round trip
+ * through `game.errorState`. The wording is the library's (`ModelRefusalError`): Anthropic
+ * "refused to answer (stop_reason: refusal)", Gemini "refused the prompt (blockReason:
+ * PROHIBITED_CONTENT)" / "refused to answer (finishReason: SAFETY…)", Qwen "refused the prompt
+ * (refusalReason: DataInspectionFailed…)". Keep in sync with `@hiper2d/ai-agents` errors.ts,
+ * google-agent.ts and qwen-agent.ts.
+ */
+const MODEL_REFUSAL_RE = /refused (?:the prompt|to answer) \((?:blockReason|finishReason|stop_reason|refusalReason): ([A-Za-z_]+)/;
+
+export function isModelRefusalError(text: string | undefined | null): boolean {
+    return !!text && MODEL_REFUSAL_RE.test(text);
+}
+
+/** The provider's own label for the refusal ("PROHIBITED_CONTENT", "SAFETY", "refusal"), if the text is one. */
+export function modelRefusalReason(text: string | undefined | null): string | undefined {
+    return text ? MODEL_REFUSAL_RE.exec(text)?.[1] : undefined;
+}
+
+/**
+ * Whether a caught error is a model refusal, and why. Three shapes reach the action
+ * wrapper: the library's ModelRefusalError itself (talk paths rethrow agent errors
+ * as-is), a BotResponseError the vote/night paths wrap it in (message kept verbatim,
+ * `context.originalError` = the class name), or a plain Error carrying the message.
+ */
+export function refusalOf(error: unknown): { reason?: string } | undefined {
+    if (error instanceof ModelRefusalError) {
+        return { reason: error.reason ?? modelRefusalReason(error.message) };
+    }
+    if (typeof error === 'object' && error !== null) {
+        const message = (error as any).message as string | undefined;
+        const details = (error as any).details as string | undefined;
+        const wrappedName = (error as any).context?.originalError as string | undefined;
+        if (wrappedName === 'ModelRefusalError' || isModelRefusalError(message) || isModelRefusalError(details)) {
+            return { reason: modelRefusalReason(message) ?? modelRefusalReason(details) };
+        }
+    }
+    return undefined;
 }

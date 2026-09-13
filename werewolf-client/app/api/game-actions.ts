@@ -30,7 +30,8 @@ import {
     USER_TIERS,
     AVATAR_VARIANTS_COLLECTION,
     DEFAULT_GAME_MODE,
-    GAME_MODES
+    GAME_MODES,
+    ProviderBlock,
 } from "@/app/api/game-models";
 import {auth} from "@/auth";
 import {AgentFactory} from "@/app/ai/agent-factory";
@@ -55,6 +56,7 @@ import {
 } from "@/app/ai/model-limit-utils";
 import {AbstractAgent} from '@hiper2d/ai-agents';
 import {ensureUserCanAccessGame} from "@/app/api/tier-guards";
+import { assertProviderNotBlocked, providerDisplayName, providerKeyOf } from '@/app/api/provider-blocks';
 import {logger} from "@/app/utils/logger";
 import {after} from "next/server";
 import {portraitKeysFor, runAvatarGeneration} from "@/app/utils/avatar-generation";
@@ -793,6 +795,7 @@ export async function updateBotModel(gameId: string, botName: string, newAiType:
             return bot;
         });
 
+        assertProviderNotBlocked({ providerBlocks: gameData?.providerBlocks }, newAiType);
         const { apiKeys: currentApiKeys } = await getUserTierAndApiKeys(session.user.email);
         validateModelUsageForTier(gameTier, gameMasterAiType, updatedBots.map((bot: Bot) => bot.aiType));
         
@@ -885,6 +888,7 @@ export async function updateGameMasterModel(gameId: string, newAiType: string): 
         const {gameTier} = await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: (gameData?.createdWithTier ?? 'free') });
 
         const bots = (gameData?.bots || []) as Bot[];
+        assertProviderNotBlocked({ providerBlocks: gameData?.providerBlocks }, newAiType);
         const { apiKeys: currentApiKeys } = await getUserTierAndApiKeys(session.user.email);
         validateModelUsageForTier(gameTier, newAiType, bots.map((bot: Bot) => bot.aiType));
 
@@ -1194,6 +1198,9 @@ export async function retryWithModelOverride(gameId: string, model: string, enab
         throw new Error('Could not determine whose action to retry');
     }
 
+    // A provider this game has blocked cannot be picked for the retry either.
+    assertProviderNotBlocked(game, model);
+
     // Enforce the same tier/usage rules as a permanent model change, with the
     // override substituted for the target's model.
     const gmModel = target === GAME_MASTER ? model : game.gameMasterAiType;
@@ -1424,6 +1431,7 @@ function gameFromFirestore(id: string, data: any): Game {
         errorState: data.errorState || null,
         modelOverride: data.modelOverride || null,
         retryHint: data.retryHint || null,
+        providerBlocks: data.providerBlocks || {},
         nightResults: data.nightResults || {},
         previousNightResults: data.previousNightResults || {},
         messageCounter: data.messageCounter || 0, // Default to 0 for existing games
@@ -1450,4 +1458,72 @@ function gameFromFirestore(id: string, data: any): Game {
         oneTimeAbilitiesUsed: data.oneTimeAbilitiesUsed || {},
         resolvedNightState: data.resolvedNightState || null
     };
+}
+
+
+/**
+ * Records that `model`'s provider refused this game's story. Called by the action wrapper
+ * alongside the error state write; no session check because it runs inside a server action
+ * that already passed one. Idempotent per provider: the first refusal wins, later ones (a
+ * second bot on the same provider hitting the wall before the player reassigned) keep the
+ * original day and reason.
+ */
+export async function recordProviderBlock(gameId: string, model: string, reason: string, botName?: string, day?: number): Promise<string | undefined> {
+    const providerKey = providerKeyOf(model);
+    if (!providerKey || !db) {
+        return undefined;
+    }
+    const gameRef = db.collection('games').doc(gameId);
+    const snap = await gameRef.get();
+    if (!snap.exists) {
+        return undefined;
+    }
+    const existing = snap.data()?.providerBlocks?.[providerKey];
+    if (existing) {
+        return providerKey;
+    }
+    const block: ProviderBlock = {
+        provider: providerDisplayName(providerKey),
+        reason,
+        model,
+        ...(botName ? { botName } : {}),
+        day: day ?? snap.data()?.currentDay ?? 0,
+        at: Date.now(),
+    };
+    await gameRef.update({ [`providerBlocks.${providerKey}`]: block });
+    logger.warn(`PROVIDER_BLOCKED ${providerKey} for the rest of the game`, { gameId, providerKey, model, reason, botName });
+    return providerKey;
+}
+
+/**
+ * "Reassign everyone on the blocked provider": moves every bot (alive or not — a dead bot's
+ * model is still shown in the players list) and the Game Master that run on `providerKey`
+ * to `newModel` in one write. Used from the refusal banner so the player does not have to
+ * discover the same wall once per bot.
+ */
+export async function reassignProviderModels(gameId: string, providerKey: string, newModel: string): Promise<Game> {
+    const session = await auth();
+    if (!session || !session.user?.email) {
+        throw new Error('Not authenticated');
+    }
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+    const gameRef = db.collection('games').doc(gameId);
+    const gameSnap = await gameRef.get();
+    if (!gameSnap.exists) {
+        throw new Error('Game not found');
+    }
+    const gameData = gameSnap.data();
+    const {gameTier} = await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: (gameData?.createdWithTier ?? 'free') });
+    assertProviderNotBlocked({ providerBlocks: gameData?.providerBlocks }, newModel);
+
+    const bots = (gameData?.bots || []) as Bot[];
+    const updatedBots = bots.map(bot => providerKeyOf(bot.aiType) === providerKey ? { ...bot, aiType: newModel } : bot);
+    const gameMasterAiType = providerKeyOf(gameData?.gameMasterAiType) === providerKey ? newModel : gameData?.gameMasterAiType;
+    validateModelUsageForTier(gameTier, gameMasterAiType, updatedBots.map(bot => bot.aiType));
+
+    await gameRef.update({ bots: updatedBots, gameMasterAiType });
+    logger.info(`Reassigned ${providerKey} players to ${newModel}`, { gameId, providerKey, newModel, count: updatedBots.filter((b, i) => b !== bots[i]).length });
+    return gameFromFirestore(gameId, { ...gameData, bots: updatedBots, gameMasterAiType });
 }

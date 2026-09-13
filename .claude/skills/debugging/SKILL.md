@@ -37,7 +37,7 @@ curl -s -u "$BS_USER:$BS_PASS" "$BS_HOST?output_format_pretty_row_numbers=0" \
 
 ### Storage model — query the S3 table
 
-BetterStack is tiered ClickHouse: a hot table `remote(t507167_ai_werewolf_2_logs)` plus an S3 archive `s3Cluster(primary, t507167_ai_werewolf_2_s3)`. **As of 2026-09-07 the S3 table returns an empty body (HTTP 200, no rows, even for `count()`) - query the hot table `remote(t507167_ai_werewolf_2_logs)`.** It held the last ~4 days (~2k rows). Earlier (pre-09) the S3 flush was aggressive and the S3 table was the one to query; if hot comes back short, try S3 again.
+BetterStack is tiered ClickHouse: a hot table `remote(t507167_ai_werewolf_2_logs)` plus an S3 archive `s3Cluster(primary, t507167_ai_werewolf_2_s3)`. **Which one holds the rows flips.** 2026-09-07: S3 returned an empty body (HTTP 200, no rows, even for `count()`) and hot had the last ~4 days. 2026-09-13: the reverse — hot returned `count() = 0` and S3 had ~13k rows covering the last 3 days. So always start with a `count(), min(dt), max(dt)` on BOTH tables and query whichever has the window you need; an empty result from one table means nothing on its own.
 
 ### Schema
 
@@ -76,7 +76,7 @@ Search log text:
 
 ## Firestore (admin SDK via tsx scripts)
 
-Run scripts from `werewolf-client/` with the env file loaded:
+Run scripts from `werewolf-client/` with the env file loaded. In a sandboxed Claude Code shell `tsx` dies with `listen EPERM ... tsx-501/<pid>.pipe` (it opens a Unix socket for its IPC), so run these with the sandbox off:
 
 ```bash
 cd werewolf-client

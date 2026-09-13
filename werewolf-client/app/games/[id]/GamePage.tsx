@@ -1,7 +1,8 @@
 'use client';
 
+import { providerDisplayName } from "@/app/api/provider-blocks";
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { getGame, updateBotModel, updateGameMasterModel, updateCharacterVoice, clearGameErrorState, setGameErrorState, afterGameDiscussion, retryWithModelOverride } from "@/app/api/game-actions";
+import { getGame, updateBotModel, updateGameMasterModel, updateCharacterVoice, clearGameErrorState, setGameErrorState, afterGameDiscussion, retryWithModelOverride, reassignProviderModels } from "@/app/api/game-actions";
 import { ttsService } from "@/app/services/tts-service";
 import { startNewDay, summarizePastDay, selectDayResponders } from "@/app/api/night-actions";
 import GameChat, { type PhaseControls } from "@/app/games/[id]/components/GameChat";
@@ -68,7 +69,9 @@ function GamePageContent({
     const [selectedBot, setSelectedBot] = useState<{ name: string; aiType: string; enableThinking?: boolean } | null>(null);
     // 'change' permanently updates the bot's model (players list); 'retry' applies the
     // chosen model to the failed request only (error banner), so hidden roles don't leak.
-    const [modelDialogMode, setModelDialogMode] = useState<'change' | 'retry'>('change');
+    const [modelDialogMode, setModelDialogMode] = useState<'change' | 'retry' | 'reassign'>('change');
+    // Provider key (GOOGLE_API_KEY…) whose players the open 'reassign' dialog moves.
+    const [reassignProviderKey, setReassignProviderKey] = useState<string | null>(null);
     const [clearNightMessages, setClearNightMessages] = useState(false);
     const [isKeepGoingLoading, setIsKeepGoingLoading] = useState(false);
     const [voteConfirmOpen, setVoteConfirmOpen] = useState(false);
@@ -673,7 +676,24 @@ function GamePageContent({
         }
     };
 
-    const openModelDialog = (botName: string, currentModel: string, enableThinking?: boolean, mode: 'change' | 'retry' = 'change') => {
+    // From the refusal banner: every player still on the blocked provider gets the model the
+    // dialog returns. The dialog shows the provider's display name where a bot name would go.
+    const handleReassignProvider = async (newModel: string) => {
+        if (!reassignProviderKey) return;
+        try {
+            const updatedGame = await runGameAction(() => reassignProviderModels(game.id, reassignProviderKey, newModel));
+            if (updatedGame) {
+                setGame(updatedGame);
+            }
+        } catch (error) {
+            if (handleGameActionError(error)) {
+                return;
+            }
+            console.error('Error reassigning provider models:', error);
+        }
+    };
+
+    const openModelDialog = (botName: string, currentModel: string, enableThinking?: boolean, mode: 'change' | 'retry' | 'reassign' = 'change') => {
         setModelDialogMode(mode);
         setSelectedBot({ name: botName, aiType: currentModel, enableThinking });
         openModal('modelSelection');
@@ -1488,6 +1508,10 @@ function GamePageContent({
                         const displayName = failedName ? failedName.charAt(0).toUpperCase() + failedName.slice(1) : '';
                         openModelDialog(displayName, currentModel ?? '', undefined, 'retry');
                     }}
+                    onReassignProvider={(providerKey: string) => {
+                        setReassignProviderKey(providerKey);
+                        openModelDialog(providerDisplayName(providerKey), '', undefined, 'reassign');
+                    }}
                     isExternalLoading={isKeepGoingLoading}
                     phaseControls={flowControlsElement}
                     chatControls={chatControlsElement}
@@ -1571,9 +1595,11 @@ function GamePageContent({
                     closeModal('modelSelection');
                     setSelectedBot(null);
                     setModelDialogMode('change');
+                    setReassignProviderKey(null);
                 }}
-                onSelect={modelDialogMode === 'retry' ? handleRetryWithModel : handleModelUpdate}
+                onSelect={modelDialogMode === 'retry' ? handleRetryWithModel : modelDialogMode === 'reassign' ? handleReassignProvider : handleModelUpdate}
                 mode={modelDialogMode}
+                blockedProviders={game.providerBlocks}
                 currentModel={selectedBot?.aiType || ''}
                 botName={selectedBot?.name || ''}
                 gameTier={game.createdWithTier}
