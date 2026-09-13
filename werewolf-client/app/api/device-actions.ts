@@ -4,7 +4,8 @@ import {randomUUID} from "crypto";
 import {cookies, headers} from "next/headers";
 import {FieldValue} from "firebase-admin/firestore";
 import {db} from "@/firebase/server";
-import {appendCapped} from "@/app/utils/device-utils";
+import {appendCapped, appendSighting, pickLinkedDevice} from "@/app/utils/device-utils";
+import {logger} from "@/app/utils/logger";
 
 /**
  * Browser identity: one id per browser profile, used to meter free-tier spend per DEVICE
@@ -28,6 +29,15 @@ import {appendCapped} from "@/app/utils/device-utils";
  * store restores the other on the next visit, so the id dies only if both die together.
  * The server owns the cookie (httpOnly, so page scripts cannot edit it) and hands the
  * canonical id back to the client, which mirrors it into localStorage.
+ *
+ * IP LINKING (2026-09-13): a wiped browser loses both stores, which is exactly what the
+ * farmer does before the next account. So a browser that arrives with NO id does not get
+ * a fresh one right away: if a device was seen from the same public IP within the last
+ * twelve hours (and the edge's city, when known, agrees), that device id is adopted — the
+ * new account lands on the old device's shared budget and both records say how the link
+ * was made. Only when nothing matches is a new id minted. The IP itself is never a key
+ * for refusals; it only decides which existing id a keyless browser inherits. See
+ * `pickLinkedDevice` for the exact rule.
  */
 
 const DEVICE_COOKIE = 'ww_device';
@@ -35,10 +45,32 @@ const DEVICE_COOKIE_MAX_AGE = 60 * 60 * 24 * 730; // 2 years
 // NOT exported: a 'use server' module may only export async functions, and a single
 // non-function export silently voids every export in the file at build time.
 const DEVICES = 'devices';
+const IPS = 'ips';
 
 /** Keep the clustering arrays bounded; a farm is visible in a handful of entries. */
 const DEVICE_USER_CAP = 20;
 const DEVICE_IP_CAP = 10;
+const IP_DEVICE_CAP = 10;
+const DEVICE_LINK_CAP = 10;
+
+/** Firestore document ids may not contain '/'; IPv4 and IPv6 are otherwise safe as ids. */
+function ipDocId(ip: string): string {
+    return ip.replace(/\//g, '_');
+}
+
+/** Which device, if any, a keyless browser on `ip` should inherit. Best effort: any failure means "none". */
+async function findRecentDeviceForIp(ip: string, city: string | undefined): Promise<string | undefined> {
+    if (!db) {
+        return undefined;
+    }
+    try {
+        const snap = await db.collection(IPS).doc(ipDocId(ip)).get();
+        return pickLinkedDevice(snap.data()?.devices, Date.now(), city)?.deviceId;
+    } catch (error: any) {
+        console.error(`findRecentDeviceForIp: lookup failed for ${ip}: ${error?.message ?? error}`);
+        return undefined;
+    }
+}
 
 /** v4 UUID, the only shape we accept from a client. Anything else is treated as absent. */
 const DEVICE_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -114,13 +146,17 @@ export async function getRequestDeviceId(): Promise<string | undefined> {
  *   cookie present          -> cookie wins; localStorage is repaired from it
  *   no cookie, client id    -> adopt the client's id and re-set the cookie (localStorage
  *                              repairs the cookie, which is the Safari-ITP case)
- *   neither                 -> mint a new one
+ *   neither, recent IP match-> inherit the device last seen from this IP (see IP LINKING)
+ *   neither, no match       -> mint a new one
  *
  * Best effort throughout: this must never break a page load, so every failure returns an
  * id (or undefined) rather than throwing.
  */
 export async function registerDevice(clientDeviceId?: string, userEmail?: string): Promise<string | undefined> {
     let deviceId: string;
+    // Set only when this request inherited an id through the IP rule, so the link is
+    // recorded once, at the moment it was made.
+    let linkedFromIp: string | undefined;
     try {
         const jar = await cookies();
         const fromCookie = jar.get(DEVICE_COOKIE)?.value;
@@ -129,7 +165,14 @@ export async function registerDevice(clientDeviceId?: string, userEmail?: string
         } else if (isValidDeviceId(clientDeviceId)) {
             deviceId = clientDeviceId;
         } else {
-            deviceId = randomUUID();
+            const ip = await readClientIp();
+            const inherited = ip ? await findRecentDeviceForIp(ip, (await readClientGeo()).city) : undefined;
+            if (inherited) {
+                deviceId = inherited;
+                linkedFromIp = ip;
+            } else {
+                deviceId = randomUUID();
+            }
         }
         jar.set(DEVICE_COOKIE, deviceId, {
             httpOnly: true,
@@ -146,7 +189,7 @@ export async function registerDevice(clientDeviceId?: string, userEmail?: string
     // Record-keeping is best effort and deliberately after the cookie is set: a Firestore
     // hiccup must not cost us the id itself.
     try {
-        await touchDevice(deviceId, userEmail);
+        await touchDevice(deviceId, userEmail, linkedFromIp);
     } catch (error: any) {
         console.error(`registerDevice: could not record device ${deviceId}: ${error?.message ?? error}`);
     }
@@ -162,12 +205,13 @@ export async function registerDevice(clientDeviceId?: string, userEmail?: string
  * family or library machine would accumulate an unbounded array on a hot document; the
  * pattern a farm makes is visible in a handful of entries anyway.
  */
-async function touchDevice(deviceId: string, userEmail?: string): Promise<void> {
+async function touchDevice(deviceId: string, userEmail?: string, linkedFromIp?: string): Promise<void> {
     if (!db) {
         return;
     }
     const ip = await readClientIp();
     const geo = await readClientGeo();
+    const now = Date.now();
 
     const ref = db.collection(DEVICES).doc(deviceId);
     const snap = await ref.get();
@@ -190,7 +234,33 @@ async function touchDevice(deviceId: string, userEmail?: string): Promise<void> 
     if (ip) {
         update.ips = appendCapped(existing.ips, ip, DEVICE_IP_CAP);
     }
+    if (linkedFromIp) {
+        // Objects, not strings: the report needs who, from where and when in one entry.
+        const links = Array.isArray(existing.ipLinks) ? existing.ipLinks : [];
+        update.ipLinks = [...links, { via: 'ip', ip: linkedFromIp, ...(userEmail ? { userEmail } : {}), at: now }].slice(-DEVICE_LINK_CAP);
+    }
     await ref.set(update, {merge: true});
+
+    // The IP's own record of devices, which is what a keyless browser inherits from.
+    if (ip) {
+        const ipRef = db.collection(IPS).doc(ipDocId(ip));
+        const ipSnap = await ipRef.get();
+        await ipRef.set({
+            ip,
+            lastSeenAt: FieldValue.serverTimestamp(),
+            devices: appendSighting(ipSnap.data()?.devices, { deviceId, at: now, ...(geo.city ? { city: geo.city } : {}) }, IP_DEVICE_CAP),
+        }, {merge: true});
+    }
+
+    if (linkedFromIp) {
+        logger.warn(`DEVICE_LINKED_BY_IP: keyless browser inherited device ${deviceId}`, {
+            deviceId,
+            ip: linkedFromIp,
+            userEmail,
+            city: geo.city,
+            otherUsers: (existing.users ?? []).filter((u: string) => u !== userEmail),
+        });
+    }
 
     if (userEmail) {
         const userUpdate: Record<string, any> = {
@@ -203,6 +273,9 @@ async function touchDevice(deviceId: string, userEmail?: string): Promise<void> 
         }
         if (Object.keys(geo).length > 0) {
             userUpdate.lastGeo = geo;
+        }
+        if (linkedFromIp) {
+            userUpdate.linkedVia = { via: 'ip', ip: linkedFromIp, deviceId, at: now };
         }
         await db.collection('users').doc(userEmail).set(userUpdate, {merge: true});
     }

@@ -101,6 +101,7 @@ New one-off queries: copy the pattern from `scripts/get-game.ts` — import `db`
 - `games/{id}` — game doc. `errorState` (null when healthy) is set by `setGameErrorState` on system errors: `{recoverable, context: {gameId, timestamp, function}, details}`. Games TTL-expire via `expireAt` (~30 days).
 - `games/{id}/messages` — ordered message log (`timestamp`, `authorName`, `recipientName`, `messageType`, `msg`, `day`).
 - `users/{email}` — user record incl. personal `apiKeys` and tier.
+- `devices/{deviceId}` — one browser: `users` seen on it, `ips`, `geo`, `dailySpend` (the per-device free cap), `ipLinks` (accounts that inherited this id through the 12h same-IP rule). `ips/{ip}` — devices seen from that address with timestamps and city; what a keyless browser inherits from. A user doc's `linkedVia` says it was linked by IP. Log line `DEVICE_LINKED_BY_IP` marks each inheritance.
 - `free-tier-keys` — platform API keys used for free-tier users (tier-aware lookup is `getApiKeysForUser` in `app/utils/tier-utils.ts`; plain `getUserApiKeys` reads only personal keys).
 
 ## Investigating a user bug report — workflow
