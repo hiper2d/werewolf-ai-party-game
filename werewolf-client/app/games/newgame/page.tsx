@@ -22,6 +22,7 @@ import AIModelSelect from '@/app/components/AIModelSelect';
 import ModelSelectDropdown from '@/app/components/ModelSelectDropdown';
 import SelectDropdown from '@/app/components/SelectDropdown';
 import {ART_STYLE_MAX_LENGTH} from "@/app/utils/art-style";
+import {INPUT_LIMITS} from "@/app/utils/input-limits";
 import {ttsService} from "@/app/services/tts-service";
 import {getVoiceConfig, getDefaultVoiceProvider, SUPPORTED_VOICE_PROVIDERS, VOICE_PROVIDER_DESCRIPTIONS, VOICE_PROVIDER_DISPLAY_NAMES, VoiceProvider} from "@/app/ai/voice-config";
 
@@ -779,6 +780,7 @@ export default function CreateNewGamePage() {
                                         placeholder="Your name"
                                         value={name}
                                         onChange={(e) => setName(e.target.value)}
+                                        maxLength={INPUT_LIMITS.playerName}
                                         required
                                     />
                                     {nameError && <p className="text-[var(--danger)] text-[12px] mt-1">{nameError}</p>}
@@ -791,6 +793,7 @@ export default function CreateNewGamePage() {
                                         placeholder="Theme or setting"
                                         value={theme}
                                         onChange={(e) => setTheme(e.target.value)}
+                                        maxLength={INPUT_LIMITS.gameTitle}
                                         required
                                     />
                                     {themeError && <p className="text-[var(--danger)] text-[12px] mt-1">{themeError}</p>}
@@ -806,6 +809,7 @@ export default function CreateNewGamePage() {
                                     placeholder="A single family with old grudges. A horror twist. All characters female…"
                                     value={description}
                                     onChange={(e) => setDescription(e.target.value)}
+                                    maxLength={INPUT_LIMITS.gmInstructions}
                                     rows={2}
                                 />
                             </div>
@@ -1030,6 +1034,7 @@ export default function CreateNewGamePage() {
                                 className={`${inputStyle} flex-1 min-h-[132px] resize-y leading-[1.6] py-2.5`}
                                 value={gameData.scene}
                                 onChange={(e) => handleStoryChange(e.target.value)}
+                                maxLength={INPUT_LIMITS.openingStory}
                             />
                         </div>
 
@@ -1066,6 +1071,7 @@ export default function CreateNewGamePage() {
                                             className={inputStyle}
                                             value={gameData.gameMasterVoiceStyle}
                                             onChange={(e) => setGameData({ ...gameData, gameMasterVoiceStyle: e.target.value })}
+                                            maxLength={INPUT_LIMITS.voiceStyle}
                                             placeholder="e.g., authoritatively, dramatically"
                                         />
                                     </div>

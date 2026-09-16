@@ -1,5 +1,6 @@
 import { transcribeAudio } from "@/app/api/stt-actions";
 import { VoiceProvider } from "@/app/ai/voice-config/voice-config";
+import { MAX_STT_RECORDING_MS } from "@/app/utils/input-limits";
 
 export interface STTOptions {
   language?: string;
@@ -14,6 +15,7 @@ export class STTService {
   private mediaRecorder: MediaRecorder | null = null;
   private audioChunks: Blob[] = [];
   private stream: MediaStream | null = null;
+  private limitTimer: ReturnType<typeof setTimeout> | null = null;
 
   static getInstance(): STTService {
     if (!STTService.instance) {
@@ -22,7 +24,13 @@ export class STTService {
     return STTService.instance;
   }
 
-  async startRecording(): Promise<void> {
+  /**
+   * Starts recording. A dictation is capped at MAX_STT_RECORDING_MS: when the
+   * cap is hit, `onLimitReached` fires so the caller can run its normal stop
+   * path (which transcribes what was captured) instead of the clip growing —
+   * and being billed — without bound.
+   */
+  async startRecording(onLimitReached?: () => void): Promise<void> {
     try {
       // Request microphone permission
       this.stream = await navigator.mediaDevices.getUserMedia({ 
@@ -49,6 +57,13 @@ export class STTService {
 
       // Start recording
       this.mediaRecorder.start();
+
+      this.limitTimer = setTimeout(() => {
+        this.limitTimer = null;
+        if (this.mediaRecorder?.state === 'recording') {
+          onLimitReached?.();
+        }
+      }, MAX_STT_RECORDING_MS);
     } catch (error) {
       console.error('Failed to start recording:', error);
       throw new Error('Failed to access microphone. Please check permissions.');
@@ -97,6 +112,10 @@ export class STTService {
   }
 
   private cleanup(): void {
+    if (this.limitTimer) {
+      clearTimeout(this.limitTimer);
+      this.limitTimer = null;
+    }
     if (this.stream) {
       this.stream.getTracks().forEach(track => track.stop());
       this.stream = null;

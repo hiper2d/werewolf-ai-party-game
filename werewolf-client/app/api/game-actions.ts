@@ -40,6 +40,7 @@ import {deletePreviewProgress, isValidProgressId, previewProgressWriter, readPre
 import {getUserTierAndApiKeys} from "@/app/utils/tier-utils";
 import {sanitizePlayerName} from "@/app/utils/name-utils";
 import {sanitizeArtStyle} from "@/app/utils/art-style";
+import {clampUserText, INPUT_LIMITS} from "@/app/utils/input-limits";
 import {getUserTier, getUserBalance, getVoiceProvider, updateVoiceProvider, assertFreeSpendWithinLimit} from "@/app/api/user-actions";
 import {recordSpend} from "@/app/api/cost-tracking";
 import {getFreeTierLimits} from "@/app/api/limits-actions";
@@ -201,6 +202,15 @@ export async function previewGame(gamePreview: GamePreview, progressId?: string)
     if (!session || !session.user?.email) {
         throw new Error('Not authenticated');
     }
+
+    // The form caps these too, but the client is untrusted and all three go
+    // straight into the story prompt. Clamp before a single token is spent.
+    gamePreview = {
+        ...gamePreview,
+        name: clampUserText(gamePreview.name, INPUT_LIMITS.playerName),
+        theme: clampUserText(gamePreview.theme, INPUT_LIMITS.gameTitle),
+        description: clampUserText(gamePreview.description, INPUT_LIMITS.gmInstructions),
+    };
 
     if (!db) {
         throw new Error('Firestore is not initialized');
@@ -471,6 +481,32 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
+    // Every field below is editable on the preview page before "Create", so the
+    // clamp previewGame applied cannot be trusted to still hold. The bot stories
+    // and the opening story are the expensive ones: they sit in the prompt of
+    // every bot for the whole game.
+    gamePreview = {
+        ...gamePreview,
+        name: clampUserText(gamePreview.name, INPUT_LIMITS.playerName),
+        theme: clampUserText(gamePreview.theme, INPUT_LIMITS.gameTitle),
+        description: clampUserText(gamePreview.description, INPUT_LIMITS.gmInstructions),
+        scene: clampUserText(gamePreview.scene, INPUT_LIMITS.openingStory),
+        gameMasterVoiceStyle: gamePreview.gameMasterVoiceStyle === undefined
+            ? undefined
+            : clampUserText(gamePreview.gameMasterVoiceStyle, INPUT_LIMITS.voiceStyle),
+        bots: gamePreview.bots.map(bot => ({
+            ...bot,
+            name: clampUserText(bot.name, INPUT_LIMITS.playerName),
+            story: clampUserText(bot.story, INPUT_LIMITS.botStory),
+            visualDescription: bot.visualDescription === undefined
+                ? undefined
+                : clampUserText(bot.visualDescription, INPUT_LIMITS.visualDescription),
+            voiceStyle: bot.voiceStyle === undefined
+                ? undefined
+                : clampUserText(bot.voiceStyle, INPUT_LIMITS.voiceStyle),
+        })),
+    };
+
     try {
         const { tier, apiKeys } = await getUserTierAndApiKeys(session.user.email);
         validateModelUsageForTier(tier, gamePreview.gameMasterAiType, gamePreview.bots.map(bot => bot.playerAiType));
@@ -815,8 +851,6 @@ export interface CharacterVoicePatch {
     voiceStyle?: string;
 }
 
-const VOICE_STYLE_MAX_LENGTH = 300;
-
 /**
  * Owner changes a character's voice from its card mid-game: the voice (within
  * the game's voice set — the set itself is decided at preview time and fixed)
@@ -830,7 +864,7 @@ export async function updateCharacterVoice(gameId: string, name: string, patch: 
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
-    const voiceStyle = (patch.voiceStyle ?? '').trim().slice(0, VOICE_STYLE_MAX_LENGTH);
+    const voiceStyle = clampUserText(patch.voiceStyle, INPUT_LIMITS.voiceStyle);
 
     try {
         const gameRef = db.collection('games').doc(gameId);

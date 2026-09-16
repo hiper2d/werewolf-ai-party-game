@@ -5,6 +5,7 @@ import { ROLE_CONFIGS, Game, GAME_ROLES } from '@/app/api/game-models';
 import SelectDropdown from '@/app/components/SelectDropdown';
 import DraggableDialog from './DraggableDialog';
 import { useUIControls } from '../context/UIControlsContext';
+import { INPUT_LIMITS } from '@/app/utils/input-limits';
 
 interface NightActionModalProps {
     onClose: () => void;
@@ -157,6 +158,7 @@ export default function NightActionModal({
                         placeholder='e.g. "A shadow slipped through the fog, silent as death itself..."'
                         value={message}
                         onChange={(e) => setMessage(e.target.value)}
+                        maxLength={INPUT_LIMITS.nightHint}
                         disabled={isSubmitting}
                     />
                 </div>

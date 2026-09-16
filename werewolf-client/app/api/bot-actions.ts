@@ -2,6 +2,7 @@
 
 import { assertProviderNotBlocked } from '@/app/api/provider-blocks';
 import {unwrapJsonReply} from "@/app/utils/text-format";
+import {clampUserText, INPUT_LIMITS} from "@/app/utils/input-limits";
 import {db} from "@/firebase/server";
 import {
     AUTO_VOTE_COEFFICIENT,
@@ -443,6 +444,9 @@ function shouldTriggerAutoVote(game: Game): boolean {
         if (!session || !session.user?.email) {
             throw new Error('Not authenticated');
         }
+        // Every bot that answers reads this message, so its length is multiplied
+        // by the table size before it is billed.
+        userMessage = clampUserText(userMessage, INPUT_LIMITS.chatMessage);
         if (!db) {
             throw new Error('Firestore is not initialized');
         }
@@ -1277,6 +1281,7 @@ async function humanPlayerVoteImpl(gameId: string, targetPlayer: string, reason:
     if (!session || !session.user?.email) {
         throw new Error('Not authenticated');
     }
+    reason = clampUserText(reason, INPUT_LIMITS.voteReason);
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
@@ -1400,6 +1405,7 @@ async function performHumanPlayerNightActionImpl(gameId: string, targetPlayer: s
     if (!session || !session.user?.email) {
         throw new Error('Not authenticated');
     }
+    message = clampUserText(message, INPUT_LIMITS.nightHint);
     if (!db) {
         throw new Error('Firestore is not initialized');
     }

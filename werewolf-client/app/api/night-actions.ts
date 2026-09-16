@@ -35,6 +35,7 @@ import { getApiKeysForUser } from "@/app/utils/tier-utils";
 import { selectRandomDayOpeningBots } from "@/app/api/bot-selection";
 import { GM_NIGHT_RESULTS_SYSTEM_PROMPT, GM_DAY_SUMMARY_SYSTEM_PROMPT, GM_DAY_SUMMARY_COMMAND, GM_NIGHT_BEGINS_SYSTEM_PROMPT } from "@/app/ai/prompts/gm-prompts";
 import { GM_COMMAND_GENERATE_NIGHT_RESULTS } from "@/app/ai/prompts/gm-commands";
+import { buildNightRoleBriefing } from "@/app/api/night-briefing";
 import { NightResultsStoryZodSchema } from "@/app/ai/prompts/zod-schemas";
 import { buildStoryContext, lynchSummaryForDay, sanitizeNarrativeHint } from "@/app/utils/story-utils";
 import { BOT_DAY_SUMMARY_PROMPT, botSystemPrompt } from "@/app/ai/prompts/bot-prompts";
@@ -419,11 +420,7 @@ async function beginNightImpl(gameId: string): Promise<GameActionResponse> {
             .sort((a, b) => (ROLE_CONFIGS[a].nightActionOrder ?? 999) - (ROLE_CONFIGS[b].nightActionOrder ?? 999));
 
         // Create Game Master message explaining the night phase (only roles with night actions)
-        const roleDescriptions = Object.values(ROLE_CONFIGS)
-            .filter(config => config && config.hasNightAction)
-            .sort((a, b) => (a.nightActionOrder ?? 999) - (b.nightActionOrder ?? 999))
-            .map(config => `• ${config.name}: ${config.description}`)
-            .join('\n');
+        const roleDescriptions = buildNightRoleBriefing();
 
         // GM-written nightfall passage continuing the game's chronicle. Pure flavor:
         // any failure falls back to the static line and never blocks the night.

@@ -10,6 +10,8 @@ interface ExpandableTextareaProps {
     id?: string;
     /** Collapsed height in pixels. When collapsed, content beyond this is clipped. */
     minHeight?: number;
+    /** Hard cap on typed/pasted length, forwarded to the textarea. */
+    maxLength?: number;
     'aria-label'?: string;
 }
 

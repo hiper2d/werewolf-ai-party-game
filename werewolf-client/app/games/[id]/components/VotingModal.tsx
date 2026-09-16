@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import SelectDropdown from '@/app/components/SelectDropdown';
 import DraggableDialog from './DraggableDialog';
 import { useUIControls } from '../context/UIControlsContext';
+import { INPUT_LIMITS } from '@/app/utils/input-limits';
 
 interface VotingModalProps {
     onClose: () => void;
@@ -78,6 +79,7 @@ export default function VotingModal({
                         placeholder="Explain why you think this player should be eliminated..."
                         value={reason}
                         onChange={(e) => setReason(e.target.value)}
+                        maxLength={INPUT_LIMITS.voteReason}
                         disabled={isSubmitting}
                     />
                 </div>

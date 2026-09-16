@@ -4,6 +4,7 @@ import React, { useMemo, useState } from 'react';
 import { GAME_MASTER, Game } from '@/app/api/game-models';
 import { getDefaultVoiceProvider, getVoiceConfig, VOICE_PROVIDER_DISPLAY_NAMES, VoiceProvider } from '@/app/ai/voice-config';
 import SelectDropdown from '@/app/components/SelectDropdown';
+import { INPUT_LIMITS } from '@/app/utils/input-limits';
 
 // A voice within the game's voice set (the set itself is fixed at preview time).
 export interface VoiceSelection {
@@ -136,7 +137,7 @@ export default function CharacterVoicePanel({ game, name, onSave, onSpeakSample,
                     value={draft.voiceStyle}
                     onChange={e => setDraft(d => ({ ...d, voiceStyle: e.target.value }))}
                     placeholder="mysteriously · or a longer direction: slow, gravelly, like an old sailor"
-                    maxLength={300}
+                    maxLength={INPUT_LIMITS.voiceStyle}
                     className="w-full px-2.5 py-1.5 text-[13px] rounded-[var(--radius-md)] bg-[var(--bg-1)] border border-[var(--line-2)] text-[var(--fg-0)] placeholder:text-[var(--fg-3)] focus:outline-none focus:border-[var(--accent-line)]"
                 />
             </div>

@@ -3,6 +3,7 @@
 import { auth } from "@/auth";
 import { getUserTierAndApiKeys } from "@/app/utils/tier-utils";
 import { assertFreeSpendWithinLimit } from "@/app/api/user-actions";
+import { MAX_STT_AUDIO_BYTES, MAX_STT_RECORDING_MS } from "@/app/utils/input-limits";
 import { incrementGameCost, recordSpend } from "@/app/api/cost-tracking";
 import { getDefaultVoiceProvider, SUPPORTED_VOICE_PROVIDERS, VoiceProvider } from "@/app/ai/voice-config";
 import { createVoiceAgent, VOICE_MODEL_CONSTANTS, VOICE_PROVIDER_API_KEY } from "@hiper2d/ai-agents";
@@ -29,6 +30,13 @@ export async function transcribeAudio(
 
   if (!audioBuffer || audioBuffer.byteLength === 0) {
     throw new Error('Audio data cannot be empty');
+  }
+  // The recorder stops itself long before this. The byte ceiling is what stops
+  // a hand-built request from buying an hour of transcription on a platform key.
+  if (audioBuffer.byteLength > MAX_STT_AUDIO_BYTES) {
+    throw new Error(
+      `Recording is too long. Please keep dictation under ${Math.round(MAX_STT_RECORDING_MS / 1000)} seconds.`
+    );
   }
   const voiceProvider = options.voiceProvider ?? getDefaultVoiceProvider();
   if (!SUPPORTED_VOICE_PROVIDERS.includes(voiceProvider)) {

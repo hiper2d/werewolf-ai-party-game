@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { talkToAll, humanPlayerVote, getSuggestion } from "@/app/api/bot-actions";
+import { clampUserText, INPUT_LIMITS, MAX_STT_RECORDING_MS } from "@/app/utils/input-limits";
 import { humanPlayerTalkWerewolves } from "@/app/api/night-actions";
 import { GAME_STATES, MessageType, RECIPIENT_ALL, RECIPIENT_WEREWOLVES, RECIPIENT_DOCTOR, RECIPIENT_DETECTIVE, RECIPIENT_MANIAC, GameMessage, Game, GameActionResponse, SystemErrorMessage, BotResponseError, GAME_MASTER, ROLE_CONFIGS, GAME_ROLES } from "@/app/api/game-models";
 import PlayerAvatar from "@/app/components/PlayerAvatar";
@@ -627,6 +628,9 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
     };
     const [isRecording, setIsRecording] = useState(false);
     const [isTranscribing, setIsTranscribing] = useState(false);
+    // Seconds left before the dictation cap stops the recorder for us. Shown in
+    // the composer placeholder so the limit is visible while speaking.
+    const [recordingSecondsLeft, setRecordingSecondsLeft] = useState(MAX_STT_RECORDING_MS / 1000);
     const [composerExpanded, setComposerExpanded] = useState(false);
     const composerRef = useRef<HTMLFormElement>(null);
     const [selectedDay, setSelectedDay] = useState(game.currentDay);
@@ -1045,6 +1049,18 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                 sttService.cancelRecording();
             }
         };
+    }, [isRecording]);
+
+    // Countdown to the dictation cap. The service does the actual stopping; this
+    // only drives the number the player sees.
+    useEffect(() => {
+        if (!isRecording) return;
+        const startedAt = Date.now();
+        const tick = setInterval(() => {
+            const left = Math.ceil((MAX_STT_RECORDING_MS - (Date.now() - startedAt)) / 1000);
+            setRecordingSecondsLeft(Math.max(0, left));
+        }, 250);
+        return () => clearInterval(tick);
     }, [isRecording]);
 
     const sendMessage = async (e?: React.FormEvent) => {
@@ -1521,7 +1537,10 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
         
         try {
             setIsRecording(true);
-            await sttService.startRecording();
+            setRecordingSecondsLeft(MAX_STT_RECORDING_MS / 1000);
+            // The cap stops the recorder through the same path as a manual stop,
+            // so whatever was said still gets transcribed and inserted.
+            await sttService.startRecording(() => { void handleStopRecording(); });
         } catch (error) {
             console.error('Error starting recording:', error);
             alert('Failed to start recording. Please check microphone permissions.');
@@ -1545,10 +1564,11 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
             
             const transcription = await sttService.transcribeRecording(audioBlob, { gameId, voiceProvider: game.voiceProvider });
             
-            // Add transcribed text to current message
+            // Add transcribed text to current message, within the same cap the
+            // textarea enforces for typing — dictation is not a way around it.
             setNewMessage(prev => {
                 const separator = prev.trim() ? ' ' : '';
-                return prev + separator + transcription;
+                return clampUserText(prev + separator + transcription, INPUT_LIMITS.chatMessage);
             });
         } catch (error) {
             console.error('Error stopping recording:', error);
@@ -1652,7 +1672,7 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
         }
         // Voice recording states take priority
         if (isRecording) {
-            return "🎤 Recording in progress... Click mic to stop";
+            return `🎤 Recording… ${recordingSecondsLeft}s left · click mic to stop`;
         }
         if (isTranscribing) {
             return "✨ Transcribing audio, please wait...";
@@ -2403,6 +2423,7 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                         onKeyDown={handleTextareaKeyDown}
                         onFocus={() => setComposerExpanded(true)}
                         disabled={!isInputEnabled()}
+                        maxLength={INPUT_LIMITS.chatMessage}
                         rows={composerExpanded ? 5 : 1}
                         style={{outline: 'none'}}
                         className={`w-full px-4 bg-transparent text-[14px] leading-[1.5] text-[var(--fg-0)] placeholder:text-[var(--fg-3)] outline-none focus:outline-none resize-none transition-[min-height,padding] duration-200 ${

@@ -5,6 +5,7 @@ import { BotPreview, PLAY_STYLE_CONFIGS, PLAY_STYLES } from '@/app/api/game-mode
 import { getModelDisplayName } from '@/app/ai/ai-models';
 import type { ImageFocus } from '@/app/utils/avatar-framing';
 import ExpandableTextarea from '@/app/components/ExpandableTextarea';
+import { INPUT_LIMITS } from '@/app/utils/input-limits';
 import ModelSelectDropdown, { ModelOption } from '@/app/components/ModelSelectDropdown';
 import SelectDropdown, { SelectOption } from '@/app/components/SelectDropdown';
 import PlayerAvatar from '@/app/components/PlayerAvatar';
@@ -90,6 +91,7 @@ export default function CastList({ bots, humanName, botPortrait, humanPortrait, 
                                                 className={`${nestedInputStyle} ${nameError ? '!border-[var(--danger)]' : ''}`}
                                                 value={player.name}
                                                 onChange={e => onPlayerChange(index, 'name', e.target.value)}
+                                                maxLength={INPUT_LIMITS.playerName}
                                                 placeholder="Player name"
                                                 aria-label="Player name"
                                             />
@@ -127,6 +129,7 @@ export default function CastList({ bots, humanName, botPortrait, humanPortrait, 
                                                 minHeight={92}
                                                 value={player.story}
                                                 onChange={e => onPlayerChange(index, 'story', e.target.value)}
+                                                maxLength={INPUT_LIMITS.botStory}
                                                 placeholder="Player's story"
                                             />
                                         </div>
@@ -137,6 +140,7 @@ export default function CastList({ bots, humanName, botPortrait, humanPortrait, 
                                                 minHeight={92}
                                                 value={player.visualDescription ?? ''}
                                                 onChange={e => onPlayerChange(index, 'visualDescription', e.target.value)}
+                                                maxLength={INPUT_LIMITS.visualDescription}
                                                 placeholder="Face, hair, build, clothing — used to draw the portrait"
                                             />
                                         </div>
@@ -158,6 +162,7 @@ export default function CastList({ bots, humanName, botPortrait, humanPortrait, 
                                                     className={nestedInputStyle}
                                                     value={player.voiceStyle}
                                                     onChange={e => onPlayerChange(index, 'voiceStyle', e.target.value)}
+                                                    maxLength={INPUT_LIMITS.voiceStyle}
                                                     placeholder="e.g., mysteriously, excitedly"
                                                 />
                                             </div>
