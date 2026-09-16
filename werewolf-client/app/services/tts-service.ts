@@ -1,4 +1,4 @@
-import { generateSpeechWithProvider } from "@/app/api/tts-actions";
+import { generateSpeechAction } from "@/app/api/tts-actions";
 import { VoiceProvider } from "@/app/ai/voice-config/voice-config";
 import { getDefaultVoiceProvider } from "@/app/ai/voice-config";
 
@@ -190,7 +190,9 @@ export class TTSService {
     }
 
     const voiceProvider = options.voiceProvider || getDefaultVoiceProvider();
-    const requestPromise = generateSpeechWithProvider(
+    // The action reports failure as a value (a thrown error loses its message in
+    // production); rethrow here so callers keep seeing one rejected promise.
+    const requestPromise = generateSpeechAction(
       text,
       {
         voice: options.voice,
@@ -199,10 +201,13 @@ export class TTSService {
       },
       voiceProvider
     )
-      .then(buffer => {
+      .then(result => {
+        if (!result.ok) {
+          throw new Error(result.error);
+        }
         this.pendingRequests.delete(cacheKey);
-        this.addToCache(cacheKey, buffer);
-        return buffer;
+        this.addToCache(cacheKey, result.audio);
+        return result.audio;
       })
       .catch(error => {
         this.pendingRequests.delete(cacheKey);

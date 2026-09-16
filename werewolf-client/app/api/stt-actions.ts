@@ -7,6 +7,7 @@ import { MAX_STT_AUDIO_BYTES, MAX_STT_RECORDING_MS } from "@/app/utils/input-lim
 import { incrementGameCost, recordSpend } from "@/app/api/cost-tracking";
 import { getDefaultVoiceProvider, SUPPORTED_VOICE_PROVIDERS, VoiceProvider } from "@/app/ai/voice-config";
 import { createVoiceAgent, VOICE_MODEL_CONSTANTS, VOICE_PROVIDER_API_KEY } from "@hiper2d/ai-agents";
+import { logger } from "@/app/utils/logger";
 
 export interface STTOptions {
   language?: string;
@@ -86,5 +87,49 @@ export async function transcribeAudio(
       throw new Error(`Failed to transcribe audio: ${error.message}`);
     }
     throw new Error('Failed to transcribe audio: Unknown error');
+  }
+}
+
+export type TranscriptionResult =
+  | { ok: true; text: string }
+  | { ok: false; error: string };
+
+/**
+ * The server action the client's stt-service calls. Same contract as
+ * generateSpeechAction in tts-actions.ts: the failure travels as a value because a
+ * production build strips thrown messages, and the logger is flushed before Vercel
+ * freezes the function. transcribeAudio keeps throwing for callers that want it.
+ */
+export async function transcribeAudioAction(
+  audioBuffer: ArrayBuffer,
+  options: STTOptions = {}
+): Promise<TranscriptionResult> {
+  try {
+    const text = await transcribeAudio(audioBuffer, options);
+    // Success is logged too: no transcription had ever shown up in production
+    // before 2026-09-16 and nothing said whether the path was unused or broken.
+    logger.info(`Transcription ok: ${text.length} chars`, {
+      function: 'transcribeAudioAction',
+      voiceProvider: options.voiceProvider,
+      gameId: options.gameId,
+      audioBytes: audioBuffer?.byteLength,
+      chars: text.length,
+    });
+    return { ok: true, text };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error(`Transcription failed: ${message}`, {
+      function: 'transcribeAudioAction',
+      voiceProvider: options.voiceProvider,
+      gameId: options.gameId,
+      audioBytes: audioBuffer?.byteLength,
+      error: message,
+      details: error instanceof Error ? error.stack : undefined,
+    });
+    return { ok: false, error: message };
+  } finally {
+    try {
+      await logger.flush();
+    } catch { /* logging must never fail dictation */ }
   }
 }

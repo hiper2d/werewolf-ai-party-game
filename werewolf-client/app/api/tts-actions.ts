@@ -6,6 +6,7 @@ import { assertFreeSpendWithinLimit } from "@/app/api/user-actions";
 import { incrementGameCost, recordSpend } from "@/app/api/cost-tracking";
 import { SUPPORTED_VOICE_PROVIDERS, VoiceProvider } from "@/app/ai/voice-config";
 import { createVoiceAgent, VOICE_MODEL_CONSTANTS, VOICE_PROVIDER_API_KEY } from "@hiper2d/ai-agents";
+import { logger } from "@/app/utils/logger";
 
 /**
  * Unified TTS options that work with both providers
@@ -82,5 +83,47 @@ export async function generateSpeechWithProvider(
       throw new Error(`Failed to generate speech: ${error.message}`);
     }
     throw new Error('Failed to generate speech: Unknown error');
+  }
+}
+
+export type SpeechResult =
+  | { ok: true; audio: ArrayBuffer }
+  | { ok: false; error: string };
+
+/**
+ * The server action the client's tts-service calls. It carries a failure back as a
+ * value: a production build strips the message off every error thrown from a server
+ * action, so the player only saw "An error occurred in the Server Components render"
+ * when a spoken line failed (2026-09-16), and nothing reached Better Stack because the
+ * action only wrote to the console. generateSpeechWithProvider keeps throwing for
+ * callers and tests that want the exception.
+ *
+ * The logger is flushed before returning: Vercel freezes the function the moment the
+ * action settles, so the debounced flush never fires for the last lines.
+ */
+export async function generateSpeechAction(
+  text: string,
+  options: UnifiedTTSOptions,
+  voiceProvider: VoiceProvider
+): Promise<SpeechResult> {
+  try {
+    const audio = await generateSpeechWithProvider(text, options, voiceProvider);
+    return { ok: true, audio };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error(`Speech generation failed: ${message}`, {
+      function: 'generateSpeechAction',
+      voiceProvider,
+      voice: options.voice,
+      gameId: options.gameId,
+      textLength: text.length,
+      error: message,
+      details: error instanceof Error ? error.stack : undefined,
+    });
+    return { ok: false, error: message };
+  } finally {
+    try {
+      await logger.flush();
+    } catch { /* logging must never fail playback */ }
   }
 }

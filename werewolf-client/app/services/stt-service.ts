@@ -1,4 +1,4 @@
-import { transcribeAudio } from "@/app/api/stt-actions";
+import { transcribeAudioAction } from "@/app/api/stt-actions";
 import { VoiceProvider } from "@/app/ai/voice-config/voice-config";
 import { MAX_STT_RECORDING_MS } from "@/app/utils/input-limits";
 
@@ -9,6 +9,9 @@ export interface STTOptions {
   gameId?: string;
   voiceProvider?: VoiceProvider; // the game's voice set picks the transcription model
 }
+
+/** Upper bound on one transcription round-trip (a 60s clip transcribes in a few seconds). */
+const TRANSCRIBE_TIMEOUT_MS = 60_000;
 
 export class STTService {
   private static instance: STTService | null = null;
@@ -31,6 +34,11 @@ export class STTService {
    * and being billed — without bound.
    */
   async startRecording(onLimitReached?: () => void): Promise<void> {
+    // A second start while one recording runs would replace the recorder and leak
+    // the first stream: the microphone stays open with nothing left to stop it.
+    if (this.isRecording()) {
+      return;
+    }
     try {
       // Request microphone permission
       this.stream = await navigator.mediaDevices.getUserMedia({ 
@@ -41,10 +49,14 @@ export class STTService {
         }
       });
 
-      // Create MediaRecorder
-      this.mediaRecorder = new MediaRecorder(this.stream, {
-        mimeType: 'audio/webm'
-      });
+      // Create MediaRecorder. Safari has no webm; fall back to what the browser
+      // offers rather than failing after the microphone was already opened.
+      const mimeType = STTService.pickMimeType();
+      // Speech-grade bitrate: at the browser default (~128 kbps) a 45 s clip measured
+      // 798 KB, so a full 60 s dictation would exceed the 1 MB server-action body
+      // limit and be rejected before the action runs. 32 kbps Opus keeps a capped
+      // clip near 240 KB.
+      this.mediaRecorder = new MediaRecorder(this.stream, { ...(mimeType ? { mimeType } : {}), audioBitsPerSecond: 32_000 });
 
       this.audioChunks = [];
 
@@ -66,8 +78,17 @@ export class STTService {
       }, MAX_STT_RECORDING_MS);
     } catch (error) {
       console.error('Failed to start recording:', error);
+      // Whatever failed, do not leave the microphone open.
+      this.cleanup();
       throw new Error('Failed to access microphone. Please check permissions.');
     }
+  }
+
+  private static pickMimeType(): string | undefined {
+    if (typeof MediaRecorder === 'undefined' || typeof MediaRecorder.isTypeSupported !== 'function') {
+      return undefined;
+    }
+    return ['audio/webm', 'audio/mp4', 'audio/ogg'].find(t => MediaRecorder.isTypeSupported(t));
   }
 
   async stopRecording(): Promise<Blob> {
@@ -77,8 +98,9 @@ export class STTService {
         return;
       }
 
+      const type = this.mediaRecorder.mimeType || 'audio/webm';
       this.mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
+        const audioBlob = new Blob(this.audioChunks, { type });
         this.cleanup();
         resolve(audioBlob);
       };
@@ -93,7 +115,18 @@ export class STTService {
   ): Promise<string> {
     try {
       const audioBuffer = await audioBlob.arrayBuffer();
-      return await transcribeAudio(audioBuffer, { ...options, mimeType: audioBlob.type || 'audio/webm' });
+      // The action reports failure as a value (a thrown error loses its message in
+      // production); rethrow so the catch below keeps its wording.
+      // Bounded wait: a request that never settles must not leave the chat stuck
+      // on the transcribing spinner with no way out.
+      const result = await Promise.race([
+        transcribeAudioAction(audioBuffer, { ...options, mimeType: audioBlob.type || 'audio/webm' }),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`No answer from the transcription service within ${TRANSCRIBE_TIMEOUT_MS / 1000}s. Please try again.`)), TRANSCRIBE_TIMEOUT_MS)),
+      ]);
+      if (!result.ok) {
+        throw new Error(result.error);
+      }
+      return result.text;
     } catch (error) {
       console.error('STT Error:', error);
       throw new Error(`Failed to transcribe audio: ${error instanceof Error ? error.message : 'Unknown error'}`);

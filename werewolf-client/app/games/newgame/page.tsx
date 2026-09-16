@@ -5,7 +5,7 @@ import { isFreeSpendLimitError, isProviderBudgetDepletedError } from '@/app/api/
 import SpendLimitModal from '@/app/components/SpendLimitModal';
 import {useRouter} from 'next/navigation';
 import {useSession} from 'next-auth/react';
-import {createGame, getPreviewProgress, previewGame} from '@/app/api/game-actions';
+import {createGame, getPreviewProgress, previewGameAction} from '@/app/api/game-actions';
 import {generateDraftIllustrations, getAvatarDraft, reframeDraftAvatar} from '@/app/api/avatar-draft-actions';
 import type {PreviewProgress} from '@/app/ai/preview-generation';
 import {AVATAR_DRAFT_IN_PROGRESS, AVATAR_GM_KEY, AvatarDraftState, AvatarFraming, avatarSheetKey, DEFAULT_GAME_MODE, GAME_MODES, GAME_ROLES, GameMode, GamePreview, GamePreviewWithGeneratedBots, getRandomVoiceForGender, RANDOM_ROLE, UserTier, USER_TIERS} from "@/app/api/game-models";
@@ -532,7 +532,13 @@ export default function CreateNewGamePage() {
         })();
 
         try {
-            const game: GamePreviewWithGeneratedBots = await previewGame(gamePreviewData, progressId);
+            // The action reports failure as a value: a thrown error loses its message in
+            // production, and the mapping in the catch below needs the real text.
+            const result = await previewGameAction(gamePreviewData, progressId);
+            if (!result.ok) {
+                throw new Error(result.error);
+            }
+            const game: GamePreviewWithGeneratedBots = result.preview;
 
             // Transliterate non-ASCII characters so old previews don't trip the validator.
             const sanitizeName = (raw: string): string => {

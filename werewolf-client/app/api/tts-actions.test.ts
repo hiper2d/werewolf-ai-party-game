@@ -18,6 +18,9 @@ jest.mock("@hiper2d/ai-agents", () => ({
 jest.mock("@/app/api/user-actions", () => ({
   assertFreeSpendWithinLimit: jest.fn(),
 }));
+jest.mock("@/app/utils/logger", () => ({
+  logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn(), flush: jest.fn().mockResolvedValue(undefined) },
+}));
 jest.mock("@/app/api/cost-tracking", () => ({
   ...jest.requireActual("@/app/api/cost-tracking"),
   recordSpend: jest.fn(),
@@ -28,7 +31,7 @@ import { getUserTierAndApiKeys } from "@/app/utils/tier-utils";
 import { createVoiceAgent, VOICE_MODEL_CONSTANTS } from "@hiper2d/ai-agents";
 import { assertFreeSpendWithinLimit } from "@/app/api/user-actions";
 import { recordSpend } from "@/app/api/cost-tracking";
-import { generateSpeechWithProvider } from "@/app/api/tts-actions";
+import { generateSpeechWithProvider, generateSpeechAction } from "@/app/api/tts-actions";
 
 const USER_EMAIL = 'player@example.com';
 const TEXT = 'The night falls over the village.';
@@ -150,5 +153,35 @@ describe('generateSpeechWithProvider: spend guard and billing', () => {
     await generateSpeechWithProvider(TEXT, { voice: 'onyx' }, 'openai');
 
     expect(mockRecordSpend).not.toHaveBeenCalled();
+  });
+});
+
+// generateSpeechAction: the client-facing wrapper. A production build strips the message
+// off a thrown server-action error, so the failure must travel as a value and the logger
+// must be flushed before the function is frozen.
+describe('generateSpeechAction', () => {
+  it('returns the audio on success and flushes the logger', async () => {
+    mockTierKeys.mockResolvedValue(openaiKeys(USER_TIERS.PAID));
+
+    const result = await generateSpeechAction(TEXT, { voice: 'onyx', gameId: 'game-1' }, 'openai');
+
+    expect(result).toEqual({ ok: true, audio: FAKE_AUDIO });
+    const { logger } = jest.requireMock('@/app/utils/logger');
+    expect(logger.flush).toHaveBeenCalled();
+  });
+
+  it('returns the provider failure as a value, logged with the voice context', async () => {
+    mockTierKeys.mockResolvedValue(openaiKeys(USER_TIERS.PAID));
+    mockCreateAgent.mockImplementation(() => ({ speak: jest.fn().mockRejectedValue(new Error('OpenAI TTS request failed: 503 Service Unavailable')) }));
+
+    const result = await generateSpeechAction(TEXT, { voice: 'onyx', gameId: 'game-1' }, 'openai');
+
+    expect(result).toEqual({ ok: false, error: 'Failed to generate speech: OpenAI TTS request failed: 503 Service Unavailable' });
+    const { logger } = jest.requireMock('@/app/utils/logger');
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.stringContaining('503'),
+      expect.objectContaining({ function: 'generateSpeechAction', voiceProvider: 'openai', voice: 'onyx', gameId: 'game-1' })
+    );
+    expect(logger.flush).toHaveBeenCalled();
   });
 });

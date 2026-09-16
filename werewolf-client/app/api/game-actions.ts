@@ -197,6 +197,44 @@ export async function getPreviewProgress(progressId: string): Promise<PreviewPro
  * Generates the game preview. `progressId` (optional, client-generated) enables the progress
  * indicator: the pipeline's stage transitions are written under that id while this runs.
  */
+export type PreviewGameResult =
+    | { ok: true; preview: GamePreviewWithGeneratedBots }
+    | { ok: false; error: string };
+
+/**
+ * The server action the new-game page calls. It returns the failure as a value
+ * instead of throwing, because a production build strips the message off every
+ * error thrown from a server action: the player would only see React's generic
+ * "An error occurred in the Server Components render" text and none of the page's
+ * error mapping (spend caps, malformed model output, the failing pipeline stage)
+ * could match (seen 2026-09-16 with a DeepSeek Flash preview). previewGame itself
+ * keeps throwing for callers that want the exception.
+ *
+ * The logger is flushed before returning on both paths: Vercel freezes the function
+ * the moment the action settles, so the 100ms debounced flush never fires for the
+ * last lines — exactly the ones that say which stage and model failed.
+ */
+export async function previewGameAction(gamePreview: GamePreview, progressId?: string): Promise<PreviewGameResult> {
+    try {
+        const preview = await previewGame(gamePreview, progressId);
+        return { ok: true, preview };
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        logger.error(`Preview generation failed: ${message}`, {
+            function: 'previewGameAction',
+            gameMasterAiType: gamePreview.gameMasterAiType,
+            theme: gamePreview.theme,
+            error: message,
+            details: error instanceof Error ? error.stack : undefined,
+        });
+        return { ok: false, error: message };
+    } finally {
+        try {
+            await logger.flush();
+        } catch { /* logging must never fail the preview */ }
+    }
+}
+
 export async function previewGame(gamePreview: GamePreview, progressId?: string): Promise<GamePreviewWithGeneratedBots> {
     const session = await auth();
     if (!session || !session.user?.email) {
@@ -357,8 +395,13 @@ export async function previewGame(gamePreview: GamePreview, progressId?: string)
     } finally {
         if (trackProgress) {
             // The doc only exists to be polled during the run; nothing should outlive it.
-            deletePreviewProgress(progressId).catch(err =>
-                logger.warn(`Preview progress cleanup failed for ${progressId}: ${err instanceof Error ? err.message : String(err)}`));
+            // Awaited: Vercel freezes the function as soon as the action settles, and a
+            // fire-and-forget delete left one stale doc per run (20 found 2026-09-16).
+            try {
+                await deletePreviewProgress(progressId);
+            } catch (err) {
+                logger.warn(`Preview progress cleanup failed for ${progressId}: ${err instanceof Error ? err.message : String(err)}`);
+            }
         }
     }
     const tokenUsage = aiResponse.tokenUsage;

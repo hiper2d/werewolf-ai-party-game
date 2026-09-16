@@ -628,6 +628,10 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
     };
     const [isRecording, setIsRecording] = useState(false);
     const [isTranscribing, setIsTranscribing] = useState(false);
+    // Mirrors isRecording for callbacks created before the state landed: the
+    // recorder's cap callback is built inside handleStartRecording, whose closure
+    // still sees isRecording=false, so a state check there would never stop anything.
+    const isRecordingRef = useRef(false);
     // Seconds left before the dictation cap stops the recorder for us. Shown in
     // the composer placeholder so the limit is visible while speaking.
     const [recordingSecondsLeft, setRecordingSecondsLeft] = useState(MAX_STT_RECORDING_MS / 1000);
@@ -1537,6 +1541,7 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
         
         try {
             setIsRecording(true);
+            isRecordingRef.current = true;
             setRecordingSecondsLeft(MAX_STT_RECORDING_MS / 1000);
             // The cap stops the recorder through the same path as a manual stop,
             // so whatever was said still gets transcribed and inserted.
@@ -1545,14 +1550,16 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
             console.error('Error starting recording:', error);
             alert('Failed to start recording. Please check microphone permissions.');
             setIsRecording(false);
+            isRecordingRef.current = false;
         }
     };
 
     const handleStopRecording = async () => {
-        if (!isRecording) {
+        if (!isRecordingRef.current) {
             return;
         }
-        
+        isRecordingRef.current = false;
+
         try {
             // Set transcribing first, but keep recording state until we actually stop
             setIsTranscribing(true);
@@ -1564,6 +1571,12 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
             
             const transcription = await sttService.transcribeRecording(audioBlob, { gameId, voiceProvider: game.voiceProvider });
             
+            if (!transcription.trim()) {
+                // A silent clip transcribes to nothing; say so instead of leaving the
+                // player staring at an unchanged box (seen 2026-09-16).
+                alert('No speech was recognized in the recording. Please try again and speak a little closer to the microphone.');
+                return;
+            }
             // Add transcribed text to current message, within the same cap the
             // textarea enforces for typing — dictation is not a way around it.
             setNewMessage(prev => {
@@ -2405,7 +2418,11 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                 className="lg:px-7 pt-3 pb-2"
             >
                 <div
-                    className={`relative rounded-[var(--radius-lg)] bg-[var(--bg-1)] border transition-[border-color,box-shadow,opacity] duration-200 ${!isInputEnabled() ? 'opacity-50 border-[var(--line-2)] pointer-events-none' : composerExpanded ? 'border-[var(--accent-line)] shadow-[0_0_0_3px_var(--accent-soft)]' : 'border-[var(--line-2)] cursor-text'}`}
+                    // Dictation disables the text input on purpose, but the composer must
+                    // stay clickable then: with pointer-events-none on this wrapper the mic
+                    // button inside it could not be clicked to stop, and the recording ran
+                    // until the cap with the microphone held open (2026-09-16).
+                    className={`relative rounded-[var(--radius-lg)] bg-[var(--bg-1)] border transition-[border-color,box-shadow,opacity] duration-200 ${isRecording || isTranscribing ? 'border-[var(--line-2)]' : !isInputEnabled() ? 'opacity-50 border-[var(--line-2)] pointer-events-none' : composerExpanded ? 'border-[var(--accent-line)] shadow-[0_0_0_3px_var(--accent-soft)]' : 'border-[var(--line-2)] cursor-text'}`}
                     onClick={() => { if (isInputEnabled() && !composerExpanded) { setComposerExpanded(true); textareaRef.current?.focus(); } }}
                 >
                     {isInputEnabled() && (
@@ -2470,12 +2487,15 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                             <button
                                 type="button"
                                 onClick={handleToggleRecording}
-                                disabled={!isMicrophoneEnabled() || isTranscribing}
+                                // Stopping must always be possible: a live recording keeps the
+                                // microphone open, so the button stays clickable even when the
+                                // chat is otherwise locked (bots responding, a vote in flight).
+                                disabled={(!isMicrophoneEnabled() && !isRecording) || isTranscribing}
                                 className={`w-8 h-8 rounded-[var(--radius-md)] flex items-center justify-center transition-all duration-[120ms] ${
                                     isRecording
                                         ? 'bg-[oklch(70%_0.13_25_/_0.12)] border border-[oklch(70%_0.13_25_/_0.4)] text-[var(--danger)]'
                                         : 'hover:bg-[var(--bg-3)] text-[var(--fg-2)] hover:text-[var(--fg-0)]'
-                                } ${!isMicrophoneEnabled() || isTranscribing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                } ${(!isMicrophoneEnabled() && !isRecording) || isTranscribing ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 title={
                                     isTranscribing
                                         ? "Transcribing audio..."

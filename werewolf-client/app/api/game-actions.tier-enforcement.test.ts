@@ -8,7 +8,7 @@
  * agent factory, spending, voice config) is jest-mocked; no network calls.
  */
 
-import { previewGame, createGame } from './game-actions';
+import { previewGame, previewGameAction, createGame } from './game-actions';
 import { GameCastingZodSchema } from '@/app/ai/prompts/zod-schemas';
 import { db } from '@/firebase/server';
 import { auth } from '@/auth';
@@ -95,6 +95,7 @@ jest.mock('@/app/utils/logger', () => ({
         error: jest.fn(),
         debug: jest.fn(),
         agentActivity: jest.fn(),
+        flush: jest.fn().mockResolvedValue(undefined),
     },
 }));
 
@@ -578,5 +579,40 @@ describe('createGame tier enforcement', () => {
         );
         expect(deductBalance).not.toHaveBeenCalled();
         expect(updateUserMonthlySpending).not.toHaveBeenCalled();
+    });
+});
+
+// previewGameAction: the page-facing wrapper. A production build strips the message off
+// a thrown server-action error, so the failure must travel as a value and the logger
+// must be flushed before the function is frozen.
+describe('previewGameAction', () => {
+    it('returns the failure message as a value instead of throwing', async () => {
+        mockTier(USER_TIERS.PAID);
+        stubAgentReturning(3);
+        (recordSpend as jest.Mock).mockRejectedValueOnce(new Error('Insufficient balance. Please add funds on your profile page to continue playing.'));
+
+        const result = await previewGameAction(makePreview());
+
+        expect(result).toEqual({ ok: false, error: expect.stringContaining('Insufficient balance') });
+        const { logger } = jest.requireMock('@/app/utils/logger');
+        expect(logger.error).toHaveBeenCalledWith(
+            expect.stringContaining('Insufficient balance'),
+            expect.objectContaining({ function: 'previewGameAction' })
+        );
+        expect(logger.flush).toHaveBeenCalled();
+    });
+
+    it('wraps a successful preview and still flushes the logger', async () => {
+        mockTier(USER_TIERS.PAID);
+        stubAgentReturning(3);
+
+        const result = await previewGameAction(makePreview());
+
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+            expect(result.preview.bots).toHaveLength(3);
+        }
+        const { logger } = jest.requireMock('@/app/utils/logger');
+        expect(logger.flush).toHaveBeenCalled();
     });
 });
