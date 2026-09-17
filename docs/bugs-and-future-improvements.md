@@ -1,27 +1,52 @@
 # Bugs and improvements
 
 ## Open
-- Improve buttons and summary loder: 
-  - Start Night, Next Day, Replay Night (hide it to PAID tier only)
-  - Summary in-progress notification is ugly
 
-- Cinematic mode should be on/off
+- **Turn claim: a page reload re-fires the bot turn that is already running (found 2026-09-16).**
+  After a reload the page sees a bot at the head of the queue and has no way to know a server
+  invocation for that bot is already in flight (the original keeps running on Vercel after the
+  browser drops; its result is discarded). So it fires another one. Dracula game, 2026-09-16:
+  Lucy's vote on Grok took 55 s, the player reloaded twice, three concurrent `vote()` calls ran for
+  Lucy. The first finished normally and the night began; the other two finished 35 s and 65 s later
+  and wrote their pre-call queue snapshot over the night queues, so `processNightQueue` looked for a
+  bot named `{"Quincey":4,...}` and the game was stuck (~30 retries, player gave up).
+  **Shipped 2026-09-17:** the vote path now re-reads the game after the model call and no-ops if
+  voting closed or the bot is no longer at the head (the discussion and night paths already did),
+  and the tally is built from the fresh doc. `scripts/reset-night.ts` resets a wedged night.
+  **Still open — the duplicates are harmless now but not free:** each late call is a full model
+  request billed to the player. Fix is a short-lived claim on the game doc, taken in a Firestore
+  transaction at the start of every bot turn (vote, discussion reply, night action):
+  - `turnClaim: {bot, action, startedAt}`; the transaction writes it only if absent or older than a
+    few minutes (covers a function killed at the timeout, so a dead claim can never wedge a game).
+  - A second call for the same bot finds a fresh claim and returns the stale-action no-op *before*
+    spending anything.
+  - Cleared when the turn finishes or fails; `cancelBotResponses` clears it too.
+  - The client reads the same field after reload and shows "Lucy is still thinking" instead of
+    firing, then resumes when the claim disappears.
+  Related small one: `cancelBotResponses` outside a discussion state throws "Cannot cancel bot
+  responses in current game state" (logged as an error twice on 2026-09-17); it should be a
+  `staleActionNoOp` like every other double-fire.
 
-- Create a welcome game for new users? Randomly create a game with free tier models in a predefined theme in the WELCOME state.
-Every new user gets one.
+- **`Game action failed: <single letter>` - minified function name in error logs (found
+  2026-09-11, still reproducing 2026-09-17: `Game action failed: I` / `J` / `R` / `S` / `W` / `_`).**
+  See the dedicated section below.
+
+- Create a welcome game for new users? Randomly create a game with free tier models in a predefined
+  theme in the WELCOME state. Every new user gets one.
 
 - **Cost-accounting loose ends.** The main fix shipped 2026-08-04 (all 9 providers feed cache hits
-  into `calculate*Cost`). Still outstanding:
+  into `calculate*Cost`). The agents now live in the `@hiper2d/ai-agents` library
+  (`~/projects/ai-agents`), so these are library changes + a release. Still outstanding:
   - *Mistral hit reporting looks model-dependent.* Live runs show Magistral returning
     `prompt_tokens_details.cached_tokens` (up to 99% of input cached) while
     mistral-large/medium/small consistently report 0. Watch the temporary
     `MISTRAL_CACHE_CALIBRATION` log lines in BetterStack over one real game, then remove the log
-    from `mistral-agent.ts` (still present at `mistral-agent.ts:146,149`).
+    (still present at `ai-agents/src/agents/mistral-agent.ts:146,149`).
   - *Anthropic cache writes are priced at 1.0x instead of 1.25x* — no `cacheWritePrice` field in
     `MODEL_PRICING`, so ~20% undercount on the written span only, on cold calls only. Add the
     field if this ever matters.
   - *Fugu orchestration tokens* are still dropped by `extractTokenUsage` (~2.3-2.9x undercount).
-    Moot once Sakana Fugu Ultra is removed from the catalog.
+    Moot once Sakana Fugu Ultra is removed from the catalog (still there as of 0.5.3).
 
 - **Resolve vote tie by asking the Detective to choose.** Today `selectEliminatedPlayer`
   (`app/api/vote-utils.ts`) breaks a tie by picking a random tied bot, never the human.
@@ -33,19 +58,27 @@ Every new user gets one.
   this. Maybe add it to personalities.
 
 - **Image generation: one Google 504 aborts a whole illustration set.**
-  `generateImage` (`app/utils/avatar-generation.ts:122`) is a bare `fetch` with no explicit
-  timeout - any non-2xx throws at `:138`, which unwinds the entire `drawIllustrationSet`
-  call in `avatar-drafts.ts:186`. Images already paid for in that set are written off through
-  `recordAbandonedSpend` (`:223`). Observed 2026-09-02: three `HTTP 504 / deadline_exceeded` from
-  `generativelanguage.googleapis.com` inside 30 minutes (19:27:13, 19:32:18, 19:56:02 UTC). Two hit
-  the scene path, which degrades gracefully (completes with `scenes: 0`, logged `warn`); the middle
-  one hit the portrait path and killed the draft with $0.067 abandoned. It self-recovered on the
-  next attempt, and `hadSet` was true so the player kept the previous set. First occurrence in 30
-  days of logs, and it was a local dev session rather than a paying user.
+  The Gemini image call now lives in the library (`@hiper2d/ai-agents/images`) and is still a bare
+  `fetch` with no explicit timeout - any non-2xx throws, which unwinds the entire
+  `drawIllustrationSet` call in `app/utils/avatar-drafts.ts`. Images already paid for in that set
+  are written off through `recordAbandonedSpend`. Observed 2026-09-02: three
+  `HTTP 504 / deadline_exceeded` from `generativelanguage.googleapis.com` inside 30 minutes
+  (19:27:13, 19:32:18, 19:56:02 UTC). Two hit the scene path, which degrades gracefully (completes
+  with `scenes: 0`, logged `warn`); the middle one hit the portrait path and killed the draft with
+  $0.067 abandoned. It self-recovered on the next attempt, and `hadSet` was true so the player kept
+  the previous set. First occurrence in 30 days of logs, and it was a local dev session rather than
+  a paying user.
   **Decision 2026-09-02: NO automatic retries** - same rule as LLM calls: the failure surfaces
   and the user triggers the redraw themselves (the draft UI already allows it). What may still
   be worth doing: an explicit timeout on the fetch so a hung call fails on our clock rather than
   Google's, and making sure the abandoned-spend path is the exception, not the rule.
+
+## Done (removed from Open)
+
+- Phase buttons (Start Night, Next Day, Replay Night paid-only) and the in-stream loaders —
+  shipped 2026-09-05 in `PhaseStrip.tsx`.
+- Cinematic mode on/off — the `cinematicEnabled` toggle in `GameChat.tsx`.
+- Vote race after a slow model call — post-call guard shipped 2026-09-17 (see the turn-claim item).
 
 ## Reference: prompt-cache semantics per provider (researched 2026-08-04, from live docs)
 
@@ -97,10 +130,12 @@ Other findings worth keeping:
 `Game action failed: t`, `Game action failed: e`. On 2026-09-11 it logged 22 new fingerprints in
 90 minutes across 6 game turns. Marlow's monitor pages urgent on every fresh fingerprint, so this
 generates alerts continuously and had been written off in her working memory as a
-"presence-model design gap, noisy by construction."
+"presence-model design gap, noisy by construction." Still reproducing on 2026-09-17 (`I`, `J`,
+`R`, `S`, `W`, `_`), and Marlow's summary of the 2026-09-15 free-cap refusal again tagged it
+"known presence-model class".
 
 **It isn't a design gap, it's a two-line logging bug.** `withErrorHandling`
-(`app/utils/server-action-wrapper.ts:67`) derives the log label from the function object:
+(`app/utils/server-action-wrapper.ts:68`) derives the log label from the function object:
 
 ```ts
 const fnName = fn.name || 'anonymousAction';
@@ -109,7 +144,7 @@ const fnName = fn.name || 'anonymousAction';
 The existing comment anticipates an *empty* `fn.name` for anonymous arrows. What it does not
 anticipate is a **minified** one: in a production Next.js build these wrapped server actions come
 through as single letters. So `fn.name` is truthy, the fallback never fires, and the letter lands
-in both the log message (`Game action failed: ${fnName}`, `:119`) and the `function:` context field.
+in both the log message (`Game action failed: ${fnName}`) and the `function:` context field.
 
 Two consequences, both bad:
 
@@ -117,7 +152,7 @@ Two consequences, both bad:
    minified letter is a brand-new signature, and letters get reshuffled on each deploy. A handful
    of real failures presents as dozens of novel error types.
 2. **The logs are unattributable.** `function: "t"` cannot be traced back to `vote`, `talkToAll` or
-   `summarizing current day`. The paired `console.error` on `:131` has the same value, so the only
+   `summarizing current day`. The paired `console.error` has the same value, so the only
    way to identify the failing action today is the stack in `details`.
 
 **Fix.** Add an explicit name rather than relying on a runtime identifier that the bundler owns:

@@ -87,6 +87,8 @@ import {
     setGameErrorState,
 } from '@/app/api/game-actions';
 import { getApiKeysForUser } from '@/app/utils/tier-utils';
+import { recordBotTokenUsage } from '@/app/api/cost-tracking';
+import { logger } from '@/app/utils/logger';
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -255,6 +257,75 @@ describe('vote: bot vote accumulation', () => {
                 JSON.stringify([
                     ...existingVotes,
                     { voter: 'Wolf', target: 'Bob', reason: 'finishing him', order: 2 },
+                ]),
+            ],
+        });
+    });
+
+    // Regression for the 2026-09-16 stuck dracula game: a page reload during a slow
+    // model call fired a second vote() for the same bot; it finished after the night
+    // had begun and wrote the vote tally over the night queues.
+    test('a vote that finishes after the night began is billed but not persisted', async () => {
+        const voteGame = makeGame({ gameStateProcessQueue: ['Alice', HUMAN_NAME] });
+        const nightGame = makeGame({
+            gameState: GAME_STATES.NIGHT,
+            gameStateProcessQueue: [GAME_ROLES.WEREWOLF],
+            gameStateParamQueue: ['Wolf'],
+        });
+        // Reads 1-2 happen before the model call and see voting open; the re-read
+        // after the reply sees the night already under way.
+        let reads = 0;
+        (getGame as jest.Mock).mockImplementation(async () => (++reads <= 2 ? voteGame : nightGame));
+        mockAskWithZodSchema.mockResolvedValue([{ who: 'Bob', why: 'late' }, '', { inputTokens: 1, outputTokens: 1 }, undefined]);
+
+        const result = await vote(GAME_ID);
+
+        expect(updatesWith('gameStateProcessQueue')).toHaveLength(0);
+        expect(updatesWith('gameStateParamQueue')).toHaveLength(0);
+        expect(savedMessages()).toHaveLength(0);
+        expect(recordBotTokenUsage).toHaveBeenCalledWith(GAME_ID, 'Alice', { inputTokens: 1, outputTokens: 1 }, USER_EMAIL);
+        expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('STALE_ACTION vote'), expect.anything());
+        expect(setGameErrorState).not.toHaveBeenCalled();
+        expect(result.game.gameState).toBe(GAME_STATES.NIGHT);
+        expect(result.messages).toHaveLength(0);
+    });
+
+    test('a duplicate vote for a bot already processed by a concurrent call is dropped', async () => {
+        const before = makeGame({ gameStateProcessQueue: ['Alice', 'Bob', HUMAN_NAME] });
+        const after = makeGame({
+            gameStateProcessQueue: ['Bob', HUMAN_NAME],
+            gameStateParamQueue: [JSON.stringify({ Bob: 1 }), JSON.stringify([{ voter: 'Alice', target: 'Bob', reason: 'first', order: 1 }])],
+        });
+        let reads = 0;
+        (getGame as jest.Mock).mockImplementation(async () => (++reads <= 2 ? before : after));
+        botVotes('Bob', 'second');
+
+        await vote(GAME_ID);
+
+        expect(updatesWith('gameStateProcessQueue')).toHaveLength(0);
+        expect(savedMessages()).toHaveLength(0);
+        expect(setGameErrorState).not.toHaveBeenCalled();
+    });
+
+    test('the tally is built from the fresh doc, so a human vote cast during the model call is kept', async () => {
+        const before = makeGame({ gameStateProcessQueue: ['Alice', HUMAN_NAME] });
+        const after = makeGame({
+            gameStateProcessQueue: ['Alice'],
+            gameStateParamQueue: [JSON.stringify({ Wolf: 1 }), JSON.stringify([{ voter: HUMAN_NAME, target: 'Wolf', reason: 'human', order: 1 }])],
+        });
+        let reads = 0;
+        (getGame as jest.Mock).mockImplementation(async () => (++reads <= 2 ? before : after));
+        botVotes('Wolf', 'agree');
+
+        await vote(GAME_ID);
+
+        expect(mockUpdate).toHaveBeenCalledWith({
+            gameStateProcessQueue: [],
+            gameStateParamQueue: [
+                JSON.stringify({ Wolf: 2 }),
+                JSON.stringify([
+                    { voter: HUMAN_NAME, target: 'Wolf', reason: 'human', order: 1 },
+                    { voter: 'Alice', target: 'Wolf', reason: 'agree', order: 2 },
                 ]),
             ],
         });

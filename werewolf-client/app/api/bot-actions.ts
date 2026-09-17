@@ -1204,16 +1204,38 @@ async function voteImpl(gameId: string): Promise<GameActionResponse> {
                 );
             }
             
-            // Update voting results in gameStateParamQueue (as a map of names to vote counts)
+            // The model call above can take a minute or more, and the pre-call checks
+            // do not survive it: a page reload mid-call fires a second vote() for the
+            // same bot, and whichever finishes last would write its queue snapshot over
+            // whatever happened meanwhile. Seen 2026-09-16 (dracula game): two late votes
+            // for Lucy landed after the night had begun and replaced the night queues
+            // with the vote tally, so the night processor looked for a bot named
+            // `{"Quincey":4,...}` and the game was stuck. Re-read and persist only if
+            // voting is still open AND this bot is still the one at the head.
+            const gameAfterAsk = await getGame(gameId) as Game;
+            if (gameAfterAsk.gameState !== GAME_STATES.VOTE || gameAfterAsk.gameStateProcessQueue[0] !== bot.name) {
+                // The provider still served (and charged for) this reply; bill it, save nothing.
+                if (tokenUsage) {
+                    await recordBotTokenUsage(gameId, bot.name, tokenUsage, session.user.email);
+                }
+                return staleActionNoOp(
+                    'vote',
+                    `${bot.name}'s vote arrived after the queue moved on (state ${gameAfterAsk.gameState}, head ${gameAfterAsk.gameStateProcessQueue[0] ?? 'empty'})`,
+                    gameAfterAsk
+                );
+            }
+
+            // Update voting results in gameStateParamQueue (as a map of names to vote counts).
+            // Read from the fresh doc: the human's vote may have landed since currentGame was read.
             let votingResults: Record<string, number> = {};
-            if (currentGame.gameStateParamQueue.length > 0) {
-                votingResults = parseVoteTally(currentGame.gameStateParamQueue[0]);
+            if (gameAfterAsk.gameStateParamQueue.length > 0) {
+                votingResults = parseVoteTally(gameAfterAsk.gameStateParamQueue[0]);
             }
 
             // Track individual votes in gameStateParamQueue[1]
             let individualVotes: IndividualVote[] = [];
-            if (currentGame.gameStateParamQueue.length > 1) {
-                individualVotes = parseIndividualVotes(currentGame.gameStateParamQueue[1]);
+            if (gameAfterAsk.gameStateParamQueue.length > 1) {
+                individualVotes = parseIndividualVotes(gameAfterAsk.gameStateParamQueue[1]);
             }
 
             // Add this vote
@@ -1251,8 +1273,8 @@ async function voteImpl(gameId: string): Promise<GameActionResponse> {
             const savedGmMsg = await addMessageToChatAndSaveToDb(gmMessage, gameId);
             const savedVoteMsg = await addMessageToChatAndSaveToDb(voteMessage, gameId);
 
-            // Remove the bot from queue and update voting results
-            const newQueue = currentGame.gameStateProcessQueue.slice(1);
+            // Remove the bot from queue and update voting results (head === bot.name was verified above)
+            const newQueue = gameAfterAsk.gameStateProcessQueue.slice(1);
 
             await db.collection('games').doc(gameId).update({
                 gameStateProcessQueue: newQueue,
