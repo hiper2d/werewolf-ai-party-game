@@ -131,7 +131,7 @@ export const SupportedAiModels: Record<string, ModelConfig> = Object.fromEntries
  * entries (see the library's isHybridThinkingModel) — burn extra reasoning tokens at the same
  * per-token price, so their effective output price is multiplied by FREE_TIER_THINKING_COST_FACTOR
  * before banding, exactly as their "(Thinking)" variants always were. Always-on reasoning models
- * (GPT-5, Gemini 3, Magistral) are priced as listed.
+ * (GPT-5, Gemini 3, Grok) are priced as listed.
  */
 export const FREE_TIER_OUTPUT_PRICE_BANDS = {
     UNLIMITED_MAX: 2,   // <= $2/1M output → unlimited bots
@@ -228,6 +228,13 @@ const DEPRECATED_MODEL_MAP: Record<string, string> = {
     // Qwen3.7 Plus retired 2026-08-30 alongside the 3.7→3.8 Flash swap; the Flash entry is the
     // cheap Qwen tier that replaces it.
     'qwen-plus': LLM_CONSTANTS.QWEN_FLASH,
+    // Mistral Large 3 and Magistral Medium 1.2 dropped 2026-09-18 (lib 0.6.0): both retired by
+    // Mistral, and Magistral's alias had already become Medium 3.5 server-side. Small 4 is the
+    // static fallback because it is the only Mistral entry every tier can hold — Medium 3.5 runs
+    // with reasoning now, and its hybrid-banded price puts it outside the free tier.
+    // `scripts/migrate-model-ids.ts` does the tier-aware rewrite (paid games → Medium 3.5).
+    'mistral-large': LLM_CONSTANTS.MISTRAL_SMALL,
+    'mistral-magistral': LLM_CONSTANTS.MISTRAL_SMALL,
 };
 
 /** Maps a possibly-retired model ID to its current equivalent; unknown IDs pass through. */

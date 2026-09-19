@@ -29,7 +29,7 @@ Pick any model for the Game Master and for each individual bot. Twelve providers
 | **Anthropic** | Claude Fable 5.1, Claude 5 Opus, Claude 5 Sonnet, Claude 4.5 Haiku |
 | **Google** | Gemini 3.1 Pro Preview, Gemini 3.8 Flash, Gemini 3.5 Flash Lite |
 | **DeepSeek** | DeepSeek V4.1 Flash, DeepSeek V4 Pro |
-| **Mistral** | Magistral Medium 1.2 (reasoning suppressed in JSON mode), Mistral Large 3, Mistral Medium 3.5, Mistral 4 Small (chat models, no reasoning) |
+| **Mistral** | Mistral Medium 3.5, Mistral 4 Small |
 | **xAI** | Grok 4.6 |
 | **Moonshot AI** | Kimi K3 |
 | **Z.AI** | GLM-5.3, GLM-5.3 Flash |
@@ -38,7 +38,7 @@ Pick any model for the Game Master and for each individual bot. Twelve providers
 | **Meta** | Muse Spark 1.3 |
 | **Sakana** | Fugu Ultra (reasons internally, but the API never returns the trace) |
 
-The reasoning is stored in the database with every message — even though it's not visible in the UI. For Claude, Gemini, Grok, and Muse Spark, the reasoning trace (a signature or an encrypted blob) is also replayed on later turns, so a bot keeps its private train of thought across the whole game. The free tier can use the cheaper models (per-model seat caps apply); the paid tier has the full list.
+The reasoning is stored in the database with every message — even though it's not visible in the UI. For Claude, Gemini, Grok, Muse Spark, and Mistral, the reasoning trace (a signature, an encrypted blob, or the trace itself) is also replayed on later turns, so a bot keeps its private train of thought across the whole game. The free tier can use the cheaper models (per-model seat caps apply); the paid tier has the full list.
 
 ## Game List
 

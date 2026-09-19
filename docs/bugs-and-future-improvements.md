@@ -37,11 +37,6 @@
 - **Cost-accounting loose ends.** The main fix shipped 2026-08-04 (all 9 providers feed cache hits
   into `calculate*Cost`). The agents now live in the `@hiper2d/ai-agents` library
   (`~/projects/ai-agents`), so these are library changes + a release. Still outstanding:
-  - *Mistral hit reporting looks model-dependent.* Live runs show Magistral returning
-    `prompt_tokens_details.cached_tokens` (up to 99% of input cached) while
-    mistral-large/medium/small consistently report 0. Watch the temporary
-    `MISTRAL_CACHE_CALIBRATION` log lines in BetterStack over one real game, then remove the log
-    (still present at `ai-agents/src/agents/mistral-agent.ts:146,149`).
   - *Anthropic cache writes are priced at 1.0x instead of 1.25x* — no `cacheWritePrice` field in
     `MODEL_PRICING`, so ~20% undercount on the written span only, on cold calls only. Add the
     field if this ever matters.
@@ -75,6 +70,12 @@
 
 ## Done (removed from Open)
 
+- Mistral reasoning + catalog refresh — shipped 2026-09-18 in lib 0.6.0: Small 4 and Medium 3.5
+  run `reasoning_effort: high` (trace arrives with json_schema output, replayed on later turns);
+  Large 3 and Magistral dropped (both retired by Mistral; Magistral's alias had already become
+  Medium 3.5). `DEPRECATED_MODEL_MAP` sends both retired ids to Small; the migration script does
+  the tier-aware rewrite (paid → Medium). Medium 3.5 left the free tier via the hybrid ×2.5 band.
+  The `MISTRAL_CACHE_CALIBRATION` log is gone too: hits arrive as `prompt_tokens_details.cached_tokens`.
 - Phase buttons (Start Night, Next Day, Replay Night paid-only) and the in-stream loaders —
   shipped 2026-09-05 in `PhaseStrip.tsx`.
 - Cinematic mode on/off — the `cinematicEnabled` toggle in `GameChat.tsx`.

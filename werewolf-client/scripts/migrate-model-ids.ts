@@ -60,8 +60,25 @@ const OLD_TO_NEW: Record<string, string> = {
     'Random': 'random',
 };
 
-function migrateValue(value: string | undefined): string | undefined {
+/**
+ * Retired ids whose replacement depends on the game's tier. Mistral Large 3 and Magistral
+ * Medium 1.2 were dropped 2026-09-18 (lib 0.6.0). Medium 3.5 is the natural successor for
+ * both, but it now runs with reasoning on and its hybrid-banded output price
+ * ($7.50 × 2.5) puts it outside the free tier, so a free game holding it would fail tier
+ * validation on its next model change. Free games get Small 4 (unlimited band), paid games
+ * get Medium 3.5. A game with no `createdWithTier` is treated as free — the safe choice.
+ */
+const OLD_TO_NEW_BY_TIER: Record<string, { free: string; paid: string }> = {
+    'mistral-large': { free: 'mistral-small', paid: 'mistral-medium' },
+    'mistral-magistral': { free: 'mistral-small', paid: 'mistral-medium' },
+};
+
+function migrateValue(value: string | undefined, tier: string | undefined): string | undefined {
     if (!value) return value;
+    const byTier = OLD_TO_NEW_BY_TIER[value];
+    if (byTier) {
+        return tier === 'paid' ? byTier.paid : byTier.free;
+    }
     return OLD_TO_NEW[value] ?? value;
 }
 
@@ -90,9 +107,10 @@ async function migrateModelIds() {
         const changes: string[] = [];
 
         const update: Record<string, any> = {};
+        const tier: string | undefined = data.createdWithTier;
 
         // Migrate gameMasterAiType
-        const newGmType = migrateValue(data.gameMasterAiType);
+        const newGmType = migrateValue(data.gameMasterAiType, tier);
         if (newGmType !== data.gameMasterAiType) {
             update.gameMasterAiType = newGmType;
             changes.push(`GM: ${data.gameMasterAiType} -> ${newGmType}`);
@@ -102,7 +120,7 @@ async function migrateModelIds() {
         if (Array.isArray(data.bots)) {
             let botsChanged = false;
             const updatedBots = data.bots.map((bot: any) => {
-                const newAiType = migrateValue(bot.aiType);
+                const newAiType = migrateValue(bot.aiType, tier);
                 if (newAiType !== bot.aiType) {
                     botsChanged = true;
                     changes.push(`bot ${bot.name}: ${bot.aiType} -> ${newAiType}`);
@@ -119,7 +137,7 @@ async function migrateModelIds() {
             if (!DRY_RUN) {
                 await gameDoc.ref.update(update);
             }
-            console.log(`${DRY_RUN ? '[dry-run] Would update' : 'Updated'} ${gameId} (${data.theme ?? 'no theme'}) — ${changes.join(', ')}`);
+            console.log(`${DRY_RUN ? '[dry-run] Would update' : 'Updated'} ${gameId} [${tier ?? 'no tier'}] (${data.theme ?? 'no theme'}) — ${changes.join(', ')}`);
             updatedCount++;
         } else {
             skippedCount++;

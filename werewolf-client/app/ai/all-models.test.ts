@@ -258,7 +258,7 @@ const TEXT_SWEEP_MODELS = new Set<string>([
     LLM_CONSTANTS.GEMINI_FLASH,
     LLM_CONSTANTS.GEMINI_LITE,
     LLM_CONSTANTS.MISTRAL_SMALL,
-    LLM_CONSTANTS.MISTRAL_MAGISTRAL,         // structured content array (thinking)
+    LLM_CONSTANTS.MISTRAL_MEDIUM,            // [thinking, text] content array
     LLM_CONSTANTS.GROK,
     LLM_CONSTANTS.KIMI,
     LLM_CONSTANTS.GLM,

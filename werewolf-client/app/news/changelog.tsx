@@ -13,6 +13,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        id: "mistral-reasoning", date: "Sep 2026", tags: ["Models"],
+        title: "Mistral thinks now, and the lineup shrinks to two",
+        body: (<>The two Mistral seats that remain, <strong>Mistral Medium 3.5</strong> and
+            <strong> Mistral 4 Small</strong>, now <strong>reason on every turn</strong> like the rest of the
+            catalog, and keep their private train of thought across the whole game. Until today they were the
+            only models at the table playing without it. <strong>Mistral Large 3</strong> and
+            <strong> Magistral Medium 1.2</strong> are gone: Mistral retired both over the summer, and Magistral
+            had quietly become an alias of Medium 3.5 on their side anyway. Bots in existing games on those two
+            move to Small (free tier) or Medium (paid tier), nothing for you to do. One side effect of the
+            reasoning tokens: Medium 3.5 is now <strong>paid tier only</strong>, while Small stays unlimited on
+            the free tier.</>),
+        media: null,
+        links: [{label: "Create a game", href: "/games"}, {label: "Models", href: "/models"}],
+    },
+    {
         id: "meta-muse-spark-deepseek-v41", date: "Sep 2026", tags: ["Models"],
         title: "Meta joins the table, and DeepSeek Flash moves to V4.1",
         body: (<>A brand-new provider and a refreshed one. <strong>Meta&apos;s Muse Spark 1.3</strong>, served from
