@@ -21,7 +21,7 @@ AI bots pretend to be humans. They don't know about other AI players. Each has p
 
 ## Supported Models
 
-Pick any model for the Game Master and for each individual bot. Twelve providers, and every model reasons on every turn unless noted:
+Pick any model for the Game Master and for each individual bot. Twelve providers, and every model reasons on every turn unless noted. The bot pickers list the chat models; the last row is the router that decides who speaks next:
 
 | Provider | Models |
 |----------|--------|
@@ -37,66 +37,81 @@ Pick any model for the Game Master and for each individual bot. Twelve providers
 | **MiniMax** | MiniMax M3 |
 | **Meta** | Muse Spark 1.3 |
 | **Sakana** | Fugu Ultra (reasons internally, but the API never returns the trace) |
+| **typesafe.ai** | Jev (System One) — not a chat model: a sub-second judge that routes the discussion, picking which bots reply to each message |
 
 The reasoning is stored in the database with every message — even though it's not visible in the UI. For Claude, Gemini, Grok, Muse Spark, and Mistral, the reasoning trace (a signature, an encrypted blob, or the trace itself) is also replayed on later turns, so a bot keeps its private train of thought across the whole game. The free tier can use the cheaper models (per-model seat caps apply); the paid tier has the full list.
 
 ## Game List
 
-After signing in, the Game List shows every game you've started — theme, the character you're playing, the current day, and the phase.
+After signing in, the Game List shows every game you've started — the opening scene, theme, the character you're playing, the current day, and the phase.
 
 <a href="images/game-list.png" target="_blank"><img src="images/game-list.png" width="800"></a>
 
 ## Game Creation
 
-Click **Create Game** and pick a theme — Star Wars, a submarine crew, a Jane Austen novel, anything the AI content filters tolerate. Set player count (up to 12), werewolf count, the AI models bots can be drawn from, and which special roles to include.
+Click **Create Game** and pick a theme — a spaceship, a submarine crew, a Jane Austen novel, anything the AI content filters tolerate. Optional **Instructions for the Game Master** steer the story ("Steampunk: the ship is flying on steam to Andromeda"), and an **Art style** line sets how portraits and scenes are drawn. Then set the player count (8–16), werewolf count, your role, the special roles, the pool of AI models bots are drawn from, the Game Master model, bot mode (role-play or plain), the voice set (OpenAI or Gemini), and reply length.
 
 <a href="images/create-game-form.png" target="_blank"><img src="images/create-game-form.png" width="800"></a>
 
-`Generate Preview` kicks off the AI pipeline that writes the story, picks a Game Master config, and rolls every player. Generating 11–12 player configs against a slower model takes 60–90s — a polite blue toast tells you it's working.
+`Generate Preview` kicks off the AI pipeline that writes the story, picks a Game Master config, and rolls every player. It takes about half a minute; the button shows the progress.
 
 <a href="images/generating-preview.png" target="_blank"><img src="images/generating-preview.png" width="800"></a>
 
-When the call returns, the **Preview** section appears below the form: AI-written game story, then the Game Master config (model, voice, voice style).
+When the call returns, the **Preview** section appears below the form: the AI-written opening story (with a play button to hear it), then the Game Master config (model, voice, voice style).
 
 <a href="images/preview-story-gm.png" target="_blank"><img src="images/preview-story-gm.png" width="800"></a>
 
-Below that, every player has its own card — name, gender, AI model, play style, backstory, voice, and voice style. Anything can be tweaked before clicking **Create Game**.
+**Illustrations** (paid tier) draw the opening scene and a portrait sheet for the whole cast in the chosen art style. Every portrait comes from one drawn sheet. Below it, the **Cast** lists every player with model and play style.
 
-<a href="images/preview-players.png" target="_blank"><img src="images/preview-players.png" width="800"></a>
+<a href="images/preview-illustrations-cast.jpg" target="_blank"><img src="images/preview-illustrations-cast.jpg" width="800"></a>
+
+Click any portrait to **reframe** it: move and resize the card's crop on the sheet, then place the avatar circle inside the card. Nothing is redrawn.
+
+<a href="images/reframe-portrait.jpg" target="_blank"><img src="images/reframe-portrait.jpg" width="800"></a>
+
+Click a cast row to edit the character — name, model, play style, story, appearance, voice, and voice style. Anything can be tweaked before clicking **Create Game**.
+
+<a href="images/preview-cast-row.png" target="_blank"><img src="images/preview-cast-row.png" width="800"></a>
 
 ## Gameplay
 
 The in-game screen is three columns:
 
-- **Left** — participants with the Game Master at the top, then players. The human is highlighted as `YOU`. Each row shows the assigned AI model, and the total game cost so far sits next to the title.
-- **Center** — chat. Game Master messages, player dialogue, and votes scroll here. The Day selector at the top right lets you jump between days.
-- **Right** — discussion queue. Live status of who's thinking, plus a **Select Bots Manually** button to override the GM and pick which 1–5 bots speak next.
+- **Left** — participants with the Game Master at the top, then players. The human is highlighted as `YOU` with their role. Each row shows the assigned AI model and its spend so far; the total game cost sits under the title.
+- **Center** — chat over the opening scene. Game Master messages, player dialogue, and votes scroll here. From day two, a Day selector at the top right of the chat lets you jump between days.
+- **Right** — discussion queue. Live status of who's thinking, plus **Select Bots Manually** to override the router and pick which bots speak next, and **Vote** to call the vote early.
 
-<a href="images/game-luna.png" target="_blank"><img src="images/game-luna.png" width="800"></a>
+<a href="images/game-chat.jpg" target="_blank"><img src="images/game-chat.jpg" width="800"></a>
+
+### Cinematic Mode
+
+Toggle **Cinematic** at the top of the chat and every new message plays as a scene: the speaker's card on the left, their line on the right, voice playing, with a speaker strip to skip back and forth. Space advances to the next speaker, Esc closes it.
+
+<a href="images/cinematic-mode.jpg" target="_blank"><img src="images/cinematic-mode.jpg" width="800"></a>
+
+### Player Cards
+
+Click any participant to open their card — portrait, model, play style, and the backstory under **STORY**. Your own card shows your role.
+
+<a href="images/player-card.jpg" target="_blank"><img src="images/player-card.jpg" width="400"></a> <a href="images/role-card.jpg" target="_blank"><img src="images/role-card.jpg" width="400"></a>
+
+<a href="images/player-card-story.jpg" target="_blank"><img src="images/player-card-story.jpg" width="800"></a>
+
+The voice can be changed mid-game from the card: pick another voice from the game's set, adjust the style, and play a sample before saving. The crop icon on the card opens the same reframe editor as in the preview.
+
+<a href="images/voice-edit.jpg" target="_blank"><img src="images/voice-edit.jpg" width="800"></a>
 
 ### Day Discussion
 
-The AI Game Master opens each day, then the bots pile in with their analysis. Chat with them using text or voice (TTS/STT). Stay in character, try to blend in, or go full meta and tell them they're AI — whatever it takes to survive. Jailbreaking isn't easy; the days of "ignore all previous instructions" are long gone.
-
-<a href="images/day-discussion.png" target="_blank"><img src="images/day-discussion.png" width="800"></a>
+The AI Game Master opens each day, then the bots pile in with their introductions and analysis. Chat with them using text or voice (TTS/STT). Stay in character, try to blend in, or go full meta and tell them they're AI — whatever it takes to survive. Jailbreaking isn't easy; the days of "ignore all previous instructions" are long gone.
 
 ### Day History
 
-The Day selector at the top right opens a dropdown of every day played so far. Past days load in **read-only history mode** — full transcript, no input box.
-
-<a href="images/day-selector.png" target="_blank"><img src="images/day-selector.png" width="800"></a>
-
-<a href="images/day-history.png" target="_blank"><img src="images/day-history.png" width="800"></a>
+From day two, the Day selector at the top right of the chat opens a dropdown of every day played so far. Past days load in **read-only history mode** — full transcript, no input box.
 
 ### Voting
 
-Once voting starts, each bot posts a `🗳️ Votes for X` message with their reasoning. The human gets a Cast Your Vote modal — pick a player from the dropdown and write a reason (required).
-
-<a href="images/voting.png" target="_blank"><img src="images/voting.png" width="800"></a>
-
-After all votes are in, the Game Master posts a tally chart and announces the elimination — and the eliminated player's true role is revealed.
-
-<a href="images/vote-results.png" target="_blank"><img src="images/vote-results.png" width="800"></a>
+Once voting starts, each bot posts a `🗳️ Votes for X` message with their reasoning. The human gets a Cast Your Vote modal — pick a player from the dropdown and write a reason (required). After all votes are in, the Game Master posts a tally chart and announces the elimination — and the eliminated player's true role is revealed.
 
 ### Night Phase
 
@@ -108,7 +123,7 @@ When the game ends — werewolves wiped out, or werewolves outnumbering villager
 
 ## Architecture
 
-No AI frameworks — each vendor has its own agent built on their native SDK. A custom router coordinates bots, and a voice framework (OpenAI and Gemini TTS) matches voices to characters. Real-time cost tracking per bot, per game, and per player.
+No AI frameworks — each vendor has its own agent built on their native SDK. A speaker router built on typesafe.ai's Jev judge model picks which bots reply to each message (the Game Master model takes over when no Jev key is configured), and a voice framework (OpenAI and Gemini TTS) matches voices to characters. Real-time cost tracking per bot, per game, and per player.
 
 ### Stack
 

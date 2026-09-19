@@ -25,3 +25,5 @@ ds-bundle/
 .design-sync/learnings/
 .design-sync/node_modules
 werewolf-client/design-kit/static/
+.vercel
+.env*.local

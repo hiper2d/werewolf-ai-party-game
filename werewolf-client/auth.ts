@@ -13,6 +13,9 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
         GithubProvider({
             clientId: process.env.GITHUB_ID!,
             clientSecret: process.env.GITHUB_SECRET!,
+            // GitHub now returns an `iss` parameter on the OAuth callback (RFC 9207). @auth/core <0.41.3
+            // validates it against a placeholder issuer and rejects the login; this is the upstream value.
+            issuer: "https://github.com/login/oauth",
         }),
         GoogleProvider({
             clientId: process.env.GOOGLE_CLIENT_ID!,
