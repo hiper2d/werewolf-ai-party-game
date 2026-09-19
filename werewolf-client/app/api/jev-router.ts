@@ -19,7 +19,6 @@ import {
     GAME_MASTER,
     GAME_STATES,
     GameMessage,
-    MESSAGE_ROLE,
     MessageType,
     RECIPIENT_ALL,
     RECIPIENT_NONE,
@@ -71,16 +70,17 @@ export const JEV_ROUTER_CONFIG = {
 } as const;
 
 /**
- * Every router call is recorded like an LLM turn (`Agent jev_router: Game Master (jev-…)` in
- * Better Stack) with NOTHING truncated: the full state, all questions, the raw answers and
- * the decision made from them. That record is what lets the selection logic be changed
- * later and replayed against real games (scripts/jev-replay.ts).
+ * Every router call shows up in Better Stack as an agent row (`Agent jev_router: Game Master
+ * (jev-…)`) carrying only the DECISION and usage — not the request (the whole day's
+ * discussion plus the questions) and not the raw answers. The full, untruncated copy lives
+ * in Firestore (`jevRouterCalls`, saveJevRouterCall); that is what scripts/jev-replay.ts
+ * replays the selection logic against.
  */
 const JEV_ROUTER_LOG_CONFIG: AgentLoggingConfig = {
     enabled: true,
     logSystemPrompt: false,
-    history: { enabled: true, maxCharactersPerMessage: -1 },
-    logCommand: true,
+    history: { enabled: false, maxCharactersPerMessage: 0 },
+    logCommand: false,
     reply: { mode: 'raw', maxReplyChars: -1, maxThinkingChars: 0, includeReasoning: false, includeUsage: true },
 };
 
@@ -317,24 +317,20 @@ export async function selectRespondingBotsWithJev(
 
     const { state, questions, lastAuthor } = buildRouterRequest(game, dayMessages, candidateNames);
 
-    // Full request on the console (dev): the state is the whole day's discussion, so this is
-    // verbose by design — it is the only way to see exactly what the judge was shown.
-    console.log(`🧭 Jev request (${Object.keys(questions).length} questions):\n${JSON.stringify({ state, questions }, null, 2)}`);
-
+    // The request and the raw answers are deliberately NOT printed or logged (the state is the
+    // whole day's discussion); the Firestore record below keeps the full copy for replay.
     let result;
     try {
         result = await askJev(apiKey, state, questions);
-        console.log(`🧭 Jev answers:\n${JSON.stringify(result.answers, null, 2)}`);
-        console.log(`🧭 Jev answered in ${result.durationMs} ms — ${result.inputTokens} input tokens, $${result.costUSD.toFixed(6)} (${result.model})`);
+        console.log(`🧭 Jev answered ${Object.keys(questions).length} questions in ${result.durationMs} ms — ${result.inputTokens} input tokens, $${result.costUSD.toFixed(6)} (${result.model})`);
     } catch (error: any) {
         console.error(`🧭 Jev request failed: ${error?.message ?? error}`);
         const detail = error instanceof JevError ? `${error.message}${error.body ? `: ${error.body}` : ''}` : String(error?.message ?? error);
-        // The failed request is recorded in full too — a bad answer and a refused request
-        // both need the exact input to be reproduced.
+        // The failed request is recorded in full in Firestore (not here) — a bad answer and a
+        // refused request both need the exact input to be reproduced.
         logger.error('Jev router request failed', {
             gameId: game.id, userId: userEmail, agentName: GAME_MASTER, activity: 'jev_router',
             error: detail, status: error instanceof JevError ? error.status : undefined,
-            state, questions,
         });
         await saveJevRouterCall({
             gameId: game.id, userId: userEmail, day: game.currentDay, status: 'error', model: JEV_MODEL,
@@ -437,14 +433,12 @@ export async function selectRespondingBotsWithJev(
         inputTokens: result.inputTokens, costUSD: result.costUSD, durationMs: result.durationMs,
     });
 
-    // The full record: state as the "history", questions as the "command", raw answers plus
-    // the decision as the "reply". Same row shape as every LLM turn, nothing truncated.
+    // Better Stack row: the decision and usage only (same row shape as an LLM turn, minus the
+    // request and the raw answers — see JEV_ROUTER_LOG_CONFIG).
     logger.agentActivity(GAME_MASTER, result.model, 'jev_router', {
         gameId: game.id,
         userId: userEmail,
-        history: [{ role: MESSAGE_ROLE.USER, content: JSON.stringify(state) }],
-        command: JSON.stringify(questions),
-        reply: { answers: result.answers, decision },
+        reply: { decision },
         usage: {
             inputTokens: result.inputTokens,
             outputTokens: 0,

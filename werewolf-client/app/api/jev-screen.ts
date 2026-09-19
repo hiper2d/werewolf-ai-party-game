@@ -19,7 +19,7 @@
  * collection `jevScreenCalls` (app/api/jev-records.ts), reported by scripts/jev-screen-report.ts.
  */
 
-import { AgentLoggingConfig, ApiKeyMap, MESSAGE_ROLE } from "@/app/api/game-models";
+import { AgentLoggingConfig, ApiKeyMap } from "@/app/api/game-models";
 import { askJev, getJevApiKey, JEV_API_KEY_NAME, JEV_MODEL, JevError, JevNoulQuestion, JevScoreQuestion } from "@/app/ai/jev-client";
 import { recordScreenSpend } from "@/app/api/cost-tracking";
 import { getJevScreenMode, JevScreenMode } from "@/app/api/limits-actions";
@@ -85,12 +85,13 @@ export interface ScreenOutcome {
     message?: string;
 }
 
-/** Full row to Better Stack, nothing truncated: the text is short by construction (input limits). */
+/** Better Stack row: verdict/decision and usage only — the screened text, the questions and the
+ * raw answers stay out of the logs. The full copy is the Firestore record (jevScreenCalls). */
 const JEV_SCREEN_LOG_CONFIG: AgentLoggingConfig = {
     enabled: true,
     logSystemPrompt: false,
-    history: { enabled: true, maxCharactersPerMessage: -1 },
-    logCommand: true,
+    history: { enabled: false, maxCharactersPerMessage: 0 },
+    logCommand: false,
     reply: { mode: 'raw', maxReplyChars: -1, maxThinkingChars: 0, includeReasoning: false, includeUsage: true },
 };
 
@@ -229,9 +230,7 @@ export async function screenHumanInput(input: ScreenInput): Promise<ScreenOutcom
     logger.agentActivity(SCREEN_AGENT_NAME, result.model, 'jev_screen', {
         gameId: input.gameId,
         userId: input.userEmail,
-        history: [{ role: MESSAGE_ROLE.USER, content: JSON.stringify(state) }],
-        command: JSON.stringify(questions),
-        reply: { answers: result.answers, decision, mode, enforced: blocked },
+        reply: { decision, mode, enforced: blocked },
         usage: {
             inputTokens: result.inputTokens,
             outputTokens: 0,

@@ -226,22 +226,23 @@ describe('selectRespondingBotsWithJev', () => {
         expect(savedMessages[0].messageType).toBe(MessageType.GM_BOT_SELECTION);
         expect(savedMessages[0].msg).toContain('Jev selected');
 
-        // Recorded like an LLM turn, untruncated: full state, questions, raw answers, decision.
+        // Better Stack row: decision + usage only. The request (state, questions) and the raw
+        // answers must NOT be in the log — the Firestore record is the full copy.
         expect(mockAgentActivity).toHaveBeenCalledTimes(1);
         const [agentName, model, activity, data, config] = mockAgentActivity.mock.calls[0];
         expect(agentName).toBe(GAME_MASTER);
         expect(model).toBe('jev-1.13.0');
         expect(activity).toBe('jev_router');
         expect(data.gameId).toBe('g1');
-        expect(JSON.parse(data.history[0].content).discussion).toHaveLength(2);
-        expect(Object.keys(JSON.parse(data.command))).toContain('reply_Bram');
-        expect(data.reply.answers.reply_Bram.score).toBe(3);
+        expect(data.history).toBeUndefined();
+        expect(data.command).toBeUndefined();
+        expect(data.reply.answers).toBeUndefined();
         expect(data.reply.decision.selected).toEqual(selected);
         expect(data.usage.inputTokens).toBe(1500);
-        expect(config.history.maxCharactersPerMessage).toBe(-1);
-        expect(config.reply.mode).toBe('raw');
+        expect(config.history.enabled).toBe(false);
+        expect(config.logCommand).toBe(false);
 
-        // ...and the durable Firestore copy carries the same record.
+        // ...while the durable Firestore copy carries the full record.
         expect(mockSaveRecord).toHaveBeenCalledTimes(1);
         const stored: any = mockSaveRecord.mock.calls[0][0];
         expect(stored).toMatchObject({ gameId: 'g1', userId: 'u@e.com', day: 2, status: 'ok', model: 'jev-1.13.0', inputTokens: 1500 });
@@ -250,16 +251,21 @@ describe('selectRespondingBotsWithJev', () => {
         expect(stored.decision.selected).toEqual(selected);
     });
 
-    it('records the full request when Jev fails', async () => {
+    it('logs a failure without the request, and records the full request in Firestore', async () => {
         const { logger } = jest.requireMock('@/app/utils/logger');
         fetchMock.mockResolvedValue({ ok: false, status: 529, text: async () => 'overloaded' });
         await selectRespondingBotsWithJev(game, messages as any, ['Alice', 'Bram', 'Cleo'], 'key', 'u@e.com').catch(() => undefined);
         expect(logger.error).toHaveBeenCalledWith('Jev router request failed', expect.objectContaining({
             gameId: 'g1', activity: 'jev_router', status: 529,
+        }));
+        const logged = (logger.error as jest.Mock).mock.calls[0][1];
+        expect(logged.state).toBeUndefined();
+        expect(logged.questions).toBeUndefined();
+        expect(mockSaveRecord).toHaveBeenCalledWith(expect.objectContaining({
+            gameId: 'g1', status: 'error', httpStatus: 529,
             state: expect.objectContaining({ bots: ['Alice', 'Bram', 'Cleo'] }),
             questions: expect.objectContaining({ reply_Bram: expect.anything() }),
         }));
-        expect(mockSaveRecord).toHaveBeenCalledWith(expect.objectContaining({ gameId: 'g1', status: 'error', httpStatus: 529 }));
     });
 
     it('tags an API failure as a recoverable bot_selection error and bills nothing', async () => {
