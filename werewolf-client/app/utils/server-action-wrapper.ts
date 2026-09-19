@@ -1,4 +1,4 @@
-import { setGameErrorState, getGame, recordProviderBlock } from '@/app/api/game-actions';
+import { setGameErrorState, getGame, recordProviderBlock, getRecentIllustrationMessages } from '@/app/api/game-actions';
 import { SystemErrorMessage, BotResponseError, GameActionResponse, GAME_STATES, Game } from '@/app/api/game-models';
 import { invalidJsonExplanation, isResponseFormatFailure } from '@/app/api/retry-hint';
 import { isTierMismatchError, refusalOf } from '@/app/api/errors';
@@ -43,6 +43,33 @@ async function resolveErrorAttribution(
 }
 
 /**
+ * Piggyback: illustrations are drawn after a response has gone out (after()), and the chat
+ * only receives new messages through action responses. So every successful game action
+ * also carries any GM_ILLUSTRATION message posted recently that it isn't already returning;
+ * the client drops duplicates by id. Best effort — a failed lookup never fails the action.
+ */
+async function withRecentIllustrations(result: GameActionResponse, gameId: string): Promise<GameActionResponse> {
+  if (!result || !Array.isArray(result.messages)) {
+    return result;
+  }
+  try {
+    const recent = await getRecentIllustrationMessages(gameId);
+    if (recent.length === 0) {
+      return result;
+    }
+    const known = new Set(result.messages.map(m => m.id).filter(Boolean));
+    const extra = recent.filter(m => m.id && !known.has(m.id));
+    if (extra.length === 0) {
+      return result;
+    }
+    return { ...result, messages: [...result.messages, ...extra] };
+  } catch (error: any) {
+    logger.warn('Could not attach recent illustrations to the action response', { gameId, error: error?.message });
+    return result;
+  }
+}
+
+/**
  * Higher-order function that wraps server actions with global error handling.
  * Automatically catches errors and updates the game object with persistent error state.
  * Returns GameActionResponse with the error game state and empty messages array.
@@ -57,7 +84,8 @@ export function withErrorHandling<T extends any[]>(
 ) {
   return async (...args: T): Promise<GameActionResponse> => {
     try {
-      return await fn(...args);
+      const result = await fn(...args);
+      return await withRecentIllustrations(result, gameIdExtractor(...args));
     } catch (error) {
       if (isTierMismatchError(error)) {
         throw error;

@@ -412,6 +412,22 @@ export const AUTO_VOTE_COEFFICIENT = 3.5;
  * Configuration for how many bots the Game Master should select to respond
  * Used in bot selection prompts and Zod schema validation
  */
+/** A game always has at least two werewolves. */
+export const MIN_WEREWOLVES = 2;
+
+/**
+ * The most werewolves a table can hold: under half the players (werewolves win at parity,
+ * so half would be a lost game at the first night), and never more than the seats left
+ * after the special roles. Never below MIN_WEREWOLVES (the lobby is 8–16 players, so the
+ * floor only matters for tiny test tables; createGame still refuses roles that don't fit).
+ * Shared by the new-game form and createGame's validation.
+ */
+export function maxWerewolvesFor(playerCount: number, specialRoleCount: number): number {
+    const underHalf = Math.floor(playerCount / 2) - 1;
+    const seatsLeft = playerCount - specialRoleCount;
+    return Math.max(MIN_WEREWOLVES, Math.min(underHalf, seatsLeft));
+}
+
 export const BOT_SELECTION_CONFIG = {
     MIN: 1,
     MAX: 5
@@ -988,4 +1004,10 @@ export interface GameMessage {
 export interface GameActionResponse {
     game: Game;
     messages: GameMessage[];
+    /**
+     * The action refused the player's input before anything was saved or sent to a model —
+     * the content screen in enforce mode. Not an error: the game is untouched, the client
+     * keeps the draft and shows `message`.
+     */
+    rejected?: { reason: string; message: string };
 }

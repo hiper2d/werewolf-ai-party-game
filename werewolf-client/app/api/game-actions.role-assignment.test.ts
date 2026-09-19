@@ -126,7 +126,7 @@ function makeGeneratedPreview(
         name: 'Human',
         theme: 'Test Theme',
         description: 'A test game',
-        werewolfCount: 1,
+        werewolfCount: 2,
         specialRoles: [],
         gameMasterAiType: LLM_CONSTANTS.DEEPSEEK_FLASH,
         playersAiType: [LLM_CONSTANTS.DEEPSEEK_FLASH],
@@ -208,15 +208,52 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 describe('createGame human role assignment', () => {
-    // A 4-player game where every slot is a distinct role:
-    // doctor + detective + maniac + 1 werewolf, 0 villagers.
+    // A 5-player game where every slot is a special role:
+    // doctor + detective + maniac + 2 werewolves, 0 villagers.
     const fullSpecialPreview = (humanPlayerRole?: string) =>
         makeGeneratedPreview({
-            playerCount: 4,
-            werewolfCount: 1,
+            playerCount: 5,
+            werewolfCount: 2,
             specialRoles: [GAME_ROLES.DOCTOR, GAME_ROLES.DETECTIVE, GAME_ROLES.MANIAC],
             humanPlayerRole,
         });
+
+    it('rejects a setup whose werewolves and special roles outnumber the players', async () => {
+        setupDbForCreate();
+
+        await expect(createGame(makeGeneratedPreview({
+            playerCount: 8,
+            werewolfCount: 6,
+            specialRoles: [GAME_ROLES.DOCTOR, GAME_ROLES.DETECTIVE, GAME_ROLES.MANIAC],
+        }))).rejects.toThrow(/Roles don't fit: 8 players cannot hold 6 werewolves and 3 special roles/);
+    });
+
+    it('caps werewolves under half the table after the special roles', async () => {
+        setupDbForCreate();
+
+        await expect(createGame(makeGeneratedPreview({
+            playerCount: 8,
+            werewolfCount: 4,
+            specialRoles: [GAME_ROLES.DOCTOR, GAME_ROLES.DETECTIVE, GAME_ROLES.MANIAC],
+        }))).rejects.toThrow(/Too many werewolves: 8 players with 3 special roles allow at most 3 werewolves/);
+    });
+
+    it('rejects fewer than two werewolves', async () => {
+        setupDbForCreate();
+
+        await expect(createGame(makeGeneratedPreview({ playerCount: 8, werewolfCount: 1 })))
+            .rejects.toThrow(/at least 2 werewolves/);
+    });
+
+    it('caps werewolves under half the table even when seats are free', async () => {
+        setupDbForCreate();
+
+        await expect(createGame(makeGeneratedPreview({
+            playerCount: 12,
+            werewolfCount: 6,
+            specialRoles: [],
+        }))).rejects.toThrow(/allow at most 5 werewolves/);
+    });
 
     it('gives the human the exact special role they chose (deterministic, RNG-independent)', async () => {
         const { setGame } = setupDbForCreate();
@@ -244,18 +281,18 @@ describe('createGame human role assignment', () => {
             [GAME_ROLES.DOCTOR]: 1,
             [GAME_ROLES.DETECTIVE]: 1,
             [GAME_ROLES.MANIAC]: 1,
-            [GAME_ROLES.WEREWOLF]: 1,
+            [GAME_ROLES.WEREWOLF]: 2,
         });
     });
 
     it('selecting villager pulls a villager out of the distribution for the human', async () => {
-        // 6 players: 1 werewolf + 1 doctor + 4 villagers.
+        // 6 players: 2 werewolves + 1 doctor + 3 villagers.
         const { setGame } = setupDbForCreate();
 
         await createGame(
             makeGeneratedPreview({
                 playerCount: 6,
-                werewolfCount: 1,
+                werewolfCount: 2,
                 specialRoles: [GAME_ROLES.DOCTOR],
                 humanPlayerRole: GAME_ROLES.VILLAGER,
             })
@@ -263,9 +300,9 @@ describe('createGame human role assignment', () => {
 
         expect(humanRole(setGame)).toBe(GAME_ROLES.VILLAGER);
         expect(roleCounts(setGame)).toEqual({
-            [GAME_ROLES.WEREWOLF]: 1,
+            [GAME_ROLES.WEREWOLF]: 2,
             [GAME_ROLES.DOCTOR]: 1,
-            [GAME_ROLES.VILLAGER]: 4,
+            [GAME_ROLES.VILLAGER]: 3,
         });
     });
 
@@ -278,7 +315,7 @@ describe('createGame human role assignment', () => {
             [GAME_ROLES.DOCTOR]: 1,
             [GAME_ROLES.DETECTIVE]: 1,
             [GAME_ROLES.MANIAC]: 1,
-            [GAME_ROLES.WEREWOLF]: 1,
+            [GAME_ROLES.WEREWOLF]: 2,
         });
         // Whatever the shuffle picked, it's one of the real roles in play.
         expect([
@@ -298,7 +335,7 @@ describe('createGame human role assignment', () => {
             [GAME_ROLES.DOCTOR]: 1,
             [GAME_ROLES.DETECTIVE]: 1,
             [GAME_ROLES.MANIAC]: 1,
-            [GAME_ROLES.WEREWOLF]: 1,
+            [GAME_ROLES.WEREWOLF]: 2,
         });
     });
 
@@ -310,7 +347,7 @@ describe('createGame human role assignment', () => {
         await createGame(
             makeGeneratedPreview({
                 playerCount: 6,
-                werewolfCount: 1,
+                werewolfCount: 2,
                 specialRoles: [], // no doctor in play
                 humanPlayerRole: GAME_ROLES.DOCTOR,
             })
@@ -318,8 +355,8 @@ describe('createGame human role assignment', () => {
 
         expect(humanRole(setGame)).not.toBe(GAME_ROLES.DOCTOR);
         expect(roleCounts(setGame)).toEqual({
-            [GAME_ROLES.WEREWOLF]: 1,
-            [GAME_ROLES.VILLAGER]: 5,
+            [GAME_ROLES.WEREWOLF]: 2,
+            [GAME_ROLES.VILLAGER]: 4,
         });
     });
 });

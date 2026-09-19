@@ -23,6 +23,8 @@ import { logger } from "@/app/utils/logger";
 import { after } from "next/server";
 import { midGameImagesEnabled, runDayIllustration } from "@/app/utils/illustration-generation";
 import { convertMessageContent } from "@/app/utils/message-utils";
+import { getJevApiKey } from "@/app/ai/jev-client";
+import { selectRespondingBotsWithJev } from "@/app/api/jev-router";
 
 /**
  * Format day activity data for the GM prompt.
@@ -102,7 +104,9 @@ export async function selectRandomDayOpeningBots(game: Game): Promise<string[]> 
 /**
  * Ask the Game Master to select which bots should respond next.
  *
- * Runs the GM router over the current day's discussion, records GM token usage,
+ * With a Jev key configured (TYPESAFE_API_KEY in the platform key doc, or J_K in the local
+ * env) the selection is a single judge call — see app/api/jev-router.ts. Otherwise this
+ * runs the GM router over the current day's discussion, records GM token usage,
  * and saves a hidden GM_BOT_SELECTION debug message. Returns the selected bot
  * names (capped at BOT_SELECTION_CONFIG.MAX). Does NOT update the process queue
  * or handle auto-vote — callers decide what to do with the selection.
@@ -136,12 +140,26 @@ export async function selectRespondingBots(
     });
 
     // Prepare candidate list for the command - bots only (human excluded)
-    const candidateNames = availableBots
+    const candidateBotNames = availableBots
         .filter(b => b.name !== game.humanPlayerName)
-        .map(b => b.name)
-        .join(", ");
+        .map(b => b.name);
+    const candidateNames = candidateBotNames.join(", ");
+
+    // Jev (typesafe.ai) routes in one sub-second judge call when its key is configured;
+    // without the key the Game Master LLM does the routing below.
+    const jevApiKey = getJevApiKey(apiKeys);
+    if (jevApiKey) {
+        // Console line on purpose: in dev the structured logger ships to Better Stack only,
+        // and this is the one place to see which router a game runs on.
+        console.log(`🧭 Speaker router: Jev (typesafe.ai) — game ${game.id}, day ${game.currentDay}, ${candidateBotNames.length} candidates`);
+        // A pending one-shot retry hint was written for the LLM router; clear it so it
+        // doesn't ride a later, unrelated GM prompt.
+        await consumeRetryHint(game.id, game, GAME_MASTER);
+        return selectRespondingBotsWithJev(game, dayMessages, candidateBotNames, jevApiKey, userEmail);
+    }
 
     const gmModel = getEffectiveModel(game, GAME_MASTER, game.gameMasterAiType);
+    console.log(`🧭 Speaker router: Game Master LLM (${gmModel.aiType}) — game ${game.id}, day ${game.currentDay}; set TYPESAFE_API_KEY to route with Jev`);
     const gmAgent = AgentFactory.createAgent(GAME_MASTER, gmPrompt, gmModel.aiType, apiKeys, gmModel.enableThinking);
     gmAgent.gameId = game.id;
     gmAgent.userId = userEmail;

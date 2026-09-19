@@ -8,7 +8,7 @@ import {useSession} from 'next-auth/react';
 import {createGame, getPreviewProgress, previewGameAction} from '@/app/api/game-actions';
 import {generateDraftIllustrations, getAvatarDraft, reframeDraftAvatar} from '@/app/api/avatar-draft-actions';
 import type {PreviewProgress} from '@/app/ai/preview-generation';
-import {AVATAR_DRAFT_IN_PROGRESS, AVATAR_GM_KEY, AvatarDraftState, AvatarFraming, avatarSheetKey, DEFAULT_GAME_MODE, GAME_MODES, GAME_ROLES, GameMode, GamePreview, GamePreviewWithGeneratedBots, getRandomVoiceForGender, RANDOM_ROLE, UserTier, USER_TIERS} from "@/app/api/game-models";
+import {AVATAR_DRAFT_IN_PROGRESS, AVATAR_GM_KEY, AvatarDraftState, AvatarFraming, avatarSheetKey, DEFAULT_GAME_MODE, GAME_MODES, GAME_ROLES, GameMode, GamePreview, GamePreviewWithGeneratedBots, getRandomVoiceForGender, RANDOM_ROLE, UserTier, USER_TIERS, maxWerewolvesFor, MIN_WEREWOLVES} from "@/app/api/game-models";
 import {sanitizePlayerName} from "@/app/utils/name-utils";
 import {circleFocus} from "@/app/utils/avatar-framing";
 import IllustrationsPanel, {CastEntry, draftFraming, draftImageUrl} from '@/app/games/newgame/components/IllustrationsPanel';
@@ -224,11 +224,16 @@ export default function CreateNewGamePage() {
         };
     }, [status, isTierLoaded]);
 
+    // Under half the table, and never more than the seats left after the special roles
+    // (same rule createGame enforces).
+    const maxWerewolves = maxWerewolvesFor(playerCount, specialRoles.length);
     useEffect(() => {
-        if (werewolfCount >= playerCount) {
-            setWerewolfCount(playerCount - 1);
+        if (werewolfCount > maxWerewolves) {
+            setWerewolfCount(maxWerewolves);
+        } else if (werewolfCount < MIN_WEREWOLVES) {
+            setWerewolfCount(MIN_WEREWOLVES);
         }
-    }, [playerCount, werewolfCount]);
+    }, [maxWerewolves, werewolfCount]);
 
     useEffect(() => {
         const nameValidationError = validateName(name);
@@ -856,7 +861,7 @@ export default function CreateNewGamePage() {
                                         <InfoButton label="Werewolf count hint" size={16}>For a balanced game, werewolves should be about 20–30% of all players.</InfoButton>
                                     </div>
                                     <SelectDropdown
-                                        options={Array.from({length: playerCount - 1}, (_, i) => ({ value: String(i), label: `${i} werewolves`, displayLabel: String(i) }))}
+                                        options={Array.from({length: maxWerewolves - MIN_WEREWOLVES + 1}, (_, i) => ({ value: String(MIN_WEREWOLVES + i), label: `${MIN_WEREWOLVES + i} werewolves`, displayLabel: String(MIN_WEREWOLVES + i) }))}
                                         value={String(werewolfCount)}
                                         onChange={(val) => setWerewolfCount(Number(val))}
                                     />

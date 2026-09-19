@@ -53,6 +53,7 @@ import {
     getUserFromFirestore
 } from "./game-actions";
 import {getApiKeysForUser} from "@/app/utils/tier-utils";
+import {screenHumanInput} from "@/app/api/jev-screen";
 import {selectRespondingBots} from "@/app/api/bot-selection";
 import {withGameErrorHandling} from "@/app/utils/server-action-wrapper";
 import {staleActionNoOp} from "@/app/api/action-guards";
@@ -475,7 +476,12 @@ function shouldTriggerAutoVote(game: Game): boolean {
 
             // Case 1: Human player initiates discussion
             if (userMessage && game.gameStateProcessQueue.length === 0) {
-                newMessages = await handleHumanPlayerMessage(gameId, game, userMessage, session.user.email);
+                const handled = await handleHumanPlayerMessage(gameId, game, userMessage, session.user.email);
+                if (handled.rejected) {
+                    // Nothing was saved and no bot was queued: the game is exactly as it was.
+                    return { game, messages: [], rejected: handled.rejected };
+                }
+                newMessages = handled.messages;
             }
             // Case 2: Process next bot in queue
             else if (game.gameStateProcessQueue.length > 0) {
@@ -656,7 +662,19 @@ async function handleHumanPlayerMessage(
     game: Game,
     userMessage: string,
     userEmail: string
-): Promise<GameMessage[]> {
+): Promise<{ messages: GameMessage[]; rejected?: GameActionResponse['rejected'] }> {
+    const apiKeys = await getApiKeysForUser(userEmail);
+
+    // Content screen (Jev) before the message is saved or reaches any provider. In monitor
+    // mode it only records a verdict; in enforce mode a would-block verdict rejects the
+    // message here — nothing written, the client keeps the draft and shows the reason.
+    const screen = await screenHumanInput({
+        source: 'chat', text: userMessage, userEmail, apiKeys, gameId, day: game.currentDay,
+    });
+    if (screen.blocked) {
+        return { messages: [], rejected: { reason: screen.reason ?? 'score', message: screen.message! } };
+    }
+
     // Save the user's message to chat
     const userChatMessage: GameMessage = {
         id: null,
@@ -672,8 +690,6 @@ async function handleHumanPlayerMessage(
     // it was only saved after validation, so any selection failure forced the user
     // to retype their message.
     const savedUserMessage = await addMessageToChatAndSaveToDb(userChatMessage, gameId);
-
-    const apiKeys = await getApiKeysForUser(userEmail);
 
     // Ensure day activity counter is initialized for backward compatibility
     await ensureDayActivityCounter(gameId);
@@ -692,7 +708,7 @@ async function handleHumanPlayerMessage(
     });
 
     // Return the human player message (selection message is hidden/debug, not shown in chat)
-    return [savedUserMessage];
+    return { messages: [savedUserMessage] };
 }
 
 /**

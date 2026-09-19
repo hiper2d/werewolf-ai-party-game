@@ -166,7 +166,7 @@ function makePreview(overrides: Partial<GamePreview> = {}): GamePreview {
         theme: 'Test Theme',
         description: 'A test game',
         playerCount: 4, // 3 bots
-        werewolfCount: 1,
+        werewolfCount: 2,
         specialRoles: [],
         gameMasterAiType: LLM_CONSTANTS.DEEPSEEK_FLASH,
         playersAiType: [LLM_CONSTANTS.DEEPSEEK_FLASH],

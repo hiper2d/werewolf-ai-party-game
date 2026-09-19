@@ -642,6 +642,9 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
     const [showDaySelector, setShowDaySelector] = useState(false);
     const daySelectorRef = useRef<HTMLDivElement | null>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    // The content screen refused the draft (enforce mode): shown above the composer until
+    // the player edits the text. The draft itself is kept.
+    const [composerNotice, setComposerNotice] = useState<string | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const messagesContainerRef = useRef<HTMLDivElement>(null);
     const [showScrollToTop, setShowScrollToTop] = useState(false);
@@ -740,6 +743,7 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
         const newValue = e.target.value;
         const newCursorPos = e.target.selectionStart;
         setNewMessage(newValue);
+        if (composerNotice) setComposerNotice(null);
 
         // Find the active mention
         const textBeforeCursor = newValue.slice(0, newCursorPos);
@@ -1115,6 +1119,11 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
             const result = await runAction(() => talkToAll(gameId, trimmed));
             if (!result) {
                 // Another action holds the lock — keep the draft.
+                return;
+            }
+            if (result.rejected) {
+                // The content screen refused it before anything was saved: keep the draft, say why.
+                setComposerNotice(result.rejected.message);
                 return;
             }
             const { game: updatedGame, messages: newMessages } = result;
@@ -2417,6 +2426,11 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                 onSubmit={sendMessage}
                 className="lg:px-7 pt-3 pb-2"
             >
+                {composerNotice && (
+                    <div role="alert" className="mb-2 px-3 py-2 rounded-[var(--radius-md)] border bg-[var(--warn-soft)] border-[var(--warn-line)] text-[13px] text-[var(--warn-fg)]">
+                        {composerNotice}
+                    </div>
+                )}
                 <div
                     // Dictation disables the text input on purpose, but the composer must
                     // stay clickable then: with pointer-events-none on this wrapper the mic

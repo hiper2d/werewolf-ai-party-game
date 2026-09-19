@@ -70,11 +70,11 @@ export default function ModelsPage() {
                             </p>
                             <p className="m-0 text-[13.5px] text-[var(--fg-2)] leading-[1.6]">
                                 <strong className="text-[var(--fg-1)] font-semibold">Thinking handling:</strong> hybrid reasoning models
-                                (Claude, DeepSeek, GLM) always run with thinking on{' '}
+                                (Claude, DeepSeek, GLM, Mistral) always run with thinking on{' '}
                                 <span className="font-mono text-[10px] tracking-[0.02em] px-[7px] py-[2px] rounded-full bg-[var(--bg-3)] border border-[var(--line-2)] text-[var(--fg-2)]">×2.5</span>{' '}
                                 and burn extra reasoning tokens beyond the sticker rate, so their effective price is
                                 multiplied by <strong className="text-[var(--fg-1)] font-semibold">2.5×</strong> before banding. Always-on reasoning
-                                models (GPT-5.x, Gemini 3.x, Magistral) are priced as listed.
+                                models (GPT-5.x, Gemini 3.x, Grok) are priced as listed.
                             </p>
                         </div>
                         <table className="w-full border-collapse text-[13px]">

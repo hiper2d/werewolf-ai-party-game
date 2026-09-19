@@ -32,6 +32,8 @@ import {
     DEFAULT_GAME_MODE,
     GAME_MODES,
     ProviderBlock,
+    maxWerewolvesFor,
+    MIN_WEREWOLVES,
 } from "@/app/api/game-models";
 import {auth} from "@/auth";
 import {AgentFactory} from "@/app/ai/agent-factory";
@@ -42,6 +44,7 @@ import {sanitizePlayerName} from "@/app/utils/name-utils";
 import {sanitizeArtStyle} from "@/app/utils/art-style";
 import {clampUserText, INPUT_LIMITS} from "@/app/utils/input-limits";
 import {getUserTier, getUserBalance, getVoiceProvider, updateVoiceProvider, assertFreeSpendWithinLimit} from "@/app/api/user-actions";
+import { screenHumanInput } from "@/app/api/jev-screen";
 import {recordSpend} from "@/app/api/cost-tracking";
 import {getFreeTierLimits} from "@/app/api/limits-actions";
 import {getDefaultVoiceProvider, getVoiceConfig, isVoiceOfProvider, SUPPORTED_VOICE_PROVIDERS, VoiceProvider} from "@/app/ai/voice-config";
@@ -177,6 +180,40 @@ export async function getGameMessages(gameId: string): Promise<GameMessage[]> {
 }
 
 /**
+ * Public GM_ILLUSTRATION messages posted in the last `windowMs` (default 10 minutes). Illustrations are drawn
+ * by background jobs after a response has already been sent, and the chat only learns
+ * about new messages from action responses — so every game action appends these to its
+ * own response (see withErrorHandling) and the picture appears on the next request
+ * instead of on the next page reload. The client de-duplicates by message id.
+ */
+export async function getRecentIllustrationMessages(gameId: string, windowMs: number = 10 * 60 * 1000): Promise<GameMessage[]> {
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+    // Same (recipientName, timestamp) index the day-messages route uses.
+    const snapshot = await db.collection('games')
+        .doc(gameId)
+        .collection('messages')
+        .where('recipientName', '==', RECIPIENT_ALL)
+        .where('timestamp', '>=', Date.now() - windowMs)
+        .orderBy('timestamp', 'asc')
+        .get();
+
+    return snapshot.docs
+        .filter((doc: any) => doc.data().messageType === MessageType.GM_ILLUSTRATION)
+        .map((doc: any) => ({
+            id: doc.id,
+            recipientName: doc.data().recipientName,
+            authorName: doc.data().authorName,
+            msg: doc.data().msg,
+            messageType: doc.data().messageType,
+            day: doc.data().day,
+            timestamp: doc.data().timestamp,
+            cost: doc.data().cost
+        }));
+}
+
+/**
  * Reads the progress of a running previewGame call. `progressId` is the token the client
  * passed to previewGame; only the run's owner can read it, and it disappears when the run
  * ends (null then means "finished or never started" — the caller stops polling on the
@@ -283,6 +320,19 @@ export async function previewGame(gamePreview: GamePreview, progressId?: string)
             );
         }
         await assertFreeSpendWithinLimit(session.user.email);
+    }
+
+    // Content screen (Jev) on everything the player typed, before a single story token is
+    // spent. Monitor mode only records; enforce mode refuses the preview with the reason,
+    // which previewGameAction hands to the form as a plain message.
+    const screen = await screenHumanInput({
+        source: 'preview',
+        text: `Player name: ${gamePreview.name}\nTheme: ${gamePreview.theme}\nInstructions for the Game Master: ${gamePreview.description}`,
+        userEmail: session.user.email,
+        apiKeys,
+    });
+    if (screen.blocked) {
+        throw new Error(screen.message);
     }
 
     const usageCounts: Record<string, number> = {};
@@ -561,7 +611,22 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
 
         const totalPlayers = gamePreview.playerCount;
         const werewolfCount = gamePreview.werewolfCount;
-        
+        const specialRoleCount = gamePreview.specialRoles.length;
+
+        // The role slots must fit the table: `Array(negative)` below would otherwise throw
+        // the meaningless "Invalid array length". The form clamps this too; this is the
+        // guard for stale or hand-crafted previews.
+        if (!Number.isInteger(totalPlayers) || totalPlayers < 2 || !Number.isInteger(werewolfCount) || werewolfCount < MIN_WEREWOLVES) {
+            throw new Error(`Invalid setup: ${totalPlayers} players and ${werewolfCount} werewolves (at least ${MIN_WEREWOLVES} werewolves)`);
+        }
+        if (werewolfCount + specialRoleCount > totalPlayers) {
+            throw new Error(`Roles don't fit: ${totalPlayers} players cannot hold ${werewolfCount} werewolves and ${specialRoleCount} special roles. Lower one of them.`);
+        }
+        const maxWerewolves = maxWerewolvesFor(totalPlayers, specialRoleCount);
+        if (werewolfCount > maxWerewolves) {
+            throw new Error(`Too many werewolves: ${totalPlayers} players with ${specialRoleCount} special roles allow at most ${maxWerewolves} werewolves (under half the table), got ${werewolfCount}.`);
+        }
+
         // Create role distribution array
         const roleDistribution: string[] = [];
         if (gamePreview.specialRoles.includes(GAME_ROLES.DOCTOR)) {

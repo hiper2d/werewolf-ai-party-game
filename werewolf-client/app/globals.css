@@ -9,8 +9,8 @@ html {
   background-color: #0b0c0f;
 }
 
-/* ── Dark Theme ─────────────────────────────────────────────────── */
-[data-theme='dark'] {
+/* ── Dark base (full token set; dark-family themes override below) ── */
+[data-base='dark'] {
   /* Backgrounds */
   --bg-0: #0b0c0f;
   --bg-1: #111317;
@@ -90,8 +90,8 @@ html {
   --color-scrollbar-thumb-hover: 58, 66, 80;
 }
 
-/* ── Light Theme ────────────────────────────────────────────────── */
-[data-theme='light'] {
+/* ── Light base (full token set; light-family themes override below) ─ */
+[data-base='light'] {
   background-color: #f7f8fa;
 
   /* Backgrounds */
@@ -183,7 +183,7 @@ html {
 }
 
 /* ── Chat-Specific Colors ───────────────────────────────────────── */
-[data-theme='dark'] {
+[data-base='dark'] {
   --gm-fg: oklch(82% 0.10 155);
   --gm-rail: oklch(60% 0.14 155);
   --gm-bg: color-mix(in oklch, oklch(60% 0.14 155) 8%, var(--bg-2));
@@ -212,7 +212,7 @@ html {
   --cine-panel-shadow: 0 30px 70px -30px rgba(0,0,0,0.85);
 }
 
-[data-theme='light'] {
+[data-base='light'] {
   --gm-fg: oklch(40% 0.13 155);
   --gm-rail: oklch(50% 0.14 155);
   --gm-bg: color-mix(in oklch, oklch(50% 0.14 155) 10%, var(--bg-2));
@@ -240,6 +240,201 @@ html {
   --cine-plate-text-shadow: 0 1px 3px rgba(0,0,0,0.9), 0 0 12px rgba(0,0,0,0.7);
   --cine-card-shadow: 0 24px 60px -20px rgba(0,0,0,0.28), 0 0 0 1px rgba(0,0,0,0.05) inset;
   --cine-panel-shadow: 0 20px 48px -26px rgba(0,0,0,0.25);
+}
+
+/* ── Theme overrides ────────────────────────────────────────────────
+   One block per theme id (app/utils/themes.ts). Each inherits the full token
+   set from its base family above and overrides only the palette; they must
+   stay BELOW the base blocks (equal specificity, source order decides).
+   Palettes from the Claude Design "Theme Directions" canvas. */
+
+/* Blood Moon — dark · warm. Near-black with a red-violet cast and a crimson
+   accent. The accent collides with danger/werewolf red, so danger shifts to
+   ember-orange here. */
+[data-theme='blood-moon'] {
+  background-color: #0c0708;
+  --bg-0: #0c0708;
+  --bg-1: #140c0e;
+  --bg-2: #1b1114;
+  --bg-3: #24171b;
+  --bg-4: #2e1e23;
+  --line-1: #241519;
+  --line-2: #331e24;
+  --line-3: #472b33;
+  --fg-0: #f0e9ea;
+  --fg-1: #c6b6b9;
+  --fg-2: #8d7b7f;
+  --fg-3: #615256;
+  --accent: oklch(68% 0.15 20);
+  --accent-soft: oklch(68% 0.15 20 / 0.16);
+  --accent-line: oklch(68% 0.15 20 / 0.45);
+  --accent-fg: #14090b;
+  --accent-text: oklch(94% 0.03 25);
+  --accent-strong: oklch(62% 0.16 20);
+  --danger: oklch(74% 0.15 45);
+  --danger-line: oklch(74% 0.15 45 / 0.45);
+  --good-fg: oklch(78% 0.10 150);
+  --good-soft: oklch(78% 0.10 150 / 0.13);
+  --good-line: oklch(78% 0.10 150 / 0.4);
+  --warn-fg: oklch(84% 0.11 85);
+  --warn-soft: oklch(84% 0.11 85 / 0.13);
+  --warn-line: oklch(84% 0.11 85 / 0.4);
+  --scrollbar-track: #0c0708;
+  --scrollbar-thumb: #331e24;
+  --scrollbar-thumb-hover: #472b33;
+  --gm-fg: oklch(80% 0.09 150);
+  --gm-rail: oklch(60% 0.12 150);
+  --gm-bg: #161016;
+  --gm-border: oklch(80% 0.09 150 / 0.22);
+  --you-fg: oklch(84% 0.10 85);
+  --werewolf-fg: oklch(70% 0.17 15);
+  --overlay: rgba(0,0,0,0.6);
+  --cine-panel: rgba(27,17,20,0.92);
+  --cine-panel-solid: #1b1114;
+  --cine-panel-hover: rgba(36,23,27,0.94);
+  --cine-chip: rgba(12,7,8,0.80);
+}
+
+/* Moonlit Forest — dark · cool. Deep pine greys under a pale moon accent;
+   keeps red free for real danger. */
+[data-theme='moonlit-forest'] {
+  background-color: #080c0b;
+  --bg-0: #080c0b;
+  --bg-1: #0d1311;
+  --bg-2: #121a17;
+  --bg-3: #18231f;
+  --bg-4: #1f2d28;
+  --line-1: #16201c;
+  --line-2: #1f2d27;
+  --line-3: #2d4038;
+  --fg-0: #e8efea;
+  --fg-1: #b3c2b9;
+  --fg-2: #7c8b83;
+  --fg-3: #55625b;
+  --accent: oklch(80% 0.06 175);
+  --accent-soft: oklch(80% 0.06 175 / 0.14);
+  --accent-line: oklch(80% 0.06 175 / 0.45);
+  --accent-fg: #08110f;
+  --accent-text: oklch(95% 0.02 175);
+  --accent-strong: oklch(72% 0.07 175);
+  --danger: oklch(70% 0.14 25);
+  --danger-line: oklch(70% 0.14 25 / 0.45);
+  --good-fg: oklch(80% 0.11 150);
+  --good-soft: oklch(80% 0.11 150 / 0.13);
+  --good-line: oklch(80% 0.11 150 / 0.4);
+  --warn-fg: oklch(82% 0.10 85);
+  --warn-soft: oklch(82% 0.10 85 / 0.13);
+  --warn-line: oklch(82% 0.10 85 / 0.4);
+  --scrollbar-track: #080c0b;
+  --scrollbar-thumb: #1f2d27;
+  --scrollbar-thumb-hover: #2d4038;
+  --gm-fg: oklch(84% 0.08 160);
+  --gm-rail: oklch(62% 0.11 160);
+  --gm-bg: #101a16;
+  --gm-border: oklch(84% 0.08 160 / 0.22);
+  --you-fg: oklch(82% 0.07 195);
+  --werewolf-fg: oklch(72% 0.14 25);
+  --overlay: rgba(0,0,0,0.6);
+  --cine-panel: rgba(18,26,23,0.92);
+  --cine-panel-solid: #121a17;
+  --cine-panel-hover: rgba(24,35,31,0.94);
+  --cine-chip: rgba(8,12,11,0.80);
+}
+
+/* Candlelight — light · warm. Parchment alternative to the clinical Light
+   theme: folk-tale, storybook, daytime village. */
+[data-theme='candlelight'] {
+  background-color: #f2ece0;
+  --bg-0: #f2ece0;
+  --bg-1: #fbf7ef;
+  --bg-2: #efe8db;
+  --bg-3: #e6ddcc;
+  --bg-4: #dbd0bb;
+  --line-1: #e7ded0;
+  --line-2: #d6cab4;
+  --line-3: #b9a98e;
+  --fg-0: #241d14;
+  --fg-1: #4a3f30;
+  --fg-2: #756a58;
+  --fg-3: #9c9078;
+  --accent: oklch(52% 0.11 55);
+  --accent-soft: oklch(52% 0.11 55 / 0.12);
+  --accent-line: oklch(52% 0.11 55 / 0.4);
+  --accent-fg: #fffaf0;
+  --accent-text: oklch(35% 0.08 55);
+  --accent-strong: oklch(45% 0.12 55);
+  --danger: oklch(52% 0.18 28);
+  --danger-line: oklch(52% 0.18 28 / 0.42);
+  --good-fg: oklch(46% 0.12 150);
+  --good-soft: oklch(46% 0.12 150 / 0.1);
+  --good-line: oklch(46% 0.12 150 / 0.32);
+  --warn-fg: oklch(50% 0.12 75);
+  --warn-soft: oklch(50% 0.12 75 / 0.1);
+  --warn-line: oklch(50% 0.12 75 / 0.32);
+  --shadow-1: 0 1px 0 rgba(60,40,10,0.03) inset, 0 1px 2px rgba(60,40,10,0.08);
+  --shadow-2: 0 8px 24px rgba(60,40,10,0.10), 0 2px 6px rgba(60,40,10,0.05);
+  --shadow-pop: 0 16px 40px rgba(60,40,10,0.14), 0 4px 12px rgba(60,40,10,0.09);
+  --scrollbar-track: #efe8db;
+  --scrollbar-thumb: #d6cab4;
+  --scrollbar-thumb-hover: #b9a98e;
+  --gm-fg: oklch(42% 0.12 155);
+  --gm-rail: oklch(52% 0.13 155);
+  --gm-bg: #eae6d8;
+  --gm-border: oklch(42% 0.12 155 / 0.25);
+  --you-fg: oklch(46% 0.11 240);
+  --werewolf-fg: oklch(48% 0.17 25);
+  --overlay: rgba(40,30,15,0.3);
+  --cine-scrim: radial-gradient(120% 100% at 50% 45%, rgba(40,30,15,0.22) 0%, rgba(40,30,15,0.58) 100%);
+  --cine-panel: rgba(251,247,239,0.94);
+  --cine-panel-solid: #fbf7ef;
+  --cine-panel-hover: rgba(239,232,219,0.96);
+  --cine-chip: rgba(251,247,239,0.86);
+}
+
+/* Noir Terminal — dark · high contrast. Pure greyscale, one amber signal
+   colour; doubles as the accessibility / OLED theme. Warn is a neutral chip. */
+[data-theme='noir'] {
+  background-color: #000000;
+  --bg-0: #000000;
+  --bg-1: #0a0a0a;
+  --bg-2: #101010;
+  --bg-3: #171717;
+  --bg-4: #202020;
+  --line-1: #1c1c1c;
+  --line-2: #2b2b2b;
+  --line-3: #404040;
+  --fg-0: #ffffff;
+  --fg-1: #cfcfcf;
+  --fg-2: #9a9a9a;
+  --fg-3: #6b6b6b;
+  --accent: oklch(84% 0.16 85);
+  --accent-soft: oklch(84% 0.16 85 / 0.14);
+  --accent-line: oklch(84% 0.16 85 / 0.45);
+  --accent-fg: #000000;
+  --accent-text: oklch(92% 0.10 85);
+  --accent-strong: oklch(78% 0.17 85);
+  --danger: oklch(72% 0.18 25);
+  --danger-line: oklch(72% 0.18 25 / 0.45);
+  --good-fg: oklch(86% 0.14 150);
+  --good-soft: oklch(86% 0.14 150 / 0.12);
+  --good-line: oklch(86% 0.14 150 / 0.38);
+  --warn-fg: #e8e8e8;
+  --warn-soft: rgba(255,255,255,0.08);
+  --warn-line: rgba(255,255,255,0.28);
+  --scrollbar-track: #000000;
+  --scrollbar-thumb: #2b2b2b;
+  --scrollbar-thumb-hover: #404040;
+  --gm-fg: oklch(86% 0.13 150);
+  --gm-rail: oklch(66% 0.15 150);
+  --gm-bg: #0d0f0d;
+  --gm-border: oklch(86% 0.13 150 / 0.22);
+  --you-fg: oklch(82% 0.10 230);
+  --werewolf-fg: oklch(72% 0.18 25);
+  --overlay: rgba(0,0,0,0.72);
+  --cine-panel: rgba(16,16,16,0.94);
+  --cine-panel-solid: #101010;
+  --cine-panel-hover: rgba(23,23,23,0.96);
+  --cine-chip: rgba(0,0,0,0.85);
 }
 
 /* ── Speed Tag Colors (semantic, theme-independent) ─────────────── */
@@ -350,6 +545,64 @@ html {
   letter-spacing: 0.08em;
 }
 
+/* Theme menu (ThemeSwitcher): list of every theme with a live token swatch. */
+.theme-menu {
+  list-style: none;
+  margin: 0;
+  background: var(--bg-1);
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-pop);
+}
+.theme-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.45rem 0.75rem;
+  font-size: 13px;
+  color: var(--fg-1);
+  transition: background-color 120ms ease, color 120ms ease;
+}
+.theme-menu-item:hover,
+.theme-menu-item:focus-visible {
+  background: var(--bg-3);
+  color: var(--fg-0);
+  outline: none;
+}
+.theme-menu-item.is-selected {
+  color: var(--fg-0);
+  font-weight: 600;
+}
+.theme-menu-kind {
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-3);
+}
+/* The swatch carries its own data-theme/data-base, so var(--bg-0)/var(--accent)
+   inside it resolve to THAT theme's tokens, not the page's. */
+.theme-swatch {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  flex-shrink: 0;
+  background: var(--bg-0);
+  border: 1px solid var(--line-3);
+  overflow: hidden;
+}
+.theme-swatch-accent {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+  background: var(--accent);
+}
+
 /* ── App Shell ──────────────────────────────────────────────────── */
 
 .app-shell {
@@ -391,7 +644,7 @@ html {
   opacity: 0.45;
   filter: blur(5px) brightness(1.25) saturate(1.05);
 }
-[data-theme='light'] .game-backdrop-img {
+[data-base='light'] .game-backdrop-img {
   /* Scenes are mostly night-dark art: lift them so they read as a bright
      wash on the light page instead of a gray smudge. */
   opacity: 0.4;
@@ -439,8 +692,8 @@ html {
 .fogfield.fog-day + .fog-horizon {
   background: linear-gradient(180deg, transparent, oklch(70% 0.10 70 / 0.10));
 }
-[data-theme='light'] .fogfield .fog { opacity: 0.5; }
-[data-theme='light'] .fogfield .fog + .fog { opacity: 0.35; }
+[data-base='light'] .fogfield .fog { opacity: 0.5; }
+[data-base='light'] .fogfield .fog + .fog { opacity: 0.35; }
 @keyframes fogdrift {
   from { transform: translate3d(-4%, 2%, 0) scale(1); }
   to   { transform: translate3d(6%, -3%, 0) scale(1.12); }
@@ -479,7 +732,7 @@ html {
   border: 1px solid oklch(80% 0.10 85 / 0.35);
   color: oklch(82% 0.10 85);
 }
-[data-theme='light'] .phase-tag-day {
+[data-base='light'] .phase-tag-day {
   background: oklch(75% 0.10 85 / 0.18);
   border-color: oklch(50% 0.10 85 / 0.5);
   color: oklch(42% 0.09 80);
@@ -492,28 +745,36 @@ html {
   color: var(--fg-0);
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9);
 }
-[data-theme='light'] .card-plate-name {
+[data-base='light'] .card-plate-name {
   text-shadow: none;
 }
 
-[data-theme='light'] .logo-backdrop {
+[data-base='light'] .logo-backdrop {
   background: radial-gradient(circle, #1e293b 35%, rgba(247, 248, 250, 0) 70%);
   padding: 0.75rem;
 }
 
-[data-theme='light'] .logo-backdrop-sm {
+[data-base='light'] .logo-backdrop-sm {
   background: radial-gradient(circle, #1e293b 40%, rgba(255, 255, 255, 0) 70%);
   padding: 0.25rem;
 }
 
-[data-theme='dark'] .logo-backdrop {
+[data-base='dark'] .logo-backdrop {
   background: radial-gradient(circle, #111317 35%, rgba(11, 12, 15, 0) 70%);
   padding: 0.75rem;
 }
 
-[data-theme='dark'] .logo-backdrop-sm {
+[data-base='dark'] .logo-backdrop-sm {
   background: radial-gradient(circle, #111317 40%, rgba(17, 19, 23, 0) 70%);
   padding: 0.25rem;
+}
+
+/* Candlelight: parchment page needs a warm halo (below the base rules: equal specificity). */
+[data-theme='candlelight'] .logo-backdrop {
+  background: radial-gradient(circle, #3a2a1c 35%, rgba(242, 236, 224, 0) 70%);
+}
+[data-theme='candlelight'] .logo-backdrop-sm {
+  background: radial-gradient(circle, #3a2a1c 40%, rgba(251, 247, 239, 0) 70%);
 }
 
 /* Navbar logo always fades to navbar bg */

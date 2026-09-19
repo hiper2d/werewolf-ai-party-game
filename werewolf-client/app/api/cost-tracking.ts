@@ -40,7 +40,7 @@ function normalizeTokenUsage(usage: TokenUsageInput): TokenUsage {
  * Where the money went. `bot` / `gm` are game LLM turns (they also carry the legacy
  * `actor` field on their stats row); the rest are the paths that used to bill ad hoc.
  */
-export type SpendKind = 'bot' | 'gm' | 'preview' | 'image' | 'tts' | 'stt';
+export type SpendKind = 'bot' | 'gm' | 'router' | 'screen' | 'preview' | 'image' | 'tts' | 'stt';
 
 // Per-request statistics: one doc per AI call in the top-level `requestStats` collection,
 // written inside the same transaction as billing so stats and money can never disagree.
@@ -300,30 +300,93 @@ export async function recordGameMasterTokenUsage(
         kind: 'gm',
         gameId,
         usage,
-        gameUpdate: (game) => {
-            const currentUsage = game.gameMasterTokenUsage || {
-                inputTokens: 0,
-                outputTokens: 0,
-                totalTokens: 0,
-                costUSD: 0
-            };
-
-            const reasoningTokens = (currentUsage.reasoningTokens || 0) + (usage.reasoningTokens || 0);
-
-            const updatedUsage: TokenUsage = {
-                inputTokens: currentUsage.inputTokens + usage.inputTokens,
-                outputTokens: currentUsage.outputTokens + usage.outputTokens,
-                totalTokens: currentUsage.totalTokens + usage.totalTokens,
-                costUSD: round6((currentUsage.costUSD || 0) + usage.costUSD),
-                ...(reasoningTokens > 0 ? { reasoningTokens } : {})
-            };
-
-            return {
-                gameMasterTokenUsage: updatedUsage,
-                totalGameCost: round6((game.totalGameCost || 0) + usage.costUSD)
-            };
-        }
+        gameUpdate: addToGameMasterUsage(usage)
     });
+}
+
+/**
+ * The Jev speaker router (app/api/jev-router.ts) is Game Master work done by a judge model
+ * that is not in the catalog: its stats row carries its own model id and key name, while the
+ * money still lands in the game's Game Master totals.
+ */
+export async function recordRouterSpend(
+    gameId: string,
+    tokenUsage: TokenUsageInput,
+    userEmail: string | undefined,
+    modelId: string,
+    apiKeyName: string
+): Promise<void> {
+    if (!db || !tokenUsage) {
+        return;
+    }
+
+    const usage = normalizeTokenUsage(tokenUsage);
+
+    await recordSpend({
+        userEmail,
+        costUSD: usage.costUSD,
+        kind: 'router',
+        gameId,
+        modelId,
+        apiKeyName,
+        usage,
+        gameUpdate: addToGameMasterUsage(usage)
+    });
+}
+
+/** A `gameUpdate` that folds a usage into the game's Game Master totals and the running cost. */
+/**
+ * The Jev content screen: a fraction of a cent per human message or game setup. Attributed to
+ * the game's running cost when there is a game; a preview has none yet, like the preview spend.
+ */
+export async function recordScreenSpend(
+    gameId: string | undefined,
+    tokenUsage: TokenUsageInput,
+    userEmail: string | undefined,
+    modelId: string,
+    apiKeyName: string
+): Promise<void> {
+    if (!db || !tokenUsage) {
+        return;
+    }
+
+    const usage = normalizeTokenUsage(tokenUsage);
+
+    await recordSpend({
+        userEmail,
+        costUSD: usage.costUSD,
+        kind: 'screen',
+        modelId,
+        apiKeyName,
+        usage,
+        ...(gameId ? { gameId, gameUpdate: incrementGameCost(usage.costUSD) } : {}),
+    });
+}
+
+function addToGameMasterUsage(usage: TokenUsage): (game: Game) => Record<string, any> {
+    return (game) => {
+        const currentUsage = game.gameMasterTokenUsage || {
+            inputTokens: 0,
+            outputTokens: 0,
+            totalTokens: 0,
+            costUSD: 0
+        };
+
+        const reasoningTokens = (currentUsage.reasoningTokens || 0) + (usage.reasoningTokens || 0);
+
+        const updatedUsage: TokenUsage = {
+            inputTokens: currentUsage.inputTokens + usage.inputTokens,
+            outputTokens: currentUsage.outputTokens + usage.outputTokens,
+            totalTokens: currentUsage.totalTokens + usage.totalTokens,
+            costUSD: round6((currentUsage.costUSD || 0) + usage.costUSD),
+            ...(reasoningTokens > 0 ? { reasoningTokens } : {})
+        };
+
+        return {
+            gameMasterTokenUsage: updatedUsage,
+            totalGameCost: round6((game.totalGameCost || 0) + usage.costUSD)
+        };
+    };
 }
 
 export async function recordBotTokenUsage(

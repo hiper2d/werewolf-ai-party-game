@@ -2,7 +2,7 @@ import type { Config } from "tailwindcss";
 
 /** @type {import('tailwindcss').Config} */
 const config: Config = {
-  darkMode: ['class', '[data-theme="dark"]'],
+  darkMode: ['class', '[data-base="dark"]'],
   content: [
     "./pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",

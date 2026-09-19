@@ -38,7 +38,8 @@ async function initializeFreeTierKeys() {
                 FUGU_API_KEY: '',
                 QWEN_API_KEY: '',
                 MINIMAX_API_KEY: '',
-                META_API_KEY: ''
+                META_API_KEY: '',
+                TYPESAFE_API_KEY: ''   // Jev speaker router (app/api/jev-router.ts); empty = LLM Game Master router
             },
             createdAt: new Date().toISOString(),
             lastUpdated: new Date().toISOString()

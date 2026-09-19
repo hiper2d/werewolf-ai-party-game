@@ -14,7 +14,7 @@ import {
 } from '@/app/api/game-models';
 import { TierMismatchError } from '@/app/api/errors';
 import { ModelRefusalError } from '@hiper2d/ai-agents';
-import { setGameErrorState, getGame, recordProviderBlock } from '@/app/api/game-actions';
+import { setGameErrorState, getGame, recordProviderBlock, getRecentIllustrationMessages } from '@/app/api/game-actions';
 import { ProviderBlockedError } from '@/app/api/provider-blocks';
 import { logger } from '@/app/utils/logger';
 
@@ -22,6 +22,7 @@ jest.mock('@/app/api/game-actions', () => ({
   setGameErrorState: jest.fn(),
   getGame: jest.fn(),
   recordProviderBlock: jest.fn(),
+  getRecentIllustrationMessages: jest.fn(async () => []),
 }));
 
 jest.mock('@/app/utils/logger', () => ({
@@ -36,6 +37,7 @@ jest.mock('@/app/utils/logger', () => ({
 const mockSetGameErrorState = setGameErrorState as jest.MockedFunction<typeof setGameErrorState>;
 const mockGetGame = getGame as jest.MockedFunction<typeof getGame>;
 const mockRecordProviderBlock = recordProviderBlock as jest.MockedFunction<typeof recordProviderBlock>;
+const mockRecentIllustrations = getRecentIllustrationMessages as jest.MockedFunction<typeof getRecentIllustrationMessages>;
 
 const GAME_ID = 'game-123';
 
@@ -93,6 +95,37 @@ describe('withErrorHandling', () => {
       expect(mockSetGameErrorState).not.toHaveBeenCalled();
       expect(mockGetGame).not.toHaveBeenCalled();
       expect(logger.error).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('recent illustration piggyback', () => {
+    const illustration = (id: string): any => ({
+      id, recipientName: 'ALL', authorName: 'Game Master', msg: { sceneKey: 'day-2-illustration' },
+      messageType: 'GM_ILLUSTRATION', day: 2, timestamp: 5,
+    });
+
+    it('appends recently posted illustrations the action did not return itself', async () => {
+      mockRecentIllustrations.mockResolvedValueOnce([illustration('ill-1')]);
+      const own: any = { id: 'm-1', authorName: 'Alice', msg: 'hi', recipientName: 'ALL', messageType: 'BOT_ANSWER', day: 2, timestamp: 4 };
+      const wrapped = withGameErrorHandling(async () => ({ game: { id: GAME_ID } as any, messages: [own] }));
+      const result = await wrapped(GAME_ID);
+      expect(mockRecentIllustrations).toHaveBeenCalledWith(GAME_ID);
+      expect(result.messages.map(m => m.id)).toEqual(['m-1', 'ill-1']);
+    });
+
+    it('does not duplicate an illustration the action already returns', async () => {
+      mockRecentIllustrations.mockResolvedValueOnce([illustration('ill-1')]);
+      const wrapped = withGameErrorHandling(async () => ({ game: { id: GAME_ID } as any, messages: [illustration('ill-1')] }));
+      const result = await wrapped(GAME_ID);
+      expect(result.messages).toHaveLength(1);
+    });
+
+    it('returns the action result untouched when the lookup fails', async () => {
+      mockRecentIllustrations.mockRejectedValueOnce(new Error('index missing'));
+      const wrapped = withGameErrorHandling(async () => ({ game: { id: GAME_ID } as any, messages: [] }));
+      const result = await wrapped(GAME_ID);
+      expect(result.messages).toEqual([]);
+      expect(logger.warn).toHaveBeenCalled();
     });
   });
 

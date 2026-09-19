@@ -167,7 +167,7 @@ function makePreview(
         theme: 'Test Theme',
         description: 'A test game',
         playerCount,
-        werewolfCount: 1,
+        werewolfCount: 2,
         specialRoles: [],
         gameMasterAiType: LLM_CONSTANTS.DEEPSEEK_FLASH,
         playersAiType: [LLM_CONSTANTS.DEEPSEEK_FLASH],
