@@ -53,11 +53,7 @@ Click **Create Game** and pick a theme — a spaceship, a submarine crew, a Jane
 
 <a href="images/create-game-form.png" target="_blank"><img src="images/create-game-form.png" width="800"></a>
 
-`Generate Preview` kicks off the AI pipeline that writes the story, picks a Game Master config, and rolls every player. It takes about half a minute; the button shows the progress.
-
-<a href="images/generating-preview.png" target="_blank"><img src="images/generating-preview.png" width="800"></a>
-
-When the call returns, the **Preview** section appears below the form: the AI-written opening story (with a play button to hear it), then the Game Master config (model, voice, voice style).
+`Generate Preview` kicks off the AI pipeline that writes the story, picks a Game Master config, and rolls every player. It takes about half a minute. When the call returns, the **Preview** section appears below the form: the AI-written opening story (with a play button to hear it), then the Game Master config (model, voice, voice style).
 
 <a href="images/preview-story-gm.png" target="_blank"><img src="images/preview-story-gm.png" width="800"></a>
 
