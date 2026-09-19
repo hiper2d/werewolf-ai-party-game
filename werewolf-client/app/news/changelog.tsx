@@ -13,6 +13,29 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        id: "jev-router-and-themes", date: "Sep 2026", tags: ["Design", "Models"],
+        title: "A faster hand on who speaks next, and four new looks",
+        body: (<>Two changes to the table. First, <strong>who replies next</strong> in a discussion is now decided
+            by <strong>Jev</strong>, a small sub-second judge model from typesafe.ai, instead of a full Game Master
+            turn. After every message it scores how much each bot wants to answer, and the game composes the set
+            from those scores: two to five speakers, with one or two seats always reserved for the
+            <strong> quietest bots</strong> so nobody fades out of the conversation. The hand-off is quicker, it
+            costs a fraction of a cent, and the Game Master keeps its budget for narrating.
+            <br/><br/>
+            Second, the theme toggle in the top bar is now a <strong>menu with six looks</strong>. Joining Dark and
+            Light: <strong>Blood Moon</strong>, near-black with a crimson accent; <strong>Moonlit Forest</strong>,
+            deep pine greys under a pale moon; <strong>Candlelight</strong>, warm parchment for daytime play; and
+            <strong> Noir Terminal</strong>, pure greyscale with one amber signal, high contrast and easy on OLED
+            screens. Your pick is remembered on this device.</>),
+        media: {
+            label: "The new theme menu",
+            images: [
+                {src: "/news/theme-menu.jpg", alt: "The theme menu open over a Blood Moon game: Dark, Light, Blood Moon, Moonlit Forest, Candlelight and Noir Terminal, each with a colour swatch"},
+            ],
+        },
+        links: [{label: "Create a game", href: "/games"}],
+    },
+    {
         id: "mistral-reasoning", date: "Sep 2026", tags: ["Models"],
         title: "Mistral thinks now, and the lineup shrinks to two",
         body: (<>The two Mistral seats that remain, <strong>Mistral Medium 3.5</strong> and
