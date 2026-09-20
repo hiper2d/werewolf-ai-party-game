@@ -18,9 +18,10 @@ import {
     SupportedAiModels,
     SupportedAiKeyNames,
     MODEL_PRICING,
-    FREE_TIER_THINKING_COST_FACTOR,
+    MEASURED_TURN_COSTS,
+    getTurnCost,
+    type TurnCost,
     getFreeTierPolicy,
-    isHybridThinkingModel,
 } from '@/app/ai/ai-models';
 
 const url = (path: string) => `${SITE_URL}${path}`;
@@ -132,10 +133,10 @@ ${playStyleLines()}
 ${modelSections()}
 
 Prices are US dollars per million tokens. "cached" is the discounted rate for a prompt-cache hit.
-A reasoning model "thinks" before it answers, and those hidden thinking tokens are billed at the
-output rate on top of the visible reply, so a turn costs more than the listed output price. Where an
-effective output price is shown, it is the output rate scaled by ×${FREE_TIER_THINKING_COST_FACTOR}
-to include that reasoning overhead on average.
+"per turn" is what one bot reply costs on average: the context read, the reply written and the
+hidden thinking a reasoning model does first, all billed. It is measured from real games over the
+last ${MEASURED_TURN_COSTS.windowDays} days (as of ${MEASURED_TURN_COSTS.measuredAt}); models
+not played enough yet show an estimate from their sticker prices. Free-tier caps derive from it.
 
 Free-tier caps are per game: "unlimited" means no limit on how many bots may use that model,
 "3 / game" and "1 / game" cap it, and "paid only" means the model needs a prepaid balance.
@@ -174,7 +175,8 @@ interface CatalogModel {
     inputPrice: number;
     cachedPrice: number | null;
     outputPrice: number;
-    effectiveOutputPrice: number | null;
+    /** Cost of one bot turn in USD and whether it was measured or estimated; null without pricing. */
+    turnCost: TurnCost | null;
     thinking: boolean;
     freeTier: string;
 }
@@ -185,11 +187,11 @@ interface CatalogModel {
  */
 function catalogModels(): CatalogModel[] {
     const models: CatalogModel[] = [];
-    for (const config of Object.values(SupportedAiModels)) {
+    for (const [id, config] of Object.entries(SupportedAiModels)) {
         const pricing = MODEL_PRICING[config.modelApiName];
         if (!pricing) continue;
 
-        const policy = config.freeTier ?? getFreeTierPolicy(config.modelApiName, config.hasThinking);
+        const policy = config.freeTier ?? getFreeTierPolicy(id);
         models.push({
             name: config.displayName,
             provider: SupportedAiKeyNames[config.apiKeyName] ?? config.apiKeyName,
@@ -197,9 +199,7 @@ function catalogModels(): CatalogModel[] {
             inputPrice: pricing.inputPrice,
             cachedPrice: pricing.cacheHitPrice ?? null,
             outputPrice: pricing.outputPrice,
-            effectiveOutputPrice: isHybridThinkingModel(config.modelApiName)
-                ? pricing.outputPrice * FREE_TIER_THINKING_COST_FACTOR
-                : null,
+            turnCost: getTurnCost(id),
             thinking: config.hasThinking,
             freeTier: !policy.available
                 ? 'paid only'
@@ -233,13 +233,14 @@ function modelSections(): string {
                 .sort((a, b) => a.inputPrice - b.inputPrice || a.outputPrice - b.outputPrice)
                 .map(m => {
                     const cached = m.cachedPrice !== null ? `, cached in $${price(m.cachedPrice)}` : '';
-                    const effective = m.effectiveOutputPrice !== null
-                        ? `, effective out $${price(m.effectiveOutputPrice)}`
-                        : '';
+                    const perTurn = m.turnCost
+                        ? `${parseFloat((m.turnCost.usd * 100).toFixed(2))}¢ per turn${m.turnCost.source === 'estimated' ? ' (estimate)' : ''}`
+                        : null;
                     const facts = [
                         `\`${m.apiName}\``,
                         `in $${price(m.inputPrice)}${cached}`,
-                        `out $${price(m.outputPrice)}${effective}`,
+                        `out $${price(m.outputPrice)}`,
+                        ...(perTurn ? [perTurn] : []),
                         m.thinking ? 'reasoning' : 'no reasoning',
                         m.freeTier,
                     ];

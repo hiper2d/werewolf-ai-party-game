@@ -2,7 +2,7 @@ import React from 'react';
 import type { Metadata } from 'next';
 import ModelsCatalog from './ModelsCatalog';
 import { InfoIcon } from '@/app/components/ui-icons';
-import { IMAGE_MODEL_CONSTANTS } from '@/app/ai/ai-models';
+import { IMAGE_MODEL_CONSTANTS, FREE_TIER_TURN_COST_BANDS, MEASURED_TURN_COSTS } from '@/app/ai/ai-models';
 import { VOICE_MODEL_CONSTANTS, VOICE_MODEL_PRICING } from '@hiper2d/ai-agents';
 import { VOICE_PROVIDER_DISPLAY_NAMES } from '@/app/ai/voice-config';
 
@@ -34,11 +34,12 @@ export const metadata: Metadata = {
     alternates: { canonical: '/models' },
 };
 
+const cents = (usd: number): string => `${parseFloat((usd * 100).toFixed(2))}¢`;
 const PRICE_BANDS: { range: string; cap: string; pill: string }[] = [
-    { range: '≤ $2', cap: 'Unlimited bots / game', pill: 'text-[var(--good-fg)] border-[var(--good-line)] bg-[var(--good-soft)]' },
-    { range: '≤ $5', cap: 'Up to 3 bots / game', pill: 'text-[var(--accent-text)] border-[var(--accent-line)] bg-[var(--accent-soft)]' },
-    { range: '≤ $15', cap: '1 bot / game', pill: 'text-[var(--warn-fg)] border-[var(--warn-line)] bg-[var(--warn-soft)]' },
-    { range: '> $15', cap: 'Not available (paid only)', pill: 'text-[var(--fg-1)] border-[var(--line-3)] bg-[var(--bg-3)]' },
+    { range: `≤ ${cents(FREE_TIER_TURN_COST_BANDS.UNLIMITED_MAX)}`, cap: 'Unlimited bots / game', pill: 'text-[var(--good-fg)] border-[var(--good-line)] bg-[var(--good-soft)]' },
+    { range: `≤ ${cents(FREE_TIER_TURN_COST_BANDS.LIMITED_MAX)}`, cap: 'Up to 3 bots / game', pill: 'text-[var(--accent-text)] border-[var(--accent-line)] bg-[var(--accent-soft)]' },
+    { range: `≤ ${cents(FREE_TIER_TURN_COST_BANDS.SINGLE_MAX)}`, cap: '1 bot / game', pill: 'text-[var(--warn-fg)] border-[var(--warn-line)] bg-[var(--warn-soft)]' },
+    { range: `> ${cents(FREE_TIER_TURN_COST_BANDS.SINGLE_MAX)}`, cap: 'Not available (paid only)', pill: 'text-[var(--fg-1)] border-[var(--line-3)] bg-[var(--bg-3)]' },
 ];
 
 export default function ModelsPage() {
@@ -53,7 +54,7 @@ export default function ModelsPage() {
                 <h1 className="m-0 font-bold tracking-[-0.03em] leading-[1.02] text-[clamp(34px,5vw,50px)] text-[var(--fg-0)]">Models</h1>
                 <p className="mt-3.5 text-[clamp(15px,1.8vw,17px)] text-[var(--fg-2)] leading-[1.55] max-w-[60ch]">
                     Every model you can seat at the table — what it costs to run, and where it&apos;s available. Free gives you a
-                    price-banded subset with per-game caps; Paid unlocks the whole catalog with no limits.
+                    cost-banded subset with per-game caps; Paid unlocks the whole catalog with no limits.
                 </p>
             </header>
 
@@ -64,23 +65,22 @@ export default function ModelsPage() {
                         <div>
                             <h3 className="m-0 mb-2 text-base font-semibold tracking-[-0.01em] text-[var(--fg-0)]">How Free-tier caps are derived</h3>
                             <p className="m-0 mb-3.5 text-[13.5px] text-[var(--fg-2)] leading-[1.6]">
-                                The metric is a model&apos;s <strong className="text-[var(--fg-1)] font-semibold">output price</strong> ($/1M tokens) — the
-                                dominant generation cost. Free-tier caps aren&apos;t hand-set; they&apos;re computed straight from that price, so every cap
-                                stays in step with the model&apos;s cost.
+                                The metric is what <strong className="text-[var(--fg-1)] font-semibold">one bot turn costs</strong>: the context the
+                                model reads, the reply it writes and the hidden thinking it does first, all billed. Free-tier caps aren&apos;t hand-set;
+                                they&apos;re computed straight from that number, so every cap stays in step with the model&apos;s real cost.
                             </p>
                             <p className="m-0 text-[13.5px] text-[var(--fg-2)] leading-[1.6]">
-                                <strong className="text-[var(--fg-1)] font-semibold">Thinking handling:</strong> hybrid reasoning models
-                                (Claude, DeepSeek, GLM, Mistral) always run with thinking on{' '}
-                                <span className="font-mono text-[10px] tracking-[0.02em] px-[7px] py-[2px] rounded-full bg-[var(--bg-3)] border border-[var(--line-2)] text-[var(--fg-2)]">×2.5</span>{' '}
-                                and burn extra reasoning tokens beyond the sticker rate, so their effective price is
-                                multiplied by <strong className="text-[var(--fg-1)] font-semibold">2.5×</strong> before banding. Always-on reasoning
-                                models (GPT-5.x, Gemini 3.x, Grok) are priced as listed.
+                                <strong className="text-[var(--fg-1)] font-semibold">Why not the sticker price:</strong> every model here reasons before
+                                it answers, and how much varies a lot. Two models with the same output rate can differ five-fold in tokens written per
+                                turn, so the per-turn figure is measured from real games over the last {MEASURED_TURN_COSTS.windowDays} days
+                                (as of {MEASURED_TURN_COSTS.measuredAt}) and re-measured periodically. A model that has not been played enough yet is
+                                banded on an estimate from its sticker prices until it has.
                             </p>
                         </div>
                         <table className="w-full border-collapse text-[13px]">
                             <thead>
                                 <tr>
-                                    <th className="text-left pb-2.5 font-mono text-[10.5px] tracking-[0.06em] uppercase text-[var(--fg-3)] font-medium border-b border-[var(--line-1)]">Output price (effective)</th>
+                                    <th className="text-left pb-2.5 font-mono text-[10.5px] tracking-[0.06em] uppercase text-[var(--fg-3)] font-medium border-b border-[var(--line-1)]">Cost per turn</th>
                                     <th className="text-right pb-2.5 font-mono text-[10.5px] tracking-[0.06em] uppercase text-[var(--fg-3)] font-medium border-b border-[var(--line-1)]">Free-tier cap</th>
                                 </tr>
                             </thead>

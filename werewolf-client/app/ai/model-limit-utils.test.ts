@@ -2,6 +2,13 @@ import {
     API_KEY_CONSTANTS,
     LLM_CONSTANTS,
     SupportedAiModels,
+    MODEL_PRICING,
+    MEASURED_TURN_COSTS,
+    MEASURED_TURN_COSTS_MIN_CALLS,
+    FREE_TIER_TURN_COST_BANDS,
+    bandTurnCost,
+    estimateTurnCostUSD,
+    getTurnCost,
     resolveModelId,
 } from './ai-models';
 import { USER_TIERS } from '@/app/api/game-models';
@@ -48,22 +55,49 @@ describe('getModelPickerOptions (single source of truth for every picker)', () =
         new Map(opts.map(o => [o.model, o]));
 
     // Pin concrete models with distinct free-tier policies, and self-validate the
-    // pricing-derived policy so this test fails loudly (rather than silently drifting)
-    // if a band ever changes.
-    // Effective output price = sticker × 2.5 for hybrid thinking-only models (Claude, DeepSeek, GLM).
-    const UNLIMITED = LLM_CONSTANTS.DEEPSEEK_FLASH;   // $0.66 × 2.5 = $1.65 <= $2 → unlimited
-    const LIMITED_3 = LLM_CONSTANTS.DEEPSEEK_PRO;     // $1.98 × 2.5 = $4.95 <= $6 → 3 bots
-    const SINGLE_1 = LLM_CONSTANTS.CLAUDE_HAIKU;       // $5 × 2.5 = $12.50 <= $15 → 1 bot
-    const UNAVAILABLE = LLM_CONSTANTS.CLAUDE_OPUS;     // $25 × 2.5 > $15 → not available
+    // cost-derived policy so this test fails loudly (rather than silently drifting)
+    // if a band ever changes. Bands come from the measured cost per turn in
+    // app/ai/measured-turn-costs.json (2026-09-20 measurement, 30 days of games).
+    const UNLIMITED = LLM_CONSTANTS.DEEPSEEK_FLASH;   // 0.12¢ per turn <= 0.3¢ → unlimited
+    const LIMITED_3 = LLM_CONSTANTS.DEEPSEEK_PRO;     // 0.58¢ <= 1¢ → 3 bots
+    const SINGLE_1 = LLM_CONSTANTS.CLAUDE_HAIKU;       // 1.14¢ <= 2¢ → 1 bot
+    const UNAVAILABLE = LLM_CONSTANTS.CLAUDE_OPUS;     // too few turns measured; estimated 6.5¢ > 2¢ → not available
 
-    it('pins the assumed free-tier policies (guards against pricing drift)', () => {
+    it('pins the assumed free-tier policies (guards against measurement drift)', () => {
         expect(SupportedAiModels[UNLIMITED].freeTier).toMatchObject({ available: true, maxBotsPerGame: -1 });
         expect(SupportedAiModels[LIMITED_3].freeTier).toMatchObject({ available: true, maxBotsPerGame: 3 });
         expect(SupportedAiModels[SINGLE_1].freeTier).toMatchObject({ available: true, maxBotsPerGame: 1 });
         expect(SupportedAiModels[UNAVAILABLE].freeTier).toMatchObject({ available: false, maxBotsPerGame: 0 });
-        // Hybrid thinking-only models keep paying the reasoning multiplier: GLM-5.3 at $4.4
-        // sticker output would be 3 bots, but ×2.5 = $11 effective lands it in the 1-bot band.
-        expect(SupportedAiModels[LLM_CONSTANTS.GLM].freeTier?.maxBotsPerGame).toBe(1);
+    });
+
+    it('bands on measured cost per turn, not the sticker output price', () => {
+        // Grok 4.6 lists $6 output (the old "3 bots" band) but averages 2,200 output tokens a
+        // turn, 94% hidden reasoning: 3.5¢ per turn, the most expensive model in the app.
+        // Gemini 3.1 Pro ($12 output, old "1 bot" band) is 2.8¢. Both are paid-only now.
+        expect(getTurnCost(LLM_CONSTANTS.GROK)?.source).toBe('measured');
+        expect(SupportedAiModels[LLM_CONSTANTS.GROK].freeTier).toMatchObject({ available: false, maxBotsPerGame: 0 });
+        expect(SupportedAiModels[LLM_CONSTANTS.GEMINI_PRO].freeTier).toMatchObject({ available: false, maxBotsPerGame: 0 });
+        // GLM-5.3 lists $4.40 output (old ×2.5 → "1 bot") but writes ~270 tokens a turn: 0.75¢, 3 bots.
+        expect(SupportedAiModels[LLM_CONSTANTS.GLM].freeTier?.maxBotsPerGame).toBe(3);
+        // Cheap models that write little are unlimited whatever their sticker says.
+        expect(SupportedAiModels[LLM_CONSTANTS.MINIMAX].freeTier?.maxBotsPerGame).toBe(-1);
+    });
+
+    it('falls back to the sticker-price estimate for a model with too few measured turns', () => {
+        const measured = MEASURED_TURN_COSTS.models[LLM_CONSTANTS.CLAUDE_OPUS];
+        expect((measured?.calls ?? 0) < MEASURED_TURN_COSTS_MIN_CALLS).toBe(true);
+        const cost = getTurnCost(LLM_CONSTANTS.CLAUDE_OPUS)!;
+        expect(cost.source).toBe('estimated');
+        expect(cost.usd).toBeCloseTo(estimateTurnCostUSD(MODEL_PRICING[SupportedAiModels[LLM_CONSTANTS.CLAUDE_OPUS].modelApiName]), 6);
+        expect(getTurnCost('not-a-model')).toBeNull();
+    });
+
+    it('maps a cost per turn to the band edges inclusively', () => {
+        expect(bandTurnCost(FREE_TIER_TURN_COST_BANDS.UNLIMITED_MAX)).toEqual({ available: true, maxBotsPerGame: -1 });
+        expect(bandTurnCost(FREE_TIER_TURN_COST_BANDS.UNLIMITED_MAX + 0.0001)).toEqual({ available: true, maxBotsPerGame: 3 });
+        expect(bandTurnCost(FREE_TIER_TURN_COST_BANDS.LIMITED_MAX)).toEqual({ available: true, maxBotsPerGame: 3 });
+        expect(bandTurnCost(FREE_TIER_TURN_COST_BANDS.SINGLE_MAX)).toEqual({ available: true, maxBotsPerGame: 1 });
+        expect(bandTurnCost(FREE_TIER_TURN_COST_BANDS.SINGLE_MAX + 0.0001)).toEqual({ available: false, maxBotsPerGame: 0 });
     });
 
     it('never returns the RANDOM pseudo-model on any tier', () => {
@@ -226,16 +260,23 @@ describe('deprecated model IDs in persisted games', () => {
 
     it('counts a legacy ID against its replacement free-tier budget, not a separate bucket', () => {
         // deepseek-flash is unlimited on the free tier, so use a capped model: the legacy
-        // grok IDs both resolve to grok (3 bots/game).
+        // deepseek-pro-thinking ID resolves to deepseek-pro (3 bots/game).
         const usage: Record<string, number> = {};
-        consumeModelUsage('grok-fast', USER_TIERS.FREE, usage, 'for bots');
-        consumeModelUsage('grok-thinking', USER_TIERS.FREE, usage, 'for bots');
-        consumeModelUsage(LLM_CONSTANTS.GROK, USER_TIERS.FREE, usage, 'for bots');
+        consumeModelUsage('deepseek-pro-thinking', USER_TIERS.FREE, usage, 'for bots');
+        consumeModelUsage(LLM_CONSTANTS.DEEPSEEK_PRO, USER_TIERS.FREE, usage, 'for bots');
+        consumeModelUsage('deepseek-pro-thinking', USER_TIERS.FREE, usage, 'for bots');
 
-        expect(usage[LLM_CONSTANTS.GROK]).toBe(3);
-        // A 4th would exceed grok's 3-bot free-tier cap.
-        expect(() => consumeModelUsage('grok-fast', USER_TIERS.FREE, usage, 'for bots')).toThrow(
+        expect(usage[LLM_CONSTANTS.DEEPSEEK_PRO]).toBe(3);
+        // A 4th would exceed deepseek-pro's 3-bot free-tier cap.
+        expect(() => consumeModelUsage('deepseek-pro-thinking', USER_TIERS.FREE, usage, 'for bots')).toThrow(
             /can only be used 3 times per game/
+        );
+    });
+
+    it('refuses a legacy ID whose replacement is paid-only on the free tier', () => {
+        const usage: Record<string, number> = {};
+        expect(() => consumeModelUsage('grok-fast', USER_TIERS.FREE, usage, 'for bots')).toThrow(
+            /not available on the free tier/
         );
     });
 

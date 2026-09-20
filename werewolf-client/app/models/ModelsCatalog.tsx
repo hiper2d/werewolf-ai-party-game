@@ -5,11 +5,12 @@ import {
     SupportedAiModels,
     SupportedAiKeyNames,
     MODEL_PRICING,
-    FREE_TIER_THINKING_COST_FACTOR,
     FREE_TIER_LIMITED_MAX_BOTS,
-    FREE_TIER_OUTPUT_PRICE_BANDS,
+    FREE_TIER_TURN_COST_BANDS,
+    MEASURED_TURN_COSTS,
     getFreeTierPolicy,
-    isHybridThinkingModel,
+    getTurnCost,
+    type TurnCost,
 } from '@/app/ai/ai-models';
 
 type BandId = 'unlim' | 'three' | 'one' | 'paid';
@@ -22,11 +23,13 @@ interface CatalogModel {
     inputPrice: number;       // input $/1M (cache-miss)
     cachedPrice: number | null; // cached input $/1M, when the model has a cache-hit rate
     price: number;            // listed output $/1M
-    eff: number | null;       // effective output $/1M when the ×2.5 thinking multiplier applies
+    turnCost: TurnCost;       // what one bot turn costs: measured from real games, or estimated from the sticker prices
 }
 
 // Cache prices can be tiny (e.g. $0.0028); keep enough precision instead of rounding to $0.00.
 const fmtCached = (price: number): string => parseFloat(price.toFixed(4)).toString();
+// Turn costs read best in cents: "0.12¢" for a flash model, "3.5¢" for Grok.
+const fmtCents = (usd: number): string => `${parseFloat((usd * 100).toFixed(2))}¢`;
 
 interface BandMeta {
     id: BandId;
@@ -41,22 +44,22 @@ interface BandMeta {
 
 const BAND_META: Record<BandId, BandMeta> = {
     unlim: {
-        id: 'unlim', capLabel: 'Unlimited bots / game', cap: 'Unlimited', range: `≤ $${FREE_TIER_OUTPUT_PRICE_BANDS.UNLIMITED_MAX}`,
+        id: 'unlim', capLabel: 'Unlimited bots / game', cap: 'Unlimited', range: `≤ ${fmtCents(FREE_TIER_TURN_COST_BANDS.UNLIMITED_MAX)} / turn`,
         desc: 'No per-game limit on Free.', availability: 'free',
         pill: 'text-[var(--good-fg)] border-[var(--good-line)] bg-[var(--good-soft)]', dot: 'bg-[var(--good-fg)]',
     },
     three: {
-        id: 'three', capLabel: 'Up to 3 bots / game', cap: '3 / game', range: `≤ $${FREE_TIER_OUTPUT_PRICE_BANDS.LIMITED_MAX}`,
+        id: 'three', capLabel: 'Up to 3 bots / game', cap: '3 / game', range: `≤ ${fmtCents(FREE_TIER_TURN_COST_BANDS.LIMITED_MAX)} / turn`,
         desc: 'Seat up to three on Free.', availability: 'free',
         pill: 'text-[var(--accent-text)] border-[var(--accent-line)] bg-[var(--accent-soft)]', dot: 'bg-[var(--accent)]',
     },
     one: {
-        id: 'one', capLabel: '1 bot / game', cap: '1 / game', range: `≤ $${FREE_TIER_OUTPUT_PRICE_BANDS.SINGLE_MAX}`,
+        id: 'one', capLabel: '1 bot / game', cap: '1 / game', range: `≤ ${fmtCents(FREE_TIER_TURN_COST_BANDS.SINGLE_MAX)} / turn`,
         desc: 'One per game on Free.', availability: 'free',
         pill: 'text-[var(--warn-fg)] border-[var(--warn-line)] bg-[var(--warn-soft)]', dot: 'bg-[var(--warn-fg)]',
     },
     paid: {
-        id: 'paid', capLabel: 'Paid tier only', cap: 'Paid only', range: `> $${FREE_TIER_OUTPUT_PRICE_BANDS.SINGLE_MAX}`,
+        id: 'paid', capLabel: 'Paid tier only', cap: 'Paid only', range: `> ${fmtCents(FREE_TIER_TURN_COST_BANDS.SINGLE_MAX)} / turn`,
         desc: 'Not available on Free.', availability: 'paid',
         pill: 'text-[var(--fg-1)] border-[var(--line-3)] bg-[var(--bg-3)]', dot: 'bg-[var(--fg-2)]',
     },
@@ -75,8 +78,9 @@ function buildBands(): Record<BandId, CatalogModel[]> {
     const out: Record<BandId, CatalogModel[]> = { unlim: [], three: [], one: [], paid: [] };
     for (const [id, config] of Object.entries(SupportedAiModels)) {
         const pricing = MODEL_PRICING[config.modelApiName];
-        if (!pricing) continue;
-        const policy = config.freeTier ?? getFreeTierPolicy(config.modelApiName, config.hasThinking);
+        const turnCost = getTurnCost(id);
+        if (!pricing || !turnCost) continue;
+        const policy = config.freeTier ?? getFreeTierPolicy(id);
         const band = policyToBand(policy.maxBotsPerGame, policy.available);
         out[band].push({
             id,
@@ -85,21 +89,13 @@ function buildBands(): Record<BandId, CatalogModel[]> {
             inputPrice: pricing.inputPrice,
             cachedPrice: pricing.cacheHitPrice ?? null,
             price: pricing.outputPrice,
-            // "eff" = effective output price: the raw output rate scaled up to include the reasoning
-            // (thinking) tokens the model emits on average. Shown only for hybrid thinking-only
-            // models, where the ×2.5 multiplier is known (it's what free-tier banding uses).
-            // Always-on reasoning models reason too, but their multiplier hasn't been measured —
-            // no hint until usage statistics establish one.
-            eff: isHybridThinkingModel(config.modelApiName)
-                ? pricing.outputPrice * FREE_TIER_THINKING_COST_FACTOR
-                : null,
+            turnCost,
         });
     }
-    // Within each band, order by price, cheapest first: input price, then output price,
-    // then effective output price as the final tiebreak.
+    // Within each band, order by what a turn costs, cheapest first; sticker prices break ties.
     for (const id of BAND_ORDER) {
         out[id].sort((a, b) =>
-            a.inputPrice - b.inputPrice || a.price - b.price || (a.eff ?? a.price) - (b.eff ?? b.price));
+            a.turnCost.usd - b.turnCost.usd || a.inputPrice - b.inputPrice || a.price - b.price);
     }
     return out;
 }
@@ -124,6 +120,7 @@ function Band({ meta, models }: { meta: BandMeta; models: CatalogModel[] }) {
                                 <th className="text-left px-5 py-3 font-mono text-[10.5px] tracking-[0.07em] uppercase text-[var(--fg-3)] font-medium border-b border-[var(--line-1)] bg-[var(--bg-2)]">Model</th>
                                 <th className="text-right px-5 py-3 font-mono text-[10.5px] tracking-[0.07em] uppercase text-[var(--fg-3)] font-medium border-b border-[var(--line-1)] bg-[var(--bg-2)]">In $/1M</th>
                                 <th className="text-right px-5 py-3 font-mono text-[10.5px] tracking-[0.07em] uppercase text-[var(--fg-3)] font-medium border-b border-[var(--line-1)] bg-[var(--bg-2)]">Out $/1M</th>
+                                <th className="text-right px-5 py-3 font-mono text-[10.5px] tracking-[0.07em] uppercase text-[var(--fg-3)] font-medium border-b border-[var(--line-1)] bg-[var(--bg-2)]">Per turn</th>
                                 <th className="text-right px-5 py-3 font-mono text-[10.5px] tracking-[0.07em] uppercase text-[var(--fg-3)] font-medium border-b border-[var(--line-1)] bg-[var(--bg-2)]">Free-tier</th>
                             </tr>
                         </thead>
@@ -133,9 +130,6 @@ function Band({ meta, models }: { meta: BandMeta; models: CatalogModel[] }) {
                                     <td className="px-5 py-[14px] border-b border-[var(--line-1)] last:border-b-0 align-middle">
                                         <span className="flex items-center gap-[9px] flex-wrap text-[14px] font-medium text-[var(--fg-0)]">
                                             <span>{m.name}</span>
-                                            {m.eff !== null && (
-                                                <span className="font-mono text-[10px] tracking-[0.02em] px-[7px] py-[2px] rounded-full bg-[var(--bg-3)] border border-[var(--line-2)] text-[var(--fg-2)] whitespace-nowrap">×2.5</span>
-                                            )}
                                         </span>
                                         <span className="block text-[12px] text-[var(--fg-3)] font-mono mt-0.5">{m.provider}</span>
                                     </td>
@@ -145,7 +139,12 @@ function Band({ meta, models }: { meta: BandMeta; models: CatalogModel[] }) {
                                     </td>
                                     <td className="px-5 py-[14px] border-b border-[var(--line-1)] text-right font-mono text-[13.5px] text-[var(--fg-1)] whitespace-nowrap align-middle">
                                         {m.price.toFixed(2)}
-                                        {m.eff !== null && <span className="block text-[11px] text-[var(--fg-3)] mt-0.5">eff {m.eff.toFixed(2)}</span>}
+                                    </td>
+                                    <td className="px-5 py-[14px] border-b border-[var(--line-1)] text-right font-mono text-[13.5px] text-[var(--fg-1)] whitespace-nowrap align-middle">
+                                        {fmtCents(m.turnCost.usd)}
+                                        <span className="block text-[11px] text-[var(--fg-3)] mt-0.5">
+                                            {m.turnCost.source === 'measured' ? `${m.turnCost.calls.toLocaleString('en-US')} turns` : 'estimate'}
+                                        </span>
                                     </td>
                                     <td className="px-5 py-[14px] border-b border-[var(--line-1)] text-right align-middle">
                                         <span className={`font-mono text-[10.5px] tracking-[0.03em] uppercase px-[9px] py-[3px] rounded-full whitespace-nowrap border ${meta.pill}`}>{meta.cap}</span>
@@ -193,13 +192,12 @@ export default function ModelsCatalog() {
             </div>
             {shownIds.map((id) => <Band key={id} meta={BAND_META[id]} models={bands[id]} />)}
             <p className="mt-6 text-[12.5px] leading-[1.6] text-[var(--fg-3)]">
-                <span className="font-mono text-[10px] tracking-[0.02em] px-[7px] py-[2px] rounded-full bg-[var(--bg-3)] border border-[var(--line-2)] text-[var(--fg-2)] align-middle">×{FREE_TIER_THINKING_COST_FACTOR}</span>
-                {' '}and the <span className="font-mono text-[var(--fg-2)]">eff</span> figure mark reasoning models. A reasoning
-                model &ldquo;thinks&rdquo; before it answers, and those hidden thinking tokens are billed at the output rate
-                on top of the visible reply — so a turn costs more than the listed output price. The{' '}
-                <span className="font-mono text-[var(--fg-2)]">eff</span> (effective) price is the output rate scaled by
-                ×{FREE_TIER_THINKING_COST_FACTOR} to include that reasoning overhead on average. It&apos;s the real extra cost
-                of running a model in thinking mode.
+                <span className="font-mono text-[var(--fg-2)]">Per turn</span> is what one bot reply costs on average:
+                the conversation context it reads, the reply it writes, and the hidden thinking tokens a reasoning model
+                burns before answering, all billed at the listed rates. Measured over the last {MEASURED_TURN_COSTS.windowDays} days
+                of real games (as of {MEASURED_TURN_COSTS.measuredAt}); a model that has not been played enough yet shows an
+                estimate from its sticker prices. It is the number the Free-tier caps are derived from, because two models
+                with the same output price can differ five-fold in how much they write per turn.
             </p>
         </div>
     );

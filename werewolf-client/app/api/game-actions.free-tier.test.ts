@@ -12,8 +12,9 @@ describe('free tier model limits', () => {
     });
 
     it('prevents using single-use models more than once per game', () => {
+        // GPT-5.6 Terra: 1.6¢ a measured turn, the 1-bot band.
         expect(() =>
-            validateModelUsageForTier('free', LLM_CONSTANTS.GLM, [LLM_CONSTANTS.GLM])
+            validateModelUsageForTier('free', LLM_CONSTANTS.GPT, [LLM_CONSTANTS.GPT])
         ).toThrow('can only be used once');
     });
 
@@ -51,7 +52,7 @@ describe('free tier model limits', () => {
             validateModelUsageForTier('free', LLM_CONSTANTS.CLAUDE_OPUS, [])
         ).toThrow('not available on the free tier');
 
-        // Sonnet's $15 sticker output ×2.5 thinking factor puts it past the free-tier ceiling.
+        // Sonnet has too few measured turns; its sticker-price estimate (2.6¢) is past the 2¢ ceiling.
         expect(() =>
             validateModelUsageForTier('free', LLM_CONSTANTS.CLAUDE_SONNET, [])
         ).toThrow('not available on the free tier');

@@ -13,9 +13,10 @@ import {
     ModelConfig as LibModelConfig,
     SupportedAiModels as DEFAULT_MODEL_CATALOG,
     MODEL_PRICING,
-    isHybridThinkingModel,
+    type ModelPricing,
     type AbstractAgent,
 } from '@hiper2d/ai-agents';
+import measuredTurnCosts from './measured-turn-costs.json';
 
 // Generic catalog + pricing surface, re-exported so existing '@/app/ai/ai-models' imports
 // keep working unchanged.
@@ -119,75 +120,118 @@ export const SupportedAiModels: Record<string, ModelConfig> = Object.fromEntries
 );
 
 /**
- * Free-tier availability and the per-game bot cap are DERIVED FROM PRICE — not hand-tuned per
- * model — so the two stay consistent. The metric is a model's output price ($/1M tokens), which
- * dominates generation cost. Bands:
- *   <= $2  → unlimited bots
- *   <= $6  → up to 3 bots
- *   <= $15 → 1 bot
- *   > $15  → not available on the free tier
+ * Free-tier availability and the per-game bot cap are DERIVED FROM WHAT A TURN COSTS — not
+ * hand-tuned per model — so the two stay consistent. The metric is the average cost of one bot
+ * turn in US dollars: input context plus the visible reply plus whatever hidden reasoning the
+ * model emits, all billed. Bands:
+ *   <= 0.3¢ per turn → unlimited bots
+ *   <= 1¢            → up to 3 bots
+ *   <= 2¢            → 1 bot
+ *   > 2¢             → not available on the free tier
  *
- * Hybrid models — models whose API can run without thinking but that ship as thinking-only
- * entries (see the library's isHybridThinkingModel) — burn extra reasoning tokens at the same
- * per-token price, so their effective output price is multiplied by FREE_TIER_THINKING_COST_FACTOR
- * before banding, exactly as their "(Thinking)" variants always were. Always-on reasoning models
- * (GPT-5, Gemini 3, Grok) are priced as listed.
+ * The cost per turn is MEASURED from `requestStats` (scripts/measure-turn-costs.ts writes
+ * `measured-turn-costs.json`). The previous metric, the sticker output price with a flat ×2.5
+ * for hybrid thinking models, missed the thing that actually drives cost: how many tokens a
+ * model emits per turn. Over 30 days Grok 4.6 ($6 output, banded as "3 bots") averaged 2,200
+ * output tokens a turn, 94% of it reasoning, and was the most expensive model in the app at
+ * 3.5¢ a turn; GLM-5.3 ($4.40 sticker, ×2.5 → "1 bot") emitted 270 and cost 0.75¢. A model
+ * without enough measured turns (MEASURED_TURN_COSTS_MIN_CALLS) is banded on an estimate from
+ * its sticker prices instead, see estimateTurnCostUSD.
  */
-export const FREE_TIER_OUTPUT_PRICE_BANDS = {
-    UNLIMITED_MAX: 2,   // <= $2/1M output → unlimited bots
-    // Bumped 5 → 6 with the GPT-5.6 promotion; Luna has since dropped to $1.20 output
-    // (unlimited band), so Grok 4.6 ($6 output) is now what holds this band at 6.
-    LIMITED_MAX: 6,     // <= $6 → up to LIMITED_MAX_BOTS bots
-    SINGLE_MAX: 15,     // <= $15 → 1 bot; above → not available on free tier
+export const FREE_TIER_TURN_COST_BANDS = {
+    UNLIMITED_MAX: 0.003,   // <= $0.003 per turn → unlimited bots
+    LIMITED_MAX: 0.01,      // <= $0.01 → up to LIMITED_MAX_BOTS bots
+    SINGLE_MAX: 0.02,       // <= $0.02 → 1 bot; above → not available on free tier
 } as const;
 export const FREE_TIER_LIMITED_MAX_BOTS = 3;
-// A reasoning model bills its (hidden) thinking tokens at the output rate on top of the visible
-// answer, so a turn costs more than the sticker output price implies. This multiplier approximates
-// that overhead — a model's "effective" output cost ≈ outputPrice × factor on average. It's the
-// extra cost of running a model in reasoning mode, and it's what free-tier budgeting is based on.
-export const FREE_TIER_THINKING_COST_FACTOR = 2.5;
+
+/** One model's measured average over the window, as written by scripts/measure-turn-costs.ts. */
+export interface MeasuredTurnCost {
+    usdPerTurn: number;
+    calls: number;
+    inputTokens: number;
+    cachedInputTokens: number;
+    outputTokens: number;
+    /** Hidden reasoning tokens where the provider reports them separately (0 where it folds them into outputTokens). */
+    reasoningTokens: number;
+}
+export interface MeasuredTurnCosts {
+    measuredAt: string;
+    windowDays: number;
+    models: Record<string, MeasuredTurnCost>;
+}
+export const MEASURED_TURN_COSTS: MeasuredTurnCosts = measuredTurnCosts;
+/** Fewer measured turns than this and the sticker-price estimate decides the band instead. */
+export const MEASURED_TURN_COSTS_MIN_CALLS = 100;
 
 /**
- * Derives a model's free-tier policy ({ available, maxBotsPerGame }) from its price.
- * Returns "not available" (available: false, maxBotsPerGame: 0) when there's no pricing.
+ * The turn-cost assumptions for a model nobody has played enough yet: a werewolf turn carries
+ * about 8k tokens of context (measured 5-12k across models, mostly cache misses) and every
+ * catalog model reasons, so budget 1k output tokens for the hidden thinking plus the reply.
+ * Deliberately a little pessimistic on output: the estimate only has to hold until the model
+ * has MEASURED_TURN_COSTS_MIN_CALLS turns on record.
  */
-export function getFreeTierPolicy(
-    modelApiName: string,
-    hasThinking: boolean
-): { available: boolean; maxBotsPerGame: number } {
-    const pricing = MODEL_PRICING[modelApiName];
-    if (!pricing) {
-        return { available: false, maxBotsPerGame: 0 };
-    }
-    const isOptionalThinkingVariant = hasThinking && isHybridThinkingModel(modelApiName);
-    const effectiveOutputPrice = isOptionalThinkingVariant
-        ? pricing.outputPrice * FREE_TIER_THINKING_COST_FACTOR
-        : pricing.outputPrice;
+export const ESTIMATED_TURN_INPUT_TOKENS = 8_000;
+export const ESTIMATED_TURN_OUTPUT_TOKENS = 1_000;
 
-    if (effectiveOutputPrice <= FREE_TIER_OUTPUT_PRICE_BANDS.UNLIMITED_MAX) {
+export function estimateTurnCostUSD(pricing: Pick<ModelPricing, 'inputPrice' | 'outputPrice'>): number {
+    return (ESTIMATED_TURN_INPUT_TOKENS * pricing.inputPrice + ESTIMATED_TURN_OUTPUT_TOKENS * pricing.outputPrice) / 1_000_000;
+}
+
+export interface TurnCost {
+    usd: number;
+    /** `measured` = averaged from real turns in requestStats; `estimated` = from sticker prices. */
+    source: 'measured' | 'estimated';
+    /** Measured turns behind the number (0 when estimated). */
+    calls: number;
+}
+
+/** What one turn of this model costs, measured when there is enough data, else estimated. Null without pricing. */
+export function getTurnCost(modelId: string): TurnCost | null {
+    const config = SupportedAiModels[modelId];
+    const pricing = config ? MODEL_PRICING[config.modelApiName] : undefined;
+    if (!pricing) {
+        return null;
+    }
+    const measured = MEASURED_TURN_COSTS.models[modelId];
+    if (measured && measured.calls >= MEASURED_TURN_COSTS_MIN_CALLS) {
+        return { usd: measured.usdPerTurn, source: 'measured', calls: measured.calls };
+    }
+    return { usd: estimateTurnCostUSD(pricing), source: 'estimated', calls: 0 };
+}
+
+/** Maps a cost per turn to the free-tier policy ({ available, maxBotsPerGame }). */
+export function bandTurnCost(usdPerTurn: number): { available: boolean; maxBotsPerGame: number } {
+    if (usdPerTurn <= FREE_TIER_TURN_COST_BANDS.UNLIMITED_MAX) {
         return { available: true, maxBotsPerGame: -1 };
     }
-    if (effectiveOutputPrice <= FREE_TIER_OUTPUT_PRICE_BANDS.LIMITED_MAX) {
+    if (usdPerTurn <= FREE_TIER_TURN_COST_BANDS.LIMITED_MAX) {
         return { available: true, maxBotsPerGame: FREE_TIER_LIMITED_MAX_BOTS };
     }
-    if (effectiveOutputPrice <= FREE_TIER_OUTPUT_PRICE_BANDS.SINGLE_MAX) {
+    if (usdPerTurn <= FREE_TIER_TURN_COST_BANDS.SINGLE_MAX) {
         return { available: true, maxBotsPerGame: 1 };
     }
     return { available: false, maxBotsPerGame: 0 };
 }
 
-// Explicit policy opt-outs from price banding, for models whose sticker price misrepresents
-// real cost. Kimi K3: banding on the $15 sticker output price would land it exactly on the
-// SINGLE_MAX boundary (1 bot), but K3 always reasons at max effort and ~85-90% of its output
-// tokens are reasoning tokens billed at the output rate. It dodges the usual
-// FREE_TIER_THINKING_COST_FACTOR only because it isn't a hybrid entry; with that factor it
-// would be $37.50 effective, far past the free-tier ceiling.
-SupportedAiModels[LLM_CONSTANTS.KIMI].freeTier = { available: false, maxBotsPerGame: 0 };
+/**
+ * Derives a model's free-tier policy ({ available, maxBotsPerGame }) from its cost per turn.
+ * Returns "not available" (available: false, maxBotsPerGame: 0) when there's no pricing.
+ */
+export function getFreeTierPolicy(modelId: string): { available: boolean; maxBotsPerGame: number } {
+    const turnCost = getTurnCost(modelId);
+    if (!turnCost) {
+        return { available: false, maxBotsPerGame: 0 };
+    }
+    return bandTurnCost(turnCost.usd);
+}
 
-// Populate each model's freeTier field from price — the single source of truth for free-tier caps.
-// A model with an explicit `freeTier` set above opts out of price banding and keeps that policy.
-for (const config of Object.values(SupportedAiModels)) {
-    config.freeTier = config.freeTier ?? getFreeTierPolicy(config.modelApiName, config.hasThinking);
+// Populate each model's freeTier field from its turn cost — the single source of truth for
+// free-tier caps. A model with an explicit `freeTier` set before this loop opts out of banding
+// and keeps that policy (none do today; Kimi K3's old opt-out is now covered by the estimate,
+// which puts its $3/$15 prices at 3.9¢ a turn, well past the free-tier ceiling).
+for (const [modelId, config] of Object.entries(SupportedAiModels)) {
+    config.freeTier = config.freeTier ?? getFreeTierPolicy(modelId);
 }
 
 /**

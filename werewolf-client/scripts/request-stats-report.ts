@@ -3,8 +3,8 @@
  * cost-tracking.ts inside the billing transaction).
  *
  * Prints, per modelApiName: request count, duration percentiles (p50/p90/max), cached-input
- * ratio, effective output multiplier (outputTokens / visible output — the measured version
- * of FREE_TIER_THINKING_COST_FACTOR), and cost per request.
+ * ratio, effective output multiplier (outputTokens / visible output), and cost per request.
+ * For the per-turn cost table that free-tier banding uses, run scripts/measure-turn-costs.ts.
  *
  * Usage:  npx tsx --env-file=.env scripts/request-stats-report.ts [--days 30]
  */
@@ -76,7 +76,7 @@ async function report() {
             durations.length ? fmtMs(durations[durations.length - 1]) : '—',
             totalInput > 0 ? `${((totalCached / totalInput) * 100).toFixed(0)}%` : '—',
             // Measured reasoning overhead: how much bigger the billed output is than the
-            // visible answer. Compare against FREE_TIER_THINKING_COST_FACTOR (2.5).
+            // visible answer.
             visibleOutput > 0 ? (totalOutput / visibleOutput).toFixed(2) : '—',
             `$${(totalCost / rows.length).toFixed(4)}`,
             `$${totalCost.toFixed(2)}`,

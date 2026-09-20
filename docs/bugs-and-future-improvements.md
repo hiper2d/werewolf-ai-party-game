@@ -74,7 +74,8 @@
   run `reasoning_effort: high` (trace arrives with json_schema output, replayed on later turns);
   Large 3 and Magistral dropped (both retired by Mistral; Magistral's alias had already become
   Medium 3.5). `DEPRECATED_MODEL_MAP` sends both retired ids to Small; the migration script does
-  the tier-aware rewrite (paid → Medium). Medium 3.5 left the free tier via the hybrid ×2.5 band.
+  the tier-aware rewrite (paid → Medium). Medium 3.5 left the free tier via the hybrid ×2.5 band
+  (and came back at 1 bot/game on 2026-09-20 when banding switched to measured cost per turn).
   The `MISTRAL_CACHE_CALIBRATION` log is gone too: hits arrive as `prompt_tokens_details.cached_tokens`.
 - Phase buttons (Start Night, Next Day, Replay Night paid-only) and the in-stream loaders —
   shipped 2026-09-05 in `PhaseStrip.tsx`.
