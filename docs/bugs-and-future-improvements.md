@@ -40,8 +40,9 @@
   - *Anthropic cache writes are priced at 1.0x instead of 1.25x* — no `cacheWritePrice` field in
     `MODEL_PRICING`, so ~20% undercount on the written span only, on cold calls only. Add the
     field if this ever matters.
-  - *Fugu orchestration tokens* are still dropped by `extractTokenUsage` (~2.3-2.9x undercount).
-    Moot once Sakana Fugu Ultra is removed from the catalog (still there as of 0.5.3).
+  - ~~*Fugu orchestration tokens* dropped by `extractTokenUsage` (~2.3-2.9x undercount).~~ Fixed
+    in lib 0.7.0 (2026-09-20): `FuguAgent` folds orchestration input/output/cached tokens into
+    the reported usage before pricing.
 
 - **Resolve vote tie by asking the Detective to choose.** Today `selectEliminatedPlayer`
   (`app/api/vote-utils.ts`) breaks a tie by picking a random tied bot, never the human.

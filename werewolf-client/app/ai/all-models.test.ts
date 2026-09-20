@@ -262,7 +262,7 @@ const TEXT_SWEEP_MODELS = new Set<string>([
     LLM_CONSTANTS.GROK,
     LLM_CONSTANTS.KIMI,
     LLM_CONSTANTS.GLM,
-    LLM_CONSTANTS.FUGU_ULTRA,                // one representative for the Fugu askText code path
+    LLM_CONSTANTS.FUGU_MAX,                  // one representative for the Fugu askText code path (Max: cheap and fast)
     LLM_CONSTANTS.QWEN_FLASH,                // one representative for the Qwen askText code path
     LLM_CONSTANTS.MINIMAX,                   // MiniMax askText code path (adaptive thinking)
 ]);
