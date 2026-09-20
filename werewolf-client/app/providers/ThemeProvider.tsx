@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { THEMES, THEME_STORAGE_KEY, ThemeDef, resolveThemeId, themeById } from '@/app/utils/themes';
+import { DEFAULT_THEME_ID, THEMES, THEME_STORAGE_KEY, ThemeDef, resolveThemeId, themeById } from '@/app/utils/themes';
 
 interface ThemeContextType {
   /** Current theme id (see THEMES). */
@@ -22,7 +22,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setMounted(true);
     // Same resolution as the pre-paint script in layout.tsx: stored theme
-    // (ignored if it no longer exists) or the OS preference.
+    // (retired ids mapped forward, unknown ones ignored) or the OS preference.
     let stored: string | null = null;
     try { stored = localStorage.getItem(THEME_STORAGE_KEY); } catch {}
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -42,7 +42,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   };
 
   const toggleTheme = () => {
-    setThemeState((prev) => ((themeById(prev)?.base ?? 'dark') === 'light' ? 'dark' : 'light'));
+    setThemeState((prev) => DEFAULT_THEME_ID[(themeById(prev)?.base ?? 'dark') === 'light' ? 'dark' : 'light']);
   };
 
   const themeDef = themeById(theme) ?? THEMES[0];

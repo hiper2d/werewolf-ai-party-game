@@ -90,87 +90,91 @@ html {
   --color-scrollbar-thumb-hover: 58, 66, 80;
 }
 
-/* ── Light base (full token set; light-family themes override below) ─ */
+/* ── Light base (full token set; light-family themes override below) ─
+   The base IS the Overcast theme (Claude Design "Theme Directions", Sep 2026):
+   the neutral-cool light look turned down — page at ~91% lightness, cards at
+   ~95%, no pure white anywhere, borders a step darker so panels still
+   separate. It replaced the original glare-white Light. */
 [data-base='light'] {
-  background-color: #f7f8fa;
+  background-color: #e7e9ec;
 
   /* Backgrounds */
-  --bg-0: #f5f6f8;
-  --bg-1: #ffffff;
-  --bg-2: #f3f4f6;
-  --bg-3: #eaecef;
-  --bg-4: #dfe2e7;
+  --bg-0: #e7e9ec;
+  --bg-1: #f2f3f5;
+  --bg-2: #e2e5e9;
+  --bg-3: #d7dbe1;
+  --bg-4: #c9cfd7;
 
   /* Lines / borders */
-  --line-1: #e6e8ec;
-  --line-2: #d4d8de;
-  --line-3: #b7bdc6;
+  --line-1: #d5d9df;
+  --line-2: #c0c6cf;
+  --line-3: #a2aab6;
 
   /* Foreground / text */
-  --fg-0: #15181d;
-  --fg-1: #3d4450;
-  --fg-2: #6b727d;
-  --fg-3: #9aa0aa;
+  --fg-0: #1a1d22;
+  --fg-1: #414751;
+  --fg-2: #666d78;
+  --fg-3: #8b929c;
 
   /* Accent — cool blue (darker for light bg contrast) */
-  --accent: oklch(55% 0.12 235);
-  --accent-soft: oklch(55% 0.12 235 / 0.10);
-  --accent-line: oklch(55% 0.12 235 / 0.40);
-  --accent-fg: #ffffff;
-  --accent-text: oklch(35% 0.08 235);
+  --accent: oklch(52% 0.11 240);
+  --accent-soft: oklch(52% 0.11 240 / 0.12);
+  --accent-line: oklch(52% 0.11 240 / 0.42);
+  --accent-fg: #f7f9fb;
+  --accent-text: oklch(36% 0.08 240);
 
   /* Danger */
-  --danger: oklch(55% 0.18 25);
-  --danger-line: oklch(55% 0.18 25 / 0.42);
+  --danger: oklch(52% 0.17 25);
+  --danger-line: oklch(52% 0.17 25 / 0.42);
 
   /* Positive / warning accents — same chroma family, shifted hue */
-  --good-fg: oklch(48% 0.13 155);
-  --good-soft: oklch(48% 0.13 155 / 0.1);
-  --good-line: oklch(48% 0.13 155 / 0.32);
-  --warn-fg: oklch(52% 0.12 65);
-  --warn-soft: oklch(52% 0.12 65 / 0.1);
-  --warn-line: oklch(52% 0.12 65 / 0.32);
+  --good-fg: oklch(46% 0.12 155);
+  --good-soft: oklch(46% 0.12 155 / 0.11);
+  --good-line: oklch(46% 0.12 155 / 0.34);
+  --warn-fg: oklch(50% 0.11 70);
+  --warn-soft: oklch(50% 0.11 70 / 0.11);
+  --warn-line: oklch(50% 0.11 70 / 0.34);
 
   /* Shadows */
-  --shadow-1: 0 1px 0 rgba(0,0,0,0.03) inset, 0 1px 2px rgba(0,0,0,0.06);
-  --shadow-2: 0 8px 24px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04);
-  --shadow-pop: 0 16px 40px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.08);
+  --shadow-1: 0 1px 0 rgba(0,0,0,0.03) inset, 0 1px 2px rgba(20,25,33,0.07);
+  --shadow-2: 0 8px 24px rgba(20,25,33,0.09), 0 2px 6px rgba(20,25,33,0.05);
+  --shadow-pop: 0 16px 40px rgba(20,25,33,0.14), 0 4px 12px rgba(20,25,33,0.09);
 
   /* Scrollbar */
-  --scrollbar-track: #f0f1f4;
-  --scrollbar-thumb: #cdd1d9;
-  --scrollbar-thumb-hover: #b0b6c1;
+  --scrollbar-track: #e2e5e9;
+  --scrollbar-thumb: #c0c6cf;
+  --scrollbar-thumb-hover: #a2aab6;
 
   /* Legacy aliases */
-  --color-text-primary: 21, 24, 29;
-  --color-text-secondary: 61, 68, 80;
-  --color-page-bg-start: 245, 246, 248;
-  --color-page-bg-end: 243, 244, 246;
-  --color-navbar-bg: 255, 255, 255;
-  --color-navbar-text: 21, 24, 29;
-  --color-navbar-link: 61, 68, 80;
-  --color-navbar-link-hover: 21, 24, 29;
-  --color-navbar-divider: 212, 216, 222;
+  --color-text-primary: 26, 29, 34;
+  --color-text-secondary: 65, 71, 81;
+  --color-page-bg-start: 231, 233, 236;
+  --color-page-bg-end: 226, 229, 233;
+  --color-navbar-bg: 242, 243, 245;
+  --color-navbar-text: 26, 29, 34;
+  --color-navbar-link: 65, 71, 81;
+  --color-navbar-link-hover: 26, 29, 34;
+  --color-navbar-divider: 192, 198, 207;
   --color-toggle-bg: rgba(0, 0, 0, 0.04);
   --color-toggle-hover-bg: rgba(0, 0, 0, 0.08);
   --color-toggle-border: rgba(0, 0, 0, 0.12);
-  --color-toggle-text: 21, 24, 29;
-  --color-card-bg: 255, 255, 255;
-  --color-card-border: 230, 232, 236;
-  --color-card-shadow: rgba(0, 0, 0, 0.08);
-  --color-button-bg: 21, 24, 29;
-  --color-button-text: 245, 246, 248;
-  --color-button-text-transparent: 21, 24, 29;
-  --color-button-hover-bg: 37, 42, 51;
+  --color-toggle-text: 26, 29, 34;
+  --color-card-bg: 242, 243, 245;
+  --color-card-border: 213, 217, 223;
+  --color-card-shadow: rgba(20, 25, 33, 0.09);
+  --color-button-bg: 26, 29, 34;
+  --color-button-text: 242, 243, 245;
+  --color-button-text-transparent: 26, 29, 34;
+  --color-button-hover-bg: 65, 71, 81;
   --color-button-transparent-bg: rgba(0, 0, 0, 0.04);
   --color-button-transparent-hover-bg: rgba(0, 0, 0, 0.08);
-  --color-input-bg: 243, 244, 246;
-  --color-input-border: 212, 216, 222;
-  --color-input-text: 21, 24, 29;
-  --color-input-placeholder: 154, 160, 170;
-  --color-scrollbar-track: 243, 244, 246;
-  --color-scrollbar-thumb: 212, 216, 222;
-  --color-scrollbar-thumb-hover: 183, 189, 198;
+  --color-input-bg: 226, 229, 233;
+  --color-input-border: 192, 198, 207;
+  --color-input-text: 26, 29, 34;
+  --color-input-placeholder: 139, 146, 156;
+  --color-scrollbar-track: 226, 229, 233;
+  --color-scrollbar-thumb: 192, 198, 207;
+  --color-scrollbar-thumb-hover: 162, 170, 182;
 }
 
 /* ── Border Radius Tokens ───────────────────────────────────────── */
@@ -213,21 +217,21 @@ html {
 }
 
 [data-base='light'] {
-  --gm-fg: oklch(40% 0.13 155);
+  --gm-fg: oklch(40% 0.12 155);
   --gm-rail: oklch(50% 0.14 155);
-  --gm-bg: color-mix(in oklch, oklch(50% 0.14 155) 10%, var(--bg-2));
-  --gm-border: color-mix(in oklch, oklch(50% 0.14 155) 25%, transparent);
-  --you-fg: oklch(48% 0.12 230);
-  --werewolf-fg: oklch(50% 0.16 25);
-  --accent-strong: oklch(48% 0.13 235);
+  --gm-bg: #dfe6e1;
+  --gm-border: oklch(40% 0.12 155 / 0.24);
+  --you-fg: oklch(46% 0.11 240);
+  --werewolf-fg: oklch(48% 0.17 25);
+  --accent-strong: oklch(45% 0.12 240);
   --on-accent: #ffffff;
-  --overlay: rgba(15,20,30,0.30);
+  --overlay: rgba(20,25,33,0.34);
   /* Cinematic Speaker Mode — light: pale panels, softer scrim, real shadows */
-  --cine-scrim: radial-gradient(120% 100% at 50% 45%, rgba(15,20,30,0.22) 0%, rgba(15,20,30,0.58) 100%);
-  --cine-panel: rgba(255,255,255,0.94);
-  --cine-panel-solid: #ffffff;
-  --cine-panel-hover: rgba(243,244,246,0.96);
-  --cine-chip: rgba(255,255,255,0.86);
+  --cine-scrim: radial-gradient(120% 100% at 50% 45%, rgba(20,25,33,0.22) 0%, rgba(20,25,33,0.58) 100%);
+  --cine-panel: rgba(242,243,245,0.94);
+  --cine-panel-solid: #f2f3f5;
+  --cine-panel-hover: rgba(226,229,233,0.96);
+  --cine-chip: rgba(242,243,245,0.86);
   /* Deliberately the same treatment as the dark theme: the card shows artwork,
      so its caption scrim stays dark with light text in BOTH themes (photo-
      caption style). A white plate washed the card out; faint dark ink on a
@@ -246,7 +250,8 @@ html {
    One block per theme id (app/utils/themes.ts). Each inherits the full token
    set from its base family above and overrides only the palette; they must
    stay BELOW the base blocks (equal specificity, source order decides).
-   Palettes from the Claude Design "Theme Directions" canvas. */
+   Palettes from the Claude Design "Theme Directions" canvas. Dark and
+   Overcast are the base blocks themselves and have no override here. */
 
 /* Blood Moon — dark · warm. Near-black with a red-violet cast and a crimson
    accent. The accent collides with danger/werewolf red, so danger shifts to
@@ -389,6 +394,108 @@ html {
   --cine-panel-solid: #fbf7ef;
   --cine-panel-hover: rgba(239,232,219,0.96);
   --cine-chip: rgba(251,247,239,0.86);
+}
+
+/* Linen — light · neutral-warm. Same luminance as Overcast but with a slight
+   warm cast: the greys carry a little yellow, so the screen reads as paper
+   rather than a dimmed monitor. Keeps the blue accent. */
+[data-theme='linen'] {
+  background-color: #e9e4da;
+  --bg-0: #e9e4da;
+  --bg-1: #f4f0e8;
+  --bg-2: #e4dfd4;
+  --bg-3: #d9d3c6;
+  --bg-4: #cbc4b4;
+  --line-1: #dcd6ca;
+  --line-2: #c6bfb0;
+  --line-3: #a79e8c;
+  --fg-0: #1f1c17;
+  --fg-1: #46423a;
+  --fg-2: #6e6859;
+  --fg-3: #938c7c;
+  --accent: oklch(50% 0.09 235);
+  --accent-soft: oklch(50% 0.09 235 / 0.12);
+  --accent-line: oklch(50% 0.09 235 / 0.4);
+  --accent-fg: #faf7f1;
+  --accent-text: oklch(35% 0.07 235);
+  --accent-strong: oklch(43% 0.10 235);
+  --danger: oklch(51% 0.17 28);
+  --danger-line: oklch(51% 0.17 28 / 0.42);
+  --good-fg: oklch(45% 0.11 150);
+  --good-soft: oklch(45% 0.11 150 / 0.11);
+  --good-line: oklch(45% 0.11 150 / 0.32);
+  --warn-fg: oklch(49% 0.11 70);
+  --warn-soft: oklch(49% 0.11 70 / 0.11);
+  --warn-line: oklch(49% 0.11 70 / 0.32);
+  --shadow-1: 0 1px 0 rgba(60,40,10,0.03) inset, 0 1px 2px rgba(35,28,18,0.08);
+  --shadow-2: 0 8px 24px rgba(35,28,18,0.10), 0 2px 6px rgba(35,28,18,0.05);
+  --shadow-pop: 0 16px 40px rgba(35,28,18,0.14), 0 4px 12px rgba(35,28,18,0.09);
+  --scrollbar-track: #e4dfd4;
+  --scrollbar-thumb: #c6bfb0;
+  --scrollbar-thumb-hover: #a79e8c;
+  --gm-fg: oklch(40% 0.11 155);
+  --gm-rail: oklch(50% 0.13 155);
+  --gm-bg: #e2e2d5;
+  --gm-border: oklch(40% 0.11 155 / 0.24);
+  --you-fg: oklch(45% 0.10 238);
+  --werewolf-fg: oklch(47% 0.16 25);
+  --overlay: rgba(35,28,18,0.32);
+  --cine-scrim: radial-gradient(120% 100% at 50% 45%, rgba(35,28,18,0.22) 0%, rgba(35,28,18,0.58) 100%);
+  --cine-panel: rgba(244,240,232,0.94);
+  --cine-panel-solid: #f4f0e8;
+  --cine-panel-hover: rgba(228,223,212,0.96);
+  --cine-chip: rgba(244,240,232,0.86);
+}
+
+/* Dusk — light · cool, the furthest step: a true mid-grey light theme at
+   ~85% lightness with deeper ink and a stronger accent. Comfortable in a dim
+   room, but visibly "grey UI" rather than white. */
+[data-theme='dusk'] {
+  background-color: #d3d6dc;
+  --bg-0: #d3d6dc;
+  --bg-1: #dfe2e7;
+  --bg-2: #d0d4db;
+  --bg-3: #c3c8d1;
+  --bg-4: #b3b9c4;
+  --line-1: #c5cad2;
+  --line-2: #aeb5c0;
+  --line-3: #8d95a3;
+  --fg-0: #171a20;
+  --fg-1: #3b4048;
+  --fg-2: #5e6570;
+  --fg-3: #818897;
+  --accent: oklch(46% 0.12 250);
+  --accent-soft: oklch(46% 0.12 250 / 0.13);
+  --accent-line: oklch(46% 0.12 250 / 0.45);
+  --accent-fg: #eef1f6;
+  --accent-text: oklch(32% 0.09 250);
+  --accent-strong: oklch(40% 0.13 250);
+  --danger: oklch(48% 0.18 25);
+  --danger-line: oklch(48% 0.18 25 / 0.45);
+  --good-fg: oklch(43% 0.12 155);
+  --good-soft: oklch(43% 0.12 155 / 0.12);
+  --good-line: oklch(43% 0.12 155 / 0.36);
+  --warn-fg: oklch(47% 0.11 70);
+  --warn-soft: oklch(47% 0.11 70 / 0.12);
+  --warn-line: oklch(47% 0.11 70 / 0.36);
+  --shadow-1: 0 1px 0 rgba(255,255,255,0.10) inset, 0 1px 2px rgba(15,20,30,0.10);
+  --shadow-2: 0 8px 24px rgba(15,20,30,0.12), 0 2px 6px rgba(15,20,30,0.07);
+  --shadow-pop: 0 16px 40px rgba(15,20,30,0.18), 0 4px 12px rgba(15,20,30,0.11);
+  --scrollbar-track: #d0d4db;
+  --scrollbar-thumb: #aeb5c0;
+  --scrollbar-thumb-hover: #8d95a3;
+  --gm-fg: oklch(38% 0.12 155);
+  --gm-rail: oklch(48% 0.14 155);
+  --gm-bg: #ccd5cf;
+  --gm-border: oklch(38% 0.12 155 / 0.26);
+  --you-fg: oklch(43% 0.12 250);
+  --werewolf-fg: oklch(45% 0.17 25);
+  --overlay: rgba(15,20,30,0.38);
+  --cine-scrim: radial-gradient(120% 100% at 50% 45%, rgba(15,20,30,0.24) 0%, rgba(15,20,30,0.60) 100%);
+  --cine-panel: rgba(223,226,231,0.94);
+  --cine-panel-solid: #dfe2e7;
+  --cine-panel-hover: rgba(208,212,219,0.96);
+  --cine-chip: rgba(223,226,231,0.86);
 }
 
 /* Noir Terminal — dark · high contrast. Pure greyscale, one amber signal

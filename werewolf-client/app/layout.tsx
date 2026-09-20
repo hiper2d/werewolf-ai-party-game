@@ -5,7 +5,7 @@ import NavBar from "@/components/navbar";
 import React from "react";
 import AuthProvider from "@/components/auth-provider";
 import { ThemeProvider } from "@/app/providers/ThemeProvider";
-import { THEME_BASES, THEME_STORAGE_KEY } from "@/app/utils/themes";
+import { DEFAULT_THEME_ID, LEGACY_THEME_IDS, THEME_BASES, THEME_STORAGE_KEY } from "@/app/utils/themes";
 import { LoginDialogProvider } from "@/app/providers/LoginDialogProvider";
 import DeviceProvider from "@/app/providers/DeviceProvider";
 import LoginDialog from "@/components/login-dialog";
@@ -91,15 +91,19 @@ const structuredData = {
 };
 
 // Inline script to prevent flash of wrong theme. Mirrors resolveThemeId():
-// stored theme (ignored if it no longer exists) or the OS preference, then
-// both the theme and its base family go on <html>.
+// stored theme (retired ids mapped forward, unknown ones ignored) or the OS
+// preference's default theme, then both the theme and its base family go on
+// <html>.
 const themeScript = `
   (function() {
     try {
       var bases = ${JSON.stringify(THEME_BASES)};
+      var legacy = ${JSON.stringify(LEGACY_THEME_IDS)};
+      var defaults = ${JSON.stringify(DEFAULT_THEME_ID)};
       var theme = localStorage.getItem(${JSON.stringify(THEME_STORAGE_KEY)});
+      if (theme && legacy[theme]) theme = legacy[theme];
       if (!theme || !bases[theme]) {
-        theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        theme = defaults[window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'];
       }
       document.documentElement.setAttribute('data-theme', theme);
       document.documentElement.setAttribute('data-base', bases[theme]);
