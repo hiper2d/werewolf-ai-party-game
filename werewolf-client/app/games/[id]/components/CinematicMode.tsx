@@ -192,13 +192,15 @@ export default function CinematicMode({ game, messages, onClose, startMessageId,
     const [typedCount, setTypedCount] = useState(0);
     const typingTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
-    // Auto-voice: read each line aloud as the scene reaches it. Off by default —
-    // audio that starts on its own is intrusive, and a browser blocks autoplay
-    // until the page has been interacted with. Remembered per browser.
-    const [autoVoice, setAutoVoice] = useState(false);
+    // Auto-voice: read each line aloud as the scene reaches it. On by default since
+    // 2026-09-20 — cinematic mode is a playback, and the click that opened it is the
+    // user gesture browsers want before audio starts. A viewer who switches it off
+    // stays off: the choice is remembered per browser (the chat's mute button still
+    // silences everything regardless).
+    const [autoVoice, setAutoVoice] = useState(true);
     useEffect(() => {
         try {
-            if (localStorage.getItem(AUTO_VOICE_KEY) === '1') setAutoVoice(true);
+            if (localStorage.getItem(AUTO_VOICE_KEY) === '0') setAutoVoice(false);
         } catch { /* ignore */ }
     }, []);
     const toggleAutoVoice = () => {
