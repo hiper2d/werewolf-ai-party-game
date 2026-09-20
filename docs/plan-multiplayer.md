@@ -59,6 +59,10 @@ the bots cannot tell who is human. Solo play must not change for existing users.
 14. **Night errors must not name the bot.** In shared games the host is a player. The
     error banner and the retry dialog address a failed night actor by queue slot, never by
     name.
+15. **(2026-09-20)** Spoken lines are stored once and replayed for free; dead humans and
+    link viewers get read-only seats; a leaver's character becomes a bot; no welcome turn
+    for humans; the ghostwriter suggestion becomes a private advisor. Details in
+    Design §12.
 
 ## Context: what the code does today
 
@@ -307,24 +311,36 @@ changes in the day prompt except that `humanPlayerName` references become the li
 human-controlled characters where the prompt needs it at all (ideally nowhere: bots should
 not know). The GM selection prompt gets the new human messages of the round.
 
-### 12. Gaps found on review (2026-09-19)
+### 12. Gaps found on review (settled 2026-09-20)
 
-Decisions still needed (also listed under Open questions):
-
-- **Voice.** `generateSpeechAction` returns audio inline and bills per generation; nothing
-  is stored. With N browsers playing every bot line the same audio is paid N times. Change
-  to generate once per message (store the file, e.g. `games/{id}/audio/{messageId}` in
-  Storage or a Firestore blob doc), bill it once under the seat billing rule as part of
-  that message's cost, and let every client fetch and decide only whether to play it.
-- **Dead humans.** Proposed: they keep the listener and stay silent viewers; no new
-  information (roles stay hidden) until game over. Their seat doc stops receiving night
-  results.
-- **Leave / kick mid-game.** Proposed: the character's `controller` flips to `'bot'` with a
-  host-chosen default model, so no phase waits on an empty seat. Mirror of hot-join.
-- **Welcome phase.** Human characters: type their own introduction, or the GM reads their
-  story. Both cheap; pick one.
-- **Suggestions (`getSuggestion`).** GM advice costs money. Proposed: available to every
-  seat, billed under the seat rule like any call.
+- **Voice is stored once per spoken line.** Today `generateSpeechAction` returns audio inline
+  and bills per generation; a reload, a re-listen or a second listener pays again. New:
+  `games/{id}/audio/{messageId}` doc (base64 audio, mime, provider, voice signature, cost),
+  same pattern as the avatar docs, no Storage bucket. Generation stays lazy: the first
+  client to press play calls `speakMessage(gameId, messageId)`, which claims the doc in a
+  transaction (`status: 'generating'`), generates, writes, and bills once under the seat
+  billing rule as part of that message; a concurrent caller sees the claim and waits for
+  the doc. Served by `/api/games/[id]/audio/[messageId]` with the seat guard and long cache
+  headers. The key includes a hash of voice + style so a mid-game voice change yields a new
+  file. Applies to solo games too. Caveat: Firestore TTL deletes the game doc but not its
+  subcollections; avatars already have this gap, so a cleanup job for expired games'
+  subcollections (avatars, audio, seats, private) is owed regardless.
+- **Seat kinds: player and viewer.** A dead human keeps their player seat with all actions
+  removed, keeps knowing their own role, learns nothing new until game over. A viewer seat
+  comes from a separate viewer link (login required), sees public messages only until game
+  over, never role-private ones. Later: `visibility: 'private' | 'link' | 'public'` on the
+  game doc for a public gallery, no model change needed.
+- **A leaver becomes a bot.** Leave or kick flips `characters[].controller` to `'bot'` with
+  the game's default model (host may change it later like any bot). The character keeps its
+  story and the message history, so the bot continues in character. If the seat was at a
+  queue head, the head now names a bot and the host's loop takes over. Mirror of hot-join.
+- **No welcome turn for humans.** Bots introduce themselves and the day begins; a human's
+  first message is whatever they choose.
+- **Advisor replaces the ghostwriter.** `getSuggestion` today writes a line in the player's
+  voice (`HUMAN_SUGGESTION_PROMPT`). Replace it with a private second-person strategic hint
+  built from the seat's own private state (role, own night results) plus public history,
+  never other seats' roles. Available to every player seat, billed under the seat rule,
+  rate-limited to a few per day phase.
 
 Mechanical, to include in the steps above:
 
@@ -355,14 +371,15 @@ Each step is shippable on its own and does not change solo play.
    (`private/state`, `seats/{uid}`, roles off the public doc). Legacy read migration.
 2. **Seats and LOBBY.** Seat model, invite token, join page, claim transaction, Start
    assigns roles, `ensureSeat`, permission matrix, `shared` flag and solo-only gates,
-   spectator-quality read for guests (they can watch a game they sit in).
+   seat kinds (player/viewer), viewer link, dead-player read-only mode, leaver → bot.
 3. **Day pacing.** `sendMessage`, `startRound`, debounce/cooldown, bot day budget,
    derived "waiting" indicator, force-round button.
 4. **Vote and night for several humans.** `voteReady` toggle, queue-head generalisation
    for votes and night actions, skip-absent, time ceiling, night errors by slot,
    werewolf `audience`.
 5. **Billing.** Payer set, multi-user `recordSpend`, per-seat guard, blocked-by banner,
-   split toggle, redraw cap removal.
+   split toggle, redraw cap removal, stored audio (`speakMessage` + audio route, also a
+   solo win), advisor replacing the ghostwriter suggestion.
 6. **DRAFT as a shared state.** Preview moved onto the game doc, listener-driven
    new-game page, host-only globals, per-character editing for guests, candidate triple
    and "browse image maps", regenerate/reroll rules, manual-pick flag on redraw.
@@ -378,13 +395,8 @@ Each step is shippable on its own and does not change solo play.
 - Driver lease when the host disconnects: v1 pauses bots. Decide after play sessions.
 - Hot-join into a running game (a friend takes over a living bot's character): cheap
   under this model, not in v1.
-- Spectator seats (no character): a seat kind with read access and no actions. Not in v1.
+- Public game gallery (`visibility: 'public'`): later, viewer seats are the v1 building block.
 - Debounce/cooldown defaults and whether they are exposed on the form.
-- Voice: generate-once-per-message storage and its billing (section 12).
-- Dead humans: silent viewers with roles hidden until game over (section 12).
-- Leave/kick mid-game: character falls back to a bot (section 12).
-- Welcome introductions for human characters: typed or GM-read (section 12).
-- Suggestions for guests: allowed and billed under the seat rule (section 12).
 - Werewolf kill vote tie-break: earliest wolf in the queue, or random (section 6).
 
 ## Out of scope
