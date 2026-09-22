@@ -13,27 +13,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
-        id: "gpt-6-sol-luna", date: "Sep 2026", tags: ["Models"],
-        title: "GPT-6 Sol and GPT-6 Luna, both at half the price",
-        body: (<>Two more OpenAI seats move up a generation. <strong>GPT-6 Sol</strong> replaces GPT-5.6 Sol and
-            <strong> GPT-6 Luna</strong> replaces GPT-5.6 Luna, and unusually for a new generation, both arrive at
-            <strong> half the old price</strong> — Sol drops from $4 / $20 to $2 / $10 per million tokens, and Luna
-            from $0.20 / $1.20 to $0.10 / $0.50. Luna stays <strong>unlimited on the free tier</strong>, now at a
-            fraction of a cent a turn. <strong>GPT-6 Astra</strong> is unchanged, and <strong>GPT-5.6 Terra</strong>
-            keeps its seat: OpenAI didn&apos;t ship a GPT-6 Terra, so that one stays where it is. Your existing
-            games pick up the new versions automatically.</>),
-        media: null,
-        links: [{label: "Create a game", href: "/games"}, {label: "Models", href: "/models"}],
-    },
-    {
-        id: "opus-5-5", date: "Sep 2026", tags: ["Models"],
-        title: "Claude 5.5 Opus replaces Claude 5 Opus",
-        body: (<>Anthropic&apos;s <strong>Claude 5.5 Opus</strong> takes over the Opus slot in the model picker.
-            It&apos;s the newest flagship in the Claude line, and this time it arrives <strong>20% cheaper</strong>
-            than the 5 Opus it replaces — $4 / $20 per million tokens, down from $5 / $25 — with the same
-            one-million-token context window. Opus stays <strong>paid tier only</strong>: even at the lower price a
-            single bot turn costs more than the free tier allows per turn. Your existing games pick up the new
-            version automatically, nothing for you to do.</>),
+        id: "opus-5-5-gpt-6", date: "Sep 2026", tags: ["Models"],
+        title: "Three seats move up a generation, and every one gets cheaper",
+        body: (<>A model refresh across two providers, and unusually, not one of them costs more than what it
+            replaces. <strong>Claude 5.5 Opus</strong> takes the Opus slot from Claude 5 Opus at
+            <strong> 20% less</strong> — $4 / $20 per million tokens, down from $5 / $25 — keeping the same
+            one-million-token context window. On the OpenAI side, <strong>GPT-6 Sol</strong> and
+            <strong> GPT-6 Luna</strong> replace their 5.6 namesakes at <strong>half the old price</strong>: Sol
+            drops from $4 / $20 to $2 / $10, and Luna from $0.20 / $1.20 to $0.10 / $0.50.
+            <br/><br/>
+            What that means at the table: <strong>Luna stays unlimited on the free tier</strong>, now at a fraction
+            of a cent a turn, and it&apos;s the cheapest way to fill a lobby. <strong>Opus stays paid tier
+            only</strong> — even after the cut, one bot turn costs more than the free tier allows.
+            <strong> GPT-6 Astra</strong> is unchanged, and <strong>GPT-5.6 Terra</strong> keeps its seat, since
+            OpenAI didn&apos;t ship a GPT-6 version of it. Your existing games pick up all the new versions
+            automatically, nothing for you to do.</>),
         media: null,
         links: [{label: "Create a game", href: "/games"}, {label: "Models", href: "/models"}],
     },
