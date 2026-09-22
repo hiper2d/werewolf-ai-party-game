@@ -26,7 +26,7 @@ Pick any model for the Game Master and for each individual bot. Twelve providers
 | Provider | Models |
 |----------|--------|
 | **OpenAI** | GPT-6 Astra, GPT-5.6 Sol, GPT-5.6 Terra, GPT-5.6 Luna |
-| **Anthropic** | Claude Fable 5.1, Claude 5 Opus, Claude 5 Sonnet, Claude 4.5 Haiku |
+| **Anthropic** | Claude Fable 5.1, Claude 5.5 Opus, Claude 5 Sonnet, Claude 4.5 Haiku |
 | **Google** | Gemini 3.1 Pro Preview, Gemini 3.8 Flash, Gemini 3.5 Flash Lite |
 | **DeepSeek** | DeepSeek V4.1 Flash, DeepSeek V4 Pro |
 | **Mistral** | Mistral Medium 3.5, Mistral 4 Small |
@@ -36,7 +36,7 @@ Pick any model for the Game Master and for each individual bot. Twelve providers
 | **Qwen** | Qwen3.8 Max, Qwen3.8 Flash |
 | **MiniMax** | MiniMax M3 |
 | **Meta** | Muse Spark 1.3 |
-| **Sakana** | Fugu Ultra (reasons internally, but the API never returns the trace) |
+| **Sakana** | Fugu Ultra, Fugu Max (both reason internally, but the API never returns the trace) |
 | **typesafe.ai** | Jev (System One) — not a chat model: a sub-second judge that routes the discussion, picking which bots reply to each message |
 
 The reasoning is stored in the database with every message — even though it's not visible in the UI. For Claude, Gemini, Grok, Muse Spark, and Mistral, the reasoning trace (a signature, an encrypted blob, or the trace itself) is also replayed on later turns, so a bot keeps its private train of thought across the whole game. The free tier can use the cheaper models (per-model seat caps apply); the paid tier has the full list.
