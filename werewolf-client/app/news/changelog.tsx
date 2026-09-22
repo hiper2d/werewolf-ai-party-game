@@ -13,6 +13,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        id: "gpt-6-sol-luna", date: "Sep 2026", tags: ["Models"],
+        title: "GPT-6 Sol and GPT-6 Luna, both at half the price",
+        body: (<>Two more OpenAI seats move up a generation. <strong>GPT-6 Sol</strong> replaces GPT-5.6 Sol and
+            <strong> GPT-6 Luna</strong> replaces GPT-5.6 Luna, and unusually for a new generation, both arrive at
+            <strong> half the old price</strong> — Sol drops from $4 / $20 to $2 / $10 per million tokens, and Luna
+            from $0.20 / $1.20 to $0.10 / $0.50. Luna stays <strong>unlimited on the free tier</strong>, now at a
+            fraction of a cent a turn. <strong>GPT-6 Astra</strong> is unchanged, and <strong>GPT-5.6 Terra</strong>
+            keeps its seat: OpenAI didn&apos;t ship a GPT-6 Terra, so that one stays where it is. Your existing
+            games pick up the new versions automatically.</>),
+        media: null,
+        links: [{label: "Create a game", href: "/games"}, {label: "Models", href: "/models"}],
+    },
+    {
         id: "opus-5-5", date: "Sep 2026", tags: ["Models"],
         title: "Claude 5.5 Opus replaces Claude 5 Opus",
         body: (<>Anthropic&apos;s <strong>Claude 5.5 Opus</strong> takes over the Opus slot in the model picker.

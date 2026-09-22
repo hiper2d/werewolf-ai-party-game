@@ -25,7 +25,7 @@ Pick any model for the Game Master and for each individual bot. Twelve providers
 
 | Provider | Models |
 |----------|--------|
-| **OpenAI** | GPT-6 Astra, GPT-5.6 Sol, GPT-5.6 Terra, GPT-5.6 Luna |
+| **OpenAI** | GPT-6 Astra, GPT-6 Sol, GPT-5.6 Terra, GPT-6 Luna |
 | **Anthropic** | Claude Fable 5.1, Claude 5.5 Opus, Claude 5 Sonnet, Claude 4.5 Haiku |
 | **Google** | Gemini 3.1 Pro Preview, Gemini 3.8 Flash, Gemini 3.5 Flash Lite |
 | **DeepSeek** | DeepSeek V4.1 Flash, DeepSeek V4 Pro |
