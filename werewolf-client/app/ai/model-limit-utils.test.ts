@@ -61,7 +61,7 @@ describe('getModelPickerOptions (single source of truth for every picker)', () =
     const UNLIMITED = LLM_CONSTANTS.DEEPSEEK_FLASH;   // 0.12¢ per turn <= 0.3¢ → unlimited
     const LIMITED_3 = LLM_CONSTANTS.DEEPSEEK_PRO;     // 0.58¢ <= 1¢ → 3 bots
     const SINGLE_1 = LLM_CONSTANTS.CLAUDE_HAIKU;       // 1.14¢ <= 2¢ → 1 bot
-    const UNAVAILABLE = LLM_CONSTANTS.CLAUDE_OPUS;     // too few turns measured; estimated 6.5¢ > 2¢ → not available
+    const UNAVAILABLE = LLM_CONSTANTS.CLAUDE_OPUS;     // too few turns measured; estimated 5.2¢ > 2¢ → not available
 
     it('pins the assumed free-tier policies (guards against measurement drift)', () => {
         expect(SupportedAiModels[UNLIMITED].freeTier).toMatchObject({ available: true, maxBotsPerGame: -1 });

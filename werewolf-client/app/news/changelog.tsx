@@ -13,6 +13,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        id: "opus-5-5", date: "Sep 2026", tags: ["Models"],
+        title: "Claude 5.5 Opus replaces Claude 5 Opus",
+        body: (<>Anthropic&apos;s <strong>Claude 5.5 Opus</strong> takes over the Opus slot in the model picker.
+            It&apos;s the newest flagship in the Claude line, and this time it arrives <strong>20% cheaper</strong>
+            than the 5 Opus it replaces — $4 / $20 per million tokens, down from $5 / $25 — with the same
+            one-million-token context window. Opus stays <strong>paid tier only</strong>: even at the lower price a
+            single bot turn costs more than the free tier allows per turn. Your existing games pick up the new
+            version automatically, nothing for you to do.</>),
+        media: null,
+        links: [{label: "Create a game", href: "/games"}, {label: "Models", href: "/models"}],
+    },
+    {
         id: "jev-router-and-themes", date: "Sep 2026", tags: ["Design", "Models"],
         title: "A faster hand on who speaks next, and four new looks",
         body: (<>Two changes to the table. First, <strong>who replies next</strong> in a discussion is now decided
