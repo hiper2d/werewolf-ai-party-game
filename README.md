@@ -30,7 +30,7 @@ Pick any model for the Game Master and for each individual bot. Twelve providers
 | **Google** | Gemini 3.1 Pro Preview, Gemini 3.8 Flash, Gemini 3.5 Flash Lite |
 | **DeepSeek** | DeepSeek V4.1 Flash, DeepSeek V4 Pro |
 | **Mistral** | Mistral Medium 3.5, Mistral 4 Small |
-| **xAI** | Grok 4.6 |
+| **xAI** | Grok 4.7 |
 | **Moonshot AI** | Kimi K3 |
 | **Z.AI** | GLM-5.3, GLM-5.3 Flash |
 | **Qwen** | Qwen3.8 Max, Qwen3.8 Flash |

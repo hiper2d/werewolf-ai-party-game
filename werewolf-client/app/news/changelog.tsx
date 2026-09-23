@@ -13,8 +13,8 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
-        id: "opus-5-5-gpt-6", date: "Sep 2026", tags: ["Models"],
-        title: "Three seats move up a generation, and every one gets cheaper",
+        id: "model-refresh-sep-2026", date: "Sep 2026", tags: ["Models"],
+        title: "Four seats move up a generation, and most get cheaper",
         body: (<>A model refresh across two providers, and unusually, not one of them costs more than what it
             replaces. <strong>Claude 5.5 Opus</strong> takes the Opus slot from Claude 5 Opus at
             <strong> 20% less</strong> — $4 / $20 per million tokens, down from $5 / $25 — keeping the same
@@ -26,8 +26,12 @@ export const CHANGELOG: ChangelogEntry[] = [
             of a cent a turn, and it&apos;s the cheapest way to fill a lobby. <strong>Opus stays paid tier
             only</strong> — even after the cut, one bot turn costs more than the free tier allows.
             <strong> GPT-6 Astra</strong> is unchanged, and <strong>GPT-5.6 Terra</strong> keeps its seat, since
-            OpenAI didn&apos;t ship a GPT-6 version of it. Your existing games pick up all the new versions
-            automatically, nothing for you to do.</>),
+            OpenAI didn&apos;t ship a GPT-6 version of it.
+            <br/><br/>
+            One more, landing the same week: <strong>Grok 4.7</strong> takes the xAI seat from Grok 4.6. That one
+            is the same price rather than cheaper, and the gain is in the model itself — a 500,000-token context
+            window, and a sharper hand at holding a long argument together across a full game. Your existing games
+            pick up all the new versions automatically, nothing for you to do.</>),
         media: null,
         links: [{label: "Create a game", href: "/games"}, {label: "Models", href: "/models"}],
     },
