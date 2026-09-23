@@ -285,6 +285,34 @@ describe('selectRespondingBotsWithJev', () => {
         expect(savedMessages).toHaveLength(0);
     });
 
+    it('gives Jev 15 s, then throws the fallback error and records the timeout', async () => {
+        jest.useFakeTimers();
+        try {
+            fetchMock.mockImplementation((_url: string, init: { signal: AbortSignal }) => new Promise((_resolve, reject) => {
+                init.signal.addEventListener('abort', () => reject(new DOMException('This operation was aborted', 'AbortError')));
+            }));
+            const call = selectRespondingBotsWithJev(game, messages as any, ['Alice', 'Bram', 'Cleo'], 'key', 'u@e.com');
+            const settled = jest.fn();
+            call.then(settled, settled);
+
+            await jest.advanceTimersByTimeAsync(JEV_ROUTER_CONFIG.TIMEOUT_MS - 1);
+            expect(settled).not.toHaveBeenCalled();
+            await jest.advanceTimersByTimeAsync(1);
+
+            const error = await call.catch(e => e);
+            expect(JEV_ROUTER_CONFIG.TIMEOUT_MS).toBe(15_000);
+            expect(error).toBeInstanceOf(JevRouterUnavailableError);
+            expect(error.recoverable).toBe(true);
+            expect(mockSaveRecord).toHaveBeenCalledWith(expect.objectContaining({
+                status: 'error', error: 'Jev request timed out after 15000 ms', httpStatus: undefined,
+            }));
+            expect(mockRecordRouterSpend).not.toHaveBeenCalled();
+            expect(savedMessages).toHaveLength(0);
+        } finally {
+            jest.useRealTimers();
+        }
+    });
+
     it('returns an empty list without calling Jev when there are no candidates', async () => {
         expect(await selectRespondingBotsWithJev(game, messages as any, [], 'key', 'u@e.com')).toEqual([]);
         expect(fetchMock).not.toHaveBeenCalled();

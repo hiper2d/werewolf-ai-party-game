@@ -123,7 +123,13 @@ export async function askJev<Q extends Record<string, JevQuestion>>(
             signal: controller.signal,
         });
     } catch (error: any) {
-        throw new JevError(`Jev request failed: ${error?.message ?? error}`, null);
+        // Elapsed time on every failure: an aborted request carries no body, so this is the only
+        // way to tell our own timeout from a network error that failed fast.
+        const elapsed = Date.now() - started;
+        if (controller.signal.aborted) {
+            throw new JevError(`Jev request timed out after ${elapsed} ms`, null);
+        }
+        throw new JevError(`Jev request failed after ${elapsed} ms: ${error?.message ?? error}`, null);
     } finally {
         clearTimeout(timer);
     }

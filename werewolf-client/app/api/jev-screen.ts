@@ -49,8 +49,11 @@ export const JEV_SCREEN_CONFIG = {
     HARD_FLAGS: { minors: 0.9, real_harm: 0.9, hate: 0.9 } as Partial<Record<JevScreenFlag, number>>,
     /** Grey zone starts here on the 0–3 score: recorded and counted, never rejected. */
     GREY_SCORE: 1.2,
-    /** Jev answered the probe in ~200 ms; anything slower than this lets the input through. */
-    TIMEOUT_MS: 1500,
+    /**
+     * Anything slower than this lets the input through (fail-open). Production p50 is ~290 ms,
+     * but previews already reached 1.1 s and one timed out at the old 1.5 s budget (2026-09-23).
+     */
+    TIMEOUT_MS: 5_000,
 } as const;
 
 export type ScreenQuestions = { risk: JevScoreQuestion } & Record<JevScreenFlag, JevNoulQuestion>;

@@ -27,6 +27,77 @@
   responses in current game state" (logged as an error twice on 2026-09-17); it should be a
   `staleActionNoOp` like every other double-fire.
 
+- **Qwen3.8 Flash ignores the vote schema: prose instead of JSON, then JSON without `why`
+  (found 2026-09-23).** Game `castle-1790174046782` (free tier, 12 players, owner paul.kenyon597,
+  since deleted by the player), bot Lancelot on `qwen-flash` (`qwen3.8-flash`), day-1 VOTE, voter
+  #8. BetterStack S3 table, UTC:
+  - 14:39:48 vote request. 14:40:11 (23.0 s) fails: `Failed to parse JSON response: SyntaxError:
+    Unexpected token 'I', "I'm voting"... is not valid JSON`. The model answered in character
+    ("I'm voting Morgana because her introduction was a taunt wrapped in a threat..."), with no
+    JSON at all. Logged `recoverable: true`, so the player got the retry banner.
+  - 14:40:21 player picks a one-shot override `deepseek-pro`; the DeepSeek V4 Pro call starts at
+    14:40:22.
+  - 14:41:05 a SECOND `qwen3.8-flash` request for Lancelot starts while the DeepSeek call is still
+    in flight (plain retry click, or a reload re-firing the head of the queue). 14:41:17 (12.3 s)
+    it fails differently: valid JSON this time, but Zod `invalid_type` on `path: ["why"]`,
+    "Required". So the reason field was dropped.
+  - 14:41:27 player overrides again with `gpt-mini`; `gpt-6-luna` answers in 8 s and the vote
+    lands at 14:41:37 (Morgana).
+  - 14:41:37 the DeepSeek call from 14:40:22 finally returns (75 s) with a DIFFERENT vote (Paul),
+    and the post-call guard discards it as `STALE_ACTION vote`. That guard did its job; the tally
+    was not corrupted.
+  Net: one bot vote cost four model calls (2x Qwen, DeepSeek, GPT), two retry banners and about
+  110 s of the player's time, and two calls ran concurrently for the same bot. These are the only
+  two parse/validation failures in the retained logs (back to ~2026-09-21), against 53 successful
+  `qwen3.8-flash` responses in the same window, so it's rare but real. The player deleted the
+  game about 10 minutes after the night, which may or may not be related.
+  **Why it can happen:** `QwenAgent.doAskWithZodSchema` (`~/projects/ai-agents/src/agents/
+  qwen-agent.ts:180`) sends NO `response_format`, because DashScope rejects `json_object` when
+  `enable_thinking` is on and we always think. The schema is only an appended instruction
+  ("Respond with ONLY a valid JSON object...") plus the lenient parser. Flash with a 1024-token
+  thinking budget is the weakest follower of that instruction, and the vote prompt is the most
+  roleplay-heavy thing it answers, so it slips into character.
+  **Options, cheapest first:**
+  - Accept a vote with a valid `who` and a missing `why` instead of failing it (show the vote
+    with no reason, or a neutral "no reason given"). That would have saved the second failure.
+    It can't save the first one: guessing `who` from free prose isn't safe.
+  - Try `enable_thinking: false` + `response_format: json_object` (or `json_schema` if DashScope
+    supports it now) for Flash on structured calls only. Check the live docs first (`api-docs`
+    skill); this trades reasoning quality for format compliance on the cheapest model.
+  - If it keeps recurring, drop Qwen Flash from the free-tier vote path or from the free tier
+    altogether. Measure first: this is one occurrence.
+  Same rule as elsewhere: no automatic retries, the failure surfaces and the player retries.
+  Also note the concurrent second Qwen call is the turn-claim item above in a new form: it was a
+  full billed request fired while another call for the same bot was already running.
+
+- **Jev content screen timed out on a preview and failed open (found 2026-09-23).**
+  21:03:59 UTC, `source: preview`, owner mukymookk, game that became
+  `whos-the-werewolf-1790197549116`: `Jev screen request failed` / `Jev request failed: This
+  operation was aborted`, `status: null`. That is our own `AbortController` firing, not an HTTP
+  error from typesafe.ai: `askJev` (`app/ai/jev-client.ts`) aborts at `timeoutMs`, and the screen
+  passes `JEV_SCREEN_CONFIG.TIMEOUT_MS = 1500` (`app/api/jev-screen.ts:53`).
+  `screenHumanInput` is fail-open by design ("Never throws: every failure path returns
+  `blocked: false`"), so the preview went ahead 0.4 s later with its theme and GM instructions
+  UNSCREENED. Harmless today, because `jevScreenMode` is `monitor` (the default in
+  `limits-actions.ts`) and nothing is rejected anyway. It stops being harmless the day the mode
+  is flipped to `enforce`: then any Jev slowdown becomes a bypass, and a user who wants to get
+  something past the screen only needs Jev to be slow.
+  Numbers from the retained logs (production, since ~2026-09-21): 72 screen calls, 1 failure
+  (this one). Latency p50 ~290 ms on both sources, but preview max is already 1098 ms, 73% of
+  the 1.5 s budget, so the margin is thin for the longer preview inputs.
+  **Shipped 2026-09-23:** the screen timeout is now 5 s for chat and preview, and the router's
+  15 s (previously just `askJev`'s default) is explicit as `JEV_ROUTER_CONFIG.TIMEOUT_MS`.
+  `askJev` errors now carry the elapsed time and name a timeout as one ("Jev request timed out
+  after 5000 ms" vs "Jev request failed after N ms: …"). Tests drive a stalled fetch
+  through both timeouts, and through the GM fallback when no key is set, on a timeout, and when
+  the GM call fails too.
+  **Before flipping to `enforce`, decide:**
+  - Fail closed for `preview` in enforce mode (show "couldn't check your theme, try again"),
+    and keep fail-open for chat, where a false refusal mid-game is worse than a missed screen.
+  - Or re-screen asynchronously after a failed-open preview and flag the game, so a bypass is at
+    least recorded rather than silent. The `saveJevScreenCall` row with `verdict: 'error'` is
+    already there to hang this on.
+
 - **`Game action failed: <single letter>` - minified function name in error logs (found
   2026-09-11, still reproducing 2026-09-17: `Game action failed: I` / `J` / `R` / `S` / `W` / `_`).**
   See the dedicated section below.

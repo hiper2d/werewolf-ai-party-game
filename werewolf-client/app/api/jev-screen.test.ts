@@ -194,6 +194,34 @@ describe('screenHumanInput', () => {
         expect(mockSaveRecord.mock.calls[0][0]).toMatchObject({ verdict: 'error', error: 'This operation was aborted', enforced: false });
     });
 
+    it('gives Jev 5 s, then fails open on the timeout and records it', async () => {
+        const { askJev } = jest.requireActual('@/app/ai/jev-client');
+        mockAskJev.mockImplementation(askJev);
+        (global as any).fetch = jest.fn((_url: string, init: { signal: AbortSignal }) => new Promise((_resolve, reject) => {
+            init.signal.addEventListener('abort', () => reject(new DOMException('This operation was aborted', 'AbortError')));
+        }));
+        mockMode.mockResolvedValue('enforce');
+        jest.useFakeTimers();
+        try {
+            const call = screenHumanInput({ ...input, source: 'preview' });
+            const settled = jest.fn();
+            call.then(settled, settled);
+
+            await jest.advanceTimersByTimeAsync(JEV_SCREEN_CONFIG.TIMEOUT_MS - 1);
+            expect(settled).not.toHaveBeenCalled();
+            await jest.advanceTimersByTimeAsync(1);
+
+            expect(JEV_SCREEN_CONFIG.TIMEOUT_MS).toBe(5_000);
+            expect(await call).toEqual({ verdict: 'error', reason: null, mode: 'enforce', blocked: false });
+            expect(mockSaveRecord.mock.calls[0][0]).toMatchObject({
+                verdict: 'error', error: 'Jev request timed out after 5000 ms', httpStatus: undefined, enforced: false,
+            });
+            expect(mockRecordScreenSpend).not.toHaveBeenCalled();
+        } finally {
+            jest.useRealTimers();
+        }
+    });
+
     it('a preview has no game: billed without a game id', async () => {
         mockAskJev.mockResolvedValue(jevResult(answers([0.9, 0.1, 0, 0])));
         const out = await screenHumanInput({ source: 'preview', text: 'Theme: a snowed-in mansion', userEmail: 'p@example.com', apiKeys: {} });

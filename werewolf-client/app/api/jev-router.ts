@@ -67,6 +67,11 @@ export const JEV_ROUTER_CONFIG = {
     DRAMATIC_THRESHOLD: 0.85,
     /** Keep the state under Jev's 32k-token limit: roughly 4 chars per token, with headroom. */
     MAX_DISCUSSION_CHARS: 90_000,
+    /**
+     * After this the call is abandoned and selectRespondingBots falls back to the Game Master LLM
+     * router, so a stalled Jev costs the player this long plus one GM call.
+     */
+    TIMEOUT_MS: 15_000,
 } as const;
 
 /**
@@ -328,7 +333,7 @@ export async function selectRespondingBotsWithJev(
     // whole day's discussion); the Firestore record below keeps the full copy for replay.
     let result;
     try {
-        result = await askJev(apiKey, state, questions);
+        result = await askJev(apiKey, state, questions, { timeoutMs: JEV_ROUTER_CONFIG.TIMEOUT_MS });
         console.log(`🧭 Jev answered ${Object.keys(questions).length} questions in ${result.durationMs} ms — ${result.inputTokens} input tokens, $${result.costUSD.toFixed(6)} (${result.model})`);
     } catch (error: any) {
         console.error(`🧭 Jev request failed: ${error?.message ?? error}`);
