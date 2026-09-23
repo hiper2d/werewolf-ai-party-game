@@ -27,7 +27,11 @@ class Logger {
         const envLevel = (process.env.LOG_LEVEL || 'info').toLowerCase();
         this.minLevel = (envLevel in LOG_LEVEL_PRIORITY ? envLevel : 'info') as LogLevel;
 
-        if (sourceToken) {
+        // Jest loads .env (setupFiles: dotenv/config), so without this guard every `npm test`
+        // run ships its deliberate error-path logs to the shared source and trips alerts.
+        if (process.env.NODE_ENV === 'test') {
+            // console only
+        } else if (sourceToken) {
             try {
                 this.logtail = new Logtail(sourceToken, {
                     ...(endpoint ? { endpoint } : {}),
