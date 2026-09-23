@@ -58,7 +58,11 @@ Jev is not a chat model: it's a sub-second judge that routes the discussion, pic
 
 Depth is tuned per model, not set globally. DeepSeek runs `low` because it emitted roughly eight reasoning tokens per answer token at the default, and Gemini Flash Lite runs `minimal` because it's the cheap seat. Story generation raises the output ceiling but deliberately does **not** reason deeper than a normal turn.
 
-The reasoning is stored in the database with every message — even though it's not visible in the UI. For Claude, Gemini, Grok, Muse Spark, and Mistral, the reasoning trace (a signature, an encrypted blob, or the trace itself) is also replayed on later turns, so a bot keeps its private train of thought across the whole game. The free tier can use the cheaper models (per-model seat caps apply); the paid tier has the full list.
+The reasoning is stored in the database with every message, even though it isn't visible in the UI. On seven of the twelve providers it is also replayed on later turns, so a bot keeps its own train of thought across the whole game rather than re-deriving it every time. What gets replayed depends on what the provider hands back: a **signature** on Claude and Gemini, an **encrypted blob** on OpenAI, Grok and Muse Spark, and the **plain trace** on Mistral and Qwen. DeepSeek, GLM, Kimi, MiniMax and Fugu return nothing replayable, so their bots start each turn fresh.
+
+None of this is stateful on the provider's side: every one of those replays is something we store and send back, so nothing depends on a session living on their servers. Changing a bot's model mid-game is safe — the new model simply can't read the old one's trace, so the bot loses its reasoning and keeps playing.
+
+The free tier can use the cheaper models (per-model seat caps apply); the paid tier has the full list.
 
 ## Game List
 

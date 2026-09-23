@@ -193,15 +193,17 @@ export function convertToAIMessages(currentBotName: string, messages: GameMessag
             let googleThoughtSignature: string | undefined;
             let grokEncryptedReasoning: string | undefined;
             let metaEncryptedReasoning: string | undefined;
+            let openaiEncryptedReasoning: string | undefined;
             if (message.msg && typeof message.msg === 'object') {
-                const signedMsg = message.msg as { thinking?: string; anthropicThinkingSignature?: string; googleThoughtSignature?: string; grokEncryptedReasoning?: string; metaEncryptedReasoning?: string };
+                const signedMsg = message.msg as { thinking?: string; anthropicThinkingSignature?: string; googleThoughtSignature?: string; grokEncryptedReasoning?: string; metaEncryptedReasoning?: string; openaiEncryptedReasoning?: string };
                 thinking = signedMsg.thinking;
                 anthropicThinkingSignature = signedMsg.anthropicThinkingSignature;
                 googleThoughtSignature = signedMsg.googleThoughtSignature;
                 grokEncryptedReasoning = signedMsg.grokEncryptedReasoning;
                 metaEncryptedReasoning = signedMsg.metaEncryptedReasoning;
+                openaiEncryptedReasoning = signedMsg.openaiEncryptedReasoning;
             }
-            const aiMessage: AIMessage = { role: MESSAGE_ROLE.ASSISTANT, content: content, thinking, anthropicThinkingSignature, googleThoughtSignature, grokEncryptedReasoning, metaEncryptedReasoning };
+            const aiMessage: AIMessage = { role: MESSAGE_ROLE.ASSISTANT, content: content, thinking, anthropicThinkingSignature, googleThoughtSignature, grokEncryptedReasoning, metaEncryptedReasoning, openaiEncryptedReasoning };
             aiMessages.push(aiMessage);
         } else {
             // Use convertMessageContent to properly handle all message types

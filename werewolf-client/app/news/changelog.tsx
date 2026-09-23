@@ -14,24 +14,24 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
     {
         id: "model-refresh-sep-2026", date: "Sep 2026", tags: ["Models"],
-        title: "Four seats move up a generation, and most get cheaper",
-        body: (<>A model refresh across two providers, and unusually, not one of them costs more than what it
-            replaces. <strong>Claude 5.5 Opus</strong> takes the Opus slot from Claude 5 Opus at
-            <strong> 20% less</strong> — $4 / $20 per million tokens, down from $5 / $25 — keeping the same
-            one-million-token context window. On the OpenAI side, <strong>GPT-6 Sol</strong> and
-            <strong> GPT-6 Luna</strong> replace their 5.6 namesakes at <strong>half the old price</strong>: Sol
-            drops from $4 / $20 to $2 / $10, and Luna from $0.20 / $1.20 to $0.10 / $0.50.
+        title: "Four seats move up a generation, and three get cheaper",
+        body: (<>A refresh across three providers in one week, and not one of the new models costs more than what
+            it replaces. <strong>Claude 5.5 Opus</strong> takes the Opus slot at <strong>20% less</strong> than
+            Claude 5 Opus. <strong>GPT-6 Sol</strong> and <strong>GPT-6 Luna</strong> replace their 5.6 namesakes
+            at <strong>half</strong> the old price. And <strong>Grok 4.7</strong> takes the xAI seat at the
+            <strong>same</strong> price as Grok 4.6, where the gain is in the model rather than the bill: a
+            500,000-token context window and a steadier hand at holding a long argument together across a full
+            game.
             <br/><br/>
-            What that means at the table: <strong>Luna stays unlimited on the free tier</strong>, now at a fraction
-            of a cent a turn, and it&apos;s the cheapest way to fill a lobby. <strong>Opus stays paid tier
-            only</strong> — even after the cut, one bot turn costs more than the free tier allows.
-            <strong> GPT-6 Astra</strong> is unchanged, and <strong>GPT-5.6 Terra</strong> keeps its seat, since
-            OpenAI didn&apos;t ship a GPT-6 version of it.
+            Per million tokens, in and out: Opus goes $5 / $25 to <strong>$4 / $20</strong>, Sol $4 / $20 to
+            <strong>$2 / $10</strong>, and Luna $0.20 / $1.20 to <strong>$0.10 / $0.50</strong>.
             <br/><br/>
-            One more, landing the same week: <strong>Grok 4.7</strong> takes the xAI seat from Grok 4.6. That one
-            is the same price rather than cheaper, and the gain is in the model itself — a 500,000-token context
-            window, and a sharper hand at holding a long argument together across a full game. Your existing games
-            pick up all the new versions automatically, nothing for you to do.</>),
+            What it means at the table: <strong>Luna stays unlimited on the free tier</strong> and is now a
+            fraction of a cent a turn, which makes it the cheapest way to fill a lobby. <strong>Opus stays paid
+            tier only</strong> — even after the cut, one bot turn costs more than the free tier allows per turn.
+            <strong> GPT-6 Astra</strong> is unchanged, and <strong>GPT-5.6 Terra</strong> keeps its seat because
+            OpenAI didn&apos;t ship a GPT-6 version of it. Your existing games pick up every new version
+            automatically, nothing for you to do.</>),
         media: null,
         links: [{label: "Create a game", href: "/games"}, {label: "Models", href: "/models"}],
     },
