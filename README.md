@@ -25,10 +25,10 @@ Pick any model for the Game Master and for each individual bot. Twelve providers
 
 | Provider | Model | Reasoning |
 |----------|-------|-----------|
-| **OpenAI** | GPT-6 Astra | provider default |
-| **OpenAI** | GPT-6 Sol | provider default |
-| **OpenAI** | GPT-5.6 Terra | provider default |
-| **OpenAI** | GPT-6 Luna | provider default |
+| **OpenAI** | GPT-6 Astra | `medium` |
+| **OpenAI** | GPT-6 Sol | `medium` |
+| **OpenAI** | GPT-5.6 Terra | `medium` |
+| **OpenAI** | GPT-6 Luna | `medium` |
 | **Anthropic** | Claude Fable 5.1 | `high` |
 | **Anthropic** | Claude 5.5 Opus | `high` |
 | **Anthropic** | Claude 5 Sonnet | `high` |
@@ -40,8 +40,8 @@ Pick any model for the Game Master and for each individual bot. Twelve providers
 | **DeepSeek** | DeepSeek V4 Pro | `low` |
 | **Mistral** | Mistral Medium 3.5 | `high` |
 | **Mistral** | Mistral 4 Small | `high` |
-| **xAI** | Grok 4.7 | provider default (`high`) |
-| **Moonshot AI** | Kimi K3 | `max` |
+| **xAI** | Grok 4.7 | `high` |
+| **Moonshot AI** | Kimi K3 | `high` |
 | **Z.AI** | GLM-5.3 | `high` |
 | **Z.AI** | GLM-5.3 Flash | `high` |
 | **Qwen** | Qwen3.8 Max | 1,024-token budget |
@@ -54,7 +54,7 @@ Pick any model for the Game Master and for each individual bot. Twelve providers
 
 Jev is not a chat model: it's a sub-second judge that routes the discussion, picking which bots reply to each message.
 
-**Reading the reasoning column.** Every provider names its levels differently, so the value shown is what we actually send, translated into that provider's own vocabulary — `high` on Claude is not the same depth as `high` on GLM. "Provider default" means we send no reasoning parameter at all and let the model pick, which is the case for the whole GPT family and for Grok. "1,024-token budget" means the provider's knob is a token cap rather than a named level: on Qwen the budget *is* the effort knob, since `reasoning_effort` is accepted but ignored there. MiniMax exposes no control of any kind. Fugu Ultra and Fugu Max reason internally but the API never returns the trace.
+**Reading the reasoning column.** Every provider names its levels differently, so the value shown is what we actually send, translated into that provider's own vocabulary — `high` on Claude is not the same depth as `high` on GLM. Every level is set explicitly: we never leave a model on the provider's default, because a default can move without notice. "1,024-token budget" means the provider's knob is a token cap rather than a named level. That applies to Claude Haiku, which is the one Claude model without adaptive thinking and so takes the older `budget_tokens` form, and to Qwen, where the budget *is* the effort knob since `reasoning_effort` is accepted but ignored. MiniMax is the only model exposing no control at all. Fugu Ultra and Fugu Max reason internally but the API never returns the trace.
 
 Depth is tuned per model, not set globally. DeepSeek runs `low` because it emitted roughly eight reasoning tokens per answer token at the default, and Gemini Flash Lite runs `minimal` because it's the cheap seat. Story generation raises the output ceiling but deliberately does **not** reason deeper than a normal turn.
 
