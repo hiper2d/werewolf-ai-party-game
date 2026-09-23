@@ -22,7 +22,7 @@ jest.mock('@/app/utils/logger', () => ({
     logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn(), agentActivity: (...args: any[]) => mockAgentActivity(...args) },
 }));
 
-import { buildRouterRequest, composeSpeakerSet, JEV_ROUTER_CONFIG, selectRespondingBotsWithJev } from '@/app/api/jev-router';
+import { buildRouterRequest, composeSpeakerSet, JEV_ROUTER_CONFIG, JevRouterUnavailableError, selectRespondingBotsWithJev } from '@/app/api/jev-router';
 
 /** Deterministic "random": returns the given values in order, then 0. */
 function seq(values: number[]): () => number {
@@ -277,6 +277,8 @@ describe('selectRespondingBotsWithJev', () => {
             caught = e as BotResponseError;
         }
         expect(caught).toBeInstanceOf(BotResponseError);
+        // selectRespondingBots falls back to the GM LLM router on exactly this class
+        expect(caught).toBeInstanceOf(JevRouterUnavailableError);
         expect(caught!.context).toMatchObject({ action: 'bot_selection', gmAiType: 'jev' });
         expect(caught!.recoverable).toBe(true);
         expect(mockRecordRouterSpend).not.toHaveBeenCalled();

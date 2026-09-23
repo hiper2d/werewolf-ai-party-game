@@ -297,6 +297,13 @@ export function buildRouterRequest(game: Game, dayMessages: GameMessage[], candi
 }
 
 /**
+ * The Jev call itself failed (network, timeout, 5xx, 429, or an auth/billing refusal such as an
+ * empty prepaid balance). selectRespondingBots catches exactly this and falls back to the Game
+ * Master LLM router; any other error (e.g. the free-tier spend cap) propagates as before.
+ */
+export class JevRouterUnavailableError extends BotResponseError {}
+
+/**
  * Ask Jev who replies next and turn the answer into the bot queue. Bills the call, saves the
  * hidden GM_BOT_SELECTION debug message and kicks off the mid-day illustration when the
  * exchange is dramatic. Returns the selected bot names (never empty for a non-empty roster).
@@ -336,7 +343,7 @@ export async function selectRespondingBotsWithJev(
             gameId: game.id, userId: userEmail, day: game.currentDay, status: 'error', model: JEV_MODEL,
             state, questions, error: detail, httpStatus: error instanceof JevError ? (error.status ?? undefined) : undefined,
         });
-        throw new BotResponseError(
+        throw new JevRouterUnavailableError(
             'Game Master failed to select responding bots',
             `Jev speaker router failed: ${detail}`,
             { gmAiType: 'jev', action: 'bot_selection' },

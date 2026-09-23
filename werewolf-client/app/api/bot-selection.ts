@@ -24,7 +24,7 @@ import { after } from "next/server";
 import { midGameImagesEnabled, runDayIllustration } from "@/app/utils/illustration-generation";
 import { convertMessageContent } from "@/app/utils/message-utils";
 import { getJevApiKey } from "@/app/ai/jev-client";
-import { selectRespondingBotsWithJev } from "@/app/api/jev-router";
+import { JevRouterUnavailableError, selectRespondingBotsWithJev } from "@/app/api/jev-router";
 
 /**
  * Format day activity data for the GM prompt.
@@ -146,7 +146,7 @@ export async function selectRespondingBots(
     const candidateNames = candidateBotNames.join(", ");
 
     // Jev (typesafe.ai) routes in one sub-second judge call when its key is configured;
-    // without the key the Game Master LLM does the routing below.
+    // without the key, or when the Jev call fails, the Game Master LLM does the routing below.
     const jevApiKey = getJevApiKey(apiKeys);
     if (jevApiKey) {
         // Console line on purpose: in dev the structured logger ships to Better Stack only,
@@ -155,7 +155,17 @@ export async function selectRespondingBots(
         // A pending one-shot retry hint was written for the LLM router; clear it so it
         // doesn't ride a later, unrelated GM prompt.
         await consumeRetryHint(game.id, game, GAME_MASTER);
-        return selectRespondingBotsWithJev(game, dayMessages, candidateBotNames, jevApiKey, userEmail);
+        try {
+            return await selectRespondingBotsWithJev(game, dayMessages, candidateBotNames, jevApiKey, userEmail);
+        } catch (error) {
+            if (!(error instanceof JevRouterUnavailableError)) throw error;
+            // Not a retry of the same call: a different router, so an outage or an empty
+            // typesafe.ai balance degrades speaker picks instead of stalling the game.
+            console.warn(`🧭 Jev unavailable, falling back to the Game Master LLM router — game ${game.id}`);
+            logger.warn('Jev router unavailable, falling back to Game Master LLM router', {
+                gameId: game.id, userId: userEmail, activity: 'jev_router', error: error.details,
+            });
+        }
     }
 
     const gmModel = getEffectiveModel(game, GAME_MASTER, game.gameMasterAiType);
