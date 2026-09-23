@@ -23,21 +23,40 @@ AI bots pretend to be humans. They don't know about other AI players. Each has p
 
 Pick any model for the Game Master and for each individual bot. Twelve providers, and every model reasons on every turn unless noted. The bot pickers list the chat models; the last row is the router that decides who speaks next:
 
-| Provider | Models |
-|----------|--------|
-| **OpenAI** | GPT-6 Astra, GPT-6 Sol, GPT-5.6 Terra, GPT-6 Luna |
-| **Anthropic** | Claude Fable 5.1, Claude 5.5 Opus, Claude 5 Sonnet, Claude 4.5 Haiku |
-| **Google** | Gemini 3.1 Pro Preview, Gemini 3.8 Flash, Gemini 3.5 Flash Lite |
-| **DeepSeek** | DeepSeek V4.1 Flash, DeepSeek V4 Pro |
-| **Mistral** | Mistral Medium 3.5, Mistral 4 Small |
-| **xAI** | Grok 4.7 |
-| **Moonshot AI** | Kimi K3 |
-| **Z.AI** | GLM-5.3, GLM-5.3 Flash |
-| **Qwen** | Qwen3.8 Max, Qwen3.8 Flash |
-| **MiniMax** | MiniMax M3 |
-| **Meta** | Muse Spark 1.3 |
-| **Sakana** | Fugu Ultra, Fugu Max (both reason internally, but the API never returns the trace) |
-| **typesafe.ai** | Jev (System One) — not a chat model: a sub-second judge that routes the discussion, picking which bots reply to each message |
+| Provider | Model | Reasoning |
+|----------|-------|-----------|
+| **OpenAI** | GPT-6 Astra | provider default |
+| **OpenAI** | GPT-6 Sol | provider default |
+| **OpenAI** | GPT-5.6 Terra | provider default |
+| **OpenAI** | GPT-6 Luna | provider default |
+| **Anthropic** | Claude Fable 5.1 | `high` |
+| **Anthropic** | Claude 5.5 Opus | `high` |
+| **Anthropic** | Claude 5 Sonnet | `high` |
+| **Anthropic** | Claude 4.5 Haiku | 1,024-token budget |
+| **Google** | Gemini 3.1 Pro Preview | `high` |
+| **Google** | Gemini 3.8 Flash | `medium` |
+| **Google** | Gemini 3.5 Flash Lite | `minimal` |
+| **DeepSeek** | DeepSeek V4.1 Flash | `low` |
+| **DeepSeek** | DeepSeek V4 Pro | `low` |
+| **Mistral** | Mistral Medium 3.5 | `high` |
+| **Mistral** | Mistral 4 Small | `high` |
+| **xAI** | Grok 4.7 | provider default (`high`) |
+| **Moonshot AI** | Kimi K3 | `max` |
+| **Z.AI** | GLM-5.3 | `high` |
+| **Z.AI** | GLM-5.3 Flash | `high` |
+| **Qwen** | Qwen3.8 Max | 1,024-token budget |
+| **Qwen** | Qwen3.8 Flash | 1,024-token budget |
+| **MiniMax** | MiniMax M3 | no knob |
+| **Meta** | Muse Spark 1.3 | `medium` |
+| **Sakana** | Fugu Ultra | `high` |
+| **Sakana** | Fugu Max | `high` |
+| **typesafe.ai** | Jev (System One) | n/a |
+
+Jev is not a chat model: it's a sub-second judge that routes the discussion, picking which bots reply to each message.
+
+**Reading the reasoning column.** Every provider names its levels differently, so the value shown is what we actually send, translated into that provider's own vocabulary — `high` on Claude is not the same depth as `high` on GLM. "Provider default" means we send no reasoning parameter at all and let the model pick, which is the case for the whole GPT family and for Grok. "1,024-token budget" means the provider's knob is a token cap rather than a named level: on Qwen the budget *is* the effort knob, since `reasoning_effort` is accepted but ignored there. MiniMax exposes no control of any kind. Fugu Ultra and Fugu Max reason internally but the API never returns the trace.
+
+Depth is tuned per model, not set globally. DeepSeek runs `low` because it emitted roughly eight reasoning tokens per answer token at the default, and Gemini Flash Lite runs `minimal` because it's the cheap seat. Story generation raises the output ceiling but deliberately does **not** reason deeper than a normal turn.
 
 The reasoning is stored in the database with every message — even though it's not visible in the UI. For Claude, Gemini, Grok, Muse Spark, and Mistral, the reasoning trace (a signature, an encrypted blob, or the trace itself) is also replayed on later turns, so a bot keeps its private train of thought across the whole game. The free tier can use the cheaper models (per-model seat caps apply); the paid tier has the full list.
 
