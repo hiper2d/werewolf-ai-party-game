@@ -53,13 +53,23 @@ export async function generateSpeechWithProvider(
     await assertFreeSpendWithinLimit(session.user.email);
 
     const agent = createVoiceAgent(voiceProvider, apiKey);
-    const { audio, costUSD } = await agent.speak({
+    const voiceStyle = options.voiceInstructions || options.voiceStyle;
+    const { audio, costUSD, styleDropped } = await agent.speak({
       text,
       voice: options.voice,
       // A legacy long instruction wins over the short style; each agent turns
       // either into its provider's form of direction.
-      voiceStyle: options.voiceInstructions || options.voiceStyle,
+      voiceStyle,
     });
+    if (styleDropped) {
+      // Gemini safety-blocked the styled line and the agent read it plain
+      logger.warn(`TTS_STYLE_DROPPED: ${voiceProvider} blocked voice style "${voiceStyle}", read without it`, {
+        voiceProvider,
+        voice: options.voice,
+        voiceStyle,
+        gameId: options.gameId,
+      });
+    }
 
     if (costUSD > 0) {
       // One chokepoint: charges the current tier (paid: cost + markup, throwing on an

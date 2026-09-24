@@ -127,7 +127,7 @@ When the game ends — werewolves wiped out, or werewolves outnumbering villager
 
 ## Architecture
 
-No AI frameworks — each vendor has its own agent built on their native SDK. A speaker router built on typesafe.ai's Jev judge model picks which bots reply to each message (the Game Master model takes over when no Jev key is configured), and a voice framework (OpenAI and Gemini TTS) matches voices to characters. Real-time cost tracking per bot, per game, and per player.
+No AI frameworks — each vendor has its own agent built on their native SDK. A speaker router built on typesafe.ai's Jev judge model picks which bots reply to each message (the Game Master model takes over when no Jev key is configured), and a voice framework matches voices to characters (OpenAI: gpt-4o-mini-tts and Whisper; Gemini: 3.8 Flash-Lite TTS and 3.5 Transcribe). Real-time cost tracking per bot, per game, and per player.
 
 ### Stack
 

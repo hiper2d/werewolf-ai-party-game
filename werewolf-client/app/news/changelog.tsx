@@ -13,6 +13,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        id: "gemini-voices-3-8", date: "Sep 2026", tags: ["Models", "Fixes"],
+        title: "Faster, cheaper Gemini voices",
+        body: (<>The Gemini voice set now runs on <strong>Gemini 3.8 Flash-Lite TTS</strong>. A line comes back
+            about <strong>2.5x faster</strong> and costs about <strong>a quarter</strong> of what it did. Voice
+            styles like &ldquo;quietly&rdquo; and &ldquo;softly&rdquo; no longer fail or come out as a whisper.
+            Three Gemini voices were also cast as the wrong gender: <strong>Sadachbia</strong> and
+            <strong> Schedar</strong> are male, <strong>Gacrux</strong> is female. New games cast them
+            correctly.</>),
+        media: null,
+        links: [{label: "Create a game", href: "/games"}],
+    },
+    {
         id: "model-refresh-sep-2026", date: "Sep 2026", tags: ["Models"],
         title: "Claude 5.5 Opus, GPT-6 Sol and Luna, and Grok 4.7",
         body: (<>New models in the picker: <strong>Claude 5.5 Opus</strong>, <strong>GPT-6 Sol</strong>,
