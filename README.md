@@ -23,38 +23,23 @@ AI bots pretend to be humans. They don't know about other AI players. Each has p
 
 Pick any model for the Game Master and for each individual bot. Twelve providers, and every model reasons on every turn unless noted. The bot pickers list the chat models; the last row is the router that decides who speaks next:
 
-| Provider | Model | Reasoning |
-|----------|-------|-----------|
-| **OpenAI** | GPT-6 Astra | `medium` |
-| **OpenAI** | GPT-6 Sol | `medium` |
-| **OpenAI** | GPT-5.6 Terra | `medium` |
-| **OpenAI** | GPT-6 Luna | `medium` |
-| **Anthropic** | Claude Fable 5.1 | `high` |
-| **Anthropic** | Claude 5.5 Opus | `high` |
-| **Anthropic** | Claude 5 Sonnet | `high` |
-| **Anthropic** | Claude 4.5 Haiku | 1,024-token budget |
-| **Google** | Gemini 3.1 Pro Preview | `high` |
-| **Google** | Gemini 3.8 Flash | `medium` |
-| **Google** | Gemini 3.5 Flash Lite | `minimal` |
-| **DeepSeek** | DeepSeek V4.1 Flash | `low` |
-| **DeepSeek** | DeepSeek V4 Pro | `low` |
-| **Mistral** | Mistral Medium 3.5 | `high` |
-| **Mistral** | Mistral 4 Small | `high` |
-| **xAI** | Grok 4.7 | `high` |
-| **Moonshot AI** | Kimi K3 | `high` |
-| **Z.AI** | GLM-5.3 | `high` |
-| **Z.AI** | GLM-5.3 Flash | `high` |
-| **Qwen** | Qwen3.8 Max | 1,024-token budget |
-| **Qwen** | Qwen3.8 Flash | 1,024-token budget |
-| **MiniMax** | MiniMax M3 | no knob |
-| **Meta** | Muse Spark 1.3 | `medium` |
-| **Sakana** | Fugu Ultra | `high` |
-| **Sakana** | Fugu Max | `high` |
-| **typesafe.ai** | Jev (System One) | n/a |
+| Provider | Models |
+|----------|--------|
+| **OpenAI** | GPT-6 Astra, GPT-6 Sol, GPT-5.6 Terra, GPT-6 Luna (`medium`) |
+| **Anthropic** | Claude Fable 5.1, Claude 5.5 Opus, Claude 5 Sonnet (`high`); Claude 4.5 Haiku (1,024-token budget) |
+| **Google** | Gemini 3.1 Pro Preview (`high`); Gemini 3.8 Flash (`medium`); Gemini 3.5 Flash Lite (`minimal`) |
+| **DeepSeek** | DeepSeek V4.1 Flash, DeepSeek V4 Pro (`low`) |
+| **Mistral** | Mistral Medium 3.5, Mistral 4 Small (`high`) |
+| **xAI** | Grok 4.7 (`high`) |
+| **Moonshot AI** | Kimi K3 (`high`) |
+| **Z.AI** | GLM-5.3, GLM-5.3 Flash (`high`) |
+| **Qwen** | Qwen3.8 Max, Qwen3.8 Flash (1,024-token budget) |
+| **MiniMax** | MiniMax M3 |
+| **Meta** | Muse Spark 1.3 (`medium`) |
+| **Sakana** | Fugu Ultra, Fugu Max (`high`; both reason internally, but the API never returns the trace) |
+| **typesafe.ai** | Jev (System One) — not a chat model: a sub-second judge that routes the discussion, picking which bots reply to each message |
 
-Jev is not a chat model: it's a sub-second judge that routes the discussion, picking which bots reply to each message.
-
-**Reading the reasoning column.** Every provider names its levels differently, so the value shown is what we actually send, translated into that provider's own vocabulary — `high` on Claude is not the same depth as `high` on GLM. Every level is set explicitly: we never leave a model on the provider's default, because a default can move without notice. "1,024-token budget" means the provider's knob is a token cap rather than a named level. That applies to Claude Haiku, which is the one Claude model without adaptive thinking and so takes the older `budget_tokens` form, and to Qwen, which accepts named levels but treats them as a coarse alias for a budget — its lowest level is 4,096 tokens, four times the cap we set, and the two settings are mutually exclusive. MiniMax is the only model exposing no control at all. Fugu Ultra and Fugu Max reason internally but the API never returns the trace.
+**Reading the reasoning levels.** The value in parentheses after each model is its reasoning depth. Every provider names its levels differently, so the value shown is what we actually send, translated into that provider's own vocabulary — `high` on Claude is not the same depth as `high` on GLM. Every level is set explicitly: we never leave a model on the provider's default, because a default can move without notice. "1,024-token budget" means the provider's knob is a token cap rather than a named level. That applies to Claude Haiku, which is the one Claude model without adaptive thinking and so takes the older `budget_tokens` form, and to Qwen, which accepts named levels but treats them as a coarse alias for a budget — its lowest level is 4,096 tokens, four times the cap we set, and the two settings are mutually exclusive. MiniMax is the only model exposing no control at all.
 
 Depth is tuned per model, not set globally. DeepSeek runs `low` because it emitted roughly eight reasoning tokens per answer token at the default, and Gemini Flash Lite runs `minimal` because it's the cheap seat. Story generation raises the output ceiling but deliberately does **not** reason deeper than a normal turn.
 
