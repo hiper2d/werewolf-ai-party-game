@@ -21,7 +21,10 @@ interface ReframeModalProps {
 type DragMode = 'move' | 'size' | 'circle' | 'circleSizeX' | 'circleSizeY';
 
 const MONO_LABEL = 'font-mono text-[10px] uppercase tracking-[0.08em]';
-const HANDLE = 'absolute w-[14px] h-[14px] rounded-full bg-white border-2 border-[var(--bg-1)] shadow-[0_1px_4px_rgba(0,0,0,0.6)]';
+// The dots stay small; an invisible ::before ring widens the grab area to
+// ~44px so a finger can catch them on a phone.
+const TOUCH_TARGET = "before:content-[''] before:absolute before:-inset-[15px] before:rounded-full touch-none";
+const HANDLE = `absolute w-[14px] h-[14px] rounded-full bg-white border-2 border-[var(--bg-1)] shadow-[0_1px_4px_rgba(0,0,0,0.6)] ${TOUCH_TARGET}`;
 
 /**
  * Two-stage crop editor over a portrait sheet: where the 3:4 card sits on
@@ -195,7 +198,7 @@ export default function ReframeModal({ name, sheetUrl, framing: framingProp, ini
                                 >
                                     <span
                                         onPointerDown={e => startDrag('size', e)}
-                                        className="absolute right-1 bottom-1 w-4 h-4 rounded-full bg-[var(--accent)] border-2 border-[var(--bg-1)] shadow-[0_1px_4px_rgba(0,0,0,0.6)] cursor-nwse-resize"
+                                        className={`absolute right-1 bottom-1 w-4 h-4 rounded-full bg-[var(--accent)] border-2 border-[var(--bg-1)] shadow-[0_1px_4px_rgba(0,0,0,0.6)] cursor-nwse-resize ${TOUCH_TARGET}`}
                                     />
                                 </div>
                             )}
