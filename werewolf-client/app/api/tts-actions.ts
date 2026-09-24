@@ -13,7 +13,7 @@ import { logger } from "@/app/utils/logger";
  */
 export interface UnifiedTTSOptions {
   voice: string;           // Voice ID from config
-  voiceStyle?: string;     // Style instruction (e.g., "mysteriously", "excitedly")
+  voiceStyle?: string;     // Voice direction (e.g., "sly and playful, a smile in the voice")
   voiceInstructions?: string; // Legacy: detailed voice instructions for OpenAI
   gameId?: string;
 }

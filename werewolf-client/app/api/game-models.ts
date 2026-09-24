@@ -107,7 +107,7 @@ export interface BotPreview {
     playerAiType: string;
     gender: 'male' | 'female';
     voice: string;
-    voiceStyle?: string; // Style instruction like "mysteriously", "excitedly"
+    voiceStyle?: string; // Voice direction, e.g. "sly and playful, a smile in the voice"
     voiceInstructions?: string; // Legacy: detailed voice instructions (OpenAI format)
     playStyle: string;
     visualDescription?: string; // Appearance only — the portrait/illustration reference (absent on legacy games)
@@ -239,7 +239,7 @@ export interface Bot {
     aiType: string;
     gender: 'male' | 'female';
     voice: string;
-    voiceStyle?: string; // Style instruction like "mysteriously", "excitedly"
+    voiceStyle?: string; // Voice direction, e.g. "sly and playful, a smile in the voice"
     voiceInstructions?: string; // Legacy: detailed voice instructions (OpenAI format)
     playStyle: string;
     visualDescription?: string; // Appearance only — the portrait/illustration reference (absent on legacy games)

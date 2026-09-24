@@ -163,7 +163,7 @@ export default function CastList({ bots, humanName, botPortrait, humanPortrait, 
                                                     value={player.voiceStyle}
                                                     onChange={e => onPlayerChange(index, 'voiceStyle', e.target.value)}
                                                     maxLength={INPUT_LIMITS.voiceStyle}
-                                                    placeholder="e.g., mysteriously, excitedly"
+                                                    placeholder="e.g., sly and playful, a smile in the voice"
                                                 />
                                             </div>
                                         )}

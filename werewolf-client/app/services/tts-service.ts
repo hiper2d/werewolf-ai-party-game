@@ -4,7 +4,7 @@ import { getDefaultVoiceProvider } from "@/app/ai/voice-config";
 
 export interface TTSOptions {
   voice: string;                  // Voice ID (e.g., "echo", "Kore")
-  voiceStyle?: string;            // Style instruction (e.g., "mysteriously", "excitedly")
+  voiceStyle?: string;            // Voice direction (e.g., "sly and playful, a smile in the voice")
   voiceProvider?: VoiceProvider;  // TTS provider (defaults to user's preference)
   gameId?: string;
   // Called when the <audio> element fails *during* playback (autoplay policy,

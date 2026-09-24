@@ -1087,7 +1087,7 @@ export default function CreateNewGamePage() {
                                             value={gameData.gameMasterVoiceStyle}
                                             onChange={(e) => setGameData({ ...gameData, gameMasterVoiceStyle: e.target.value })}
                                             maxLength={INPUT_LIMITS.voiceStyle}
-                                            placeholder="e.g., authoritatively, dramatically"
+                                            placeholder="e.g., grave storyteller, low and unhurried"
                                         />
                                     </div>
                                 )}

@@ -22,7 +22,7 @@ export const INPUT_LIMITS = {
     gameTitle: 80,
     /** "Instructions for the Game Master" — steers story generation. */
     gmInstructions: 1500,
-    /** Voice direction ("mysteriously, excitedly"). Pasted into the TTS call. */
+    /** Voice direction ("sly and playful, a smile in the voice"). Pasted into the TTS call. */
     voiceStyle: 300,
     /** A character's backstory. Sits in that bot's system prompt for the whole game. */
     botStory: 1500,

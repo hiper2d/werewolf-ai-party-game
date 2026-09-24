@@ -136,7 +136,7 @@ export default function CharacterVoicePanel({ game, name, onSave, onSpeakSample,
                     type="text"
                     value={draft.voiceStyle}
                     onChange={e => setDraft(d => ({ ...d, voiceStyle: e.target.value }))}
-                    placeholder="mysteriously · or a longer direction: slow, gravelly, like an old sailor"
+                    placeholder="e.g., slow and gravelly, like an old sailor"
                     maxLength={INPUT_LIMITS.voiceStyle}
                     className="w-full px-2.5 py-1.5 text-[13px] rounded-[var(--radius-md)] bg-[var(--bg-1)] border border-[var(--line-2)] text-[var(--fg-0)] placeholder:text-[var(--fg-3)] focus:outline-none focus:border-[var(--accent-line)]"
                 />
