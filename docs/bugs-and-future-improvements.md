@@ -57,15 +57,16 @@
   ("Respond with ONLY a valid JSON object...") plus the lenient parser. Flash with a 1024-token
   thinking budget is the weakest follower of that instruction, and the vote prompt is the most
   roleplay-heavy thing it answers, so it slips into character.
-  **Options, cheapest first:**
-  - Accept a vote with a valid `who` and a missing `why` instead of failing it (show the vote
-    with no reason, or a neutral "no reason given"). That would have saved the second failure.
-    It can't save the first one: guessing `who` from free prose isn't safe.
-  - Try `enable_thinking: false` + `response_format: json_object` (or `json_schema` if DashScope
-    supports it now) for Flash on structured calls only. Check the live docs first (`api-docs`
-    skill); this trades reasoning quality for format compliance on the cheapest model.
-  - If it keeps recurring, drop Qwen Flash from the free-tier vote path or from the free tier
-    altogether. Measure first: this is one occurrence.
+  **Shipped 2026-09-24 in `@hiper2d/ai-agents` 0.15.0:** the belief above was wrong for the models
+  we run. QwenCloud's structured-output docs list qwen3.8-max/flash (and the 3.7 models) as
+  supporting strict `json_schema` WITH thinking on, so `QwenAgent` now sends
+  `response_format: {type: 'json_schema', strict: true}` on every structured call. That rules out
+  both failures by construction (prose instead of JSON, a missing required field), so the
+  "accept a vote without `why`" workaround isn't needed. Verified live: raw calls 12/12, all 8
+  game schemas on both models 16/16, a new `qwen-agent.live.test.ts`, and the app's production
+  day-2 vote and 15-character story on both models, reasoning returned every time and no slowdown
+  (Flash story 122 s vs 127 s on 0.14.1). Tests can't prove a 2-in-55 failure is gone: **watch
+  the logs** for `Failed to parse JSON` / Zod errors from `qwen3.8-*` over the next week or two.
   Same rule as elsewhere: no automatic retries, the failure surfaces and the player retries.
   Also note the concurrent second Qwen call is the turn-claim item above in a new form: it was a
   full billed request fired while another call for the same bot was already running.
