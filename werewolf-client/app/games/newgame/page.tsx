@@ -21,7 +21,7 @@ import {FREE_TIER_UNLIMITED, getCandidateModelsForTier, getModelPickerOptions, g
 import AIModelSelect from '@/app/components/AIModelSelect';
 import ModelSelectDropdown from '@/app/components/ModelSelectDropdown';
 import SelectDropdown from '@/app/components/SelectDropdown';
-import {ART_STYLE_MAX_LENGTH} from "@/app/utils/art-style";
+import {ART_STYLE_MAX_LENGTH, sanitizeArtStyle} from "@/app/utils/art-style";
 import {INPUT_LIMITS} from "@/app/utils/input-limits";
 import {ttsService} from "@/app/services/tts-service";
 import {getVoiceConfig, getDefaultVoiceProvider, SUPPORTED_VOICE_PROVIDERS, VOICE_PROVIDER_DESCRIPTIONS, VOICE_PROVIDER_DISPLAY_NAMES, VoiceProvider} from "@/app/ai/voice-config";
@@ -299,11 +299,15 @@ export default function CreateNewGamePage() {
             { key: AVATAR_GM_KEY, name: 'Game Master', kind: 'gm' as const },
         ];
     }, [gameData]);
-    const draftMatchesCast = useMemo(() => {
+    const draftMatchesNames = useMemo(() => {
         if (!draft) return false;
         const a = [...draft.keys].sort(), b = cast.map(c => c.key).sort();
         return a.length === b.length && a.every((k, i) => k === b[i]);
     }, [draft, cast]);
+    // Compared sanitized, the way the server records it, so stray spaces in
+    // the field don't count as a new style.
+    const draftMatchesStyle = !!draft && (draft.artStyle ?? '') === (sanitizeArtStyle(artStyle) ?? '');
+    const draftMatchesCast = draftMatchesNames && draftMatchesStyle;
     const draftReadyForCast = draft?.status === 'ready' && draftMatchesCast;
 
     // Poll the draft while the server draws it. The draw runs off the request
@@ -1098,7 +1102,8 @@ export default function CreateNewGamePage() {
                         <IllustrationsPanel
                             draft={draft}
                             cast={cast}
-                            castChanged={!!draft && draft.status !== 'generating' && !draftMatchesCast}
+                            castChanged={!!draft && draft.status !== 'generating' && !draftMatchesNames}
+                            styleChanged={!!draft && draft.status !== 'generating' && !draftMatchesStyle}
                             busy={draftBusy}
                             error={draftError}
                             onGenerate={handleGenerateIllustrations}

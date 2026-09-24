@@ -713,7 +713,7 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
         // mismatch or copy failure falls back to the ordinary 'pending' flow.
         const gameKeys = portraitKeysFor({theme: gamePreview.theme, description: gamePreview.description, humanPlayerName, bots});
         const draftAdoption = tier === USER_TIERS.PAID
-            ? await findAdoptableDraft(ownerEmail, gamePreview.avatarDraftVersion, gameKeys).catch(error => {
+            ? await findAdoptableDraft(ownerEmail, gamePreview.avatarDraftVersion, gameKeys, artStyle).catch(error => {
                 logger.warn(`Illustration draft lookup failed for ${customGameId}`, {error: error.message});
                 return null;
             })
@@ -809,7 +809,7 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
                     logger.error(`Avatar generation kickoff failed for ${customGameId}`, { error: error.message })
                 ));
             } else if (awaitDraft) {
-                after(() => adoptDraftWhenReady(customGameId, ownerEmail, gameKeys).catch(error =>
+                after(() => adoptDraftWhenReady(customGameId, ownerEmail, gameKeys, artStyle).catch(error =>
                     logger.error(`Illustration draft follow-up failed for ${customGameId}`, { error: error.message })
                 ));
             } else if (draftAdoption) {

@@ -147,6 +147,10 @@ export interface AvatarDraft {
     // GM key. createGame adopts the draft only when the game's keys match
     // exactly — a renamed character would otherwise get a stranger's face.
     keys: string[];
+    // The sanitized art style the set was drawn in (absent = no style given).
+    // Part of the match like the keys: a set drawn in another style is not
+    // attached to a game that will draw everything else in the new one.
+    artStyle?: string;
     avatarVariants: Record<string, AvatarVariantEntry>;
     avatarVersions: Record<string, number>;
     hasScene: boolean;
@@ -161,7 +165,7 @@ export interface AvatarDraft {
 }
 
 /** What the preview page sees of its draft (plain, serializable). */
-export type AvatarDraftState = Pick<AvatarDraft, 'status' | 'version' | 'keys' | 'avatarVariants' | 'avatarVersions' | 'hasScene' | 'stages' | 'error'>;
+export type AvatarDraftState = Pick<AvatarDraft, 'status' | 'version' | 'keys' | 'artStyle' | 'avatarVariants' | 'avatarVersions' | 'hasScene' | 'stages' | 'error'>;
 
 /** What the preview page sends to draw a set: the same character facts the
  * in-game generator reads off a Game. Names are sanitized server-side. */

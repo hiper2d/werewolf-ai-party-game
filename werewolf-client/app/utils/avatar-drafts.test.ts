@@ -140,6 +140,24 @@ describe('startDraftGeneration', () => {
         expect(setCalls[0]).toMatchObject({ avatarVariants: {}, totalCostUSD: 0, hasScene: false });
     });
 
+    it('starts over when the art style changed, and records the new one', async () => {
+        draftDoc = readyDraft({ artStyle: 'gritty noir comic' });
+        const { subject: styled, keys: styledKeys } = normalizeDraftSpec({ ...spec(), artStyle: '  muted   watercolor ' });
+        const claim = await startDraftGeneration(OWNER, styled, styledKeys);
+        expect(claim.append).toBe(false);
+        expect(setCalls[0]).toMatchObject({ artStyle: 'muted watercolor', avatarVariants: {}, totalCostUSD: 0 });
+    });
+
+    it('starts over when a style was added to an unstyled set, and writes no field when there is none', async () => {
+        draftDoc = readyDraft();
+        const { subject: styled } = normalizeDraftSpec({ ...spec(), artStyle: 'noir' });
+        expect((await startDraftGeneration(OWNER, styled, keys)).append).toBe(false);
+        setCalls.length = 0;
+        draftDoc = readyDraft({ artStyle: 'noir' });
+        expect((await startDraftGeneration(OWNER, subject, keys)).append).toBe(false);
+        expect(setCalls[0]).not.toHaveProperty('artStyle');
+    });
+
     it('does not claim while a draw is in flight — the double-click and the second tab', async () => {
         draftDoc = readyDraft({ status: 'generating', generatingAt: Date.now() - 10_000 });
         const claim = await startDraftGeneration(OWNER, subject, keys);
@@ -177,37 +195,44 @@ describe('findAdoptableDraft', () => {
 
     it('adopts a ready draft whose version the client saw', async () => {
         draftDoc = readyDraft();
-        const adoption = await findAdoptableDraft(OWNER, 1700000000000, gameKeys);
+        const adoption = await findAdoptableDraft(OWNER, 1700000000000, gameKeys, undefined);
         expect(adoption?.mode).toBe('ready');
     });
 
     it('adopts a ready draft for a client that left while it was drawing', async () => {
         draftDoc = readyDraft();
-        const adoption = await findAdoptableDraft(OWNER, AVATAR_DRAFT_IN_PROGRESS, gameKeys);
+        const adoption = await findAdoptableDraft(OWNER, AVATAR_DRAFT_IN_PROGRESS, gameKeys, undefined);
         expect(adoption?.mode).toBe('ready');
     });
 
     it('refuses a set redrawn in another tab (version mismatch)', async () => {
         draftDoc = readyDraft();
-        expect(await findAdoptableDraft(OWNER, 1600000000000, gameKeys)).toBeNull();
+        expect(await findAdoptableDraft(OWNER, 1600000000000, gameKeys, undefined)).toBeNull();
     });
 
     it('refuses a set drawn for a different cast — a renamed character must not wear a stranger\'s face', async () => {
         draftDoc = readyDraft();
-        expect(await findAdoptableDraft(OWNER, 1700000000000, ['Mina', 'Jon', 'Bob', AVATAR_GM_KEY])).toBeNull();
+        expect(await findAdoptableDraft(OWNER, 1700000000000, ['Mina', 'Jon', 'Bob', AVATAR_GM_KEY], undefined)).toBeNull();
+    });
+
+    it('refuses a set drawn in a different art style — the rest of the game draws in the new one', async () => {
+        draftDoc = readyDraft({ artStyle: 'gritty noir comic' });
+        expect(await findAdoptableDraft(OWNER, 1700000000000, gameKeys, 'muted watercolor')).toBeNull();
+        expect(await findAdoptableDraft(OWNER, 1700000000000, gameKeys, undefined)).toBeNull();
+        expect((await findAdoptableDraft(OWNER, 1700000000000, gameKeys, 'gritty noir comic'))?.mode).toBe('ready');
     });
 
     it('waits on a draw in flight, but not on one that died', async () => {
         draftDoc = readyDraft({ status: 'generating', generatingAt: Date.now() - 5_000 });
-        expect((await findAdoptableDraft(OWNER, AVATAR_DRAFT_IN_PROGRESS, gameKeys))?.mode).toBe('in-progress');
+        expect((await findAdoptableDraft(OWNER, AVATAR_DRAFT_IN_PROGRESS, gameKeys, undefined))?.mode).toBe('in-progress');
         draftDoc = readyDraft({ status: 'generating', generatingAt: Date.now() - STALE_REGEN_MS - 1 });
-        expect(await findAdoptableDraft(OWNER, AVATAR_DRAFT_IN_PROGRESS, gameKeys)).toBeNull();
+        expect(await findAdoptableDraft(OWNER, AVATAR_DRAFT_IN_PROGRESS, gameKeys, undefined)).toBeNull();
     });
 
     it('ignores drafts when the client did not ask for one, and other users\' drafts', async () => {
         draftDoc = readyDraft();
-        expect(await findAdoptableDraft(OWNER, undefined, gameKeys)).toBeNull();
+        expect(await findAdoptableDraft(OWNER, undefined, gameKeys, undefined)).toBeNull();
         draftDoc = readyDraft({ ownerEmail: 'someone@else.com' });
-        expect(await findAdoptableDraft(OWNER, 1700000000000, gameKeys)).toBeNull();
+        expect(await findAdoptableDraft(OWNER, 1700000000000, gameKeys, undefined)).toBeNull();
     });
 });

@@ -67,6 +67,12 @@ export function sameKeySet(a: string[], b: string[]): boolean {
     return sa.every((k, i) => k === sb[i]);
 }
 
+/** Whether a draft was drawn for this cast in this art style. Both sides are
+ * sanitized styles; absent and empty both mean "no style given". */
+export function draftFits(draft: Pick<AvatarDraft, 'keys' | 'artStyle'>, keys: string[], artStyle: string | undefined): boolean {
+    return sameKeySet(draft.keys ?? [], keys) && (draft.artStyle ?? '') === (artStyle ?? '');
+}
+
 /** Server-side gate for what the preview page sends: names take the same
  * canonical form createGame enforces (that is what makes the draft's keys
  * comparable to the game's), lengths are capped, and duplicates are refused
@@ -107,6 +113,7 @@ function stateFrom(draft: AvatarDraft): AvatarDraftState {
         status: stale ? 'failed' : draft.status,
         version: draft.version,
         keys: draft.keys ?? [],
+        ...(draft.artStyle ? {artStyle: draft.artStyle} : {}),
         avatarVariants: draft.avatarVariants ?? {},
         avatarVersions: draft.avatarVersions ?? {},
         hasScene: !!draft.hasScene,
@@ -124,8 +131,9 @@ export async function getDraftState(userEmail: string): Promise<AvatarDraftState
 export interface DraftClaim {
     claimed: boolean;
     state: AvatarDraftState;
-    // A redraw of the same cast appends candidates (old faces stay switchable
-    // in the game); a different cast starts a fresh set.
+    // A redraw of the same cast in the same style appends candidates (old
+    // faces stay switchable in the game); a different cast or style starts a
+    // fresh set.
     append: boolean;
     existingVariants: AvatarVariantMap;
     existingHasScene: boolean;
@@ -144,12 +152,14 @@ export async function startDraftGeneration(userEmail: string, subject: AvatarSub
         if (existing && existing.status === 'generating' && existing.generatingAt && now - existing.generatingAt < STALE_REGEN_MS) {
             return {claimed: false, state: stateFrom(existing), append: false, existingVariants: {}, existingHasScene: false};
         }
-        const append = !!existing && existing.status === 'ready' && sameKeySet(existing.keys ?? [], keys);
+        const append = !!existing && existing.status === 'ready' && draftFits(existing, keys, subject.artStyle);
         const draft: AvatarDraft = {
             ownerEmail: userEmail,
             status: 'generating',
             version: append ? existing!.version : AVATAR_DRAFT_IN_PROGRESS,
             keys,
+            // Firestore rejects undefined; no style = no field.
+            ...(subject.artStyle ? {artStyle: subject.artStyle} : {}),
             avatarVariants: append ? existing!.avatarVariants : {},
             avatarVersions: append ? existing!.avatarVersions : {},
             hasScene: append ? existing!.hasScene : false,
@@ -260,15 +270,17 @@ export interface DraftAdoption {
  * AVATAR_DRAFT_IN_PROGRESS when the client left while the set was still
  * being drawn; that adopts whatever lands, as long as the cast matches.
  */
-export async function findAdoptableDraft(userEmail: string, requestedVersion: number | undefined, gameKeys: string[]): Promise<DraftAdoption | null> {
+export async function findAdoptableDraft(userEmail: string, requestedVersion: number | undefined, gameKeys: string[], artStyle: string | undefined): Promise<DraftAdoption | null> {
     if (requestedVersion === undefined || requestedVersion === null) return null;
     const ref = draftRefFor(userEmail);
     const snap = await ref.get();
     if (!snap.exists) return null;
     const draft = snap.data() as AvatarDraft;
     if (draft.ownerEmail !== userEmail) return null;
-    if (!sameKeySet(draft.keys ?? [], gameKeys)) {
-        logger.warn(`Illustration draft skipped: cast changed since it was drawn`, {draft: ref.id, draftKeys: draft.keys, gameKeys});
+    if (!draftFits(draft, gameKeys, artStyle)) {
+        logger.warn(`Illustration draft skipped: cast or art style changed since it was drawn`, {
+            draft: ref.id, draftKeys: draft.keys, gameKeys, draftArtStyle: draft.artStyle ?? null, artStyle: artStyle ?? null,
+        });
         return null;
     }
     if (draft.status === 'ready') {
@@ -321,7 +333,7 @@ export async function copyDraftIntoGame(draftRef: firestore.DocumentReference, g
  * illustrations and gets them either way. Runs off the request, like the
  * creation-time kickoff.
  */
-export async function adoptDraftWhenReady(gameId: string, userEmail: string, gameKeys: string[]): Promise<void> {
+export async function adoptDraftWhenReady(gameId: string, userEmail: string, gameKeys: string[], artStyle: string | undefined): Promise<void> {
     if (!db) throw new Error('Firestore is not initialized');
     const gameRef = db.collection('games').doc(gameId);
     const draftRef = draftRefFor(userEmail);
@@ -331,7 +343,7 @@ export async function adoptDraftWhenReady(gameId: string, userEmail: string, gam
         await new Promise(resolve => setTimeout(resolve, 3000));
         const snap = await draftRef.get();
         const draft = snap.exists ? (snap.data() as AvatarDraft) : null;
-        if (!draft || draft.ownerEmail !== userEmail || !sameKeySet(draft.keys ?? [], gameKeys)) break;
+        if (!draft || draft.ownerEmail !== userEmail || !draftFits(draft, gameKeys, artStyle)) break;
         if (draft.status === 'ready') {
             try {
                 const adopted = await copyDraftIntoGame(draftRef, gameRef);

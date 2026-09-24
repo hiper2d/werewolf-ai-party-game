@@ -20,6 +20,8 @@ interface IllustrationsPanelProps {
     // The set was drawn for different names than the preview has now; it
     // won't be attached to the game unless redrawn.
     castChanged: boolean;
+    // Same, for the Art style field: edited since the set was drawn.
+    styleChanged: boolean;
     // A request is in flight (click → claim). Distinct from draft.status ===
     // 'generating', which is the server-side draw.
     busy: boolean;
@@ -92,7 +94,7 @@ const Spinner = ({ size = 16 }: { size?: number }) => (
  * set lives in the user's illustration draft until createGame adopts it.
  * @category Game
  */
-export default function IllustrationsPanel({ draft, cast, castChanged, busy, error, onGenerate, locked = false, upgradeHref = '/profile', imageUrlFn, onPortraitClick }: IllustrationsPanelProps) {
+export default function IllustrationsPanel({ draft, cast, castChanged, styleChanged, busy, error, onGenerate, locked = false, upgradeHref = '/profile', imageUrlFn, onPortraitClick }: IllustrationsPanelProps) {
     const [sceneFailed, setSceneFailed] = useState(false);
     const imgUrl = (key: string) => imageUrlFn ? imageUrlFn(key) : draftImageUrl(draft!, key);
     const drawing = draft?.status === 'generating';
@@ -262,11 +264,11 @@ export default function IllustrationsPanel({ draft, cast, castChanged, busy, err
                             </div>
                         </div>
                         <p className="m-0 text-[12px] leading-[1.5] text-[var(--fg-3)]">
-                            All portraits come from one drawn sheet &mdash; click any of them to move its crop frame. Redrawing keeps the old set, and every character can be switched back on their card.
+                            All portraits come from one drawn sheet &mdash; click any of them to move its crop frame. Redrawing in the same style keeps the old set, and every character can be switched back on their card.
                         </p>
-                        {castChanged && (
+                        {(castChanged || styleChanged) && (
                             <p className="m-0 text-[12px] leading-[1.5] text-[var(--fg-2)]">
-                                Names changed since these were drawn. Redraw to match the new cast &mdash; otherwise the game draws a fresh set when it starts.
+                                {castChanged && styleChanged ? 'Names and art style changed' : castChanged ? 'Names changed' : 'Art style changed'} since these were drawn. Redraw to match &mdash; otherwise the game draws a fresh set when it starts.
                             </p>
                         )}
                         {error && <p className="m-0 text-[12px] text-[var(--danger)]">{error}</p>}
