@@ -22,7 +22,7 @@ export const BotAnswerZodSchema = z.object({
 export const GameCastingZodSchema = z.object({
   scene: z.string().describe("The vivid scene description (2-3 sentences)"),
   gameMasterVoice: z.string().describe("Voice ID for the Game Master (from available voices)"),
-  gameMasterVoiceStyle: z.string().describe("Game Master voice direction, one phrase of ~4-12 words (e.g., 'grave campfire storyteller, low and unhurried')"),
+  gameMasterVoiceStyle: z.string().describe("Game Master voice direction, one vivid phrase of ~8-20 words: narrator persona, texture, accent, mood, pace"),
   cast: z.array(z.object({
     name: z.string().describe("Single-word unique name (ASCII letters and digits only)"),
     gender: z.string().describe("male or female")
@@ -36,7 +36,7 @@ export const CharacterSheetBatchZodSchema = z.object({
     story: z.string().describe("3-5 sentence character background"),
     playStyle: z.string().describe("The playstyle identifier for this character (e.g., aggressive_provoker, protective_team_player, etc.)"),
     voice: z.string().describe("Voice ID for this character (from available voices, matching character gender)"),
-    voiceStyle: z.string().describe("Voice direction, one phrase of ~4-12 words: texture, attitude, pace (e.g., 'sly and playful, a smile in the voice')"),
+    voiceStyle: z.string().describe("Voice direction, one vivid phrase of ~8-20 words: age, texture, accent, pace, emotion, a vocal habit"),
     visualDescription: z.string().describe("1-2 sentences of physical appearance only: face, hair, build, clothing, one distinguishing detail")
   })).describe("One character sheet per name in the batch")
 });

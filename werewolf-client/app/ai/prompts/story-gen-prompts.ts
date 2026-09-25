@@ -102,7 +102,7 @@ You are an AI agent casting a chat-based version of the party game Werewolf: you
 
   <Task3>
     <GameMasterVoice>
-      Select the Game Master's voice from <AvailableVoices>: pick one that is authoritative and informative, and write a short voice direction (one phrase, about 4-12 words) describing HOW the Game Master narrates: voice texture, mood and pace, fitted to the theme (e.g., "grave campfire storyteller, low and unhurried, deliberate pauses", "crisp newsreel announcer, brisk and ominous").
+      Select the Game Master's voice from <AvailableVoices>: pick one that is authoritative and informative, and write a vivid voice direction (one phrase, about 8-20 words) casting the Game Master as a narrator OF THIS WORLD: a persona, texture, accent or period flavour, mood and pace (e.g., "weathered old sea-dog spinning a yarn, gravelly West Country burr, slow and ominous, relishing every dread", "1940s newsreel announcer, crisp mid-Atlantic diction, brisk and breathless with doom").
     </GameMasterVoice>
   </Task3>
 </Tasks>
@@ -113,7 +113,7 @@ You are an AI agent casting a chat-based version of the party game Werewolf: you
   interface GameCasting {
     scene: string;                // The vivid scene description (2-3 sentences)
     gameMasterVoice: string;      // Voice ID for Game Master (from available voices)
-    gameMasterVoiceStyle: string; // Voice direction, one phrase of ~4-12 words
+    gameMasterVoiceStyle: string; // Voice direction, one vivid phrase of ~8-20 words
     cast: Array<{
       name: string;               // Single-word unique name, ASCII letters and digits only
       gender: string;             // male or female
@@ -124,7 +124,7 @@ You are an AI agent casting a chat-based version of the party game Werewolf: you
   {
     "scene": "In the heart of a bustling space station...",
     "gameMasterVoice": "echo",
-    "gameMasterVoiceStyle": "measured station announcer, cool and clipped, a hint of dread",
+    "gameMasterVoiceStyle": "cold station AI announcer, precise clipped diction, calm and faintly amused by the danger",
     "cast": [
       { "name": "Zenith", "gender": "male" },
       { "name": "Mira", "gender": "female" }
@@ -160,7 +160,7 @@ Expected response format:
 {
   "scene": string,                // Vivid scene description (2-3 sentences)
   "gameMasterVoice": string,      // Voice ID for Game Master
-  "gameMasterVoiceStyle": string, // Voice direction, one phrase of ~4-12 words
+  "gameMasterVoiceStyle": string, // Voice direction, one vivid phrase of ~8-20 words
   "cast": Array<{
     "name": string,               // Single-word unique name, ASCII letters and digits only
     "gender": string              // male or female
@@ -201,14 +201,21 @@ You are an AI agent writing character sheets for a chat-based version of the par
 
   - <Voice>voice</Voice>: a voice ID from <AvailableVoices> whose gender matches the character's gender (male character = male voice, female character = female voice) and whose description complements the personality. Prefer a different voice for each character in the batch.
 
-  - <VoiceStyle>voiceStyle</VoiceStyle>: a voice direction for the speech model, one phrase of about 4-12 words describing HOW this character sounds in every line: voice texture, attitude and pace. Draw on the character's age, background and personality, and match the play style. Examples of the register (write your own, don't copy):
-    * Aggressive Provoker: "sharp and accusing, fast clipped sentences"
-    * Protective Team Player: "warm and steady, unhurried, reassuring"
-    * Trickster: "sly and playful, a smile in the voice"
-    * Rule Breaker: "defiant drawl, skeptical, leaning on key words"
-    * Modest Mouse: "hesitant and quiet, short pauses between thoughts"
-    * Normal: "relaxed and conversational, even pace"
-    Rules: a single phrase, not sentences or a paragraph (long directions make the voice drift); describe the delivery, never the content; an accent only when the character clearly has one.
+  - <VoiceStyle>voiceStyle</VoiceStyle>: a voice direction for the speech model — a performance, not a neutral read. One phrase of about 8-20 words describing HOW this character sounds in every line. Be bold and specific; combine several of:
+    * apparent age ("creaky seventy-year-old", "breathless teenager")
+    * texture (raspy, growling, gravelly, breathy, nasal, smoky, booming, thin and reedy, wheezing)
+    * accent or dialect that fits the theme and the character's origin (Cockney, Scottish burr, Southern drawl, thick Russian, posh Oxbridge, Caribbean lilt, Brooklyn)
+    * pace and rhythm (rapid-fire, drawling, clipped, halting, sing-song)
+    * emotion and attitude (menacing, gleeful, weary, paranoid, smug, grieving, barely contained fury)
+    * a vocal habit (chuckles between words, sighs heavily, sneers, whispers the threats, voice cracks under pressure)
+    Examples of the register (write your own, don't copy):
+    * Aggressive Provoker: "gravel-voiced dockside bruiser, thick Glaswegian burr, fast and snarling, spits every accusation"
+    * Protective Team Player: "warm grandmotherly Southern drawl, slow and soothing, a chuckle hiding real worry"
+    * Trickster: "sly Cockney street kid, quick sing-song patter, giggles mid-sentence, delighted by chaos"
+    * Rule Breaker: "smoky, bored aristocrat, posh drawl dripping contempt, sighs before every answer"
+    * Modest Mouse: "timid young clerk, thin reedy voice, halting, stammers and trails off when accused"
+    * Normal: "tired middle-aged sailor, low weathered rasp, plain-spoken, unhurried"
+    Rules: one phrase, never sentences or a paragraph (long directions make the voice drift); describe the delivery, never the content; make every character in the batch sound clearly different from the others — vary age, accent, texture and speed across the cast.
 
   - <VisualDescription>visualDescription</VisualDescription> (1-2 sentences) used as the reference for drawing this character's portrait:
     * **Appearance only**: apparent age, face, hair, build, skin, clothing and one distinguishing detail (a scar, a brooch, cracked glasses, a burn on the sleeve)
@@ -226,7 +233,7 @@ You are an AI agent writing character sheets for a chat-based version of the par
       story: string;             // 3-5 sentence character background
       playStyle: string;         // Playstyle identifier (e.g., aggressive_provoker, protective_team_player, etc.)
       voice: string;             // Voice ID (from available voices, matching character gender)
-      voiceStyle: string;        // Voice direction, one phrase of ~4-12 words
+      voiceStyle: string;        // Voice direction, one vivid phrase of ~8-20 words
       visualDescription: string; // 1-2 sentences, appearance only
     }>;
   }
@@ -239,7 +246,7 @@ You are an AI agent writing character sheets for a chat-based version of the par
         "story": "A veteran maintenance engineer with a mysterious past...",
         "playStyle": "modest_mouse",
         "voice": "onyx",
-        "voiceStyle": "tired and gravelly, slow, weighing every word",
+        "voiceStyle": "grizzled fifty-year-old mechanic, low smoker's rasp, slow and suspicious, grunts before answering",
         "visualDescription": "A wiry man in his fifties with close-cropped grey hair and a deeply lined face, wearing a grease-stained orange jumpsuit; a faded burn scar runs along his left jaw."
       }
       // ... one entry per character in the batch
