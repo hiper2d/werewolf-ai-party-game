@@ -27,7 +27,6 @@ import CharacterVoicePanel, { VoiceSelection } from './CharacterVoicePanel';
  * steals the stage — it just re-enables Next.
  */
 
-const AUTO_VOICE_KEY = 'cinematicAutoVoice';
 const ILLUSTRATION_ALT = 'A scene from the story';
 // The scene's shortest window of recent lines (see `turns`).
 const MIN_SCENE_LINES = 10;
@@ -119,6 +118,10 @@ interface CinematicModeProps {
     // Stops the voice (playing or still loading). Moving to another line calls
     // it so the old line never talks over the new one.
     onStopSpeaking?: () => void;
+    // The chat's auto-play setting (one setting for chat and scene): on, each
+    // line the scene lands on is read aloud; off, only the play button reads.
+    autoPlay?: boolean;
+    onToggleAutoPlay?: () => void;
     // The game is blocked on the player (their vote, their night action). The
     // scene says so and turns its primary button into the way out, because the
     // modal that asks for it opens behind this overlay.
@@ -135,7 +138,7 @@ interface CinematicModeProps {
     onStopSample?: () => void;
 }
 
-export default function CinematicMode({ game, messages, onClose, startMessageId, onSpeak, voiceMuted, onToggleVoiceMuted, onStopSpeaking, pendingHumanAction, speakingMessageId, loadingMessageId, isOwner = false, onGameChange, onUpdateVoice, onSpeakSample, onStopSample }: CinematicModeProps) {
+export default function CinematicMode({ game, messages, onClose, startMessageId, onSpeak, voiceMuted, onToggleVoiceMuted, onStopSpeaking, autoPlay = false, onToggleAutoPlay, pendingHumanAction, speakingMessageId, loadingMessageId, isOwner = false, onGameChange, onUpdateVoice, onSpeakSample, onStopSample }: CinematicModeProps) {
     // Every line carries the same picture it carries in chat: the day's opening
     // GM message its establishing shot, each "night falls" the night scene, and
     // a GM illustration the drawing it was posted with. An illustration is an
@@ -202,23 +205,6 @@ export default function CinematicMode({ game, messages, onClose, startMessageId,
     const [typedCount, setTypedCount] = useState(0);
     const typingTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
-    // Auto-voice: read each line aloud as the scene reaches it. On by default since
-    // 2026-09-20 — cinematic mode is a playback, and the click that opened it is the
-    // user gesture browsers want before audio starts. A viewer who switches it off
-    // stays off: the choice is remembered per browser (the chat's mute button still
-    // silences everything regardless).
-    // Read synchronously on mount (the overlay only renders client-side, after a
-    // click or a live message): loading it in an effect left the first render
-    // with auto-voice ON, and the auto-voice effect below read — and paid for —
-    // the opening line before the stored "off" arrived.
-    const [autoVoice, setAutoVoice] = useState(() => {
-        try { return localStorage.getItem(AUTO_VOICE_KEY) !== '0'; } catch { return true; }
-    });
-    const toggleAutoVoice = () => {
-        const next = !autoVoice;
-        setAutoVoice(next);
-        try { localStorage.setItem(AUTO_VOICE_KEY, next ? '1' : '0'); } catch { /* ignore */ }
-    };
     // A line that slid out of the window (10+ arrivals while parked) resolves
     // to the oldest line still shown.
     const turnIndex = Math.max(0, turns.findIndex(t => t.key === turnKey));
@@ -298,10 +284,10 @@ export default function CinematicMode({ game, messages, onClose, startMessageId,
     // (the browser cache replays it without a new call), the player's own lines.
     // Silence is what auto-read off or mute is for; then nothing is generated.
     useEffect(() => {
-        if (!autoVoice || !onSpeak || !turn || voiceMuted) return;
+        if (!autoPlay || !onSpeak || !turn || voiceMuted) return;
         onSpeak(turn.key, turn.text, { silent: true });
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [turn?.key, autoVoice, voiceMuted]);
+    }, [turn?.key, autoPlay, voiceMuted]);
 
     const goTo = useCallback((index: number) => {
         const target = Math.max(0, Math.min(index, turns.length - 1));
@@ -410,7 +396,7 @@ export default function CinematicMode({ game, messages, onClose, startMessageId,
             {onSpeak && (
                 <div
                     className={`fixed top-4 right-[68px] z-30 h-[42px] flex items-center gap-2 rounded-full border pl-2.5 pr-3 transition-colors ${
-                        autoVoice && !voiceMuted ? 'border-[var(--accent-line)]' : 'border-[var(--line-3)]'
+                        autoPlay && !voiceMuted ? 'border-[var(--accent-line)]' : 'border-[var(--line-3)]'
                     }`}
                     style={{background: 'var(--cine-panel)', backdropFilter: 'blur(8px)'}}
                 >
@@ -461,24 +447,24 @@ export default function CinematicMode({ game, messages, onClose, startMessageId,
                     <button
                         type="button"
                         role="switch"
-                        aria-checked={autoVoice}
-                        aria-label="Read new lines aloud automatically"
-                        onClick={toggleAutoVoice}
+                        aria-checked={autoPlay}
+                        aria-label="Auto-play new speeches"
+                        onClick={onToggleAutoPlay}
                         disabled={voiceMuted}
                         title={voiceMuted
                             ? 'Voices are muted — unmute to play'
-                            : autoVoice
-                                ? 'Each new line reads itself aloud. Click to read only on demand.'
-                                : 'Lines are read only when you press the speaker. Click to read each new line automatically.'}
+                            : autoPlay
+                                ? 'Auto-play is on: every line is read aloud and new speeches open the scene. Click to turn off.'
+                                : 'Auto-play is off: lines are read only when you press play. Click to turn on.'}
                         className={`relative h-[15px] w-[27px] rounded-full border transition-colors duration-[160ms] flex-shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ${
-                            autoVoice && !voiceMuted
+                            autoPlay && !voiceMuted
                                 ? 'bg-[var(--accent)] border-[var(--accent-line)]'
                                 : 'bg-[var(--bg-4)] border-[var(--line-3)]'
                         }`}
                     >
                         <span
                             className={`absolute top-[2px] h-[9px] w-[9px] rounded-full transition-all duration-[160ms] ${
-                                autoVoice
+                                autoPlay
                                     ? 'left-[15px] bg-[var(--accent-fg)]'
                                     : 'left-[2px] bg-[var(--fg-2)]'
                             }`}

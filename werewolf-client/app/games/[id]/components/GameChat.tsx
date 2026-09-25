@@ -17,7 +17,10 @@ import ConfirmModal from "./ConfirmModal";
 import CinematicMode, { SPEECH_TYPES } from "./CinematicMode";
 
 // localStorage key for the cinematic on/off switch (browser-wide, not per game).
-const CINEMATIC_ENABLED_KEY = 'cinematicEnabled';
+const CINEMATIC_ENABLED_KEY = 'autoPlay';
+// The scene's own auto-read switch before the two merged (2026-09-25); read
+// once so a browser that had turned voices off keeps them off.
+const LEGACY_AUTO_VOICE_KEY = 'cinematicAutoVoice';
 const VOICE_MUTED_KEY = 'voiceMuted';
 import { LoadingRail, PhaseBar, StreamPill, stripChromeClass, stripChromeStyle, type LoadingRailProps, type PhaseTone, type RailActor } from "./PhaseStrip";
 import { ttsService } from "@/app/services/tts-service";
@@ -555,15 +558,17 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
 
     const [cinematicOpen, setCinematicOpen] = useState(false);
     const [cinematicStartId, setCinematicStartId] = useState<string | undefined>(undefined);
-    // Playing a scene and auto-playing new ones are separate controls (the header
-    // pill holds both): `cinematicEnabled` governs ONLY whether fresh speech pops
-    // the overlay open, so it can be turned off while still replaying on demand,
-    // and turned on without interrupting the current read. Remembered per browser
-    // across games.
-    const [cinematicEnabled, setCinematicEnabled] = useState(true);
+    // Auto-play, one setting behind two switches (the header pill and the
+    // scene's voice controls): on, fresh speech opens the scene and every line
+    // it lands on is read aloud; off, speech stays in the chat and nothing is
+    // generated unless asked for. Playing a scene on demand works either way.
+    // Remembered per browser across games; off if either pre-merge switch was.
+    const [autoPlay, setAutoPlay] = useState(true);
     useEffect(() => {
         try {
-            if (localStorage.getItem(CINEMATIC_ENABLED_KEY) === '0') setCinematicEnabled(false);
+            if (localStorage.getItem(CINEMATIC_ENABLED_KEY) === '0' || localStorage.getItem(LEGACY_AUTO_VOICE_KEY) === '0') {
+                setAutoPlay(false);
+            }
         } catch { /* ignore */ }
     }, []);
     // Explicit play: always opens, whatever the switch says. It also lifts the
@@ -574,10 +579,13 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
         setCinematicStartId(undefined);
         setCinematicOpen(true);
     };
-    const toggleCinematicAuto = () => {
-        const next = !cinematicEnabled;
-        setCinematicEnabled(next);
-        try { localStorage.setItem(CINEMATIC_ENABLED_KEY, next ? '1' : '0'); } catch { /* ignore */ }
+    const toggleAutoPlay = () => {
+        const next = !autoPlay;
+        setAutoPlay(next);
+        try {
+            localStorage.setItem(CINEMATIC_ENABLED_KEY, next ? '1' : '0');
+            localStorage.removeItem(LEGACY_AUTO_VOICE_KEY);
+        } catch { /* ignore */ }
     };
     // Ids already in the chat when we last looked — arrivals beyond this set
     // are "someone just spoke" events that auto-open cinematic mode. Starts
@@ -691,7 +699,7 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
         const seen = seenMsgIdsRef.current;
         const fresh = messages.filter(m => m.id && !seen.has(m.id));
         fresh.forEach(m => seen.add(m.id!));
-        if (!cinematicEnabled || cinematicOpen || cinematicDismissedRef.current || !isCurrentDaySelected) return;
+        if (!autoPlay || cinematicOpen || cinematicDismissedRef.current || !isCurrentDaySelected) return;
         const spoken = fresh.find(m =>
             SPEECH_TYPES.has(m.messageType as MessageType) &&
             m.authorName !== game.humanPlayerName
@@ -700,7 +708,7 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
             setCinematicStartId(spoken.id!);
             setCinematicOpen(true);
         }
-    }, [messages, isLoadingMessages, cinematicEnabled, cinematicOpen, isCurrentDaySelected, game.humanPlayerName]);
+    }, [messages, isLoadingMessages, autoPlay, cinematicOpen, isCurrentDaySelected, game.humanPlayerName]);
 
     // A finished speaking burst lifts the "stop popping up" suppression.
     useEffect(() => {
@@ -1912,10 +1920,10 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                 </div>
                 <div className="flex items-center gap-3 max-[720px]:gap-2 max-[720px]:flex-shrink-0">
                     {/* One pill, two controls: press the label to play the last exchange now,
-                        flick the switch to decide whether new speech opens by itself. */}
+                        flick the switch for auto-play (new speech opens the scene and is read). */}
                     <div
                         className={`inline-flex items-center gap-2 rounded-full border pl-3 pr-2 py-1.5 transition-all duration-[120ms] max-[720px]:gap-1.5 max-[720px]:pl-2 max-[720px]:pr-1.5 max-[720px]:py-1 ${
-                            cinematicEnabled
+                            autoPlay
                                 ? 'border-[var(--accent-line)] bg-[var(--accent-soft)]'
                                 : 'border-[var(--line-3)] bg-[var(--bg-3)]'
                         }`}
@@ -1926,7 +1934,7 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                             disabled={messages.length === 0}
                             title="Play the last exchange as a scene"
                             className={`flex items-center gap-1.5 text-[13px] transition-colors duration-[120ms] disabled:opacity-40 disabled:cursor-not-allowed max-[720px]:text-[12px] ${
-                                cinematicEnabled
+                                autoPlay
                                     ? 'text-[var(--fg-0)] hover:brightness-110'
                                     : 'text-[var(--fg-2)] hover:text-[var(--fg-0)]'
                             }`}
@@ -1937,21 +1945,21 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                         <button
                             type="button"
                             role="switch"
-                            aria-checked={cinematicEnabled}
-                            aria-label="Play new speeches automatically"
-                            onClick={toggleCinematicAuto}
-                            title={cinematicEnabled
-                                ? 'New speeches play automatically. Click to stop them opening on their own.'
-                                : 'New speeches stay in the chat. Click to play them automatically.'}
+                            aria-checked={autoPlay}
+                            aria-label="Auto-play new speeches"
+                            onClick={toggleAutoPlay}
+                            title={autoPlay
+                                ? 'Auto-play is on: new speeches open the scene and are read aloud. Click to turn off.'
+                                : 'Auto-play is off: new speeches stay in the chat and nothing is read aloud. Click to turn on.'}
                             className={`relative h-[15px] w-[27px] rounded-full border transition-colors duration-[160ms] flex-shrink-0 ${
-                                cinematicEnabled
+                                autoPlay
                                     ? 'bg-[var(--accent)] border-[var(--accent-line)]'
                                     : 'bg-[var(--bg-4)] border-[var(--line-3)]'
                             }`}
                         >
                             <span
                                 className={`absolute top-[2px] h-[9px] w-[9px] rounded-full transition-all duration-[160ms] ${
-                                    cinematicEnabled
+                                    autoPlay
                                         ? 'left-[15px] bg-[var(--accent-fg)]'
                                         : 'left-[2px] bg-[var(--fg-2)]'
                                 }`}
@@ -2623,6 +2631,8 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                     voiceMuted={voiceMuted}
                     onToggleVoiceMuted={toggleVoiceMuted}
                     onStopSpeaking={stopSpeaking}
+                    autoPlay={autoPlay}
+                    onToggleAutoPlay={toggleAutoPlay}
                     pendingHumanAction={pendingHumanAction}
                     speakingMessageId={speakingMessageId}
                     loadingMessageId={loadingMessageId}
