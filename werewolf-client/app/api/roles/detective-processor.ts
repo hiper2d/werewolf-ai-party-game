@@ -386,7 +386,8 @@ export class DetectiveProcessor extends BaseRoleProcessor {
             console.error('Error in DetectiveProcessor:', error);
             return {
                 success: false,
-                error: error instanceof Error ? error.message : 'Unknown error in detective action'
+                error: error instanceof Error ? error.message : 'Unknown error in detective action',
+                explanation: error instanceof BotResponseError ? error.explanation : undefined
             };
         }
     }

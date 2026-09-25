@@ -257,7 +257,8 @@ export class ManiacProcessor extends BaseRoleProcessor {
             console.error('Error in ManiacProcessor:', error);
             return {
                 success: false,
-                error: error instanceof Error ? error.message : 'Unknown error in maniac action'
+                error: error instanceof Error ? error.message : 'Unknown error in maniac action',
+                explanation: error instanceof BotResponseError ? error.explanation : undefined
             };
         }
     }

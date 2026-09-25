@@ -353,7 +353,8 @@ export class WerewolfProcessor extends BaseRoleProcessor {
             console.error('Error in WerewolfProcessor:', error);
             return {
                 success: false,
-                error: error instanceof Error ? error.message : 'Unknown error in werewolf action'
+                error: error instanceof Error ? error.message : 'Unknown error in werewolf action',
+                explanation: error instanceof BotResponseError ? error.explanation : undefined
             };
         }
     }

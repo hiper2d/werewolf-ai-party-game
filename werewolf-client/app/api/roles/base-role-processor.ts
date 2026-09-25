@@ -13,6 +13,9 @@ export interface NightActionResult {
     success: boolean;
     // Optional error message if action failed
     error?: string;
+    // Model-facing explanation from a BotResponseError thrown inside the processor, carried
+    // up so the wrapper's error keeps it and a user Retry can pass it back as a hint
+    explanation?: string;
 }
 
 /**

@@ -360,7 +360,8 @@ export class DoctorProcessor extends BaseRoleProcessor {
             console.error('Error in DoctorProcessor:', error);
             return {
                 success: false,
-                error: error instanceof Error ? error.message : 'Unknown error in doctor action'
+                error: error instanceof Error ? error.message : 'Unknown error in doctor action',
+                explanation: error instanceof BotResponseError ? error.explanation : undefined
             };
         }
     }

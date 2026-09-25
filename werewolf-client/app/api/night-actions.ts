@@ -780,7 +780,8 @@ async function processNightQueue(gameId: string, game: Game): Promise<GameAction
                     gameStateProcessQueue: game.gameStateProcessQueue,
                     gameStateParamQueue: game.gameStateParamQueue
                 },
-                true // Recoverable - user can replay night phase
+                true, // Recoverable - user can replay night phase
+                result.explanation
             );
         }
 
