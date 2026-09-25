@@ -47,10 +47,15 @@ export class TTSService {
     return TTSService.instance;
   }
 
+  /**
+   * Plays `text`, stopping whatever was playing. Resolves true once playback
+   * starts, false when a later speakText() or stopSpeaking() superseded this
+   * request while its audio was loading — the caller must not show it as playing.
+   */
   async speakText(
     text: string,
     options: TTSOptions
-  ): Promise<void> {
+  ): Promise<boolean> {
     const sanitizedText = text.trim();
     if (!sanitizedText) {
       throw new Error('Text cannot be empty');
@@ -62,14 +67,14 @@ export class TTSService {
     const cacheKey = this.getCacheKey(sanitizedText, options);
 
     // Stop any existing playback so we never layer the same sound
-    this.stopSpeaking();
+    this.stopPlayback();
 
     try {
       const audioBuffer = await this.getAudioBuffer(cacheKey, sanitizedText, options);
 
-      // Another request superseded this one while loading
+      // Another request (or a stop) superseded this one while loading
       if (this.playRequestId !== requestId) {
-        return;
+        return false;
       }
 
       // Both providers return WAV format
@@ -113,16 +118,23 @@ export class TTSService {
       this.currentAudioCleanup = cleanup;
 
       await audioElement.play();
+      return true;
     } catch (error) {
       if (this.playRequestId === requestId) {
-        this.stopSpeaking();
+        this.stopPlayback();
       }
       console.error('TTS Error:', error);
       throw new Error(`Failed to generate speech: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
+  /** Stops playback AND drops any request still loading, so nothing starts after a stop. */
   stopSpeaking(): void {
+    this.playRequestId += 1;
+    this.stopPlayback();
+  }
+
+  private stopPlayback(): void {
     if (this.currentAudioCleanup) {
       this.currentAudioCleanup();
       return;

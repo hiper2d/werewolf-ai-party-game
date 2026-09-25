@@ -29,6 +29,8 @@ import CharacterVoicePanel, { VoiceSelection } from './CharacterVoicePanel';
 
 const AUTO_VOICE_KEY = 'cinematicAutoVoice';
 const ILLUSTRATION_ALT = 'A scene from the story';
+// The scene's shortest window of recent lines (see `turns`).
+const MIN_SCENE_LINES = 10;
 
 // Message types that read as "someone speaking" — everything with real prose.
 export const SPEECH_TYPES = new Set<MessageType>([
@@ -108,9 +110,15 @@ interface CinematicModeProps {
     // `silent` suppresses the failure alert — an auto-played line that a browser's
     // autoplay policy blocks must not throw a dialog at someone who never clicked.
     onSpeak?: (messageId: string, text: string, opts?: { silent?: boolean }) => void;
-    // Voices muted in the header: the pipeline ignores requests, so the scene
-    // shows that rather than offering buttons that would do nothing.
+    // The chat's global mute (one setting for chat and scene). Muted, the
+    // pipeline ignores requests, so the line and auto-read controls go inert.
     voiceMuted?: boolean;
+    // Flips that same mute from inside the scene. Unmuting with auto-read on
+    // reads the current line right away (see the auto-voice effect).
+    onToggleVoiceMuted?: () => void;
+    // Stops the voice (playing or still loading). Moving to another line calls
+    // it so the old line never talks over the new one.
+    onStopSpeaking?: () => void;
     // The game is blocked on the player (their vote, their night action). The
     // scene says so and turns its primary button into the way out, because the
     // modal that asks for it opens behind this overlay.
@@ -127,7 +135,7 @@ interface CinematicModeProps {
     onStopSample?: () => void;
 }
 
-export default function CinematicMode({ game, messages, onClose, startMessageId, onSpeak, voiceMuted, pendingHumanAction, speakingMessageId, loadingMessageId, isOwner = false, onGameChange, onUpdateVoice, onSpeakSample, onStopSample }: CinematicModeProps) {
+export default function CinematicMode({ game, messages, onClose, startMessageId, onSpeak, voiceMuted, onToggleVoiceMuted, onStopSpeaking, pendingHumanAction, speakingMessageId, loadingMessageId, isOwner = false, onGameChange, onUpdateVoice, onSpeakSample, onStopSample }: CinematicModeProps) {
     // Every line carries the same picture it carries in chat: the day's opening
     // GM message its establishing shot, each "night falls" the night scene, and
     // a GM illustration the drawing it was posted with. An illustration is an
@@ -176,14 +184,16 @@ export default function CinematicMode({ game, messages, onClose, startMessageId,
             pendingIllustration = undefined;
             if (isGmText(m)) lastGmTurn = built.length - 1;
         });
-        // A scene, not an archive: only the 10 most recent lines play.
-        return built.slice(-10);
+        // A scene, not an archive: only the most recent lines play — at least
+        // 10, or one per speaker (bots, the human, the Game Master) so a full
+        // round of a big lobby fits.
+        return built.slice(-Math.max(MIN_SCENE_LINES, game.bots.length + 2));
     }, [messages, game]);
 
     // Auto-open lands on the line that just arrived; manual open starts at the
     // NEWEST line (the scene is "what's happening now" — Previous/rail go back).
     // The position is the line's KEY, not an index: the turn list is a sliding
-    // last-10 window, so a live message shifts every index by one — anchoring
+    // window of recent lines, so a live message shifts every index by one — anchoring
     // on the key keeps the reader on the same line when that happens.
     const [turnKey, setTurnKey] = useState<string | undefined>(() => {
         if (startMessageId && turns.some(t => t.key === startMessageId)) return startMessageId;
@@ -197,28 +207,56 @@ export default function CinematicMode({ game, messages, onClose, startMessageId,
     // user gesture browsers want before audio starts. A viewer who switches it off
     // stays off: the choice is remembered per browser (the chat's mute button still
     // silences everything regardless).
-    const [autoVoice, setAutoVoice] = useState(true);
-    useEffect(() => {
-        try {
-            if (localStorage.getItem(AUTO_VOICE_KEY) === '0') setAutoVoice(false);
-        } catch { /* ignore */ }
-    }, []);
+    // Read synchronously on mount (the overlay only renders client-side, after a
+    // click or a live message): loading it in an effect left the first render
+    // with auto-voice ON, and the auto-voice effect below read — and paid for —
+    // the opening line before the stored "off" arrived.
+    const [autoVoice, setAutoVoice] = useState(() => {
+        try { return localStorage.getItem(AUTO_VOICE_KEY) !== '0'; } catch { return true; }
+    });
     const toggleAutoVoice = () => {
         const next = !autoVoice;
         setAutoVoice(next);
         try { localStorage.setItem(AUTO_VOICE_KEY, next ? '1' : '0'); } catch { /* ignore */ }
     };
-    // Lines already read aloud by the switch, and whether the last move was
-    // backwards. Together they make auto-voice strictly forward-going: stepping
-    // back with Previous or the rail is for re-reading, so it stays quiet rather
-    // than restarting the audio — and re-billing the TTS call — on every glance.
-    const autoSpokenRef = useRef<Set<string>>(new Set());
-    const wentBackRef = useRef(false);
-
     // A line that slid out of the window (10+ arrivals while parked) resolves
     // to the oldest line still shown.
     const turnIndex = Math.max(0, turns.findIndex(t => t.key === turnKey));
     const turn = turns[turnIndex];
+
+    // The speaker rail is one swipeable row; keep the current line's face in
+    // view as the scene steps (scrollLeft only, so the page never jumps).
+    const railRef = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        const rail = railRef.current;
+        const thumb = rail?.querySelector<HTMLElement>(`[data-turn-index="${turnIndex}"]`);
+        if (!rail || !thumb) return;
+        rail.scrollTo({left: thumb.offsetLeft - (rail.clientWidth - thumb.offsetWidth) / 2, behavior: 'smooth'});
+    }, [turnIndex, turns.length]);
+
+    // Edge arrows say "more faces this way"; each shows only while the rail can
+    // still scroll in its direction (1px slack for fractional scroll positions).
+    const [railMore, setRailMore] = useState({left: false, right: false});
+    const updateRailMore = useCallback(() => {
+        const rail = railRef.current;
+        if (!rail) return;
+        const left = rail.scrollLeft > 1;
+        const right = rail.scrollLeft + rail.clientWidth < rail.scrollWidth - 1;
+        setRailMore(prev => (prev.left === left && prev.right === right ? prev : {left, right}));
+    }, []);
+    useEffect(() => {
+        const rail = railRef.current;
+        if (!rail) return;
+        updateRailMore();
+        const observer = new ResizeObserver(updateRailMore);
+        observer.observe(rail);
+        if (rail.firstElementChild) observer.observe(rail.firstElementChild);
+        return () => observer.disconnect();
+    }, [updateRailMore, turns.length]);
+    const scrollRail = (direction: -1 | 1) => {
+        const rail = railRef.current;
+        if (rail) rail.scrollBy({left: direction * rail.clientWidth * 0.8, behavior: 'smooth'});
+    };
     const tokens = useMemo(() => turn ? tokenize(toSpeechHtml(turn.text)) : [], [turn]);
     const typingDone = typedCount >= tokens.length;
     const botsStillTalking = game.gameStateProcessQueue.length > 0;
@@ -229,7 +267,7 @@ export default function CinematicMode({ game, messages, onClose, startMessageId,
     }, []);
 
     // Typewriter: reveal 2 tokens per 42ms tick. Keyed on the line's identity,
-    // not the index: the turn list is a sliding last-10 window, so when a new
+    // not the index: the turn list is a sliding window, so when a new
     // live message pushes the window forward, the line under the same index
     // changes and must retype.
     useEffect(() => {
@@ -254,26 +292,27 @@ export default function CinematicMode({ game, messages, onClose, startMessageId,
     // the line types itself instead of after the reader asks for it. Playback
     // starts when the request returns — the manual button drives the identical
     // path, so it shows the same loading/pause state either way.
+    //
+    // One rule, no exceptions: auto-read on and not muted, every line the scene
+    // lands on is read — forward, back, a face on the rail, a line heard before
+    // (the browser cache replays it without a new call), the player's own lines.
+    // Silence is what auto-read off or mute is for; then nothing is generated.
     useEffect(() => {
         if (!autoVoice || !onSpeak || !turn || voiceMuted) return;
-        if (wentBackRef.current) { wentBackRef.current = false; return; }
-        // The player's own lines are never auto-read: they have no assigned voice
-        // (the lookup falls through to the default), so it costs a TTS call to
-        // recite what the player just typed, in a voice they never picked. The
-        // speaker button still works if they want to hear it.
-        if (turn.speaker === game.humanPlayerName) return;
-        if (autoSpokenRef.current.has(turn.key)) return;
-        autoSpokenRef.current.add(turn.key);
         onSpeak(turn.key, turn.text, { silent: true });
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [turn?.key, autoVoice, voiceMuted, game.humanPlayerName]);
+    }, [turn?.key, autoVoice, voiceMuted]);
 
     const goTo = useCallback((index: number) => {
-        clearTimers();
         const target = Math.max(0, Math.min(index, turns.length - 1));
-        if (target < turnIndex) wentBackRef.current = true;
+        // Re-picking the line on screen changes nothing (and must not retype it).
+        if (target === turnIndex) return;
+        clearTimers();
+        // Leaving a line silences it; with auto-read on the effect above then
+        // reads the new one, so two lines never talk over each other.
+        onStopSpeaking?.();
         setTurnKey(turns[target]?.key);
-    }, [clearTimers, turns, turnIndex]);
+    }, [clearTimers, turns, turnIndex, onStopSpeaking]);
 
     const next = useCallback(() => {
         if (!typingDone) { setTypedCount(tokens.length); return; }
@@ -311,10 +350,11 @@ export default function CinematicMode({ game, messages, onClose, startMessageId,
             if (target?.closest?.('input, textarea, select, [contenteditable="true"]')) return;
             if (e.key === ' ' || e.key === 'ArrowRight') { e.preventDefault(); next(); }
             if (e.key === 'ArrowLeft') { e.preventDefault(); prev(); }
+            if ((e.key === 'm' || e.key === 'M') && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); onToggleVoiceMuted?.(); }
         };
         document.addEventListener('keydown', onKey);
         return () => document.removeEventListener('keydown', onKey);
-    }, [next, prev, onClose]);
+    }, [next, prev, onClose, onToggleVoiceMuted]);
 
     // Persists a voice change and patches the game so the poster, the chat and
     // the next auto-read line all pick it up — mirrors CharacterCard.saveVoice.
@@ -364,8 +404,9 @@ export default function CinematicMode({ game, messages, onClose, startMessageId,
                 onClick={advanceOnClick}
             />
 
-            {/* Voice — press to read the current line; the switch beside it decides
-                whether each new line reads itself as the scene moves forward. */}
+            {/* Voice — the global mute (same as the chat header's), then play for the
+                current line and the switch that decides whether each new line reads
+                itself as the scene moves forward. */}
             {onSpeak && (
                 <div
                     className={`fixed top-4 right-[68px] z-30 h-[42px] flex items-center gap-2 rounded-full border pl-2.5 pr-3 transition-colors ${
@@ -373,12 +414,35 @@ export default function CinematicMode({ game, messages, onClose, startMessageId,
                     }`}
                     style={{background: 'var(--cine-panel)', backdropFilter: 'blur(8px)'}}
                 >
+                    {onToggleVoiceMuted && (
+                        <>
+                            <button
+                                type="button"
+                                onClick={onToggleVoiceMuted}
+                                aria-pressed={voiceMuted}
+                                aria-label={voiceMuted ? 'Unmute voices' : 'Mute voices'}
+                                title={voiceMuted
+                                    ? 'Voices are muted — nothing plays and no audio is generated. Click to unmute (M).'
+                                    : 'Mute voices: stops what is playing and blocks new audio (M).'}
+                                className={`w-[26px] h-[26px] flex items-center justify-center transition-colors ${
+                                    voiceMuted ? 'text-[var(--fg-3)] hover:text-[var(--fg-1)]' : 'text-[var(--fg-1)] hover:text-[var(--fg-0)]'
+                                }`}
+                            >
+                                {voiceMuted ? (
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5,6 9,2 9,2 15,6 15,11 19"/><path d="M22 9l-6 6M16 9l6 6"/></svg>
+                                ) : (
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5,6 9,2 9,2 15,6 15,11 19"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                                )}
+                            </button>
+                            <span aria-hidden className="w-px h-[18px] bg-[var(--line-3)]" />
+                        </>
+                    )}
                     <button
                         onClick={() => onSpeak(turn.key, turn.text)}
                         disabled={voiceMuted}
                         aria-label="Read this line aloud"
                         title={voiceMuted
-                            ? 'Voices are muted — unmute in the chat header'
+                            ? 'Voices are muted — unmute to play'
                             : speakingMessageId === turn.key ? 'Pause' : 'Read aloud'}
                         className={`w-[26px] h-[26px] flex items-center justify-center transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
                             speakingMessageId === turn.key
@@ -391,7 +455,7 @@ export default function CinematicMode({ game, messages, onClose, startMessageId,
                         ) : speakingMessageId === turn.key ? (
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
                         ) : (
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5,6 9,2 9,2 15,6 15,11 19"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                            <svg width="14" height="14" viewBox="0 0 12 12" fill="currentColor"><path d="M2 1.5v9l8-4.5z"/></svg>
                         )}
                     </button>
                     <button
@@ -402,7 +466,7 @@ export default function CinematicMode({ game, messages, onClose, startMessageId,
                         onClick={toggleAutoVoice}
                         disabled={voiceMuted}
                         title={voiceMuted
-                            ? 'Voices are muted — unmute in the chat header'
+                            ? 'Voices are muted — unmute to play'
                             : autoVoice
                                 ? 'Each new line reads itself aloud. Click to read only on demand.'
                                 : 'Lines are read only when you press the speaker. Click to read each new line automatically.'}
@@ -548,8 +612,16 @@ export default function CinematicMode({ game, messages, onClose, startMessageId,
                     </div>
 
                     {/* Speaker rail */}
-                    {/* pt-1 gives the active thumb's -3px lift headroom inside overflow-hidden */}
-                    <div className="order-3 min-[1101px]:col-span-2 flex justify-center gap-2 flex-wrap max-h-[96px] overflow-hidden pt-1">
+                    {/* One row that swipes sideways when the faces don't fit (a big lobby
+                        on a phone); the inner w-max + mx-auto centres it when they do.
+                        py-1 gives the active thumb's ring headroom inside the scroller. */}
+                    <div className="order-3 min-[1101px]:col-span-2 relative">
+                    <div
+                        ref={railRef}
+                        onScroll={updateRailMore}
+                        className="overflow-x-auto overflow-y-hidden overscroll-x-contain snap-x snap-proximity [scrollbar-width:none] [&::-webkit-scrollbar]:hidden py-1 px-1"
+                    >
+                      <div className="flex gap-2 w-max mx-auto">
                         {turns.map((t, i) => {
                             const view = getAvatarView(game, t.speaker);
                             const url = view?.url;
@@ -560,9 +632,10 @@ export default function CinematicMode({ game, messages, onClose, startMessageId,
                             return (
                                 <button
                                     key={t.key}
+                                    data-turn-index={i}
                                     onClick={() => goTo(i)}
                                     title={t.speaker}
-                                    className={`w-[38px] h-[38px] rounded-[10px] overflow-hidden border transition-all flex-none ${
+                                    className={`snap-center w-[38px] h-[38px] rounded-[10px] overflow-hidden border transition-all flex-none ${
                                         state === 'active'
                                             ? 'opacity-100 border-[var(--accent)] shadow-[0_0_0_2px_var(--accent-soft)]'
                                             : state === 'done' ? 'opacity-[.65] border-transparent' : 'opacity-40 border-transparent'
@@ -593,6 +666,22 @@ export default function CinematicMode({ game, messages, onClose, startMessageId,
                                 </button>
                             );
                         })}
+                      </div>
+                    </div>
+                    {([['left', -1], ['right', 1]] as const).map(([side, direction]) => railMore[side] && (
+                        <button
+                            key={side}
+                            type="button"
+                            onClick={() => scrollRail(direction)}
+                            aria-label={side === 'left' ? 'Earlier speakers' : 'Later speakers'}
+                            className={`absolute top-1/2 -translate-y-1/2 ${side === 'left' ? 'left-0' : 'right-0'} w-7 h-7 rounded-full border border-[var(--line-2)] flex items-center justify-center text-[var(--fg-1)] hover:text-[var(--fg-0)] hover:border-[var(--line-3)] hover:bg-[var(--cine-panel-hover)] transition-colors shadow-[0_2px_8px_rgba(0,0,0,0.45)]`}
+                            style={{background: 'var(--cine-panel)', backdropFilter: 'blur(8px)'}}
+                        >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <path d={side === 'left' ? 'M15 18l-6-6 6-6' : 'M9 18l6-6-6-6'} />
+                            </svg>
+                        </button>
+                    ))}
                     </div>
                 </div>
             </div>

@@ -1570,7 +1570,7 @@ function GamePageContent({
                     onSelectVariant={selectAvatarVariant}
                     onReframe={reframeAvatar}
                     onUpdateVoice={updateCharacterVoice}
-                    onSpeakSample={(text, sel) => ttsService.speakText(text, { voice: sel.voice, voiceStyle: sel.voiceStyle || undefined, voiceProvider: game.voiceProvider, gameId: game.id })}
+                    onSpeakSample={async (text, sel) => { await ttsService.speakText(text, { voice: sel.voice, voiceStyle: sel.voiceStyle || undefined, voiceProvider: game.voiceProvider, gameId: game.id }); }}
                     onStopSample={() => ttsService.stopSpeaking()}
                 />
             )}

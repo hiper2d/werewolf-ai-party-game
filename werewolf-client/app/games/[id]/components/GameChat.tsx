@@ -22,7 +22,7 @@ const VOICE_MUTED_KEY = 'voiceMuted';
 import { LoadingRail, PhaseBar, StreamPill, stripChromeClass, stripChromeStyle, type LoadingRailProps, type PhaseTone, type RailActor } from "./PhaseStrip";
 import { ttsService } from "@/app/services/tts-service";
 import { sttService } from "@/app/services/stt-service";
-import { getDefaultVoiceProvider } from "@/app/ai/voice-config";
+import { getDefaultVoiceProvider, getVoiceConfig } from "@/app/ai/voice-config";
 import { getModelDisplayName, getModelProviderName } from "@/app/ai/ai-models";
 import { freeSpendLimitScope, freeSpendLimitWindow, isFreeSpendLimitError, isInsufficientBalanceError, isModelRefusalError, isProviderBudgetDepletedError, isProviderBusyError, modelRefusalReason } from "@/app/api/errors";
 import { actorsOnProvider, isProviderBlockedError, providerDisplayName, providerKeyOf, refusalReasonLabel } from "@/app/api/provider-blocks";
@@ -1424,6 +1424,14 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
     // `silent`: the caller started this playback on its own (cinematic auto-voice),
     // so a failure must not raise an alert — a browser that blocks autoplay would
     // otherwise pop a dialog for something the player never asked for.
+    // Silences the voice outright: playing, paused and still-loading lines alike.
+    const stopSpeaking = () => {
+        ttsService.stopSpeaking();
+        setSpeakingMessageId(null);
+        setPausedMessageId(null);
+        setLoadingMessageId(null);
+    };
+
     const handleSpeak = async (messageId: string, text: string, opts?: { silent?: boolean }) => {
         const reportFailure = (message: string) => {
             if (opts?.silent) { console.warn('TTS playback failed:', message); return; }
@@ -1462,31 +1470,37 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
             // Find the message to get the author name
             const message = messages.find(msg => msg.id === messageId);
 
+            // The player has no assigned voice: they read in the provider's first
+            // voice no character uses, so their lines never sound like a bot's
+            // (and the fallback is a real voice of this game's provider).
+            const providerVoices = getVoiceConfig(voiceProvider).getVoices().map(v => v.id);
+            const takenVoices = new Set([game.gameMasterVoice, ...game.bots.map(b => b.voice)]);
+            const fallbackVoice = providerVoices.find(id => !takenVoices.has(id)) ?? providerVoices[0];
+
             // Map author to their assigned voice and style
-            let voice = 'alloy'; // default fallback
+            let voice = fallbackVoice;
             let voiceStyle: string | undefined;
 
             if (!message) {
                 console.error('Message not found for voice mapping:', messageId);
-                voice = game.gameMasterVoice || 'alloy';
+                voice = game.gameMasterVoice || fallbackVoice;
             } else if (message.authorName === GAME_MASTER) {
                 // Use Game Master voice
-                voice = game.gameMasterVoice || 'alloy';
+                voice = game.gameMasterVoice || fallbackVoice;
                 voiceStyle = game.gameMasterVoiceStyle;
             } else {
                 // Find the bot with matching name
                 const bot = game.bots.find(b => b.name === message.authorName);
                 if (bot) {
-                    voice = bot.voice || 'alloy';
+                    voice = bot.voice || fallbackVoice;
                     voiceStyle = bot.voiceStyle;
                 }
-                // If no bot found (human player), use default voice
             }
 
             // Show loading state
             setLoadingMessageId(messageId);
 
-            await ttsService.speakText(text, {
+            const started = await ttsService.speakText(text, {
                 voice, voiceStyle, voiceProvider, gameId,
                 // Playback failures (autoplay policy, codec) fire after this await
                 // resolves, so surface them through the same alert + reset path.
@@ -1497,6 +1511,13 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                     setPausedMessageId(null);
                 },
             });
+
+            // Superseded while loading (another line was picked, or a stop): the
+            // newer request owns the loading/speaking state, so leave it alone.
+            if (!started) {
+                setLoadingMessageId(prev => prev === messageId ? null : prev);
+                return;
+            }
 
             // Audio started playing
             setLoadingMessageId(null);
@@ -2600,13 +2621,15 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                     startMessageId={cinematicStartId}
                     onSpeak={handleSpeak}
                     voiceMuted={voiceMuted}
+                    onToggleVoiceMuted={toggleVoiceMuted}
+                    onStopSpeaking={stopSpeaking}
                     pendingHumanAction={pendingHumanAction}
                     speakingMessageId={speakingMessageId}
                     loadingMessageId={loadingMessageId}
                     isOwner={isOwner}
                     onGameChange={onGameChange}
                     onUpdateVoice={onUpdateVoice}
-                    onSpeakSample={(text, sel) => ttsService.speakText(text, { voice: sel.voice, voiceStyle: sel.voiceStyle || undefined, voiceProvider: game.voiceProvider, gameId: game.id })}
+                    onSpeakSample={async (text, sel) => { await ttsService.speakText(text, { voice: sel.voice, voiceStyle: sel.voiceStyle || undefined, voiceProvider: game.voiceProvider, gameId: game.id }); }}
                     onStopSample={() => ttsService.stopSpeaking()}
                     onClose={() => {
                         // Manual close mid-burst = "let me read the chat":
