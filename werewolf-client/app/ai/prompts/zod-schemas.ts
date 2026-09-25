@@ -61,31 +61,31 @@ export const BotVoteZodSchema = z.object({
 
 // Werewolf action schema
 export const WerewolfActionZodSchema = z.object({
-  target: z.string().describe("The exact name of the player to eliminate. Must be a SINGLE name copied verbatim from the available targets list — no titles, surnames, or extra words (e.g. 'Pansy', never 'Pansy Parkinson')"),
   reasoning: z.string().describe("Reasoning for the target selection"),
+  target: z.string().describe("The exact name of the player to eliminate. Must be a SINGLE name copied verbatim from the available targets list — no titles, surnames, or extra words (e.g. 'Pansy', never 'Pansy Parkinson')"),
   narrativeHint: z.string().nullable().optional().describe("OPTIONAL: one short atmospheric sentence describing how your night action looks or feels in the story world. Pure imagery and mood — it MUST NOT name any player, place a player at a location, or hint at anyone's role. The Game Master may weave it anonymously into the morning narrative.")
 });
 
 // Doctor action schema
 export const DoctorActionZodSchema = z.object({
-  target: z.string().describe("The exact name of the player to protect from werewolf attacks (or kill if using Doctor's Mistake). Must be a SINGLE name copied verbatim from the available targets list — no titles, surnames, or extra words (e.g. 'Pansy', never 'Pansy Parkinson')"),
   reasoning: z.string().describe("Reasoning for the protection or kill choice"),
+  target: z.string().describe("The exact name of the player to protect from werewolf attacks (or kill if using Doctor's Mistake). Must be a SINGLE name copied verbatim from the available targets list — no titles, surnames, or extra words (e.g. 'Pansy', never 'Pansy Parkinson')"),
   action_type: z.enum(['protect', 'kill']).nullable().optional().describe("The type of action: 'protect' (default) or 'kill' (one-time ability)"),
   narrativeHint: z.string().nullable().optional().describe("OPTIONAL: one short atmospheric sentence describing how your night action looks or feels in the story world. Pure imagery and mood — it MUST NOT name any player, place a player at a location, or hint at anyone's role. The Game Master may weave it anonymously into the morning narrative.")
 });
 
 // Detective action schema
 export const DetectiveActionZodSchema = z.object({
-  target: z.string().describe("The exact name of the player to investigate or kill. Must be a SINGLE name copied verbatim from the available targets list — no titles, surnames, or extra words (e.g. 'Pansy', never 'Pansy Parkinson')"),
   reasoning: z.string().describe("Reasoning for the action choice"),
+  target: z.string().describe("The exact name of the player to investigate or kill. Must be a SINGLE name copied verbatim from the available targets list — no titles, surnames, or extra words (e.g. 'Pansy', never 'Pansy Parkinson')"),
   action_type: z.enum(['investigate', 'kill']).nullable().optional().describe("The type of action: 'investigate' (default) to learn their role, or 'kill' (one-time ability) to eliminate them"),
   narrativeHint: z.string().nullable().optional().describe("OPTIONAL: one short atmospheric sentence describing how your night action looks or feels in the story world. Pure imagery and mood — it MUST NOT name any player, place a player at a location, or hint at anyone's role. The Game Master may weave it anonymously into the morning narrative.")
 });
 
 // Maniac action schema
 export const ManiacActionZodSchema = z.object({
-  target: z.string().describe("The exact name of the player to abduct for the night. Must be a SINGLE name copied verbatim from the available targets list — no titles, surnames, or extra words (e.g. 'Pansy', never 'Pansy Parkinson')"),
   reasoning: z.string().describe("Reasoning for the abduction choice"),
+  target: z.string().describe("The exact name of the player to abduct for the night. Must be a SINGLE name copied verbatim from the available targets list — no titles, surnames, or extra words (e.g. 'Pansy', never 'Pansy Parkinson')"),
   narrativeHint: z.string().nullable().optional().describe("OPTIONAL: one short atmospheric sentence describing how your night action looks or feels in the story world. Pure imagery and mood — it MUST NOT name any player, place a player at a location, or hint at anyone's role. The Game Master may weave it anonymously into the morning narrative.")
 });
 
