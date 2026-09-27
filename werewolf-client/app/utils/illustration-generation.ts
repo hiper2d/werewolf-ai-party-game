@@ -86,23 +86,39 @@ function mentionedParticipants(game: Game, text: string): string[] {
         .map(x => x.name);
 }
 
-function buildIllustrationPrompt(game: Game, sceneDescription: string, characterNames: string[]): string {
+export function buildIllustrationPrompt(game: Game, sceneDescription: string, characterNames: string[], timeOfDay: 'day' | 'night'): string {
     const characterLine = characterNames.length > 0
-        ? `The named characters must be recognizable — match each one's face, hair and clothing to their labeled reference portrait. `
+        ? `The named characters must be recognizable — keep each one's face, hair and clothing from their labeled reference portrait. `
         : `Characters may be shown from a distance or partially obscured. `;
-    // The establishing-shot reference already carries the game's look; the
-    // player's art direction is restated for the case where that reference is
-    // missing (the scene pair failed at creation) so the style still holds.
+    const lighting = timeOfDay === 'night' ? 'atmospheric night lighting' : 'lighting that fits the scene';
+    // The player's art direction governs the whole image. The references are
+    // image inputs, and the model copies their rendering over a one-line style
+    // note (portraits drawn as comics turned a "photoreal" game's illustrations
+    // into comics) — so with a player style they are demoted to identity and
+    // location only, and the style is stated first and restated last.
     const artStyle = sanitizeArtStyle(game.artStyle);
-    const styleLine = artStyle ? `\n\nArt style, chosen by the player: "${artStyle}"` : '';
-    return `Illustrate this moment from a social deduction story. Cinematic composition, atmospheric night lighting.
+    if (artStyle) {
+        return `Art style, chosen by the player — it governs the entire image: "${artStyle}".
 
-Setting — "${game.theme}": ${game.description}${styleLine}
+Depict this moment from a social deduction story in that art style. Cinematic composition, ${lighting}.
+
+Setting — "${game.theme}": ${game.description}
 
 Scene to depict:
 ${sceneDescription}
 
-${characterLine}Match the illustration style and palette of the establishing-shot reference exactly — this is another scene from the same story. The portrait references contain nameplate labels — do NOT reproduce them: no text, lettering, name tags or labels anywhere in the image.`;
+${characterLine}The reference images show only WHO the characters are and WHERE the scene takes place — they are not a style guide. Wherever their rendering differs from the art style, redraw those faces, costumes and places in the art style instead of copying how the references are drawn. The portrait references contain nameplate labels — do NOT reproduce them: no text, lettering, name tags, labels or logos anywhere in the image.
+
+Final image must be fully in this art style: "${artStyle}".`;
+    }
+    return `Illustrate this moment from a social deduction story. Cinematic composition, ${lighting}.
+
+Setting — "${game.theme}": ${game.description}
+
+Scene to depict:
+${sceneDescription}
+
+${characterLine}Match the illustration style and palette of the establishing-shot reference exactly — this is another scene from the same story. The portrait references contain nameplate labels — do NOT reproduce them: no text, lettering, name tags, labels or logos anywhere in the image.`;
 }
 
 /**
@@ -119,6 +135,7 @@ async function generateAndPostIllustration(
     sourceText: string,
     sourceLabel: string,
     postDay: number,
+    timeOfDay: 'day' | 'night',
     imageDocFields: Record<string, any>,
 ): Promise<void> {
     if (!db) return;
@@ -157,7 +174,9 @@ async function generateAndPostIllustration(
     const welcomeSnap = await gameRef.collection('avatars').doc(SCENE_WELCOME_KEY).get();
     if (welcomeSnap.exists && (welcomeSnap.data() as any)?.data) {
         references.push({
-            label: 'Establishing-shot reference — the same story\'s setting, style and palette:',
+            label: sanitizeArtStyle(game.artStyle)
+                ? 'Establishing-shot reference — the same story\'s setting (location and layout only):'
+                : 'Establishing-shot reference — the same story\'s setting, style and palette:',
             jpeg: Buffer.from((welcomeSnap.data() as any).data, 'base64'),
         });
     }
@@ -174,7 +193,7 @@ async function generateAndPostIllustration(
         }
     });
 
-    const image = await generateImage(apiKey, buildIllustrationPrompt(game, sceneDescription, portraitNames), "3:2", {references, imageSize: '1K'});
+    const image = await generateImage(apiKey, buildIllustrationPrompt(game, sceneDescription, portraitNames, timeOfDay), "3:2", {references, imageSize: '1K'});
 
     const sharp = (await import('sharp')).default;
     const jpeg = await sharp(image.buffer).resize({width: 1024, withoutEnlargement: true}).jpeg({quality: 80}).toBuffer();
@@ -254,7 +273,7 @@ export async function runNightIllustration(
         });
         if (!claimed) return;
 
-        await generateAndPostIllustration(gameId, userEmail, key, story, "the narration of last night's events", postDay, {msgId: summaryMsgId});
+        await generateAndPostIllustration(gameId, userEmail, key, story, "the narration of last night's events", postDay, 'night', {msgId: summaryMsgId});
     } catch (error: any) {
         logger.warn(`Night illustration failed for game ${gameId} (decorative, ignored)`, {gameId, nightDay, error: error.message});
     }
@@ -289,7 +308,7 @@ export async function runDayIllustration(
         if (!claimed) return;
 
         const sourceText = `The pivotal moment to depict: ${moment}\n\nRecent discussion:\n${discussionExcerpt}`;
-        await generateAndPostIllustration(gameId, userEmail, key, sourceText, "the latest scene from today's discussion between the players", day, {});
+        await generateAndPostIllustration(gameId, userEmail, key, sourceText, "the latest scene from today's discussion between the players", day, 'day', {});
     } catch (error: any) {
         logger.warn(`Day illustration failed for game ${gameId} (decorative, ignored)`, {gameId, day, error: error.message});
     }

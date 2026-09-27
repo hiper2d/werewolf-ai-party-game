@@ -71,8 +71,8 @@ function buildCells(game: AvatarSubject): AvatarCell[] {
     return cells;
 }
 
-export function buildPrompt(game: AvatarSubject, cells: AvatarCell[], cols: number, rows: number): string {
-    return buildPortraitSheetPrompt({
+export function buildPrompt(game: AvatarSubject, cells: AvatarCell[], cols: number, rows: number, withStyleReference = false): string {
+    const prompt = buildPortraitSheetPrompt({
         cells, cols, rows,
         purpose: 'a social deduction game',
         setting: {title: game.theme, description: game.description},
@@ -80,7 +80,12 @@ export function buildPrompt(game: AvatarSubject, cells: AvatarCell[], cols: numb
         // stays style-only guidance, and the prompt's no-text rule has the last word.
         artStyle: sanitizeArtStyle(game.artStyle),
     });
+    return withStyleReference
+        ? `${prompt}\n\nThe attached image is a scene from this same story, already rendered in the game's art style: match its rendering technique, realism, lighting and color grading exactly in every portrait. Use it for style only — do not copy its content.`
+        : prompt;
 }
+
+const STYLE_REFERENCE_LABEL = 'Style reference — a scene from this story in the game\'s art style:';
 
 
 
@@ -98,7 +103,7 @@ Setting — "${game.theme}": ${game.description}
 Top panel: the setting at the story's opening — the gathering place of the characters, inviting yet with a first hint of unease.
 Bottom panel: the same setting at night — dark, ominous, something predatory hidden in the shadows.
 
-No text anywhere in the image.`;
+No text anywhere in the image.${artStyle ? `\n\nBoth panels must be fully in this art style: "${artStyle}".` : ''}`;
 }
 
 /** The kept sheet (library type): stored as avatars/sheet-{round}. */
@@ -347,12 +352,19 @@ export interface DrawnSet {
  * billing — so the game generator, the in-game reroll and the preview draft
  * all run the same pipeline and differ only in where the result lands.
  * `onStage` fires as each half lands, for progress display.
+ *
+ * `styleReference` (a reroll's stored welcome scene) is attached to the sheet
+ * draw: the image model follows a reference image far more reliably than style
+ * text (an "ultra-realism" game got comic portraits from text alone). A fresh
+ * set does not wait for its own scene to use it — the two draws stay parallel.
  */
 export async function drawIllustrationSet(
     apiKey: string,
     subject: AvatarSubject,
     opts: {
         withScenes: boolean;
+        // An already drawn welcome scene (reroll): the sheet's style reference.
+        styleReference?: Buffer;
         ledger: SpendLedger;
         logContext: Record<string, unknown>;
         onStage?: (stage: 'portraits' | 'scene') => Promise<void>;
@@ -394,7 +406,13 @@ export async function drawIllustrationSet(
                 return [];
             });
 
-    const grid = await generateImage(apiKey, buildPrompt(subject, cells, cols, rows), "4:3");
+    const styleReference = opts.styleReference;
+    const grid = await generateImage(
+        apiKey,
+        buildPrompt(subject, cells, cols, rows, !!styleReference),
+        "4:3",
+        styleReference ? {references: [{label: STYLE_REFERENCE_LABEL, jpeg: styleReference}]} : undefined,
+    );
     ledger.spentUSD += grid.costUSD;
     const {slices, sheet} = await sliceSheet(sharp, grid.buffer, cells, realCount, cols, rows, {
         onMismatch: m => logger.warn(`AVATAR_GRID_MISMATCH: ${m.message}`, {...logContext, ...m.detail}),
@@ -552,7 +570,9 @@ export async function runAvatarRegeneration(gameId: string, userEmail: string, m
             ? claimed.avatarVariants!
             : await adoptExistingAvatars(gameRef, portraitKeysFor(claimed));
 
-        const drawn = await drawIllustrationSet(apiKey, claimed, {withScenes: false, ledger, logContext: {gameId, reroll: true}});
+        const welcome = (await gameRef.collection('avatars').doc(SCENE_WELCOME_KEY).get()).data() as {data?: string} | undefined;
+        const styleReference = welcome?.data ? Buffer.from(welcome.data, 'base64') : undefined;
+        const drawn = await drawIllustrationSet(apiKey, claimed, {withScenes: false, styleReference, ledger, logContext: {gameId, reroll: true}});
         const {variants, versions} = await writeCandidates(gameRef, drawn.portraits, existing, [], {}, drawn.sheet);
 
         const costUSD = parseFloat(ledger.spentUSD.toFixed(6));
