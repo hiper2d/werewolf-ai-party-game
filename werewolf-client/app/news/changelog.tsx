@@ -13,6 +13,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        id: "sonnet-5-5", date: "Sep 2026", tags: ["Models"],
+        title: "Claude Sonnet 5.5 replaces Claude Sonnet 5",
+        body: (<>Anthropic&apos;s <strong>Claude Sonnet 5.5</strong> takes over the Sonnet slot in the model picker,
+            at the <strong>same price</strong> as Sonnet 5. Games that already have Sonnet bots switch to 5.5 on
+            their next turn, and those bots keep the reasoning from their earlier turns. Pick it for any bot or the
+            Game Master when you set up a lobby. Like Sonnet 5, it&apos;s available on the paid tier.</>),
+        media: null,
+        links: [{label: "Create a game", href: "/games"}],
+    },
+    {
         id: "gemini-voices-3-8", date: "Sep 2026", tags: ["Models", "Fixes"],
         title: "Faster, cheaper Gemini voices",
         body: (<>The Gemini voice set now runs on <strong>Gemini 3.8 Flash-Lite TTS</strong>. A line comes back
