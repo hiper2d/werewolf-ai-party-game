@@ -51,9 +51,10 @@ export const JEV_SCREEN_CONFIG = {
     GREY_SCORE: 1.2,
     /**
      * Anything slower than this lets the input through (fail-open). Production p50 is ~290 ms,
-     * but previews already reached 1.1 s and one timed out at the old 1.5 s budget (2026-09-23).
+     * but previews already reached 1.1 s and one timed out at the old 1.5 s budget (2026-09-23),
+     * and a chat message timed out at 5 s (2026-10-01).
      */
-    TIMEOUT_MS: 5_000,
+    TIMEOUT_MS: 10_000,
 } as const;
 
 export type ScreenQuestions = { risk: JevScoreQuestion } & Record<JevScreenFlag, JevNoulQuestion>;
