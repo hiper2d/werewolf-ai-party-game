@@ -89,9 +89,17 @@ export const IMAGE_MODEL_CONSTANTS = {
 export const STORY_MAX_OUTPUT_TOKENS = 16384;
 
 /**
+ * Story calls write up to 16k tokens and routinely run past the library's 60s per-call
+ * timeout (lib 0.19.0): Claude Haiku's character-sheet batches timed out at 60s in the live
+ * suite on 2026-10-06. 240s stays under Vercel's default 300s function limit.
+ */
+export const STORY_REQUEST_TIMEOUT_MS = 240_000;
+
+/**
  * Applies the story-generation profile to a freshly created GM agent (used by the story path
- * and mirrored by the live story test). Only the output ceiling differs from a turn: reasoning
- * stays at each model's catalog default (DeepSeek `low`, Qwen budget 1024, …). A deeper
+ * and mirrored by the live story test). Only the output ceiling and the per-call timeout differ
+ * from a turn: reasoning stays at each model's catalog default (DeepSeek `low`, Qwen budget
+ * 1024, …). A deeper
  * story profile (effort `high` + budget 8192) was measured 2026-08-30 and rejected — it
  * roughly doubled setup time on every model and made DeepSeek Flash volatile (60s to a
  * 240s timeout) with no observed quality gain. The per-instance `reasoningEffort` /
@@ -99,6 +107,7 @@ export const STORY_MAX_OUTPUT_TOKENS = 16384;
  */
 export function configureStoryAgent(agent: AbstractAgent): void {
     agent.maxOutputTokens = STORY_MAX_OUTPUT_TOKENS;
+    agent.requestTimeoutMs = STORY_REQUEST_TIMEOUT_MS;
 }
 
 // The image model's price is a library fact (see its image-catalog); the brief model is
@@ -262,13 +271,11 @@ const DEPRECATED_MODEL_MAP: Record<string, string> = {
     'deepseek-flash-thinking': LLM_CONSTANTS.DEEPSEEK_FLASH,
     'deepseek-pro-thinking': LLM_CONSTANTS.DEEPSEEK_PRO,
     'glm-thinking': LLM_CONSTANTS.GLM,
-    // Base `fugu` retired 2026-08-04: it billed at ultra's rates anyway (see the Fugu comment in
-    // the library's MODEL_PRICING), so persisted bots resolve to the model they were effectively
-    // already paying for. NOTE fugu-ultra is not free-tier eligible ($30 output), so a free-tier
-    // game still holding a migrated bot plays fine (agent creation resolves the id) but its model
-    // picker and "Retry with different model" will reject until that bot is switched —
-    // validateModelUsageForTier re-checks every bot in the game, not just the one being changed.
-    'fugu': LLM_CONSTANTS.FUGU_ULTRA,
+    // Base `fugu` retired 2026-08-04 and Fugu Ultra removed 2026-10-07 (lib 0.19.1: 65-78s
+    // turns, past the 60s request timeout, and too slow for story generation). Both resolve to
+    // Fugu Max, the remaining Fugu.
+    'fugu': LLM_CONSTANTS.FUGU_MAX,
+    'fugu-ultra': LLM_CONSTANTS.FUGU_MAX,
     // Qwen3.7 Plus retired 2026-08-30 alongside the 3.7→3.8 Flash swap; the Flash entry is the
     // cheap Qwen tier that replaces it.
     'qwen-plus': LLM_CONSTANTS.QWEN_FLASH,

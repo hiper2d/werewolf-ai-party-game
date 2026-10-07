@@ -51,9 +51,11 @@ const OLD_TO_NEW: Record<string, string> = {
     'kimi-turbo': 'kimi',
     'kimi-turbo-thinking': 'kimi',
     'kimi-thinking': 'kimi',
-    // Base Fugu retired 2026-08-04 — it billed at fugu-ultra's rates anyway.
-    'Sakana Fugu': 'fugu-ultra',
-    'fugu': 'fugu-ultra',
+    // Base Fugu retired 2026-08-04, Fugu Ultra removed 2026-10-07 — both move to Max.
+    'Sakana Fugu': 'fugu-max',
+    'fugu': 'fugu-max',
+    'Sakana Fugu Ultra': 'fugu-max',
+    'fugu-ultra': 'fugu-max',
     // Qwen3.7 Plus retired 2026-08-30; its games move to the (3.8) Flash entry.
     'qwen-plus': 'qwen-flash',
     'Qwen3.7 Plus': 'qwen-flash',
