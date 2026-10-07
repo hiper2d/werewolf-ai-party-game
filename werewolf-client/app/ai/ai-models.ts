@@ -294,6 +294,41 @@ export function resolveModelId(modelId: string): string {
 }
 
 /**
+ * Models that may play but may not be the Game Master. The GM writes the story at creation (a
+ * casting call plus parallel character-sheet batches, 240s per call, all inside Vercel's 300s
+ * function) and narrates every night and day while the player waits, so it has to be fast.
+ * Rule (2026-10-07): the 15-character story pipeline took over 150s in the live suite —
+ * Mistral Medium 3.5 277s, Grok 4.7 213s (medium effort), Qwen3.8 Max 198s, MiniMax M3 169s,
+ * Qwen3.8 Flash 160s. Kimi K3 (146s) is the closest one still allowed. Re-measure with the
+ * live story suite (app/ai/all-models.test.ts) when a model changes.
+ * Both Qwen models are slow at story time only because Qwen runs our parallel requests one at a
+ * time (Flash 2026-10-07: casting 14.5s, then 4 batches of ~20s work each finishing 20s apart,
+ * reasoning already at its minimum 1,024-token budget); a single GM turn is ~15-20s.
+ *
+ * Checked on every NEW Game Master choice (create, preview, model change, retry override,
+ * provider reassignment), not inside validateModelUsageForTier: that one also re-validates the
+ * existing GM on every bot model change, which would lock games that already have one of these.
+ */
+export const GAME_MASTER_BLOCKED_MODELS: ReadonlySet<string> = new Set([
+    LLM_CONSTANTS.MISTRAL_MEDIUM,
+    LLM_CONSTANTS.GROK,
+    LLM_CONSTANTS.QWEN_MAX,
+    LLM_CONSTANTS.MINIMAX,
+    LLM_CONSTANTS.QWEN_FLASH,
+]);
+
+export function isAllowedAsGameMaster(modelId: string): boolean {
+    return !GAME_MASTER_BLOCKED_MODELS.has(resolveModelId(modelId));
+}
+
+/** Throws a player-readable error when `modelId` cannot be the Game Master. RANDOM passes (resolved later). */
+export function assertAllowedAsGameMaster(modelId: string): void {
+    if (modelId === LLM_CONSTANTS.RANDOM || isAllowedAsGameMaster(modelId)) return;
+    const name = SupportedAiModels[resolveModelId(modelId)]?.displayName ?? modelId;
+    throw new Error(`${name} is too slow to be the Game Master. It can still play as a bot — pick a faster model for the Game Master.`);
+}
+
+/**
  * Returns all models available for free tier users
  */
 export function getFreeTierModels(): Array<{ modelName: string; config: ModelConfig }> {

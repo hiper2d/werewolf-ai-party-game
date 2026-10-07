@@ -24,7 +24,7 @@ import { after } from "next/server";
 import { midGameImagesEnabled, runDayIllustration } from "@/app/utils/illustration-generation";
 import { convertMessageContent } from "@/app/utils/message-utils";
 import { getJevApiKey } from "@/app/ai/jev-client";
-import { JevRouterUnavailableError, selectRespondingBotsWithJev } from "@/app/api/jev-router";
+import { JEV_JUDGE, JevRouterUnavailableError, OPENAI_DECISIONS_JUDGE, RouterJudge, selectRespondingBotsWithJev } from "@/app/api/jev-router";
 
 /**
  * Format day activity data for the GM prompt.
@@ -145,24 +145,32 @@ export async function selectRespondingBots(
         .map(b => b.name);
     const candidateNames = candidateBotNames.join(", ");
 
-    // Jev (typesafe.ai) routes in one sub-second judge call when its key is configured;
-    // without the key, or when the Jev call fails, the Game Master LLM does the routing below.
+    // Judge models route in one sub-second call: Jev (typesafe.ai) first, then OpenAI Decisions
+    // (gpt-6-luna, on the platform OpenAI key). Without a key for either, or when every judge
+    // call fails, the Game Master LLM does the routing below.
+    const judges: Array<{ judge: RouterJudge; apiKey: string }> = [];
     const jevApiKey = getJevApiKey(apiKeys);
-    if (jevApiKey) {
-        // Console line on purpose: in dev the structured logger ships to Better Stack only,
-        // and this is the one place to see which router a game runs on.
-        console.log(`🧭 Speaker router: Jev (typesafe.ai) — game ${game.id}, day ${game.currentDay}, ${candidateBotNames.length} candidates`);
+    if (jevApiKey) judges.push({ judge: JEV_JUDGE, apiKey: jevApiKey });
+    const openAiKey = apiKeys?.[OPENAI_DECISIONS_JUDGE.apiKeyName]?.trim();
+    if (openAiKey) judges.push({ judge: OPENAI_DECISIONS_JUDGE, apiKey: openAiKey });
+    if (judges.length > 0) {
         // A pending one-shot retry hint was written for the LLM router; clear it so it
         // doesn't ride a later, unrelated GM prompt.
         await consumeRetryHint(game.id, game, GAME_MASTER);
+    }
+    for (const [index, { judge, apiKey }] of judges.entries()) {
+        // Console line on purpose: in dev the structured logger ships to Better Stack only,
+        // and this is the one place to see which router a game runs on.
+        console.log(`🧭 Speaker router: ${judge.label} — game ${game.id}, day ${game.currentDay}, ${candidateBotNames.length} candidates`);
         try {
-            return await selectRespondingBotsWithJev(game, dayMessages, candidateBotNames, jevApiKey, userEmail);
+            return await selectRespondingBotsWithJev(game, dayMessages, candidateBotNames, apiKey, userEmail, judge);
         } catch (error) {
             if (!(error instanceof JevRouterUnavailableError)) throw error;
             // Not a retry of the same call: a different router, so an outage or an empty
-            // typesafe.ai balance degrades speaker picks instead of stalling the game.
-            console.warn(`🧭 Jev unavailable, falling back to the Game Master LLM router — game ${game.id}`);
-            logger.warn('Jev router unavailable, falling back to Game Master LLM router', {
+            // prepaid balance degrades speaker picks instead of stalling the game.
+            const next = judges[index + 1]?.judge.label ?? 'the Game Master LLM router';
+            console.warn(`🧭 ${judge.label} unavailable, falling back to ${next} — game ${game.id}`);
+            logger.warn(`${judge.label} router unavailable, falling back to ${next}`, {
                 gameId: game.id, userId: userEmail, activity: 'jev_router', error: error.details,
             });
         }

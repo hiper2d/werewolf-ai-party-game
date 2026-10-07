@@ -23,7 +23,8 @@ import {
     RECIPIENT_ALL,
     RECIPIENT_NONE,
 } from "@/app/api/game-models";
-import { askJev, JEV_API_KEY_NAME, JEV_MODEL, JevChoiceQuestion, JevError, JevNoulQuestion, JevScoreQuestion } from "@/app/ai/jev-client";
+import { askJev, JEV_API_KEY_NAME, JEV_MODEL, JevChoiceQuestion, JevInstructions, JevNoulQuestion, JevQuestion, JevResult, JevScoreQuestion } from "@/app/ai/jev-client";
+import { askOpenAiDecisions, OPENAI_DECISIONS_API_KEY_NAME, OPENAI_DECISIONS_MODEL } from "@/app/ai/openai-decisions-client";
 import { addMessageToChatAndSaveToDb } from "@/app/api/game-actions";
 import { recordRouterSpend } from "@/app/api/cost-tracking";
 import { assertFreeSpendWithinLimit } from "@/app/api/user-actions";
@@ -68,10 +69,14 @@ export const JEV_ROUTER_CONFIG = {
     /** Keep the state under Jev's 32k-token limit: roughly 4 chars per token, with headroom. */
     MAX_DISCUSSION_CHARS: 90_000,
     /**
-     * After this the call is abandoned and selectRespondingBots falls back to the Game Master LLM
-     * router, so a stalled Jev costs the player this long plus one GM call.
+     * After this a judge call is abandoned and selectRespondingBots moves on to the next judge,
+     * then the Game Master LLM router. Production Jev router calls Oct 4-7 2026 (224): p50 164 ms,
+     * p99 283 ms, slowest 404 ms — so a call still running at 2 s is stalled, not slow. This was
+     * 15 s until 2026-10-07, which froze the game for 15 s on every Jev hang.
      */
-    TIMEOUT_MS: 15_000,
+    TIMEOUT_MS: 2_000,
+    /** OpenAI Decisions, the second judge: measured 0.2-0.6 s on full router requests (2026-10-07). */
+    DECISIONS_TIMEOUT_MS: 3_000,
 } as const;
 
 /**
@@ -302,14 +307,52 @@ export function buildRouterRequest(game: Game, dayMessages: GameMessage[], candi
 }
 
 /**
- * The Jev call itself failed (network, timeout, 5xx, 429, or an auth/billing refusal such as an
- * empty prepaid balance). selectRespondingBots catches exactly this and falls back to the Game
- * Master LLM router; any other error (e.g. the free-tier spend cap) propagates as before.
+ * A judge model the router can ask: the same fan-out questions in, Jev-shaped answers out.
+ * Jev is the primary; OpenAI Decisions (gpt-6-luna) answers the same three question types and is
+ * the fallback before the Game Master LLM router. Answers are not calibrated identically across
+ * judges — JEV_ROUTER_CONFIG's thresholds were tuned on Jev.
+ */
+export interface RouterJudge {
+    /** Stable short id, used as the error context's gmAiType. */
+    id: string;
+    /** Shown in logs and the hidden GM_BOT_SELECTION message. */
+    label: string;
+    model: string;
+    /** Platform key doc entry this judge bills against. */
+    apiKeyName: string;
+    /** Abandon the call (and fall back) after this long. */
+    timeoutMs: number;
+    ask<Q extends Record<string, JevQuestion>>(apiKey: string, state: JevInstructions, questions: Q, options: { timeoutMs?: number }): Promise<JevResult<Q>>;
+}
+
+export const JEV_JUDGE: RouterJudge = {
+    id: 'jev',
+    label: 'Jev',
+    model: JEV_MODEL,
+    apiKeyName: JEV_API_KEY_NAME,
+    timeoutMs: JEV_ROUTER_CONFIG.TIMEOUT_MS,
+    ask: (apiKey, state, questions, options) => askJev(apiKey, state, questions, options),
+};
+
+export const OPENAI_DECISIONS_JUDGE: RouterJudge = {
+    id: 'openai-decisions',
+    label: 'OpenAI Decisions',
+    model: OPENAI_DECISIONS_MODEL,
+    apiKeyName: OPENAI_DECISIONS_API_KEY_NAME,
+    timeoutMs: JEV_ROUTER_CONFIG.DECISIONS_TIMEOUT_MS,
+    ask: (apiKey, state, questions, options) => askOpenAiDecisions(apiKey, state, questions, options),
+};
+
+/**
+ * The judge call itself failed (network, timeout, 5xx, 429, a refusal, or an auth/billing refusal
+ * such as an empty prepaid balance). selectRespondingBots catches exactly this and moves on to the
+ * next judge, then the Game Master LLM router; any other error (e.g. the free-tier spend cap)
+ * propagates as before.
  */
 export class JevRouterUnavailableError extends BotResponseError {}
 
 /**
- * Ask Jev who replies next and turn the answer into the bot queue. Bills the call, saves the
+ * Ask a judge (Jev by default) who replies next and turn the answer into the bot queue. Bills the call, saves the
  * hidden GM_BOT_SELECTION debug message and kicks off the mid-day illustration when the
  * exchange is dramatic. Returns the selected bot names (never empty for a non-empty roster).
  */
@@ -318,7 +361,8 @@ export async function selectRespondingBotsWithJev(
     dayMessages: GameMessage[],
     candidateNames: string[],
     apiKey: string,
-    userEmail: string
+    userEmail: string,
+    judge: RouterJudge = JEV_JUDGE
 ): Promise<string[]> {
     if (candidateNames.length === 0) {
         return [];
@@ -333,25 +377,27 @@ export async function selectRespondingBotsWithJev(
     // whole day's discussion); the Firestore record below keeps the full copy for replay.
     let result;
     try {
-        result = await askJev(apiKey, state, questions, { timeoutMs: JEV_ROUTER_CONFIG.TIMEOUT_MS });
-        console.log(`🧭 Jev answered ${Object.keys(questions).length} questions in ${result.durationMs} ms — ${result.inputTokens} input tokens, $${result.costUSD.toFixed(6)} (${result.model})`);
+        result = await judge.ask(apiKey, state, questions, { timeoutMs: judge.timeoutMs });
+        console.log(`🧭 ${judge.label} answered ${Object.keys(questions).length} questions in ${result.durationMs} ms — ${result.inputTokens} input tokens, $${result.costUSD.toFixed(6)} (${result.model})`);
     } catch (error: any) {
-        console.error(`🧭 Jev request failed: ${error?.message ?? error}`);
-        const detail = error instanceof JevError ? `${error.message}${error.body ? `: ${error.body}` : ''}` : String(error?.message ?? error);
+        console.error(`🧭 ${judge.label} request failed: ${error?.message ?? error}`);
+        // Both judge clients throw errors carrying the HTTP status and a body excerpt.
+        const status: number | undefined = typeof error?.status === 'number' ? error.status : undefined;
+        const detail = `${error?.message ?? error}${error?.body ? `: ${error.body}` : ''}`;
         // The failed request is recorded in full in Firestore (not here) — a bad answer and a
         // refused request both need the exact input to be reproduced.
-        logger.error('Jev router request failed', {
+        logger.error(`${judge.label} router request failed`, {
             gameId: game.id, userId: userEmail, agentName: GAME_MASTER, activity: 'jev_router',
-            error: detail, status: error instanceof JevError ? error.status : undefined,
+            model: judge.model, error: detail, status,
         });
         await saveJevRouterCall({
-            gameId: game.id, userId: userEmail, day: game.currentDay, status: 'error', model: JEV_MODEL,
-            state, questions, error: detail, httpStatus: error instanceof JevError ? (error.status ?? undefined) : undefined,
+            gameId: game.id, userId: userEmail, day: game.currentDay, status: 'error', model: judge.model,
+            state, questions, error: detail, httpStatus: status,
         });
         throw new JevRouterUnavailableError(
             'Game Master failed to select responding bots',
-            `Jev speaker router failed: ${detail}`,
-            { gmAiType: 'jev', action: 'bot_selection' },
+            `${judge.label} speaker router failed: ${detail}`,
+            { gmAiType: judge.id, action: 'bot_selection' },
             true
         );
     }
@@ -361,7 +407,7 @@ export async function selectRespondingBotsWithJev(
         { inputTokens: result.inputTokens, outputTokens: 0, costUSD: result.costUSD, durationMs: result.durationMs },
         userEmail,
         result.model,
-        JEV_API_KEY_NAME
+        judge.apiKeyName
     );
 
     const quietChoice = result.answers.quiet_pick;
@@ -417,14 +463,14 @@ export async function selectRespondingBotsWithJev(
         id: null,
         recipientName: RECIPIENT_NONE,
         authorName: GAME_MASTER,
-        msg: `Jev selected: [${selectedBots.join(', ')}]. Ranked: ${ranking}. Must: [${composed.must.join(', ')}]. Quiet slots: [${composed.quiet.join(', ')}] from pool {${quietSummary}}. Target count: ${composed.target}. Dramatic: ${dramatic.toFixed(2)}. ${result.durationMs} ms, ${result.inputTokens} tokens.`,
+        msg: `${judge.label} selected: [${selectedBots.join(', ')}]. Ranked: ${ranking}. Must: [${composed.must.join(', ')}]. Quiet slots: [${composed.quiet.join(', ')}] from pool {${quietSummary}}. Target count: ${composed.target}. Dramatic: ${dramatic.toFixed(2)}. ${result.durationMs} ms, ${result.inputTokens} tokens.`,
         messageType: MessageType.GM_BOT_SELECTION,
         day: game.currentDay,
         timestamp: null
     };
     await addMessageToChatAndSaveToDb(selectionMessage, game.id);
 
-    console.log(`🧭 Jev selected [${selectedBots.join(', ')}] — ranked: ${ranking}; must: [${composed.must.join(', ')}]; quiet: [${composed.quiet.join(', ')}] from pool {${quietSummary}}; target ${composed.target}; dramatic ${dramatic.toFixed(2)}`);
+    console.log(`🧭 ${judge.label} selected [${selectedBots.join(', ')}] — ranked: ${ranking}; must: [${composed.must.join(', ')}]; quiet: [${composed.quiet.join(', ')}] from pool {${quietSummary}}; target ${composed.target}; dramatic ${dramatic.toFixed(2)}`);
 
     const decision = {
         selected: selectedBots,

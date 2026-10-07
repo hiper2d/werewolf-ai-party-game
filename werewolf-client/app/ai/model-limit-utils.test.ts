@@ -10,11 +10,15 @@ import {
     estimateTurnCostUSD,
     getTurnCost,
     resolveModelId,
+    GAME_MASTER_BLOCKED_MODELS,
+    assertAllowedAsGameMaster,
+    isAllowedAsGameMaster,
 } from './ai-models';
 import { USER_TIERS } from '@/app/api/game-models';
 import {
     consumeModelUsage,
     getCandidateModelsForTier,
+    getGameMasterCandidateModelsForTier,
     getModelPickerOptions,
     validateModelUsageForTier,
     type ModelPickerOption,
@@ -306,5 +310,34 @@ describe('Kimi K3 free-tier policy', () => {
 
     it('remains selectable on paid tier', () => {
         expect(getCandidateModelsForTier(USER_TIERS.PAID)).toContain(LLM_CONSTANTS.KIMI);
+    });
+});
+
+describe('Game Master speed rule', () => {
+    it('pins the blocked set: story pipeline over 150s in the 2026-10-07 live suite', () => {
+        expect([...GAME_MASTER_BLOCKED_MODELS].sort()).toEqual([
+            LLM_CONSTANTS.GROK, LLM_CONSTANTS.MINIMAX, LLM_CONSTANTS.MISTRAL_MEDIUM, LLM_CONSTANTS.QWEN_FLASH, LLM_CONSTANTS.QWEN_MAX,
+        ].sort());
+        for (const id of GAME_MASTER_BLOCKED_MODELS) expect(SupportedAiModels[id]).toBeDefined();
+    });
+
+    it('resolves retired ids before checking', () => {
+        expect(resolveModelId('grok-thinking')).toBe(LLM_CONSTANTS.GROK);
+        expect(isAllowedAsGameMaster('grok-thinking')).toBe(false);
+        expect(isAllowedAsGameMaster(LLM_CONSTANTS.DEEPSEEK_FLASH)).toBe(true);
+    });
+
+    it('GM candidates are the tier candidates minus the blocked set, on every tier', () => {
+        for (const tier of [USER_TIERS.FREE, USER_TIERS.PAID]) {
+            const gm = getGameMasterCandidateModelsForTier(tier);
+            expect(gm.length).toBeGreaterThan(0);
+            expect(gm).toEqual(getCandidateModelsForTier(tier).filter(m => !GAME_MASTER_BLOCKED_MODELS.has(m)));
+        }
+    });
+
+    it('assertAllowedAsGameMaster names the model and lets RANDOM through for later resolution', () => {
+        expect(() => assertAllowedAsGameMaster(LLM_CONSTANTS.QWEN_FLASH)).toThrow('Qwen3.8 Flash is too slow to be the Game Master.');
+        expect(() => assertAllowedAsGameMaster(LLM_CONSTANTS.RANDOM)).not.toThrow();
+        expect(() => assertAllowedAsGameMaster(LLM_CONSTANTS.CLAUDE_HAIKU)).not.toThrow();
     });
 });

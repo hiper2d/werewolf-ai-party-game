@@ -194,7 +194,7 @@ describe('screenHumanInput', () => {
         expect(mockSaveRecord.mock.calls[0][0]).toMatchObject({ verdict: 'error', error: 'This operation was aborted', enforced: false });
     });
 
-    it('gives Jev 10 s, then fails open on the timeout and records it', async () => {
+    it('gives Jev 3 s, then fails open on the timeout and records it', async () => {
         const { askJev } = jest.requireActual('@/app/ai/jev-client');
         mockAskJev.mockImplementation(askJev);
         (global as any).fetch = jest.fn((_url: string, init: { signal: AbortSignal }) => new Promise((_resolve, reject) => {
@@ -211,10 +211,10 @@ describe('screenHumanInput', () => {
             expect(settled).not.toHaveBeenCalled();
             await jest.advanceTimersByTimeAsync(1);
 
-            expect(JEV_SCREEN_CONFIG.TIMEOUT_MS).toBe(10_000);
+            expect(JEV_SCREEN_CONFIG.TIMEOUT_MS).toBe(3_000);
             expect(await call).toEqual({ verdict: 'error', reason: null, mode: 'enforce', blocked: false });
             expect(mockSaveRecord.mock.calls[0][0]).toMatchObject({
-                verdict: 'error', error: 'Jev request timed out after 10000 ms', httpStatus: undefined, enforced: false,
+                verdict: 'error', error: 'Jev request timed out after 3000 ms', httpStatus: undefined, enforced: false,
             });
             expect(mockRecordScreenSpend).not.toHaveBeenCalled();
         } finally {

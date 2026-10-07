@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { LLM_CONSTANTS, SupportedAiModels, getModelDisplayName, getModelTags, type ModelTag } from '@/app/ai/ai-models';
+import { LLM_CONSTANTS, SupportedAiModels, getModelDisplayName, getModelTags, isAllowedAsGameMaster, type ModelTag } from '@/app/ai/ai-models';
 import { getModelPickerOptions } from '@/app/ai/model-limit-utils';
-import { UserTier, USER_TIERS, type ProviderBlock } from '@/app/api/game-models';
+import { GAME_MASTER, UserTier, USER_TIERS, type ProviderBlock } from '@/app/api/game-models';
 import { providerBlockMessage } from '@/app/api/provider-blocks';
 import { useUIControls } from '../context/UIControlsContext';
 
@@ -62,8 +62,11 @@ export default function ModelSelectionDialog({
             .filter(option => {
                 const apiKeyName = SupportedAiModels[option.model]?.apiKeyName;
                 return !(apiKeyName && blockedProviders?.[apiKeyName]);
-            });
-    }, [gameTier, usageCounts, currentModel, blockedProviders]);
+            })
+            // Models too slow to be the Game Master (GAME_MASTER_BLOCKED_MODELS) are not offered
+            // for the GM; the server rejects them too.
+            .filter(option => botName !== GAME_MASTER || isAllowedAsGameMaster(option.model));
+    }, [gameTier, usageCounts, currentModel, blockedProviders, botName]);
 
     const blockedNotices = useMemo(() => Object.values(blockedProviders ?? {}).map(providerBlockMessage), [blockedProviders]);
 

@@ -1,4 +1,4 @@
-import {LLM_CONSTANTS, SupportedAiModels, resolveModelId} from '@/app/ai/ai-models';
+import {LLM_CONSTANTS, SupportedAiModels, isAllowedAsGameMaster, resolveModelId} from '@/app/ai/ai-models';
 import {UserTier, USER_TIERS} from '@/app/api/game-models';
 
 export const FREE_TIER_UNLIMITED = Number.POSITIVE_INFINITY;
@@ -76,6 +76,11 @@ export function consumeModelUsage(
     }
 
     usageCounts[resolved] = used + 1;
+}
+
+/** Models the tier can use that are also allowed to be the Game Master (see GAME_MASTER_BLOCKED_MODELS). */
+export function getGameMasterCandidateModelsForTier(tier: UserTier): string[] {
+    return getCandidateModelsForTier(tier).filter(isAllowedAsGameMaster);
 }
 
 export function getCandidateModelsForTier(tier: UserTier): string[] {

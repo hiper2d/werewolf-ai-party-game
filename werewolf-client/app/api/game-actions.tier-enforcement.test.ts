@@ -432,6 +432,44 @@ describe('previewGame tier enforcement', () => {
         });
     });
 
+    describe('Game Master speed rule (GAME_MASTER_BLOCKED_MODELS)', () => {
+        it('rejects a slow GM model on the paid tier before the story agent runs', async () => {
+            mockTier(USER_TIERS.PAID);
+            setupDbForPreview(0);
+            stubAgentReturning(3);
+
+            await expect(
+                previewGame(makePreview({ gameMasterAiType: LLM_CONSTANTS.GROK }))
+            ).rejects.toThrow('Grok 4.7 is too slow to be the Game Master.');
+            expect(AgentFactory.createAgent).not.toHaveBeenCalled();
+            expect(recordSpend).not.toHaveBeenCalled();
+        });
+
+        it('resolves a RANDOM GM only among models allowed as Game Master', async () => {
+            mockTier(USER_TIERS.PAID);
+            setupDbForPreview(0);
+            stubAgentReturning(3);
+
+            const result = await previewGame(makePreview({
+                gameMasterAiType: LLM_CONSTANTS.RANDOM,
+                playersAiType: [LLM_CONSTANTS.GROK, LLM_CONSTANTS.QWEN_MAX, LLM_CONSTANTS.DEEPSEEK_FLASH],
+            }));
+            expect(result.gameMasterAiType).toBe(LLM_CONSTANTS.DEEPSEEK_FLASH);
+        });
+
+        it('rejects a RANDOM GM when every selected model is too slow to be the Game Master', async () => {
+            mockTier(USER_TIERS.PAID);
+            setupDbForPreview(0);
+            stubAgentReturning(3);
+
+            await expect(previewGame(makePreview({
+                gameMasterAiType: LLM_CONSTANTS.RANDOM,
+                playersAiType: [LLM_CONSTANTS.GROK, LLM_CONSTANTS.MISTRAL_MEDIUM],
+            }))).rejects.toThrow('No AI models are available for the game master');
+            expect(AgentFactory.createAgent).not.toHaveBeenCalled();
+        });
+    });
+
     describe('RANDOM game master resolution', () => {
         it('resolves RANDOM GM from the selected player models, respecting tier capacity', async () => {
             mockTier(USER_TIERS.FREE);
@@ -488,6 +526,16 @@ describe('createGame tier enforcement', () => {
         ).rejects.toThrow(
             `Failed to create game: The AI model ${LLM_CONSTANTS.CLAUDE_OPUS} is not available on the free tier as the game master.`
         );
+        expect(setGame).not.toHaveBeenCalled();
+    });
+
+    it('rejects a GM model that is too slow to be the Game Master, on any tier', async () => {
+        mockTier(USER_TIERS.PAID);
+        const { setGame } = setupDbForCreate();
+
+        await expect(
+            createGame(makeGeneratedPreview({ gameMasterAiType: LLM_CONSTANTS.MINIMAX }))
+        ).rejects.toThrow('MiniMax M3 is too slow to be the Game Master.');
         expect(setGame).not.toHaveBeenCalled();
     });
 

@@ -22,7 +22,7 @@ jest.mock('@/app/utils/logger', () => ({
     logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn(), agentActivity: (...args: any[]) => mockAgentActivity(...args) },
 }));
 
-import { buildRouterRequest, composeSpeakerSet, JEV_ROUTER_CONFIG, JevRouterUnavailableError, selectRespondingBotsWithJev } from '@/app/api/jev-router';
+import { buildRouterRequest, composeSpeakerSet, JEV_ROUTER_CONFIG, JevRouterUnavailableError, OPENAI_DECISIONS_JUDGE, selectRespondingBotsWithJev } from '@/app/api/jev-router';
 
 /** Deterministic "random": returns the given values in order, then 0. */
 function seq(values: number[]): () => number {
@@ -193,6 +193,37 @@ describe('selectRespondingBotsWithJev', () => {
         (global as any).fetch = fetchMock;
     });
 
+    it('runs the same selection on the OpenAI Decisions judge, billed to the OpenAI key', async () => {
+        const decisionsScore = (name: string, top: number, score: number) => ({
+            type: 'score', name: `reply_${name}`, score, confidence: 0.5,
+            probabilities: [0, 1, 2, 3].map(value => ({ value, label: String(value), probability: value === 3 ? top : (1 - top) / 3 })),
+        });
+        fetchMock.mockResolvedValue({
+            ok: true, status: 200,
+            text: async () => JSON.stringify({
+                model: 'gpt-6-luna',
+                answers: [
+                    { type: 'predicate', name: 'dramatic', probability: 0.2 },
+                    { type: 'choice', name: 'quiet_pick', choice: 'Cleo', confidence: 0.5,
+                      probabilities: [{ value: 'Alice', probability: 0.3 }, { value: 'Cleo', probability: 0.7 }] },
+                    decisionsScore('Alice', 0.05, 1.2), decisionsScore('Bram', 0.97, 3), decisionsScore('Cleo', 0.02, 0.3),
+                ],
+                usage: { input_tokens: 2000, output_tokens: 0 },
+            }),
+        });
+
+        const selected = await selectRespondingBotsWithJev(game, messages as any, ['Alice', 'Bram', 'Cleo'], 'sk', 'u@e.com', OPENAI_DECISIONS_JUDGE);
+
+        expect(fetchMock.mock.calls[0][0]).toBe('https://api.openai.com/v1/decisions');
+        expect(selected).toContain('Bram');
+        const [, usage, , modelId, keyName] = mockRecordRouterSpend.mock.calls[0];
+        expect(usage.costUSD).toBeCloseTo(2000 / 1e6 * 0.10, 10);
+        expect(modelId).toBe('gpt-6-luna');
+        expect(keyName).toBe('OPENAI_API_KEY');
+        expect(savedMessages[0].msg).toContain('OpenAI Decisions selected');
+        expect(mockSaveRecord.mock.calls[0][0]).toMatchObject({ status: 'ok', model: 'gpt-6-luna' });
+    });
+
     it('calls Jev once, bills it, saves the debug message, and picks the must-reply bot', async () => {
         fetchMock.mockResolvedValue({
             ok: true, status: 200,
@@ -285,7 +316,32 @@ describe('selectRespondingBotsWithJev', () => {
         expect(savedMessages).toHaveLength(0);
     });
 
-    it('gives Jev 15 s, then throws the fallback error and records the timeout', async () => {
+    it('gives OpenAI Decisions its own 3 s budget', async () => {
+        jest.useFakeTimers();
+        try {
+            fetchMock.mockImplementation((_url: string, init: { signal: AbortSignal }) => new Promise((_resolve, reject) => {
+                init.signal.addEventListener('abort', () => reject(new DOMException('This operation was aborted', 'AbortError')));
+            }));
+            const call = selectRespondingBotsWithJev(game, messages as any, ['Alice', 'Bram', 'Cleo'], 'sk', 'u@e.com', OPENAI_DECISIONS_JUDGE);
+            const settled = jest.fn();
+            call.then(settled, settled);
+
+            await jest.advanceTimersByTimeAsync(JEV_ROUTER_CONFIG.DECISIONS_TIMEOUT_MS - 1);
+            expect(settled).not.toHaveBeenCalled();
+            await jest.advanceTimersByTimeAsync(1);
+
+            const error = await call.catch(e => e);
+            expect(JEV_ROUTER_CONFIG.DECISIONS_TIMEOUT_MS).toBe(3_000);
+            expect(error).toBeInstanceOf(JevRouterUnavailableError);
+            expect(mockSaveRecord).toHaveBeenCalledWith(expect.objectContaining({
+                status: 'error', model: 'gpt-6-luna', error: 'OpenAI Decisions request timed out after 3000 ms',
+            }));
+        } finally {
+            jest.useRealTimers();
+        }
+    });
+
+    it('gives Jev 2 s, then throws the fallback error and records the timeout', async () => {
         jest.useFakeTimers();
         try {
             fetchMock.mockImplementation((_url: string, init: { signal: AbortSignal }) => new Promise((_resolve, reject) => {
@@ -300,11 +356,11 @@ describe('selectRespondingBotsWithJev', () => {
             await jest.advanceTimersByTimeAsync(1);
 
             const error = await call.catch(e => e);
-            expect(JEV_ROUTER_CONFIG.TIMEOUT_MS).toBe(15_000);
+            expect(JEV_ROUTER_CONFIG.TIMEOUT_MS).toBe(2_000);
             expect(error).toBeInstanceOf(JevRouterUnavailableError);
             expect(error.recoverable).toBe(true);
             expect(mockSaveRecord).toHaveBeenCalledWith(expect.objectContaining({
-                status: 'error', error: 'Jev request timed out after 15000 ms', httpStatus: undefined,
+                status: 'error', error: 'Jev request timed out after 2000 ms', httpStatus: undefined,
             }));
             expect(mockRecordRouterSpend).not.toHaveBeenCalled();
             expect(savedMessages).toHaveLength(0);

@@ -19,7 +19,12 @@ jest.mock('@/app/ai/jev-client', () => ({ getJevApiKey: () => mockGetJevApiKey()
 jest.mock('@/app/api/jev-router', () => {
     const { BotResponseError } = jest.requireActual('@/app/api/game-models');
     class JevRouterUnavailableError extends BotResponseError {}
-    return { JevRouterUnavailableError, selectRespondingBotsWithJev: (...args: any[]) => mockJevSelect(...args) };
+    return {
+        JevRouterUnavailableError,
+        JEV_JUDGE: { label: 'Jev', apiKeyName: 'TYPESAFE_API_KEY' },
+        OPENAI_DECISIONS_JUDGE: { label: 'OpenAI Decisions', apiKeyName: 'OPENAI_API_KEY' },
+        selectRespondingBotsWithJev: (...args: any[]) => mockJevSelect(...args),
+    };
 });
 
 import { selectRespondingBots } from '@/app/api/bot-selection';
@@ -59,13 +64,13 @@ describe('Jev router falls back to the Game Master LLM router', () => {
         expect(mockAsk).toHaveBeenCalledTimes(1);
         const { logger } = jest.requireMock('@/app/utils/logger');
         expect(logger.warn).toHaveBeenCalledWith(
-            'Jev router unavailable, falling back to Game Master LLM router',
+            'Jev router unavailable, falling back to the Game Master LLM router',
             expect.objectContaining({ gameId: 'g1', activity: 'jev_router', error: 'Jev returned HTTP 402' })
         );
     });
 
     it('falls back the same way when Jev timed out', async () => {
-        mockJevSelect.mockRejectedValue(new JevRouterUnavailableError('x', 'Jev speaker router failed: Jev request timed out after 15000 ms', { gmAiType: 'jev' }, true));
+        mockJevSelect.mockRejectedValue(new JevRouterUnavailableError('x', 'Jev speaker router failed: Jev request timed out after 2000 ms', { gmAiType: 'jev' }, true));
         mockAsk.mockResolvedValue([{ selected_bots: ['Bram'] }, '', undefined, undefined]);
         expect(await selectRespondingBots(game, {}, 'u@e.com')).toContain('Bram');
         expect(mockAsk).toHaveBeenCalledTimes(1);
@@ -94,5 +99,37 @@ describe('Jev router falls back to the Game Master LLM router', () => {
         mockJevSelect.mockRejectedValue(capError);
         await expect(selectRespondingBots(game, {}, 'u@e.com')).rejects.toBe(capError);
         expect(mockAsk).not.toHaveBeenCalled();
+    });
+
+    it('tries OpenAI Decisions after Jev when the OpenAI key is configured', async () => {
+        mockJevSelect
+            .mockRejectedValueOnce(new JevRouterUnavailableError('x', 'Jev returned HTTP 402', { gmAiType: 'jev' }, true))
+            .mockResolvedValueOnce(['Alice']);
+        expect(await selectRespondingBots(game, { OPENAI_API_KEY: 'sk' }, 'u@e.com')).toEqual(['Alice']);
+        expect(mockJevSelect).toHaveBeenCalledTimes(2);
+        expect(mockJevSelect.mock.calls[0][5].label).toBe('Jev');
+        expect(mockJevSelect.mock.calls[1][3]).toBe('sk');
+        expect(mockJevSelect.mock.calls[1][5].label).toBe('OpenAI Decisions');
+        expect(mockAsk).not.toHaveBeenCalled();
+        const { logger } = jest.requireMock('@/app/utils/logger');
+        expect(logger.warn).toHaveBeenCalledWith('Jev router unavailable, falling back to OpenAI Decisions', expect.anything());
+    });
+
+    it('runs the GM router once when both judges fail', async () => {
+        mockJevSelect.mockRejectedValue(new JevRouterUnavailableError('x', 'down', { gmAiType: 'jev' }, true));
+        mockAsk.mockResolvedValue([{ selected_bots: ['Bram'] }, '', undefined, undefined]);
+        expect(await selectRespondingBots(game, { OPENAI_API_KEY: 'sk' }, 'u@e.com')).toContain('Bram');
+        expect(mockJevSelect).toHaveBeenCalledTimes(2);
+        expect(mockAsk).toHaveBeenCalledTimes(1);
+        const { logger } = jest.requireMock('@/app/utils/logger');
+        expect(logger.warn).toHaveBeenLastCalledWith('OpenAI Decisions router unavailable, falling back to the Game Master LLM router', expect.anything());
+    });
+
+    it('routes with OpenAI Decisions alone when there is no Jev key', async () => {
+        mockGetJevApiKey.mockReturnValue(null);
+        mockJevSelect.mockResolvedValue(['Bram']);
+        expect(await selectRespondingBots(game, { OPENAI_API_KEY: 'sk' }, 'u@e.com')).toEqual(['Bram']);
+        expect(mockJevSelect).toHaveBeenCalledTimes(1);
+        expect(mockJevSelect.mock.calls[0][5].label).toBe('OpenAI Decisions');
     });
 });

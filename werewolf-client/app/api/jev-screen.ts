@@ -50,11 +50,13 @@ export const JEV_SCREEN_CONFIG = {
     /** Grey zone starts here on the 0–3 score: recorded and counted, never rejected. */
     GREY_SCORE: 1.2,
     /**
-     * Anything slower than this lets the input through (fail-open). Production p50 is ~290 ms,
-     * but previews already reached 1.1 s and one timed out at the old 1.5 s budget (2026-09-23),
-     * and a chat message timed out at 5 s (2026-10-01).
+     * Anything slower than this lets the input through (fail-open). Production Oct 4-7 2026 (189
+     * calls): p50 168 ms, p99 314 ms, slowest 343 ms; earlier, previews reached 1.1 s and one
+     * timed out at a 1.5 s budget (2026-09-23), and a chat message timed out at 5 s (2026-10-01).
+     * 3 s covers the slow previews; past that Jev is stalled, and every human message would wait
+     * on it (it was 10 s until 2026-10-07).
      */
-    TIMEOUT_MS: 10_000,
+    TIMEOUT_MS: 3_000,
 } as const;
 
 export type ScreenQuestions = { risk: JevScoreQuestion } & Record<JevScreenFlag, JevNoulQuestion>;

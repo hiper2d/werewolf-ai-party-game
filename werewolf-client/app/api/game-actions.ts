@@ -50,7 +50,7 @@ import {getFreeTierLimits} from "@/app/api/limits-actions";
 import {getDefaultVoiceProvider, getVoiceConfig, isVoiceOfProvider, SUPPORTED_VOICE_PROVIDERS, VoiceProvider} from "@/app/ai/voice-config";
 import {normalizeSpendings} from "@/app/utils/spending-utils";
 import {serializeMessageForFirestore} from "@/app/api/message-serialization";
-import {LLM_CONSTANTS, configureStoryAgent, SupportedAiModels} from "@/app/ai/ai-models";
+import {LLM_CONSTANTS, assertAllowedAsGameMaster, configureStoryAgent, isAllowedAsGameMaster, SupportedAiModels} from "@/app/ai/ai-models";
 import {
     consumeModelUsage,
     getCandidateModelsForTier,
@@ -359,14 +359,17 @@ export async function previewGame(gamePreview: GamePreview, progressId?: string)
         const selectedModels = Array.isArray(gamePreview.playersAiType) && gamePreview.playersAiType.length > 0
             ? gamePreview.playersAiType.filter(m => m !== LLM_CONSTANTS.RANDOM)
             : [];
+        // Only models fast enough to be the Game Master (GAME_MASTER_BLOCKED_MODELS).
         const pool = selectedModels.length > 0
-            ? selectedModels.filter(model => hasCapacity(model, tier, usageCounts))
-            : getCandidateModelsForTier(tier).filter(model => hasCapacity(model, tier, usageCounts));
+            ? selectedModels.filter(model => isAllowedAsGameMaster(model) && hasCapacity(model, tier, usageCounts))
+            : getCandidateModelsForTier(tier).filter(model => isAllowedAsGameMaster(model) && hasCapacity(model, tier, usageCounts));
         if (pool.length === 0) {
             throw new Error('No AI models are available for the game master on your current tier. Please adjust your selection or upgrade your plan.');
         }
         resolvedGmAiType = pool[Math.floor(Math.random() * pool.length)];
     }
+    // Before any story token is spent: a slow Game Master fails or stalls story generation.
+    assertAllowedAsGameMaster(resolvedGmAiType);
 
     consumeModelUsage(resolvedGmAiType, tier, usageCounts, 'as the game master');
 
@@ -603,6 +606,7 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
     try {
         const { tier, apiKeys } = await getUserTierAndApiKeys(session.user.email);
         validateModelUsageForTier(tier, gamePreview.gameMasterAiType, gamePreview.bots.map(bot => bot.playerAiType));
+        assertAllowedAsGameMaster(gamePreview.gameMasterAiType);
         // The preview was guarded too, but the avatar draw that follows creation is
         // image spend of its own; refuse here rather than draw past the cap.
         if (tier === USER_TIERS.FREE) {
@@ -1032,6 +1036,7 @@ export async function updateGameMasterModel(gameId: string, newAiType: string): 
         const bots = (gameData?.bots || []) as Bot[];
         assertProviderNotBlocked({ providerBlocks: gameData?.providerBlocks }, newAiType);
         const { apiKeys: currentApiKeys } = await getUserTierAndApiKeys(session.user.email);
+        assertAllowedAsGameMaster(newAiType);
         validateModelUsageForTier(gameTier, newAiType, bots.map((bot: Bot) => bot.aiType));
 
         // Update the Game Master AI type in Firestore
@@ -1346,6 +1351,7 @@ export async function retryWithModelOverride(gameId: string, model: string, enab
     // Enforce the same tier/usage rules as a permanent model change, with the
     // override substituted for the target's model.
     const gmModel = target === GAME_MASTER ? model : game.gameMasterAiType;
+    if (target === GAME_MASTER) assertAllowedAsGameMaster(model);
     const botModels = game.bots.map(b => (b.name === target ? model : b.aiType));
     const { apiKeys } = await getUserTierAndApiKeys(session.user.email);
     validateModelUsageForTier(gameTier, gmModel, botModels);
@@ -1663,6 +1669,8 @@ export async function reassignProviderModels(gameId: string, providerKey: string
     const bots = (gameData?.bots || []) as Bot[];
     const updatedBots = bots.map(bot => providerKeyOf(bot.aiType) === providerKey ? { ...bot, aiType: newModel } : bot);
     const gameMasterAiType = providerKeyOf(gameData?.gameMasterAiType) === providerKey ? newModel : gameData?.gameMasterAiType;
+    // Only when the GM itself moves: an existing slow GM on another provider is left alone.
+    if (gameMasterAiType !== gameData?.gameMasterAiType) assertAllowedAsGameMaster(gameMasterAiType);
     validateModelUsageForTier(gameTier, gameMasterAiType, updatedBots.map(bot => bot.aiType));
 
     await gameRef.update({ bots: updatedBots, gameMasterAiType });

@@ -16,8 +16,8 @@ import CastList, {RowPortrait} from '@/app/games/newgame/components/CastList';
 import GeneratingStatus from '@/app/games/newgame/components/GeneratingStatus';
 import {iconButton, InfoButton, inputStyle, labelStyle, monoLabel, monoMeta, PlayIcon, primaryButton, secondaryButton, SegmentedControl} from '@/app/games/newgame/components/form-ui';
 import ReframeModal from '@/app/components/ReframeModal';
-import {LLM_CONSTANTS, SupportedAiModels, getModelDisplayName, modelHasTag, modelIsFast} from "@/app/ai/ai-models";
-import {FREE_TIER_UNLIMITED, getCandidateModelsForTier, getModelPickerOptions, getPerGameModelLimit} from "@/app/ai/model-limit-utils";
+import {LLM_CONSTANTS, SupportedAiModels, getModelDisplayName, isAllowedAsGameMaster, modelHasTag, modelIsFast} from "@/app/ai/ai-models";
+import {FREE_TIER_UNLIMITED, getCandidateModelsForTier, getGameMasterCandidateModelsForTier, getModelPickerOptions, getPerGameModelLimit} from "@/app/ai/model-limit-utils";
 import AIModelSelect from '@/app/components/AIModelSelect';
 import ModelSelectDropdown from '@/app/components/ModelSelectDropdown';
 import SelectDropdown from '@/app/components/SelectDropdown';
@@ -108,7 +108,7 @@ export default function CreateNewGamePage() {
         // render — a reconciliation effect below re-picks from the user's actually-allowed
         // pool once that data is in.
         return pickDefaultGmModel(
-            Object.values(LLM_CONSTANTS).filter(m => m !== LLM_CONSTANTS.RANDOM)
+            Object.values(LLM_CONSTANTS).filter(m => m !== LLM_CONSTANTS.RANDOM && isAllowedAsGameMaster(m))
         );
     });
     const [selectedPlayerAiTypes, setSelectedPlayerAiTypes] = useState<string[]>(
@@ -154,8 +154,8 @@ export default function CreateNewGamePage() {
     const candidateModels = useMemo(() => getCandidateModelsForTier(userTier), [userTier]);
 
     const gmModelOptions = useMemo(() => {
-        // Tested single source of truth: free tier → free-tier catalog, paid → all models.
-        return getCandidateModelsForTier(userTier)
+        // Tested single source of truth: the tier's models minus the ones too slow to be the GM.
+        return getGameMasterCandidateModelsForTier(userTier)
             .map(model => {
                 const name = getModelDisplayName(model);
                 return { model, disabled: false, label: name, displayLabel: name };
@@ -419,8 +419,8 @@ export default function CreateNewGamePage() {
         if (!isTierLoaded) return;
         if (gameMasterAiType === LLM_CONSTANTS.RANDOM) return;
 
-        // Tested single source of truth for the allowed-for-this-user set.
-        const allowed = getCandidateModelsForTier(userTier);
+        // Tested single source of truth for the allowed-for-this-user set (tier + GM speed rule).
+        const allowed = getGameMasterCandidateModelsForTier(userTier);
         if (allowed.includes(gameMasterAiType)) return;
 
         setGameMasterAiType(pickDefaultGmModel(allowed.filter(m => m !== LLM_CONSTANTS.RANDOM)));
@@ -1059,7 +1059,7 @@ export default function CreateNewGamePage() {
                             <div>
                                 <label className={labelStyle}>Model</label>
                                 <ModelSelectDropdown
-                                    options={getPreviewModelOptions(gameData.gameMasterAiType)}
+                                    options={getPreviewModelOptions(gameData.gameMasterAiType).filter(o => isAllowedAsGameMaster(o.model))}
                                     value={gameData.gameMasterAiType}
                                     onChange={(value) => handleGameMasterAiChange(value)}
                                     className="w-full"
