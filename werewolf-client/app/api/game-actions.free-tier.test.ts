@@ -35,14 +35,14 @@ describe('free tier model limits', () => {
         ).toThrow('can only be used 3 times');
     });
 
-    it('enforces the single-use limit for Claude Haiku (thinking cost lands it in the 1-bot band)', () => {
+    it('enforces the single-use limit for GPT-5.6 Terra (measured 1.6¢ a turn lands it in the 1-bot band)', () => {
         expect(() =>
-            validateModelUsageForTier('free', LLM_CONSTANTS.CLAUDE_HAIKU, [])
+            validateModelUsageForTier('free', LLM_CONSTANTS.GPT, [])
         ).not.toThrow();
 
         expect(() =>
-            validateModelUsageForTier('free', LLM_CONSTANTS.CLAUDE_HAIKU, [
-                LLM_CONSTANTS.CLAUDE_HAIKU,
+            validateModelUsageForTier('free', LLM_CONSTANTS.GPT, [
+                LLM_CONSTANTS.GPT,
             ])
         ).toThrow('can only be used once');
     });

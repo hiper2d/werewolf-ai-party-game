@@ -226,12 +226,10 @@ describe("All models - day 2 vote with full game context", () => {
 });
 
 // Models whose askText is expected to return thinking content reliably.
-// NOT guaranteed: adaptive-thinking Claude models (Opus 4.8, Sonnet 5) decide per-request
-// and skip thinking on trivial prompts; Grok returns encrypted reasoning; Gemini thought
-// summaries vary. Those are logged instead of asserted.
-// Haiku 4.5 still uses budget thinking, so its reasoning is always surfaced.
+// NOT guaranteed: adaptive-thinking Claude models (all of them since Haiku 5.5) decide
+// per-request and skip thinking on trivial prompts; Grok returns encrypted reasoning; Gemini
+// thought summaries vary. Those are logged instead of asserted.
 const THINKING_GUARANTEED = new Set<string>([
-    LLM_CONSTANTS.CLAUDE_HAIKU,
     LLM_CONSTANTS.DEEPSEEK_FLASH,
     LLM_CONSTANTS.DEEPSEEK_PRO,
 ]);
@@ -251,7 +249,7 @@ const THINKING_ALWAYS_EMPTY = new Set<string>([
 // and the only axis that changes behavior is the thinking toggle (plus Claude's
 // adaptive-vs-budget thinking split). One representative per code path is enough.
 const TEXT_SWEEP_MODELS = new Set<string>([
-    LLM_CONSTANTS.CLAUDE_HAIKU,            // budget thinking
+    LLM_CONSTANTS.CLAUDE_HAIKU,            // adaptive thinking (may skip thinking)
     LLM_CONSTANTS.CLAUDE_OPUS,             // adaptive thinking (may skip thinking)
     LLM_CONSTANTS.DEEPSEEK_FLASH,
     LLM_CONSTANTS.GPT_MINI,              // single path: thinking never surfaces

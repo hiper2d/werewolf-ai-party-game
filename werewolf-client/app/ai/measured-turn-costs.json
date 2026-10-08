@@ -114,14 +114,6 @@
       "outputTokens": 198,
       "reasoningTokens": 78
     },
-    "claude-haiku": {
-      "usdPerTurn": 0.011423,
-      "calls": 451,
-      "inputTokens": 7454,
-      "cachedInputTokens": 2753,
-      "outputTokens": 1289,
-      "reasoningTokens": 0
-    },
     "claude-opus": {
       "usdPerTurn": 0.037571,
       "calls": 14,

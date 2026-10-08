@@ -304,8 +304,8 @@ describe('previewGame tier enforcement', () => {
                 previewGame(
                     makePreview({
                         playerCount: 2, // 1 bot
-                        gameMasterAiType: LLM_CONSTANTS.CLAUDE_HAIKU,
-                        playersAiType: [LLM_CONSTANTS.CLAUDE_HAIKU],
+                        gameMasterAiType: LLM_CONSTANTS.GPT,
+                        playersAiType: [LLM_CONSTANTS.GPT],
                     })
                 )
             ).rejects.toThrow(
@@ -544,12 +544,12 @@ describe('createGame tier enforcement', () => {
         const { setGame } = setupDbForCreate();
 
         const preview = makeGeneratedPreview({
-            gameMasterAiType: LLM_CONSTANTS.CLAUDE_HAIKU,
+            gameMasterAiType: LLM_CONSTANTS.GPT,
         });
-        preview.bots[0].playerAiType = LLM_CONSTANTS.CLAUDE_HAIKU;
+        preview.bots[0].playerAiType = LLM_CONSTANTS.GPT;
 
         await expect(createGame(preview)).rejects.toThrow(
-            `Failed to create game: The AI model ${LLM_CONSTANTS.CLAUDE_HAIKU} can only be used once per game on the free tier.`
+            `Failed to create game: The AI model ${LLM_CONSTANTS.GPT} can only be used once per game on the free tier.`
         );
         expect(setGame).not.toHaveBeenCalled();
     });

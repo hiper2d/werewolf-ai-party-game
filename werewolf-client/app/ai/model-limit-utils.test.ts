@@ -64,7 +64,7 @@ describe('getModelPickerOptions (single source of truth for every picker)', () =
     // app/ai/measured-turn-costs.json (2026-09-20 measurement, 30 days of games).
     const UNLIMITED = LLM_CONSTANTS.DEEPSEEK_FLASH;   // 0.12¢ per turn <= 0.3¢ → unlimited
     const LIMITED_3 = LLM_CONSTANTS.DEEPSEEK_PRO;     // 0.58¢ <= 1¢ → 3 bots
-    const SINGLE_1 = LLM_CONSTANTS.CLAUDE_HAIKU;       // 1.14¢ <= 2¢ → 1 bot
+    const SINGLE_1 = LLM_CONSTANTS.QWEN_MAX;           // 1.20¢ <= 2¢ → 1 bot
     const UNAVAILABLE = LLM_CONSTANTS.CLAUDE_OPUS;     // too few turns measured; estimated 5.2¢ > 2¢ → not available
 
     it('pins the assumed free-tier policies (guards against measurement drift)', () => {
