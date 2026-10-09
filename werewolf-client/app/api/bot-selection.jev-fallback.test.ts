@@ -101,28 +101,24 @@ describe('Jev router falls back to the Game Master LLM router', () => {
         expect(mockAsk).not.toHaveBeenCalled();
     });
 
-    it('tries OpenAI Decisions after Jev when the OpenAI key is configured', async () => {
-        mockJevSelect
-            .mockRejectedValueOnce(new JevRouterUnavailableError('x', 'Jev returned HTTP 402', { gmAiType: 'jev' }, true))
-            .mockResolvedValueOnce(['Alice']);
+    it('asks Jev and OpenAI Decisions in one call when the OpenAI key is configured (Jev first)', async () => {
+        mockJevSelect.mockResolvedValue(['Alice']);
         expect(await selectRespondingBots(game, { OPENAI_API_KEY: 'sk' }, 'u@e.com')).toEqual(['Alice']);
-        expect(mockJevSelect).toHaveBeenCalledTimes(2);
-        expect(mockJevSelect.mock.calls[0][5].label).toBe('Jev');
-        expect(mockJevSelect.mock.calls[1][3]).toBe('sk');
-        expect(mockJevSelect.mock.calls[1][5].label).toBe('OpenAI Decisions');
+        expect(mockJevSelect).toHaveBeenCalledTimes(1);
+        const call = mockJevSelect.mock.calls[0];
+        expect(call[5].label).toBe('Jev');
+        expect(call[6]).toMatchObject({ apiKey: 'sk', judge: { label: 'OpenAI Decisions' } });
         expect(mockAsk).not.toHaveBeenCalled();
-        const { logger } = jest.requireMock('@/app/utils/logger');
-        expect(logger.warn).toHaveBeenCalledWith('Jev router unavailable, falling back to OpenAI Decisions', expect.anything());
     });
 
     it('runs the GM router once when both judges fail', async () => {
-        mockJevSelect.mockRejectedValue(new JevRouterUnavailableError('x', 'down', { gmAiType: 'jev' }, true));
+        mockJevSelect.mockRejectedValue(new JevRouterUnavailableError('x', 'down', { gmAiType: 'openai-decisions' }, true));
         mockAsk.mockResolvedValue([{ selected_bots: ['Bram'] }, '', undefined, undefined]);
         expect(await selectRespondingBots(game, { OPENAI_API_KEY: 'sk' }, 'u@e.com')).toContain('Bram');
-        expect(mockJevSelect).toHaveBeenCalledTimes(2);
+        expect(mockJevSelect).toHaveBeenCalledTimes(1);
         expect(mockAsk).toHaveBeenCalledTimes(1);
         const { logger } = jest.requireMock('@/app/utils/logger');
-        expect(logger.warn).toHaveBeenLastCalledWith('OpenAI Decisions router unavailable, falling back to the Game Master LLM router', expect.anything());
+        expect(logger.warn).toHaveBeenLastCalledWith('Jev and OpenAI Decisions routers unavailable, falling back to the Game Master LLM router', expect.anything());
     });
 
     it('routes with OpenAI Decisions alone when there is no Jev key', async () => {

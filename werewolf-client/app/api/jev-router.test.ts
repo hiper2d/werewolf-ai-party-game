@@ -15,14 +15,18 @@ jest.mock('@/app/api/cost-tracking', () => ({ recordRouterSpend: (...args: any[]
 jest.mock('@/app/api/user-actions', () => ({ assertFreeSpendWithinLimit: (...args: any[]) => mockAssertFreeSpend(...(args as [])) }));
 jest.mock('@/app/utils/illustration-generation', () => ({ midGameImagesEnabled: () => false, runDayIllustration: jest.fn() }));
 jest.mock('next/server', () => ({ after: (fn: () => void) => fn() }));
-const mockSaveRecord = jest.fn<Promise<void>, [any]>(async () => undefined);
-jest.mock('@/app/api/jev-records', () => ({ saveJevRouterCall: (record: any) => mockSaveRecord(record) }));
+const mockSaveRecord = jest.fn<Promise<string | null>, [any]>(async () => 'row-1');
+const mockSaveShadow = jest.fn<Promise<void>, [string, string, any]>(async () => undefined);
+jest.mock('@/app/api/jev-records', () => ({
+    saveJevRouterCall: (record: any) => mockSaveRecord(record),
+    saveJevRouterShadow: (id: string, gameId: string, shadow: any) => mockSaveShadow(id, gameId, shadow),
+}));
 const mockAgentActivity = jest.fn();
 jest.mock('@/app/utils/logger', () => ({
     logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn(), agentActivity: (...args: any[]) => mockAgentActivity(...args) },
 }));
 
-import { buildRouterRequest, composeSpeakerSet, JEV_ROUTER_CONFIG, JevRouterUnavailableError, OPENAI_DECISIONS_JUDGE, selectRespondingBotsWithJev } from '@/app/api/jev-router';
+import { buildRouterRequest, composeSpeakerSet, JEV_JUDGE, JEV_ROUTER_CONFIG, JevRouterUnavailableError, OPENAI_DECISIONS_JUDGE, RouterJudge, selectRespondingBotsWithJev } from '@/app/api/jev-router';
 
 /** Deterministic "random": returns the given values in order, then 0. */
 function seq(values: number[]): () => number {
@@ -372,5 +376,114 @@ describe('selectRespondingBotsWithJev', () => {
     it('returns an empty list without calling Jev when there are no candidates', async () => {
         expect(await selectRespondingBotsWithJev(game, messages as any, [], 'key', 'u@e.com')).toEqual([]);
         expect(fetchMock).not.toHaveBeenCalled();
+    });
+});
+
+describe('selectRespondingBotsWithJev with a second judge (both asked at once)', () => {
+    const names = ['Alice', 'Bram', 'Cleo'];
+    /** A judge whose ask is a mock returning a Jev-shaped result (no HTTP). */
+    const stubJudge = (base: RouterJudge, model: string, costUSD: number) => {
+        const ask = jest.fn();
+        const answer = (scores: Record<string, { score: number; top: number }>) =>
+            ({ ...jevResponse(scores), model, inputTokens: 1500, costUSD, durationMs: 300 });
+        return { judge: { ...base, ask } as RouterJudge, ask, answer };
+    };
+    const flush = () => new Promise(resolve => setImmediate(resolve));
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        savedMessages.length = 0;
+    });
+
+    it('Jev decides; Decisions is billed and recorded as the shadow, composed with the same random draws', async () => {
+        const jev = stubJudge(JEV_JUDGE, 'jev-1.13.0', 0.00006);
+        const dec = stubJudge(OPENAI_DECISIONS_JUDGE, 'gpt-6-luna', 0.00015);
+        const scores = { Alice: { score: 1.2, top: 0.05 }, Bram: { score: 3, top: 0.97 }, Cleo: { score: 0.3, top: 0.02 } };
+        jev.ask.mockResolvedValue(jev.answer(scores));
+        // Same answers on purpose: with the replayed draws the shadow set must come out identical.
+        dec.ask.mockResolvedValue(dec.answer(scores));
+
+        const selected = await selectRespondingBotsWithJev(game, messages as any, names, 'key', 'u@e.com', jev.judge, { judge: dec.judge, apiKey: 'sk' });
+        await flush();
+
+        expect(jev.ask).toHaveBeenCalledTimes(1);
+        expect(dec.ask).toHaveBeenCalledTimes(1);
+        expect(dec.ask.mock.calls[0][0]).toBe('sk');
+        expect(dec.ask.mock.calls[0][1]).toEqual(jev.ask.mock.calls[0][1]);
+        expect(savedMessages[0].msg).toContain('Jev selected');
+        expect(mockRecordRouterSpend.mock.calls.map(c => [c[3], c[4]])).toEqual([
+            ['jev-1.13.0', 'TYPESAFE_API_KEY'],
+            ['gpt-6-luna', 'OPENAI_API_KEY'],
+        ]);
+        expect(mockSaveRecord).toHaveBeenCalledTimes(1);
+        expect(mockSaveRecord.mock.calls[0][0]).toMatchObject({ status: 'ok', model: 'jev-1.13.0' });
+        expect(mockSaveRecord.mock.calls[0][0].shadow).toBeUndefined();
+
+        expect(mockSaveShadow).toHaveBeenCalledTimes(1);
+        const [rowId, gameId, shadow] = mockSaveShadow.mock.calls[0];
+        expect(rowId).toBe('row-1');
+        expect(gameId).toBe(game.id);
+        expect(shadow).toMatchObject({ model: 'gpt-6-luna', costUSD: 0.00015, durationMs: 300 });
+        expect(shadow.answers.reply_Bram.score).toBe(3);
+        expect(shadow.decision.selected).toEqual(selected);
+        expect(shadow.decision.target).toBe(mockSaveRecord.mock.calls[0][0].decision.target);
+    });
+
+    it('when Jev fails, the running Decisions call decides at once and the Jev error is the shadow', async () => {
+        const jev = stubJudge(JEV_JUDGE, 'jev-1.13.0', 0.00006);
+        const dec = stubJudge(OPENAI_DECISIONS_JUDGE, 'gpt-6-luna', 0.00015);
+        jev.ask.mockRejectedValue(Object.assign(new Error('Jev returned HTTP 529'), { status: 529, body: 'busy' }));
+        dec.ask.mockResolvedValue(dec.answer({ Alice: { score: 0.4, top: 0.02 }, Bram: { score: 3, top: 0.95 }, Cleo: { score: 0.3, top: 0.02 } }));
+
+        const selected = await selectRespondingBotsWithJev(game, messages as any, names, 'key', 'u@e.com', jev.judge, { judge: dec.judge, apiKey: 'sk' });
+        await flush();
+
+        expect(selected).toContain('Bram');
+        expect(dec.ask).toHaveBeenCalledTimes(1);
+        expect(savedMessages[0].msg).toContain('OpenAI Decisions selected');
+        expect(mockRecordRouterSpend).toHaveBeenCalledTimes(1);
+        expect(mockRecordRouterSpend.mock.calls[0][4]).toBe('OPENAI_API_KEY');
+        expect(mockSaveRecord).toHaveBeenCalledTimes(1);
+        expect(mockSaveRecord.mock.calls[0][0]).toMatchObject({
+            status: 'ok', model: 'gpt-6-luna',
+            shadow: { model: 'jev-latest', error: 'Jev returned HTTP 529: busy', httpStatus: 529 },
+        });
+        expect(mockSaveShadow).not.toHaveBeenCalled();
+        const { logger } = jest.requireMock('@/app/utils/logger');
+        expect(logger.warn).toHaveBeenCalledWith('Jev router unavailable, falling back to OpenAI Decisions', expect.anything());
+    });
+
+    it('throws only when both fail: one error row with Jev\'s error and the Decisions error as the shadow', async () => {
+        const jev = stubJudge(JEV_JUDGE, 'jev-1.13.0', 0.00006);
+        const dec = stubJudge(OPENAI_DECISIONS_JUDGE, 'gpt-6-luna', 0.00015);
+        jev.ask.mockRejectedValue(new Error('Jev request timed out after 2003 ms'));
+        dec.ask.mockRejectedValue(new Error('OpenAI Decisions returned HTTP 500'));
+
+        let caught: any;
+        try {
+            await selectRespondingBotsWithJev(game, messages as any, names, 'key', 'u@e.com', jev.judge, { judge: dec.judge, apiKey: 'sk' });
+        } catch (error) {
+            caught = error;
+        }
+        expect(caught).toBeInstanceOf(JevRouterUnavailableError);
+        expect(caught.details).toContain('Jev request timed out after 2003 ms; OpenAI Decisions: OpenAI Decisions returned HTTP 500');
+        expect(mockRecordRouterSpend).not.toHaveBeenCalled();
+        expect(mockSaveRecord).toHaveBeenCalledTimes(1);
+        expect(mockSaveRecord.mock.calls[0][0]).toMatchObject({
+            status: 'error', model: 'jev-latest', error: 'Jev request timed out after 2003 ms',
+            shadow: { model: 'gpt-6-luna', error: 'OpenAI Decisions returned HTTP 500' },
+        });
+    });
+
+    it('a Decisions failure alone changes nothing in the game: Jev decides, the shadow records the error', async () => {
+        const jev = stubJudge(JEV_JUDGE, 'jev-1.13.0', 0.00006);
+        const dec = stubJudge(OPENAI_DECISIONS_JUDGE, 'gpt-6-luna', 0.00015);
+        jev.ask.mockResolvedValue(jev.answer({ Alice: { score: 1.2, top: 0.05 }, Bram: { score: 3, top: 0.97 }, Cleo: { score: 0.3, top: 0.02 } }));
+        dec.ask.mockRejectedValue(new Error('OpenAI Decisions returned HTTP 500'));
+
+        expect(await selectRespondingBotsWithJev(game, messages as any, names, 'key', 'u@e.com', jev.judge, { judge: dec.judge, apiKey: 'sk' })).toContain('Bram');
+        await flush();
+        expect(mockRecordRouterSpend).toHaveBeenCalledTimes(1);
+        expect(mockSaveShadow.mock.calls[0][2]).toEqual({ model: 'gpt-6-luna', error: 'OpenAI Decisions returned HTTP 500', httpStatus: undefined });
     });
 });

@@ -38,6 +38,27 @@ export interface JevRouterCallRecord {
     durationMs?: number;
     error?: string;
     httpStatus?: number;
+    /**
+     * The other judge's answer to the same request (since 2026-10-09 both are asked at once when
+     * both keys exist, to compare who routes better). The row's own fields are the judge that
+     * decided — Jev, or OpenAI Decisions when Jev failed; on an `error` row (both failed) they
+     * carry Jev's error and this Decisions'. Never acted on. When Jev decided, this is written a
+     * moment after the row, once the slower call lands, so a row can briefly lack it.
+     */
+    shadow?: JevRouterShadow;
+}
+
+export interface JevRouterShadow {
+    model: string;
+    answers?: Record<string, unknown>;
+    /** The speaker set this judge's answers compose to, drawn with the SAME random numbers as the
+     * decider's (count, tie-breaks), so a difference in `selected` is the judges' difference. */
+    decision?: Record<string, unknown>;
+    inputTokens?: number;
+    costUSD?: number;
+    durationMs?: number;
+    error?: string;
+    httpStatus?: number;
 }
 
 export interface StoredJevRouterCall extends JevRouterCallRecord {
@@ -50,19 +71,35 @@ function compact<T extends Record<string, unknown>>(obj: T): T {
     return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined)) as T;
 }
 
-export async function saveJevRouterCall(record: JevRouterCallRecord): Promise<void> {
+/** Returns the new row's id (null when not saved), so a late shadow can be attached to it. */
+export async function saveJevRouterCall(record: JevRouterCallRecord): Promise<string | null> {
     if (!db) {
-        return;
+        return null;
     }
     const now = Date.now();
     try {
-        await db.collection(JEV_ROUTER_CALLS_COLLECTION).add(compact({
+        const ref = await db.collection(JEV_ROUTER_CALLS_COLLECTION).add(compact({
             ...record,
+            shadow: record.shadow ? compact(record.shadow as unknown as Record<string, unknown>) : undefined,
             createdAt: now,
             expireAt: new Date(now + JEV_RECORD_TTL_MS),
         }));
+        return ref.id;
     } catch (error: any) {
         logger.warn('Jev router record not saved', { gameId: record.gameId, error: error?.message });
+        return null;
+    }
+}
+
+/** Attach the shadow judge's answer to a saved router row (it lands after the decider's). */
+export async function saveJevRouterShadow(id: string, gameId: string, shadow: JevRouterShadow): Promise<void> {
+    if (!db) {
+        return;
+    }
+    try {
+        await db.collection(JEV_ROUTER_CALLS_COLLECTION).doc(id).update({ shadow: compact(shadow as unknown as Record<string, unknown>) });
+    } catch (error: any) {
+        logger.warn('Jev router shadow not saved', { gameId, error: error?.message });
     }
 }
 
@@ -118,6 +155,29 @@ export interface JevScreenCallRecord {
     enforced: boolean;
     error?: string;
     httpStatus?: number;
+    /**
+     * The other judge's answer to the same input (since 2026-10-09 both are asked at once, to
+     * collect paired verdicts). The row's own fields are the judge that decided — Jev, or OpenAI
+     * Decisions when Jev failed; on an `error` row (both failed) they carry Jev's error and this
+     * Decisions'. Its verdict is recorded only, never acted on. Missing on older rows and when only
+     * one judge has a key.
+     */
+    shadow?: JevScreenShadow;
+}
+
+export interface JevScreenShadow {
+    model: string;
+    verdict: JevScreenVerdict;
+    reason: string | null;
+    riskScore: number | null;
+    highRisk: number | null;
+    flags: Record<string, number> | null;
+    answers?: Record<string, unknown>;
+    inputTokens?: number;
+    costUSD?: number;
+    durationMs?: number;
+    error?: string;
+    httpStatus?: number;
 }
 
 export interface StoredJevScreenCall extends JevScreenCallRecord {
@@ -133,6 +193,7 @@ export async function saveJevScreenCall(record: JevScreenCallRecord): Promise<vo
     try {
         await db.collection(JEV_SCREEN_CALLS_COLLECTION).add(compact({
             ...record,
+            shadow: record.shadow ? compact(record.shadow as unknown as Record<string, unknown>) : undefined,
             createdAt: now,
             expireAt: new Date(now + JEV_RECORD_TTL_MS),
         }));

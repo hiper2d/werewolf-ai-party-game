@@ -6,6 +6,8 @@
  *      healthy and are the thresholds sitting clear of ordinary game talk?
  *   2. The grey and would-block rows with an excerpt, the score and the top flags — the rows
  *      to read by hand before flipping `jevScreenMode` to `enforce`.
+ *   2c. Rows with a shadow (both judges asked, since 2026-10-09): the deciding judge's verdict
+ *      against the other's, the mean score gap, and where either judge raised a hard flag.
  *   3. Games that hit a provider refusal in the window, joined with their screen rows — did a
  *      player message we let through precede it, or did the bots drift on their own?
  *
@@ -73,7 +75,7 @@ async function report() {
         byVerdict[row.verdict] = (byVerdict[row.verdict] ?? 0) + 1;
         bySource[row.source] = (bySource[row.source] ?? 0) + 1;
         byMode[row.mode] = (byMode[row.mode] ?? 0) + 1;
-        cost += row.costUSD ?? 0;
+        cost += (row.costUSD ?? 0) + (row.shadow?.costUSD ?? 0);
         if (row.durationMs) durations.push(row.durationMs);
     }
     durations.sort((a, b) => a - b);
@@ -90,7 +92,7 @@ async function report() {
         const n = scores.filter(s => s >= lo && s < hi).length;
         return `${lo.toFixed(1)}–${Math.min(hi, 3).toFixed(1)}: ${n}`;
     });
-    console.log(`Score histogram:  ${hist.join('   ')}   (grey ≥ ${JEV_SCREEN_CONFIG.GREY_SCORE}, block when top-two ≥ ${JEV_SCREEN_CONFIG.BLOCK_HIGH_RISK_PROBABILITY})`);
+    console.log(`Score histogram:  ${hist.join('   ')}   (grey ≥ ${JEV_SCREEN_CONFIG.GREY_SCORE}, grey with a reason when top-two ≥ ${JEV_SCREEN_CONFIG.HIGH_RISK_PROBABILITY}, would-block on hard flags only)`);
 
     // 2. The rows to read
     const interesting = SHOW_ALL ? rows : rows.filter(r => r.verdict === 'grey' || r.verdict === 'would_block' || r.verdict === 'error');
@@ -112,6 +114,27 @@ async function report() {
         console.log(`\nReplay with the current thresholds: ${changed.length} of ${rows.length} verdicts would change`);
         for (const { row, now } of changed) {
             console.log(`  ${when(row.createdAt)}  ${row.verdict}${row.reason ? `(${row.reason})` : ''} → ${now.verdict}${now.reason ? `(${now.reason})` : ''}  "${excerpt(row.text, 80)}"  [${row.id}]`);
+        }
+    }
+
+    // 2c. The two judges on the same inputs
+    const paired = rows.filter(r => r.verdict !== 'error' && r.shadow && r.shadow.verdict !== 'error');
+    if (paired.length > 0) {
+        const pairs: Record<string, number> = {};
+        let gap = 0;
+        for (const r of paired) {
+            const key = `${r.model.startsWith('jev') ? 'jev' : 'decisions'} ${r.verdict} / shadow ${r.shadow!.verdict}`;
+            pairs[key] = (pairs[key] ?? 0) + 1;
+            gap += (r.riskScore ?? 0) - (r.shadow!.riskScore ?? 0);
+        }
+        console.log(`\nJudges side by side (${paired.length} inputs with both answers; mean score gap decider − shadow ${(gap / paired.length).toFixed(2)}):`);
+        for (const [key, n] of Object.entries(pairs).sort((a, b) => b[1] - a[1])) console.log(`  ${key.padEnd(40)} ${n}`);
+        const hardFlags = Object.entries(JEV_SCREEN_CONFIG.HARD_FLAGS) as [string, number][];
+        const raised = paired.filter(r => hardFlags.some(([f, t]) => (r.flags?.[f] ?? 0) >= t || (r.shadow!.flags?.[f] ?? 0) >= t));
+        console.log(`  Hard flag raised by either judge: ${raised.length}`);
+        for (const r of raised) {
+            const show = (flags: Record<string, number> | null) => hardFlags.map(([f]) => `${f}=${(flags?.[f] ?? 0).toFixed(2)}`).join(' ');
+            console.log(`    ${when(r.createdAt)}  ${r.model}: ${show(r.flags)}  |  ${r.shadow!.model}: ${show(r.shadow!.flags)}  "${excerpt(r.text, 60)}"  [${r.id}]`);
         }
     }
 

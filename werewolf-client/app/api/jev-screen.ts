@@ -12,18 +12,23 @@
  * Bot output is never screened: refusing a bot turn only creates a stuck game, and the
  * cumulative drift of a permissive model is outside what input screening can fix.
  *
- * Fails open: a Jev error or timeout lets the input through (logged, recorded) — the
- * provider filters stay as the backstop, screening never makes a game stuck.
+ * Two judges, asked at once: Jev decides, OpenAI Decisions (gpt-6-luna on the platform OpenAI
+ * key) decides when Jev errors or times out, and otherwise its answer is recorded alongside as
+ * the shadow — paired verdicts to compare the judges on. Decisions takes the same questions and
+ * returns Jev-shaped answers, so one verdict rule serves both, though its scores run lower; the
+ * hard flags are what blocks. Fails open only when both fail: the input goes through (logged,
+ * recorded) — the provider filters stay as the backstop, screening never makes a game stuck.
  *
  * Question wording and levels: app/ai/prompts/jev-screen-prompts.ts. Records: the Firestore
  * collection `jevScreenCalls` (app/api/jev-records.ts), reported by scripts/jev-screen-report.ts.
  */
 
 import { AgentLoggingConfig, ApiKeyMap } from "@/app/api/game-models";
-import { askJev, getJevApiKey, JEV_API_KEY_NAME, JEV_MODEL, JevError, JevNoulQuestion, JevScoreQuestion } from "@/app/ai/jev-client";
+import { askJev, getJevApiKey, JEV_API_KEY_NAME, JEV_MODEL, JevNoulQuestion, JevResult, JevScoreQuestion } from "@/app/ai/jev-client";
+import { askOpenAiDecisions, OPENAI_DECISIONS_API_KEY_NAME, OPENAI_DECISIONS_MODEL } from "@/app/ai/openai-decisions-client";
 import { recordScreenSpend } from "@/app/api/cost-tracking";
 import { getJevScreenMode, JevScreenMode } from "@/app/api/limits-actions";
-import { JevScreenSource, JevScreenVerdict, saveJevScreenCall } from "@/app/api/jev-records";
+import { JevScreenShadow, JevScreenSource, JevScreenVerdict, saveJevScreenCall } from "@/app/api/jev-records";
 import { logger } from "@/app/utils/logger";
 import {
     JEV_SCREEN_CONTEXT_CHAT,
@@ -37,16 +42,22 @@ import {
 
 export const JEV_SCREEN_CONFIG = {
     /**
-     * Would-block when the probability mass on the top two risk levels ("likely to be refused"
-     * + "must be blocked") reaches this. The probe put every prohibited sample at ≥ 0.9 here and
-     * every game-talk sample at ≤ 0.05.
-     */
-    BLOCK_HIGH_RISK_PROBABILITY: 0.6,
-    /**
-     * Would-block when one of these flags alone is this confident, whatever the score says. High
-     * on purpose: `minors` leaned to 0.5 on a "loyal boy / puppy" message in the probe.
+     * Would-block comes from these flags alone, each at its own confidence. The 0–3 score never
+     * blocks: it is a monitoring signal. 30 days to 2026-10-08: Jev rated 56 of 836 inputs
+     * would-block on the score, including explicit sexual roleplay and racial slurs, and the
+     * providers refused none of them (0 games with a provider block). The screen exists to predict
+     * provider refusals and account flags, so it keeps only the categories providers never
+     * tolerate. The bar is high on purpose: `minors` leaned to 0.5 on a "loyal boy / puppy"
+     * message in the probe. Flags, unlike the score, read alike on Jev and on OpenAI Decisions
+     * for blatant content, so one bar serves both judges; Decisions scores ran ~0.5 lower.
      */
     HARD_FLAGS: { minors: 0.9, real_harm: 0.9, hate: 0.9 } as Partial<Record<JevScreenFlag, number>>,
+    /**
+     * Grey with a reason when the probability mass on the top two risk levels ("likely to be
+     * refused" + "must be blocked") reaches this — the rows to read by hand. Was the score block
+     * until 2026-10-08.
+     */
+    HIGH_RISK_PROBABILITY: 0.6,
     /** Grey zone starts here on the 0–3 score: recorded and counted, never rejected. */
     GREY_SCORE: 1.2,
     /**
@@ -57,13 +68,19 @@ export const JEV_SCREEN_CONFIG = {
      * on it (it was 10 s until 2026-10-07).
      */
     TIMEOUT_MS: 3_000,
+    /**
+     * OpenAI Decisions, asked only after Jev failed: measured 0.2-0.6 s on full router requests
+     * (2026-10-07). With Jev's budget this caps a human message's wait at 6 s when both stall.
+     */
+    DECISIONS_TIMEOUT_MS: 3_000,
 } as const;
 
 export type ScreenQuestions = { risk: JevScoreQuestion } & Record<JevScreenFlag, JevNoulQuestion>;
 
 export interface ScreenDecision {
     verdict: Exclude<JevScreenVerdict, 'error'>;
-    /** The flag that tripped, or 'score' when the risk levels did, or null when ok / grey. */
+    /** On would_block the hard flag that tripped; on a high-risk grey the strongest flag (≥ 0.5) or
+     * 'score'; null otherwise. */
     reason: string | null;
     riskScore: number;
     highRisk: number;
@@ -102,6 +119,60 @@ const JEV_SCREEN_LOG_CONFIG: AgentLoggingConfig = {
 };
 
 const SCREEN_AGENT_NAME = 'Content screen';
+
+interface ScreenJudge {
+    label: string;
+    model: string;
+    /** Platform key doc entry this judge bills against. */
+    apiKeyName: string;
+    timeoutMs: number;
+    ask(apiKey: string, state: Record<string, unknown>, questions: ScreenQuestions, options: { timeoutMs: number }): Promise<JevResult<ScreenQuestions>>;
+}
+
+const JEV_SCREEN_JUDGE: ScreenJudge = {
+    label: 'Jev', model: JEV_MODEL, apiKeyName: JEV_API_KEY_NAME, timeoutMs: JEV_SCREEN_CONFIG.TIMEOUT_MS,
+    ask: (apiKey, state, questions, options) => askJev(apiKey, state, questions, options),
+};
+
+const DECISIONS_SCREEN_JUDGE: ScreenJudge = {
+    label: 'OpenAI Decisions', model: OPENAI_DECISIONS_MODEL, apiKeyName: OPENAI_DECISIONS_API_KEY_NAME,
+    timeoutMs: JEV_SCREEN_CONFIG.DECISIONS_TIMEOUT_MS,
+    ask: (apiKey, state, questions, options) => askOpenAiDecisions(apiKey, state, questions, options),
+};
+
+interface ScreenAttempt {
+    judge: ScreenJudge;
+    result?: JevResult<ScreenQuestions>;
+    error?: string;
+    status?: number;
+}
+
+/** A judge's answer (or failure) in the record's shadow shape. */
+function toShadow(attempt: ScreenAttempt): JevScreenShadow {
+    if (!attempt.result) {
+        return {
+            model: attempt.judge.model, verdict: 'error', reason: null, riskScore: null, highRisk: null, flags: null,
+            error: attempt.error, httpStatus: attempt.status,
+        };
+    }
+    const decision = decideScreen(attempt.result.answers);
+    return {
+        model: attempt.result.model, verdict: decision.verdict, reason: decision.reason,
+        riskScore: decision.riskScore, highRisk: decision.highRisk, flags: decision.flags,
+        answers: attempt.result.answers, inputTokens: attempt.result.inputTokens,
+        costUSD: attempt.result.costUSD, durationMs: attempt.result.durationMs,
+    };
+}
+
+/** The judges with a key, in order of precedence: the first that answers decides. */
+function screenJudges(apiKeys: ScreenInput['apiKeys']): Array<{ judge: ScreenJudge; apiKey: string }> {
+    const judges: Array<{ judge: ScreenJudge; apiKey: string }> = [];
+    const jevKey = getJevApiKey(apiKeys);
+    if (jevKey) judges.push({ judge: JEV_SCREEN_JUDGE, apiKey: jevKey });
+    const openAiKey = (apiKeys as Record<string, string> | undefined)?.[OPENAI_DECISIONS_API_KEY_NAME];
+    if (typeof openAiKey === 'string' && openAiKey.trim()) judges.push({ judge: DECISIONS_SCREEN_JUDGE, apiKey: openAiKey.trim() });
+    return judges;
+}
 const FLAG_NAMES = Object.keys(JEV_SCREEN_FLAG_QUESTIONS) as JevScreenFlag[];
 const TOP_LEVELS = [JEV_SCREEN_RISK_LEVELS.length - 2, JEV_SCREEN_RISK_LEVELS.length - 1].map(String);
 
@@ -130,9 +201,9 @@ export function decideScreen(answers: Record<string, any>, config = JEV_SCREEN_C
             return { verdict: 'would_block', reason: flag, riskScore, highRisk, flags };
         }
     }
-    if (highRisk >= config.BLOCK_HIGH_RISK_PROBABILITY) {
+    if (highRisk >= config.HIGH_RISK_PROBABILITY) {
         const strongest = FLAG_NAMES.reduce((best, flag) => (flags[flag] > flags[best] ? flag : best), FLAG_NAMES[0]);
-        return { verdict: 'would_block', reason: flags[strongest] >= 0.5 ? strongest : 'score', riskScore, highRisk, flags };
+        return { verdict: 'grey', reason: flags[strongest] >= 0.5 ? strongest : 'score', riskScore, highRisk, flags };
     }
     if (riskScore >= config.GREY_SCORE) {
         return { verdict: 'grey', reason: null, riskScore, highRisk, flags };
@@ -156,11 +227,11 @@ export function screenRejectionMessage(source: JevScreenSource, reason: string |
 
 /**
  * Screen one piece of human text. Never throws: every failure path returns `blocked: false`.
- * Skips entirely (no call, no record) without a Jev key or when the mode is `off`.
+ * Skips entirely (no call, no record) without a judge key or when the mode is `off`.
  */
 export async function screenHumanInput(input: ScreenInput): Promise<ScreenOutcome> {
-    const apiKey = getJevApiKey(input.apiKeys);
-    if (!apiKey) {
+    const judges = screenJudges(input.apiKeys);
+    if (judges.length === 0) {
         return { verdict: 'skipped', reason: null, mode: 'off', blocked: false };
     }
     const mode = await getJevScreenMode();
@@ -189,48 +260,70 @@ export async function screenHumanInput(input: ScreenInput): Promise<ScreenOutcom
     // Not behind assertFreeSpendWithinLimit: the callers run that guard on the same request
     // (the router right after a chat message, previewGame before this), and the call costs
     // a few thousandths of a cent. It is still billed through recordSpend like everything else.
-    let result;
-    try {
-        result = await askJev(apiKey, state, questions, { timeoutMs: JEV_SCREEN_CONFIG.TIMEOUT_MS });
-    } catch (error: any) {
-        const detail = error instanceof JevError ? `${error.message}${error.body ? `: ${error.body}` : ''}` : String(error?.message ?? error);
-        console.error(`🛡️ Jev screen failed (${input.source}, let through): ${detail}`);
-        logger.error('Jev screen request failed', {
+    // Every judge is asked at once, not in turn: the wait is the slower of the two instead of their
+    // sum when Jev fails, and each input gets a paired verdict to compare the judges on (they score
+    // the same text very differently, and no refusal data exists yet to say which reads providers
+    // better). The first judge that answered decides; the other is recorded as the shadow.
+    const attempts: ScreenAttempt[] = await Promise.all(judges.map(async ({ judge, apiKey }) => {
+        try {
+            return { judge, result: await judge.ask(apiKey, state, questions, { timeoutMs: judge.timeoutMs }) };
+        } catch (error: any) {
+            // Both judge clients throw errors carrying the HTTP status and a body excerpt.
+            const status: number | undefined = typeof error?.status === 'number' ? error.status : undefined;
+            return { judge, error: `${error?.message ?? error}${error?.body ? `: ${error.body}` : ''}`, status };
+        }
+    }));
+    const deciding = attempts.find(attempt => attempt.result);
+    const shadowAttempt = attempts.find(attempt => attempt !== (deciding ?? attempts[0]));
+
+    for (const attempt of attempts) {
+        if (attempt.result) {
+            await recordScreenSpend(
+                input.gameId,
+                { inputTokens: attempt.result.inputTokens, outputTokens: 0, costUSD: attempt.result.costUSD, durationMs: attempt.result.durationMs },
+                input.userEmail,
+                attempt.result.model,
+                attempt.judge.apiKeyName
+            );
+            continue;
+        }
+        const fallback = deciding ? `${deciding.judge.label} decided` : 'let through';
+        console.error(`🛡️ ${attempt.judge.label} screen failed (${input.source}, ${fallback}): ${attempt.error}`);
+        logger.error(`${attempt.judge.label} screen request failed`, {
             gameId: input.gameId, userId: input.userEmail, agentName: SCREEN_AGENT_NAME, activity: 'jev_screen',
-            source: input.source, error: detail, status: error instanceof JevError ? error.status : undefined,
+            source: input.source, model: attempt.judge.model, error: attempt.error, status: attempt.status, fallback,
         });
+    }
+    const shadow = shadowAttempt ? toShadow(shadowAttempt) : undefined;
+
+    if (!deciding?.result) {
+        const failed = attempts[0];
         await saveJevScreenCall({
-            ...base, model: JEV_MODEL, verdict: 'error', reason: null, riskScore: null, highRisk: null, flags: null,
-            enforced: false, error: detail, httpStatus: error instanceof JevError ? (error.status ?? undefined) : undefined,
+            ...base, model: failed.judge.model, verdict: 'error', reason: null, riskScore: null, highRisk: null, flags: null,
+            enforced: false, error: failed.error, httpStatus: failed.status, shadow,
         });
         return { verdict: 'error', reason: null, mode, blocked: false };
     }
-
-    await recordScreenSpend(
-        input.gameId,
-        { inputTokens: result.inputTokens, outputTokens: 0, costUSD: result.costUSD, durationMs: result.durationMs },
-        input.userEmail,
-        result.model,
-        JEV_API_KEY_NAME
-    );
+    const { judge, result } = deciding;
 
     const decision = decideScreen(result.answers);
     const blocked = mode === 'enforce' && decision.verdict === 'would_block';
     const summary = `${decision.verdict}${decision.reason ? ` (${decision.reason})` : ''} score=${decision.riskScore.toFixed(2)} high=${decision.highRisk.toFixed(2)} ` +
         FLAG_NAMES.map(flag => `${flag}=${decision.flags[flag].toFixed(2)}`).join(' ');
-    console.log(`🛡️ Jev screen [${mode}] ${input.source}: ${summary} — ${result.durationMs} ms, ${result.inputTokens} tokens${blocked ? ' → REJECTED' : ''}`);
+    const shadowSummary = shadow ? `; ${shadowAttempt!.judge.label} ${shadow.verdict}${shadow.riskScore !== null ? ` score=${shadow.riskScore.toFixed(2)}` : ''}` : '';
+    console.log(`🛡️ ${judge.label} screen [${mode}] ${input.source}: ${summary} — ${result.durationMs} ms, ${result.inputTokens} tokens${blocked ? ' → REJECTED' : ''}${shadowSummary}`);
 
     await saveJevScreenCall({
         ...base, model: result.model, answers: result.answers,
         inputTokens: result.inputTokens, costUSD: result.costUSD, durationMs: result.durationMs,
         verdict: decision.verdict, reason: decision.reason, riskScore: decision.riskScore, highRisk: decision.highRisk,
-        flags: decision.flags, enforced: blocked,
+        flags: decision.flags, enforced: blocked, shadow,
     });
 
     const logLevel = decision.verdict === 'would_block' ? 'warn' : 'info';
     logger[logLevel](`Jev screen ${decision.verdict}${blocked ? ' (rejected)' : ''}`, {
         gameId: input.gameId, userId: input.userEmail, activity: 'jev_screen', source: input.source, mode,
-        verdict: decision.verdict, reason: decision.reason, riskScore: decision.riskScore, highRisk: decision.highRisk,
+        model: result.model, verdict: decision.verdict, reason: decision.reason, riskScore: decision.riskScore, highRisk: decision.highRisk,
         durationMs: result.durationMs,
     });
     logger.agentActivity(SCREEN_AGENT_NAME, result.model, 'jev_screen', {

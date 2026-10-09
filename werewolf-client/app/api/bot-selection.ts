@@ -158,19 +158,24 @@ export async function selectRespondingBots(
         // doesn't ride a later, unrelated GM prompt.
         await consumeRetryHint(game.id, game, GAME_MASTER);
     }
-    for (const [index, { judge, apiKey }] of judges.entries()) {
+    if (judges.length > 0) {
+        // Both judges are asked at once (one call): the first decides, the second takes over when
+        // it fails and is otherwise recorded as the shadow, for comparing who routes better.
+        const [{ judge, apiKey }, second] = judges;
+        const labels = judges.map(j => j.judge.label).join(' + ');
         // Console line on purpose: in dev the structured logger ships to Better Stack only,
         // and this is the one place to see which router a game runs on.
-        console.log(`🧭 Speaker router: ${judge.label} — game ${game.id}, day ${game.currentDay}, ${candidateBotNames.length} candidates`);
+        console.log(`🧭 Speaker router: ${labels} — game ${game.id}, day ${game.currentDay}, ${candidateBotNames.length} candidates`);
         try {
-            return await selectRespondingBotsWithJev(game, dayMessages, candidateBotNames, apiKey, userEmail, judge);
+            return await selectRespondingBotsWithJev(game, dayMessages, candidateBotNames, apiKey, userEmail, judge, second);
         } catch (error) {
             if (!(error instanceof JevRouterUnavailableError)) throw error;
             // Not a retry of the same call: a different router, so an outage or an empty
             // prepaid balance degrades speaker picks instead of stalling the game.
-            const next = judges[index + 1]?.judge.label ?? 'the Game Master LLM router';
-            console.warn(`🧭 ${judge.label} unavailable, falling back to ${next} — game ${game.id}`);
-            logger.warn(`${judge.label} router unavailable, falling back to ${next}`, {
+            const failed = judges.map(j => j.judge.label).join(' and ');
+            const noun = judges.length > 1 ? 'routers' : 'router';
+            console.warn(`🧭 ${failed} unavailable, falling back to the Game Master LLM router — game ${game.id}`);
+            logger.warn(`${failed} ${noun} unavailable, falling back to the Game Master LLM router`, {
                 gameId: game.id, userId: userEmail, activity: 'jev_router', error: error.details,
             });
         }

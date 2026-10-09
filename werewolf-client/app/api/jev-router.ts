@@ -31,7 +31,7 @@ import { assertFreeSpendWithinLimit } from "@/app/api/user-actions";
 import { convertMessageContent } from "@/app/utils/message-utils";
 import { midGameImagesEnabled, runDayIllustration } from "@/app/utils/illustration-generation";
 import { logger } from "@/app/utils/logger";
-import { saveJevRouterCall } from "@/app/api/jev-records";
+import { JevRouterShadow, saveJevRouterCall, saveJevRouterShadow } from "@/app/api/jev-records";
 import { format } from "@/app/ai/prompts/utils";
 import {
     JEV_DRAMATIC_QUESTION,
@@ -351,10 +351,57 @@ export const OPENAI_DECISIONS_JUDGE: RouterJudge = {
  */
 export class JevRouterUnavailableError extends BotResponseError {}
 
+type JudgeAttempt =
+    | { ok: true; result: JevResult<Record<string, JevQuestion>> }
+    | { ok: false; detail: string; status?: number };
+
+/** One judge call that never rejects, so two can run side by side. */
+async function askJudge(judge: RouterJudge, apiKey: string, state: JevInstructions, questions: Record<string, JevQuestion>): Promise<JudgeAttempt> {
+    try {
+        const result = await judge.ask(apiKey, state, questions, { timeoutMs: judge.timeoutMs });
+        console.log(`🧭 ${judge.label} answered ${Object.keys(questions).length} questions in ${result.durationMs} ms — ${result.inputTokens} input tokens, $${result.costUSD.toFixed(6)} (${result.model})`);
+        return { ok: true, result };
+    } catch (error: any) {
+        console.error(`🧭 ${judge.label} request failed: ${error?.message ?? error}`);
+        // Both judge clients throw errors carrying the HTTP status and a body excerpt.
+        const status: number | undefined = typeof error?.status === 'number' ? error.status : undefined;
+        return { ok: false, detail: `${error?.message ?? error}${error?.body ? `: ${error.body}` : ''}`, status };
+    }
+}
+
+function logJudgeFailure(judge: RouterJudge, attempt: { detail: string; status?: number }, gameId: string, userEmail: string) {
+    // The failed request is recorded in full in Firestore (not here) — a bad answer and a
+    // refused request both need the exact input to be reproduced.
+    logger.error(`${judge.label} router request failed`, {
+        gameId, userId: userEmail, agentName: GAME_MASTER, activity: 'jev_router',
+        model: judge.model, error: attempt.detail, status: attempt.status,
+    });
+}
+
+function signalsFrom(result: JevResult<Record<string, JevQuestion>>, candidateNames: string[]): SpeakerSignal[] {
+    const answers = result.answers as Record<string, any>;
+    const quietChoice = answers.quiet_pick;
+    return candidateNames.map(name => {
+        const reply = answers[replyKey(name)];
+        return {
+            name,
+            score: Number(reply?.score) || 0,
+            mustReply: Number(reply?.probabilities?.[TOP_LEVEL]) || 0,
+            quietRelevance: Number(quietChoice?.probabilities?.[name]) || 0,
+        };
+    });
+}
+
 /**
  * Ask a judge (Jev by default) who replies next and turn the answer into the bot queue. Bills the call, saves the
  * hidden GM_BOT_SELECTION debug message and kicks off the mid-day illustration when the
  * exchange is dramatic. Returns the selected bot names (never empty for a non-empty roster).
+ *
+ * With `second`, both judges are asked at once. The first decides; when it fails, the second's
+ * already-running call decides instead (no extra wait for a sequential fallback). Otherwise the
+ * second's answer is recorded on the same row as the shadow, after the response, so the game
+ * never waits on it — paired data to compare who routes better. Throws
+ * JevRouterUnavailableError only when every judge asked failed.
  */
 export async function selectRespondingBotsWithJev(
     game: Game,
@@ -362,7 +409,8 @@ export async function selectRespondingBotsWithJev(
     candidateNames: string[],
     apiKey: string,
     userEmail: string,
-    judge: RouterJudge = JEV_JUDGE
+    judge: RouterJudge = JEV_JUDGE,
+    second?: { judge: RouterJudge; apiKey: string }
 ): Promise<string[]> {
     if (candidateNames.length === 0) {
         return [];
@@ -375,59 +423,73 @@ export async function selectRespondingBotsWithJev(
 
     // The request and the raw answers are deliberately NOT printed or logged (the state is the
     // whole day's discussion); the Firestore record below keeps the full copy for replay.
-    let result;
-    try {
-        result = await judge.ask(apiKey, state, questions, { timeoutMs: judge.timeoutMs });
-        console.log(`🧭 ${judge.label} answered ${Object.keys(questions).length} questions in ${result.durationMs} ms — ${result.inputTokens} input tokens, $${result.costUSD.toFixed(6)} (${result.model})`);
-    } catch (error: any) {
-        console.error(`🧭 ${judge.label} request failed: ${error?.message ?? error}`);
-        // Both judge clients throw errors carrying the HTTP status and a body excerpt.
-        const status: number | undefined = typeof error?.status === 'number' ? error.status : undefined;
-        const detail = `${error?.message ?? error}${error?.body ? `: ${error.body}` : ''}`;
-        // The failed request is recorded in full in Firestore (not here) — a bad answer and a
-        // refused request both need the exact input to be reproduced.
-        logger.error(`${judge.label} router request failed`, {
-            gameId: game.id, userId: userEmail, agentName: GAME_MASTER, activity: 'jev_router',
-            model: judge.model, error: detail, status,
+    const secondCall = second ? askJudge(second.judge, second.apiKey, state, questions) : undefined;
+    const first = await askJudge(judge, apiKey, state, questions);
+
+    let decider = judge;
+    let result: JevResult<Record<string, JevQuestion>>;
+    /** Known now (the first judge failed and the second decided) — else filled in after the response. */
+    let shadowNow: JevRouterShadow | undefined;
+    if (first.ok) {
+        result = first.result;
+    } else {
+        logJudgeFailure(judge, first, game.id, userEmail);
+        const fallback = secondCall ? await secondCall : undefined;
+        if (!fallback?.ok) {
+            if (second && fallback && !fallback.ok) logJudgeFailure(second.judge, fallback, game.id, userEmail);
+            await saveJevRouterCall({
+                gameId: game.id, userId: userEmail, day: game.currentDay, status: 'error', model: judge.model,
+                state, questions, error: first.detail, httpStatus: first.status,
+                shadow: second && fallback && !fallback.ok
+                    ? { model: second.judge.model, error: fallback.detail, httpStatus: fallback.status }
+                    : undefined,
+            });
+            const secondDetail = second && fallback && !fallback.ok ? `; ${second.judge.label}: ${fallback.detail}` : '';
+            throw new JevRouterUnavailableError(
+                'Game Master failed to select responding bots',
+                `${judge.label} speaker router failed: ${first.detail}${secondDetail}`,
+                { gmAiType: second ? second.judge.id : judge.id, action: 'bot_selection' },
+                true
+            );
+        }
+        // Not a retry of the same call: a different judge, already running, so an outage or an
+        // empty prepaid balance degrades speaker picks instead of stalling the game.
+        console.warn(`🧭 ${judge.label} unavailable, falling back to ${second!.judge.label} — game ${game.id}`);
+        logger.warn(`${judge.label} router unavailable, falling back to ${second!.judge.label}`, {
+            gameId: game.id, userId: userEmail, activity: 'jev_router', error: `${judge.label} speaker router failed: ${first.detail}`,
         });
-        await saveJevRouterCall({
-            gameId: game.id, userId: userEmail, day: game.currentDay, status: 'error', model: judge.model,
-            state, questions, error: detail, httpStatus: status,
-        });
-        throw new JevRouterUnavailableError(
-            'Game Master failed to select responding bots',
-            `${judge.label} speaker router failed: ${detail}`,
-            { gmAiType: judge.id, action: 'bot_selection' },
-            true
-        );
+        decider = second!.judge;
+        result = fallback.result;
+        shadowNow = { model: judge.model, error: first.detail, httpStatus: first.status };
     }
+    // When the first judge decided, the second's still-running call becomes the shadow.
+    const pendingShadow = first.ok && second && secondCall ? { judge: second.judge, call: secondCall } : undefined;
 
     await recordRouterSpend(
         game.id,
         { inputTokens: result.inputTokens, outputTokens: 0, costUSD: result.costUSD, durationMs: result.durationMs },
         userEmail,
         result.model,
-        judge.apiKeyName
+        decider.apiKeyName
     );
 
-    const quietChoice = result.answers.quiet_pick;
-    const signals: SpeakerSignal[] = candidateNames.map(name => {
-        const reply = result.answers[replyKey(name)];
-        return {
-            name,
-            score: Number(reply?.score) || 0,
-            mustReply: Number(reply?.probabilities?.[TOP_LEVEL]) || 0,
-            quietRelevance: Number(quietChoice?.probabilities?.[name]) || 0,
-        };
-    });
+    const quietChoice = (result.answers as Record<string, any>).quiet_pick;
+    const signals = signalsFrom(result, candidateNames);
+    // The random draws are kept so the shadow judge's set is composed with the same ones.
+    const draws: number[] = [];
     const composed = composeSpeakerSet({
         signals,
         activity: game.dayActivityCounter || {},
         lastAuthor,
+        random: () => {
+            const r = Math.random();
+            draws.push(r);
+            return r;
+        },
     });
     const selectedBots = composed.selected.slice(0, BOT_SELECTION_CONFIG.MAX);
 
-    const dramatic = Number(result.answers.dramatic?.noul) || 0;
+    const dramatic = Number((result.answers as Record<string, any>).dramatic?.noul) || 0;
     const isAfterGame = game.gameState === GAME_STATES.AFTER_GAME_DISCUSSION;
     if (!isAfterGame && dramatic >= JEV_ROUTER_CONFIG.DRAMATIC_THRESHOLD && midGameImagesEnabled(game)) {
         // Jev cannot describe the moment; the illustrator's assistant writes its own brief from
@@ -463,14 +525,14 @@ export async function selectRespondingBotsWithJev(
         id: null,
         recipientName: RECIPIENT_NONE,
         authorName: GAME_MASTER,
-        msg: `${judge.label} selected: [${selectedBots.join(', ')}]. Ranked: ${ranking}. Must: [${composed.must.join(', ')}]. Quiet slots: [${composed.quiet.join(', ')}] from pool {${quietSummary}}. Target count: ${composed.target}. Dramatic: ${dramatic.toFixed(2)}. ${result.durationMs} ms, ${result.inputTokens} tokens.`,
+        msg: `${decider.label} selected: [${selectedBots.join(', ')}]. Ranked: ${ranking}. Must: [${composed.must.join(', ')}]. Quiet slots: [${composed.quiet.join(', ')}] from pool {${quietSummary}}. Target count: ${composed.target}. Dramatic: ${dramatic.toFixed(2)}. ${result.durationMs} ms, ${result.inputTokens} tokens.`,
         messageType: MessageType.GM_BOT_SELECTION,
         day: game.currentDay,
         timestamp: null
     };
     await addMessageToChatAndSaveToDb(selectionMessage, game.id);
 
-    console.log(`🧭 ${judge.label} selected [${selectedBots.join(', ')}] — ranked: ${ranking}; must: [${composed.must.join(', ')}]; quiet: [${composed.quiet.join(', ')}] from pool {${quietSummary}}; target ${composed.target}; dramatic ${dramatic.toFixed(2)}`);
+    console.log(`🧭 ${decider.label} selected [${selectedBots.join(', ')}] — ranked: ${ranking}; must: [${composed.must.join(', ')}]; quiet: [${composed.quiet.join(', ')}] from pool {${quietSummary}}; target ${composed.target}; dramatic ${dramatic.toFixed(2)}`);
 
     const decision = {
         selected: selectedBots,
@@ -485,11 +547,66 @@ export async function selectRespondingBotsWithJev(
     };
 
     // Durable copy in Firestore (jevRouterCalls) — Better Stack only keeps rows for days.
-    await saveJevRouterCall({
+    const rowId = await saveJevRouterCall({
         gameId: game.id, userId: userEmail, day: game.currentDay, status: 'ok', model: result.model,
         state, questions, answers: result.answers, decision,
         inputTokens: result.inputTokens, costUSD: result.costUSD, durationMs: result.durationMs,
+        shadow: shadowNow,
     });
+
+    // The second judge's answer, when the first one decided: recorded after the response, so the
+    // game never waits on the slower judge. Composed with the decider's random draws.
+    if (pendingShadow) {
+        const gameId = game.id;
+        const recordShadow = async () => {
+            const attempt = await pendingShadow.call;
+            let shadow: JevRouterShadow;
+            if (attempt.ok) {
+                const shadowResult = attempt.result;
+                await recordRouterSpend(
+                    gameId,
+                    { inputTokens: shadowResult.inputTokens, outputTokens: 0, costUSD: shadowResult.costUSD, durationMs: shadowResult.durationMs },
+                    userEmail,
+                    shadowResult.model,
+                    pendingShadow.judge.apiKeyName
+                );
+                let next = 0;
+                const replayed = composeSpeakerSet({
+                    signals: signalsFrom(shadowResult, candidateNames),
+                    activity,
+                    lastAuthor,
+                    random: () => (next < draws.length ? draws[next++] : Math.random()),
+                });
+                shadow = {
+                    model: shadowResult.model,
+                    answers: shadowResult.answers,
+                    decision: {
+                        selected: replayed.selected.slice(0, BOT_SELECTION_CONFIG.MAX),
+                        must: replayed.must,
+                        quiet: replayed.quiet,
+                        quietPool: replayed.quietPool,
+                        target: replayed.target,
+                        dramatic: Number((shadowResult.answers as Record<string, any>).dramatic?.noul) || 0,
+                    },
+                    inputTokens: shadowResult.inputTokens,
+                    costUSD: shadowResult.costUSD,
+                    durationMs: shadowResult.durationMs,
+                };
+            } else {
+                logJudgeFailure(pendingShadow.judge, attempt, gameId, userEmail);
+                shadow = { model: pendingShadow.judge.model, error: attempt.detail, httpStatus: attempt.status };
+            }
+            if (rowId) await saveJevRouterShadow(rowId, gameId, shadow);
+        };
+        const task = () => recordShadow().catch(error =>
+            logger.warn('Jev router shadow failed', { gameId, error: error?.message }));
+        try {
+            after(task);
+        } catch {
+            // Outside a request scope (unit tests, scripts): run it detached.
+            void task();
+        }
+    }
 
     // Better Stack row: the decision and usage only (same row shape as an LLM turn, minus the
     // request and the raw answers — see JEV_ROUTER_LOG_CONFIG).

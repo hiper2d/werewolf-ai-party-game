@@ -1,6 +1,7 @@
 /**
  * Jev content screen: the pure verdict (decideScreen), the request shape, and screenHumanInput
- * end to end with a mocked Jev API — monitor vs enforce, fail-open, skipping without a key.
+ * end to end with mocked Jev and OpenAI Decisions APIs — monitor vs enforce, the Decisions
+ * fallback, fail-open, skipping without a key.
  */
 const mockAskJev = jest.fn();
 const mockGetJevApiKey = jest.fn<string | null, [any]>(() => 'test-key');
@@ -11,6 +12,11 @@ jest.mock('@/app/ai/jev-client', () => {
         askJev: (...args: any[]) => mockAskJev(...args),
         getJevApiKey: (keys: any) => mockGetJevApiKey(keys),
     };
+});
+const mockAskDecisions = jest.fn();
+jest.mock('@/app/ai/openai-decisions-client', () => {
+    const actual = jest.requireActual('@/app/ai/openai-decisions-client');
+    return { ...actual, askOpenAiDecisions: (...args: any[]) => mockAskDecisions(...args) };
 });
 const mockMode = jest.fn(async () => 'monitor' as 'off' | 'monitor' | 'enforce');
 jest.mock('@/app/api/limits-actions', () => ({ getJevScreenMode: () => mockMode() }));
@@ -63,15 +69,15 @@ describe('decideScreen', () => {
         expect(d.verdict).toBe('grey');
     });
 
-    it('blocks on the top two levels and names the strongest flag', () => {
+    it('the score never blocks: high risk is grey and names the strongest flag', () => {
         const d = decideScreen(answers([0, 0.03, 0.97, 0], { sexual: 0.97, minors: 0.5 }));
-        expect(d.verdict).toBe('would_block');
+        expect(d.verdict).toBe('grey');
         expect(d.reason).toBe('sexual');
     });
 
     it('falls back to "score" as the reason when no flag is confident', () => {
         const d = decideScreen(answers([0, 0.2, 0.8, 0], { jailbreak: 0.3 }));
-        expect(d.verdict).toBe('would_block');
+        expect(d.verdict).toBe('grey');
         expect(d.reason).toBe('score');
     });
 
@@ -86,9 +92,21 @@ describe('decideScreen', () => {
         expect(d.verdict).toBe('ok');
     });
 
-    it('the jailbreak flag alone is not a hard block, only the score is', () => {
+    it('the jailbreak flag alone is not a hard block', () => {
         const d = decideScreen(answers([0.1, 0.5, 0.35, 0.05], { jailbreak: 0.99 }));
         expect(d.verdict).toBe('grey');
+    });
+
+    it('a high-risk line without a hard flag is grey and keeps its reason, never would_block', () => {
+        const d = decideScreen(answers([0, 0.03, 0.97, 0], { sexual: 0.91, real_harm: 0.72 }));
+        expect(d.verdict).toBe('grey');
+        expect(d.reason).toBe('sexual');
+    });
+
+    it('hate is a hard flag: it blocks however the score reads', () => {
+        const d = decideScreen(answers([0, 0.05, 0.95, 0], { hate: 0.98 }));
+        expect(d.verdict).toBe('would_block');
+        expect(d.reason).toBe('hate');
     });
 
     it('tolerates missing answers', () => {
@@ -141,10 +159,14 @@ describe('screenHumanInput', () => {
         expect(mockAskJev).not.toHaveBeenCalled();
     });
 
+    const setup = { ...input, source: 'preview' as const };
+    // A would-block needs a hard flag; the score alone never blocks.
+    const minorsAnswers = () => answers([0, 0.03, 0.97, 0], { sexual: 0.97, minors: 0.96 });
+
     it('monitor mode records a would-block verdict, bills it, and lets the text through', async () => {
-        mockAskJev.mockResolvedValue(jevResult(answers([0, 0.03, 0.97, 0], { sexual: 0.97 })));
-        const out = await screenHumanInput(input);
-        expect(out).toEqual({ verdict: 'would_block', reason: 'sexual', mode: 'monitor', blocked: false });
+        mockAskJev.mockResolvedValue(jevResult(minorsAnswers()));
+        const out = await screenHumanInput(setup);
+        expect(out).toEqual({ verdict: 'would_block', reason: 'minors', mode: 'monitor', blocked: false });
 
         expect(mockAskJev).toHaveBeenCalledTimes(1);
         const [, , , options] = mockAskJev.mock.calls[0];
@@ -155,8 +177,8 @@ describe('screenHumanInput', () => {
         expect(mockSaveRecord).toHaveBeenCalledTimes(1);
         const record = mockSaveRecord.mock.calls[0][0];
         expect(record).toMatchObject({
-            gameId: 'g1', userEmail: 'p@example.com', source: 'chat', day: 2, text: input.text,
-            promptVersion: JEV_SCREEN_PROMPT_VERSION, model: 'jev-1.13.0', verdict: 'would_block', reason: 'sexual',
+            gameId: 'g1', userEmail: 'p@example.com', source: 'preview', day: 2, text: input.text,
+            promptVersion: JEV_SCREEN_PROMPT_VERSION, model: 'jev-1.13.0', verdict: 'would_block', reason: 'minors',
             mode: 'monitor', enforced: false, thresholds: JEV_SCREEN_CONFIG,
         });
         expect(record.state.text).toBe(input.text);
@@ -165,16 +187,16 @@ describe('screenHumanInput', () => {
         expect(record.flags.sexual).toBe(0.97);
         expect(record.riskScore).toBeCloseTo(1.97);
 
-        expect(mockWarn).toHaveBeenCalledWith('Jev screen would_block', expect.objectContaining({ activity: 'jev_screen', reason: 'sexual' }));
+        expect(mockWarn).toHaveBeenCalledWith('Jev screen would_block', expect.objectContaining({ activity: 'jev_screen', reason: 'minors' }));
         expect(mockAgentActivity).toHaveBeenCalledWith('Content screen', 'jev-1.13.0', 'jev_screen', expect.objectContaining({ gameId: 'g1' }), expect.anything());
     });
 
     it('enforce mode rejects a would-block verdict with a message and marks the record enforced', async () => {
         mockMode.mockResolvedValue('enforce');
-        mockAskJev.mockResolvedValue(jevResult(answers([0, 0.03, 0.97, 0], { sexual: 0.97 })));
-        const out = await screenHumanInput(input);
+        mockAskJev.mockResolvedValue(jevResult(minorsAnswers()));
+        const out = await screenHumanInput(setup);
         expect(out.blocked).toBe(true);
-        expect(out.message).toBe("This message can't be sent to the AI players because it contains sexual content. Please rephrase it.");
+        expect(out.message).toBe("This game setup can't be sent to the AI players because it sexualizes a minor. Please rephrase it.");
         expect(mockSaveRecord.mock.calls[0][0]).toMatchObject({ mode: 'enforce', enforced: true });
     });
 
@@ -192,6 +214,99 @@ describe('screenHumanInput', () => {
         expect(out).toEqual({ verdict: 'error', reason: null, mode: 'enforce', blocked: false });
         expect(mockRecordScreenSpend).not.toHaveBeenCalled();
         expect(mockSaveRecord.mock.calls[0][0]).toMatchObject({ verdict: 'error', error: 'This operation was aborted', enforced: false });
+        expect(mockSaveRecord.mock.calls[0][0].shadow).toBeUndefined();
+        expect(mockAskDecisions).not.toHaveBeenCalled();
+    });
+
+    describe('both judges, asked at once', () => {
+        const withOpenAi = { ...setup, apiKeys: { OPENAI_API_KEY: 'sk-test' } };
+        const decisionsResult = (a: Record<string, any>) => ({ ...jevResult(a), model: 'gpt-6-luna', costUSD: 0.000065, durationMs: 400 });
+
+        it('Jev decides; the Decisions answer is billed and recorded as the shadow on the same row', async () => {
+            mockAskJev.mockResolvedValue(jevResult(answers([0, 0.2, 0.8, 0], { sexual: 0.9 })));
+            mockAskDecisions.mockResolvedValue(decisionsResult(answers([0.4, 0.5, 0.1, 0])));
+
+            const out = await screenHumanInput(withOpenAi);
+            expect(out).toMatchObject({ verdict: 'grey', reason: 'sexual' });
+
+            const [key, state, questions, options] = mockAskDecisions.mock.calls[0];
+            expect(key).toBe('sk-test');
+            expect(state.text).toBe(input.text);
+            expect(Object.keys(questions)).toEqual(Object.keys(mockAskJev.mock.calls[0][2]));
+            expect(options.timeoutMs).toBe(JEV_SCREEN_CONFIG.DECISIONS_TIMEOUT_MS);
+
+            expect(mockRecordScreenSpend.mock.calls.map(c => [c[3], c[4]])).toEqual([
+                ['jev-1.13.0', 'TYPESAFE_API_KEY'],
+                ['gpt-6-luna', 'OPENAI_API_KEY'],
+            ]);
+            expect(mockSaveRecord).toHaveBeenCalledTimes(1);
+            const record = mockSaveRecord.mock.calls[0][0];
+            expect(record).toMatchObject({ model: 'jev-1.13.0', verdict: 'grey', reason: 'sexual' });
+            expect(record.shadow).toMatchObject({ model: 'gpt-6-luna', verdict: 'ok', reason: null, costUSD: 0.000065, durationMs: 400 });
+            expect(record.shadow.riskScore).toBeCloseTo(0.7);
+            expect(record.shadow.answers.risk).toBeDefined();
+        });
+
+        it('asks both at once: the wait is the slower call, not the sum', async () => {
+            let resolveJev: (v: any) => void = () => undefined;
+            mockAskJev.mockReturnValue(new Promise(resolve => { resolveJev = resolve; }));
+            mockAskDecisions.mockResolvedValue(decisionsResult(answers([0.9, 0.1, 0, 0])));
+            const call = screenHumanInput(withOpenAi);
+            await new Promise(resolve => setImmediate(resolve));
+            expect(mockAskDecisions).toHaveBeenCalledTimes(1);
+            resolveJev(jevResult(answers([0.9, 0.1, 0, 0])));
+            expect((await call).verdict).toBe('ok');
+        });
+
+        it('when Jev fails, Decisions decides and enforces, and the Jev error is the shadow', async () => {
+            mockMode.mockResolvedValue('enforce');
+            mockAskJev.mockRejectedValue(Object.assign(new Error('Jev returned HTTP 529'), { status: 529, body: 'overloaded' }));
+            mockAskDecisions.mockResolvedValue(decisionsResult(minorsAnswers()));
+
+            const out = await screenHumanInput(withOpenAi);
+            expect(out).toMatchObject({ verdict: 'would_block', reason: 'minors', blocked: true });
+            expect(mockRecordScreenSpend).toHaveBeenCalledTimes(1);
+            expect(mockRecordScreenSpend).toHaveBeenCalledWith('g1', expect.objectContaining({ costUSD: 0.000065 }), 'p@example.com', 'gpt-6-luna', 'OPENAI_API_KEY');
+
+            expect(mockSaveRecord).toHaveBeenCalledTimes(1);
+            const record = mockSaveRecord.mock.calls[0][0];
+            expect(record).toMatchObject({ model: 'gpt-6-luna', verdict: 'would_block', enforced: true });
+            expect(record.shadow).toEqual({
+                model: 'jev-latest', verdict: 'error', reason: null, riskScore: null, highRisk: null, flags: null,
+                error: 'Jev returned HTTP 529: overloaded', httpStatus: 529,
+            });
+        });
+
+        it('lets the text through only when both fail: one error row, Jev\'s error on it, Decisions\' in the shadow', async () => {
+            mockMode.mockResolvedValue('enforce');
+            mockAskJev.mockRejectedValue(new Error('Jev request timed out after 3002 ms'));
+            mockAskDecisions.mockRejectedValue(new Error('OpenAI Decisions refused: risk'));
+
+            const out = await screenHumanInput(withOpenAi);
+            expect(out).toEqual({ verdict: 'error', reason: null, mode: 'enforce', blocked: false });
+            expect(mockRecordScreenSpend).not.toHaveBeenCalled();
+            expect(mockSaveRecord).toHaveBeenCalledTimes(1);
+            const record = mockSaveRecord.mock.calls[0][0];
+            expect(record).toMatchObject({ model: 'jev-latest', verdict: 'error', error: 'Jev request timed out after 3002 ms' });
+            expect(record.shadow).toMatchObject({ model: 'gpt-6-luna', verdict: 'error', error: 'OpenAI Decisions refused: risk' });
+        });
+
+        it('a Decisions failure alone changes nothing for the player: Jev decides, the shadow records the error', async () => {
+            mockAskJev.mockResolvedValue(jevResult(answers([0.9, 0.1, 0, 0])));
+            mockAskDecisions.mockRejectedValue(new Error('OpenAI Decisions returned HTTP 500'));
+            const out = await screenHumanInput(withOpenAi);
+            expect(out.verdict).toBe('ok');
+            expect(mockSaveRecord.mock.calls[0][0]).toMatchObject({ model: 'jev-1.13.0', verdict: 'ok', shadow: { verdict: 'error' } });
+        });
+
+        it('screens on Decisions alone when there is no Jev key', async () => {
+            mockGetJevApiKey.mockReturnValue(null);
+            mockAskDecisions.mockResolvedValue(decisionsResult(answers([0.9, 0.1, 0, 0])));
+            const out = await screenHumanInput(withOpenAi);
+            expect(out.verdict).toBe('ok');
+            expect(mockAskJev).not.toHaveBeenCalled();
+            expect(mockSaveRecord.mock.calls[0][0].shadow).toBeUndefined();
+        });
     });
 
     it('gives Jev 3 s, then fails open on the timeout and records it', async () => {
