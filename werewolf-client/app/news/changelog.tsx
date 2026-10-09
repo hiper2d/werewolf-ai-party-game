@@ -13,6 +13,28 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        id: "haiku-5-5", date: "Oct 2026", tags: ["Models"],
+        title: "Claude Haiku 5.5: ten times cheaper and much faster",
+        body: (<>Anthropic&apos;s <strong>Claude Haiku 5.5</strong> replaces Claude 4.5 Haiku in the model picker.
+            It costs <strong>a tenth</strong> of what 4.5 did and answers far faster: in our tests a bot&apos;s
+            vote came back in about <strong>7 seconds instead of 28</strong>, and a full 15-character story in
+            71 seconds instead of 113. Games that already have Haiku bots switch to 5.5 on their next turn, and
+            those bots keep the reasoning from their earlier turns. On the free tier, the one-Haiku-per-game limit
+            is gone: you can fill the whole lobby with it.</>),
+        media: null,
+        links: [{label: "Create a game", href: "/games"}],
+    },
+    {
+        id: "gpt-6-1-sol", date: "Sep 2026", tags: ["Models"],
+        title: "GPT-6.1 Sol replaces GPT-6 Sol",
+        body: (<>OpenAI&apos;s <strong>GPT-6.1 Sol</strong> takes over the Sol slot in the model picker, at the
+            <strong> same price</strong> as GPT-6 Sol. Games that already have Sol bots switch to 6.1 on their
+            next turn. Pick it for any bot or the Game Master when you set up a lobby. Like GPT-6 Sol, it&apos;s
+            available on the paid tier.</>),
+        media: null,
+        links: [{label: "Create a game", href: "/games"}],
+    },
+    {
         id: "sonnet-5-5", date: "Sep 2026", tags: ["Models"],
         title: "Claude Sonnet 5.5 replaces Claude Sonnet 5",
         body: (<>Anthropic&apos;s <strong>Claude Sonnet 5.5</strong> takes over the Sonnet slot in the model picker,
