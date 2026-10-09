@@ -1,65 +1,86 @@
 # Plan: multiplayer (shared games with several human seats)
 
-Status: design draft, 2026-09-19. Nothing implemented. Written up from a brainstorm with
-Alex on 2026-09-18/19; the "Decisions" section is what he settled, the "Design" section is
-how the code would carry it, "Open questions" is what is still his call.
+Status: design draft. Nothing implemented. Brainstormed with Alex on 2026-09-18/19, gaps
+settled 2026-09-20, simplified 2026-10-01 (game creation unchanged, queue as lock, host
+drives blind, strict per-seat privacy, send cooldown). The "Decisions" section is what Alex settled, the "Design" section
+is how the code would carry it, "Open questions" is what is still Alex's call.
 
-Goal: let several humans sit at one table with the bots. A game is created and driven by a
-host, friends join through an invite link, each human plays a character from the cast, and
-the bots cannot tell who is human. Solo play must not change for existing users.
+Goal: let several humans sit at one table with the bots. The host creates a game exactly as
+today, friends join through an invite link and take over bot characters, and the bots
+cannot tell who is human. Solo play must not change for existing users beyond the day chat
+no longer locking while bots talk.
 
-## Decisions (Alex, 2026-09-18/19)
+## Decisions (Alex)
 
 1. **No relay through Vercel.** SSE was removed (commit b89f888) because open function
    invocations burned the Hobby CPU budget; polling would do the same. Live updates go
    browser → Firestore directly (`onSnapshot`), authenticated with a Firebase custom token
    minted from the NextAuth session. Vercel is touched only by actual moves.
-2. **The host's browser stays the game engine.** Exactly one browser advances bots. Guests
-   read the doc and call small actions for their own moves. If the host is away, bots
-   pause; humans keep chatting. (A driver lease is a later option, not v1.)
-3. **The queue head names the actor.** Every phase is already a queue of names. Bot at
-   the head → host processes it. Human at the head → that human's browser shows the
-   control, their action pops the queue. Everyone else renders "waiting for X".
-4. **Humans never block on bots.** A human message is just a message. Bot reply rounds
-   are triggered by pacing (debounce + cooldown + per-day bot budget), sized by the GM
-   (never zero in practice, so silence comes from the deterministic levers, not the GM),
-   with a host button to force a round.
-5. **Vote starts by agreement.** Each alive human presses "Vote"; the button stays pressed
+2. **Game creation stays as it is.** The host fills the form, generates the cast and
+   creates the game as today, including their own name and role choice. A shareable game
+   opens in a new LOBBY state instead of starting introductions; a solo game starts
+   automatically, exactly as now. No shared preview, no
+   persisted draft. (2026-09-30)
+3. **Guests take a bot's slot.** A joined player picks an unclaimed bot character in the
+   lobby and becomes it, inheriting its role. Before Start they may edit everything the
+   preview lets the host edit on a bot: name, story, visual description, voice, voice
+   style, and the portrait with the avatar tool (candidates, sheets, reframe, mannequin).
+   Play style and model are bot-only and do not apply. The cast size is whatever the host
+   set; humans replace bots, so the number of guests is at most the number of bots. Zero-bot games are allowed. (2026-09-30)
+4. **No joining after Start.** The invite link stops working when the host presses Start.
+   The viewer link keeps working. (2026-09-30)
+5. **The queue is the lock.** Every phase is already a queue of names. When the day queue
+   is empty, any player's message fills it: the player's own `sendMessage` runs bot
+   selection over that message, server-side. While it is
+   non-empty, humans chat freely and their messages add no bots; queued bots see them
+   because each bot reads the day history at its turn. A message posted while the last
+   bot is generating may go unanswered: accepted, the next message starts a new round.
+   (2026-09-30)
+6. **The host's browser runs the queues, blind.** Filling is anyone's; running is the
+   host's. The host's browser is today's solo loop over the shared doc: it says "next"
+   and the server, which alone knows the hidden queue, runs the bot at the head or
+   answers "waiting" when a human is there. Introductions, bot turns, bot votes, bot
+   night actions, summaries and phase steps all run this way. One engine means no
+   claims, leases, timers or races between browsers. Host away → a filled queue waits
+   and bots stay silent; humans keep chatting; the host's return resumes it. (2026-10-01)
+7. **No browser receives what its seat may not know.** Not in the game doc, not in a
+   message query, not in an action response, not in a log line shown to the client.
+   Roles, night queues, night results and role-private messages live in private docs
+   readable only by the server or by the seat they belong to; Firestore rules enforce it;
+   actions return `ok | waiting | no-op | rejected | error` and never game data. The host
+   is a player and gets no exception. Today the full doc and the action responses carry
+   all of it, which is fine solo and a cheat channel in multiplayer. (2026-10-01)
+8. **Send cooldown: 5 s per player.** After sending, a player's composer is replaced by a
+   loader with a 5 s countdown bar (same look as the current bot-selection loader).
+   Enforced on the server too. Stops endless spamming, which would otherwise be free of
+   LLM cost but not of Vercel invocations and Firestore writes. (2026-09-30)
+9. **Vote starts by agreement.** Each alive human presses "Vote"; the button stays pressed
    for them and shows a counter to the others; they may unpress until everyone has
-   pressed. All pressed → voting begins. The auto-vote ceiling remains, plus a time-based
-   ceiling that does not depend on bot messages.
-6. **The preview becomes a persisted game state (DRAFT), owned by the host.** Only the
-   host edits global fields and triggers generation/regeneration. Invites work from the
-   first minute. Joined players edit only their own character (name, story, visual
-   description, voice) and their avatar with the existing edit tool: candidates, previous
-   sheets ("image maps"), reframe, mannequin.
-7. **Regeneration is never locked.** A whole-cast regeneration resets joined players'
-   picks; they re-claim from the new cast and may pick a face from any previous sheet.
-   The mannequin sheet guarantees everyone has a face on join.
-8. **Humans claim characters from the generated cast.** Unclaimed characters become bots
-   at Start. Roles are assigned per character at Start. Zero-bot games are allowed
-   (humans-only Werewolf with a narrating GM, or no narration at all).
-9. **Models are host-only, always.** Lobby: host sets bot and GM models, visible to all.
-   In game: only through the recovery flows (retry, provider reassignment, GM swap), with
-   a system line in chat. Guests never change models: it is spend and a sync point.
-10. **Any tier can join any game.** The game's tier is the host's tier: it decides the
+   pressed. All pressed → voting begins. The auto-vote ceiling by bot message count
+   remains; no time ceiling (bots only talk after a human message, and the host's "skip
+   absent player" covers a human who never presses).
+10. **Werewolf night unchanged: the last wolf decides.** The wolf turn list is every alive
+   wolf twice, shuffled; each slot is a line in the wolf room and the last slot picks the
+   victim, human or bot. No kill vote, no tie-break. (2026-09-30)
+11. **Models are host-only, always.** Lobby: host sets bot and GM models, visible to all.
+    In game: only through the recovery flows (retry, provider reassignment, GM swap), with
+    a system line in chat. Guests never change models: it is spend and a sync point.
+12. **Any tier can join any game.** The game's tier is the host's tier: it decides the
     model catalog and per-model bot caps. Tier guards check seat membership, not tier
     equality.
-11. **Billing.** Free seats are debited the full cost of every call in every game they sit
+13. **Billing.** Free seats are debited the full cost of every call in every game they sit
     in (allowance accounting, as if solo, no matter who pays the money). The paid host
-    pays the full real cost by default. If the host enables "split" in the preview, the
+    pays the full real cost by default. If the host enables "split" in the lobby, the
     real cost is divided evenly among paid seats. Paid guests otherwise pay nothing. A seat
     that runs dry (free allowance or paid balance) blocks the game for everybody with that
     seat's name on the banner. No "cover for X" button.
-12. **Redraws become unlimited for everyone.** `FREE_TIER_AVATAR_REGENS` goes; the daily
-    spend cap already bounds image spend. Keep the counter for stats.
-13. **No rewinds in shared games.** Message deletion, delete-after trims, night replay and
+14. **No rewinds in shared games.** Message deletion, delete-after trims, night replay and
     the one-shot model override on retry are solo-only. A game is `shared` from the first
     guest claim, permanently.
-14. **Night errors must not name the bot.** In shared games the host is a player. The
+15. **Night errors must not name the bot.** In shared games the host is a player. The
     error banner and the retry dialog address a failed night actor by queue slot, never by
     name.
-15. **(2026-09-20)** Spoken lines are stored once and replayed for free; dead humans and
+16. **(2026-09-20)** Spoken lines are stored once and replayed for free; dead humans and
     link viewers get read-only seats; a leaver's character becomes a bot; no welcome turn
     for humans; the ghostwriter suggestion becomes a private advisor. Details in
     Design §12.
@@ -75,24 +96,33 @@ the bots cannot tell who is human. Solo play must not change for existing users.
 - A human message: saved first, then `selectRespondingBots` fills
   `gameStateProcessQueue`, the client loops `talkToAll` per bot, input disabled while the
   local `isProcessing` flag or the queue is non-empty (`GameChat.tsx`).
-- The full game doc, including every bot's role and model, ships to the browser.
+- Roles are assigned in `createGame` (`game-actions.ts`): shuffled distribution, the
+  human's role choice swapped into slot 0, bots get the rest.
+- Werewolf night: with more than one alive wolf the param queue is the wolf list twice,
+  shuffled (`bot-actions.ts`); every slot but the last is a coordination message
+  (`humanPlayerTalkWerewolves` for the human), the last picks the target.
+- The full game doc ships to the browser on every load and in every action response
+  (`getGame` → `gameFromFirestore`, unfiltered): every bot's role and model, the night
+  queues with the wolves' names (`gameStateParamQueue`), night results. Messages are the
+  one filtered path (`app/api/games/[id]/messages/route.ts` adds role-private recipients
+  only for the human's role), but action responses bypass it: `performNightAction`
+  returns a bot's night messages directly (`night-actions.ts` ~812).
 - Access is owner-only: `page.tsx` redirects non-owners, `ensureUserCanAccessGame`
   (`tier-guards.ts`) throws on owner mismatch and on tier mismatch.
 - Firestore is admin-only. `firebase/client.ts` is empty, `firestore.rules` is the
   expired starter template, so browsers can read nothing directly.
-- The preview is browser state on `app/games/newgame/page.tsx` plus a per-user avatar
-  draft (`avatar-draft-actions.ts`). Nothing shareable exists until `createGame`, and the
-  game page starts bot introductions on load.
+- The game page starts bot introductions on load.
 - Avatars: sheets kept per round, per-character docs `games/{id}/avatars/{key}`,
-  `selectAvatarVariant` and `reframeAvatar` write one key and cost nothing. Candidate index
-  == sheet round is an invariant. Image route and all avatar actions gate through
-  `ensureUserCanAccessGame`.
+  `selectAvatarVariant` and `reframeAvatar` write one key and cost nothing. Image route
+  and all avatar actions gate through `ensureUserCanAccessGame`.
 - Billing: every spend goes through `recordSpend` (`cost-tracking.ts`), one user, one
   transaction. Free-tier guard `assertFreeSpendWithinLimit` runs before every ask for the
   session user via `setBeforeAskHook`.
 - Free-tier caps that are per game: per-model bot count from price bands
   (`ai-models.ts`) and one portrait redraw. Everything else is per user, per device or
   global (`FREE_TIER_LIMITS`, `config/limits`).
+- Cinematic auto-play voices every line on every client that has it on, and each
+  generation is billed (see §12, stored audio).
 
 ## Design
 
@@ -120,24 +150,27 @@ the bots cannot tell who is human. Solo play must not change for existing users.
 #### 2.1 Game doc (public projection, readable by all seats)
 
 ```
-gameState: 'DRAFT' | 'LOBBY' | 'WELCOME' | ... (existing states)
+gameState: 'LOBBY' | 'WELCOME' | ... (existing states)
 shared: boolean                 // set true on first guest claim, never cleared
-inviteToken: string             // random; host may regenerate to revoke links
-hostUid: string                 // replaces ownerEmail as the admin identity (keep ownerEmail)
+inviteToken: string | null      // random; host may regenerate; cleared at Start
+viewerToken: string             // separate read-only link
+hostUid: string                 // admin identity (keep ownerEmail)
 seatUids: string[]              // denormalised for rules
 seats: Record<uid, {            // public part of a seat
-    characterKey: string | null // claimed character, null while browsing
+    characterKey: string        // the host's own character, or the claimed bot's
     displayName: string
     tier: 'free' | 'paid'
+    kind: 'player' | 'viewer'
     joinedAt: number
+    lastMessageAt: number       // send cooldown
 }>
 splitPaidCost: boolean          // host toggle, editable until Start
-characters: Character[]         // was `bots`; each has `controller: 'bot' | uid`
-                                // public fields only: name, story, visualDescription,
-                                // voice, aiType (aiType hidden from guests in game, see 7)
+characters: Character[]         // was `bots` + the human; each has
+                                // `controller: 'bot' | uid`; public fields only
+dayQueueLength: number          // public: how many bots are queued in the day, no names
+stepCounter: number             // bumps on every engine step; the host's loop and the
+                                // seats' "is it my turn" checks key off it, no names
 voteReady: string[]             // uids who pressed Vote this day
-lastRoundEndedAt: number        // pacing
-dayStartedAt: number            // time-based vote ceiling
 ```
 
 `humanPlayerName/Role/IsAlive` are replaced by `characters[].controller` plus per-seat
@@ -146,14 +179,33 @@ the owner, the human name becomes a character with `controller = ownerUid`.
 
 #### 2.2 Private docs
 
-- `games/{id}/private/state` (admin only): roles per character, night results, the
-  werewolf list, anything the GM knows. Server actions read it; browsers never can.
+- `games/{id}/private/state` (admin only): roles per character, every queue that can
+  reveal a role (night process and param queues, the wolf turn list), night results,
+  the werewolf list, anything the GM knows. The day bot queue can stay public: a day
+  queue is selected by the GM over public messages and reveals nothing. Server actions read it; browsers never can.
 - `games/{id}/seats/{uid}` (own uid only): the seat's role, its role card, its own night
-  results, "your action is due" hints. Written by the server when roles are assigned or
-  a night resolves.
+  results, "your action is due" hints. Written by the server when a seat claims a
+  character or a night resolves.
 
 `characters[].role` leaves the public doc. Everything that renders a role today reads it
-from `seats/{me}` (own) or from the public doc only after death or game over.
+from `seats/{me}` (own) or from the public doc only after death or game over. Bot models
+(`aiType`) are host-visible only during the game: a model tag hints at "bot" and is a
+host lever, so the public projection omits it and the host reads it from a host-only doc.
+
+#### 2.2.1 What may reach a browser
+
+| Data | Who | How |
+|---|---|---|
+| Public messages, public doc (state, day, alive list, names, stories, portraits, voices, day queue, step counter, vote-ready) | every seat | listener |
+| Own role, own night results, own "your turn" | that seat | `seats/{uid}` |
+| Role-private messages (wolf room, detective, doctor, maniac) | seats in `audience` | listener with rule |
+| Roles of others | nobody until death reveal / game over | copied to public doc at that moment |
+| Night queues, wolf list, GM state | nobody | `private/state`, server only |
+| Bot models | host (and everyone at lobby / game over) | host-only doc |
+
+Action responses carry none of it: `ok | waiting | no-op | rejected | error` plus at most
+the caller's own new message id. Clients learn everything through their listeners, which
+the rules filter. Error banners and client-visible logs follow the same table (§9).
 
 #### 2.3 Messages
 
@@ -162,113 +214,126 @@ werewolf-chat and role-private messages so a rule can filter without knowing rol
 `resource.data.audience.hasAny([myCharacterKey])` where `myCharacterKey` comes from the
 seat doc (rules can `get()` it). `ALL` messages carry no audience.
 
-#### 2.4 Avatar candidates
-
-A candidate becomes an explicit `{ round, cell, framing }` instead of the implicit
-"cell of this character on sheet `round`". Needed because after a regeneration the new
-cast no longer lines up with old sheets and a player may pick any cell from any kept
-sheet. `reframeAvatar` already stores framing per sheet; this widens the same record.
-
-### 3. States and the lobby
+### 3. Lobby
 
 ```
-DRAFT  → host fills the form, generates/regenerates the cast, invites
-LOBBY  → cast exists; humans claim and edit characters; host presses Start
-WELCOME → unchanged from here
+new-game form (unchanged) → createGame → LOBBY → host presses Start → WELCOME
 ```
 
-- `createGame` writes the doc in DRAFT. The new-game page becomes listener-driven over
-  that doc (fields read from the doc, written through a small patch action). Solo users:
-  create → DRAFT → LOBBY → Start with the same clicks as today, or auto-start when no
-  invite was ever opened.
+- `createGame` is unchanged except that it writes `gameState: 'LOBBY'`, the host's seat
+  and the invite/viewer tokens. Roles are assigned there as today; the host's role choice
+  still works. The game page renders the lobby instead of starting introductions.
+- Solo starts automatically as today: no lobby screen, no extra click. How the form
+  tells solo from shared (an "invite friends" toggle, or a lobby only when the host opens
+  the invite link) is an implementation detail for step 4.
 - Join page `/games/{id}/join?t=<token>`: sign-in required, token check, tier recorded on
-  the seat, shows unclaimed characters. Claim is a transaction (two people cannot take the
-  same character). Claiming sets `shared = true`.
-- Host controls in lobby: regenerate cast, reroll one unclaimed character, redraw
-  portraits, kick, lock lobby, regenerate invite token, Start.
-- Start: assigns roles over the final cast (`controller` decides human vs bot), writes
-  `private/state` and every `seats/{uid}`, transitions to WELCOME. Role balance for small
-  tables (5 to 7 players) needs a table; today's minimum is 8.
-- Avatars: the sheet is drawn when the lobby opens (as creation does today). A rerolled
-  character shows the mannequin until Start; at Start a small sheet of rerolled cells is
-  drawn. A host redraw adds candidates for everyone but only switches the shown face for
-  characters whose owner has not made a manual pick (new flag `pickIsManual` on the
-  per-character avatar doc).
+  the seat, shows unclaimed bot characters. Claim is a transaction (two people cannot
+  take the same character): sets `controller = uid`, writes the seat doc with the
+  inherited role, sets `shared = true`.
+- A guest edits their character before Start with the same fields and avatar tool as the
+  preview: name, story, visual description, voice, voice style, portrait. Names are
+  identifiers and the cast's stories mention each other, so a rename replaces the old
+  name across all stories in the same write. Nothing has been said yet, so no message
+  history to fix.
+- A guest may release their claim and pick another character before Start.
+- Host controls in lobby: models, split toggle, kick (character reverts to a bot),
+  regenerate invite token, Start. Start clears `inviteToken` and moves to WELCOME.
 - Lobby copy: "free players' daily allowance applies in this game", and "X is covering
   this game" / "cost is split among paid players" from the toggle.
 
-### 4. Day discussion
+### 4. Queues: anyone fills, the host runs
 
-- `sendMessage(gameId, text)`: any seated alive human, any time. Writes the message,
-  returns. No LLM call. Optimistic append on the sender's screen.
-- The host's browser watches the doc and calls `startRound(gameId)` when all hold:
-  process queue empty; human messages newer than `lastRoundEndedAt`; humans quiet for
-  `debounceMs` (default 3s); `cooldownMs` since `lastRoundEndedAt` (default 30s). Both
-  intervals are per-game settings.
-- `startRound` = today's `selectRespondingBots` over the new messages, fills the queue.
-  The host loops `talkToAll` as now. Bots read the day history at their turn, so a human
-  message mid-round is seen by the next bot.
-- Per-day bot budget: the existing day activity counter becomes a hard ceiling on bot
+- **Filling the day queue (any player).** `sendMessage(gameId, text)`: any seated alive
+  player, any time. Saves the message. If the day queue is empty, runs
+  `selectRespondingBots` over the new message, then writes the names in a transaction
+  that re-checks the queue is still empty; if another sender filled it meanwhile, the
+  selection is discarded (one wasted Jev call, ~$0.0001) and the message stays plain
+  chat. This is the only AI call a guest's browser ever causes for the game engine, and
+  it is one call per deliberate message, not a loop.
+- **While the queue is non-empty**, messages are saved and nothing else happens. Bots
+  read the day history at their turn, so mid-round messages are seen by the bots still
+  queued. A message that lands while the last bot is generating goes unanswered: accepted.
+- **Running every queue (host's browser only).** The host's game page keeps today's
+  solo effect loop, fed by the listener instead of action responses. For every automatic
+  step (introductions, `talkToAll`, bot votes, `performNightAction`, day summaries,
+  `selectDayResponders`, end of night) it calls the action with no target; the server
+  reads the hidden queue and either runs the bot at the head (`ok`) or finds a human
+  there (`waiting`). On `waiting` the loop stops until `stepCounter` changes. Each pop is
+  a transaction checking the head is still the expected name (stale-action no-op
+  pattern). Guests' pages have no engine loop at all.
+- **Duplicates.** One engine, so no races between browsers. The only duplicate source is
+  the host's own reload or second tab, same as solo today; a browser-side tab guard
+  (BroadcastChannel / localStorage) keeps one host tab as the engine if it matters.
+- **Host away.** A filled queue waits; humans keep chatting; bots resume when the host's
+  page is back. A call already in flight when the host's tab closes still finishes on
+  the server.
+- **Send cooldown.** `sendMessage` rejects when `now - seat.lastMessageAt < 5 s`
+  (`rejected`, the composer keeps the draft). The client replaces the composer with a
+  loader and a 5 s countdown bar after each send, the same component as the
+  bot-selection loader. Length stays under `INPUT_LIMITS`.
+- **Per-day bot budget.** The day activity counter becomes a hard ceiling on bot
   messages per day. Auto-vote threshold counts bot messages only.
-- Host button "let the table respond" = today's `manualSelectBots`, bypasses cooldown.
-- The "waiting for bots" indicator is derived from the doc for every client; the local
-  `isProcessing` flag goes.
+- The "bots are talking" indicator is derived from `dayQueueLength` for every client;
+  the local `isProcessing` flag goes. The host's "let the table respond" button
+  (`manualSelectBots`) stays.
 
 ### 5. Voting
 
 - `toggleVoteReady(gameId)`: transaction adds/removes the uid in `voteReady`, then
   compares the set with alive human seats; if complete, the same transaction transitions
-  to VOTE. Presses after VOTE are ignored server-side.
+  to VOTE (a pure write, no AI call; the host's loop then runs the bot votes). Presses
+  after VOTE are ignored server-side.
 - A death removes the uid from `voteReady` in the same write.
 - The vote queue keeps its fixed order of names. Human at the head → that human's
   browser shows the vote modal, `humanPlayerVote` (generalised to "the seat whose
-  character is at the head") records and pops. Host has "skip absent player" (random or
-  abstain per rules) so a closed laptop cannot stall the vote.
-- Ceilings: auto-vote by bot message count (existing) and `dayStartedAt + maxDayMs`
-  shown as a countdown.
+  character is at the head") records and pops. Bot at the head → the host's loop runs it.
+  Host has "skip absent player" (abstain) so a closed laptop cannot stall the vote, plus
+  "replace with bot" for a player who is seated but unresponsive.
+- Ceiling: auto-vote by bot message count (existing). No time ceiling.
 - Solo degrades to today: one human, one press.
 
 ### 6. Night
 
-- Night queue lists roles in order (existing). Role held by a human → the host's
-  `performNightAction` returns a "waiting for human" no-op; that human's browser shows the
-  night modal from its seat doc; `performHumanPlayerNightAction` (generalised per seat)
-  pops. Werewolf chat with human werewolves = messages with a werewolf `audience`, round
-  logic = the same debounce as day.
-- Every queue pop is a transaction that checks the head is still the expected name
-  (extends the stale-action no-op pattern).
+- Night queues (roles in order, and the per-role player list) live in `private/state`.
+  The host's loop calls `performNightAction(gameId)` blind: bot at the head → the server
+  runs it and returns `ok`; human at the head → `waiting`, the server sets that seat's
+  `yourTurn` in `seats/{uid}`, and that human's browser shows the night modal (or the
+  wolf-room input) from its own seat doc. `performHumanPlayerNightAction` /
+  `humanPlayerTalkWerewolves` (generalised per seat) pop and bump `stepCounter`, which
+  restarts the host's loop. The host's browser never learns whose turn it was, even
+  when the host is a villager driving a night full of wolves.
+- Every queue pop is a transaction that checks the head is still the expected name.
 - Night results are written to `private/state` and projected into each `seats/{uid}`; the
   public narration goes to messages as today.
 - **What non-acting clients see: nothing.** During the night every client that is not at
   the head shows "the night is in progress" with no name and no role. A "waiting for Alice"
   hint at night would reveal her role. Bot night actions may get a small random delay so a
-  human's slower turn does not stand out.
-- **Several human werewolves.** Today the werewolf param queue is coordination slots in
-  order and the last name decides the kill. Replace the decider:
-  - Coordination is a room, not a turn: human werewolves post in the wolf room at any time
-    during the phase (messages with the werewolf `audience`); bot werewolves take their
-    coordination slots in order, driven by the host, reading the room when they speak.
-  - The kill is a vote among alive werewolves: bots submit at their slot, each human
-    werewolf gets the target modal once coordination slots are done; the phase closes when
-    every wolf has submitted (checked in the transaction that records each vote, same
-    shape as `toggleVoteReady`). Majority wins; tie → earliest werewolf in the queue (or
-    random, to settle). One human plus bots yields today's behaviour in practice.
-  - Absence: a wolf who does not submit before the night time ceiling, or is skipped by the
-    host's unnamed "skip pending player" button, is dropped from the vote. No submissions →
-    no kill that night.
-- Other roles exist once per game (doctor, detective, maniac), so "both humans hold it"
-  cannot happen; several humans with different roles are just sequential queue heads.
+  human's slower turn does not stand out. Exception: wolves see the wolf turn list, since
+  they already know each other.
+- **Werewolves, any mix of humans and bots:** today's mechanism, unchanged. The turn list
+  is every alive wolf twice, shuffled, e.g. `[H1, Bot, H2, H1, H2, Bot]`. A human at the
+  head gets the wolf-room input (`humanPlayerTalkWerewolves`, generalised per seat); a bot
+  at the head is run by the host's loop; the last slot picks the target, whoever it is.
+  Wolf room messages carry the werewolf `audience`, so the rules keep them from every
+  non-wolf browser, the host's included. The bot wolf reads the room server-side.
+- An absent human at a night head: the host's unnamed "skip pending player" (the slot is
+  passed; a skipped last wolf slot passes the decision to the previous wolf; no
+  submissions → no kill) or "replace with bot".
+- Other roles exist once per game (doctor, detective, maniac), so several humans with
+  different roles are just sequential queue heads.
 
 ### 7. Permissions
 
 | Action | Host | Guest |
 |---|---|---|
-| Edit global preview fields, generate, regenerate, reroll, redraw | yes | no |
-| Edit own character text and avatar (candidates, sheets, reframe, mannequin) | own | own |
-| Invite, kick, lock, Start, split toggle | yes | no |
+| Create game, form, cast generation, redraws before creation | yes | no |
+| Claim/release/edit own character in lobby (name, story, voice, portrait) | own (host has theirs from the form) | own |
+| Invite, kick, regenerate invite, Start, split toggle | yes | no |
 | Send day message, vote-ready toggle, own vote, own night action | yes | yes |
-| Advance bots (`welcome`, `talkToAll`, `vote`, `performNightAction`, rounds) | yes | no |
+| Fill the day queue with a message | yes | yes |
+| Run queues (engine loop), phase-step buttons (start night, start new day, keep going) | yes | no |
 | Models (lobby, retry, provider reassignment, GM swap) | yes | no |
+| Skip absent player, replace with bot | yes | no |
 | Cancel bot responses, retry failed call | yes | no |
 | Message deletion, delete-after, night replay, model override on retry | solo only | no |
 | See model tags on bots during the game | yes | no (lobby and game over only) |
@@ -279,7 +344,7 @@ whether it is the host; the tier mismatch check applies to host-only actions onl
 ### 8. Billing
 
 - Payer set for a call: `splitPaidCost ? paidSeats : [host]`. Free seats are always
-  debited the full amount as allowance.
+  debited the full amount as allowance. Who drives the queue never matters for billing.
 - Pre-call guard: every free seat's daily/monthly allowance, every payer's balance.
   Any failure blocks with that seat's name; the error is a `SystemErrorMessage` with
   `blockedBy: uid`.
@@ -309,12 +374,13 @@ Gated on `shared === false`: message deletion routes, delete-after trims, `repla
 Bots already address the human by name as a fellow player; with several humans nothing
 changes in the day prompt except that `humanPlayerName` references become the list of
 human-controlled characters where the prompt needs it at all (ideally nowhere: bots should
-not know). The GM selection prompt gets the new human messages of the round.
+not know). The GM selection prompt gets the message that filled the queue.
 
-### 12. Gaps found on review (settled 2026-09-20)
+### 12. Settled 2026-09-20
 
 - **Voice is stored once per spoken line.** Today `generateSpeechAction` returns audio inline
-  and bills per generation; a reload, a re-listen or a second listener pays again. New:
+  and bills per generation; a reload, a re-listen or a second listener pays again, and
+  cinematic auto-play makes every client generate every line. New:
   `games/{id}/audio/{messageId}` doc (base64 audio, mime, provider, voice signature, cost),
   same pattern as the avatar docs, no Storage bucket. Generation stays lazy: the first
   client to press play calls `speakMessage(gameId, messageId)`, which claims the doc in a
@@ -327,13 +393,14 @@ not know). The GM selection prompt gets the new human messages of the round.
   subcollections (avatars, audio, seats, private) is owed regardless.
 - **Seat kinds: player and viewer.** A dead human keeps their player seat with all actions
   removed, keeps knowing their own role, learns nothing new until game over. A viewer seat
-  comes from a separate viewer link (login required), sees public messages only until game
+  comes from the viewer link (login required), sees public messages only until game
   over, never role-private ones. Later: `visibility: 'private' | 'link' | 'public'` on the
   game doc for a public gallery, no model change needed.
 - **A leaver becomes a bot.** Leave or kick flips `characters[].controller` to `'bot'` with
   the game's default model (host may change it later like any bot). The character keeps its
   story and the message history, so the bot continues in character. If the seat was at a
-  queue head, the head now names a bot and the host's loop takes over. Mirror of hot-join.
+  queue head, the head now names a bot and the host's loop takes over. The host leaving
+  is different: the host's page is the engine, so bots pause until it is back.
 - **No welcome turn for humans.** Bots introduce themselves and the day begins; a human's
   first message is whatever they choose.
 - **Advisor replaces the ghostwriter.** `getSuggestion` today writes a line in the player's
@@ -348,8 +415,6 @@ Mechanical, to include in the steps above:
   (`firebase deploy --only firestore:indexes`).
 - Ops: enable Firebase Auth in the project, add the public client config
   (`NEXT_PUBLIC_FIREBASE_*`) to env, deploy `firestore.rules`.
-- Per-seat rate limit on `sendMessage` (free of LLM cost but each send is a Vercel
-  invocation and a Firestore write); reuse `INPUT_LIMITS` for length.
 - Every reader of `humanPlayerName` / `humanPlayerRole` outside the state machine gets the
   seat version: cinematic mode, night briefing, role card, day summary, mention dropdown,
   mid-day illustrations, story chapters, `getSuggestion` prompt, GM narration prompts.
@@ -359,49 +424,45 @@ Mechanical, to include in the steps above:
   a notice.
 - Logging: seat uid and host uid on every game log line so the debugging skill can still
   find a user's activity.
-- Testing: Jest for the claim, vote-ready, queue-pop and payer-set transactions; a scripted
-  two-browser run for turn order (extend the `verify` skill with a multi-client mode).
+- Testing: Jest for the claim, fill-if-empty, vote-ready, queue-pop, send-cooldown and
+  payer-set transactions, plus a privacy suite: for each seat kind and role, the public
+  doc, the seat doc, rule-filtered message queries and every action response contain
+  nothing from the 2.2.1 "nobody" rows (Firestore emulator for the rules); a scripted two-browser run for turn order
+  (extend the `verify` skill with a multi-client mode).
 
 ## Rollout order
 
-Each step is shippable on its own and does not change solo play.
+Each step is shippable on its own and does not change solo play (step 3 unlocks the solo
+composer while bots talk, deliberately).
 
 1. **Transport + rules.** Custom token action, `firebase/client.ts`, rules, listener hook,
    solo game page reads from the listener, `isProcessing` removed. Private data split
    (`private/state`, `seats/{uid}`, roles off the public doc). Legacy read migration.
-2. **Seats and LOBBY.** Seat model, invite token, join page, claim transaction, Start
-   assigns roles, `ensureSeat`, permission matrix, `shared` flag and solo-only gates,
-   seat kinds (player/viewer), viewer link, dead-player read-only mode, leaver → bot.
-3. **Day pacing.** `sendMessage`, `startRound`, debounce/cooldown, bot day budget,
-   derived "waiting" indicator, force-round button.
-4. **Vote and night for several humans.** `voteReady` toggle, queue-head generalisation
-   for votes and night actions, skip-absent, time ceiling, night errors by slot,
-   werewolf `audience`.
-5. **Billing.** Payer set, multi-user `recordSpend`, per-seat guard, blocked-by banner,
-   split toggle, redraw cap removal, stored audio (`speakMessage` + audio route, also a
-   solo win), advisor replacing the ghostwriter suggestion.
-6. **DRAFT as a shared state.** Preview moved onto the game doc, listener-driven
-   new-game page, host-only globals, per-character editing for guests, candidate triple
-   and "browse image maps", regenerate/reroll rules, manual-pick flag on redraw.
+2. **Stored audio.** `speakMessage` + audio route; a solo win on its own, and a
+   prerequisite before several clients auto-play the same lines.
+3. **Queue as lock.** `sendMessage` with fill-if-empty, host-only engine loop keyed on
+   `stepCounter`, `waiting` result, 5 s send cooldown with the countdown loader, bot day
+   budget, derived indicator, minimal action responses.
+4. **Seats and LOBBY.** LOBBY state after `createGame`, seat model, invite/viewer tokens,
+   join page, claim/release/edit, Start, `ensureSeat`, permission matrix, `shared` flag
+   and solo-only gates, seat kinds, dead-player read-only mode, kick/leave → bot.
+5. **Vote and night for several humans.** `voteReady` toggle, queue-head generalisation
+   for votes and night actions (wolf room per seat), skip-absent, replace with bot, time
+   ceiling, night errors by slot, werewolf `audience`.
+6. **Billing.** Payer set, multi-user `recordSpend`, per-seat guard, blocked-by banner,
+   split toggle, redraw cap removal, advisor replacing the ghostwriter suggestion.
 7. **Small tables.** Role balance for 5 to 7 players, humans-only mode, "no narration"
    toggle.
 
 ## Open questions
 
-- Cast size on the form: total players only, with humans replacing bots at Start (the
-  plan assumes this), or a declared human count for balance?
-- Should the host also claim a character from the cast, or keep entering their own name
-  as today? The plan assumes the host claims like everyone else.
-- Driver lease when the host disconnects: v1 pauses bots. Decide after play sessions.
-- Hot-join into a running game (a friend takes over a living bot's character): cheap
-  under this model, not in v1.
-- Public game gallery (`visibility: 'public'`): later, viewer seats are the v1 building block.
-- Debounce/cooldown defaults and whether they are exposed on the form.
-- Werewolf kill vote tie-break: earliest wolf in the queue, or random (section 6).
+- Phase-step buttons in shared games (start night, start new day): host-only (plan), or
+  any alive player, or a ready-toggle like Vote?
 
 ## Out of scope
 
+- Hot-join into a started game.
 - Public lobbies, matchmaking, strangers: this is friends-on-a-call multiplayer.
 - Server-driven games with timers and no browser open.
-- Collaborative editing of global preview fields (per-field presence): host-only for now.
+- A shared or collaborative new-game form.
 - Any change to the ai-agents library.
