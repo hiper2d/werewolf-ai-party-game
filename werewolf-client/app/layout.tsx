@@ -24,11 +24,14 @@ const roboto_mono = Roboto_Mono({
   variable: '--font-roboto-mono',
 })
 
+// Variable font, no `weight` list: fixed weights made Google serve on-the-fly cuts
+// (`fonts.gstatic.com/l/font?kit=…&skey=…`), whose multi-param URLs Turbopack's font
+// loader rejects ("next/font/google queries have exactly one entry") — that broke the
+// Vercel build on 2026-10-09. The variable file covers 400 and 500.
 const jetbrains_mono = JetBrains_Mono({
   subsets: ['latin'],
   display: 'swap',
   variable: '--font-jetbrains-mono',
-  weight: ['400', '500'],
 })
 
 export const metadata: Metadata = {
