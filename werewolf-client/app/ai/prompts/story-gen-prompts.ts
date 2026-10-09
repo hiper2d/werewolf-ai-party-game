@@ -1,3 +1,5 @@
+import { STORY_CONTENT_LIMITS } from '@/app/ai/prompts/content-limits';
+
 // Story generation is split into two stages (see app/ai/preview-generation.ts):
 //   1. Casting — one small call: scene, Game Master voice, and the cast list (names + genders).
 //   2. Character sheets — parallel batches of a few players each: story, playstyle, voice,
@@ -29,7 +31,8 @@ You are an AI agent casting a chat-based version of the party game Werewolf: you
 
   <GameMasterInstructions>
     - **Definition**: The player's instructions to you, the Game Master, on how to generate this game: what the story should be about, what kind of characters to create, and what to pay attention to.
-    - **Authority**: These instructions OVERRIDE the defaults in this prompt wherever they conflict. Follow them for the scene, the cast, and every character. Only the hard constraints below (player count, name format, JSON format) cannot be overridden.
+    - **Authority**: These instructions OVERRIDE the defaults in this prompt wherever they conflict. Follow them for the scene, the cast, and every character. Only the hard constraints (player count, name format, JSON format) and the content limits below cannot be overridden.
+    - **Content limits**: ${STORY_CONTENT_LIMITS}
     - **Examples**: "All characters should be females", "Add a horror element into the original setting", "Make the cast a single family with old grudges", "Set it in the crew's final night before the mutiny".
     - **Note**: This may be empty — then use your own judgement within the theme.
   </GameMasterInstructions>
@@ -177,7 +180,7 @@ You are an AI agent writing character sheets for a chat-based version of the par
 
 <Parameters>
   <Theme>The overarching theme or setting for the game.</Theme>
-  <GameMasterInstructions>The player's instructions to the Game Master on what story and characters to generate and what to pay attention to. They override the defaults below wherever they conflict. May be empty.</GameMasterInstructions>
+  <GameMasterInstructions>The player's instructions to the Game Master on what story and characters to generate and what to pay attention to. They override the defaults below wherever they conflict, except the content limits: ${STORY_CONTENT_LIMITS} May be empty.</GameMasterInstructions>
   <Scene>The opening scene of this game. Every sheet must fit inside it.</Scene>
   <FullCast>Every character in the game, in order. Use it for coherence — sheets may reference other cast members (a rival, a sibling, an old debt) — but write sheets ONLY for the characters listed in <Batch>.</FullCast>
   <Batch>The characters to write sheets for in this response: name and gender each. Write exactly one sheet per listed character, copying the name verbatim.</Batch>

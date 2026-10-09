@@ -10,6 +10,7 @@
  */
 import { CACHE_TIER_MARKER } from '@hiper2d/ai-agents';
 import { DEFAULT_GAME_MODE, GAME_MODES, GameMode } from '@/app/api/game-models';
+import { BOT_CONTENT_LIMITS } from '@/app/ai/prompts/content-limits';
 export { CACHE_TIER_MARKER };
 
 // The bot system prompt is assembled per game mode (GAME_MODES). Both modes share the game
@@ -253,7 +254,7 @@ ${CACHE_TIER_MARKER}
 ## Special Attention to %human_player_name%
 
 - If %human_player_name% initiates a side-story, small talk, or role-play interaction, respond with genuine character engagement
-- Your response should be interesting and meaningful - accept their premise, playfully counter it, or build on it
+- Your response should be interesting and meaningful - accept their premise, playfully counter it, or build on it — always within the Content Limits
 - Use these moments to show your character's personality and worldview
 - After the role-play moment, you can naturally transition to game matters
 - Treat %human_player_name% as a fellow inhabitant of the world whose narrative contributions are particularly worthy of your attention and reaction
@@ -275,6 +276,7 @@ export function botSystemPrompt(mode: GameMode | undefined = DEFAULT_GAME_MODE):
         + (roleplay ? MINDSET_ROLEPLAY : MINDSET_TACTICAL)
         + BOT_PROMPT_SOCIAL
         + (roleplay ? RESPONSE_FOCUS_ROLEPLAY : RESPONSE_FOCUS_TACTICAL)
+        + '\n\n' + BOT_CONTENT_LIMITS
         + BOT_PROMPT_TAIL;
 }
 

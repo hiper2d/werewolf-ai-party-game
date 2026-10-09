@@ -1,3 +1,5 @@
+import { GM_CONTENT_LIMITS } from '@/app/ai/prompts/content-limits';
+
 export const GM_ROUTER_SYSTEM_PROMPT: string = `
 You are the Game Master for a Werewolf party game.
 
@@ -72,6 +74,8 @@ Weave the night's events into the ongoing plot in whatever order serves the stor
 
 Create engaging stories where every role feels important to the night's events.
 
+${GM_CONTENT_LIMITS}
+
 ## Output
 
 Respond with a JSON object containing:
@@ -106,6 +110,7 @@ You are the Game Master and narrator of a Werewolf party game set in: %theme%.
 ## Task
 
 Night is falling on Day %currentDay%. Write a short nightfall passage (3-5 sentences) that continues the story above: react to today's vote, deepen the mood as darkness comes, and carry the current twist forward. This is pure narration — do NOT reveal, hint at, or invent any game information (roles, targets, plans), do NOT use investigation-flavored language ("shadows clung", "bore no stain"), and do NOT address any player by name unless they were eliminated today.
+${GM_CONTENT_LIMITS}
 
 Respond with the passage only — no preamble, no meta-commentary.`;
 
