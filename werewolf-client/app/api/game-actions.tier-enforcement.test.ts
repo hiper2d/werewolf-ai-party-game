@@ -464,7 +464,7 @@ describe('previewGame tier enforcement', () => {
 
             await expect(previewGame(makePreview({
                 gameMasterAiType: LLM_CONSTANTS.RANDOM,
-                playersAiType: [LLM_CONSTANTS.GROK, LLM_CONSTANTS.MISTRAL_MEDIUM],
+                playersAiType: [LLM_CONSTANTS.GROK, LLM_CONSTANTS.MINIMAX],
             }))).rejects.toThrow('No AI models are available for the game master');
             expect(AgentFactory.createAgent).not.toHaveBeenCalled();
         });

@@ -1,6 +1,7 @@
 /**
  * Script to migrate AI model references from old display names to new stable IDs in Firestore.
- * Covers both model-ID fields on a game doc: gameMasterAiType and bots[].aiType.
+ * Covers every model-ID field on a game doc: gameMasterAiType, bots[].aiType and the pending
+ * one-shot retry override (modelOverride.model).
  *
  * Preview:  npx tsx --env-file=.env scripts/migrate-model-ids.ts --dry-run
  * Run:      npx tsx --env-file=.env scripts/migrate-model-ids.ts
@@ -33,9 +34,16 @@ const OLD_TO_NEW: Record<string, string> = {
     'GPT-5-mini': 'gpt-mini',
     'Gemini 3.1 Pro Preview': 'gemini-pro',
     'Gemini 3 Flash Preview': 'gemini-flash',
-    'Mistral Large 3': 'mistral-large',
-    'Mistral Medium 3.1': 'mistral-medium',
-    'Magistral Medium 1.2 (Thinking)': 'mistral-magistral',
+    // Mistral Large 3 and Magistral Medium 1.2 dropped 2026-09-18 (lib 0.6.0), Mistral Medium
+    // 3.5 on 2026-10-10 (lib 0.21.0: slow, ~6% failed calls, $0.036 a turn). Small 4 is the
+    // only Mistral entry left, and every tier can hold it.
+    'Mistral Large 3': 'mistral-small',
+    'Mistral Medium 3.1': 'mistral-small',
+    'Mistral Medium 3.5': 'mistral-small',
+    'Magistral Medium 1.2 (Thinking)': 'mistral-small',
+    'mistral-large': 'mistral-small',
+    'mistral-magistral': 'mistral-small',
+    'mistral-medium': 'mistral-small',
     // All Grok variants collapsed onto the single always-reasoning Grok entry ('grok').
     'Grok 4': 'grok',
     'Grok 4.1 Fast Reasoning': 'grok',
@@ -62,25 +70,8 @@ const OLD_TO_NEW: Record<string, string> = {
     'Random': 'random',
 };
 
-/**
- * Retired ids whose replacement depends on the game's tier. Mistral Large 3 and Magistral
- * Medium 1.2 were dropped 2026-09-18 (lib 0.6.0). Medium 3.5 is the natural successor for
- * both, but it now runs with reasoning on and its hybrid-banded output price
- * ($7.50 × 2.5) puts it outside the free tier, so a free game holding it would fail tier
- * validation on its next model change. Free games get Small 4 (unlimited band), paid games
- * get Medium 3.5. A game with no `createdWithTier` is treated as free — the safe choice.
- */
-const OLD_TO_NEW_BY_TIER: Record<string, { free: string; paid: string }> = {
-    'mistral-large': { free: 'mistral-small', paid: 'mistral-medium' },
-    'mistral-magistral': { free: 'mistral-small', paid: 'mistral-medium' },
-};
-
-function migrateValue(value: string | undefined, tier: string | undefined): string | undefined {
+function migrateValue(value: string | undefined): string | undefined {
     if (!value) return value;
-    const byTier = OLD_TO_NEW_BY_TIER[value];
-    if (byTier) {
-        return tier === 'paid' ? byTier.paid : byTier.free;
-    }
     return OLD_TO_NEW[value] ?? value;
 }
 
@@ -112,7 +103,7 @@ async function migrateModelIds() {
         const tier: string | undefined = data.createdWithTier;
 
         // Migrate gameMasterAiType
-        const newGmType = migrateValue(data.gameMasterAiType, tier);
+        const newGmType = migrateValue(data.gameMasterAiType);
         if (newGmType !== data.gameMasterAiType) {
             update.gameMasterAiType = newGmType;
             changes.push(`GM: ${data.gameMasterAiType} -> ${newGmType}`);
@@ -122,7 +113,7 @@ async function migrateModelIds() {
         if (Array.isArray(data.bots)) {
             let botsChanged = false;
             const updatedBots = data.bots.map((bot: any) => {
-                const newAiType = migrateValue(bot.aiType, tier);
+                const newAiType = migrateValue(bot.aiType);
                 if (newAiType !== bot.aiType) {
                     botsChanged = true;
                     changes.push(`bot ${bot.name}: ${bot.aiType} -> ${newAiType}`);
@@ -133,6 +124,14 @@ async function migrateModelIds() {
             if (botsChanged) {
                 update.bots = updatedBots;
             }
+        }
+
+        // Migrate a pending one-shot retry override
+        const override = data.modelOverride;
+        const newOverrideModel = migrateValue(override?.model);
+        if (override && newOverrideModel !== override.model) {
+            update.modelOverride = { ...override, model: newOverrideModel };
+            changes.push(`override ${override.botName}: ${override.model} -> ${newOverrideModel}`);
         }
 
         if (changes.length > 0) {

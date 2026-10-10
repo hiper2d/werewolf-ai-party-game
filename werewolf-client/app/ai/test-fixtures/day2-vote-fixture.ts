@@ -58,7 +58,7 @@ const bots: Bot[] = [
         story: "A kind-hearted girl who sits with lonely students at lunch and notices when her classmates are struggling. She stands up against cruelty in the hallways and offers quiet support to those in need. Her classmates depend on her compassion, even if some mistake her protectiveness for being overbearing.",
         role: GAME_ROLES.DOCTOR,
         isAlive: true,
-        aiType: "mistral-medium",
+        aiType: "mistral-small",
         gender: "female",
         voice: "coral",
         playStyle: "protective_team_player",

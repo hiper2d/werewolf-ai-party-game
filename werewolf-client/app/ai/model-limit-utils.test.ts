@@ -316,7 +316,7 @@ describe('Kimi K3 free-tier policy', () => {
 describe('Game Master speed rule', () => {
     it('pins the blocked set: story pipeline over 150s in the 2026-10-07 live suite', () => {
         expect([...GAME_MASTER_BLOCKED_MODELS].sort()).toEqual([
-            LLM_CONSTANTS.GROK, LLM_CONSTANTS.MINIMAX, LLM_CONSTANTS.MISTRAL_MEDIUM, LLM_CONSTANTS.QWEN_FLASH, LLM_CONSTANTS.QWEN_MAX,
+            LLM_CONSTANTS.GROK, LLM_CONSTANTS.MINIMAX, LLM_CONSTANTS.QWEN_FLASH, LLM_CONSTANTS.QWEN_MAX,
         ].sort());
         for (const id of GAME_MASTER_BLOCKED_MODELS) expect(SupportedAiModels[id]).toBeDefined();
     });
@@ -325,6 +325,9 @@ describe('Game Master speed rule', () => {
         expect(resolveModelId('grok-thinking')).toBe(LLM_CONSTANTS.GROK);
         expect(isAllowedAsGameMaster('grok-thinking')).toBe(false);
         expect(isAllowedAsGameMaster(LLM_CONSTANTS.DEEPSEEK_FLASH)).toBe(true);
+        // Medium 3.5 was blocked as GM; its games now run on Small, which is allowed.
+        expect(resolveModelId('mistral-medium')).toBe(LLM_CONSTANTS.MISTRAL_SMALL);
+        expect(isAllowedAsGameMaster('mistral-medium')).toBe(true);
     });
 
     it('GM candidates are the tier candidates minus the blocked set, on every tier', () => {

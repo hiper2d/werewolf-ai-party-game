@@ -279,13 +279,12 @@ const DEPRECATED_MODEL_MAP: Record<string, string> = {
     // Qwen3.7 Plus retired 2026-08-30 alongside the 3.7→3.8 Flash swap; the Flash entry is the
     // cheap Qwen tier that replaces it.
     'qwen-plus': LLM_CONSTANTS.QWEN_FLASH,
-    // Mistral Large 3 and Magistral Medium 1.2 dropped 2026-09-18 (lib 0.6.0): both retired by
-    // Mistral, and Magistral's alias had already become Medium 3.5 server-side. Small 4 is the
-    // static fallback because it is the only Mistral entry every tier can hold — Medium 3.5 runs
-    // with reasoning now, and its hybrid-banded price puts it outside the free tier.
-    // `scripts/migrate-model-ids.ts` does the tier-aware rewrite (paid games → Medium 3.5).
+    // Mistral Large 3 and Magistral Medium 1.2 dropped 2026-09-18 (lib 0.6.0), Mistral Medium 3.5
+    // on 2026-10-10 (lib 0.21.0: p50 16s, ~6% failed calls, $0.036 a turn at the only reasoning
+    // level it takes). Small 4 is the only Mistral entry left until Medium 4 ships.
     'mistral-large': LLM_CONSTANTS.MISTRAL_SMALL,
     'mistral-magistral': LLM_CONSTANTS.MISTRAL_SMALL,
+    'mistral-medium': LLM_CONSTANTS.MISTRAL_SMALL,
 };
 
 /** Maps a possibly-retired model ID to its current equivalent; unknown IDs pass through. */
@@ -298,8 +297,8 @@ export function resolveModelId(modelId: string): string {
  * casting call plus parallel character-sheet batches, 240s per call, all inside Vercel's 300s
  * function) and narrates every night and day while the player waits, so it has to be fast.
  * Rule (2026-10-07): the 15-character story pipeline took over 150s in the live suite —
- * Mistral Medium 3.5 277s, Grok 4.7 213s (medium effort), Qwen3.8 Max 198s, MiniMax M3 169s,
- * Qwen3.8 Flash 160s. Kimi K3 (146s) is the closest one still allowed. Re-measure with the
+ * Mistral Medium 3.5 277s (since removed), Grok 4.7 213s (medium effort), Qwen3.8 Max 198s,
+ * MiniMax M3 169s, Qwen3.8 Flash 160s. Kimi K3 (146s) is the closest one still allowed. Re-measure with the
  * live story suite (app/ai/all-models.test.ts) when a model changes.
  * Both Qwen models are slow at story time only because Qwen runs our parallel requests one at a
  * time (Flash 2026-10-07: casting 14.5s, then 4 batches of ~20s work each finishing 20s apart,
@@ -310,7 +309,6 @@ export function resolveModelId(modelId: string): string {
  * existing GM on every bot model change, which would lock games that already have one of these.
  */
 export const GAME_MASTER_BLOCKED_MODELS: ReadonlySet<string> = new Set([
-    LLM_CONSTANTS.MISTRAL_MEDIUM,
     LLM_CONSTANTS.GROK,
     LLM_CONSTANTS.QWEN_MAX,
     LLM_CONSTANTS.MINIMAX,

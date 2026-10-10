@@ -98,14 +98,6 @@
       "outputTokens": 2202,
       "reasoningTokens": 2078
     },
-    "mistral-medium": {
-      "usdPerTurn": 0.011009,
-      "calls": 571,
-      "inputTokens": 7851,
-      "cachedInputTokens": 1521,
-      "outputTokens": 171,
-      "reasoningTokens": 0
-    },
     "gpt": {
       "usdPerTurn": 0.016149,
       "calls": 709,
