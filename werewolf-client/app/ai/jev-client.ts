@@ -72,6 +72,9 @@ export interface JevResult<Q extends Record<string, JevQuestion>> {
     inputTokens: number;
     costUSD: number;
     durationMs: number;
+    /** Optional questions the judge declined to answer; their keys are absent from `answers`.
+     *  Only OpenAI Decisions refuses (Jev always answers). */
+    refused?: string[];
 }
 
 export class JevError extends Error {

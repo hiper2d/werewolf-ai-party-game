@@ -322,8 +322,15 @@ export interface RouterJudge {
     apiKeyName: string;
     /** Abandon the call (and fall back) after this long. */
     timeoutMs: number;
-    ask<Q extends Record<string, JevQuestion>>(apiKey: string, state: JevInstructions, questions: Q, options: { timeoutMs?: number }): Promise<JevResult<Q>>;
+    ask<Q extends Record<string, JevQuestion>>(apiKey: string, state: JevInstructions, questions: Q, options: { timeoutMs?: number; optionalQuestions?: readonly string[] }): Promise<JevResult<Q>>;
 }
+
+/**
+ * Questions a judge may decline without failing the call. quiet_pick only breaks ties inside the
+ * quiet slots (fewest messages comes first), so without it the slots still fill — the same way
+ * they do when the pool is too small to ask. Decisions refuses it when no quiet bot fits the topic.
+ */
+const ROUTER_OPTIONAL_QUESTIONS: readonly string[] = ['quiet_pick'];
 
 export const JEV_JUDGE: RouterJudge = {
     id: 'jev',
@@ -358,8 +365,9 @@ type JudgeAttempt =
 /** One judge call that never rejects, so two can run side by side. */
 async function askJudge(judge: RouterJudge, apiKey: string, state: JevInstructions, questions: Record<string, JevQuestion>): Promise<JudgeAttempt> {
     try {
-        const result = await judge.ask(apiKey, state, questions, { timeoutMs: judge.timeoutMs });
-        console.log(`🧭 ${judge.label} answered ${Object.keys(questions).length} questions in ${result.durationMs} ms — ${result.inputTokens} input tokens, $${result.costUSD.toFixed(6)} (${result.model})`);
+        const result = await judge.ask(apiKey, state, questions, { timeoutMs: judge.timeoutMs, optionalQuestions: ROUTER_OPTIONAL_QUESTIONS });
+        const refused = result.refused?.length ? `, declined ${result.refused.join(', ')}` : '';
+        console.log(`🧭 ${judge.label} answered ${Object.keys(questions).length} questions in ${result.durationMs} ms${refused} — ${result.inputTokens} input tokens, $${result.costUSD.toFixed(6)} (${result.model})`);
         return { ok: true, result };
     } catch (error: any) {
         console.error(`🧭 ${judge.label} request failed: ${error?.message ?? error}`);
@@ -369,10 +377,14 @@ async function askJudge(judge: RouterJudge, apiKey: string, state: JevInstructio
     }
 }
 
-function logJudgeFailure(judge: RouterJudge, attempt: { detail: string; status?: number }, gameId: string, userEmail: string) {
+/**
+ * `warn` for a shadow judge: its answer is never acted on, so its failure costs the player nothing.
+ * A judge that was supposed to decide failing stays an `error`.
+ */
+function logJudgeFailure(judge: RouterJudge, attempt: { detail: string; status?: number }, gameId: string, userEmail: string, level: 'error' | 'warn' = 'error') {
     // The failed request is recorded in full in Firestore (not here) — a bad answer and a
     // refused request both need the exact input to be reproduced.
-    logger.error(`${judge.label} router request failed`, {
+    logger[level](`${judge.label} router request failed${level === 'warn' ? ' (shadow)' : ''}`, {
         gameId, userId: userEmail, agentName: GAME_MASTER, activity: 'jev_router',
         model: judge.model, error: attempt.detail, status: attempt.status,
     });
@@ -549,7 +561,7 @@ export async function selectRespondingBotsWithJev(
     // Durable copy in Firestore (jevRouterCalls) — Better Stack only keeps rows for days.
     const rowId = await saveJevRouterCall({
         gameId: game.id, userId: userEmail, day: game.currentDay, status: 'ok', model: result.model,
-        state, questions, answers: result.answers, decision,
+        state, questions, answers: result.answers, refused: result.refused, decision,
         inputTokens: result.inputTokens, costUSD: result.costUSD, durationMs: result.durationMs,
         shadow: shadowNow,
     });
@@ -580,6 +592,7 @@ export async function selectRespondingBotsWithJev(
                 shadow = {
                     model: shadowResult.model,
                     answers: shadowResult.answers,
+                    refused: shadowResult.refused,
                     decision: {
                         selected: replayed.selected.slice(0, BOT_SELECTION_CONFIG.MAX),
                         must: replayed.must,
@@ -593,7 +606,7 @@ export async function selectRespondingBotsWithJev(
                     durationMs: shadowResult.durationMs,
                 };
             } else {
-                logJudgeFailure(pendingShadow.judge, attempt, gameId, userEmail);
+                logJudgeFailure(pendingShadow.judge, attempt, gameId, userEmail, 'warn');
                 shadow = { model: pendingShadow.judge.model, error: attempt.detail, httpStatus: attempt.status };
             }
             if (rowId) await saveJevRouterShadow(rowId, gameId, shadow);

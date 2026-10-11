@@ -32,6 +32,8 @@ export interface JevRouterCallRecord {
     state: Record<string, unknown>;
     questions: Record<string, unknown>;
     answers?: Record<string, unknown>;
+    /** Optional questions the deciding judge declined (OpenAI Decisions on quiet_pick); absent from `answers`. */
+    refused?: string[];
     decision?: Record<string, unknown>;
     inputTokens?: number;
     costUSD?: number;
@@ -51,6 +53,8 @@ export interface JevRouterCallRecord {
 export interface JevRouterShadow {
     model: string;
     answers?: Record<string, unknown>;
+    /** Optional questions this judge declined; absent from `answers`. */
+    refused?: string[];
     /** The speaker set this judge's answers compose to, drawn with the SAME random numbers as the
      * decider's (count, tie-breaks), so a difference in `selected` is the judges' difference. */
     decision?: Record<string, unknown>;

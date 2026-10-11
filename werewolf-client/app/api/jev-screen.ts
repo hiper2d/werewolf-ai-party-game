@@ -289,7 +289,10 @@ export async function screenHumanInput(input: ScreenInput): Promise<ScreenOutcom
         }
         const fallback = deciding ? `${deciding.judge.label} decided` : 'let through';
         console.error(`🛡️ ${attempt.judge.label} screen failed (${input.source}, ${fallback}): ${attempt.error}`);
-        logger.error(`${attempt.judge.label} screen request failed`, {
+        // `warn` for the backup judge when the primary decided (its answer is only the shadow);
+        // `error` when the primary failed (Decisions deciding is the fallback) or nothing decided.
+        const shadowOnly = deciding === attempts[0] && attempt !== attempts[0];
+        logger[shadowOnly ? 'warn' : 'error'](`${attempt.judge.label} screen request failed${shadowOnly ? ' (shadow)' : ''}`, {
             gameId: input.gameId, userId: input.userEmail, agentName: SCREEN_AGENT_NAME, activity: 'jev_screen',
             source: input.source, model: attempt.judge.model, error: attempt.error, status: attempt.status, fallback,
         });

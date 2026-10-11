@@ -485,5 +485,26 @@ describe('selectRespondingBotsWithJev with a second judge (both asked at once)',
         await flush();
         expect(mockRecordRouterSpend).toHaveBeenCalledTimes(1);
         expect(mockSaveShadow.mock.calls[0][2]).toEqual({ model: 'gpt-6-luna', error: 'OpenAI Decisions returned HTTP 500', httpStatus: undefined });
+        // Never acted on, so a warning, not an error.
+        const { logger } = jest.requireMock('@/app/utils/logger');
+        expect(logger.error).not.toHaveBeenCalled();
+        expect(logger.warn).toHaveBeenCalledWith('OpenAI Decisions router request failed (shadow)', expect.objectContaining({ model: 'gpt-6-luna' }));
+    });
+
+    it('asks every judge with quiet_pick optional; a declined quiet_pick still routes and is recorded', async () => {
+        const jev = stubJudge(JEV_JUDGE, 'jev-1.13.0', 0.00006);
+        const dec = stubJudge(OPENAI_DECISIONS_JUDGE, 'gpt-6-luna', 0.00015);
+        jev.ask.mockRejectedValue(Object.assign(new Error('Jev returned HTTP 529'), { status: 529 }));
+        const declined = dec.answer({ Alice: { score: 0.4, top: 0.02 }, Bram: { score: 3, top: 0.95 }, Cleo: { score: 0.3, top: 0.02 } });
+        delete (declined.answers as any).quiet_pick;
+        dec.ask.mockResolvedValue({ ...declined, refused: ['quiet_pick'] });
+
+        const selected = await selectRespondingBotsWithJev(game, messages as any, names, 'key', 'u@e.com', jev.judge, { judge: dec.judge, apiKey: 'sk' });
+
+        expect(dec.ask.mock.calls[0][3]).toMatchObject({ optionalQuestions: ['quiet_pick'] });
+        expect(jev.ask.mock.calls[0][3]).toMatchObject({ optionalQuestions: ['quiet_pick'] });
+        expect(selected).toContain('Bram');
+        expect(savedMessages[0].msg).toContain('OpenAI Decisions selected');
+        expect(mockSaveRecord.mock.calls[0][0]).toMatchObject({ status: 'ok', model: 'gpt-6-luna', refused: ['quiet_pick'] });
     });
 });

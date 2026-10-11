@@ -68,6 +68,18 @@ describe('askOpenAiDecisions', () => {
         await expect(askOpenAiDecisions('sk', 'state', questions)).rejects.toThrow('missing answers: reply_Ivo');
     });
 
+    it('leaves out a refused optional question instead of failing the call', async () => {
+        mockFetch(200, { ...okBody, answers: [okBody.answers[0], { type: 'refusal', name: 'quiet_pick' }, okBody.answers[2]] });
+        const result = await askOpenAiDecisions('sk', 'state', questions, { optionalQuestions: ['quiet_pick'] });
+        expect(result.refused).toEqual(['quiet_pick']);
+        expect('quiet_pick' in result.answers).toBe(false);
+        expect(result.answers.reply_Ivo.score).toBe(2.6);
+        // A refusal on a question that is not optional still fails the call.
+        mockFetch(200, { ...okBody, answers: [{ type: 'refusal', name: 'dramatic' }, { type: 'refusal', name: 'quiet_pick' }, okBody.answers[2]] });
+        await expect(askOpenAiDecisions('sk', 'state', questions, { optionalQuestions: ['quiet_pick'] }))
+            .rejects.toThrow('OpenAI Decisions refused: dramatic');
+    });
+
     it('carries the HTTP status and body on an API error', async () => {
         mockFetch(429, { error: { message: 'rate limited' } });
         const error = await askOpenAiDecisions('sk', 'state', questions).catch(e => e);

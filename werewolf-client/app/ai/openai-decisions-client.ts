@@ -91,14 +91,16 @@ function toJevAnswer(answer: any): unknown {
 
 /**
  * One Decisions call with Jev-shaped input and output. `state` is sent as the shared text input
- * (JSON-encoded when it is an object). A `refusal` answer for any question fails the whole call:
- * the router has no use for a partial set of answers.
+ * (JSON-encoded when it is an object). A `refusal` answer fails the whole call, unless every
+ * refused question is listed in `optionalQuestions`: those are left out of `answers` and named in
+ * `refused`. Decisions refuses a choice when no option fits — seen on the router's quiet_pick
+ * (2026-10-10/11) when none of the quiet bots had anything to do with the discussion.
  */
 export async function askOpenAiDecisions<Q extends Record<string, JevQuestion>>(
     apiKey: string,
     state: JevInstructions,
     questions: Q,
-    options: { timeoutMs?: number } = {}
+    options: { timeoutMs?: number; optionalQuestions?: readonly string[] } = {}
 ): Promise<JevResult<Q>> {
     const started = Date.now();
     const controller = new AbortController();
@@ -138,12 +140,15 @@ export async function askOpenAiDecisions<Q extends Record<string, JevQuestion>>(
     if (!Array.isArray(parsed?.answers)) {
         throw new OpenAiDecisionsError('OpenAI Decisions response has no answers', response.status, text.slice(0, 500));
     }
-    const refused = parsed.answers.filter((a: any) => a?.type === 'refusal').map((a: any) => a.name);
-    if (refused.length > 0) {
-        throw new OpenAiDecisionsError(`OpenAI Decisions refused: ${refused.join(', ')}`, response.status, text.slice(0, 500));
+    const refused: string[] = parsed.answers.filter((a: any) => a?.type === 'refusal').map((a: any) => String(a.name));
+    const blocking = refused.filter(name => !options.optionalQuestions?.includes(name));
+    if (blocking.length > 0) {
+        throw new OpenAiDecisionsError(`OpenAI Decisions refused: ${blocking.join(', ')}`, response.status, text.slice(0, 500));
     }
-    const answers = Object.fromEntries(parsed.answers.map((a: any) => [a.name, toJevAnswer(a)]));
-    const missing = Object.keys(questions).filter(name => !(name in answers));
+    const answers = Object.fromEntries(parsed.answers
+        .filter((a: any) => a?.type !== 'refusal')
+        .map((a: any) => [a.name, toJevAnswer(a)]));
+    const missing = Object.keys(questions).filter(name => !(name in answers) && !refused.includes(name));
     if (missing.length > 0) {
         throw new OpenAiDecisionsError(`OpenAI Decisions response is missing answers: ${missing.join(', ')}`, response.status, text.slice(0, 500));
     }
@@ -155,5 +160,6 @@ export async function askOpenAiDecisions<Q extends Record<string, JevQuestion>>(
         inputTokens,
         costUSD: openAiDecisionsCostUSD(inputTokens),
         durationMs: Date.now() - started,
+        ...(refused.length > 0 ? { refused } : {}),
     };
 }

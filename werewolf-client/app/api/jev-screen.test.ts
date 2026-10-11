@@ -297,6 +297,10 @@ describe('screenHumanInput', () => {
             const out = await screenHumanInput(withOpenAi);
             expect(out.verdict).toBe('ok');
             expect(mockSaveRecord.mock.calls[0][0]).toMatchObject({ model: 'jev-1.13.0', verdict: 'ok', shadow: { verdict: 'error' } });
+            // Never acted on, so a warning, not an error.
+            const { logger } = jest.requireMock('@/app/utils/logger');
+            expect(logger.error).not.toHaveBeenCalled();
+            expect(mockWarn).toHaveBeenCalledWith('OpenAI Decisions screen request failed (shadow)', expect.objectContaining({ fallback: 'Jev decided' }));
         });
 
         it('screens on Decisions alone when there is no Jev key', async () => {
