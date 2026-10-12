@@ -190,7 +190,11 @@ function GamePageContent({
                 setRedrawError('Redraw unavailable right now.');
                 return;
             }
-            setGame(prev => ({ ...prev, ...result }));
+            const { failure, ...fields } = result;
+            setGame(prev => ({ ...prev, ...fields }));
+            // The server drew nothing (most often the image model refused the
+            // cast); without this the button just stops spinning.
+            if (failure) setRedrawError(failure.message);
         } catch (error: any) {
             setRedrawError(error?.message ?? 'Redraw failed.');
         } finally {

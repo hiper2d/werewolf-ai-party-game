@@ -303,6 +303,9 @@ export function resolveModelId(modelId: string): string {
  * Both Qwen models are slow at story time only because Qwen runs our parallel requests one at a
  * time (Flash 2026-10-07: casting 14.5s, then 4 batches of ~20s work each finishing 20s apart,
  * reasoning already at its minimum 1,024-token budget); a single GM turn is ~15-20s.
+ * Muse Spark 1.3 (catalog tag `slow`, effort pinned medium) is fine as a bot (prod 2026-10-12:
+ * p50 10s, p90 16s) but its GM turns ran p90 109s: the dawn narrative took 115s and 135s against
+ * the 60s request timeout, failing the night twice in a row. Added 2026-10-12.
  *
  * Checked on every NEW Game Master choice (create, preview, model change, retry override,
  * provider reassignment), not inside validateModelUsageForTier: that one also re-validates the
@@ -313,6 +316,7 @@ export const GAME_MASTER_BLOCKED_MODELS: ReadonlySet<string> = new Set([
     LLM_CONSTANTS.QWEN_MAX,
     LLM_CONSTANTS.MINIMAX,
     LLM_CONSTANTS.QWEN_FLASH,
+    LLM_CONSTANTS.MUSE_SPARK,
 ]);
 
 export function isAllowedAsGameMaster(modelId: string): boolean {

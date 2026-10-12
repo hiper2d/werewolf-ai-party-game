@@ -314,9 +314,9 @@ describe('Kimi K3 free-tier policy', () => {
 });
 
 describe('Game Master speed rule', () => {
-    it('pins the blocked set: story pipeline over 150s in the 2026-10-07 live suite', () => {
+    it('pins the blocked set: story pipeline over 150s in the 2026-10-07 live suite, plus Muse Spark (night narration past the 60s timeout in prod, 2026-10-12)', () => {
         expect([...GAME_MASTER_BLOCKED_MODELS].sort()).toEqual([
-            LLM_CONSTANTS.GROK, LLM_CONSTANTS.MINIMAX, LLM_CONSTANTS.QWEN_FLASH, LLM_CONSTANTS.QWEN_MAX,
+            LLM_CONSTANTS.GROK, LLM_CONSTANTS.MINIMAX, LLM_CONSTANTS.QWEN_FLASH, LLM_CONSTANTS.QWEN_MAX, LLM_CONSTANTS.MUSE_SPARK,
         ].sort());
         for (const id of GAME_MASTER_BLOCKED_MODELS) expect(SupportedAiModels[id]).toBeDefined();
     });

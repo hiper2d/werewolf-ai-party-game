@@ -1,7 +1,7 @@
 import {db} from "@/firebase/server";
 import {firestore} from "firebase-admin";
 import {Game, USER_TIERS, UserTier, AVATAR_GM_KEY, SCENE_WELCOME_KEY, SCENE_NIGHT_KEY, AVATAR_VARIANTS_COLLECTION, avatarVariantKey, avatarSheetKey, MANNEQUIN_VARIANT_INDEX, AvatarFraming, AvatarVariantEntry, ImageRect, ReframeTarget} from "@/app/api/game-models";
-import {buildPortraitSheetPrompt, cutCard, defaultFraming, detectSheetGrid, equalSplitGrid, fitFraming, generateImage, gridFor, isFramingShape, padCells, PortraitCell, sliceSheet} from "@hiper2d/ai-agents/images";
+import {buildPortraitSheetPrompt, cutCard, defaultFraming, detectSheetGrid, equalSplitGrid, fitFraming, generateImage, gridFor, isFramingShape, isImageRefusalError, padCells, PortraitCell, sliceSheet} from "@hiper2d/ai-agents/images";
 import type {DrawnSheet} from "@hiper2d/ai-agents/images";
 import {PRESET_SHEET_SIZE} from "@/app/utils/preset-avatars";
 import {getUserTierAndApiKeys} from "@/app/utils/tier-utils";
@@ -308,6 +308,19 @@ export interface AvatarGenerationResult {
     avatarVariants?: AvatarVariantMap;
     avatarVersions?: Record<string, number>;
     avatarRegenCount?: number;
+    /** Set when a reroll ran and drew nothing: the portraits above are unchanged
+     * and the allowance was not spent. `refused` = the image model declined the
+     * cast (a safety block on the prompt), so retrying the same art style is futile. */
+    failure?: {refused: boolean; message: string};
+}
+
+/**
+ * Gemini blocks a drawing with HTTP 200 and no image; ai-agents ≥0.22.0 turns that
+ * into an `ImageRefusalError` (checked by name — the images subpath is its own
+ * bundle, so `instanceof` would not match across entries).
+ */
+export function isImageRefusal(error: unknown): boolean {
+    return isImageRefusalError(error);
 }
 
 function resultFrom(game: Game): AvatarGenerationResult {
@@ -486,7 +499,12 @@ export async function runAvatarGeneration(gameId: string, userEmail: string): Pr
     } catch (error: any) {
         // Avatars are decorative: never surface errorState, just mark failed so
         // the UI keeps its preset-sketch fallback and a later visit may retry.
-        logger.error(`Avatar generation failed for game ${gameId}`, {gameId, error: error.message, costUSD: ledger.spentUSD});
+        // A refusal (the model declined the cast) is expected on edgy themes and
+        // logs at warn; anything else is an outage worth an error.
+        const refused = isImageRefusal(error);
+        const fields = {gameId, error: error.message, refused, costUSD: ledger.spentUSD};
+        if (refused) logger.warn(`Avatar generation refused for game ${gameId}`, fields);
+        else logger.error(`Avatar generation failed for game ${gameId}`, fields);
         await gameRef.update({avatarsStatus: 'failed'});
         await recordAbandonedSpend(gameRef, userEmail, tier, ledger.spentUSD, gameId);
     }
@@ -556,6 +574,7 @@ export async function runAvatarRegeneration(gameId: string, userEmail: string, m
 
     const ledger: SpendLedger = {spentUSD: 0};
     let tier: UserTier = USER_TIERS.FREE;
+    let failure: AvatarGenerationResult['failure'];
 
     try {
         const keys = await getUserTierAndApiKeys(userEmail);
@@ -591,13 +610,21 @@ export async function runAvatarRegeneration(gameId: string, userEmail: string, m
         logger.info(`Avatars regenerated for game ${gameId}`, {gameId, costUSD});
     } catch (error: any) {
         // A failed reroll leaves the existing portraits exactly as they were.
-        logger.error(`Avatar regeneration failed for game ${gameId}`, {gameId, error: error.message, costUSD: ledger.spentUSD});
+        // A refusal is the model's verdict on the cast, not an outage: warn, and
+        // tell the owner so they stop clicking Redraw at the same art style.
+        failure = isImageRefusal(error)
+            ? {refused: true, message: 'The image model declined to draw this cast. Adjust the art style or the character descriptions and try again.'}
+            : {refused: false, message: 'Redraw failed. Your portraits are unchanged — try again in a moment.'};
+        const fields = {gameId, error: error.message, refused: failure.refused, costUSD: ledger.spentUSD};
+        if (failure.refused) logger.warn(`Avatar regeneration refused for game ${gameId}`, fields);
+        else logger.error(`Avatar regeneration failed for game ${gameId}`, fields);
         await gameRef.update({avatarsRegeneratingAt: null});
         await recordAbandonedSpend(gameRef, userEmail, tier, ledger.spentUSD, gameId);
     }
 
     const snap = await gameRef.get();
-    return snap.exists ? resultFrom(snap.data() as Game) : null;
+    if (!snap.exists) return null;
+    return failure ? {...resultFrom(snap.data() as Game), failure} : resultFrom(snap.data() as Game);
 }
 
 /** Copies a pre-variants game's portraits into the candidate subcollection as
