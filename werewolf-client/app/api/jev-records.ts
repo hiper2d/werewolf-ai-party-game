@@ -126,7 +126,9 @@ export async function getJevRouterCall(id: string): Promise<StoredJevRouterCall 
     return doc.exists ? { id: doc.id, ...(doc.data() as Omit<StoredJevRouterCall, 'id'>) } : null;
 }
 
-export type JevScreenSource = 'chat' | 'preview';
+/** `art_style`: the theme and art style alone, re-screened where a style enters an image prompt
+ * after the preview (game creation, draft illustrations) — the player may have retyped it. */
+export type JevScreenSource = 'chat' | 'preview' | 'art_style';
 export type JevScreenVerdict = 'ok' | 'grey' | 'would_block' | 'error';
 
 export interface JevScreenCallRecord {
@@ -152,6 +154,9 @@ export interface JevScreenCallRecord {
     /** Probability mass on the top two risk levels. */
     highRisk: number | null;
     flags: Record<string, number> | null;
+    /** Probability that an image model would refuse the described pictures; only on sources that
+     * carry an art style (preview, art_style), null on chat and on older rows. Since 2026-10-13. */
+    imageRefusal?: number | null;
     /** The config in force when the verdict was made. */
     thresholds: Record<string, unknown>;
     mode: 'monitor' | 'enforce';
@@ -173,6 +178,7 @@ export interface JevScreenShadow {
     model: string;
     verdict: JevScreenVerdict;
     reason: string | null;
+    imageRefusal?: number | null;
     riskScore: number | null;
     highRisk: number | null;
     flags: Record<string, number> | null;

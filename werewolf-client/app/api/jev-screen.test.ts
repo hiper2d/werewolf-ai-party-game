@@ -30,8 +30,8 @@ jest.mock('@/app/utils/logger', () => ({
     logger: { info: jest.fn(), warn: (...args: any[]) => mockWarn(...args), error: jest.fn(), debug: jest.fn(), agentActivity: (...args: any[]) => mockAgentActivity(...args) },
 }));
 
-import { buildScreenRequest, decideScreen, JEV_SCREEN_CONFIG, screenHumanInput, screenRejectionMessage } from '@/app/api/jev-screen';
-import { JEV_SCREEN_FLAG_QUESTIONS, JEV_SCREEN_PROMPT_VERSION, JEV_SCREEN_RISK_LEVELS } from '@/app/ai/prompts/jev-screen-prompts';
+import { buildScreenRequest, decideScreen, isImageUnsafe, JEV_SCREEN_CONFIG, screenArtStyle, screenHumanInput, screenRejectionMessage } from '@/app/api/jev-screen';
+import { JEV_SCREEN_FLAG_QUESTIONS, JEV_SCREEN_IMAGE_QUESTION, JEV_SCREEN_PROMPT_VERSION, JEV_SCREEN_RISK_LEVELS } from '@/app/ai/prompts/jev-screen-prompts';
 
 /** Jev-shaped answers: a risk score with the given per-level probabilities plus flag nouls (default 0.01). */
 function answers(levels: number[], flags: Partial<Record<string, number>> = {}) {
@@ -132,6 +132,33 @@ describe('buildScreenRequest', () => {
         const { state } = buildScreenRequest('preview', 'x');
         expect(String(state.context)).toContain('new Werewolf party game');
     });
+
+    it('asks the image question only where an art style can be: setup and art_style, never chat', () => {
+        expect(buildScreenRequest('chat', 'x').questions.image).toBeUndefined();
+        expect(buildScreenRequest('preview', 'x').questions.image).toEqual({ type: 'noul', instructions: JEV_SCREEN_IMAGE_QUESTION });
+        const style = buildScreenRequest('art_style', 'x');
+        expect(style.questions.image).toEqual({ type: 'noul', instructions: JEV_SCREEN_IMAGE_QUESTION });
+        expect(String(style.state.context)).toContain('image prompt');
+    });
+});
+
+describe('image question', () => {
+    it('is null when not asked and never touches the text verdict', () => {
+        const chat = decideScreen(answers([0.9, 0.1, 0, 0]));
+        expect(chat.imageRefusal).toBeNull();
+        expect(isImageUnsafe(chat)).toBe(false);
+
+        // "women in bikinis, big boobs, sexy": the text side reads grey at most, the image side refuses.
+        const setup = decideScreen({ ...answers([0.1, 0.3, 0.6, 0], { sexual: 0.79 }), image: { type: 'noul', noul: 0.91 } });
+        expect(setup.verdict).toBe('grey');
+        expect(setup.imageRefusal).toBe(0.91);
+        expect(isImageUnsafe(setup)).toBe(true);
+
+        // A clothed pin-up poster: edgy text, fine picture.
+        const pinup = decideScreen({ ...answers([0.4, 0.5, 0.1, 0], { sexual: 0.3 }), image: { type: 'noul', noul: 0.2 } });
+        expect(isImageUnsafe(pinup)).toBe(false);
+        expect(isImageUnsafe({ imageRefusal: JEV_SCREEN_CONFIG.IMAGE_REFUSAL_PROBABILITY })).toBe(true);
+    });
 });
 
 describe('screenRejectionMessage', () => {
@@ -147,7 +174,7 @@ describe('screenHumanInput', () => {
     it('skips without a key: no call, no record', async () => {
         mockGetJevApiKey.mockReturnValue(null);
         const out = await screenHumanInput(input);
-        expect(out).toEqual({ verdict: 'skipped', reason: null, mode: 'off', blocked: false });
+        expect(out).toEqual({ verdict: 'skipped', reason: null, mode: 'off', blocked: false, imageUnsafe: false });
         expect(mockAskJev).not.toHaveBeenCalled();
         expect(mockSaveRecord).not.toHaveBeenCalled();
     });
@@ -166,7 +193,7 @@ describe('screenHumanInput', () => {
     it('monitor mode records a would-block verdict, bills it, and lets the text through', async () => {
         mockAskJev.mockResolvedValue(jevResult(minorsAnswers()));
         const out = await screenHumanInput(setup);
-        expect(out).toEqual({ verdict: 'would_block', reason: 'minors', mode: 'monitor', blocked: false });
+        expect(out).toEqual({ verdict: 'would_block', reason: 'minors', mode: 'monitor', blocked: false, imageUnsafe: false });
 
         expect(mockAskJev).toHaveBeenCalledTimes(1);
         const [, , , options] = mockAskJev.mock.calls[0];
@@ -204,14 +231,14 @@ describe('screenHumanInput', () => {
         mockMode.mockResolvedValue('enforce');
         mockAskJev.mockResolvedValue(jevResult(answers([0.1, 0.6, 0.3, 0])));
         const out = await screenHumanInput(input);
-        expect(out).toEqual({ verdict: 'grey', reason: null, mode: 'enforce', blocked: false });
+        expect(out).toEqual({ verdict: 'grey', reason: null, mode: 'enforce', blocked: false, imageUnsafe: false });
     });
 
     it('fails open: a Jev error is recorded and the text goes through, even in enforce mode', async () => {
         mockMode.mockResolvedValue('enforce');
         mockAskJev.mockRejectedValue(new Error('This operation was aborted'));
         const out = await screenHumanInput(input);
-        expect(out).toEqual({ verdict: 'error', reason: null, mode: 'enforce', blocked: false });
+        expect(out).toEqual({ verdict: 'error', reason: null, mode: 'enforce', blocked: false, imageUnsafe: false });
         expect(mockRecordScreenSpend).not.toHaveBeenCalled();
         expect(mockSaveRecord.mock.calls[0][0]).toMatchObject({ verdict: 'error', error: 'This operation was aborted', enforced: false });
         expect(mockSaveRecord.mock.calls[0][0].shadow).toBeUndefined();
@@ -283,7 +310,7 @@ describe('screenHumanInput', () => {
             mockAskDecisions.mockRejectedValue(new Error('OpenAI Decisions refused: risk'));
 
             const out = await screenHumanInput(withOpenAi);
-            expect(out).toEqual({ verdict: 'error', reason: null, mode: 'enforce', blocked: false });
+            expect(out).toEqual({ verdict: 'error', reason: null, mode: 'enforce', blocked: false, imageUnsafe: false });
             expect(mockRecordScreenSpend).not.toHaveBeenCalled();
             expect(mockSaveRecord).toHaveBeenCalledTimes(1);
             const record = mockSaveRecord.mock.calls[0][0];
@@ -331,7 +358,7 @@ describe('screenHumanInput', () => {
             await jest.advanceTimersByTimeAsync(1);
 
             expect(JEV_SCREEN_CONFIG.TIMEOUT_MS).toBe(3_000);
-            expect(await call).toEqual({ verdict: 'error', reason: null, mode: 'enforce', blocked: false });
+            expect(await call).toEqual({ verdict: 'error', reason: null, mode: 'enforce', blocked: false, imageUnsafe: false });
             expect(mockSaveRecord.mock.calls[0][0]).toMatchObject({
                 verdict: 'error', error: 'Jev request timed out after 3000 ms', httpStatus: undefined, enforced: false,
             });
@@ -347,5 +374,40 @@ describe('screenHumanInput', () => {
         expect(out.verdict).toBe('ok');
         expect(mockRecordScreenSpend.mock.calls[0][0]).toBeUndefined();
         expect(mockSaveRecord.mock.calls[0][0]).toMatchObject({ gameId: null, day: null, source: 'preview' });
+    });
+});
+
+describe('screenArtStyle', () => {
+    const base = { theme: 'Palace', userEmail: 'p@example.com', apiKeys: {} };
+
+    it('makes no call without an art style', async () => {
+        expect(await screenArtStyle({ ...base, artStyle: undefined })).toEqual({ unsafe: false });
+        expect(await screenArtStyle({ ...base, artStyle: '   ' })).toEqual({ unsafe: false });
+        expect(mockAskJev).not.toHaveBeenCalled();
+    });
+
+    it('sets a refused style aside in monitor mode too, and records the image answer on an art_style row', async () => {
+        mockAskJev.mockResolvedValue(jevResult({ ...answers([0.2, 0.5, 0.3, 0], { sexual: 0.6 }), image: { type: 'noul', noul: 0.88 } }));
+        const out = await screenArtStyle({ ...base, artStyle: 'Realistic women in bikinis, big boobs, sexy' });
+        expect(out).toEqual({ unsafe: true });
+
+        const [, state, questions] = mockAskJev.mock.calls[0];
+        expect(state.text).toBe('Theme: Palace\nArt style: Realistic women in bikinis, big boobs, sexy');
+        expect(questions.image.instructions).toBe(JEV_SCREEN_IMAGE_QUESTION);
+
+        const record = mockSaveRecord.mock.calls[0][0];
+        expect(record).toMatchObject({ source: 'art_style', gameId: null, verdict: 'ok', imageRefusal: 0.88, mode: 'monitor', enforced: false });
+        expect(mockWarn).toHaveBeenCalledWith('Jev screen ok (art style set aside)', expect.objectContaining({ source: 'art_style', imageUnsafe: true }));
+    });
+
+    it('lets a clothed pin-up style through', async () => {
+        mockAskJev.mockResolvedValue(jevResult({ ...answers([0.6, 0.4, 0, 0]), image: { type: 'noul', noul: 0.15 } }));
+        expect(await screenArtStyle({ ...base, artStyle: '1950s pin-up poster, bold ink, flat colors' })).toEqual({ unsafe: false });
+        expect(mockSaveRecord.mock.calls[0][0]).toMatchObject({ source: 'art_style', imageRefusal: 0.15 });
+    });
+
+    it('fails open: a failed call leaves the style in place', async () => {
+        mockAskJev.mockRejectedValue(Object.assign(new Error('boom'), { status: 500 }));
+        expect(await screenArtStyle({ ...base, artStyle: 'anything' })).toEqual({ unsafe: false });
     });
 });

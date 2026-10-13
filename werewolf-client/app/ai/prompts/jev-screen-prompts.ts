@@ -13,7 +13,7 @@
  * it, so old rows are not read against wording they were never asked.
  */
 
-export const JEV_SCREEN_PROMPT_VERSION = '2026-09-19.1';
+export const JEV_SCREEN_PROMPT_VERSION = '2026-10-13.1';
 
 export const JEV_SCREEN_CONTEXT_CHAT =
     'A message typed by a human player in the chat of a Werewolf party game (a social deduction game where ' +
@@ -23,8 +23,26 @@ export const JEV_SCREEN_CONTEXT_CHAT =
 export const JEV_SCREEN_CONTEXT_PREVIEW =
     'The setup a human typed for a new Werewolf party game (a social deduction game where werewolves secretly ' +
     'kill villagers each night and the village votes to hang a suspect each day): their player name, the game ' +
-    'theme and their instructions for the AI Game Master. The text will be sent to an AI provider as part of ' +
-    'the prompt that writes the story and the characters.';
+    'theme, their instructions for the AI Game Master, and an optional art style. The text will be sent to an ' +
+    'AI provider as part of the prompt that writes the story and the characters; the art style is also pasted ' +
+    'into every image prompt that draws the character portraits and scenes.';
+
+export const JEV_SCREEN_CONTEXT_ART_STYLE =
+    'The theme and the art style a human typed for a Werewolf party game. The art style is pasted verbatim ' +
+    'into every image prompt that draws the character portraits and the story scenes.';
+
+/**
+ * Separate from the text risk on purpose: an image model's filter draws its line elsewhere.
+ * Gemini's image endpoint refused "nude women" and "women in bikinis, big boobs, sexy" (HTTP 400,
+ * 2026-10-13) while the same players' text prompts went through; a clothed pin-up poster is fine.
+ * Asked only where an art style exists (game setup, draft illustrations), never on chat.
+ */
+export const JEV_SCREEN_IMAGE_QUESTION =
+    'Would an image generator\'s safety filter refuse to draw pictures described this way? Yes when the ' +
+    'pictures would show nudity, exposed breasts, buttocks or genitals, a sexual act, or bodies described ' +
+    'to emphasize breasts or buttocks as the point of the image (such as "big boobs", "ass", "seductive ' +
+    'for their prey"). No for clothed pin-up or glamour portraits, swimsuits or period costume, monsters, ' +
+    'blood, gore, horror or weapons.';
 
 export const JEV_SCREEN_RISK_QUESTION =
     'How risky is this text for being sent to a strict AI content filter?';

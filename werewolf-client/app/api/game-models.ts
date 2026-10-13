@@ -123,6 +123,9 @@ export interface GamePreviewWithGeneratedBots extends GamePreview {
     gameMasterVoiceInstructions?: string; // Legacy: detailed voice instructions
     gameMasterThinking?: boolean;
     tokenUsage?: any; // Token usage from preview generation
+    /** Set when the content screen judged the typed art style as something the image model would
+     * refuse: `artStyle` comes back empty and the form shows this line under the field. */
+    artStyleNotice?: string;
     // Paid tier only: attach the illustration set drawn on the preview page
     // (see AvatarDraft). The version the client last saw — createGame adopts
     // the draft only when it still matches; AVATAR_DRAFT_IN_PROGRESS means the

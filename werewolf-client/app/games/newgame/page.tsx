@@ -95,6 +95,9 @@ export default function CreateNewGamePage() {
     // never the story prompts. Stays editable after the preview is generated, so
     // the live value (not the one baked into gameData) is what createGame gets.
     const [artStyle, setArtStyle] = useState('');
+    // Set by a preview that judged the art style as something the image model
+    // would refuse: the field is cleared and this line explains why.
+    const [artStyleNotice, setArtStyleNotice] = useState<string | null>(null);
     const [playerCount, setPlayerCount] = useState(12);
     const [werewolfCount, setWerewolfCount] = useState(3);
     const [specialRoles, setSpecialRoles] = useState<string[]>([GAME_ROLES.DOCTOR, GAME_ROLES.DETECTIVE, GAME_ROLES.MANIAC]);
@@ -574,6 +577,12 @@ export default function CreateNewGamePage() {
             setBotNameErrors(initialBotNameErrors);
 
             setGameData(updatedGame);
+            // The screen set the art style aside: clear the field so Create
+            // and the drafts send none, and say why under it.
+            if (updatedGame.artStyleNotice) {
+                setArtStyle('');
+                setArtStyleNotice(updatedGame.artStyleNotice);
+            }
             // A new cast: whatever was drawn belongs to the previous one.
             setDraft(null);
             setDraftError(null);
@@ -834,9 +843,12 @@ export default function CreateNewGamePage() {
                                     type="text"
                                     placeholder="90s anime cel animation, muted watercolor, gritty noir comic…"
                                     value={artStyle}
-                                    onChange={(e) => setArtStyle(e.target.value)}
+                                    onChange={(e) => { setArtStyle(e.target.value); setArtStyleNotice(null); }}
                                     maxLength={ART_STYLE_MAX_LENGTH}
                                 />
+                                {artStyleNotice && (
+                                    <p className="mt-1.5 text-[12px] text-[var(--danger)]">{artStyleNotice}</p>
+                                )}
                             </div>
                         </div>
                     </div>

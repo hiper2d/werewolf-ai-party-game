@@ -31,14 +31,17 @@ import { getJevScreenMode, JevScreenMode } from "@/app/api/limits-actions";
 import { JevScreenShadow, JevScreenSource, JevScreenVerdict, saveJevScreenCall } from "@/app/api/jev-records";
 import { logger } from "@/app/utils/logger";
 import {
+    JEV_SCREEN_CONTEXT_ART_STYLE,
     JEV_SCREEN_CONTEXT_CHAT,
     JEV_SCREEN_CONTEXT_PREVIEW,
     JEV_SCREEN_FLAG_QUESTIONS,
+    JEV_SCREEN_IMAGE_QUESTION,
     JEV_SCREEN_PROMPT_VERSION,
     JEV_SCREEN_RISK_LEVELS,
     JEV_SCREEN_RISK_QUESTION,
     JevScreenFlag,
 } from "@/app/ai/prompts/jev-screen-prompts";
+import { sanitizeArtStyle } from "@/app/utils/art-style";
 
 export const JEV_SCREEN_CONFIG = {
     /**
@@ -61,6 +64,20 @@ export const JEV_SCREEN_CONFIG = {
     /** Grey zone starts here on the 0–3 score: recorded and counted, never rejected. */
     GREY_SCORE: 1.2,
     /**
+     * The image question (asked where an art style exists) at or above this sets the art style
+     * aside: the game is created and the story untouched, but every image prompt draws from the
+     * theme alone. Not a rejection, so it acts in monitor mode too — the mode gates refusing human
+     * text, this only steers image prompts away from a call Gemini answers with a 400. The two
+     * refused setups of 2026-10-12/13 scored 0.79-0.93 on the text `sexual` flag; the image
+     * question is tuned to Gemini's line instead. Live probe 2026-10-13 (Jev, ~150 ms each): the
+     * three styles Gemini refused read 0.94 ("nude women, big boobs"), 0.89 ("women in bras …
+     * seductive smiles for their prey"), 0.80 ("women in bikinis, big boobs, sexy"); fine styles
+     * read 0.18 (1950s pin-up poster girls), 0.14 (gothic romance, sensual atmosphere), 0.15
+     * (gore, severed limbs), 0.08 (swimsuits on the beach), 0.09 (ink and watercolor). Read the
+     * recorded `imageRefusal` against the image refusals in the logs before moving the bar.
+     */
+    IMAGE_REFUSAL_PROBABILITY: 0.6,
+    /**
      * Anything slower than this lets the input through (fail-open). Production Oct 4-7 2026 (189
      * calls): p50 168 ms, p99 314 ms, slowest 343 ms; earlier, previews reached 1.1 s and one
      * timed out at a 1.5 s budget (2026-09-23), and a chat message timed out at 5 s (2026-10-01).
@@ -75,7 +92,7 @@ export const JEV_SCREEN_CONFIG = {
     DECISIONS_TIMEOUT_MS: 3_000,
 } as const;
 
-export type ScreenQuestions = { risk: JevScoreQuestion } & Record<JevScreenFlag, JevNoulQuestion>;
+export type ScreenQuestions = { risk: JevScoreQuestion; image?: JevNoulQuestion } & Record<JevScreenFlag, JevNoulQuestion>;
 
 export interface ScreenDecision {
     verdict: Exclude<JevScreenVerdict, 'error'>;
@@ -85,6 +102,9 @@ export interface ScreenDecision {
     riskScore: number;
     highRisk: number;
     flags: Record<JevScreenFlag, number>;
+    /** The image question's probability; null when it was not asked (chat). Outside the verdict:
+     * it steers image prompts, it never blocks text. */
+    imageRefusal: number | null;
 }
 
 export interface ScreenInput {
@@ -106,7 +126,14 @@ export interface ScreenOutcome {
     blocked: boolean;
     /** What to show the player when blocked. */
     message?: string;
+    /** True when the deciding judge put the image question at or above IMAGE_REFUSAL_PROBABILITY:
+     * the caller drops the art style from image prompts. False when not asked, skipped or failed. */
+    imageUnsafe: boolean;
 }
+
+/** Shown under the art style field when the preview set the style aside. */
+export const ART_STYLE_SET_ASIDE_MESSAGE =
+    'Your art style was set aside: the image model would refuse to draw it. Portraits and scenes will follow the theme instead.';
 
 /** Better Stack row: verdict/decision and usage only — the screened text, the questions and the
  * raw answers stay out of the logs. The full copy is the Firestore record (jevScreenCalls). */
@@ -158,7 +185,7 @@ function toShadow(attempt: ScreenAttempt): JevScreenShadow {
     const decision = decideScreen(attempt.result.answers);
     return {
         model: attempt.result.model, verdict: decision.verdict, reason: decision.reason,
-        riskScore: decision.riskScore, highRisk: decision.highRisk, flags: decision.flags,
+        riskScore: decision.riskScore, highRisk: decision.highRisk, flags: decision.flags, imageRefusal: decision.imageRefusal,
         answers: attempt.result.answers, inputTokens: attempt.result.inputTokens,
         costUSD: attempt.result.costUSD, durationMs: attempt.result.durationMs,
     };
@@ -176,14 +203,21 @@ function screenJudges(apiKeys: ScreenInput['apiKeys']): Array<{ judge: ScreenJud
 const FLAG_NAMES = Object.keys(JEV_SCREEN_FLAG_QUESTIONS) as JevScreenFlag[];
 const TOP_LEVELS = [JEV_SCREEN_RISK_LEVELS.length - 2, JEV_SCREEN_RISK_LEVELS.length - 1].map(String);
 
+const CONTEXT_BY_SOURCE: Record<JevScreenSource, string> = {
+    chat: JEV_SCREEN_CONTEXT_CHAT,
+    preview: JEV_SCREEN_CONTEXT_PREVIEW,
+    art_style: JEV_SCREEN_CONTEXT_ART_STYLE,
+};
+
+/** Sources whose text carries an art style, so the image question is asked alongside. */
+const IMAGE_SOURCES: ReadonlySet<JevScreenSource> = new Set(['preview', 'art_style']);
+
 export function buildScreenRequest(source: JevScreenSource, text: string): { state: Record<string, unknown>; questions: ScreenQuestions } {
-    const state = {
-        context: source === 'chat' ? JEV_SCREEN_CONTEXT_CHAT : JEV_SCREEN_CONTEXT_PREVIEW,
-        text,
-    };
+    const state = { context: CONTEXT_BY_SOURCE[source], text };
     const questions = {
         risk: { type: 'score', instructions: JEV_SCREEN_RISK_QUESTION, criteria: [...JEV_SCREEN_RISK_LEVELS] },
         ...Object.fromEntries(FLAG_NAMES.map(flag => [flag, { type: 'noul', instructions: JEV_SCREEN_FLAG_QUESTIONS[flag] }])),
+        ...(IMAGE_SOURCES.has(source) ? { image: { type: 'noul', instructions: JEV_SCREEN_IMAGE_QUESTION } } : {}),
     } as ScreenQuestions;
     return { state, questions };
 }
@@ -194,26 +228,32 @@ export function decideScreen(answers: Record<string, any>, config = JEV_SCREEN_C
     const riskScore = Number(risk.score) || 0;
     const highRisk = TOP_LEVELS.reduce((sum, level) => sum + (Number(risk.probabilities?.[level]) || 0), 0);
     const flags = Object.fromEntries(FLAG_NAMES.map(flag => [flag, Number(answers?.[flag]?.noul) || 0])) as Record<JevScreenFlag, number>;
+    const imageRefusal = answers?.image?.noul === undefined ? null : (Number(answers.image.noul) || 0);
 
     // A hard flag names the reason even when the score agrees, so the message to the player is specific.
     for (const [flag, threshold] of Object.entries(config.HARD_FLAGS) as [JevScreenFlag, number][]) {
         if (flags[flag] >= threshold) {
-            return { verdict: 'would_block', reason: flag, riskScore, highRisk, flags };
+            return { verdict: 'would_block', reason: flag, riskScore, highRisk, flags, imageRefusal };
         }
     }
     if (highRisk >= config.HIGH_RISK_PROBABILITY) {
         const strongest = FLAG_NAMES.reduce((best, flag) => (flags[flag] > flags[best] ? flag : best), FLAG_NAMES[0]);
-        return { verdict: 'grey', reason: flags[strongest] >= 0.5 ? strongest : 'score', riskScore, highRisk, flags };
+        return { verdict: 'grey', reason: flags[strongest] >= 0.5 ? strongest : 'score', riskScore, highRisk, flags, imageRefusal };
     }
     if (riskScore >= config.GREY_SCORE) {
-        return { verdict: 'grey', reason: null, riskScore, highRisk, flags };
+        return { verdict: 'grey', reason: null, riskScore, highRisk, flags, imageRefusal };
     }
-    return { verdict: 'ok', reason: null, riskScore, highRisk, flags };
+    return { verdict: 'ok', reason: null, riskScore, highRisk, flags, imageRefusal };
+}
+
+/** Pure: does the decision put the art style past the image bar? */
+export function isImageUnsafe(decision: Pick<ScreenDecision, 'imageRefusal'>, config = JEV_SCREEN_CONFIG): boolean {
+    return decision.imageRefusal !== null && decision.imageRefusal >= config.IMAGE_REFUSAL_PROBABILITY;
 }
 
 /** What the player reads when the input is rejected. Names the category, never the score. */
 export function screenRejectionMessage(source: JevScreenSource, reason: string | null): string {
-    const what = source === 'chat' ? 'This message' : 'This game setup';
+    const what = source === 'chat' ? 'This message' : source === 'art_style' ? 'This art style' : 'This game setup';
     const because: Record<string, string> = {
         sexual: 'it contains sexual content',
         minors: 'it sexualizes a minor',
@@ -232,15 +272,15 @@ export function screenRejectionMessage(source: JevScreenSource, reason: string |
 export async function screenHumanInput(input: ScreenInput): Promise<ScreenOutcome> {
     const judges = screenJudges(input.apiKeys);
     if (judges.length === 0) {
-        return { verdict: 'skipped', reason: null, mode: 'off', blocked: false };
+        return { verdict: 'skipped', reason: null, mode: 'off', blocked: false, imageUnsafe: false };
     }
     const mode = await getJevScreenMode();
     if (mode === 'off') {
-        return { verdict: 'skipped', reason: null, mode, blocked: false };
+        return { verdict: 'skipped', reason: null, mode, blocked: false, imageUnsafe: false };
     }
     const text = input.text.trim();
     if (!text) {
-        return { verdict: 'skipped', reason: null, mode, blocked: false };
+        return { verdict: 'skipped', reason: null, mode, blocked: false, imageUnsafe: false };
     }
 
     const { state, questions } = buildScreenRequest(input.source, text);
@@ -305,14 +345,16 @@ export async function screenHumanInput(input: ScreenInput): Promise<ScreenOutcom
             ...base, model: failed.judge.model, verdict: 'error', reason: null, riskScore: null, highRisk: null, flags: null,
             enforced: false, error: failed.error, httpStatus: failed.status, shadow,
         });
-        return { verdict: 'error', reason: null, mode, blocked: false };
+        return { verdict: 'error', reason: null, mode, blocked: false, imageUnsafe: false };
     }
     const { judge, result } = deciding;
 
     const decision = decideScreen(result.answers);
     const blocked = mode === 'enforce' && decision.verdict === 'would_block';
+    const imageUnsafe = isImageUnsafe(decision);
     const summary = `${decision.verdict}${decision.reason ? ` (${decision.reason})` : ''} score=${decision.riskScore.toFixed(2)} high=${decision.highRisk.toFixed(2)} ` +
-        FLAG_NAMES.map(flag => `${flag}=${decision.flags[flag].toFixed(2)}`).join(' ');
+        FLAG_NAMES.map(flag => `${flag}=${decision.flags[flag].toFixed(2)}`).join(' ') +
+        (decision.imageRefusal === null ? '' : ` image=${decision.imageRefusal.toFixed(2)}${imageUnsafe ? ' (art style set aside)' : ''}`);
     const shadowSummary = shadow ? `; ${shadowAttempt!.judge.label} ${shadow.verdict}${shadow.riskScore !== null ? ` score=${shadow.riskScore.toFixed(2)}` : ''}` : '';
     console.log(`🛡️ ${judge.label} screen [${mode}] ${input.source}: ${summary} — ${result.durationMs} ms, ${result.inputTokens} tokens${blocked ? ' → REJECTED' : ''}${shadowSummary}`);
 
@@ -320,14 +362,14 @@ export async function screenHumanInput(input: ScreenInput): Promise<ScreenOutcom
         ...base, model: result.model, answers: result.answers,
         inputTokens: result.inputTokens, costUSD: result.costUSD, durationMs: result.durationMs,
         verdict: decision.verdict, reason: decision.reason, riskScore: decision.riskScore, highRisk: decision.highRisk,
-        flags: decision.flags, enforced: blocked, shadow,
+        flags: decision.flags, imageRefusal: decision.imageRefusal, enforced: blocked, shadow,
     });
 
-    const logLevel = decision.verdict === 'would_block' ? 'warn' : 'info';
-    logger[logLevel](`Jev screen ${decision.verdict}${blocked ? ' (rejected)' : ''}`, {
+    const logLevel = decision.verdict === 'would_block' || imageUnsafe ? 'warn' : 'info';
+    logger[logLevel](`Jev screen ${decision.verdict}${blocked ? ' (rejected)' : ''}${imageUnsafe ? ' (art style set aside)' : ''}`, {
         gameId: input.gameId, userId: input.userEmail, activity: 'jev_screen', source: input.source, mode,
         model: result.model, verdict: decision.verdict, reason: decision.reason, riskScore: decision.riskScore, highRisk: decision.highRisk,
-        durationMs: result.durationMs,
+        imageRefusal: decision.imageRefusal, imageUnsafe, durationMs: result.durationMs,
     });
     logger.agentActivity(SCREEN_AGENT_NAME, result.model, 'jev_screen', {
         gameId: input.gameId,
@@ -348,5 +390,25 @@ export async function screenHumanInput(input: ScreenInput): Promise<ScreenOutcom
         mode,
         blocked,
         ...(blocked ? { message: screenRejectionMessage(input.source, decision.reason) } : {}),
+        imageUnsafe,
     };
+}
+
+/**
+ * Screens an art style on its own, where one enters an image prompt after the preview already
+ * judged the setup: game creation and the paid draft illustrations both take the field as the
+ * player last typed it, which may not be what the preview saw. Returns `unsafe: false` without
+ * a call when there is no style, and (like every screen) on a skipped or failed call.
+ */
+export async function screenArtStyle(input: { theme: string; artStyle: string | undefined; userEmail: string; apiKeys: ScreenInput['apiKeys']; gameId?: string }): Promise<{ unsafe: boolean }> {
+    const artStyle = sanitizeArtStyle(input.artStyle);
+    if (!artStyle) return { unsafe: false };
+    const outcome = await screenHumanInput({
+        source: 'art_style',
+        text: `Theme: ${input.theme.trim()}\nArt style: ${artStyle}`,
+        userEmail: input.userEmail,
+        apiKeys: input.apiKeys,
+        gameId: input.gameId,
+    });
+    return { unsafe: outcome.imageUnsafe };
 }

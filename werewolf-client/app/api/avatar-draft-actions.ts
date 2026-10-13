@@ -4,6 +4,8 @@ import {after} from "next/server";
 import {auth} from "@/auth";
 import {AvatarDraftSpec, AvatarDraftState, AvatarFraming, ReframeTarget, USER_TIERS} from "@/app/api/game-models";
 import {assertFreeSpendWithinLimit, getUserBalance, getUserTier} from "@/app/api/user-actions";
+import {screenArtStyle} from "@/app/api/jev-screen";
+import {getUserTierAndApiKeys} from "@/app/utils/tier-utils";
 import {getDraftState, normalizeDraftSpec, reframeDraftAvatarFor, runDraftGeneration, startDraftGeneration} from "@/app/utils/avatar-drafts";
 import {ReframeResult} from "@/app/utils/avatar-generation";
 import {logger} from "@/app/utils/logger";
@@ -37,6 +39,17 @@ export async function generateDraftIllustrations(spec: AvatarDraftSpec): Promise
     await assertFreeSpendWithinLimit(userEmail);
 
     const {subject, keys} = normalizeDraftSpec(spec);
+    // The style may have been retyped since the preview screened it; this is
+    // the last stop before it reaches the image model. A refused style is an
+    // error here, not a silent drop: the panel shows it and the player can
+    // clear the field and draw again.
+    if (subject.artStyle) {
+        const {apiKeys} = await getUserTierAndApiKeys(userEmail);
+        const styleScreen = await screenArtStyle({theme: subject.theme, artStyle: subject.artStyle, userEmail, apiKeys});
+        if (styleScreen.unsafe) {
+            throw new Error('The image model would refuse this art style. Clear or change it, then draw again.');
+        }
+    }
     const claim = await startDraftGeneration(userEmail, subject, keys);
     if (!claim.claimed) return claim.state;
 

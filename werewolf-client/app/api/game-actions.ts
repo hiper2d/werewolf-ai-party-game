@@ -44,7 +44,7 @@ import {sanitizePlayerName} from "@/app/utils/name-utils";
 import {sanitizeArtStyle} from "@/app/utils/art-style";
 import {clampUserText, INPUT_LIMITS} from "@/app/utils/input-limits";
 import {getUserTier, getUserBalance, getVoiceProvider, updateVoiceProvider, assertFreeSpendWithinLimit} from "@/app/api/user-actions";
-import { screenHumanInput } from "@/app/api/jev-screen";
+import { ART_STYLE_SET_ASIDE_MESSAGE, screenArtStyle, screenHumanInput } from "@/app/api/jev-screen";
 import {recordSpend} from "@/app/api/cost-tracking";
 import {getFreeTierLimits} from "@/app/api/limits-actions";
 import {getDefaultVoiceProvider, getVoiceConfig, isVoiceOfProvider, SUPPORTED_VOICE_PROVIDERS, VoiceProvider} from "@/app/ai/voice-config";
@@ -324,16 +324,20 @@ export async function previewGame(gamePreview: GamePreview, progressId?: string)
 
     // Content screen (Jev) on everything the player typed, before a single story token is
     // spent. Monitor mode only records; enforce mode refuses the preview with the reason,
-    // which previewGameAction hands to the form as a plain message.
+    // which previewGameAction hands to the form as a plain message. The art style gets its
+    // own image question: past the bar it is set aside (the preview comes back without it and
+    // the form says why) instead of riding into every image prompt until Gemini refuses it.
+    const requestedArtStyle = sanitizeArtStyle(gamePreview.artStyle);
     const screen = await screenHumanInput({
         source: 'preview',
-        text: `Player name: ${gamePreview.name}\nTheme: ${gamePreview.theme}\nInstructions for the Game Master: ${gamePreview.description}`,
+        text: `Player name: ${gamePreview.name}\nTheme: ${gamePreview.theme}\nInstructions for the Game Master: ${gamePreview.description}\nArt style: ${requestedArtStyle ?? ''}`,
         userEmail: session.user.email,
         apiKeys,
     });
     if (screen.blocked) {
         throw new Error(screen.message);
     }
+    const artStyleSetAside = !!requestedArtStyle && screen.imageUnsafe;
 
     const usageCounts: Record<string, number> = {};
 
@@ -559,6 +563,7 @@ export async function previewGame(gamePreview: GamePreview, progressId?: string)
 
     return {
         ...gamePreview,
+        ...(artStyleSetAside ? { artStyle: '', artStyleNotice: ART_STYLE_SET_ASIDE_MESSAGE } : {}),
         gameMasterAiType: resolvedGmAiType,
         voiceProvider: voiceProvider,
         gameMasterVoice: aiResponse.gameMasterVoice,
@@ -700,8 +705,17 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
         const previewCost = gamePreview.tokenUsage?.costUSD || 0;
         
         // Optional player-supplied art direction for image generation; omitted
-        // entirely when blank (Firestore rejects undefined field values).
-        const artStyle = sanitizeArtStyle(gamePreview.artStyle);
+        // entirely when blank (Firestore rejects undefined field values). Screened
+        // again here: the field is editable after the preview judged it, and this
+        // is the last stop before it reaches every image prompt of the game.
+        let artStyle = sanitizeArtStyle(gamePreview.artStyle);
+        if (artStyle) {
+            const styleScreen = await screenArtStyle({ theme: gamePreview.theme, artStyle, userEmail: session.user.email, apiKeys });
+            if (styleScreen.unsafe) {
+                logger.warn(`Art style set aside at game creation`, { userId: session.user.email, theme: gamePreview.theme });
+                artStyle = undefined;
+            }
+        }
 
         // Generate custom game ID: theme-timestamp
         const sanitizedTheme = sanitizeForId(gamePreview.theme);

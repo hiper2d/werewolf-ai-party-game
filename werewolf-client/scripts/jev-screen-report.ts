@@ -48,7 +48,8 @@ const topFlags = (flags: Record<string, number> | null) =>
 function printRow(row: StoredJevScreenCall): void {
     const where = row.source === 'chat' ? `game ${row.gameId} day ${row.day}` : 'preview';
     const verdict = `${row.verdict}${row.reason ? `(${row.reason})` : ''}${row.enforced ? ' REJECTED' : ''}`;
-    console.log(`  ${when(row.createdAt)}  ${verdict.padEnd(24)} score=${(row.riskScore ?? 0).toFixed(2)} high=${(row.highRisk ?? 0).toFixed(2)}  ${topFlags(row.flags)}`);
+    const image = row.imageRefusal === null || row.imageRefusal === undefined ? '' : ` image=${row.imageRefusal.toFixed(2)}`;
+    console.log(`  ${when(row.createdAt)}  ${verdict.padEnd(24)} score=${(row.riskScore ?? 0).toFixed(2)} high=${(row.highRisk ?? 0).toFixed(2)}${image}  ${topFlags(row.flags)}`);
     console.log(`      ${row.userEmail}  ${where}  [${row.id}]`);
     console.log(`      "${excerpt(row.text)}"`);
 }
