@@ -52,10 +52,18 @@ describe('free tier model limits', () => {
             validateModelUsageForTier('free', LLM_CONSTANTS.CLAUDE_OPUS, [])
         ).toThrow('not available on the free tier');
 
-        // Sonnet has too few measured turns; its sticker-price estimate (2.6¢) is past the 2¢ ceiling.
+        // Gemini Pro is paid-only on 667 measured turns (2.8¢, past the 2¢ ceiling).
         expect(() =>
-            validateModelUsageForTier('free', LLM_CONSTANTS.CLAUDE_SONNET, [])
+            validateModelUsageForTier('free', LLM_CONSTANTS.GEMINI_PRO, [])
         ).toThrow('not available on the free tier');
+    });
+
+    it('temporarily seats Sonnet 5.5 and Gemini 4 Argon once per free game to collect measured turns', () => {
+        // Explicit freeTier opt-outs in ai-models.ts (2026-10-13); drop this test with them.
+        for (const model of [LLM_CONSTANTS.CLAUDE_SONNET, LLM_CONSTANTS.GEMINI_ARGON]) {
+            expect(() => validateModelUsageForTier('free', model, [])).not.toThrow();
+            expect(() => validateModelUsageForTier('free', model, [model])).toThrow();
+        }
     });
 
     it('allows paid tier users to reuse any models without per-game caps', () => {
@@ -68,7 +76,7 @@ describe('free tier model limits', () => {
         const candidates = getCandidateModelsForTier('free');
         expect(candidates).toContain(LLM_CONSTANTS.CLAUDE_HAIKU);
         expect(candidates).toContain(LLM_CONSTANTS.DEEPSEEK_PRO);
-        expect(candidates).not.toContain(LLM_CONSTANTS.CLAUDE_SONNET);
+        expect(candidates).not.toContain(LLM_CONSTANTS.GEMINI_PRO);
         expect(candidates).not.toContain(LLM_CONSTANTS.CLAUDE_OPUS);
     });
 });

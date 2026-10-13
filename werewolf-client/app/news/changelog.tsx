@@ -13,6 +13,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        id: "gemini-4-argon", date: "Oct 2026", tags: ["Models"],
+        title: "Gemini 4 Argon joins the picker, and the free tier gets Argon and Sonnet 5.5",
+        body: (<>Google&apos;s new flagship reasoning model, <strong>Gemini 4 Argon</strong>, is in the model
+            picker. It sits above Gemini 3.1 Pro, which stays available, and costs <strong>less than Pro</strong> at
+            launch: $2 per million input tokens and $10 per million output. Google doubles those rates on
+            December 1, and the game will follow. Free-tier bonus: Argon and <strong>Claude Sonnet 5.5</strong>,
+            until now paid-only, can each play as <strong>one bot per game</strong> on the free tier. Try them
+            while it lasts.</>),
+        media: null,
+        links: [{label: "Create a game", href: "/games"}],
+    },
+    {
         id: "haiku-5-5", date: "Oct 2026", tags: ["Models"],
         title: "Claude Haiku 5.5: ten times cheaper and much faster",
         body: (<>Anthropic&apos;s <strong>Claude Haiku 5.5</strong> replaces Claude 4.5 Haiku in the model picker.

@@ -237,8 +237,17 @@ export function getFreeTierPolicy(modelId: string): { available: boolean; maxBot
 
 // Populate each model's freeTier field from its turn cost — the single source of truth for
 // free-tier caps. A model with an explicit `freeTier` set before this loop opts out of banding
-// and keeps that policy (none do today; Kimi K3's old opt-out is now covered by the estimate,
-// which puts its $3/$15 prices at 3.9¢ a turn, well past the free-tier ceiling).
+// and keeps that policy (Kimi K3's old opt-out is now covered by the estimate, which puts its
+// $3/$15 prices at 3.9¢ a turn, well past the free-tier ceiling).
+//
+// Gemini 4 Argon and Claude Sonnet 5.5 (2026-10-13): one bot per free game, TEMPORARILY, to
+// collect measured turns. Both are $2/$10, and the sticker estimate (2.6¢) puts them just past
+// the 2¢ ceiling; with no paid players the measurement would never reach
+// MEASURED_TURN_COSTS_MIN_CALLS. Sonnet's 25 measured turns already average 1.4¢ (the 1-bot
+// band), so this is likely where it lands anyway. Remove each line once measured-turn-costs.json
+// has 100+ turns for that model — the band then decides on its own.
+SupportedAiModels[LLM_CONSTANTS.GEMINI_ARGON].freeTier = { available: true, maxBotsPerGame: 1 };
+SupportedAiModels[LLM_CONSTANTS.CLAUDE_SONNET].freeTier = { available: true, maxBotsPerGame: 1 };
 for (const [modelId, config] of Object.entries(SupportedAiModels)) {
     config.freeTier = config.freeTier ?? getFreeTierPolicy(modelId);
 }
