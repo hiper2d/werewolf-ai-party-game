@@ -35,7 +35,7 @@ Pick any model for the Game Master and for each individual bot. Twelve providers
 | **Z.AI** | GLM-5.3, GLM-5.3 Flash (`high`) |
 | **Qwen** | Qwen3.8 Max, Qwen3.8 Flash (1,024-token budget) |
 | **MiniMax** | MiniMax M3 |
-| **Meta** | Muse Spark 1.3 (`medium`) |
+| **Meta** | Muse Wonder 1.0, Muse Spark 1.3 (`medium`) |
 | **Sakana** | Fugu Ultra, Fugu Max (`high`; both reason internally, but the API never returns the trace) |
 | **typesafe.ai** | Jev (System One) — not a chat model: a sub-second judge that routes the discussion, picking which bots reply to each message |
 

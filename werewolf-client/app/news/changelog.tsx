@@ -14,13 +14,14 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
     {
         id: "gemini-4-argon", date: "Oct 2026", tags: ["Models"],
-        title: "Gemini 4 Argon joins the picker, and the free tier gets Argon and Sonnet 5.5",
+        title: "Gemini 4 Argon and Muse Wonder join the picker, and the free tier gets Argon and Sonnet 5.5",
         body: (<>Google&apos;s new flagship reasoning model, <strong>Gemini 4 Argon</strong>, is in the model
             picker. It sits above Gemini 3.1 Pro, which stays available, and costs <strong>less than Pro</strong> at
             launch: $2 per million input tokens and $10 per million output. Google doubles those rates on
-            December 1, and the game will follow. Free-tier bonus: Argon and <strong>Claude Sonnet 5.5</strong>,
-            until now paid-only, can each play as <strong>one bot per game</strong> on the free tier. Try them
-            while it lasts.</>),
+            December 1, and the game will follow. Meta&apos;s <strong>Muse Wonder 1.0</strong>, the bigger sibling
+            of Muse Spark, is in too, on the paid tier at $4 and $20. Free-tier bonus: Argon and
+            <strong> Claude Sonnet 5.5</strong>, until now paid-only, can each play as <strong>one bot per
+            game</strong> on the free tier. Try them while it lasts.</>),
         media: null,
         links: [{label: "Create a game", href: "/games"}],
     },
