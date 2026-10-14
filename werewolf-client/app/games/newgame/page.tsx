@@ -9,7 +9,7 @@ import {createGame, getPreviewProgress, previewGameAction} from '@/app/api/game-
 import {generateDraftIllustrations, getAvatarDraft, reframeDraftAvatar} from '@/app/api/avatar-draft-actions';
 import type {PreviewProgress} from '@/app/ai/preview-generation';
 import {AVATAR_DRAFT_IN_PROGRESS, AVATAR_GM_KEY, AvatarDraftState, AvatarFraming, avatarSheetKey, DEFAULT_GAME_MODE, GAME_MODES, GAME_ROLES, GameMode, GamePreview, GamePreviewWithGeneratedBots, getRandomVoiceForGender, RANDOM_ROLE, UserTier, USER_TIERS, maxWerewolvesFor, MIN_WEREWOLVES} from "@/app/api/game-models";
-import {sanitizePlayerName} from "@/app/utils/name-utils";
+import {duplicateNameErrors, sanitizePlayerName} from "@/app/utils/name-utils";
 import {circleFocus} from "@/app/utils/avatar-framing";
 import IllustrationsPanel, {CastEntry, draftFraming, draftImageUrl} from '@/app/games/newgame/components/IllustrationsPanel';
 import CastList, {RowPortrait} from '@/app/games/newgame/components/CastList';
@@ -51,6 +51,22 @@ const validateName = (name: string): string | null => {
         return "Name can only contain letters and numbers (no spaces)";
     }
     return null;
+};
+
+// Per-bot name errors for the cast list: the format rule, then uniqueness across
+// the table (human included) — the same check createGame enforces. Recomputed
+// for the whole cast on every edit, since renaming one bot can clear another's
+// duplicate error.
+const botNameErrorsFor = (humanName: string, botNames: string[]): {[key: number]: string} => {
+    const errors: {[key: number]: string} = {};
+    botNames.forEach((botName, index) => {
+        const formatError = validateName(botName);
+        if (formatError) errors[index] = formatError;
+    });
+    Object.entries(duplicateNameErrors(humanName, botNames)).forEach(([index, message]) => {
+        if (!errors[Number(index)]) errors[Number(index)] = message;
+    });
+    return errors;
 };
 
 const validateTheme = (theme: string): string | null => {
@@ -567,14 +583,7 @@ export default function CreateNewGamePage() {
             };
 
             // Validate initial bot names
-            const initialBotNameErrors: {[key: number]: string} = {};
-            updatedGame.bots.forEach((bot, index) => {
-                const nameValidationError = validateName(bot.name);
-                if (nameValidationError) {
-                    initialBotNameErrors[index] = nameValidationError;
-                }
-            });
-            setBotNameErrors(initialBotNameErrors);
+            setBotNameErrors(botNameErrorsFor(updatedGame.name, updatedGame.bots.map(bot => bot.name)));
 
             setGameData(updatedGame);
             // The screen set the art style aside: clear the field so Create
@@ -693,13 +702,9 @@ export default function CreateNewGamePage() {
             updatedPlayers[index] = { ...updatedPlayers[index], [field]: value };
             setGameData({ ...gameData, bots: updatedPlayers });
 
-            // Validate bot names
+            // Validate bot names (the whole cast: uniqueness is a table-wide rule)
             if (field === 'name' && typeof value === 'string') {
-                const nameValidationError = validateName(value);
-                setBotNameErrors(prev => ({
-                    ...prev,
-                    [index]: nameValidationError || ''
-                }));
+                setBotNameErrors(botNameErrorsFor(gameData.name, updatedPlayers.map(bot => bot.name)));
             }
         }
     };

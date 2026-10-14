@@ -1,4 +1,37 @@
-import { sanitizePlayerName, validatePlayerName, VALID_NAME_PATTERN } from './name-utils';
+import { duplicateNameErrors, playerNameKey, sanitizePlayerName, validatePlayerName, VALID_NAME_PATTERN } from './name-utils';
+
+describe('playerNameKey', () => {
+    it('folds case and sanitizes, so "Zacharybook" and "zachary book" are the same player', () => {
+        expect(playerNameKey('Zacharybook')).toBe('zacharybook');
+        expect(playerNameKey('zachary book ')).toBe('zacharybook');
+    });
+});
+
+describe('duplicateNameErrors', () => {
+    it('is empty for a unique table', () => {
+        expect(duplicateNameErrors('Alex', ['Bot1', 'Bot2', 'Bot3'])).toEqual({});
+    });
+
+    it('flags every bot carrying the human name', () => {
+        expect(duplicateNameErrors('Zacharybook', ['zacharybook', 'Mira', 'ZACHARYBOOK'])).toEqual({
+            0: '"zacharybook" is your name — every player needs a different one',
+            2: '"ZACHARYBOOK" is your name — every player needs a different one',
+        });
+    });
+
+    it('flags both sides of a bot-bot clash, the first with a distinct message', () => {
+        expect(duplicateNameErrors('Alex', ['Mira', 'Theo', 'mira ', 'Theo'])).toEqual({
+            0: '"Mira" is used by more than one player',
+            2: '"mira" is already taken by another player',
+            1: '"Theo" is used by more than one player',
+            3: '"Theo" is already taken by another player',
+        });
+    });
+
+    it('ignores names that sanitize to nothing (rejected elsewhere)', () => {
+        expect(duplicateNameErrors('Alex', ['日本語', '!!!', 'Mira'])).toEqual({});
+    });
+});
 
 describe('sanitizePlayerName', () => {
     it('strips trailing/leading whitespace', () => {

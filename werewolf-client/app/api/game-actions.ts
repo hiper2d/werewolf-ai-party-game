@@ -40,7 +40,7 @@ import {AgentFactory} from "@/app/ai/agent-factory";
 import {generateGamePreview, PreviewProgress} from "@/app/ai/preview-generation";
 import {deletePreviewProgress, isValidProgressId, previewProgressWriter, readPreviewProgress} from "@/app/utils/preview-progress";
 import {getUserTierAndApiKeys} from "@/app/utils/tier-utils";
-import {sanitizePlayerName} from "@/app/utils/name-utils";
+import {duplicateNameErrors, sanitizePlayerName} from "@/app/utils/name-utils";
 import {sanitizeArtStyle} from "@/app/utils/art-style";
 import {clampUserText, INPUT_LIMITS} from "@/app/utils/input-limits";
 import {getUserTier, getUserBalance, getVoiceProvider, updateVoiceProvider, assertFreeSpendWithinLimit} from "@/app/api/user-actions";
@@ -699,6 +699,14 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
                 ...(bot.visualDescription?.trim() ? {visualDescription: bot.visualDescription.trim()} : {}),
             };
         });
+
+        // Names must be unique across the whole table, human included: every
+        // vote target, GM pick and message route is a name lookup. The cast list
+        // is editable after the preview, so this is the gate that matters.
+        const duplicates = Object.values(duplicateNameErrors(humanPlayerName, bots.map(b => b.name)));
+        if (duplicates.length > 0) {
+            throw new Error(`Player names must be unique: ${duplicates[0]}.`);
+        }
 
         // Create the game object
         const timestamp = Date.now();

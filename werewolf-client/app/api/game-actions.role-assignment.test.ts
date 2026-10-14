@@ -255,6 +255,24 @@ describe('createGame human role assignment', () => {
         }))).rejects.toThrow(/allow at most 5 werewolves/);
     });
 
+    it('rejects a cast where two bots share a name, case-insensitively', async () => {
+        // The 2026-10-14 "zach town" game: eleven bots renamed to one name in the
+        // preview form, the vote target list collapsed to the human.
+        setupDbForCreate();
+        const preview = makeGeneratedPreview({ playerCount: 8 });
+        preview.bots[3].name = 'bot2';
+
+        await expect(createGame(preview)).rejects.toThrow(/Player names must be unique: "Bot2" is used by more than one player/);
+    });
+
+    it("rejects a bot that takes the human's name", async () => {
+        setupDbForCreate();
+        const preview = makeGeneratedPreview({ playerCount: 8 });
+        preview.bots[5].name = 'human';
+
+        await expect(createGame(preview)).rejects.toThrow(/Player names must be unique: "human" is your name/);
+    });
+
     it('gives the human the exact special role they chose (deterministic, RNG-independent)', async () => {
         const { setGame } = setupDbForCreate();
 
