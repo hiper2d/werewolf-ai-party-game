@@ -321,10 +321,11 @@ export interface Game {
     gameStateParamQueue: Array<string>; // some states require a queue of params, usually bot names
     gameStateProcessQueue: Array<string>; // some states need to keep intermediate results
     errorState?: SystemErrorMessage | null; // Persistent error state stored in the game object
-    // One-shot model override set by "Retry with different model" on the error banner.
-    // Applies to the named player's (or Game Master's) next AI request only, then is
-    // consumed. Never mutates the bot's stored aiType, so retrying a hidden role's
-    // failed night action doesn't reveal the role via a model change in the players list.
+    // One-shot model override set by "Retry with different model" on the error banner —
+    // only for a bot's failed NIGHT action (see retry-model.ts). Applies to that bot's next
+    // AI request only, then is consumed; the stored aiType stays, so the retry doesn't
+    // reveal the hidden role via a model change in the players list. Every other retry
+    // switches the player's model permanently and never sets this.
     modelOverride?: { botName: string; model: string; enableThinking?: boolean } | null;
     // One-shot "why the last attempt failed" line, set when the user presses Retry and consumed
     // by the next AI call for that actor. Same lifecycle as modelOverride. Never set by

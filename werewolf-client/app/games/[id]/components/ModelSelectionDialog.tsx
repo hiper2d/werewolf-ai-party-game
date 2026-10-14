@@ -25,10 +25,12 @@ interface ModelSelectionDialogProps {
     botName: string;
     gameTier: UserTier;
     usageCounts: Record<string, number>;
-    // 'change' (default) permanently switches the bot's model; 'retry' applies the
-    // chosen model to the failed request only, leaving the bot's model untouched;
-    // 'reassign' moves every player on a blocked provider to the chosen model.
-    mode?: 'change' | 'retry' | 'reassign';
+    // 'change' (default) permanently switches the bot's model; 'retry' re-runs the failed
+    // request with the chosen model AND keeps it as the player's model for the rest of the
+    // game; 'retry-once' (a hidden role's night action) applies it to the failed request
+    // only, leaving the bot's model untouched; 'reassign' moves every player on a blocked
+    // provider to the chosen model.
+    mode?: 'change' | 'retry' | 'retry-once' | 'reassign';
     // Providers whose content filter refused this game (Game.providerBlocks): their models
     // are left out of the list entirely and named in a notice, so the player is never
     // offered the option the server would reject.
@@ -47,6 +49,7 @@ export default function ModelSelectionDialog({
 }: ModelSelectionDialogProps) {
     const { isModalOpen } = useUIControls();
     const isOpen = isModalOpen('modelSelection');
+    const isRetry = mode === 'retry' || mode === 'retry-once';
     const [search, setSearch] = useState('');
 
     const modelOptions = useMemo(() => {
@@ -143,11 +146,13 @@ export default function ModelSelectionDialog({
                 <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--line-1)]">
                     <div>
                         <h3 className="text-[16px] font-semibold text-[var(--fg-0)]">
-                            {mode === 'retry' ? 'Retry with a Different Model' : mode === 'reassign' ? `Reassign ${botName} Players` : 'Change AI Model'}
+                            {isRetry ? 'Retry with a Different Model' : mode === 'reassign' ? `Reassign ${botName} Players` : 'Change AI Model'}
                         </h3>
                         <p className="text-[12px] text-[var(--fg-2)] mt-0.5">
                             {mode === 'retry'
-                                ? <>{botName ? <>{botName} &middot; </> : null}one-time retry &mdash; no player&apos;s model is changed</>
+                                ? <>{botName ? <>{botName} &middot; </> : null}retries with the model you pick, and keeps it for the rest of the game</>
+                                : mode === 'retry-once'
+                                    ? <>{botName ? <>{botName} &middot; </> : null}one-time retry &mdash; no player&apos;s model is changed</>
                                 : mode === 'reassign'
                                     ? <>every player still on {botName} moves to the model you pick, for the rest of the game</>
                                     : <>{botName} &middot; Currently: <span className="font-mono">{getModelDisplayName(currentModel)}</span></>}
@@ -246,8 +251,8 @@ export default function ModelSelectionDialog({
                         className={`px-4 py-2 text-[13px] font-medium rounded-[var(--radius-md)] bg-[var(--accent)] text-[var(--on-accent)] hover:brightness-110 transition-all duration-[120ms] ${isUpdating || selectedModel === currentModel ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                         {isUpdating
-                            ? (mode === 'retry' ? 'Retrying...' : mode === 'reassign' ? 'Reassigning...' : 'Updating...')
-                            : (mode === 'retry' ? 'Retry' : mode === 'reassign' ? 'Reassign' : 'Apply')}
+                            ? (isRetry ? 'Retrying...' : mode === 'reassign' ? 'Reassigning...' : 'Updating...')
+                            : (isRetry ? 'Retry' : mode === 'reassign' ? 'Reassign' : 'Apply')}
                     </button>
                 </div>
             </div>

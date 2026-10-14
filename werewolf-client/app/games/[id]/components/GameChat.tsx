@@ -29,6 +29,7 @@ import { getDefaultVoiceProvider, getVoiceConfig } from "@/app/ai/voice-config";
 import { getModelDisplayName, getModelProviderName } from "@/app/ai/ai-models";
 import { freeSpendLimitScope, freeSpendLimitWindow, isFreeSpendLimitError, isInsufficientBalanceError, isModelRefusalError, isProviderBudgetDepletedError, isProviderBusyError, modelRefusalReason } from "@/app/api/errors";
 import { actorsOnProvider, isProviderBlockedError, providerDisplayName, providerKeyOf, refusalReasonLabel } from "@/app/api/provider-blocks";
+import { isHiddenRoleRetry } from "@/app/api/retry-model";
 import SpendLimitModal from "@/app/components/SpendLimitModal";
 import { formatReplyForDisplay } from "@/app/utils/text-format";
 import { DISCORD_URL } from "@/app/config/external-links";
@@ -2096,6 +2097,11 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                     // During NIGHT `who` is a lowercase role name ("doctor") — capitalize for
                     // display only; callbacks get the raw value.
                     const displayWho = who ? who.charAt(0).toUpperCase() + who.slice(1) : who;
+                    // "Retry with different model" switches the player's model for the rest of
+                    // the game, except a hidden role's night action (one-shot, see retry-model.ts).
+                    const retryModelTitle = isHiddenRoleRetry(game.gameState, who ?? '')
+                        ? "Retry this action once with a different AI model (the player's model is not changed, so the role stays hidden)"
+                        : "Retry this action with a different AI model — it becomes the player's model for the rest of the game";
                     // During NIGHT, `who` is a role name and showing the failing model could
                     // identify which bot holds that hidden role — keep the model hidden then.
                     const model = game.gameState === GAME_STATES.NIGHT
@@ -2252,7 +2258,7 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                                             <button
                                                 onClick={() => onRetryWithModel(who)}
                                                 className="px-3 py-1.5 rounded-[var(--radius-md)] bg-[var(--accent)] text-[var(--accent-fg)] hover:brightness-110 text-[12px] font-medium transition-all duration-[120ms] flex items-center justify-center gap-1.5"
-                                                title="Retry this action once with a model from another provider (doesn't change the bot's model)"
+                                                title={retryModelTitle}
                                             >
                                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
                                                     <path d="M12 20h9"/>
@@ -2388,7 +2394,7 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                                         <button
                                             onClick={() => onRetryWithModel(who)}
                                             className="px-3 py-1.5 rounded-[var(--radius-md)] bg-[var(--bg-2)] border border-[var(--line-2)] text-[var(--fg-1)] hover:bg-[var(--bg-3)] hover:text-[var(--fg-0)] text-[12px] font-medium transition-all duration-[120ms] flex items-center justify-center gap-1.5"
-                                            title="Retry this action once with a different AI model (doesn't change the bot's model)"
+                                            title={retryModelTitle}
                                         >
                                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
                                                 <path d="M12 20h9"/>

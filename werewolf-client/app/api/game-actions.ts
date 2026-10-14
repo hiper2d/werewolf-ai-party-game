@@ -61,6 +61,7 @@ import {
 import {AbstractAgent} from '@hiper2d/ai-agents';
 import {ensureUserCanAccessGame} from "@/app/api/tier-guards";
 import { assertProviderNotBlocked, providerDisplayName, providerKeyOf } from '@/app/api/provider-blocks';
+import { retryModelPatch } from '@/app/api/retry-model';
 import {logger} from "@/app/utils/logger";
 import {after} from "next/server";
 import {portraitKeysFor, runAvatarGeneration} from "@/app/utils/avatar-generation";
@@ -1324,11 +1325,11 @@ function resolveRetryTarget(game: Game): string | null {
 }
 
 /**
- * "Retry with different model": stores a one-shot model override for the player whose
- * AI call failed and clears the error state in the same write, so the auto-processing
- * effects re-run the failed action once with the chosen model. The bot's stored aiType
- * is never changed — nothing shows up in the players list, so a hidden role (maniac,
- * doctor, detective, werewolf) is not revealed by the retry.
+ * "Retry with different model" from the error banner: switches the failed player's model
+ * for the rest of the game (the player kept hitting the same wall when this was a one-shot
+ * override — 12 retries in one game on 2026-10-14) and clears the error state in the same
+ * write, so the auto-processing effects re-run the failed action with the chosen model.
+ * A hidden role's night action keeps the one-shot form; see `isHiddenRoleRetry`.
  */
 export async function retryWithModelOverride(gameId: string, model: string, enableThinking?: boolean): Promise<Game> {
     const session = await auth();
@@ -1370,13 +1371,14 @@ export async function retryWithModelOverride(gameId: string, model: string, enab
     const { apiKeys } = await getUserTierAndApiKeys(session.user.email);
     validateModelUsageForTier(gameTier, gmModel, botModels);
 
-    const modelOverride = { botName: target, model, enableThinking: enableThinking ?? false };
     // No hint on this path by design: a different model has not made the mistake being described,
     // and any hint left over from an earlier plain Retry is cleared here rather than inherited.
-    await gameRef.update({ modelOverride, errorState: null, retryHint: null });
-    logger.info(`One-shot model override set for retry`, { gameId, model, gameState: game.gameState });
+    const { permanent, ...patch } = retryModelPatch(game, target, model, enableThinking);
+    await gameRef.update(patch);
+    logger.info(permanent ? 'Model switched for retry' : 'One-shot model override set for retry (hidden role)',
+        { gameId, model, target: permanent ? target : undefined, gameState: game.gameState });
 
-    return gameFromFirestore(gameId, { ...gameData, modelOverride, errorState: null, retryHint: null });
+    return gameFromFirestore(gameId, { ...gameData, ...patch });
 }
 
 /**

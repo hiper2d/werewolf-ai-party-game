@@ -3,6 +3,7 @@
 import { providerDisplayName } from "@/app/api/provider-blocks";
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getGame, updateBotModel, updateGameMasterModel, updateCharacterVoice, clearGameErrorState, setGameErrorState, afterGameDiscussion, retryWithModelOverride, reassignProviderModels } from "@/app/api/game-actions";
+import { isHiddenRoleRetry } from "@/app/api/retry-model";
 import { ttsService } from "@/app/services/tts-service";
 import { startNewDay, summarizePastDay, selectDayResponders } from "@/app/api/night-actions";
 import GameChat, { type PhaseControls } from "@/app/games/[id]/components/GameChat";
@@ -69,7 +70,7 @@ function GamePageContent({
     const [selectedBot, setSelectedBot] = useState<{ name: string; aiType: string; enableThinking?: boolean } | null>(null);
     // 'change' permanently updates the bot's model (players list); 'retry' applies the
     // chosen model to the failed request only (error banner), so hidden roles don't leak.
-    const [modelDialogMode, setModelDialogMode] = useState<'change' | 'retry' | 'reassign'>('change');
+    const [modelDialogMode, setModelDialogMode] = useState<'change' | 'retry' | 'retry-once' | 'reassign'>('change');
     // Provider key (GOOGLE_API_KEY…) whose players the open 'reassign' dialog moves.
     const [reassignProviderKey, setReassignProviderKey] = useState<string | null>(null);
     const [clearNightMessages, setClearNightMessages] = useState(false);
@@ -697,14 +698,15 @@ function GamePageContent({
         }
     };
 
-    const openModelDialog = (botName: string, currentModel: string, enableThinking?: boolean, mode: 'change' | 'retry' | 'reassign' = 'change') => {
+    const openModelDialog = (botName: string, currentModel: string, enableThinking?: boolean, mode: 'change' | 'retry' | 'retry-once' | 'reassign' = 'change') => {
         setModelDialogMode(mode);
         setSelectedBot({ name: botName, aiType: currentModel, enableThinking });
         openModal('modelSelection');
     };
 
-    // One-shot retry from the error banner: the chosen model is used for the failed
-    // request only; the bot's stored model never changes.
+    // "Retry with different model" from the error banner: the chosen model re-runs the failed
+    // request and becomes the player's model for the rest of the game. Only a hidden role's
+    // night action keeps it one-shot (see retry-model.ts); the server decides from the state.
     const handleRetryWithModel = async (newModel: string, enableThinking?: boolean) => {
         // Same gap as the plain Retry: a router failure never wrote the process queue, so the
         // auto-processing effect cannot resume on its own. Captured before the override clears
@@ -1510,7 +1512,9 @@ function GamePageContent({
                             : game.bots.find(b => b.name === failedName)?.aiType;
                         // Capitalize lowercase night role names ("doctor") for the dialog header.
                         const displayName = failedName ? failedName.charAt(0).toUpperCase() + failedName.slice(1) : '';
-                        openModelDialog(displayName, currentModel ?? '', undefined, 'retry');
+                        // Mirrors the server's choice: a hidden role's night action is a one-shot retry.
+                        const mode = isHiddenRoleRetry(game.gameState, failedName ?? '') ? 'retry-once' : 'retry';
+                        openModelDialog(displayName, currentModel ?? '', undefined, mode);
                     }}
                     onReassignProvider={(providerKey: string) => {
                         setReassignProviderKey(providerKey);
@@ -1601,7 +1605,7 @@ function GamePageContent({
                     setModelDialogMode('change');
                     setReassignProviderKey(null);
                 }}
-                onSelect={modelDialogMode === 'retry' ? handleRetryWithModel : modelDialogMode === 'reassign' ? handleReassignProvider : handleModelUpdate}
+                onSelect={modelDialogMode === 'retry' || modelDialogMode === 'retry-once' ? handleRetryWithModel : modelDialogMode === 'reassign' ? handleReassignProvider : handleModelUpdate}
                 mode={modelDialogMode}
                 blockedProviders={game.providerBlocks}
                 currentModel={selectedBot?.aiType || ''}
