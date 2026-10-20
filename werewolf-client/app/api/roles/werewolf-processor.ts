@@ -24,6 +24,7 @@ import {
 import {format} from "@/app/ai/prompts/utils";
 import {BotAnswerZodSchema, WerewolfActionZod, WerewolfActionZodSchema} from "@/app/ai/prompts/zod-schemas";
 import { invalidTargetExplanation, repeatTargetExplanation, selfSelectionExplanation } from "@/app/api/retry-hint";
+import { normalizeTargetName } from "@/app/api/target-resolution";
 import {recordBotTokenUsage} from "@/app/api/cost-tracking";
 import {getProviderSignatureFields} from "@/app/ai/ai-models";
 import {unwrapJsonReply} from "@/app/utils/text-format";
@@ -273,9 +274,15 @@ export class WerewolfProcessor extends BaseRoleProcessor {
             };
 
             if (isLastWerewolf) {
-                const targetName = (werewolfResponse as WerewolfActionZod).target;
                 const targetablePlayers = this.getTargetablePlayers(true); // Exclude werewolves
                 const targetableNames = targetablePlayers.map(p => p.name);
+                // Repair a name that starts right and trails into garbage (see target-resolution.ts).
+                // Written back onto the response so the saved message carries the clean name.
+                (werewolfResponse as WerewolfActionZod).target = normalizeTargetName(
+                    (werewolfResponse as WerewolfActionZod).target, targetableNames,
+                    { gameId: this.gameId, botName: werewolfBot.name, model: werewolfModel.aiType, action: 'werewolf' }
+                );
+                const targetName = (werewolfResponse as WerewolfActionZod).target;
 
                 if (!targetableNames.includes(targetName)) {
                     throw new BotResponseError(

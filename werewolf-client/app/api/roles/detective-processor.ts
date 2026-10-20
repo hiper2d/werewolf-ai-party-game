@@ -18,6 +18,7 @@ import {format} from "@/app/ai/prompts/utils";
 import {generateBotContextSection, getAlivePlayerNames, getEffectiveModel} from "@/app/utils/bot-utils";
 import {DetectiveActionZodSchema} from "@/app/ai/prompts/zod-schemas";
 import { invalidTargetExplanation, repeatTargetExplanation, selfSelectionExplanation } from "@/app/api/retry-hint";
+import { normalizeTargetName } from "@/app/api/target-resolution";
 import {recordBotTokenUsage} from "@/app/api/cost-tracking";
 import {getProviderSignatureFields} from "@/app/ai/ai-models";
 
@@ -278,6 +279,11 @@ export class DetectiveProcessor extends BaseRoleProcessor {
             if (!detectiveResponse) {
                 throw new Error(`Detective ${detectiveBot.name} failed to respond to investigation prompt`);
             }
+
+            // Repair a name that starts right and trails into garbage (see target-resolution.ts).
+            detectiveResponse.target = normalizeTargetName(detectiveResponse.target, allLivePlayers, {
+                gameId: this.gameId, botName: detectiveBot.name, model: detectiveModel.aiType, action: 'detective'
+            });
 
             // Validate target - detective can target any living player except themselves
             if (!allLivePlayers.includes(detectiveResponse.target)) {

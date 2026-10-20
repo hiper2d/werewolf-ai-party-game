@@ -11,6 +11,7 @@ import { format } from "@/app/ai/prompts/utils";
 import { generateBotContextSection, getAlivePlayerNames, getEffectiveModel } from "@/app/utils/bot-utils";
 import { DoctorActionZodSchema } from "@/app/ai/prompts/zod-schemas";
 import { invalidTargetExplanation, repeatTargetExplanation, selfSelectionExplanation } from "@/app/api/retry-hint";
+import { normalizeTargetName } from "@/app/api/target-resolution";
 import { DoctorAction } from "@/app/ai/prompts/ai-schemas";
 import { recordBotTokenUsage } from "@/app/api/cost-tracking";
 import { getProviderSignatureFields } from "@/app/ai/ai-models";
@@ -237,6 +238,13 @@ export class DoctorProcessor extends BaseRoleProcessor {
             if (!doctorResponse) {
                 throw new Error(`Doctor ${doctorBot.name} failed to respond to protection prompt`);
             }
+
+            // Repair a name that starts right and trails into garbage (see target-resolution.ts).
+            // Resolved against every living player, not just tonight's targets, so a damaged
+            // repeat of last night's name still lands in the repeat-target branch below.
+            doctorResponse.target = normalizeTargetName(doctorResponse.target, allLivePlayers, {
+                gameId: this.gameId, botName: doctorBot.name, model: doctorModel.aiType, action: 'doctor'
+            });
 
             // Validate target - must be a living player AND not the same as last night
             if (!availableTargets.includes(doctorResponse.target)) {

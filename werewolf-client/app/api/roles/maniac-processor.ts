@@ -18,6 +18,7 @@ import { format } from "@/app/ai/prompts/utils";
 import { generateBotContextSection, getAlivePlayerNames, getEffectiveModel } from "@/app/utils/bot-utils";
 import { ManiacActionZodSchema } from "@/app/ai/prompts/zod-schemas";
 import { invalidTargetExplanation, repeatTargetExplanation, selfSelectionExplanation } from "@/app/api/retry-hint";
+import { normalizeTargetName } from "@/app/api/target-resolution";
 import { recordBotTokenUsage } from "@/app/api/cost-tracking";
 import { getProviderSignatureFields } from "@/app/ai/ai-models";
 
@@ -166,6 +167,13 @@ export class ManiacProcessor extends BaseRoleProcessor {
             if (!maniacResponse) {
                 throw new Error(`Maniac ${maniacBot.name} failed to respond to abduction prompt`);
             }
+
+            // Repair a name that starts right and trails into garbage (see target-resolution.ts).
+            // Against every living player so a damaged repeat of last night's name still lands
+            // in the repeat-target branch below.
+            maniacResponse.target = normalizeTargetName(maniacResponse.target, allLivePlayers, {
+                gameId: this.gameId, botName: maniacBot.name, model: maniacModel.aiType, action: 'maniac'
+            });
 
             // Validate target - must be a living player AND not the same as last night
             if (!availableTargets.includes(maniacResponse.target)) {

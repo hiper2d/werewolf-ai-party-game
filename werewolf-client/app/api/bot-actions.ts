@@ -34,6 +34,7 @@ import {botReminderPostfix, botSystemPrompt, BOT_VOTE_PROMPT, BOT_AFTER_GAME_SYS
 import {HUMAN_SUGGESTION_PROMPT} from "@/app/ai/prompts/gm-prompts";
 import {BotVoteZodSchema} from "@/app/ai/prompts/zod-schemas";
 import {invalidTargetExplanation, selfSelectionExplanation} from "@/app/api/retry-hint";
+import {normalizeTargetName} from "@/app/api/target-resolution";
 import {AgentFactory} from "@/app/ai/agent-factory";
 import {format} from "@/app/ai/prompts/utils";
 import {auth} from "@/auth";
@@ -1204,6 +1205,11 @@ async function voteImpl(gameId: string): Promise<GameActionResponse> {
                 );
             }
             
+            // Repair a name that starts right and trails into garbage (see target-resolution.ts).
+            voteResponse.who = normalizeTargetName(voteResponse.who, alivePlayerNames, {
+                gameId, botName: bot.name, model: bot.aiType, action: 'vote'
+            });
+
             // Validate the vote target is alive and valid
             if (!alivePlayerNames.includes(voteResponse.who)) {
                 // Voting for yourself is never legal, so it gets its own explanation — the generic
