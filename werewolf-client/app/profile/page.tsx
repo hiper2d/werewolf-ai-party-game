@@ -12,9 +12,10 @@ import { auth } from '@/auth';
 import { GoogleIcon, GithubIcon } from '@/app/components/ui-icons';
 import ProfileTierCards from './components/ProfileTierCards';
 import BalanceTopUp from './components/BalanceTopUp';
+import { getCheckoutStatus, CheckoutStatus } from '@/app/api/stripe-actions';
 
 interface PageProps {
-    searchParams: Promise<{ payment?: string }>;
+    searchParams: Promise<{ payment?: string; session_id?: string }>;
 }
 
 function formatCurrency(amount: number): string {
@@ -49,6 +50,9 @@ export default async function UserProfilePage({ searchParams }: PageProps) {
 
     const params = await searchParams;
     const email = session.user?.email!;
+    const checkoutStatus: CheckoutStatus | null = params.payment === 'success'
+        ? (params.session_id ? await getCheckoutStatus(params.session_id) : { status: 'unknown' })
+        : null;
 
     let userTier: UserTier = USER_TIERS.FREE;
     let balance = 0;
@@ -136,9 +140,24 @@ export default async function UserProfilePage({ searchParams }: PageProps) {
 
     return (
         <div className="max-w-[1040px] mx-auto w-full text-[var(--fg-0)] pb-16">
-            {params.payment === 'success' && (
+            {checkoutStatus?.status === 'paid' && (
                 <div className="mt-4 p-3 rounded-[var(--radius-lg)] border border-[var(--good-line)] bg-[var(--good-soft)] text-[var(--good-fg)] text-[13px]">
-                    Payment successful! Your balance has been updated.
+                    Payment successful! {formatCurrency(checkoutStatus.amountUSD)} is added to your balance — refresh in a few seconds if it isn&apos;t shown yet.
+                </div>
+            )}
+            {checkoutStatus?.status === 'processing' && (
+                <div className="mt-4 p-3 rounded-[var(--radius-lg)] border border-[var(--warn-line)] bg-[var(--warn-soft)] text-[var(--warn-fg)] text-[13px]">
+                    Your payment of {formatCurrency(checkoutStatus.amountUSD)} is still processing. The credits are added as soon as your bank confirms it.
+                </div>
+            )}
+            {checkoutStatus?.status === 'unknown' && (
+                <div className="mt-4 p-3 rounded-[var(--radius-lg)] border border-[var(--line-2)] bg-[var(--bg-1)] text-[var(--fg-1)] text-[13px]">
+                    Thanks! Your payment is being confirmed — the balance below updates once it is.
+                </div>
+            )}
+            {params.payment === 'cancelled' && (
+                <div className="mt-4 p-3 rounded-[var(--radius-lg)] border border-[var(--line-2)] bg-[var(--bg-1)] text-[var(--fg-1)] text-[13px]">
+                    Checkout was cancelled — nothing was charged.
                 </div>
             )}
 
@@ -263,7 +282,7 @@ export default async function UserProfilePage({ searchParams }: PageProps) {
                         <p className="m-0 mb-4 text-[13.5px] text-[var(--fg-2)] leading-[1.55]">
                             Top up your prepaid balance. Each AI call is billed at the model&apos;s base price + 15% (covers hosting and beer for devs).
                         </p>
-                        <BalanceTopUp userId={email} />
+                        <BalanceTopUp />
                     </div>
                 </section>
             )}

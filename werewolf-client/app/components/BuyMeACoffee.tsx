@@ -37,12 +37,17 @@ export default function BuyMeACoffee({ className = '', label = 'Buy me a coffee'
     }
     setBuying(true);
     try {
-      const url = await createCheckoutSession(email, COFFEE_PACKAGE.id);
-      window.location.href = url;
+      const result = await createCheckoutSession(COFFEE_PACKAGE.id);
+      if (result.ok) {
+        window.location.assign(result.url);
+        return;
+      }
+      alert(result.error);
     } catch (error) {
       console.error('Failed to start coffee checkout:', error);
-      setBuying(false);
+      alert('Could not start checkout. Please try again in a minute.');
     }
+    setBuying(false);
   };
 
   return (
