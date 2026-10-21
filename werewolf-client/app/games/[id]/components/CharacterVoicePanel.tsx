@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { GAME_MASTER, Game } from '@/app/api/game-models';
-import { getDefaultVoiceProvider, getVoiceConfig, VOICE_PROVIDER_DISPLAY_NAMES, VoiceProvider } from '@/app/ai/voice-config';
+import { getVoiceConfig, LEGACY_VOICE_PROVIDER, VOICE_PROVIDER_DISPLAY_NAMES, VoiceProvider } from '@/app/ai/voice-config';
 import SelectDropdown from '@/app/components/SelectDropdown';
 import { INPUT_LIMITS } from '@/app/utils/input-limits';
 
@@ -55,7 +55,7 @@ export default function CharacterVoicePanel({ game, name, onSave, onSpeakSample,
     const [busy, setBusy] = useState<'save' | 'play' | null>(null);
     const [error, setError] = useState<string | null>(null);
     const gender: 'male' | 'female' = game.bots.find(b => b.name === name)?.gender ?? 'male';
-    const voiceProvider: VoiceProvider = game.voiceProvider || getDefaultVoiceProvider();
+    const voiceProvider: VoiceProvider = game.voiceProvider || LEGACY_VOICE_PROVIDER;
 
     const voices = useMemo(() => {
         // Matching-gender voices first; the rest stay reachable for deliberate picks.

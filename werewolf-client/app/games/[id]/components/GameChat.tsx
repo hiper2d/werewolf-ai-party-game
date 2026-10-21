@@ -25,7 +25,7 @@ const VOICE_MUTED_KEY = 'voiceMuted';
 import { LoadingRail, PhaseBar, StreamPill, stripChromeClass, stripChromeStyle, type LoadingRailProps, type PhaseTone, type RailActor } from "./PhaseStrip";
 import { ttsService } from "@/app/services/tts-service";
 import { sttService } from "@/app/services/stt-service";
-import { getDefaultVoiceProvider, getVoiceConfig } from "@/app/ai/voice-config";
+import { getVoiceConfig, LEGACY_VOICE_PROVIDER } from "@/app/ai/voice-config";
 import { getModelDisplayName, getModelProviderName } from "@/app/ai/ai-models";
 import { freeSpendLimitScope, freeSpendLimitWindow, isFreeSpendLimitError, isInsufficientBalanceError, isModelRefusalError, isProviderBudgetDepletedError, isProviderBusyError, modelRefusalReason } from "@/app/api/errors";
 import { actorsOnProvider, isProviderBlockedError, providerDisplayName, providerKeyOf, refusalReasonLabel } from "@/app/api/provider-blocks";
@@ -1441,7 +1441,7 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
         setLoadingMessageId(null);
     };
 
-    const handleSpeak = async (messageId: string, text: string, opts?: { silent?: boolean }) => {
+    const handleSpeak = async (messageId: string, text: string, opts?: { silent?: boolean; source?: 'chat' | 'cinematic' }) => {
         const reportFailure = (message: string) => {
             if (opts?.silent) { console.warn('TTS playback failed:', message); return; }
             alert(message);
@@ -1474,7 +1474,7 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
             }
 
             // The game's voice set (fixed at creation; legacy games read as the default)
-            const voiceProvider = game.voiceProvider || getDefaultVoiceProvider();
+            const voiceProvider = game.voiceProvider || LEGACY_VOICE_PROVIDER;
 
             // Find the message to get the author name
             const message = messages.find(msg => msg.id === messageId);
@@ -1511,6 +1511,8 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
 
             const started = await ttsService.speakText(text, {
                 voice, voiceStyle, voiceProvider, gameId,
+                // Auto-read lines are nobody's click; the metrics keep them apart.
+                source: opts?.silent ? 'cinematic_auto' : (opts?.source ?? 'chat'),
                 // Playback failures (autoplay policy, codec) fire after this await
                 // resolves, so surface them through the same alert + reset path.
                 onPlaybackError: (error) => {
@@ -2645,7 +2647,7 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                     isOwner={isOwner}
                     onGameChange={onGameChange}
                     onUpdateVoice={onUpdateVoice}
-                    onSpeakSample={async (text, sel) => { await ttsService.speakText(text, { voice: sel.voice, voiceStyle: sel.voiceStyle || undefined, voiceProvider: game.voiceProvider, gameId: game.id }); }}
+                    onSpeakSample={async (text, sel) => { await ttsService.speakText(text, { voice: sel.voice, voiceStyle: sel.voiceStyle || undefined, voiceProvider: game.voiceProvider, gameId: game.id, source: 'audition' }); }}
                     onStopSample={() => ttsService.stopSpeaking()}
                     onClose={() => {
                         // Manual close mid-burst = "let me read the chat":

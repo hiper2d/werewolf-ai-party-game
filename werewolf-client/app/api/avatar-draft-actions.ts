@@ -9,6 +9,7 @@ import {getUserTierAndApiKeys} from "@/app/utils/tier-utils";
 import {getDraftState, normalizeDraftSpec, reframeDraftAvatarFor, runDraftGeneration, startDraftGeneration} from "@/app/utils/avatar-drafts";
 import {ReframeResult} from "@/app/utils/avatar-generation";
 import {logger} from "@/app/utils/logger";
+import {recordFeatureEvent} from "@/app/api/feature-events";
 
 /**
  * Paid tier only: draws the story illustration and every character portrait
@@ -52,6 +53,7 @@ export async function generateDraftIllustrations(spec: AvatarDraftSpec): Promise
     }
     const claim = await startDraftGeneration(userEmail, subject, keys);
     if (!claim.claimed) return claim.state;
+    await recordFeatureEvent({userId: userEmail, feature: 'draft_illustrations', detail: {characters: keys.length, redraw: claim.append}});
 
     const run = () => runDraftGeneration(userEmail, subject, claim).catch(error =>
         logger.error(`Illustration draft kickoff failed`, {error: error.message})
@@ -86,5 +88,9 @@ export async function reframeDraftAvatar(key: string, target: ReframeTarget, fra
     if (!session || !session.user?.email) {
         throw new Error('Not authenticated');
     }
-    return reframeDraftAvatarFor(session.user.email, key, target, framing);
+    const result = await reframeDraftAvatarFor(session.user.email, key, target, framing);
+    if (result) {
+        await recordFeatureEvent({userId: session.user.email, feature: 'avatar_reframe', detail: {key, target, where: 'draft'}});
+    }
+    return result;
 }

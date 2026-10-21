@@ -5,6 +5,7 @@ export type { VoiceProvider, VoiceMetadata, VoiceConfig } from './voice-config';
 export {
   getVoiceConfig,
   getDefaultVoiceProvider,
+  LEGACY_VOICE_PROVIDER,
   SUPPORTED_VOICE_PROVIDERS,
   VOICE_PROVIDER_DISPLAY_NAMES,
   VOICE_PROVIDER_DESCRIPTIONS,

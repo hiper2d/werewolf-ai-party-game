@@ -7,6 +7,8 @@ import { incrementGameCost, recordSpend } from "@/app/api/cost-tracking";
 import { SUPPORTED_VOICE_PROVIDERS, VoiceProvider } from "@/app/ai/voice-config";
 import { createVoiceAgent, VOICE_MODEL_CONSTANTS, VOICE_PROVIDER_API_KEY } from "@hiper2d/ai-agents";
 import { logger } from "@/app/utils/logger";
+import { after } from "next/server";
+import { recordFeatureEvent, SpeechSource } from "@/app/api/feature-events";
 
 /**
  * Unified TTS options that work with both providers
@@ -16,6 +18,7 @@ export interface UnifiedTTSOptions {
   voiceStyle?: string;     // Voice direction (e.g., "sly and playful, a smile in the voice")
   voiceInstructions?: string; // Legacy: detailed voice instructions for OpenAI
   gameId?: string;
+  source?: SpeechSource;   // Where the line was asked for; feature-use metrics only
 }
 
 /**
@@ -84,6 +87,21 @@ export async function generateSpeechWithProvider(
         gameId: options.gameId,
         gameUpdate: options.gameId ? incrementGameCost(costUSD) : undefined,
       });
+    }
+
+    // Feature-use row, written after the audio is on its way: the player is
+    // waiting for the line to start, so the write must not sit in front of it.
+    const event = {
+      userId: session.user.email,
+      feature: 'voice_tts' as const,
+      gameId: options.gameId,
+      detail: { provider: voiceProvider, source: options.source ?? 'chat', chars: text.length },
+    };
+    try {
+      after(() => recordFeatureEvent(event));
+    } catch {
+      // Outside a request scope (unit tests, scripts): record inline.
+      await recordFeatureEvent(event);
     }
 
     return audio;

@@ -4,6 +4,7 @@ import {auth} from "@/auth";
 import {AvatarGenerationResult, ReframeResult, reframeGameAvatar, runAvatarGeneration, runAvatarRegeneration, selectAvatarVariantFor} from "@/app/utils/avatar-generation";
 import {AvatarFraming, FREE_TIER_AVATAR_REGENS, ReframeTarget, USER_TIERS} from "@/app/api/game-models";
 import {assertFreeSpendWithinLimit, getUserBalance, getUserTier} from "@/app/api/user-actions";
+import {recordFeatureEvent} from "@/app/api/feature-events";
 
 /**
  * Generates the full themed avatar set for a game in ONE image-model call:
@@ -55,7 +56,11 @@ export async function regenerateGameAvatars(gameId: string): Promise<AvatarGener
     }
     await assertFreeSpendWithinLimit(session.user.email);
     const maxRegens = tier === USER_TIERS.PAID ? Number.MAX_SAFE_INTEGER : FREE_TIER_AVATAR_REGENS;
-    return runAvatarRegeneration(gameId, session.user.email, maxRegens);
+    const result = await runAvatarRegeneration(gameId, session.user.email, maxRegens);
+    if (result) {
+        await recordFeatureEvent({userId: session.user.email, feature: 'avatar_reroll', gameId, detail: {tier}});
+    }
+    return result;
 }
 
 /**
@@ -68,7 +73,11 @@ export async function selectAvatarVariant(gameId: string, key: string, index: nu
     if (!session || !session.user?.email) {
         throw new Error('Not authenticated');
     }
-    return selectAvatarVariantFor(gameId, session.user.email, key, index);
+    const result = await selectAvatarVariantFor(gameId, session.user.email, key, index);
+    if (result) {
+        await recordFeatureEvent({userId: session.user.email, feature: 'avatar_variant_select', gameId, detail: {key, index}});
+    }
+    return result;
 }
 
 /**
@@ -83,5 +92,9 @@ export async function reframeAvatar(gameId: string, key: string, target: Reframe
     if (!session || !session.user?.email) {
         throw new Error('Not authenticated');
     }
-    return reframeGameAvatar(gameId, session.user.email, key, target, framing);
+    const result = await reframeGameAvatar(gameId, session.user.email, key, target, framing);
+    if (result) {
+        await recordFeatureEvent({userId: session.user.email, feature: 'avatar_reframe', gameId, detail: {key, target, where: 'game'}});
+    }
+    return result;
 }

@@ -84,6 +84,10 @@ jest.mock('@/app/ai/voice-config', () => ({
     getVoiceConfig: jest.fn(),
 }));
 
+jest.mock('@/app/api/feature-events', () => ({
+    recordFeatureEvent: jest.fn().mockResolvedValue(undefined),
+}));
+
 jest.mock('@/app/api/tier-guards', () => ({
     ensureUserCanAccessGame: jest.fn(),
 }));

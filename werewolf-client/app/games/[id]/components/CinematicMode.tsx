@@ -108,7 +108,7 @@ interface CinematicModeProps {
     // Chat's TTS pipeline: play/pause the current line with the speaker's voice.
     // `silent` suppresses the failure alert — an auto-played line that a browser's
     // autoplay policy blocks must not throw a dialog at someone who never clicked.
-    onSpeak?: (messageId: string, text: string, opts?: { silent?: boolean }) => void;
+    onSpeak?: (messageId: string, text: string, opts?: { silent?: boolean; source?: 'chat' | 'cinematic' }) => void;
     // The chat's global mute (one setting for chat and scene). Muted, the
     // pipeline ignores requests, so the line and auto-read controls go inert.
     voiceMuted?: boolean;
@@ -424,7 +424,7 @@ export default function CinematicMode({ game, messages, onClose, startMessageId,
                         </>
                     )}
                     <button
-                        onClick={() => onSpeak(turn.key, turn.text)}
+                        onClick={() => onSpeak(turn.key, turn.text, { source: 'cinematic' })}
                         disabled={voiceMuted}
                         aria-label="Read this line aloud"
                         title={voiceMuted

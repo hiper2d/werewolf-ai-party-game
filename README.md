@@ -57,7 +57,7 @@ After signing in, the Game List shows every game you've started — the opening 
 
 ## Game Creation
 
-Click **Create Game** and pick a theme — a spaceship, a submarine crew, a Jane Austen novel, anything the AI content filters tolerate. Optional **Instructions for the Game Master** steer the story ("Steampunk: the ship is flying on steam to Andromeda"), and an **Art style** line sets how portraits and scenes are drawn. Then set the player count (8–16), werewolf count, your role, the special roles, the pool of AI models bots are drawn from, the Game Master model, bot mode (role-play or plain), the voice set (OpenAI or Gemini), and reply length.
+Click **Create Game** and pick a theme — a spaceship, a submarine crew, a Jane Austen novel, anything the AI content filters tolerate. Optional **Instructions for the Game Master** steer the story ("Steampunk: the ship is flying on steam to Andromeda"), and an **Art style** line sets how portraits and scenes are drawn. Then set the player count (8–16), werewolf count, your role, the special roles, the pool of AI models bots are drawn from, the Game Master model, bot mode (role-play or plain), the voice set (Gemini by default, or OpenAI), and reply length.
 
 <a href="images/create-game-form.png" target="_blank"><img src="images/create-game-form.png" width="800"></a>
 

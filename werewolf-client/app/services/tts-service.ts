@@ -1,12 +1,14 @@
 import { generateSpeechAction } from "@/app/api/tts-actions";
 import { VoiceProvider } from "@/app/ai/voice-config/voice-config";
 import { getDefaultVoiceProvider } from "@/app/ai/voice-config";
+import type { SpeechSource } from "@/app/api/feature-events";
 
 export interface TTSOptions {
   voice: string;                  // Voice ID (e.g., "echo", "Kore")
   voiceStyle?: string;            // Voice direction (e.g., "sly and playful, a smile in the voice")
   voiceProvider?: VoiceProvider;  // TTS provider (defaults to user's preference)
   gameId?: string;
+  source?: SpeechSource;          // Where the line was asked for (feature-use metrics)
   // Called when the <audio> element fails *during* playback (autoplay policy,
   // codec/decode failure). These fire after speakText() has already resolved, so
   // the caller's await/catch can't see them — surface them here instead.
@@ -209,7 +211,8 @@ export class TTSService {
       {
         voice: options.voice,
         voiceStyle: options.voiceStyle,
-        gameId: options.gameId
+        gameId: options.gameId,
+        source: options.source,
       },
       voiceProvider
     )

@@ -742,6 +742,7 @@ export default function CreateNewGamePage() {
                 voice: voice,
                 voiceStyle: voiceStyle,
                 voiceProvider: voiceProvider,
+                source: 'preview',
                 onPlaybackError: () => setIsSpeaking(false)
             });
             setIsSpeaking(false);
@@ -973,7 +974,7 @@ export default function CreateNewGamePage() {
                                     <span className="text-[12px] font-medium text-[var(--fg-1)]">Voices</span>
                                     <SegmentedControl<VoiceProvider>
                                         value={voiceProvider}
-                                        options={SUPPORTED_VOICE_PROVIDERS.map(p => ({ value: p, label: VOICE_PROVIDER_DISPLAY_NAMES[p] }))}
+                                        options={[getDefaultVoiceProvider(), ...SUPPORTED_VOICE_PROVIDERS.filter(p => p !== getDefaultVoiceProvider())].map(p => ({ value: p, label: VOICE_PROVIDER_DISPLAY_NAMES[p] }))}
                                         onChange={setVoiceProvider}
                                         disabled={!!gameData}
                                     />

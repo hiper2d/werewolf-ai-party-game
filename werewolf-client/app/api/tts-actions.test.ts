@@ -25,8 +25,11 @@ jest.mock("@/app/api/cost-tracking", () => ({
   ...jest.requireActual("@/app/api/cost-tracking"),
   recordSpend: jest.fn(),
 }));
+jest.mock("next/server", () => ({ after: (fn: () => void) => fn() }));
+jest.mock("@/app/api/feature-events", () => ({ recordFeatureEvent: jest.fn().mockResolvedValue(undefined) }));
 
 import { auth } from "@/auth";
+import { recordFeatureEvent } from "@/app/api/feature-events";
 import { getUserTierAndApiKeys } from "@/app/utils/tier-utils";
 import { createVoiceAgent, VOICE_MODEL_CONSTANTS } from "@hiper2d/ai-agents";
 import { assertFreeSpendWithinLimit } from "@/app/api/user-actions";
@@ -117,6 +120,40 @@ describe('generateSpeechWithProvider: key resolution', () => {
   it('rejects an unknown provider before touching keys', async () => {
     await expect(generateSpeechWithProvider(TEXT, { voice: 'x' }, 'azure' as any)).rejects.toThrow('Unknown voice provider');
     expect(mockTierKeys).not.toHaveBeenCalled();
+  });
+});
+
+describe('generateSpeechWithProvider: feature-use event', () => {
+  it('records one voice_tts row per spoken line with the provider, the source and the length', async () => {
+    mockTierKeys.mockResolvedValue(openaiKeys(USER_TIERS.FREE));
+
+    await generateSpeechWithProvider(TEXT, { voice: 'onyx', gameId: 'game-1', source: 'cinematic_auto' }, 'openai');
+
+    expect(recordFeatureEvent).toHaveBeenCalledWith({
+      userId: USER_EMAIL,
+      feature: 'voice_tts',
+      gameId: 'game-1',
+      detail: { provider: 'openai', source: 'cinematic_auto', chars: TEXT.length },
+    });
+  });
+
+  it('a line with no source counts as a chat click; a line outside a game carries no game', async () => {
+    mockTierKeys.mockResolvedValue({ tier: USER_TIERS.FREE, apiKeys: { [API_KEY_CONSTANTS.GOOGLE]: 'k' } });
+
+    await generateSpeechWithProvider(TEXT, { voice: 'Kore' }, 'google');
+
+    expect(recordFeatureEvent).toHaveBeenCalledWith(expect.objectContaining({
+      gameId: undefined,
+      detail: expect.objectContaining({ provider: 'google', source: 'chat' }),
+    }));
+  });
+
+  it('records nothing when the line was not generated', async () => {
+    mockTierKeys.mockResolvedValue(openaiKeys(USER_TIERS.FREE));
+    speak.mockRejectedValueOnce(new Error('provider down'));
+
+    await expect(generateSpeechWithProvider(TEXT, { voice: 'onyx' }, 'openai')).rejects.toThrow('provider down');
+    expect(recordFeatureEvent).not.toHaveBeenCalled();
   });
 });
 

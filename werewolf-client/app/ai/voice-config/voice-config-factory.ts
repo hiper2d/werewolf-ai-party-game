@@ -22,12 +22,23 @@ export function getVoiceConfig(provider: VoiceProvider): VoiceConfig {
 }
 
 /**
- * Get the default voice provider.
- * Returns 'openai' as the default since it was the original provider.
+ * The voice set a new game is cast from when the player has no saved
+ * preference. Gemini since 2026-10-21: about 4x cheaper and 2.5x faster than
+ * OpenAI, and OpenAI's speech stream was being cut mid-line for about one call
+ * in ten ("terminated") in the two voiced games of that week. OpenAI was the
+ * default before only because it was the original provider.
  */
 export function getDefaultVoiceProvider(): VoiceProvider {
-  return 'openai';
+  return 'google';
 }
+
+/**
+ * The provider of a game doc that predates the `voiceProvider` field (before
+ * 2026-09-05): those games were cast from OpenAI voice ids, so reading them
+ * through the current default would pair Gemini with ids it does not have.
+ * Only for reading stored games — never for a new choice.
+ */
+export const LEGACY_VOICE_PROVIDER: VoiceProvider = 'openai';
 
 /** The providers the library's VoiceAgentFactory serves — the same list this app casts from. */
 export { SUPPORTED_VOICE_PROVIDERS } from '@hiper2d/ai-agents';

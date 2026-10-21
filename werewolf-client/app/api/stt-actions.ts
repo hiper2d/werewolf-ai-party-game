@@ -8,6 +8,8 @@ import { incrementGameCost, recordSpend } from "@/app/api/cost-tracking";
 import { getDefaultVoiceProvider, SUPPORTED_VOICE_PROVIDERS, VoiceProvider } from "@/app/ai/voice-config";
 import { createVoiceAgent, VOICE_MODEL_CONSTANTS, VOICE_PROVIDER_API_KEY } from "@hiper2d/ai-agents";
 import { logger } from "@/app/utils/logger";
+import { after } from "next/server";
+import { recordFeatureEvent } from "@/app/api/feature-events";
 
 export interface STTOptions {
   language?: string;
@@ -78,6 +80,19 @@ export async function transcribeAudio(
         gameId: options.gameId,
         gameUpdate: options.gameId ? incrementGameCost(costUSD) : undefined,
       });
+    }
+
+    // Feature-use row, written after the text is on its way (see tts-actions).
+    const event = {
+      userId: session.user.email,
+      feature: 'voice_stt' as const,
+      gameId: options.gameId,
+      detail: { provider: voiceProvider, chars: text.length, audioBytes: audioBuffer.byteLength },
+    };
+    try {
+      after(() => recordFeatureEvent(event));
+    } catch {
+      await recordFeatureEvent(event);
     }
 
     return text;

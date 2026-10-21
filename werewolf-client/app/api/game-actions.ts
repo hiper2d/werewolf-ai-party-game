@@ -47,7 +47,8 @@ import {getUserTier, getUserBalance, getVoiceProvider, updateVoiceProvider, asse
 import { ART_STYLE_SET_ASIDE_MESSAGE, screenArtStyle, screenHumanInput } from "@/app/api/jev-screen";
 import {recordSpend} from "@/app/api/cost-tracking";
 import {getFreeTierLimits} from "@/app/api/limits-actions";
-import {getDefaultVoiceProvider, getVoiceConfig, isVoiceOfProvider, SUPPORTED_VOICE_PROVIDERS, VoiceProvider} from "@/app/ai/voice-config";
+import {getVoiceConfig, isVoiceOfProvider, LEGACY_VOICE_PROVIDER, SUPPORTED_VOICE_PROVIDERS, VoiceProvider} from "@/app/ai/voice-config";
+import {recordFeatureEvent} from "@/app/api/feature-events";
 import {normalizeSpendings} from "@/app/utils/spending-utils";
 import {serializeMessageForFirestore} from "@/app/api/message-serialization";
 import {LLM_CONSTANTS, assertAllowedAsGameMaster, configureStoryAgent, isAllowedAsGameMaster, SupportedAiModels} from "@/app/ai/ai-models";
@@ -824,6 +825,22 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
 
         await addMessageToChatAndSaveToDb(gameStoryMessage, customGameId);
         logger.info(`Game created: ${customGameId}`, { theme: gamePreview.theme, owner: session.user.email });
+        // The choices made on the form, as one feature-use row: the game doc
+        // holds them too, but it expires in 30 days and this survives 180.
+        await recordFeatureEvent({
+            userId: session.user.email,
+            feature: 'game_created',
+            gameId: customGameId,
+            detail: {
+                tier,
+                players: gamePreview.playerCount,
+                voiceProvider: gamePreview.voiceProvider,
+                gameMode: gamePreview.gameMode ?? DEFAULT_GAME_MODE,
+                longReplies: gamePreview.longReplies ?? false,
+                artStyle: !!artStyle,
+                gameMaster: gamePreview.gameMasterAiType,
+            },
+        });
 
         // Kick off themed avatar generation right at creation, after the response
         // is sent so navigation isn't delayed. The transaction inside makes it
@@ -1011,7 +1028,7 @@ export async function updateCharacterVoice(gameId: string, name: string, patch: 
         await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: (gameData?.createdWithTier ?? 'free') });
 
         // Voice ids are provider-specific: the new voice must belong to this game's set.
-        const voiceProvider: VoiceProvider = gameData?.voiceProvider || getDefaultVoiceProvider();
+        const voiceProvider: VoiceProvider = gameData?.voiceProvider || LEGACY_VOICE_PROVIDER;
         if (!isVoiceOfProvider(voiceProvider, patch.voice)) {
             throw new Error(`"${patch.voice}" is not a voice of this game's ${voiceProvider} voice set.`);
         }
@@ -1587,7 +1604,7 @@ function gameFromFirestore(id: string, data: any): Game {
         // Pre-setting games were played as strategists wearing personas — keep them that way.
         gameMode: data.gameMode ?? GAME_MODES.TACTICAL,
         gameMasterAiType: data.gameMasterAiType,
-        voiceProvider: data.voiceProvider || getDefaultVoiceProvider(), // Fallback to default for existing games
+        voiceProvider: data.voiceProvider || LEGACY_VOICE_PROVIDER, // games from before the field were cast from OpenAI ids
         gameMasterVoice: data.gameMasterVoice || getRandomVoiceForGender('male'), // Fallback for existing games
         gameMasterVoiceStyle: data.gameMasterVoiceStyle,
         gameMasterVoiceInstructions: data.gameMasterVoiceInstructions, // Legacy field
