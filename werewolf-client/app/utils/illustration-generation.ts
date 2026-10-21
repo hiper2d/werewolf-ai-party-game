@@ -15,7 +15,7 @@ import {addMessageToChatAndSaveToDb} from "@/app/api/game-actions";
 import {getUserTierAndApiKeys} from "@/app/utils/tier-utils";
 import {assertFreeSpendWithinLimit} from "@/app/api/user-actions";
 import {isFreeSpendLimitError} from "@/app/api/errors";
-import {API_KEY_CONSTANTS, IMAGE_MODEL_CONSTANTS, IMAGE_MODEL_PRICING} from "@/app/ai/ai-models";
+import {API_KEY_CONSTANTS, IMAGE_MODEL_CONSTANTS, IMAGE_MODEL_PRICING, IMAGE_THINKING_LEVEL} from "@/app/ai/ai-models";
 import {billImages} from "@/app/utils/avatar-generation";
 import {generateImage} from "@hiper2d/ai-agents/images";
 import {logger} from "@/app/utils/logger";
@@ -193,7 +193,7 @@ async function generateAndPostIllustration(
         }
     });
 
-    const image = await generateImage(apiKey, buildIllustrationPrompt(game, sceneDescription, portraitNames, timeOfDay), "3:2", {references, imageSize: '1K'});
+    const image = await generateImage(apiKey, buildIllustrationPrompt(game, sceneDescription, portraitNames, timeOfDay), "3:2", {references, imageSize: '1K', thinkingLevel: IMAGE_THINKING_LEVEL});
 
     const sharp = (await import('sharp')).default;
     const jpeg = await sharp(image.buffer).resize({width: 1024, withoutEnlargement: true}).jpeg({quality: 80}).toBuffer();

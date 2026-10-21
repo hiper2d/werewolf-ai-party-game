@@ -75,9 +75,17 @@ export interface ModelConfig extends LibModelConfig {
 // a concrete scene description for the image model. See
 // app/utils/avatar-generation.ts and app/utils/illustration-generation.ts.
 export const IMAGE_MODEL_CONSTANTS = {
-    AVATARS: LIB_IMAGE_MODELS.GEMINI_FLASH_IMAGE,
+    AVATARS: LIB_IMAGE_MODELS.GEMINI_NANO_BANANA,
     ILLUSTRATION_BRIEF: 'gemini-3.5-flash-lite',
 } as const;
+
+/**
+ * Nano Banana 2.1 thinks before it draws and bills the thought as text output. On the
+ * same 9-cell sheet `minimal` matched `medium` (the API default) in quality while
+ * drawing in 18s instead of 35s for $0.057 instead of $0.076 (live, 2026-10-20), so
+ * every pipeline draws at `minimal`. Raise per call if a pipeline ever needs it.
+ */
+export const IMAGE_THINKING_LEVEL = 'minimal' as const;
 
 /**
  * Story generation emits a whole game setup in one response — a character object per bot
@@ -113,7 +121,7 @@ export function configureStoryAgent(agent: AbstractAgent): void {
 // The image model's price is a library fact (see its image-catalog); the brief model is
 // a text model priced here because it is not in the LLM catalog.
 export const IMAGE_MODEL_PRICING = {
-    [IMAGE_MODEL_CONSTANTS.AVATARS]: LIB_IMAGE_PRICING[LIB_IMAGE_MODELS.GEMINI_FLASH_IMAGE],
+    [IMAGE_MODEL_CONSTANTS.AVATARS]: LIB_IMAGE_PRICING[LIB_IMAGE_MODELS.GEMINI_NANO_BANANA],
     [IMAGE_MODEL_CONSTANTS.ILLUSTRATION_BRIEF]: {
         inputPricePerM: 0.30,
         outputPricePerM: 2.50,

@@ -7,7 +7,7 @@ import {PRESET_SHEET_SIZE} from "@/app/utils/preset-avatars";
 import {getUserTierAndApiKeys} from "@/app/utils/tier-utils";
 import {recordSpend} from "@/app/api/cost-tracking";
 import {isInsufficientBalanceError} from "@/app/api/errors";
-import {API_KEY_CONSTANTS, IMAGE_MODEL_CONSTANTS} from "@/app/ai/ai-models";
+import {API_KEY_CONSTANTS, IMAGE_MODEL_CONSTANTS, IMAGE_THINKING_LEVEL} from "@/app/ai/ai-models";
 import {logger} from "@/app/utils/logger";
 import {sanitizeArtStyle} from "@/app/utils/art-style";
 
@@ -394,7 +394,7 @@ export async function drawIllustrationSet(
     // (bottom). Downscale to 1024 wide — plenty for a chat bubble.
     const scenePromise: Promise<{key: string; jpeg: Buffer}[]> = !opts.withScenes
         ? Promise.resolve([])
-        : generateImage(apiKey, buildScenePrompt(subject), "3:4")
+        : generateImage(apiKey, buildScenePrompt(subject), "3:4", {thinkingLevel: IMAGE_THINKING_LEVEL})
             .then(async image => {
                 ledger.spentUSD += image.costUSD;
                 const scenes = image.buffer;
@@ -424,7 +424,10 @@ export async function drawIllustrationSet(
         apiKey,
         buildPrompt(subject, cells, cols, rows, !!styleReference),
         "4:3",
-        styleReference ? {references: [{label: STYLE_REFERENCE_LABEL, jpeg: styleReference}]} : undefined,
+        {
+            thinkingLevel: IMAGE_THINKING_LEVEL,
+            ...(styleReference ? {references: [{label: STYLE_REFERENCE_LABEL, jpeg: styleReference}]} : {}),
+        },
     );
     ledger.spentUSD += grid.costUSD;
     const {slices, sheet} = await sliceSheet(sharp, grid.buffer, cells, realCount, cols, rows, {
