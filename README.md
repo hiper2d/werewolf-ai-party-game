@@ -29,14 +29,14 @@ Pick any model for the Game Master and for each individual bot. Twelve providers
 | **Anthropic** | Claude Fable 5.1, Claude 5.5 Opus, Claude 5.5 Sonnet, Claude 5.5 Haiku (`high`) |
 | **Google** | Gemini 4 Argon, Gemini 3.1 Pro Preview (`high`); Gemini 3.8 Flash (`medium`); Gemini 3.5 Flash Lite (`minimal`) |
 | **DeepSeek** | DeepSeek V4.1 Flash, DeepSeek V4 Pro (`low`) |
-| **Mistral** | Mistral Medium 3.5, Mistral 4 Small (`high`) |
+| **Mistral** | Mistral 4 Small (`high`) |
 | **xAI** | Grok 4.7 (`high`) |
 | **Moonshot AI** | Kimi K3 (`high`) |
 | **Z.AI** | GLM-5.3, GLM-5.3 Flash (`high`) |
 | **Qwen** | Qwen3.8 Max, Qwen3.8 Flash (1,024-token budget) |
 | **MiniMax** | MiniMax M3 |
 | **Meta** | Muse Wonder 1.0, Muse Spark 1.3 (`medium`) |
-| **Sakana** | Fugu Ultra, Fugu Max (`high`; both reason internally, but the API never returns the trace) |
+| **Sakana** | Fugu Max (`high`; reasons internally, but the API never returns the trace) |
 | **typesafe.ai** | Jev (System One) — not a chat model: a sub-second judge that routes the discussion, picking which bots reply to each message |
 
 **Reading the reasoning levels.** The value in parentheses after each model is its reasoning depth. Every provider names its levels differently, so the value shown is what we actually send, translated into that provider's own vocabulary — `high` on Claude is not the same depth as `high` on GLM. Every level is set explicitly: we never leave a model on the provider's default, because a default can move without notice. "1,024-token budget" means the provider's knob is a token cap rather than a named level. That applies to Qwen, which accepts named levels but treats them as a coarse alias for a budget — its lowest level is 4,096 tokens, four times the cap we set, and the two settings are mutually exclusive. MiniMax is the only model exposing no control at all.
@@ -47,7 +47,7 @@ The reasoning is stored in the database with every message, even though it isn't
 
 None of this is stateful on the provider's side: every one of those replays is something we store and send back, so nothing depends on a session living on their servers. Changing a bot's model mid-game is safe — the new model simply can't read the old one's trace, so the bot loses its reasoning and keeps playing.
 
-The free tier can use the cheaper models (per-model seat caps apply); the paid tier has the full list. **Temporarily** (since October 2026) Gemini 4 Argon and Claude 5.5 Sonnet are also open to the free tier at one bot per game, so the game can measure what a turn on them really costs; the usual price-based cap takes over once each has enough measured turns.
+The free tier can use the cheaper models (per-model seat caps apply); the paid tier has the full list. The paid tier runs on a prepaid balance topped up from the profile page by card, Link, Google Pay or crypto (USDC). **Temporarily** (since October 2026) Gemini 4 Argon and Claude 5.5 Sonnet are also open to the free tier at one bot per game, so the game can measure what a turn on them really costs; the usual price-based cap takes over once each has enough measured turns.
 
 ## Game List
 
@@ -65,7 +65,7 @@ Click **Create Game** and pick a theme — a spaceship, a submarine crew, a Jane
 
 <a href="images/preview-story-gm.png" target="_blank"><img src="images/preview-story-gm.png" width="800"></a>
 
-**Illustrations** (paid tier) draw the opening scene and a portrait sheet for the whole cast in the chosen art style. Every portrait comes from one drawn sheet. Below it, the **Cast** lists every player with model and play style.
+**Illustrations** draw the opening scene and a portrait sheet for the whole cast in the chosen art style, using Google's Gemini Nano Banana 2.1 image model. Every portrait comes from one drawn sheet; the sheet can be redrawn, a few times on the free tier and without limit on the paid tier. Below it, the **Cast** lists every player with model and play style.
 
 <a href="images/preview-illustrations-cast.jpg" target="_blank"><img src="images/preview-illustrations-cast.jpg" width="800"></a>
 
@@ -193,7 +193,7 @@ No AI frameworks — each vendor has its own agent built on their native SDK. A 
    - GitHub: [Developer Settings](https://github.com/settings/developers)
    - Google: [Cloud Console](https://console.cloud.google.com/apis/credentials)
 
-5. **AI API Keys**: Users provide their own keys via the profile page after signing in.
+5. **AI API Keys**: platform keys live in the Firestore doc `config/freeTierApiKeys` (seed them with `scripts/init-free-tier-keys.ts`); players never enter their own keys.
 
 6. **Stripe** (optional, for paid tier):
    - Create a [Stripe account](https://dashboard.stripe.com) and get your test API keys from **Developers > API keys** (use Test mode toggle)

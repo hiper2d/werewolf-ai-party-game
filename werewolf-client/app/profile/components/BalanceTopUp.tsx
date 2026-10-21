@@ -40,6 +40,10 @@ export default function BalanceTopUp() {
                     </button>
                 ))}
             </div>
+            <p className="mt-3 text-[12.5px] text-[var(--fg-3)] leading-[1.45]">
+                Cards, Link, Google Pay and crypto (USDC) are accepted at checkout. Cards issued in Russia
+                are declined by the card networks — pay with crypto instead.
+            </p>
             {error && (
                 <p className="mt-3 text-[13px] text-[var(--warn-fg)]">{error}</p>
             )}

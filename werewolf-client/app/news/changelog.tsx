@@ -13,6 +13,27 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        id: "crypto-payments", date: "Oct 2026", tags: ["Payments"],
+        title: "More ways to pay: crypto and Google Pay",
+        body: (<>Adding balance now offers more payment options, including <strong>crypto (USDC)</strong> and
+            <strong> Google Pay</strong>. If your card didn&apos;t go through before, give it another try.</>),
+        media: null,
+        links: [{label: "Add balance", href: "/profile"}],
+    },
+    {
+        id: "nano-banana-2-1", date: "Oct 2026", tags: ["Design", "Models"],
+        title: "Portraits and illustrations now drawn by Gemini Nano Banana 2.1",
+        body: (<>Every picture in the game — the cast portraits, the welcome and night scenes and the mid-day
+            illustrations — is now drawn by Google&apos;s <strong>Nano Banana 2.1</strong>, the new version of the
+            image model we used before. Faces are more consistent across a cast, the grid comes back cleaner,
+            and a portrait sheet draws in <strong>about half the time</strong>. It&apos;s also cheaper: a sheet costs
+            about 15% less and an illustration about half of what it did, which counts against your free-tier
+            budget and your balance alike. Existing games keep their pictures; new previews and rerolls use the
+            new model.</>),
+        media: null,
+        links: [{label: "Create a game", href: "/games"}],
+    },
+    {
         id: "gemini-4-argon", date: "Oct 2026", tags: ["Models"],
         title: "Gemini 4 Argon and Muse Wonder join the picker, and the free tier gets Argon and Sonnet 5.5",
         body: (<>Google&apos;s new flagship reasoning model, <strong>Gemini 4 Argon</strong>, is in the model
