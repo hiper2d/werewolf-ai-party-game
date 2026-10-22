@@ -66,7 +66,7 @@ export default function ModelSelectionDialog({
                 const apiKeyName = SupportedAiModels[option.model]?.apiKeyName;
                 return !(apiKeyName && blockedProviders?.[apiKeyName]);
             })
-            // Models too slow to be the Game Master (GAME_MASTER_BLOCKED_MODELS) are not offered
+            // Models too slow to be the Game Master (`excludedFromGmAndRandom` in the model config) are not offered
             // for the GM; the server rejects them too.
             .filter(option => botName !== GAME_MASTER || isAllowedAsGameMaster(option.model));
     }, [gameTier, usageCounts, currentModel, blockedProviders, botName]);

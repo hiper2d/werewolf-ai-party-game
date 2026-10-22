@@ -65,6 +65,15 @@ export interface ModelConfig extends LibModelConfig {
         available: boolean;
         maxBotsPerGame: number; // -1 means unlimited bots, 0 means not available, 1 means only 1 bot (GM or player) can use this model
     };
+    /**
+     * Never the Game Master and never drawn for RANDOM; still selectable as a
+     * bot by name. Two reasons, one flag: as GM a slow model fails the preview
+     * (the story pipeline runs inside one Vercel function) and the GM does not
+     * need to be the smartest model anyway; in the RANDOM pool it hands a
+     * stalled bot to the player least able to tell it from a dead game.
+     * See the block below `SupportedAiModels` for who and why.
+     */
+    excludedFromGmAndRandom?: boolean;
 }
 
 // Voice models (TTS/STT) live in @hiper2d/ai-agents: VOICE_MODEL_CONSTANTS / VOICE_MODEL_PRICING.
@@ -310,34 +319,53 @@ export function resolveModelId(modelId: string): string {
 }
 
 /**
- * Models that may play but may not be the Game Master. The GM writes the story at creation (a
- * casting call plus parallel character-sheet batches, 240s per call, all inside Vercel's 300s
- * function) and narrates every night and day while the player waits, so it has to be fast.
- * Rule (2026-10-07): the 15-character story pipeline took over 150s in the live suite —
- * Mistral Medium 3.5 277s (since removed), Grok 4.7 213s (medium effort), Qwen3.8 Max 198s,
- * MiniMax M3 169s, Qwen3.8 Flash 160s. Kimi K3 (146s) is the closest one still allowed. Re-measure with the
- * live story suite (app/ai/all-models.test.ts) when a model changes.
- * Both Qwen models are slow at story time only because Qwen runs our parallel requests one at a
- * time (Flash 2026-10-07: casting 14.5s, then 4 batches of ~20s work each finishing 20s apart,
- * reasoning already at its minimum 1,024-token budget); a single GM turn is ~15-20s.
- * Muse Spark 1.3 (catalog tag `slow`, effort pinned medium) is fine as a bot (prod 2026-10-12:
- * p50 10s, p90 16s) but its GM turns ran p90 109s: the dawn narrative took 115s and 135s against
- * the 60s request timeout, failing the night twice in a row. Added 2026-10-12.
+ * `excludedFromGmAndRandom` models: they may play, but only when a player picks them by name — never the
+ * Game Master, never drawn for RANDOM (see ModelConfig.excludedFromGmAndRandom). Every model
+ * here also carries a `slow` or `very-slow` tag in the library catalog, so the pickers say so.
+ *
+ * GAME MASTER: the GM writes the story at creation (a casting call plus parallel character-sheet
+ * batches, 240s per call, all inside Vercel's 300s function) and narrates every night and day
+ * while the player waits, so it has to be fast — and it does not have to be the smartest model
+ * in the game. Rule (2026-10-07): the 15-character story pipeline took
+ * over 150s in the live suite — Mistral Medium 3.5 277s (since removed), Grok 4.7 213s (medium
+ * effort), Qwen3.8 Max 198s, MiniMax M3 169s, Qwen3.8 Flash 160s. Kimi K3 (146s) is the closest
+ * one still allowed. Re-measure with the live story suite (app/ai/all-models.test.ts) when a
+ * model changes. Both Qwen models are slow at story time only because Qwen runs our parallel
+ * requests one at a time (Flash 2026-10-07: casting 14.5s, then 4 batches of ~20s work each
+ * finishing 20s apart, reasoning already at its minimum 1,024-token budget); a single GM turn
+ * is ~15-20s. Muse Spark 1.3 (catalog tag `slow`, effort pinned medium) is fine as a bot
+ * (prod 2026-10-12: p50 10s, p90 16s) but its GM turns ran p90 109s: the dawn narrative took
+ * 115s and 135s against the 60s request timeout, failing the night twice in a row. Added 2026-10-12.
+ *
+ * RANDOM (2026-10-21): bot turns hit the 60s timeout in a 16-player game at days
+ * 8-9, and the timeouts belonged to four models only — DeepSeek V4 Pro 7 of 79 calls (30-day
+ * p90 31s), MiniMax 5 of 55 (p90 22s, max 105s), Muse Spark 4 of 73 (p90 26s), Gemini 4 Argon
+ * 3 of 50 (p90 34s, max 207s) — while ~1,500 calls on the rest of the catalog had none (p90 7-15s).
+ * DeepSeek V4 Pro and Argon were added for that; the five story-slow models were already here.
  *
  * Checked on every NEW Game Master choice (create, preview, model change, retry override,
  * provider reassignment), not inside validateModelUsageForTier: that one also re-validates the
  * existing GM on every bot model change, which would lock games that already have one of these.
  */
-export const GAME_MASTER_BLOCKED_MODELS: ReadonlySet<string> = new Set([
+for (const modelId of [
     LLM_CONSTANTS.GROK,
     LLM_CONSTANTS.QWEN_MAX,
     LLM_CONSTANTS.MINIMAX,
     LLM_CONSTANTS.QWEN_FLASH,
     LLM_CONSTANTS.MUSE_SPARK,
-]);
+    LLM_CONSTANTS.DEEPSEEK_PRO,
+    LLM_CONSTANTS.GEMINI_ARGON,
+]) {
+    SupportedAiModels[modelId].excludedFromGmAndRandom = true;
+}
+
+/** True when the model may only play as a bot a player picked by name (ModelConfig.excludedFromGmAndRandom). */
+export function isExcludedFromGmAndRandom(modelId: string): boolean {
+    return SupportedAiModels[resolveModelId(modelId)]?.excludedFromGmAndRandom === true;
+}
 
 export function isAllowedAsGameMaster(modelId: string): boolean {
-    return !GAME_MASTER_BLOCKED_MODELS.has(resolveModelId(modelId));
+    return !isExcludedFromGmAndRandom(modelId);
 }
 
 /** Throws a player-readable error when `modelId` cannot be the Game Master. RANDOM passes (resolved later). */

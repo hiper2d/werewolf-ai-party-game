@@ -30,7 +30,7 @@ import {
 } from '@/app/api/user-actions';
 import { getVoiceConfig } from '@/app/ai/voice-config';
 import { LLM_CONSTANTS } from '@/app/ai/ai-models';
-import { getCandidateModelsForTier } from '@/app/ai/model-limit-utils';
+import { getCandidateModelsForTier, getRandomPoolForTier } from '@/app/ai/model-limit-utils';
 import { GamePreview, USER_TIERS } from '@/app/api/game-models';
 
 // ---------------------------------------------------------------------------
@@ -308,7 +308,7 @@ describe('previewGame model allocation — fair distribution (paid tier)', () =>
 describe('previewGame model allocation — RANDOM expansion (paid tier)', () => {
     it('expands a RANDOM entry in the array to the tier candidate pool', async () => {
         mockTier(USER_TIERS.PAID);
-        const pool = new Set(getCandidateModelsForTier(USER_TIERS.PAID));
+        const pool = new Set(getRandomPoolForTier(USER_TIERS.PAID));
 
         const result = await previewGame(
             makePreview(6, { playersAiType: [LLM_CONSTANTS.RANDOM] })
@@ -322,7 +322,7 @@ describe('previewGame model allocation — RANDOM expansion (paid tier)', () => 
 
     it('expands the legacy RANDOM string (non-array playersAiType)', async () => {
         mockTier(USER_TIERS.PAID);
-        const pool = new Set(getCandidateModelsForTier(USER_TIERS.PAID));
+        const pool = new Set(getRandomPoolForTier(USER_TIERS.PAID));
 
         const result = await previewGame(
             makePreview(6, { playersAiType: LLM_CONSTANTS.RANDOM })
@@ -335,13 +335,25 @@ describe('previewGame model allocation — RANDOM expansion (paid tier)', () => 
 
     it('treats an empty selection array as RANDOM', async () => {
         mockTier(USER_TIERS.PAID);
-        const pool = new Set(getCandidateModelsForTier(USER_TIERS.PAID));
+        const pool = new Set(getRandomPoolForTier(USER_TIERS.PAID));
 
         const result = await previewGame(makePreview(6, { playersAiType: [] }));
 
         expect(result.bots).toHaveLength(5);
         for (const bot of result.bots) {
             expect(pool.has(bot.playerAiType)).toBe(true);
+        }
+    });
+
+    it('RANDOM never draws a model excluded from GM and Random, but a player may still pick one by name', async () => {
+        mockTier(USER_TIERS.PAID);
+        expect(getRandomPoolForTier(USER_TIERS.PAID)).not.toContain(LLM_CONSTANTS.DEEPSEEK_PRO);
+
+        const picked = await previewGame(makePreview(6, { playersAiType: [LLM_CONSTANTS.DEEPSEEK_PRO] }));
+
+        expect(picked.bots).toHaveLength(5);
+        for (const bot of picked.bots) {
+            expect(bot.playerAiType).toBe(LLM_CONSTANTS.DEEPSEEK_PRO);
         }
     });
 });

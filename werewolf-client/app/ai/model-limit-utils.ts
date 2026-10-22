@@ -1,4 +1,4 @@
-import {LLM_CONSTANTS, SupportedAiModels, isAllowedAsGameMaster, resolveModelId} from '@/app/ai/ai-models';
+import {LLM_CONSTANTS, SupportedAiModels, isAllowedAsGameMaster, isExcludedFromGmAndRandom, resolveModelId} from '@/app/ai/ai-models';
 import {UserTier, USER_TIERS} from '@/app/api/game-models';
 
 export const FREE_TIER_UNLIMITED = Number.POSITIVE_INFINITY;
@@ -78,9 +78,17 @@ export function consumeModelUsage(
     usageCounts[resolved] = used + 1;
 }
 
-/** Models the tier can use that are also allowed to be the Game Master (see GAME_MASTER_BLOCKED_MODELS). */
+/** Models the tier can use that are also allowed to be the Game Master (not `excludedFromGmAndRandom`). */
 export function getGameMasterCandidateModelsForTier(tier: UserTier): string[] {
     return getCandidateModelsForTier(tier).filter(isAllowedAsGameMaster);
+}
+
+/**
+ * What RANDOM stands for: the tier's candidates minus the `excludedFromGmAndRandom` models. A player who
+ * picks a slow model by name gets it; a player who picks Random gets only models that answer.
+ */
+export function getRandomPoolForTier(tier: UserTier): string[] {
+    return getCandidateModelsForTier(tier).filter(model => !isExcludedFromGmAndRandom(model));
 }
 
 export function getCandidateModelsForTier(tier: UserTier): string[] {

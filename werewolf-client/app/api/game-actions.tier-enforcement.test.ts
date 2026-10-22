@@ -317,7 +317,7 @@ describe('previewGame tier enforcement', () => {
             );
         });
 
-        it('rejects when a capped model (DeepSeek Pro, max 3) is exhausted across GM + bots', async () => {
+        it('rejects when a capped model (GLM-5.3, max 3) is exhausted across GM + bots', async () => {
             mockTier(USER_TIERS.FREE);
             setupDbForPreview(0);
             stubAgentReturning(3);
@@ -326,8 +326,8 @@ describe('previewGame tier enforcement', () => {
                 previewGame(
                     makePreview({
                         playerCount: 4, // 3 bots; GM + 3 bots = 4 > cap of 3
-                        gameMasterAiType: LLM_CONSTANTS.DEEPSEEK_PRO,
-                        playersAiType: [LLM_CONSTANTS.DEEPSEEK_PRO],
+                        gameMasterAiType: LLM_CONSTANTS.GLM,
+                        playersAiType: [LLM_CONSTANTS.GLM],
                     })
                 )
             ).rejects.toThrow(
@@ -335,7 +335,7 @@ describe('previewGame tier enforcement', () => {
             );
         });
 
-        it('allows a capped model exactly up to its per-game limit (GM + 2 bots = 3 DeepSeek Pro uses)', async () => {
+        it('allows a capped model exactly up to its per-game limit (GM + 2 bots = 3 GLM-5.3 uses)', async () => {
             mockTier(USER_TIERS.FREE);
             setupDbForPreview(0);
             stubAgentReturning(2);
@@ -343,16 +343,16 @@ describe('previewGame tier enforcement', () => {
             const result = await previewGame(
                 makePreview({
                     playerCount: 3, // 2 bots
-                    gameMasterAiType: LLM_CONSTANTS.DEEPSEEK_PRO,
-                    playersAiType: [LLM_CONSTANTS.DEEPSEEK_PRO],
+                    gameMasterAiType: LLM_CONSTANTS.GLM,
+                    playersAiType: [LLM_CONSTANTS.GLM],
                 })
             );
 
-            expect(result.gameMasterAiType).toBe(LLM_CONSTANTS.DEEPSEEK_PRO);
+            expect(result.gameMasterAiType).toBe(LLM_CONSTANTS.GLM);
             expect(result.bots).toHaveLength(2);
             expect(result.bots.map(b => b.playerAiType)).toEqual([
-                LLM_CONSTANTS.DEEPSEEK_PRO,
-                LLM_CONSTANTS.DEEPSEEK_PRO,
+                LLM_CONSTANTS.GLM,
+                LLM_CONSTANTS.GLM,
             ]);
         });
 

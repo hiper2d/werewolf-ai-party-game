@@ -10,15 +10,16 @@ import {
     estimateTurnCostUSD,
     getTurnCost,
     resolveModelId,
-    GAME_MASTER_BLOCKED_MODELS,
     assertAllowedAsGameMaster,
     isAllowedAsGameMaster,
+    isExcludedFromGmAndRandom,
 } from './ai-models';
 import { USER_TIERS } from '@/app/api/game-models';
 import {
     consumeModelUsage,
     getCandidateModelsForTier,
     getGameMasterCandidateModelsForTier,
+    getRandomPoolForTier,
     getModelPickerOptions,
     validateModelUsageForTier,
     type ModelPickerOption,
@@ -313,12 +314,37 @@ describe('Kimi K3 free-tier policy', () => {
     });
 });
 
-describe('Game Master speed rule', () => {
-    it('pins the blocked set: story pipeline over 150s in the 2026-10-07 live suite, plus Muse Spark (night narration past the 60s timeout in prod, 2026-10-12)', () => {
-        expect([...GAME_MASTER_BLOCKED_MODELS].sort()).toEqual([
+describe('excludedFromGmAndRandom models (Game Master speed rule + RANDOM pool)', () => {
+    const excludedFromGmAndRandom = () => Object.entries(SupportedAiModels).filter(([, c]) => c.excludedFromGmAndRandom).map(([id]) => id).sort();
+
+    it('pins the set: story pipeline over 150s (2026-10-07), Muse Spark night narration past 60s (2026-10-12), DeepSeek V4 Pro and Argon bot-turn timeouts (2026-10-21)', () => {
+        expect(excludedFromGmAndRandom()).toEqual([
             LLM_CONSTANTS.GROK, LLM_CONSTANTS.MINIMAX, LLM_CONSTANTS.QWEN_FLASH, LLM_CONSTANTS.QWEN_MAX, LLM_CONSTANTS.MUSE_SPARK,
+            LLM_CONSTANTS.DEEPSEEK_PRO, LLM_CONSTANTS.GEMINI_ARGON,
         ].sort());
-        for (const id of GAME_MASTER_BLOCKED_MODELS) expect(SupportedAiModels[id]).toBeDefined();
+        expect(isExcludedFromGmAndRandom(LLM_CONSTANTS.DEEPSEEK_PRO)).toBe(true);
+        expect(isExcludedFromGmAndRandom(LLM_CONSTANTS.DEEPSEEK_FLASH)).toBe(false);
+    });
+
+    it('the RANDOM pool is the tier candidates minus the excludedFromGmAndRandom models, and is never empty', () => {
+        for (const tier of [USER_TIERS.FREE, USER_TIERS.PAID]) {
+            const pool = getRandomPoolForTier(tier);
+            expect(pool.length).toBeGreaterThan(0);
+            expect(pool).toEqual(getCandidateModelsForTier(tier).filter(m => !isExcludedFromGmAndRandom(m)));
+            for (const id of excludedFromGmAndRandom()) expect(pool).not.toContain(id);
+        }
+        // Still selectable by name: the candidate list the pickers use keeps them.
+        expect(getCandidateModelsForTier(USER_TIERS.PAID)).toContain(LLM_CONSTANTS.DEEPSEEK_PRO);
+        expect(getCandidateModelsForTier(USER_TIERS.FREE)).toContain(LLM_CONSTANTS.DEEPSEEK_PRO);
+    });
+
+    it('every excluded model is tagged slow in the library catalog, so the pickers say why', () => {
+        for (const id of excludedFromGmAndRandom()) {
+            const tags = SupportedAiModels[id].tags ?? [];
+            expect({ id, tags }).toEqual(expect.objectContaining({
+                tags: expect.arrayContaining([expect.stringMatching(/^(slow|very-slow|extremely-slow)$/)]),
+            }));
+        }
     });
 
     it('resolves retired ids before checking', () => {
@@ -334,7 +360,7 @@ describe('Game Master speed rule', () => {
         for (const tier of [USER_TIERS.FREE, USER_TIERS.PAID]) {
             const gm = getGameMasterCandidateModelsForTier(tier);
             expect(gm.length).toBeGreaterThan(0);
-            expect(gm).toEqual(getCandidateModelsForTier(tier).filter(m => !GAME_MASTER_BLOCKED_MODELS.has(m)));
+            expect(gm).toEqual(getCandidateModelsForTier(tier).filter(m => !isExcludedFromGmAndRandom(m)));
         }
     });
 

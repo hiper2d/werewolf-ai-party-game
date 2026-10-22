@@ -55,6 +55,7 @@ import {LLM_CONSTANTS, assertAllowedAsGameMaster, configureStoryAgent, isAllowed
 import {
     consumeModelUsage,
     getCandidateModelsForTier,
+    getRandomPoolForTier,
     getPerGameModelLimit,
     hasCapacity,
     validateModelUsageForTier
@@ -365,7 +366,7 @@ export async function previewGame(gamePreview: GamePreview, progressId?: string)
         const selectedModels = Array.isArray(gamePreview.playersAiType) && gamePreview.playersAiType.length > 0
             ? gamePreview.playersAiType.filter(m => m !== LLM_CONSTANTS.RANDOM)
             : [];
-        // Only models fast enough to be the Game Master (GAME_MASTER_BLOCKED_MODELS).
+        // Only models fast enough to be the Game Master (not `excludedFromGmAndRandom`).
         const pool = selectedModels.length > 0
             ? selectedModels.filter(model => isAllowedAsGameMaster(model) && hasCapacity(model, tier, usageCounts))
             : getCandidateModelsForTier(tier).filter(model => isAllowedAsGameMaster(model) && hasCapacity(model, tier, usageCounts));
@@ -478,7 +479,8 @@ export async function previewGame(gamePreview: GamePreview, progressId?: string)
             usage: tokenUsage,
         });
     }
-    const defaultPlayerCandidates = getCandidateModelsForTier(tier);
+    // RANDOM never draws a `excludedFromGmAndRandom` model; a model picked by name is taken as is.
+    const defaultPlayerCandidates = getRandomPoolForTier(tier);
 
     // Initial setup for model distribution
     let modelDeck: string[] = [];
