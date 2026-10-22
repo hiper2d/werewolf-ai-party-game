@@ -41,6 +41,24 @@ export function isInsufficientBalanceError(text: string | undefined | null): boo
 }
 
 /**
+ * The refusal every paid-tier balance gate throws. One wording so the player always
+ * reads the same two exits — top up, or go back to the free tier — whichever action
+ * hit the wall. The "Insufficient balance" prefix is what `isInsufficientBalanceError`
+ * and the UI key on; `what` names the thing that was not charged ("the game",
+ * "the next reply", "the illustrations").
+ *
+ * Both exits are named on purpose: the profile page's Upgrade button switches the
+ * tier without a payment, so a brand-new account can be on the paid tier with an
+ * empty balance (seen 2026-10-22, 70 seconds after signup). Told only to add funds,
+ * that player never learns that free play is one click away on the same page.
+ */
+export function insufficientBalanceMessage(what: string): string {
+    return `Insufficient balance: your prepaid balance can't cover ${what}, so nothing was charged. `
+        + 'Add funds on your profile page, or switch to the Free tier there to keep playing on '
+        + "the platform's keys within the free caps.";
+}
+
+/**
  * True when the AI provider refused the call because the PLATFORM's account with
  * that provider is out of money — OpenAI "You have no credits remaining" /
  * insufficient_quota, Anthropic "credit balance is too low", DeepSeek / xAI

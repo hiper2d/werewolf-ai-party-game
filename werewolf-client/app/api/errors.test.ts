@@ -1,4 +1,4 @@
-import { isInsufficientBalanceError, isModelRefusalError, isProviderBudgetDepletedError, isProviderBusyError, FreeSpendLimitError, freeSpendLimitMessage, freeSpendLimitScope, freeSpendLimitWindow, isFreeSpendLimitError, modelRefusalReason, refusalOf } from './errors';
+import { insufficientBalanceMessage, isInsufficientBalanceError, isModelRefusalError, isProviderBudgetDepletedError, isProviderBusyError, FreeSpendLimitError, freeSpendLimitMessage, freeSpendLimitScope, freeSpendLimitWindow, isFreeSpendLimitError, modelRefusalReason, refusalOf } from './errors';
 import { BotResponseError, ModelRefusalError } from '@hiper2d/ai-agents';
 
 describe('isProviderBudgetDepletedError', () => {
@@ -68,8 +68,21 @@ describe('isProviderBusyError', () => {
 
 describe('isInsufficientBalanceError', () => {
     it('matches the shared prepaid-balance refusal wording from every paid call site', () => {
+        expect(isInsufficientBalanceError(insufficientBalanceMessage('a new game'))).toBe(true);
+        expect(isInsufficientBalanceError(`Error: ${insufficientBalanceMessage('the illustrations')}\n    at commitUsageAtomically`)).toBe(true);
+        // Error states written before the wording changed (2026-10-22) still match.
         expect(isInsufficientBalanceError('Insufficient balance. Please add funds on your profile page to continue playing.')).toBe(true);
-        expect(isInsufficientBalanceError('Error: Insufficient balance. Please add funds on your profile page to draw illustrations.\n    at commitUsageAtomically')).toBe(true);
+    });
+
+    it('names both exits: topping up and switching back to the free tier', () => {
+        const text = insufficientBalanceMessage('this reply');
+        expect(text).toMatch(/^Insufficient balance/);
+        expect(text).toContain("can't cover this reply");
+        expect(text).toContain('Add funds on your profile page');
+        expect(text).toContain('switch to the Free tier');
+        // Never mistaken for the free-tier caps or the platform's own provider budget.
+        expect(isFreeSpendLimitError(text)).toBe(false);
+        expect(isProviderBudgetDepletedError(text)).toBe(false);
     });
 
     it('ignores provider and parsing failures, and empty input', () => {

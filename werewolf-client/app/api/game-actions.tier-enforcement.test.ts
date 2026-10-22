@@ -403,7 +403,7 @@ describe('previewGame tier enforcement', () => {
             (getUserBalance as jest.Mock).mockResolvedValue(0);
 
             await expect(previewGame(makePreview())).rejects.toThrow(
-                'Insufficient balance. Please add funds on your profile page before starting a game.'
+                /Insufficient balance.*switch to the Free tier/
             );
             expect(AgentFactory.createAgent).not.toHaveBeenCalled();
             expect(recordSpend).not.toHaveBeenCalled();
@@ -646,12 +646,32 @@ describe('previewGameAction', () => {
         const result = await previewGameAction(makePreview());
 
         expect(result).toEqual({ ok: false, error: expect.stringContaining('Insufficient balance') });
+        // A player-side wall is the gate working, so it is a warn, not an error alert.
         const { logger } = jest.requireMock('@/app/utils/logger');
-        expect(logger.error).toHaveBeenCalledWith(
+        expect(logger.warn).toHaveBeenCalledWith(
             expect.stringContaining('Insufficient balance'),
             expect.objectContaining({ function: 'previewGameAction' })
         );
+        expect(logger.error).not.toHaveBeenCalledWith(
+            expect.stringContaining('Insufficient balance'),
+            expect.anything()
+        );
         expect(logger.flush).toHaveBeenCalled();
+    });
+
+    it('still logs a model failure at error level', async () => {
+        mockTier(USER_TIERS.PAID);
+        stubAgentReturning(3);
+        (recordSpend as jest.Mock).mockRejectedValueOnce(new Error('Failed to get response from DeepSeek API: Empty or undefined response'));
+
+        const result = await previewGameAction(makePreview());
+
+        expect(result).toEqual({ ok: false, error: expect.stringContaining('DeepSeek') });
+        const { logger } = jest.requireMock('@/app/utils/logger');
+        expect(logger.error).toHaveBeenCalledWith(
+            expect.stringContaining('DeepSeek'),
+            expect.objectContaining({ function: 'previewGameAction' })
+        );
     });
 
     it('wraps a successful preview and still flushes the logger', async () => {

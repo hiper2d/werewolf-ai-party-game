@@ -1,7 +1,7 @@
 'use client';
 
 import React, {useEffect, useMemo, useRef, useState} from 'react';
-import { isFreeSpendLimitError, isProviderBudgetDepletedError } from '@/app/api/errors';
+import { isFreeSpendLimitError, isInsufficientBalanceError, isProviderBudgetDepletedError } from '@/app/api/errors';
 import SpendLimitModal from '@/app/components/SpendLimitModal';
 import {useRouter} from 'next/navigation';
 import {useSession} from 'next-auth/react';
@@ -611,13 +611,15 @@ export default function CreateNewGamePage() {
             // casting the lobby)"); keep that tail on whatever friendly text follows.
             const stageTail = /\(while [^)]+\)\s*$/.exec(err.message)?.[0];
 
-            if (isFreeSpendLimitError(err.message)) {
-                // The free-tier spend cap refusal is already player-worded (and names the
-                // profile page); the generic "API" branches below must not overwrite it.
+            if (isFreeSpendLimitError(err.message) || isInsufficientBalanceError(err.message)) {
+                // The free-tier spend cap and the empty-prepaid-balance refusals are already
+                // player-worded (and name the profile page); the generic "API" branches
+                // below must not overwrite them.
                 userFriendlyError = err.message;
                 // Announce it up front too: on this page the inline banner sits below the
                 // fold after a long form, and a player who just waited on a preview should
-                // not have to hunt for why nothing happened.
+                // not have to hunt for why nothing happened. For the balance case the
+                // popup is also where the two exits (add funds / switch to Free) are buttons.
                 setSpendLimitNotice(err.message);
             } else if (err.message.includes('failed to produce a valid response')) {
                 userFriendlyError = `The Game Master model failed to produce a valid response — the output was malformed or cut off. This happens occasionally; generate the preview again, or pick a different Game Master model.`;
@@ -1008,15 +1010,17 @@ export default function CreateNewGamePage() {
 
             {error && (() => {
                 // Free-tier limits (the $/day, $/month spend caps and the games-per-day cap)
-                // are a pause, not a failure: neutral tone, and the server's own wording.
-                const freeLimit = isFreeSpendLimitError(error) || /^Free tier limit reached/i.test(error);
+                // and an empty prepaid balance are a pause, not a failure: neutral tone,
+                // and the server's own wording, which names both ways out.
+                const noBalance = isInsufficientBalanceError(error);
+                const freeLimit = noBalance || isFreeSpendLimitError(error) || /^Free tier limit reached/i.test(error);
                 return (
                     <div className={`p-4 border rounded-[var(--radius-lg)] ${freeLimit ? 'bg-[var(--warn-soft)] border-[var(--warn-line)]' : 'bg-[oklch(70%_0.13_25_/_0.08)] border-[oklch(70%_0.13_25_/_0.3)]'}`}>
                         <div className="flex items-start gap-2">
                             <span className={`${freeLimit ? 'text-[var(--warn-fg)]' : 'text-[var(--danger)]'} text-lg flex-none`}>&#9888;</span>
                             <div>
                                 <h3 className={`${freeLimit ? 'text-[var(--warn-fg)]' : 'text-[var(--danger)]'} font-semibold text-[14px] mb-1`}>
-                                    {freeLimit ? 'Free tier limit reached' : 'Game Preview Generation Failed'}
+                                    {noBalance ? 'Your prepaid balance has run out' : freeLimit ? 'Free tier limit reached' : 'Game Preview Generation Failed'}
                                 </h3>
                                 <p className="text-[var(--fg-1)] text-[13px]">{error}</p>
                             </div>

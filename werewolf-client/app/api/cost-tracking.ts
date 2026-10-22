@@ -1,4 +1,5 @@
 import {db} from "@/firebase/server";
+import {insufficientBalanceMessage} from "@/app/api/errors";
 import {Game, TokenUsage, UserTier, USER_TIERS} from "@/app/api/game-models";
 import {SupportedAiModels, resolveModelId} from "@/app/ai/ai-models";
 import {PAID_TIER_MARKUP} from "@/app/config/credit-packages";
@@ -233,7 +234,7 @@ export async function recordSpend(input: RecordSpendInput, timestamp: number = D
                 const chargedAmount = round6(costUSD * (1 + PAID_TIER_MARKUP));
                 const balance = Number(userData.balance) || 0;
                 if (balance < chargedAmount) {
-                    throw new Error('Insufficient balance. Please add funds on your profile page to continue playing.');
+                    throw new Error(insufficientBalanceMessage('this reply'));
                 }
                 userUpdate.balance = round6(balance - chargedAmount);
                 recordedAmount = chargedAmount;

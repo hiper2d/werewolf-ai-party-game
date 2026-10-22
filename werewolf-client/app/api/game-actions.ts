@@ -1,6 +1,7 @@
 'use server'
 
 import {db} from "@/firebase/server";
+import {insufficientBalanceMessage, isFreeSpendLimitError, isInsufficientBalanceError} from "@/app/api/errors";
 import {firestore} from "firebase-admin";
 import {
     Bot,
@@ -260,7 +261,10 @@ export async function previewGameAction(gamePreview: GamePreview, progressId?: s
         return { ok: true, preview };
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        logger.error(`Preview generation failed: ${message}`, {
+        // A player-side wall (empty prepaid balance, free-tier cap) is the gate doing its
+        // job, not a failure: it logs at warn so the error alerts stay for real faults.
+        const playerWall = isInsufficientBalanceError(message) || isFreeSpendLimitError(message);
+        logger[playerWall ? 'warn' : 'error'](`Preview generation ${playerWall ? 'refused' : 'failed'}: ${message}`, {
             function: 'previewGameAction',
             gameMasterAiType: gamePreview.gameMasterAiType,
             theme: gamePreview.theme,
@@ -300,7 +304,7 @@ export async function previewGame(gamePreview: GamePreview, progressId?: string)
     if (tier === USER_TIERS.PAID) {
         const balance = await getUserBalance(session.user.email);
         if (balance <= 0) {
-            throw new Error('Insufficient balance. Please add funds on your profile page before starting a game.');
+            throw new Error(insufficientBalanceMessage('a new game'));
         }
     }
 

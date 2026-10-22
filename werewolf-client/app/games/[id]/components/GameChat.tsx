@@ -539,15 +539,16 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
     // carries the same explanation after this is dismissed.
     const [spendLimitNotice, setSpendLimitNotice] = useState<string | undefined>(undefined);
     const dismissedSpendNoticeRef = useRef<string | undefined>(undefined);
-    // Open the popup whenever the game stops on a spend-cap refusal. The message can
-    // arrive on `error` or wrapped inside `details`, the same two places the persistent
-    // banner below looks. Clearing the error resets the dismissal, so tomorrow's refusal
-    // is announced again rather than silently suppressed.
+    // Open the popup whenever the game stops on a spend-cap refusal or an empty prepaid
+    // balance. The message can arrive on `error` or wrapped inside `details`, the same
+    // two places the persistent banner below looks. Clearing the error resets the
+    // dismissal, so tomorrow's refusal is announced again rather than silently suppressed.
     useEffect(() => {
         const err = game.errorState;
-        const text = isFreeSpendLimitError(err?.error)
+        const isWall = (t: string | undefined) => isFreeSpendLimitError(t) || isInsufficientBalanceError(t);
+        const text = isWall(err?.error)
             ? err?.error
-            : isFreeSpendLimitError(err?.details) ? err?.details : undefined;
+            : isWall(err?.details) ? err?.details : undefined;
         if (!text) {
             dismissedSpendNoticeRef.current = undefined;
             return;
@@ -2302,7 +2303,7 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                                         </div>
                                         <div className="text-[12px] mt-1 text-[var(--fg-1)] break-words">
                                             Every AI turn is paid from your prepaid balance, and it can&apos;t cover
-                                            {displayWho ? ` ${displayWho}'s next reply` : ' the next reply'}. Retrying or switching the model won&apos;t help — add funds on your profile page, then come back and press Retry to pick up where the game left off.
+                                            {displayWho ? ` ${displayWho}'s next reply` : ' the next reply'}. Retrying or switching the model won&apos;t help. On your profile page you can add funds, or switch to the Free tier and keep playing on the platform&apos;s keys within the free caps; then come back and press Retry to pick up where the game left off.
                                         </div>
                                     </div>
                                     <div className="flex-shrink-0 flex flex-col gap-1.5">

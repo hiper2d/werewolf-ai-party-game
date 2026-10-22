@@ -1,6 +1,7 @@
 'use server'
 
 import {auth} from "@/auth";
+import {insufficientBalanceMessage} from "@/app/api/errors";
 import {AvatarGenerationResult, ReframeResult, reframeGameAvatar, runAvatarGeneration, runAvatarRegeneration, selectAvatarVariantFor} from "@/app/utils/avatar-generation";
 import {AvatarFraming, FREE_TIER_AVATAR_REGENS, ReframeTarget, USER_TIERS} from "@/app/api/game-models";
 import {assertFreeSpendWithinLimit, getUserBalance, getUserTier} from "@/app/api/user-actions";
@@ -51,7 +52,7 @@ export async function regenerateGameAvatars(gameId: string): Promise<AvatarGener
     if (tier === USER_TIERS.PAID) {
         const balance = await getUserBalance(session.user.email);
         if (balance <= 0) {
-            throw new Error('Insufficient balance. Please add funds on your profile page to reroll portraits.');
+            throw new Error(insufficientBalanceMessage('a new portrait sheet'));
         }
     }
     await assertFreeSpendWithinLimit(session.user.email);

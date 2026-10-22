@@ -2,6 +2,7 @@
 
 import {after} from "next/server";
 import {auth} from "@/auth";
+import {insufficientBalanceMessage} from "@/app/api/errors";
 import {AvatarDraftSpec, AvatarDraftState, AvatarFraming, ReframeTarget, USER_TIERS} from "@/app/api/game-models";
 import {assertFreeSpendWithinLimit, getUserBalance, getUserTier} from "@/app/api/user-actions";
 import {screenArtStyle} from "@/app/api/jev-screen";
@@ -35,7 +36,7 @@ export async function generateDraftIllustrations(spec: AvatarDraftSpec): Promise
     }
     const balance = await getUserBalance(userEmail);
     if (balance <= 0) {
-        throw new Error('Insufficient balance. Please add funds on your profile page to draw illustrations.');
+        throw new Error(insufficientBalanceMessage('the illustrations'));
     }
     await assertFreeSpendWithinLimit(userEmail);
 

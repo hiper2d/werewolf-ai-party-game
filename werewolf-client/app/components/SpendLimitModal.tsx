@@ -2,14 +2,18 @@
 
 import React, {useEffect} from 'react';
 import Link from 'next/link';
-import {freeSpendLimitScope, freeSpendLimitWindow} from '@/app/api/errors';
+import {freeSpendLimitScope, freeSpendLimitWindow, isInsufficientBalanceError} from '@/app/api/errors';
 
 /**
- * The popup a player sees when a free-tier ceiling refuses a call. Two variants:
+ * The popup a player sees when a spend gate refuses a call. Three variants:
  *
  *   account   an allowance is used up (their own daily/monthly cap, or one of the device
  *             ceilings - see below for why those are not distinguished here)
  *   global    the whole platform's free pool for today is gone; nothing to do with them
+ *   balance   a paid-tier account whose prepaid balance can't cover the call. Two exits,
+ *             both on the profile page: add funds, or switch back to the Free tier. The
+ *             second one matters because the Upgrade button flips the tier without a
+ *             payment, so a new account can land here a minute after signing up.
  *
  * The device ceilings deliberately render as an ordinary daily limit. Copy that named the
  * browser would tell a farmer exactly which axis to change; see the note in
@@ -35,7 +39,7 @@ function resetLabel(window: 'day' | 'month'): string {
 }
 
 export default function SpendLimitModal({message, onClose}: SpendLimitModalProps) {
-    const scope = freeSpendLimitScope(message);
+    const scope = freeSpendLimitScope(message) ?? (isInsufficientBalanceError(message) ? 'balance' : undefined);
     const window = freeSpendLimitWindow(message) ?? 'day';
 
     useEffect(() => {
@@ -50,12 +54,22 @@ export default function SpendLimitModal({message, onClose}: SpendLimitModalProps
         return null;
     }
 
-    const content = {
+    type Content = { title: string; body: string; aside: string; cta: string; ctaHref: string; alt?: { label: string; href: string } };
+    const contents: Record<'global' | 'account' | 'balance', Content> = {
+        balance: {
+            title: 'Your prepaid balance has run out',
+            body: 'On the Paid tier every AI call is paid from your prepaid balance, and it can\'t cover this one. Nothing was charged and nothing was lost.',
+            aside: 'Add funds to keep going on the Paid tier, or switch to the Free tier to keep playing on the platform\'s keys within the free caps. Both are on your profile page.',
+            cta: 'Add funds',
+            ctaHref: '/profile#add-balance',
+            alt: { label: 'Switch to Free', href: '/profile#tier' },
+        },
         global: {
             title: 'Free play is paused for today',
             body: "Everyone on the free tier shares a daily pool of AI, and today's pool is spent. This is not about your account - you have allowance left.",
             aside: `Free play resumes ${resetLabel('day')} (your local time), at midnight UTC.`,
             cta: 'Add funds to keep playing now',
+            ctaHref: '/profile',
         },
         account: {
             title: window === 'day'
@@ -64,8 +78,10 @@ export default function SpendLimitModal({message, onClose}: SpendLimitModalProps
             body: 'The free tier includes a daily and a monthly amount of AI on the platform\'s keys. The game is paused, not broken - nothing was charged and nothing was lost.',
             aside: `It resets ${resetLabel(window)} (your local time), ${window === 'day' ? 'at midnight UTC' : 'on the 1st at midnight UTC'}.`,
             cta: 'Add funds',
+            ctaHref: '/profile',
         },
-    }[scope];
+    };
+    const content = contents[scope];
 
     return (
         <div
@@ -98,11 +114,19 @@ export default function SpendLimitModal({message, onClose}: SpendLimitModalProps
 
                 <div className="flex items-center gap-2 flex-wrap">
                     <Link
-                        href="/profile"
+                        href={content.ctaHref}
                         className="inline-flex items-center justify-center gap-2 flex-1 min-w-[160px] font-semibold text-[14px] px-5 py-[11px] rounded-[var(--radius-md)] bg-[var(--accent)] text-[var(--accent-fg)] border border-transparent shadow-[var(--shadow-1)] hover:bg-[var(--accent-strong)] transition-all duration-[120ms]"
                     >
                         {content.cta}
                     </Link>
+                    {content.alt && (
+                        <Link
+                            href={content.alt.href}
+                            className="inline-flex items-center justify-center font-semibold text-[14px] px-5 py-[11px] rounded-[var(--radius-md)] bg-transparent text-[var(--fg-0)] border border-[var(--line-2)] hover:bg-[var(--bg-2)] transition-all duration-[120ms]"
+                        >
+                            {content.alt.label}
+                        </Link>
+                    )}
                     <button
                         type="button"
                         onClick={onClose}
