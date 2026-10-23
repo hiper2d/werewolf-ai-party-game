@@ -31,7 +31,7 @@ Pick any model for the Game Master and for each individual bot. Twelve providers
 | **DeepSeek** | DeepSeek V4.1 Flash, DeepSeek V4 Pro (`low`) |
 | **Mistral** | Mistral 4 Small (`high`) |
 | **xAI** | Grok 4.7 (`high`) |
-| **Moonshot AI** | Kimi K3 (`high`) |
+| **Moonshot AI** | Kimi K3.1 Pro, Kimi K3.1 Pro Highspeed (`high`; the same model served about twice as fast at twice the price) |
 | **Z.AI** | GLM-5.3, GLM-5.3 Flash (`high`) |
 | **Qwen** | Qwen3.8 Max, Qwen3.8 Flash (1,024-token budget) |
 | **MiniMax** | MiniMax M3 |
@@ -47,7 +47,7 @@ The reasoning is stored in the database with every message, even though it isn't
 
 None of this is stateful on the provider's side: every one of those replays is something we store and send back, so nothing depends on a session living on their servers. Changing a bot's model mid-game is safe — the new model simply can't read the old one's trace, so the bot loses its reasoning and keeps playing.
 
-The free tier can use the cheaper models (per-model seat caps apply); the paid tier has the full list. The paid tier runs on a prepaid balance topped up from the profile page by card, Link, Google Pay or crypto (USDC). **Temporarily** (since October 2026) Gemini 4 Argon and Claude 5.5 Sonnet are also open to the free tier at one bot per game, so the game can measure what a turn on them really costs; the usual price-based cap takes over once each has enough measured turns.
+The free tier can use the cheaper models (per-model seat caps apply); the paid tier has the full list. The paid tier runs on a prepaid balance topped up from the profile page by card, Link, Google Pay or crypto (USDC). **Temporarily** (since October 2026) Gemini 4 Argon, Claude 5.5 Sonnet and Kimi K3.1 Pro are also open to the free tier at one bot per game, so the game can measure what a turn on them really costs; the usual price-based cap takes over once each has enough measured turns.
 
 ## Game List
 
