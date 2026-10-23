@@ -13,6 +13,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        id: "kimi-k3-1", date: "Oct 2026", tags: ["Models"],
+        title: "Kimi K3.1 Pro replaces K3, and a Highspeed version joins the paid tier",
+        body: (<>Moonshot&apos;s <strong>Kimi K3.1 Pro</strong> takes over the Kimi slot in the model picker at a
+            <strong> third less</strong> than K3: $2 per million input tokens and $10 per million output. Games
+            that already have Kimi bots switch to K3.1 on their next turn. Free-tier bonus: Kimi, until now
+            paid-only, can play as <strong>one bot per game</strong> on the free tier. For the paid tier there is
+            also <strong>Kimi K3.1 Pro Highspeed</strong>: the same model served about <strong>twice as fast</strong>,
+            at twice the price ($4 and $20). Pick it when you want Kimi&apos;s reasoning without the wait.</>),
+        media: null,
+        links: [{label: "Create a game", href: "/games"}],
+    },
+    {
         id: "crypto-payments", date: "Oct 2026", tags: ["Payments"],
         title: "More ways to pay: crypto and Google Pay",
         body: (<>Adding balance now offers more payment options, including <strong>crypto (USDC)</strong> and
