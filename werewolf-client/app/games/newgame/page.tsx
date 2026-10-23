@@ -16,7 +16,7 @@ import CastList, {RowPortrait} from '@/app/games/newgame/components/CastList';
 import GeneratingStatus from '@/app/games/newgame/components/GeneratingStatus';
 import {iconButton, InfoButton, inputStyle, labelStyle, monoLabel, monoMeta, PlayIcon, primaryButton, secondaryButton, SegmentedControl} from '@/app/games/newgame/components/form-ui';
 import ReframeModal from '@/app/components/ReframeModal';
-import {LLM_CONSTANTS, SupportedAiModels, getModelDisplayName, isAllowedAsGameMaster, modelHasTag, modelIsFast} from "@/app/ai/ai-models";
+import {LLM_CONSTANTS, SupportedAiModels, getModelDisplayName, isAllowedAsGameMaster, isExcludedFromGmAndRandom, modelHasTag, modelIsFast} from "@/app/ai/ai-models";
 import {FREE_TIER_UNLIMITED, getCandidateModelsForTier, getGameMasterCandidateModelsForTier, getModelPickerOptions, getPerGameModelLimit} from "@/app/ai/model-limit-utils";
 import AIModelSelect from '@/app/components/AIModelSelect';
 import ModelSelectDropdown from '@/app/components/ModelSelectDropdown';
@@ -130,8 +130,13 @@ export default function CreateNewGamePage() {
             Object.values(LLM_CONSTANTS).filter(m => m !== LLM_CONSTANTS.RANDOM && isAllowedAsGameMaster(m))
         );
     });
+    // The untouched form sends this list BY NAME, never RANDOM, so the server's Random
+    // pool rule does not apply to it: the default must leave the `excludedFromGmAndRandom`
+    // models (slow or timing out) unticked itself. A player can still tick them.
+    // Found 2026-10-23: every game created after the pool rule shipped still had 4-6
+    // of them, because the default selected the whole catalog.
     const [selectedPlayerAiTypes, setSelectedPlayerAiTypes] = useState<string[]>(
-        Object.values(LLM_CONSTANTS).filter(model => model !== LLM_CONSTANTS.RANDOM)
+        Object.values(LLM_CONSTANTS).filter(model => model !== LLM_CONSTANTS.RANDOM && !isExcludedFromGmAndRandom(model))
     );
     const [isFormValid, setIsFormValid] = useState(false);
     const [gameData, setGameData] = useState<GamePreviewWithGeneratedBots | null>(null);
@@ -420,8 +425,9 @@ export default function CreateNewGamePage() {
                 if (filtered.length > 0) {
                     return filtered;
                 }
-                // Fall back to whatever is actually visible.
-                return visiblePlayerModels;
+                // Fall back to whatever is actually visible, reliable models first.
+                const reliable = visiblePlayerModels.filter(model => !isExcludedFromGmAndRandom(model));
+                return reliable.length > 0 ? reliable : visiblePlayerModels;
             }
 
             if (filtered.length !== prev.length) {

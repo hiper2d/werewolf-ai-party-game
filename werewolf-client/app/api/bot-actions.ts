@@ -1749,9 +1749,15 @@ async function cancelBotResponsesImpl(gameId: string): Promise<GameActionRespons
 
     await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: game.createdWithTier });
 
-    // Only cancel during states that have bot response queues
+    // Only DAY_DISCUSSION and AFTER_GAME_DISCUSSION have a bot reply queue to cancel. A
+    // click that lands after the game moved on (the button shows after 10s of processing,
+    // the state can flip underneath it) is stale, not an error: no-op, like the other
+    // STALE_ACTION cases, instead of a thrown error the player sees as a failure.
     if (game.gameState !== GAME_STATES.DAY_DISCUSSION && game.gameState !== GAME_STATES.AFTER_GAME_DISCUSSION) {
-        throw new Error('Cannot cancel bot responses in current game state');
+        logger.warn(`STALE_ACTION cancelBotResponses: game is in ${game.gameState}, nothing to cancel`, {
+            gameId, function: 'cancelBotResponses', gameState: game.gameState,
+        });
+        return { game, messages: [] };
     }
 
     if (game.gameStateProcessQueue.length === 0) {
