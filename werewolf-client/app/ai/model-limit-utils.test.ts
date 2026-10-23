@@ -292,25 +292,34 @@ describe('deprecated model IDs in persisted games', () => {
     });
 });
 
-// Kimi K3 always reasons at max effort with ~85-90% of output tokens spent on reasoning, so it
-// opts out of price-derived banding rather than riding the $15 SINGLE_MAX boundary.
-describe('Kimi K3 free-tier policy', () => {
-    it('is not available on the free tier', () => {
-        expect(SupportedAiModels[LLM_CONSTANTS.KIMI].freeTier).toEqual({
-            available: false,
-            maxBotsPerGame: 0,
-        });
-        expect(getCandidateModelsForTier(USER_TIERS.FREE)).not.toContain(LLM_CONSTANTS.KIMI);
+// Kimi K3.1 Pro (2026-10-23): $2/$10 like Argon and Sonnet 5.5, so the sticker estimate (2.6¢)
+// would keep it off the free tier; the explicit 1-bot opt-in in ai-models.ts collects the 100
+// measured turns the band needs. Remove the pin together with the opt-in line.
+describe('Kimi K3.1 Pro free-tier policy (temporary 1-bot opt-in)', () => {
+    it('is estimated past the ceiling but opted in at one bot per free game', () => {
+        const cost = getTurnCost(LLM_CONSTANTS.KIMI)!;
+        expect(cost.source).toBe('estimated');
+        expect(cost.usd).toBeGreaterThan(FREE_TIER_TURN_COST_BANDS.SINGLE_MAX);
+        expect(SupportedAiModels[LLM_CONSTANTS.KIMI].freeTier).toEqual({ available: true, maxBotsPerGame: 1 });
+        expect(getCandidateModelsForTier(USER_TIERS.FREE)).toContain(LLM_CONSTANTS.KIMI);
     });
 
-    it('throws for a free-tier game trying to use it', () => {
+    it('allows one Kimi bot in a free game and refuses a second', () => {
+        expect(() => validateModelUsageForTier(USER_TIERS.FREE, LLM_CONSTANTS.GPT_MINI, [LLM_CONSTANTS.KIMI])).not.toThrow();
         expect(() =>
-            validateModelUsageForTier(USER_TIERS.FREE, LLM_CONSTANTS.KIMI, [])
-        ).toThrow(/not available on the free tier/);
+            validateModelUsageForTier(USER_TIERS.FREE, LLM_CONSTANTS.GPT_MINI, [LLM_CONSTANTS.KIMI, LLM_CONSTANTS.KIMI])
+        ).toThrow(/can only be used once per game on the free tier/);
     });
 
     it('remains selectable on paid tier', () => {
         expect(getCandidateModelsForTier(USER_TIERS.PAID)).toContain(LLM_CONSTANTS.KIMI);
+    });
+
+    it('keeps Kimi K3.1 Pro Highspeed ($4/$20) on the paid tier only — no opt-in, by decision', () => {
+        expect(getTurnCost(LLM_CONSTANTS.KIMI_HIGHSPEED)?.source).toBe('estimated');
+        expect(SupportedAiModels[LLM_CONSTANTS.KIMI_HIGHSPEED].freeTier).toEqual({ available: false, maxBotsPerGame: 0 });
+        expect(getCandidateModelsForTier(USER_TIERS.FREE)).not.toContain(LLM_CONSTANTS.KIMI_HIGHSPEED);
+        expect(getCandidateModelsForTier(USER_TIERS.PAID)).toContain(LLM_CONSTANTS.KIMI_HIGHSPEED);
     });
 });
 

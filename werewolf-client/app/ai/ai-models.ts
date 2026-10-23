@@ -254,8 +254,7 @@ export function getFreeTierPolicy(modelId: string): { available: boolean; maxBot
 
 // Populate each model's freeTier field from its turn cost — the single source of truth for
 // free-tier caps. A model with an explicit `freeTier` set before this loop opts out of banding
-// and keeps that policy (Kimi K3's old opt-out is now covered by the estimate, which puts its
-// $3/$15 prices at 3.9¢ a turn, well past the free-tier ceiling).
+// and keeps that policy.
 //
 // Gemini 4 Argon and Claude Sonnet 5.5 (2026-10-13): one bot per free game, TEMPORARILY, to
 // collect measured turns. Both are $2/$10, and the sticker estimate (2.6¢) puts them just past
@@ -263,8 +262,15 @@ export function getFreeTierPolicy(modelId: string): { available: boolean; maxBot
 // MEASURED_TURN_COSTS_MIN_CALLS. Sonnet's 25 measured turns already average 1.4¢ (the 1-bot
 // band), so this is likely where it lands anyway. Remove each line once measured-turn-costs.json
 // has 100+ turns for that model — the band then decides on its own.
+//
+// Kimi K3.1 Pro (2026-10-23): the same deal, for the same reason. Also $2/$10 since the K3 →
+// K3.1 Pro repoint (lib 0.27.0), so the estimate is the same 2.6¢; the 15 turns measured on
+// K3's $3/$15 average 2.2¢, which is ~1.5¢ at the new prices — the 1-bot band. Kimi K3.1 Pro
+// Highspeed (LLM_CONSTANTS.KIMI_HIGHSPEED, $4/$20) is deliberately NOT here: paid tier only
+// (estimate 5.2¢), pinned in model-limit-utils.test.ts.
 SupportedAiModels[LLM_CONSTANTS.GEMINI_ARGON].freeTier = { available: true, maxBotsPerGame: 1 };
 SupportedAiModels[LLM_CONSTANTS.CLAUDE_SONNET].freeTier = { available: true, maxBotsPerGame: 1 };
+SupportedAiModels[LLM_CONSTANTS.KIMI].freeTier = { available: true, maxBotsPerGame: 1 };
 for (const [modelId, config] of Object.entries(SupportedAiModels)) {
     config.freeTier = config.freeTier ?? getFreeTierPolicy(modelId);
 }
