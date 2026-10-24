@@ -14,6 +14,7 @@ import type {SpendLimitScope} from "@/app/api/errors";
 import {readDeviceRecord, readGlobalDailySpend} from "@/app/api/spend-ledgers";
 import {firstRefusal} from "@hiper2d/ai-agents";
 import type {BudgetVerdict} from "@hiper2d/ai-agents";
+import {logger} from "@/app/utils/logger";
 import FieldValue = firestore.FieldValue;
 
 const ZERO_SPENDINGS: UserMonthlySpending[] = [];
@@ -314,8 +315,20 @@ export async function assertFreeSpendWithinLimit(userId: string, timestamp: numb
     } catch (error: any) {
         console.error(`FREE_SPEND_LIMIT: could not record limit hit for ${userId}: ${error?.message ?? error}`);
     }
-    // Expected behaviour, not an incident: warn with a fixed tag, never error.
-    console.warn(`FREE_SPEND_LIMIT: refused ${userId} — ${scope} ${refused.window} cap $${refused.limitUSD} reached ($${refused.spentUSD} spent, hit #${counted.limitHits}, resets ${new Date(refused.resetsAt).toISOString()})`);
+    // Expected behaviour, not an incident: warn with a fixed tag, never error. Goes through
+    // the app logger (not console) so it reaches Better Stack: a refusal with a device scope
+    // is the strongest multi-account signal there is, and Marlow's log watch reads it from
+    // there. Until 2026-10-23 this was console.warn and lived only in Vercel's 5-minute tail.
+    logger.warn(`FREE_SPEND_LIMIT: refused ${userId} — ${scope} ${refused.window} cap $${refused.limitUSD} reached ($${refused.spentUSD} spent, hit #${counted.limitHits}, resets ${new Date(refused.resetsAt).toISOString()})`, {
+        userEmail: userId,
+        scope,
+        window: refused.window,
+        limitUSD: refused.limitUSD,
+        spentUSD: refused.spentUSD,
+        limitHits: counted.limitHits,
+        resetsAt: new Date(refused.resetsAt).toISOString(),
+        deviceId: userData.lastDeviceId ?? null,
+    });
     throw new FreeSpendLimitError(refused, scope);
 }
 
