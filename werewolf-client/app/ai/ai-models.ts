@@ -113,6 +113,14 @@ export const STORY_MAX_OUTPUT_TOKENS = 16384;
 export const STORY_REQUEST_TIMEOUT_MS = 240_000;
 
 /**
+ * End-of-day bot summaries rewrite a bot's whole diary from the day's full history, so they are
+ * the longest bot calls in a game: Kimi K3.1 Pro ran 79-89s on them in prod (2026-10-25) against
+ * the library's 60s default. 150s gives ~1.7x headroom over that; each summary is its own server
+ * action (one bot per call), so it stays well under Vercel's 300s function limit.
+ */
+export const SUMMARY_REQUEST_TIMEOUT_MS = 150_000;
+
+/**
  * Applies the story-generation profile to a freshly created GM agent (used by the story path
  * and mirrored by the live story test). Only the output ceiling and the per-call timeout differ
  * from a turn: reasoning stays at each model's catalog default (DeepSeek `low`, Qwen budget
@@ -348,6 +356,9 @@ export function resolveModelId(modelId: string): string {
  * p90 31s), MiniMax 5 of 55 (p90 22s, max 105s), Muse Spark 4 of 73 (p90 26s), Gemini 4 Argon
  * 3 of 50 (p90 34s, max 207s) — while ~1,500 calls on the rest of the catalog had none (p90 7-15s).
  * DeepSeek V4 Pro and Argon were added for that; the five story-slow models were already here.
+ * Kimi K3.1 Pro added 2026-10-25: 7 of 40 prod calls ran 55-89s overnight (end-of-day summaries
+ * and late votes past the 60s timeout), and a replay of those summaries at effort high took 24-84s
+ * (2 of 9 over 60s). Effort `low` was tried and was worse (median 93s), so it stays at high.
  *
  * Checked on every NEW Game Master choice (create, preview, model change, retry override,
  * provider reassignment), not inside validateModelUsageForTier: that one also re-validates the
@@ -361,6 +372,7 @@ for (const modelId of [
     LLM_CONSTANTS.MUSE_SPARK,
     LLM_CONSTANTS.DEEPSEEK_PRO,
     LLM_CONSTANTS.GEMINI_ARGON,
+    LLM_CONSTANTS.KIMI,
 ]) {
     SupportedAiModels[modelId].excludedFromGmAndRandom = true;
 }

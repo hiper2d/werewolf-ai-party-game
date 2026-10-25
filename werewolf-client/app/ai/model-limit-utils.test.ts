@@ -326,10 +326,10 @@ describe('Kimi K3.1 Pro free-tier policy (temporary 1-bot opt-in)', () => {
 describe('excludedFromGmAndRandom models (Game Master speed rule + RANDOM pool)', () => {
     const excludedFromGmAndRandom = () => Object.entries(SupportedAiModels).filter(([, c]) => c.excludedFromGmAndRandom).map(([id]) => id).sort();
 
-    it('pins the set: story pipeline over 150s (2026-10-07), Muse Spark night narration past 60s (2026-10-12), DeepSeek V4 Pro and Argon bot-turn timeouts (2026-10-21)', () => {
+    it('pins the set: story pipeline over 150s (2026-10-07), Muse Spark night narration past 60s (2026-10-12), DeepSeek V4 Pro and Argon bot-turn timeouts (2026-10-21), Kimi K3.1 Pro summary/vote timeouts (2026-10-25)', () => {
         expect(excludedFromGmAndRandom()).toEqual([
             LLM_CONSTANTS.GROK, LLM_CONSTANTS.MINIMAX, LLM_CONSTANTS.QWEN_FLASH, LLM_CONSTANTS.QWEN_MAX, LLM_CONSTANTS.MUSE_SPARK,
-            LLM_CONSTANTS.DEEPSEEK_PRO, LLM_CONSTANTS.GEMINI_ARGON,
+            LLM_CONSTANTS.DEEPSEEK_PRO, LLM_CONSTANTS.GEMINI_ARGON, LLM_CONSTANTS.KIMI,
         ].sort());
         expect(isExcludedFromGmAndRandom(LLM_CONSTANTS.DEEPSEEK_PRO)).toBe(true);
         expect(isExcludedFromGmAndRandom(LLM_CONSTANTS.DEEPSEEK_FLASH)).toBe(false);

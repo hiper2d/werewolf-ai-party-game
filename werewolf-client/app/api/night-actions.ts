@@ -45,7 +45,7 @@ import { convertToAIMessages, convertMessageContent, formatMessagesForNightSumma
 import { after } from "next/server";
 import { midGameImagesEnabled, runNightIllustration } from "@/app/utils/illustration-generation";
 import { checkGameEndConditions } from "@/app/utils/game-utils";
-import { getProviderSignatureFields } from "@/app/ai/ai-models";
+import { getProviderSignatureFields, SUMMARY_REQUEST_TIMEOUT_MS } from "@/app/ai/ai-models";
 import { GameEndChecker } from "@/app/utils/game-end-checker";
 import { recordBotTokenUsage, recordGameMasterTokenUsage } from "@/app/api/cost-tracking";
 import { ensureUserCanAccessGame } from "@/app/api/tier-guards";
@@ -1406,6 +1406,7 @@ async function summarizePastDayImpl(gameId: string): Promise<GameActionResponse>
         // Create agent
         const summaryModel = getEffectiveModel(currentGame, bot.name, bot.aiType);
         const agent = AgentFactory.createAgent(bot.name, botPrompt, summaryModel.aiType, apiKeys, summaryModel.enableThinking);
+        agent.requestTimeoutMs = SUMMARY_REQUEST_TIMEOUT_MS;
         agent.gameId = gameId;
         agent.userId = session.user.email;
 
