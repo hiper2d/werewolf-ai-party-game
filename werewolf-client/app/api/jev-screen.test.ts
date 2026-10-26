@@ -103,10 +103,16 @@ describe('decideScreen', () => {
         expect(d.reason).toBe('sexual');
     });
 
-    it('hate is a hard flag: it blocks however the score reads', () => {
+    it('hate never blocks (no provider refused a slur in five weeks): a certain hate line is grey with the reason', () => {
         const d = decideScreen(answers([0, 0.05, 0.95, 0], { hate: 0.98 }));
-        expect(d.verdict).toBe('would_block');
+        expect(d.verdict).toBe('grey');
         expect(d.reason).toBe('hate');
+    });
+
+    it('the 2026-10-26 "legally retarded" row (score 1.51, top-two 0.52, hate 0.90) is a plain grey', () => {
+        const d = decideScreen(answers([0.1, 0.38, 0.45, 0.07], { hate: 0.9 }));
+        expect(d.verdict).toBe('grey');
+        expect(d.reason).toBeNull();
     });
 
     it('tolerates missing answers', () => {

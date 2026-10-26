@@ -49,12 +49,18 @@ export const JEV_SCREEN_CONFIG = {
      * blocks: it is a monitoring signal. 30 days to 2026-10-08: Jev rated 56 of 836 inputs
      * would-block on the score, including explicit sexual roleplay and racial slurs, and the
      * providers refused none of them (0 games with a provider block). The screen exists to predict
-     * provider refusals and account flags, so it keeps only the categories providers never
-     * tolerate. The bar is high on purpose: `minors` leaned to 0.5 on a "loyal boy / puppy"
-     * message in the probe. Flags, unlike the score, read alike on Jev and on OpenAI Decisions
-     * for blatant content, so one bar serves both judges; Decisions scores ran ~0.5 lower.
+     * provider refusals and account flags, so it keeps only what providers act on. `hate` left the
+     * list 2026-10-26: its whole record was five n-word messages in one game (2026-09-20) and a
+     * self-deprecating "I'm legally retarded" bit, all at 0.90-0.98 on both judges, and every turn
+     * went through every provider. The two that stay have no refusal data either; they stay because
+     * sexualized minors and threats against real people are what a provider acts on at the ACCOUNT
+     * level, where there is no refusal to learn from first. The bar is high on purpose: `minors`
+     * leaned to 0.5 on a "loyal boy / puppy" message in the probe. Flags, unlike the score, read
+     * alike on Jev and on OpenAI Decisions for blatant content, so one bar serves both judges;
+     * Decisions scores ran ~0.5 lower. The other flags, hate included, stay as questions: a grey
+     * row carries the strongest one as its reason and the report joins them against refusals.
      */
-    HARD_FLAGS: { minors: 0.9, real_harm: 0.9, hate: 0.9 } as Partial<Record<JevScreenFlag, number>>,
+    HARD_FLAGS: { minors: 0.9, real_harm: 0.9 } as Partial<Record<JevScreenFlag, number>>,
     /**
      * Grey with a reason when the probability mass on the top two risk levels ("likely to be
      * refused" + "must be blocked") reaches this — the rows to read by hand. Was the score block
