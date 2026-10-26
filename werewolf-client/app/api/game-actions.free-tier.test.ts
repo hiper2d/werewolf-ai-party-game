@@ -12,7 +12,7 @@ describe('free tier model limits', () => {
     });
 
     it('prevents using single-use models more than once per game', () => {
-        // GPT-5.6 Terra: 1.6¢ a measured turn, the 1-bot band.
+        // GPT-6.1 Terra: 1.3¢ a turn on the sticker estimate, the 1-bot band.
         expect(() =>
             validateModelUsageForTier('free', LLM_CONSTANTS.GPT, [LLM_CONSTANTS.GPT])
         ).toThrow('can only be used once');
@@ -35,7 +35,7 @@ describe('free tier model limits', () => {
         ).toThrow('can only be used 3 times');
     });
 
-    it('enforces the single-use limit for GPT-5.6 Terra (measured 1.6¢ a turn lands it in the 1-bot band)', () => {
+    it('enforces the single-use limit for GPT-6.1 Terra (the 1.3¢ sticker estimate lands it in the 1-bot band)', () => {
         expect(() =>
             validateModelUsageForTier('free', LLM_CONSTANTS.GPT, [])
         ).not.toThrow();

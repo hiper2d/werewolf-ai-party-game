@@ -98,14 +98,6 @@
       "outputTokens": 2202,
       "reasoningTokens": 2078
     },
-    "gpt": {
-      "usdPerTurn": 0.016149,
-      "calls": 709,
-      "inputTokens": 8191,
-      "cachedInputTokens": 1422,
-      "outputTokens": 198,
-      "reasoningTokens": 78
-    },
     "claude-opus": {
       "usdPerTurn": 0.037571,
       "calls": 14,

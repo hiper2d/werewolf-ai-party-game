@@ -276,6 +276,11 @@ export function getFreeTierPolicy(modelId: string): { available: boolean; maxBot
 // K3's $3/$15 average 2.2¢, which is ~1.5¢ at the new prices — the 1-bot band. Kimi K3.1 Pro
 // Highspeed (LLM_CONSTANTS.KIMI_HIGHSPEED, $4/$20) is deliberately NOT here: paid tier only
 // (estimate 5.2¢), pinned in model-limit-utils.test.ts.
+//
+// GPT-6.1 Terra (2026-10-26, lib 0.28.0): the `gpt` slot halved in price ($2/$12 → $1/$5), so
+// the 709 turns measured on 5.6 Terra (1.6¢) were dropped from measured-turn-costs.json, as
+// with Haiku 5.5. The sticker estimate (1.3¢) keeps it in the 1-bot band; the same 5.6 token
+// profile at the new prices is ~0.8¢, so expect it to move to 3 bots once re-measured.
 SupportedAiModels[LLM_CONSTANTS.GEMINI_ARGON].freeTier = { available: true, maxBotsPerGame: 1 };
 SupportedAiModels[LLM_CONSTANTS.CLAUDE_SONNET].freeTier = { available: true, maxBotsPerGame: 1 };
 SupportedAiModels[LLM_CONSTANTS.KIMI].freeTier = { available: true, maxBotsPerGame: 1 };

@@ -13,6 +13,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        id: "gpt-6-1-terra", date: "Oct 2026", tags: ["Models"],
+        title: "GPT-6.1 Terra replaces GPT-5.6 Terra at half the price",
+        body: (<>OpenAI&apos;s <strong>GPT-6.1 Terra</strong> takes over the main GPT slot in the model picker. It is
+            <strong> half the price</strong> of the 5.6 Terra it replaces: $1 per million input tokens and $5 per
+            million output, which puts Terra back where it belongs, between Sol and Luna. Games that already have
+            Terra bots switch to 6.1 on their next turn, and in our runs it answers as quickly as Luna. Free-tier
+            players can still run <strong>one Terra bot per game</strong>; that cap is likely to loosen once the new
+            price has been measured over real games.</>),
+        media: null,
+        links: [{label: "Create a game", href: "/games"}],
+    },
+    {
         id: "kimi-k3-1", date: "Oct 2026", tags: ["Models"],
         title: "Kimi K3.1 Pro replaces K3, and a Highspeed version joins the paid tier",
         body: (<>Moonshot&apos;s <strong>Kimi K3.1 Pro</strong> takes over the Kimi slot in the model picker at a

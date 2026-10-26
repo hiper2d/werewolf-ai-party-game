@@ -641,7 +641,7 @@ describe('requestStats recording (per-request statistics doc)', () => {
             actor: 'gm',
             tier: 'paid',
             modelId: 'gpt',
-            modelApiName: 'gpt-5.6-terra',
+            modelApiName: 'gpt-6.1-terra',
             apiKeyName: 'OPENAI_API_KEY',
             durationMs: 3600,
             status: 'ok'
