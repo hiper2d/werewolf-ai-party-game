@@ -1006,6 +1006,22 @@ export interface GameMessage {
 }
 
 /**
+ * A model's answer came back empty or malformed and the agent is asking it again (one
+ * automatic re-send, see app/ai/agent-factory.ts). The library's retry hook writes it on the
+ * game doc as `llmRetry` for the duration of the re-send; the page polls it while an action
+ * is in flight so the loading rail can say why the turn is taking longer. `actor` is the
+ * agent's name — a bot, or "Game Master"; the client never shows it during NIGHT, where the
+ * role is hidden.
+ */
+export interface LlmRetryNotice {
+    actor: string;
+    model: string;
+    reason: 'empty' | 'malformed';
+    attempt: number;
+    startedAt: number; // epoch ms
+}
+
+/**
  * Response type for server actions that create messages.
  * Contains the updated game state and any messages created during the action.
  */

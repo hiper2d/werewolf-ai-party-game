@@ -15,7 +15,8 @@ const btnAccent = "px-3 py-1.5 text-[13px] font-medium rounded-[var(--radius-md)
 const btnWarn = "px-3 py-1.5 text-[13px] font-medium rounded-[var(--radius-md)] bg-[oklch(75%_0.10_65)] text-[var(--bg-0)] hover:brightness-110 transition-all duration-[120ms]";
 import { getModelDisplayName } from "@/app/ai/ai-models";
 import { GAME_STATES, GAME_ROLES, AUTO_VOTE_COEFFICIENT, BOT_SELECTION_CONFIG, FREE_TIER_AVATAR_REGENS, USER_TIERS } from "@/app/api/game-models";
-import type { Game, GameActionResponse, GameMessage } from "@/app/api/game-models";
+import type { Game, GameActionResponse, GameMessage, LlmRetryNotice } from "@/app/api/game-models";
+import { watchLlmRetryNotice } from './llm-retry-notice';
 import type { Session } from "next-auth";
 import { welcome, vote, keepBotsGoing, manualSelectBots, cancelBotResponses } from '@/app/api/bot-actions';
 import BotSelectionDialog from '@/app/games/[id]/components/BotSelectionDialog';
@@ -67,6 +68,8 @@ function GamePageContent({
 }) {
     const [game, setGame] = useState(initialGame);
     const [pendingMessages, setPendingMessages] = useState<GameMessage[]>([]);
+    // A model being asked again inside the running action (see LlmRetryNotice); the rail shows it.
+    const [retryNotice, setRetryNotice] = useState<LlmRetryNotice | null>(null);
     const [selectedBot, setSelectedBot] = useState<{ name: string; aiType: string; enableThinking?: boolean } | null>(null);
     // 'change' permanently updates the bot's model (players list); 'retry' applies the
     // chosen model to the failed request only (error banner), so hidden roles don't leak.
@@ -369,6 +372,9 @@ function GamePageContent({
             return undefined;
         }
         inFlightRef.current = true;
+        // The action returns nothing until the model answered, so the only way the rail can
+        // explain a turn that runs long is to poll the re-send notice from inside the wait.
+        const stopWatching = watchLlmRetryNotice(initialGame.id, setRetryNotice);
         try {
             return await action();
         } catch (error) {
@@ -379,6 +385,7 @@ function GamePageContent({
             throw error;
         } finally {
             inFlightRef.current = false;
+            stopWatching();
         }
     }, [initialGame.id]);
 
@@ -1521,6 +1528,7 @@ function GamePageContent({
                         openModelDialog(providerDisplayName(providerKey), '', undefined, 'reassign');
                     }}
                     isExternalLoading={isKeepGoingLoading}
+                    retryNotice={retryNotice}
                     phaseControls={flowControlsElement}
                     chatControls={chatControlsElement}
                     onBeforeAction={() => { preActionGameRef.current = game; }}

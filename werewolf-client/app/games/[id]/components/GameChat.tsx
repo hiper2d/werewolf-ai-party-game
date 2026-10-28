@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { talkToAll, humanPlayerVote, getSuggestion } from "@/app/api/bot-actions";
 import { clampUserText, INPUT_LIMITS, MAX_STT_RECORDING_MS } from "@/app/utils/input-limits";
 import { humanPlayerTalkWerewolves } from "@/app/api/night-actions";
-import { GAME_STATES, MessageType, RECIPIENT_ALL, RECIPIENT_WEREWOLVES, RECIPIENT_DOCTOR, RECIPIENT_DETECTIVE, RECIPIENT_MANIAC, GameMessage, Game, GameActionResponse, SystemErrorMessage, BotResponseError, GAME_MASTER, ROLE_CONFIGS, GAME_ROLES } from "@/app/api/game-models";
+import { GAME_STATES, MessageType, RECIPIENT_ALL, RECIPIENT_WEREWOLVES, RECIPIENT_DOCTOR, RECIPIENT_DETECTIVE, RECIPIENT_MANIAC, GameMessage, Game, GameActionResponse, SystemErrorMessage, BotResponseError, GAME_MASTER, ROLE_CONFIGS, GAME_ROLES, LlmRetryNotice } from "@/app/api/game-models";
 import PlayerAvatar from "@/app/components/PlayerAvatar";
 import ImageLightbox from "@/app/components/ImageLightbox";
 import type { VoiceSelection } from "./CharacterVoicePanel";
@@ -57,6 +57,9 @@ interface GameChatProps {
     // cannot resume the game (the process queue was never written).
     onRetryBotSelection?: () => void;
     isExternalLoading?: boolean;
+    // A model inside the running action is being asked again after an empty or malformed
+    // answer; the loading rail says so, since the turn takes a second round trip.
+    retryNotice?: LlmRetryNotice | null;
     // Flow actions for the phase bar that replaces the disabled composer
     // (Start Night, Next Day, Exit Game…) plus the phase context shown next to them.
     phaseControls?: PhaseControls | null;
@@ -526,7 +529,13 @@ function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcludin
     );
 }
 
-export default function GameChat({ gameId, game, runGameAction, onGameStateChange, pendingMessages, onPendingMessagesConsumed, clearNightMessages, onErrorHandled, onRetryWithModel, onReassignProvider, onRetryBotSelection, isExternalLoading, phaseControls, chatControls, onBeforeAction, cancelButton, onAvatarClick, isOwner, onGameChange, onUpdateVoice }: GameChatProps) {
+function retryNoteFor(gameState: string, notice: LlmRetryNotice): string {
+    const who = gameState === GAME_STATES.NIGHT ? 'A model' : `${notice.actor}'s model`;
+    const what = notice.reason === 'empty' ? 'returned nothing' : 'returned garbled text';
+    return `${who} ${what}, asking again`;
+}
+
+export default function GameChat({ gameId, game, runGameAction, onGameStateChange, pendingMessages, onPendingMessagesConsumed, clearNightMessages, onErrorHandled, onRetryWithModel, onReassignProvider, onRetryBotSelection, isExternalLoading, retryNotice, phaseControls, chatControls, onBeforeAction, cancelButton, onAvatarClick, isOwner, onGameChange, onUpdateVoice }: GameChatProps) {
     // Without a parent-provided lock, run actions directly (standalone use).
     const runAction = useMemo(
         () => runGameAction ?? (<T,>(action: () => Promise<T>) => action()),
@@ -1812,7 +1821,7 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
     };
     const nightSubject = (role: string) => role === GAME_ROLES.WEREWOLF ? 'The werewolves' : `The ${role}`;
 
-    const railState = ((): LoadingRailProps | null => {
+    const baseRailState = ((): LoadingRailProps | null => {
         if (game.errorState || !isCurrentDaySelected) return null;
         const queue = game.gameStateProcessQueue;
         const params = game.gameStateParamQueue;
@@ -1884,6 +1893,11 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
         }
         return null;
     })();
+    // A re-send in progress: say why the turn is taking longer. During NIGHT the actor stays
+    // unnamed — the role is hidden, and the werewolves' chat is where most empty replies happen.
+    const railState: LoadingRailProps | null = baseRailState && retryNotice
+        ? { ...baseRailState, note: retryNoteFor(game.gameState, retryNotice) }
+        : baseRailState;
 
     // Quiet status for the strip when nothing is busy and no flow action is
     // waiting (history view, a paused error, a phase the client kicks off).

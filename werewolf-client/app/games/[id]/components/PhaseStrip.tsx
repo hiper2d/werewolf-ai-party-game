@@ -125,6 +125,8 @@ export interface LoadingRailProps {
     counter?: string;
     /** Bouncing dots after the label, for the open-ended waits. */
     dots?: boolean;
+    /** Muted aside after the label: why the wait is longer ("Cora's model returned nothing, asking again"). */
+    note?: string;
     /** Accent-tinted rail — reserved for art in progress. */
     tone?: 'default' | 'accent';
     /** Right-side control (Cancel). */
@@ -171,7 +173,7 @@ function RailActorChip({ actor, tone }: { actor: RailActor; tone: 'default' | 'a
     );
 }
 
-export function LoadingRail({ actor, subject, verb, progress, counter, dots, tone = 'default', trailing, className = '' }: LoadingRailProps) {
+export function LoadingRail({ actor, subject, verb, progress, counter, dots, note, tone = 'default', trailing, className = '' }: LoadingRailProps) {
     const determinate = !!progress && progress.total > 0;
     const pct = determinate ? Math.round((Math.max(0, progress!.done) / progress!.total) * 100) : 0;
     const counterText = counter ?? (determinate ? `${progress!.done} / ${progress!.total}${progress!.unit ? ` ${progress!.unit}` : ''}` : undefined);
@@ -190,6 +192,7 @@ export function LoadingRail({ actor, subject, verb, progress, counter, dots, ton
                     <span className={`font-semibold ${accent ? '' : 'text-[var(--fg-0)]'} truncate max-w-full`}>{subject}</span>
                     {verb && <span>{verb}</span>}
                     {dots && <BounceDots />}
+                    {note && <span className={accent ? 'opacity-80' : 'text-[var(--fg-2)]'}>· {note}</span>}
                 </div>
                 <div
                     className="relative h-[3px] rounded-full overflow-hidden"

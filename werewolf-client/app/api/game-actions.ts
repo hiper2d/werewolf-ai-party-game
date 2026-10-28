@@ -63,6 +63,7 @@ import {
 } from "@/app/ai/model-limit-utils";
 import {AbstractAgent} from '@hiper2d/ai-agents';
 import {ensureUserCanAccessGame} from "@/app/api/tier-guards";
+import type {LlmRetryNotice} from "@/app/api/game-models";
 import { assertProviderNotBlocked, providerDisplayName, providerKeyOf } from '@/app/api/provider-blocks';
 import { retryModelPatch } from '@/app/api/retry-model';
 import {logger} from "@/app/utils/logger";
@@ -159,6 +160,40 @@ export async function getGame(gameId: string): Promise<Game | null> {
     } else {
         return null;
     }
+}
+
+// A notice older than this cannot belong to a running ask (the longest calls time out at
+// 240s); one left behind by a function that died mid-ask is ignored rather than shown.
+const LLM_RETRY_NOTICE_MAX_AGE_MS = 5 * 60_000;
+
+/**
+ * The re-send notice on a game, if a model is being asked again right now (see
+ * LlmRetryNotice). Polled by the page while an action is in flight, so it reads only the
+ * fields it needs rather than the whole game. Null when nothing is being retried, when the
+ * notice is stale, or when the caller does not own the game.
+ */
+export async function getLlmRetryNotice(gameId: string): Promise<LlmRetryNotice | null> {
+    const session = await auth();
+    if (!session || !session.user?.email) {
+        throw new Error('Not authenticated');
+    }
+    if (!db) {
+        throw new Error('Firestore is not initialized');
+    }
+    const snapshot = await db.collection('games')
+        .where(firestore.FieldPath.documentId(), '==', gameId)
+        .select('llmRetry', 'ownerEmail')
+        .limit(1)
+        .get();
+    const data = snapshot.docs[0]?.data();
+    if (!data || (data.ownerEmail && data.ownerEmail !== session.user.email)) {
+        return null;
+    }
+    const notice = data.llmRetry as LlmRetryNotice | undefined;
+    if (!notice || typeof notice.startedAt !== 'number' || Date.now() - notice.startedAt > LLM_RETRY_NOTICE_MAX_AGE_MS) {
+        return null;
+    }
+    return notice;
 }
 
 export async function getGameMessages(gameId: string): Promise<GameMessage[]> {

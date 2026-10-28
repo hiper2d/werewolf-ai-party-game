@@ -628,7 +628,7 @@ export default function CreateNewGamePage() {
                 // popup is also where the two exits (add funds / switch to Free) are buttons.
                 setSpendLimitNotice(err.message);
             } else if (err.message.includes('failed to produce a valid response')) {
-                userFriendlyError = `The Game Master model failed to produce a valid response — the output was malformed or cut off. This happens occasionally; generate the preview again, or pick a different Game Master model.`;
+                userFriendlyError = `The Game Master model failed to produce a valid response — the output was empty, malformed or cut off. This happens occasionally; generate the preview again, or pick a different Game Master model.`;
             } else if (err.message.includes('Failed to parse JSON response') || err.message.includes('JSON mode failed')) {
                 userFriendlyError = `The AI model had trouble generating a properly formatted response. This sometimes happens with certain models. Please try again, or consider using a different AI model for the Game Master.`;
             } else if (err.message.includes('Response validation failed')) {

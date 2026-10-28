@@ -43,14 +43,16 @@ export default function NightActionModal({
 
     const getAvailableTargets = () => {
         const allPlayers = [
-            { name: game.humanPlayerName, isAlive: true, isHuman: true },
-            ...game.bots.map(bot => ({ name: bot.name, isAlive: bot.isAlive, isHuman: false }))
+            { name: game.humanPlayerName, isAlive: true, isHuman: true, role: game.humanPlayerRole },
+            ...game.bots.map(bot => ({ name: bot.name, isAlive: bot.isAlive, isHuman: false, role: bot.role }))
         ];
         const previousTarget = game.previousNightResults?.[currentRole]?.target;
 
         switch (currentRole) {
             case GAME_ROLES.WEREWOLF:
-                return allPlayers.filter(p => p.isAlive && p.name !== game.humanPlayerName);
+                // The pack is not prey: the server rejects a werewolf target (bot-actions.ts), and
+                // the human knows who the pack is from the night chat, so hiding them leaks nothing.
+                return allPlayers.filter(p => p.isAlive && p.name !== game.humanPlayerName && p.role !== GAME_ROLES.WEREWOLF);
             case GAME_ROLES.DOCTOR:
                 return allPlayers.filter(p => p.isAlive && p.name !== previousTarget);
             case GAME_ROLES.DETECTIVE:
