@@ -11,6 +11,7 @@
 import { CACHE_TIER_MARKER } from '@hiper2d/ai-agents';
 import { DEFAULT_GAME_MODE, GAME_MODES, GameMode } from '@/app/api/game-models';
 import { BOT_CONTENT_LIMITS } from '@/app/ai/prompts/content-limits';
+import { languageInstruction, replyLanguageLine } from '@/app/ai/game-language';
 export { CACHE_TIER_MARKER };
 
 // The bot system prompt is assembled per game mode (GAME_MODES). Both modes share the game
@@ -265,8 +266,9 @@ ${CACHE_TIER_MARKER}
 %bot_context%`;
 
 /** The bot system prompt template for a game mode (placeholders below CACHE_TIER_MARKER
- * are filled by the caller with format()). */
-export function botSystemPrompt(mode: GameMode | undefined = DEFAULT_GAME_MODE): string {
+ * are filled by the caller with format()). A non-English game appends its language block
+ * to the per-game tail, so the shared tier above the marker stays byte-identical. */
+export function botSystemPrompt(mode: GameMode | undefined = DEFAULT_GAME_MODE, language?: string): string {
     const roleplay = mode !== GAME_MODES.TACTICAL;
     return BOT_PROMPT_HEAD
         + (roleplay ? CORE_OBJECTIVE_ROLEPLAY : CORE_OBJECTIVE_TACTICAL)
@@ -277,7 +279,8 @@ export function botSystemPrompt(mode: GameMode | undefined = DEFAULT_GAME_MODE):
         + BOT_PROMPT_SOCIAL
         + (roleplay ? RESPONSE_FOCUS_ROLEPLAY : RESPONSE_FOCUS_TACTICAL)
         + '\n\n' + BOT_CONTENT_LIMITS
-        + BOT_PROMPT_TAIL;
+        + BOT_PROMPT_TAIL
+        + languageInstruction(language, 'bot');
 }
 
 export const BOT_VOTE_PROMPT: string = `%bot_name%, it's time to vote for someone to eliminate from the game. \
@@ -353,10 +356,12 @@ const DECISION_REMINDER_ROLEPLAY: string = `**DECISION-MAKING REMINDER:**
 `;
 
 /** The per-turn reminder template for a game mode (the caller fills %play_style%,
- * %human_player_name% and %reply_length_instruction% with format()). */
-export function botReminderPostfix(mode: GameMode | undefined = DEFAULT_GAME_MODE): string {
+ * %human_player_name% and %reply_length_instruction% with format()). A non-English game
+ * gets one more line: short-context models hold the language better when the last thing
+ * they read says so. */
+export function botReminderPostfix(mode: GameMode | undefined = DEFAULT_GAME_MODE, language?: string): string {
     const roleplay = mode !== GAME_MODES.TACTICAL;
-    return BOT_REMINDER_HEAD + (roleplay ? DECISION_REMINDER_ROLEPLAY : DECISION_REMINDER_TACTICAL) + '%reply_length_instruction%' + BOT_REPLY_FORMAT;
+    return BOT_REMINDER_HEAD + (roleplay ? DECISION_REMINDER_ROLEPLAY : DECISION_REMINDER_TACTICAL) + '%reply_length_instruction%' + BOT_REPLY_FORMAT + replyLanguageLine(language);
 }
 
 // The prompt's examples sit in quotation marks so they read as examples; some

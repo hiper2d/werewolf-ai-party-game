@@ -1,5 +1,6 @@
 import {AIMessage, GAME_MASTER, GameMessage, MESSAGE_ROLE, MessageType} from "@/app/api/game-models";
 import {unwrapJsonReply} from "@/app/utils/text-format";
+import {eliminationText, gameText, GameTextSource} from "@/app/ai/game-language";
 
 /**
  * Converts message content to a human-readable string format
@@ -279,15 +280,16 @@ export { cleanResponse } from '@hiper2d/ai-agents';
 
 
 /**
- * Generates a natural language summary of voting results
+ * Generates a natural language summary of voting results, in the game's language
  * @param results - Record of player names to vote counts
+ * @param game - the game, for its text pack (absent = English)
  * @returns Formatted voting results message
  */
-export function generateVotingResultsMessage(results: Record<string, number>): string {
+export function generateVotingResultsMessage(results: Record<string, number>, game?: GameTextSource): string {
     // Handle no votes case
     const totalVotes = Object.values(results).reduce((sum, count) => sum + count, 0);
     if (totalVotes === 0) {
-        return "No votes were cast during this round.";
+        return gameText(game, 'vote_none');
     }
 
     // Find highest vote count and players
@@ -299,25 +301,26 @@ export function generateVotingResultsMessage(results: Record<string, number>): s
     // Format results
     const resultLines = Object.entries(results)
         .filter(([_, count]) => count > 0)
-        .map(([name, count]) => `${name}: ${count} vote${count !== 1 ? 's' : ''}`)
+        .map(([name, count]) => gameText(game, count === 1 ? 'vote_line_one' : 'vote_line_many', { name, count }))
         .join('\n');
 
     // Handle ties
     if (topPlayers.length > 1) {
-        return `Voting results (tie):\n${resultLines}\n\nThere is a tie between ${topPlayers.join(', ')}!`;
+        return `${gameText(game, 'vote_results_tie')}\n${resultLines}\n\n${gameText(game, 'vote_tie_between', { names: topPlayers.join(', ') })}`;
     }
 
-    return `Voting results:\n${resultLines}\n\n${topPlayers[0]} received the most votes and will be eliminated.`;
+    return `${gameText(game, 'vote_results')}\n${resultLines}\n\n${gameText(game, 'vote_top', { name: topPlayers[0] })}`;
 }
 
 /**
- * Generates an elimination message with role reveal
+ * Generates an elimination message with role reveal, in the game's language
  * @param playerName - Name of the eliminated player
  * @param playerRole - Role of the eliminated player
+ * @param game - the game, for its text pack (absent = English)
  * @returns Formatted elimination message
  */
-export function generateEliminationMessage(playerName: string, playerRole: string): string {
-    return `${playerName} has been eliminated! They were a ${playerRole}.`;
+export function generateEliminationMessage(playerName: string, playerRole: string, game?: GameTextSource): string {
+    return eliminationText(game, playerName, playerRole);
 }
 
 export function generateNightResultsMessage(nightResults: Record<string, { target: string }>, game: any): string {

@@ -1620,7 +1620,7 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
             // Only now set recording to false after we've actually stopped
             setIsRecording(false);
             
-            const transcription = await sttService.transcribeRecording(audioBlob, { gameId, voiceProvider: game.voiceProvider });
+            const transcription = await sttService.transcribeRecording(audioBlob, { gameId, voiceProvider: game.voiceProvider, language: game.language });
             
             if (!transcription.trim()) {
                 // A silent clip transcribes to nothing; say so instead of leaving the

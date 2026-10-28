@@ -1,4 +1,5 @@
 import { Game, GAME_ROLES } from '@/app/api/game-models';
+import { gameText, GameTextKey, roleName } from '@/app/ai/game-language';
 
 /**
  * Result of a win condition check
@@ -27,6 +28,39 @@ interface WinConditionChecker {
     getEndGameMessage(game: Game): string;
 }
 
+function roleEmoji(role: string): string {
+    switch (role) {
+        case GAME_ROLES.WEREWOLF: return '🐺';
+        case GAME_ROLES.DOCTOR: return '🏥';
+        case GAME_ROLES.DETECTIVE: return '🔍';
+        case GAME_ROLES.MANIAC: return '🔪';
+        case GAME_ROLES.VILLAGER: return '👤';
+        default: return '❓';
+    }
+}
+
+/**
+ * The end-of-game block in the game's language: title, one line on how it ended, and
+ * every player's role. `humanIsAlive` is what the list says about the human — the human
+ * is not a bot entry, and the human-eliminated checker is called before the game doc
+ * records their death.
+ */
+function endGameMessage(game: Game, title: GameTextKey, body: GameTextKey, humanIsAlive: boolean): string {
+    const allPlayers = [
+        { name: game.humanPlayerName, role: game.humanPlayerRole, isAlive: humanIsAlive },
+        ...game.bots.map(bot => ({ name: bot.name, role: bot.role, isAlive: bot.isAlive })),
+    ];
+    const roleList = allPlayers
+        .map(player => {
+            const status = gameText(game, player.isAlive ? 'alive' : 'dead');
+            return `• ${player.name}: ${roleEmoji(player.role)} **${roleName(game, player.role)}** (${status})`;
+        })
+        .join('\n');
+    return `\n\n${gameText(game, title)}\n\n` +
+           `${gameText(game, body)}\n\n` +
+           `${gameText(game, 'final_roles')}\n${roleList}`;
+}
+
 /**
  * Check if human player has been eliminated
  */
@@ -48,40 +82,7 @@ class HumanEliminatedChecker implements WinConditionChecker {
     }
 
     getEndGameMessage(game: Game): string {
-        const roleList = this.generateRoleRevealList(game);
-        return `\n\n🎭 **GAME OVER**\n\n` +
-               `The human player has been eliminated from the game.\n\n` +
-               `**Final Role Reveals:**\n${roleList}`;
-    }
-
-    private generateRoleRevealList(game: Game): string {
-        const allPlayers = [
-            { name: game.humanPlayerName, role: game.humanPlayerRole, isAlive: false },
-            ...game.bots.map(bot => ({
-                name: bot.name,
-                role: bot.role,
-                isAlive: bot.isAlive
-            }))
-        ];
-
-        return allPlayers
-            .map(player => {
-                const status = player.isAlive ? '✅ Alive' : '💀 Dead';
-                const roleEmoji = this.getRoleEmoji(player.role);
-                return `• ${player.name}: ${roleEmoji} **${player.role}** (${status})`;
-            })
-            .join('\n');
-    }
-
-    private getRoleEmoji(role: string): string {
-        switch (role) {
-            case GAME_ROLES.WEREWOLF: return '🐺';
-            case GAME_ROLES.DOCTOR: return '🏥';
-            case GAME_ROLES.DETECTIVE: return '🔍';
-            case GAME_ROLES.MANIAC: return '🔪';
-            case GAME_ROLES.VILLAGER: return '👤';
-            default: return '❓';
-        }
+        return endGameMessage(game, 'game_over_human_title', 'game_over_human_body', false);
     }
 }
 
@@ -116,40 +117,7 @@ class VillagersWinChecker implements WinConditionChecker {
     }
 
     getEndGameMessage(game: Game): string {
-        const roleList = this.generateRoleRevealList(game);
-        return `\n\n🎭 **GAME OVER - VILLAGERS WIN!** 🎉\n\n` +
-               `All werewolves have been eliminated! The village is safe.\n\n` +
-               `**Final Role Reveals:**\n${roleList}`;
-    }
-
-    private generateRoleRevealList(game: Game): string {
-        const allPlayers = [
-            { name: game.humanPlayerName, role: game.humanPlayerRole, isAlive: game.humanPlayerIsAlive ?? true },
-            ...game.bots.map(bot => ({
-                name: bot.name,
-                role: bot.role,
-                isAlive: bot.isAlive
-            }))
-        ];
-
-        return allPlayers
-            .map(player => {
-                const status = player.isAlive ? '✅ Alive' : '💀 Dead';
-                const roleEmoji = this.getRoleEmoji(player.role);
-                return `• ${player.name}: ${roleEmoji} **${player.role}** (${status})`;
-            })
-            .join('\n');
-    }
-
-    private getRoleEmoji(role: string): string {
-        switch (role) {
-            case GAME_ROLES.WEREWOLF: return '🐺';
-            case GAME_ROLES.DOCTOR: return '🏥';
-            case GAME_ROLES.DETECTIVE: return '🔍';
-            case GAME_ROLES.MANIAC: return '🔪';
-            case GAME_ROLES.VILLAGER: return '👤';
-            default: return '❓';
-        }
+        return endGameMessage(game, 'game_over_villagers_title', 'game_over_villagers_body', game.humanPlayerIsAlive ?? true);
     }
 }
 
@@ -184,40 +152,7 @@ class WerewolvesWinChecker implements WinConditionChecker {
     }
 
     getEndGameMessage(game: Game): string {
-        const roleList = this.generateRoleRevealList(game);
-        return `\n\n🎭 **GAME OVER - WEREWOLVES WIN!** 🐺\n\n` +
-               `The werewolves have achieved dominance! They equal or outnumber the remaining villagers.\n\n` +
-               `**Final Role Reveals:**\n${roleList}`;
-    }
-
-    private generateRoleRevealList(game: Game): string {
-        const allPlayers = [
-            { name: game.humanPlayerName, role: game.humanPlayerRole, isAlive: game.humanPlayerIsAlive ?? true },
-            ...game.bots.map(bot => ({
-                name: bot.name,
-                role: bot.role,
-                isAlive: bot.isAlive
-            }))
-        ];
-
-        return allPlayers
-            .map(player => {
-                const status = player.isAlive ? '✅ Alive' : '💀 Dead';
-                const roleEmoji = this.getRoleEmoji(player.role);
-                return `• ${player.name}: ${roleEmoji} **${player.role}** (${status})`;
-            })
-            .join('\n');
-    }
-
-    private getRoleEmoji(role: string): string {
-        switch (role) {
-            case GAME_ROLES.WEREWOLF: return '🐺';
-            case GAME_ROLES.DOCTOR: return '🏥';
-            case GAME_ROLES.DETECTIVE: return '🔍';
-            case GAME_ROLES.MANIAC: return '🔪';
-            case GAME_ROLES.VILLAGER: return '👤';
-            default: return '❓';
-        }
+        return endGameMessage(game, 'game_over_werewolves_title', 'game_over_werewolves_body', game.humanPlayerIsAlive ?? true);
     }
 }
 

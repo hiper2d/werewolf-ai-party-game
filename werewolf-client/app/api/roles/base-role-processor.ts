@@ -1,5 +1,6 @@
 import { Game, Bot, GAME_MASTER, GameMessage, MessageType, RECIPIENT_ALL, RECIPIENT_WEREWOLVES, ROLE_CONFIGS, GAME_ROLES } from "@/app/api/game-models";
 import { addMessageToChatAndSaveToDb } from "@/app/api/game-actions";
+import { gameText, nightTurnText } from "@/app/ai/game-language";
 
 /**
  * Result of a night action processing
@@ -291,9 +292,7 @@ export abstract class BaseRoleProcessor {
 
         // This announcement goes to every player, so it must stay generic: naming the
         // players with this role would hand the whole village the werewolf roster.
-        const announcement = isWerewolfTurn && hasMultiplePlayers
-            ? `🌙 **Night Phase**: It's time for the ${roleConfig.name}s to act. ${roleConfig.description}.`
-            : `🌙 **Night Phase**: It's time for the ${roleConfig.name} to act. ${roleConfig.description}.`;
+        const announcement = nightTurnText(this.game, this.roleName, isWerewolfTurn && hasMultiplePlayers);
 
         await this.sendMessage(announcement);
 
@@ -301,11 +300,9 @@ export abstract class BaseRoleProcessor {
         // on the werewolves-only channel, which no villager can read.
         if (isWerewolfTurn && playersInfo.hasHumanPlayer) {
             const werewolfRoster = playersInfo.allPlayers
-                .map(player => player.isHuman ? `${player.name} (You)` : player.name)
+                .map(player => player.isHuman ? `${player.name} ${gameText(this.game, 'pack_you')}` : player.name)
                 .join(', ');
-            const packNote = hasMultiplePlayers
-                ? `🐺 **Your pack**: ${werewolfRoster}. Discuss privately before locking in a target.`
-                : `🐺 **Your pack**: ${werewolfRoster}. You are the only werewolf left — pick a target on your own.`;
+            const packNote = gameText(this.game, hasMultiplePlayers ? 'pack_note_many' : 'pack_note_alone', { roster: werewolfRoster });
             await this.sendMessage(packNote, MessageType.GM_COMMAND, RECIPIENT_WEREWOLVES);
         }
 

@@ -85,6 +85,8 @@ export interface GamePreview {
     longReplies?: boolean;
     // How bots relate to their characters — see GAME_MODES. Absent = roleplay (the default).
     gameMode?: GameMode;
+    // The language the game is played in (ISO 639-1, see app/ai/game-language.ts). Absent = English.
+    language?: string;
 }
 
 /**
@@ -126,6 +128,9 @@ export interface GamePreviewWithGeneratedBots extends GamePreview {
     /** Set when the content screen judged the typed art style as something the image model would
      * refuse: `artStyle` comes back empty and the form shows this line under the field. */
     artStyleNotice?: string;
+    /** Non-English games: the code-written game lines translated by the Game Master at
+     * preview time (GAME_TEXT_EN keys). Absent = English lines. */
+    gameText?: Record<string, string>;
     // Paid tier only: attach the illustration set drawn on the preview page
     // (see AvatarDraft). The version the client last saw — createGame adopts
     // the draft only when it still matches; AVATAR_DRAFT_IN_PROGRESS means the
@@ -306,6 +311,10 @@ export interface Game {
     // Locked at creation. Absent on games created before the setting existed — those
     // were played under the tactical prompt, so gameFromFirestore defaults them to tactical.
     gameMode?: GameMode;
+    // Locked at creation. ISO 639-1 code (app/ai/game-language.ts); absent on games from before
+    // the setting = English. The prompts carry it; `gameText` carries the translated fixed lines.
+    language?: string;
+    gameText?: Record<string, string>;
     gameMasterAiType: string;
     voiceProvider?: VoiceProvider; // The game's voice set, picked on the form and fixed at creation (voice ids belong to it)
     gameMasterVoice: string;

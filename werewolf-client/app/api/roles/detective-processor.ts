@@ -213,7 +213,7 @@ export class DetectiveProcessor extends BaseRoleProcessor {
             const apiKeys = await getApiKeysForUser(session.user.email);
 
             // Create detective prompt
-            const detectivePrompt = format(botSystemPrompt(this.game.gameMode), {
+            const detectivePrompt = format(botSystemPrompt(this.game.gameMode, this.game.language), {
                 name: detectiveBot.name,
                 personal_story: detectiveBot.story,
                 play_style: "",

@@ -153,7 +153,7 @@ export class DoctorProcessor extends BaseRoleProcessor {
             const apiKeys = await getApiKeysForUser(session.user.email);
 
             // Create doctor prompt
-            const doctorPrompt = format(botSystemPrompt(this.game.gameMode), {
+            const doctorPrompt = format(botSystemPrompt(this.game.gameMode, this.game.language), {
                 name: doctorBot.name,
                 personal_story: doctorBot.story,
                 play_style: "",

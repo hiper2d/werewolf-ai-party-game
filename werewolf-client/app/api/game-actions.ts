@@ -39,6 +39,8 @@ import {
 import {auth} from "@/auth";
 import {AgentFactory} from "@/app/ai/agent-factory";
 import {generateGamePreview, PreviewProgress} from "@/app/ai/preview-generation";
+import {generateGameTextPack} from "@/app/ai/game-text-pack";
+import {DEFAULT_GAME_LANGUAGE, gameText, normalizeGameLanguage, roleName} from "@/app/ai/game-language";
 import {deletePreviewProgress, isValidProgressId, previewProgressWriter, readPreviewProgress} from "@/app/utils/preview-progress";
 import {getUserTierAndApiKeys} from "@/app/utils/tier-utils";
 import {duplicateNameErrors, sanitizePlayerName} from "@/app/utils/name-utils";
@@ -52,7 +54,7 @@ import {getVoiceConfig, isVoiceOfProvider, LEGACY_VOICE_PROVIDER, SUPPORTED_VOIC
 import {recordFeatureEvent} from "@/app/api/feature-events";
 import {normalizeSpendings} from "@/app/utils/spending-utils";
 import {serializeMessageForFirestore} from "@/app/api/message-serialization";
-import {LLM_CONSTANTS, assertAllowedAsGameMaster, configureStoryAgent, isAllowedAsGameMaster, SupportedAiModels} from "@/app/ai/ai-models";
+import {LLM_CONSTANTS, assertAllowedAsGameMaster, configureStoryAgent, GAME_TEXT_PACK_MODEL, isAllowedAsGameMaster, SupportedAiModels} from "@/app/ai/ai-models";
 import {
     consumeModelUsage,
     getCandidateModelsForTier,
@@ -381,6 +383,9 @@ export async function previewGame(gamePreview: GamePreview, progressId?: string)
     }
     const artStyleSetAside = !!requestedArtStyle && screen.imageUnsafe;
 
+    // The language the whole game is played in: refused outright when it is not one we list.
+    const language = normalizeGameLanguage(gamePreview.language);
+
     const usageCounts: Record<string, number> = {};
 
     // The voice set the cast is drawn from: picked on the form, else the
@@ -474,23 +479,37 @@ export async function previewGame(gamePreview: GamePreview, progressId?: string)
     // generateGamePreview. Each stage gets its own GM agent with the story output profile.
     const trackProgress = isValidProgressId(progressId);
     const onProgress = trackProgress ? previewProgressWriter(progressId, session.user.email) : undefined;
+    const createStoryAgent = (systemPrompt: string) => {
+        const agent: AbstractAgent = AgentFactory.createAgent(GAME_MASTER, systemPrompt, resolvedGmAiType, apiKeys, false);
+        agent.userId = session.user!.email!;
+        configureStoryAgent(agent);
+        return agent;
+    };
+    const createPackAgent = (systemPrompt: string) => {
+        const agent: AbstractAgent = AgentFactory.createAgent(GAME_MASTER, systemPrompt, GAME_TEXT_PACK_MODEL, apiKeys, false);
+        agent.userId = session.user!.email!;
+        return agent;
+    };
     let aiResponse;
+    let textPack;
     try {
-        aiResponse = await generateGamePreview((systemPrompt) => {
-            const agent: AbstractAgent = AgentFactory.createAgent(GAME_MASTER, systemPrompt, resolvedGmAiType, apiKeys, false);
-            agent.userId = session.user!.email!;
-            configureStoryAgent(agent);
-            return agent;
-        }, {
-            theme: gamePreview.theme,
-            description: gamePreview.description,
-            excludedName: gamePreview.name,
-            botCount,
-            werewolfCount: gamePreview.werewolfCount,
-            gameRolesText,
-            playStylesText,
-            voiceConfig,
-        }, onProgress);
+        // A non-English game also gets its fixed Game Master lines translated — one small
+        // call on the pinned pack model that runs beside the story pipeline, so it adds no
+        // wait (and never fails the preview).
+        [aiResponse, textPack] = await Promise.all([
+            generateGamePreview(createStoryAgent, {
+                theme: gamePreview.theme,
+                description: gamePreview.description,
+                excludedName: gamePreview.name,
+                botCount,
+                werewolfCount: gamePreview.werewolfCount,
+                gameRolesText,
+                playStylesText,
+                voiceConfig,
+                language,
+            }, onProgress),
+            generateGameTextPack(createPackAgent, language),
+        ]);
     } finally {
         if (trackProgress) {
             // The doc only exists to be polled during the run; nothing should outlive it.
@@ -516,6 +535,16 @@ export async function previewGame(gamePreview: GamePreview, progressId?: string)
             kind: 'preview',
             modelId: resolvedGmAiType,
             usage: tokenUsage,
+        });
+    }
+    if (textPack.tokenUsage) {
+        // Its own row: the pack ran on the pinned pack model, not the Game Master.
+        await recordSpend({
+            userEmail: session.user.email,
+            costUSD: textPack.tokenUsage.costUSD,
+            kind: 'preview',
+            modelId: GAME_TEXT_PACK_MODEL,
+            usage: textPack.tokenUsage,
         });
     }
     // RANDOM never draws a `excludedFromGmAndRandom` model; a model picked by name is taken as is.
@@ -607,6 +636,8 @@ export async function previewGame(gamePreview: GamePreview, progressId?: string)
     return {
         ...gamePreview,
         ...(artStyleSetAside ? { artStyle: '', artStyleNotice: ART_STYLE_SET_ASIDE_MESSAGE } : {}),
+        language,
+        ...(textPack.pack ? { gameText: textPack.pack } : {}),
         gameMasterAiType: resolvedGmAiType,
         voiceProvider: voiceProvider,
         gameMasterVoice: aiResponse.gameMasterVoice,
@@ -810,6 +841,8 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
             specialRoles: gamePreview.specialRoles,
             longReplies: gamePreview.longReplies ?? false,
             gameMode: gamePreview.gameMode ?? DEFAULT_GAME_MODE,
+            language: normalizeGameLanguage(gamePreview.language),
+            ...(gamePreview.gameText ? {gameText: gamePreview.gameText} : {}),
             gameMasterAiType: gamePreview.gameMasterAiType,
             voiceProvider: gamePreview.voiceProvider, // TTS provider (locked at creation)
             gameMasterVoice: gamePreview.gameMasterVoice,
@@ -878,6 +911,7 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
                 voiceProvider: gamePreview.voiceProvider,
                 gameMode: gamePreview.gameMode ?? DEFAULT_GAME_MODE,
                 longReplies: gamePreview.longReplies ?? false,
+                language: gamePreview.language ?? DEFAULT_GAME_LANGUAGE,
                 artStyle: !!artStyle,
                 gameMaster: gamePreview.gameMasterAiType,
             },
@@ -1523,16 +1557,16 @@ export async function afterGameDiscussion(gameId: string): Promise<GameActionRes
 
         const roleReveal = allPlayerRoles
             .map(p => {
-                const eliminatedNote = p.wasEliminated ? ' (was eliminated)' : '';
+                const eliminatedNote = p.wasEliminated ? ` ${gameText(game, 'was_eliminated')}` : '';
                 const roleEmoji = p.role === 'werewolf' ? '🐺' : p.role === 'doctor' ? '🏥' : p.role === 'detective' ? '🔍' : p.role === 'maniac' ? '🔪' : '👤';
-                return `• ${p.name}: ${roleEmoji} **${p.role}**${eliminatedNote}`;
+                return `• ${p.name}: ${roleEmoji} **${roleName(game, p.role)}**${eliminatedNote}`;
             })
             .join('\n');
 
-        const gmMessage = `🎭 **GAME OVER - POST-GAME DISCUSSION**\n\n` +
-            `The game has ended! All roles are now revealed and **everyone** (including those who were eliminated) can participate in the discussion.\n\n` +
-            `**Final Roles:**\n${roleReveal}\n\n` +
-            `Feel free to share your experiences, reveal your strategies, discuss close calls, and ask questions about what really happened during the game. This is a time for open and honest reflection!`;
+        const gmMessage = `${gameText(game, 'post_game_title')}\n\n` +
+            `${gameText(game, 'post_game_intro')}\n\n` +
+            `${gameText(game, 'post_game_roles')}\n${roleReveal}\n\n` +
+            gameText(game, 'post_game_outro');
 
         const nextDay = game.currentDay + 1;
 
@@ -1644,6 +1678,8 @@ function gameFromFirestore(id: string, data: any): Game {
         longReplies: data.longReplies ?? true,
         // Pre-setting games were played as strategists wearing personas — keep them that way.
         gameMode: data.gameMode ?? GAME_MODES.TACTICAL,
+        language: data.language ?? DEFAULT_GAME_LANGUAGE,
+        ...(data.gameText ? {gameText: data.gameText} : {}),
         gameMasterAiType: data.gameMasterAiType,
         voiceProvider: data.voiceProvider || LEGACY_VOICE_PROVIDER, // games from before the field were cast from OpenAI ids
         gameMasterVoice: data.gameMasterVoice || getRandomVoiceForGender('male'), // Fallback for existing games

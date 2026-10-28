@@ -41,6 +41,7 @@ import { buildStoryContext, lynchSummaryForDay, sanitizeNarrativeHint } from "@/
 import { BOT_DAY_SUMMARY_PROMPT, botSystemPrompt } from "@/app/ai/prompts/bot-prompts";
 import { generateBotContextSection, generateWerewolfTeammatesSection, getAlivePlayerNames, getEffectiveModel } from "@/app/utils/bot-utils";
 import { format } from "@/app/ai/prompts/utils";
+import { gameText, languageInstruction } from "@/app/ai/game-language";
 import { convertToAIMessages, convertMessageContent, formatMessagesForNightSummary } from "@/app/utils/message-utils";
 import { after } from "next/server";
 import { midGameImagesEnabled, runNightIllustration } from "@/app/utils/illustration-generation";
@@ -108,7 +109,7 @@ async function endNightWithResults(gameId: string, game: Game): Promise<GameActi
         theme: game.theme || 'Werewolf Village',
         story_so_far: buildStoryContext(game),
         lynch_summary: lynchSummaryForDay(game, game.currentDay)
-    });
+    }) + languageInstruction(game.language, 'gm');
 
     // Build simplified GM prompt params from NightState
     const deathsSummary = nightState.deaths.length > 0
@@ -219,11 +220,11 @@ async function endNightWithResults(gameId: string, game: Game): Promise<GameActi
     // it explicit for bots and humans alike. Nothing is added when there is no
     // detective — the prose already stays silent in that case.
     const detectiveLine = detectiveResultSummary === 'FOUND_EVIL'
-        ? "\n\n🔍 *The detective's investigation revealed evil.*"
+        ? `\n\n${gameText(game, 'detective_evil')}`
         : detectiveResultSummary === 'FOUND_INNOCENT'
-            ? "\n\n🔍 *The detective's investigation found an innocent.*"
+            ? `\n\n${gameText(game, 'detective_innocent')}`
             : detectiveResultSummary === 'BLOCKED'
-                ? "\n\n🔍 *The detective's investigation revealed nothing.*"
+                ? `\n\n${gameText(game, 'detective_blocked')}`
                 : '';
 
     // Append end game message to night results if game is ending
@@ -420,11 +421,11 @@ async function beginNightImpl(gameId: string): Promise<GameActionResponse> {
             .sort((a, b) => (ROLE_CONFIGS[a].nightActionOrder ?? 999) - (ROLE_CONFIGS[b].nightActionOrder ?? 999));
 
         // Create Game Master message explaining the night phase (only roles with night actions)
-        const roleDescriptions = buildNightRoleBriefing();
+        const roleDescriptions = buildNightRoleBriefing(game);
 
         // GM-written nightfall passage continuing the game's chronicle. Pure flavor:
         // any failure falls back to the static line and never blocks the night.
-        let nightfallStory = 'Night falls over the village.';
+        let nightfallStory = gameText(game, 'night_fallback');
         try {
             const apiKeys = await getApiKeysForUser(session.user.email);
             const nightBeginsPrompt = format(GM_NIGHT_BEGINS_SYSTEM_PROMPT, {
@@ -432,7 +433,7 @@ async function beginNightImpl(gameId: string): Promise<GameActionResponse> {
                 story_so_far: buildStoryContext(game),
                 lynch_summary: lynchSummaryForDay(game, game.currentDay),
                 currentDay: game.currentDay
-            });
+            }) + languageInstruction(game.language, 'gm');
             const gmModel = getEffectiveModel(game, GAME_MASTER, game.gameMasterAiType);
             const gmAgent = AgentFactory.createAgent(GAME_MASTER, nightBeginsPrompt, gmModel.aiType, apiKeys, gmModel.enableThinking);
             gmAgent.gameId = gameId;
@@ -450,7 +451,7 @@ async function beginNightImpl(gameId: string): Promise<GameActionResponse> {
             logger.warn(`🌙 Nightfall story generation failed, using static fallback`, { gameId, error: error?.message });
         }
 
-        const gmMessage = `🌙 ${nightfallStory}\n\nDuring this phase, players with special abilities will act in this order:\n${roleDescriptions}\n\nThe night actions will be processed automatically.`;
+        const gmMessage = `🌙 ${nightfallStory}\n\n${gameText(game, 'night_intro')}\n${roleDescriptions}\n\n${gameText(game, 'night_outro')}`;
 
         const gameMessage: GameMessage = {
             id: null,
@@ -1224,8 +1225,8 @@ async function summarizePastDayImpl(gameId: string): Promise<GameActionResponse>
             // night-results call wrote (continuing the game's chronicle); fall back to the
             // static template for legacy games or if the GM omitted it.
             const dayOpening = (currentGame.pendingDayOpening || '').trim()
-                || `The village awakens to a new day. The events of the night have left their mark. Now is the time to discuss what happened and decide who among you might be a threat to the village.`;
-            const gmStory = `☀️ **Day ${nextDay} begins.**\n\n${dayOpening}\n\nDiscuss the night's events, share your suspicions, and prepare to vote when ready.`;
+                || gameText(currentGame, 'day_opening_fallback');
+            const gmStory = `${gameText(currentGame, 'day_begins', { day: nextDay })}\n\n${dayOpening}\n\n${gameText(currentGame, 'day_outro')}`;
 
             const gameMessage: GameMessage = {
                 id: null,
@@ -1294,7 +1295,7 @@ async function summarizePastDayImpl(gameId: string): Promise<GameActionResponse>
 
                     const gmSummaryModel = getEffectiveModel(currentGame, GAME_MASTER, currentGame.gameMasterAiType);
                     const gmAgent = AgentFactory.createAgent(
-                        GAME_MASTER, GM_DAY_SUMMARY_SYSTEM_PROMPT,
+                        GAME_MASTER, GM_DAY_SUMMARY_SYSTEM_PROMPT + languageInstruction(currentGame.language, 'gm'),
                         gmSummaryModel.aiType, apiKeys, gmSummaryModel.enableThinking
                     );
                     gmAgent.gameId = gameId;
@@ -1369,7 +1370,7 @@ async function summarizePastDayImpl(gameId: string): Promise<GameActionResponse>
         const apiKeys = await getApiKeysForUser(session.user.email);
 
         // Create bot system prompt
-        const botPrompt = format(botSystemPrompt(currentGame.gameMode), {
+        const botPrompt = format(botSystemPrompt(currentGame.gameMode, currentGame.language), {
             name: bot.name,
             personal_story: bot.story,
             play_style: "",

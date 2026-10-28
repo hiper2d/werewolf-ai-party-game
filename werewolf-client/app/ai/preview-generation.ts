@@ -24,6 +24,7 @@ import {
     CHARACTER_SHEET_SYSTEM_PROMPT,
     CHARACTER_SHEET_USER_PROMPT,
 } from '@/app/ai/prompts/story-gen-prompts';
+import {languageInstruction} from '@/app/ai/game-language';
 import {CharacterSheetBatchZodSchema, GameCastingZodSchema} from '@/app/ai/prompts/zod-schemas';
 
 /** Characters per stage-2 call. Small enough that the JSON stays trivial for any model,
@@ -42,6 +43,8 @@ export interface PreviewGenerationInput {
     /** Pre-formatted playstyle list for the character-sheet prompt. */
     playStylesText: string;
     voiceConfig: VoiceConfig;
+    /** The game's language code (app/ai/game-language.ts). Absent = English. */
+    language?: string;
 }
 
 export interface GeneratedCharacter {
@@ -112,7 +115,7 @@ export async function generateGamePreview(
         werewolf_count: input.werewolfCount,
         available_voices: input.voiceConfig.getPromptDescription(),
     });
-    const castingAgent = createAgent(CASTING_SYSTEM_PROMPT);
+    const castingAgent = createAgent(CASTING_SYSTEM_PROMPT + languageInstruction(input.language, 'story'));
     const [casting, , castingUsage] = await askStage(castingAgent, 'casting the lobby', {theme: input.theme}, () =>
         castingAgent.askWithZodSchema(GameCastingZodSchema, [userMessage(castingPrompt)]));
     if (!casting) {
@@ -124,7 +127,7 @@ export async function generateGamePreview(
 
     // ---- Stage 2: character sheets, in parallel batches --------------------------------
     const fullCastText = cast.map(c => `${c.name} (${c.gender})`).join(', ');
-    const sheetAgent = createAgent(CHARACTER_SHEET_SYSTEM_PROMPT);
+    const sheetAgent = createAgent(CHARACTER_SHEET_SYSTEM_PROMPT + languageInstruction(input.language, 'sheets'));
     const batches = splitIntoBatches(cast, CHARACTER_SHEET_BATCH_SIZE);
     progress.stage = 'sheets';
     progress.cast = cast;

@@ -37,6 +37,7 @@ import {invalidTargetExplanation, selfSelectionExplanation} from "@/app/api/retr
 import {normalizeTargetName} from "@/app/api/target-resolution";
 import {AgentFactory} from "@/app/ai/agent-factory";
 import {format} from "@/app/ai/prompts/utils";
+import {languageInstruction} from "@/app/ai/game-language";
 import {auth} from "@/auth";
 import {
     convertToAIMessages,
@@ -102,7 +103,7 @@ function parseIndividualVotes(raw: string): IndividualVote[] {
  * Helper function to generate bot system prompt with after-game addition if needed
  */
 function generateBotSystemPrompt(bot: Bot, game: Game): string {
-    const basePrompt = format(botSystemPrompt(game.gameMode), {
+    const basePrompt = format(botSystemPrompt(game.gameMode, game.language), {
         name: bot.name,
         personal_story: bot.story,
         play_style: "",
@@ -369,7 +370,7 @@ function shouldTriggerAutoVote(game: Game): boolean {
             // reminder rides as its own trailing message (never persisted) so the GM
             // command block stays byte-stable for prompt caches; providers that need
             // alternating roles merge it back in prepareMessages.
-            const playStyleReminder = format(botReminderPostfix(game.gameMode), { play_style: generatePlayStyleDescription(bot), human_player_name: game.humanPlayerName, reply_length_instruction: replyLengthInstruction(game.longReplies) });
+            const playStyleReminder = format(botReminderPostfix(game.gameMode, game.language), { play_style: generatePlayStyleDescription(bot), human_player_name: game.humanPlayerName, reply_length_instruction: replyLengthInstruction(game.longReplies) });
             const history = convertToAIMessages(bot.name, [...botMessages, gmMessage]);
             history.push({ role: MESSAGE_ROLE.USER, content: playStyleReminder.trim() });
             const [rawAnswer, thinking, tokenUsage, thinkingSignature] = await agent.askText(history);
@@ -778,7 +779,7 @@ async function processNextBotInQueue(
     // rides as its own trailing message (never persisted) so the GM command block stays
     // byte-stable for prompt caches; providers that need alternating roles merge it back
     // in prepareMessages.
-    const playStyleReminder = format(botReminderPostfix(game.gameMode), { play_style: generatePlayStyleDescription(bot), human_player_name: game.humanPlayerName, reply_length_instruction: replyLengthInstruction(game.longReplies) });
+    const playStyleReminder = format(botReminderPostfix(game.gameMode, game.language), { play_style: generatePlayStyleDescription(bot), human_player_name: game.humanPlayerName, reply_length_instruction: replyLengthInstruction(game.longReplies) });
     const history = convertToAIMessages(bot.name, [...botMessages, gmMessage]);
     history.push({ role: MESSAGE_ROLE.USER, content: playStyleReminder.trim() });
     const [rawBotReply, thinking, tokenUsage, thinkingSignature] = await agent.askText(history);
@@ -926,7 +927,7 @@ async function voteImpl(gameId: string): Promise<GameActionResponse> {
                 const updatedGame = await getGame(gameId) as Game;
                 
                 // Generate GM message with voting results
-                const resultsMessage = generateVotingResultsMessage(votingResults);
+                const resultsMessage = generateVotingResultsMessage(votingResults, updatedGame);
                 console.log('📝 VOTE FUNCTION: Generated results message:', resultsMessage);
                 
                 // Create and save GM message
@@ -966,7 +967,7 @@ async function voteImpl(gameId: string): Promise<GameActionResponse> {
                     }
                     
                     // Generate elimination message
-                    const eliminationMessage = generateEliminationMessage(eliminatedPlayer, eliminatedRole);
+                    const eliminationMessage = generateEliminationMessage(eliminatedPlayer, eliminatedRole, updatedGame);
 
                     // Parse individual votes from gameStateParamQueue[1]
                     let savedIndividualVotes: IndividualVote[] = [];
@@ -1106,7 +1107,7 @@ async function voteImpl(gameId: string): Promise<GameActionResponse> {
             const apiKeys = await getApiKeysForUser(session.user!.email!);
             
             const botPrompt = format(
-                botSystemPrompt(currentGame.gameMode),
+                botSystemPrompt(currentGame.gameMode, currentGame.language),
                 {
                     name: bot.name,
                     personal_story: bot.story,
@@ -1172,7 +1173,7 @@ async function voteImpl(gameId: string): Promise<GameActionResponse> {
             // Create history including the voting command; the playstyle reminder rides
             // as its own trailing message (never persisted) so the GM command block stays
             // byte-stable for prompt caches.
-            const playStyleReminder = format(botReminderPostfix(currentGame.gameMode), { play_style: generatePlayStyleDescription(bot), human_player_name: currentGame.humanPlayerName, reply_length_instruction: replyLengthInstruction(currentGame.longReplies) });
+            const playStyleReminder = format(botReminderPostfix(currentGame.gameMode, currentGame.language), { play_style: generatePlayStyleDescription(bot), human_player_name: currentGame.humanPlayerName, reply_length_instruction: replyLengthInstruction(currentGame.longReplies) });
             const history = convertToAIMessages(bot.name, [...botMessages, gmMessage]);
             history.push({ role: MESSAGE_ROLE.USER, content: playStyleReminder.trim() });
             
@@ -1703,7 +1704,7 @@ async function getSuggestionImpl(gameId: string): Promise<string> {
                 .filter(b => !b.isAlive)
                 .map(b => `${b.name} (${b.role})`)
                 .join(", ")
-        });
+        }) + languageInstruction(game.language, 'gm');
 
         // Use the game master AI to generate suggestion
         assertProviderNotBlocked(game, game.gameMasterAiType);

@@ -25,6 +25,7 @@ import {ART_STYLE_MAX_LENGTH, sanitizeArtStyle} from "@/app/utils/art-style";
 import {INPUT_LIMITS} from "@/app/utils/input-limits";
 import {ttsService} from "@/app/services/tts-service";
 import {getVoiceConfig, getDefaultVoiceProvider, SUPPORTED_VOICE_PROVIDERS, VOICE_PROVIDER_DESCRIPTIONS, VOICE_PROVIDER_DISPLAY_NAMES, VoiceProvider} from "@/app/ai/voice-config";
+import {DEFAULT_GAME_LANGUAGE, GAME_LANGUAGES} from "@/app/ai/game-language";
 
 const RANDOM_NAMES = ['Bob', 'John', 'Alex', 'Sam', 'Max', 'Leo', 'Kai', 'Finn'];
 const RANDOM_THEMES = ['Dracula', 'Sherlock Holmes', 'Cthulhu Mythos', 'Treasure Island', 'Spaceship Crew', 'Wild West Town'];
@@ -107,6 +108,9 @@ export default function CreateNewGamePage() {
     const [name, setName] = useState(() => pickRandom(RANDOM_NAMES));
     const [theme, setTheme] = useState(() => pickRandom(RANDOM_THEMES));
     const [description, setDescription] = useState('');
+    // The language the whole game is played in (story, bots, Game Master). Fixed once the
+    // preview is generated: the story and the translated fixed lines are made for it.
+    const [language, setLanguage] = useState<string>(DEFAULT_GAME_LANGUAGE);
     // Free-text drawing direction for avatars/illustrations — image prompts only,
     // never the story prompts. Stays editable after the preview is generated, so
     // the live value (not the one baked into gameData) is what createGame gets.
@@ -525,6 +529,7 @@ export default function CreateNewGamePage() {
             name,
             theme,
             description,
+            language,
             artStyle,
             playerCount,
             werewolfCount,
@@ -833,19 +838,35 @@ export default function CreateNewGamePage() {
                                     {themeError && <p className="text-[var(--danger)] text-[12px] mt-1">{themeError}</p>}
                                 </div>
                             </div>
-                            <div>
-                                <div className="flex items-baseline justify-between gap-2 flex-wrap mb-1.5">
-                                    <label className="text-[12px] font-medium text-[var(--fg-1)]">Instructions for the Game Master</label>
-                                    <span className="text-[11px] text-[var(--fg-3)]">optional</span>
+                            <div className="grid grid-cols-[minmax(0,1fr)_minmax(150px,200px)] gap-3 items-start">
+                                <div className="min-w-0">
+                                    <div className="flex items-baseline justify-between gap-2 flex-wrap mb-1.5">
+                                        <label className="text-[12px] font-medium text-[var(--fg-1)]">Instructions for the Game Master</label>
+                                        <span className="text-[11px] text-[var(--fg-3)]">optional</span>
+                                    </div>
+                                    <textarea
+                                        className={`${inputStyle} min-h-[58px] resize-y leading-[1.5]`}
+                                        placeholder="A single family with old grudges. A horror twist. All characters female…"
+                                        value={description}
+                                        onChange={(e) => setDescription(e.target.value)}
+                                        maxLength={INPUT_LIMITS.gmInstructions}
+                                        rows={2}
+                                    />
                                 </div>
-                                <textarea
-                                    className={`${inputStyle} min-h-[58px] resize-y leading-[1.5]`}
-                                    placeholder="A single family with old grudges. A horror twist. All characters female…"
-                                    value={description}
-                                    onChange={(e) => setDescription(e.target.value)}
-                                    maxLength={INPUT_LIMITS.gmInstructions}
-                                    rows={2}
-                                />
+                                <div>
+                                    <div className="flex items-center gap-1.5 mb-1.5">
+                                        <label className={labelStyle + ' !mb-0'}>Language</label>
+                                        <InfoButton label="Language info" size={16}>
+                                            The language the whole game is played in: the story, every character, the Game Master and the bots. Names stay as written. Fixed once the preview is generated — regenerate to switch. Smaller, faster models hold a language less reliably over long passages.
+                                        </InfoButton>
+                                    </div>
+                                    <SelectDropdown
+                                        options={GAME_LANGUAGES.map(l => ({ value: l.code, label: l.native, secondaryLabel: l.code === DEFAULT_GAME_LANGUAGE ? undefined : l.name }))}
+                                        value={language}
+                                        onChange={setLanguage}
+                                        disabled={!!gameData}
+                                    />
+                                </div>
                             </div>
                             <div>
                                 <div className="flex items-baseline justify-between gap-2 flex-wrap mb-1.5">

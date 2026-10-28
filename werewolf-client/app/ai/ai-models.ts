@@ -130,6 +130,16 @@ export const SUMMARY_REQUEST_TIMEOUT_MS = 150_000;
  * 240s timeout) with no observed quality gain. The per-instance `reasoningEffort` /
  * `thinkingBudgetTokens` fields on AbstractAgent remain available if that ever changes.
  */
+/**
+ * The model that translates the fixed Game Master lines for a non-English game (one call
+ * at preview time, app/ai/game-text-pack.ts). Pinned instead of following the Game Master
+ * pick: the lines are the game's rulebook voice, so they should not depend on which model
+ * the player chose — MiniMax M3.1 Flash mixed Chinese characters into Japanese lines
+ * (2026-10-28), Gemini Flash Lite returned clean French/Japanese/Russian in 3-5 s for
+ * about $0.002. Falls back to English lines on any failure, never to an error.
+ */
+export const GAME_TEXT_PACK_MODEL: string = LLM_CONSTANTS.GEMINI_LITE;
+
 export function configureStoryAgent(agent: AbstractAgent): void {
     agent.maxOutputTokens = STORY_MAX_OUTPUT_TOKENS;
     agent.requestTimeoutMs = STORY_REQUEST_TIMEOUT_MS;

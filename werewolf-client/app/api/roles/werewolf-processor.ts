@@ -188,7 +188,7 @@ export class WerewolfProcessor extends BaseRoleProcessor {
             const apiKeys = await getApiKeysForUser(session.user.email);
 
             // Create werewolf prompt
-            const werewolfPrompt = format(botSystemPrompt(this.game.gameMode), {
+            const werewolfPrompt = format(botSystemPrompt(this.game.gameMode, this.game.language), {
                 name: werewolfBot.name,
                 personal_story: werewolfBot.story,
                 play_style: "",

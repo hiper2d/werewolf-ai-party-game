@@ -91,7 +91,7 @@ export class ManiacProcessor extends BaseRoleProcessor {
             const apiKeys = await getApiKeysForUser(session.user.email);
 
             // Create maniac prompt
-            const maniacPrompt = format(botSystemPrompt(this.game.gameMode), {
+            const maniacPrompt = format(botSystemPrompt(this.game.gameMode, this.game.language), {
                 name: maniacBot.name,
                 personal_story: maniacBot.story,
                 play_style: "",
