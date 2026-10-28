@@ -130,14 +130,6 @@
       "outputTokens": 107,
       "reasoningTokens": 0
     },
-    "minimax": {
-      "usdPerTurn": 0.002624,
-      "calls": 689,
-      "inputTokens": 7862,
-      "cachedInputTokens": 2571,
-      "outputTokens": 735,
-      "reasoningTokens": 0
-    },
     "glm-flash": {
       "usdPerTurn": 0.000954,
       "calls": 481,

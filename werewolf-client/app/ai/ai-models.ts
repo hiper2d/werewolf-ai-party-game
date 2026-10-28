@@ -349,7 +349,9 @@ export function resolveModelId(modelId: string): string {
  * over 150s in the live suite — Mistral Medium 3.5 277s (since removed), Grok 4.7 213s (medium
  * effort), Qwen3.8 Max 198s, MiniMax M3 169s, Qwen3.8 Flash 160s. Kimi K3 (146s) is the closest
  * one still allowed. Re-measure with the live story suite (app/ai/all-models.test.ts) when a
- * model changes. Both Qwen models are slow at story time only because Qwen runs our parallel
+ * model changes — MiniMax left the list 2026-10-27 that way: the `minimax` slot moved from M3 to
+ * M3.1 Flash (lib 0.29.0) and the same suite ran the pipeline in 35s (casting 7.7s, four
+ * character-sheet batches finishing 7-27s), the day-2 vote in 4.3s and the welcome in 2.5s. Both Qwen models are slow at story time only because Qwen runs our parallel
  * requests one at a time (Flash 2026-10-07: casting 14.5s, then 4 batches of ~20s work each
  * finishing 20s apart, reasoning already at its minimum 1,024-token budget); a single GM turn
  * is ~15-20s. Muse Spark 1.3 (catalog tag `slow`, effort pinned medium) is fine as a bot
@@ -358,9 +360,11 @@ export function resolveModelId(modelId: string): string {
  *
  * RANDOM (2026-10-21): bot turns hit the 60s timeout in a 16-player game at days
  * 8-9, and the timeouts belonged to four models only — DeepSeek V4 Pro 7 of 79 calls (30-day
- * p90 31s), MiniMax 5 of 55 (p90 22s, max 105s), Muse Spark 4 of 73 (p90 26s), Gemini 4 Argon
+ * p90 31s), MiniMax M3 5 of 55 (p90 22s, max 105s), Muse Spark 4 of 73 (p90 26s), Gemini 4 Argon
  * 3 of 50 (p90 34s, max 207s) — while ~1,500 calls on the rest of the catalog had none (p90 7-15s).
  * DeepSeek V4 Pro and Argon were added for that; the five story-slow models were already here.
+ * The MiniMax timeouts were M3's (two more on 2026-10-25 and 10-27); M3.1 Flash is back in RANDOM
+ * on the 2026-10-27 measurements above — watch its p90 in requestStats over the first week.
  * Kimi K3.1 Pro added 2026-10-25: 7 of 40 prod calls ran 55-89s overnight (end-of-day summaries
  * and late votes past the 60s timeout), and a replay of those summaries at effort high took 24-84s
  * (2 of 9 over 60s). Effort `low` was tried and was worse (median 93s), so it stays at high.
@@ -372,7 +376,6 @@ export function resolveModelId(modelId: string): string {
 for (const modelId of [
     LLM_CONSTANTS.GROK,
     LLM_CONSTANTS.QWEN_MAX,
-    LLM_CONSTANTS.MINIMAX,
     LLM_CONSTANTS.QWEN_FLASH,
     LLM_CONSTANTS.MUSE_SPARK,
     LLM_CONSTANTS.DEEPSEEK_PRO,

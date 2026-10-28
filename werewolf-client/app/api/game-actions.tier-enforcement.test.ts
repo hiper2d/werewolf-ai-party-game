@@ -468,7 +468,7 @@ describe('previewGame tier enforcement', () => {
 
             await expect(previewGame(makePreview({
                 gameMasterAiType: LLM_CONSTANTS.RANDOM,
-                playersAiType: [LLM_CONSTANTS.GROK, LLM_CONSTANTS.MINIMAX],
+                playersAiType: [LLM_CONSTANTS.GROK, LLM_CONSTANTS.QWEN_MAX],
             }))).rejects.toThrow('No AI models are available for the game master');
             expect(AgentFactory.createAgent).not.toHaveBeenCalled();
         });
@@ -538,8 +538,8 @@ describe('createGame tier enforcement', () => {
         const { setGame } = setupDbForCreate();
 
         await expect(
-            createGame(makeGeneratedPreview({ gameMasterAiType: LLM_CONSTANTS.MINIMAX }))
-        ).rejects.toThrow('MiniMax M3 is too slow to be the Game Master.');
+            createGame(makeGeneratedPreview({ gameMasterAiType: LLM_CONSTANTS.GROK }))
+        ).rejects.toThrow('Grok 4.7 is too slow to be the Game Master.');
         expect(setGame).not.toHaveBeenCalled();
     });
 

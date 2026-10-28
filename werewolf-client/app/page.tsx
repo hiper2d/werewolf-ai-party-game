@@ -18,7 +18,7 @@ export const metadata: Metadata = {
 
 const MODELS = [
   'Claude 5.5 Opus', 'GPT-6.1 Sol', 'Gemini 4 Argon', 'DeepSeek V4 Pro',
-  'Mistral 4 Small', 'GLM-5.3', 'Kimi K3.1 Pro', 'Grok 4.7', 'Qwen3.8 Max', 'MiniMax M3', 'Sakana Fugu Max', 'Meta Muse Wonder 1.0',
+  'Mistral 4 Small', 'GLM-5.3', 'Kimi K3.1 Pro', 'Grok 4.7', 'Qwen3.8 Max', 'MiniMax M3.1 Flash', 'Sakana Fugu Max', 'Meta Muse Wonder 1.0',
 ];
 
 // Real plans: Free (platform-paid, capped) vs Paid (pay-as-you-go, no subscription).
