@@ -74,6 +74,10 @@ Required environment variables:
 
 To investigate user bug reports, stuck games, or production errors, use the `debugging` skill (`.claude/skills/debugging/SKILL.md`). It covers querying BetterStack app logs via the ClickHouse SQL API and reading production Firestore (find games by theme, dump game docs/messages/errorState) with the scripts in `werewolf-client/scripts/`. Credentials live in `werewolf-client/.env`.
 
+## Usage Metrics
+
+To answer "how many", "what do players choose", "does anyone use X" questions (languages, models, voices, cast edits, retention, spend by day or model), use the `metrics` skill (`.claude/skills/metrics/SKILL.md`). It maps each question to the collection and script that answers it (`featureEvents` `game_created` rows carry the form choices and the preview edits; Marlow's history file is the only series older than 30 days) and lists the caveats: retention windows, own-account exclusion, UTC.
+
 ## Testing
 
 - Jest configuration in `jest.config.js`; `npm test` runs the app suites (mocked, free)
