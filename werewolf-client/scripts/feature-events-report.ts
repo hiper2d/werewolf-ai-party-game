@@ -6,7 +6,9 @@
  *      spoken line, so its count is high by nature; read its users and games.
  *   2. Reach: of the games created in the window, how many had any avatar edit, a spoken
  *      line (clicked vs cinematic auto-read), a dictation; spoken lines by source; the
- *      per-user counts (who edits a lot — a power user or a crop that keeps coming out wrong).
+ *      per-user counts (who edits a lot — a power user or a crop that keeps coming out wrong);
+ *      the new-game form's choices per game (language, voice provider, mode, ...) and how
+ *      many games had their generated names, stories or opening story edited before Create.
  *   3. The rows themselves with --all (time, user, feature, game, detail).
  *
  * Usage:
@@ -77,10 +79,23 @@ async function main() {
     const creations = events.filter(e => e.feature === 'game_created');
     if (creations.length) {
         console.log(`\n  choices on the new-game form (${creations.length} games):`);
-        for (const field of ['voiceProvider', 'gameMode', 'longReplies', 'tier', 'artStyle', 'players', 'gameMaster']) {
+        for (const field of ['language', 'voiceProvider', 'gameMode', 'longReplies', 'tier', 'artStyle', 'players', 'gameMaster']) {
             const counts = countBy(creations, e => String(e.detail?.[field] ?? '-'));
             const parts = [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([v, n]) => `${v} ${n}`).join(', ');
             console.log(`    ${field.padEnd(14)} ${parts}`);
+        }
+        // Edits made on the preview before Create (rows since 2026-10-29 carry them).
+        const withEdits = creations.filter(e => e.detail?.editedNames !== undefined);
+        if (withEdits.length) {
+            const touched = (field: string) => withEdits.filter(e => Number(e.detail?.[field]) > 0 || e.detail?.[field] === true).length;
+            const total = (field: string) => withEdits.reduce((sum, e) => sum + (Number(e.detail?.[field]) || 0), 0);
+            const pct = (n: number) => `${Math.round(100 * n / withEdits.length)}%`;
+            console.log(`  edited on the preview before Create (${withEdits.length} games):`);
+            console.log(`    names          ${touched('editedNames')} games (${pct(touched('editedNames'))}), ${total('editedNames')} bots renamed`);
+            console.log(`    stories        ${touched('editedStories')} games (${pct(touched('editedStories'))}), ${total('editedStories')} stories rewritten`);
+            console.log(`    details        ${touched('editedDetails')} games (${pct(touched('editedDetails'))}): play style, appearance, voice`);
+            console.log(`    opening story  ${touched('editedScene')} games (${pct(touched('editedScene'))})`);
+            console.log(`    untouched      ${withEdits.filter(e => !['editedNames', 'editedStories', 'editedDetails'].some(f => Number(e.detail?.[f]) > 0) && e.detail?.editedScene !== true).length} games kept the cast as generated`);
         }
     }
     const perUser = countBy(events, e => e.userId);

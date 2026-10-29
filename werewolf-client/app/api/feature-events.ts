@@ -25,7 +25,8 @@ export type FeatureName =
     | 'draft_illustrations'    // drew the portraits + scenes on the preview (paid)
     | 'voice_tts'              // one spoken line (detail.source says where: chat, cinematic, cinematic_auto, preview, audition)
     | 'voice_stt'              // one dictated message
-    | 'game_created';          // the form's choices: tier, players, voiceProvider, gameMode, longReplies, artStyle, gameMaster
+    | 'game_created';          // the form's choices: tier, players, voiceProvider, gameMode, longReplies, language, artStyle, gameMaster,
+                               // plus what was edited on the preview before Create: editedNames, editedStories, editedDetails (counts), editedScene
 
 /**
  * Where a spoken line was asked for. `cinematic_auto` is the auto-read in

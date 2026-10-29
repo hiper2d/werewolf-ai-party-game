@@ -524,7 +524,7 @@ export async function previewGame(gamePreview: GamePreview, progressId?: string)
     }
     const tokenUsage = aiResponse.tokenUsage;
 
-    logger.info(`Preview token usage: ${JSON.stringify(tokenUsage)}, tier: ${tier}`);
+    logger.info(`Preview token usage: ${JSON.stringify(tokenUsage)}, tier: ${tier}`, { language });
     if (tokenUsage) {
         // No game exists yet, so the preview's cost belongs to the user alone. recordSpend
         // charges the current tier (paid: cost + markup off the balance, throwing on an
@@ -898,7 +898,7 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
         };
 
         await addMessageToChatAndSaveToDb(gameStoryMessage, customGameId);
-        logger.info(`Game created: ${customGameId}`, { theme: gamePreview.theme, owner: session.user.email });
+        logger.info(`Game created: ${customGameId}`, { theme: gamePreview.theme, owner: session.user.email, language: gamePreview.language ?? DEFAULT_GAME_LANGUAGE });
         // The choices made on the form, as one feature-use row: the game doc
         // holds them too, but it expires in 30 days and this survives 180.
         await recordFeatureEvent({
@@ -914,6 +914,9 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
                 language: gamePreview.language ?? DEFAULT_GAME_LANGUAGE,
                 artStyle: !!artStyle,
                 gameMaster: gamePreview.gameMasterAiType,
+                // Counted by the form against the preview it got back; absent on an
+                // old client. Zeros mean the generated cast was kept as written.
+                ...(gamePreview.edits ?? {}),
             },
         });
 

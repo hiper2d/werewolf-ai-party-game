@@ -26,6 +26,7 @@ import {INPUT_LIMITS} from "@/app/utils/input-limits";
 import {ttsService} from "@/app/services/tts-service";
 import {getVoiceConfig, getDefaultVoiceProvider, SUPPORTED_VOICE_PROVIDERS, VOICE_PROVIDER_DESCRIPTIONS, VOICE_PROVIDER_DISPLAY_NAMES, VoiceProvider} from "@/app/ai/voice-config";
 import {DEFAULT_GAME_LANGUAGE, GAME_LANGUAGES} from "@/app/ai/game-language";
+import {previewEdits} from '@/app/games/newgame/preview-edits';
 
 const RANDOM_NAMES = ['Bob', 'John', 'Alex', 'Sam', 'Max', 'Leo', 'Kai', 'Finn'];
 const RANDOM_THEMES = ['Dracula', 'Sherlock Holmes', 'Cthulhu Mythos', 'Treasure Island', 'Spaceship Crew', 'Wild West Town'];
@@ -136,6 +137,8 @@ export default function CreateNewGamePage() {
     );
     const [isFormValid, setIsFormValid] = useState(false);
     const [gameData, setGameData] = useState<GamePreviewWithGeneratedBots | null>(null);
+    // The preview exactly as it came back, so Create can count what was edited on it.
+    const previewBaselineRef = useRef<GamePreviewWithGeneratedBots | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     // isLoading also covers createGame; the status card belongs to preview runs only.
     const [isPreviewing, setIsPreviewing] = useState(false);
@@ -582,6 +585,7 @@ export default function CreateNewGamePage() {
             setBotNameErrors(botNameErrorsFor(updatedGame.name, updatedGame.bots.map(bot => bot.name)));
 
             setGameData(updatedGame);
+            previewBaselineRef.current = updatedGame;
             // The screen set the art style aside: clear the field so Create
             // and the drafts send none, and say why under it.
             if (updatedGame.artStyleNotice) {
@@ -673,6 +677,7 @@ export default function CreateNewGamePage() {
                 ...gameData,
                 artStyle,
                 gameMode,
+                edits: previewEdits(previewBaselineRef.current, gameData),
                 ...(avatarDraftVersion !== undefined ? { avatarDraftVersion } : {}),
             });
             if (newGameId) {

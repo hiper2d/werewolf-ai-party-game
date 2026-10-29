@@ -136,6 +136,10 @@ export interface GamePreviewWithGeneratedBots extends GamePreview {
     // the draft only when it still matches; AVATAR_DRAFT_IN_PROGRESS means the
     // set is still being drawn and should be adopted when it lands.
     avatarDraftVersion?: number;
+    /** Client-side only: what the player changed on the preview page before Create (names,
+     * stories, details, opening story), counted for the `game_created` feature event.
+     * Never stored on the game. See app/games/newgame/preview-edits.ts. */
+    edits?: {editedNames: number; editedStories: number; editedDetails: number; editedScene: boolean};
 }
 
 /**
