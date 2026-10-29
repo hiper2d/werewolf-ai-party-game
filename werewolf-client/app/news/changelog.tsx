@@ -13,6 +13,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        id: "game-language", date: "Oct 2026", tags: ["Languages"],
+        title: "Play in your own language: 14 languages on the new-game form",
+        body: (<>The new-game form has a <strong>Language</strong> picker. Pick one of <strong>14 languages</strong> —
+            Spanish, Portuguese, French, German, Italian, Dutch, Polish, Ukrainian, Russian, Turkish, Japanese, Korean
+            and Chinese, besides English — and the whole game is played in it: the story and the cast, every bot&apos;s
+            messages, the Game Master&apos;s narration and day summaries, the night and vote announcements, the game-over
+            and post-game lines. The cast is named in that language&apos;s script too, so a Japanese village has
+            Japanese names and a Russian one Russian names. Voices read the lines in the chosen language, and the
+            microphone transcribes you in it. The site itself stays in English; the game is what changes. English
+            games are exactly what they were.</>),
+        media: null,
+        links: [{label: "Create a game", href: "/games"}],
+    },
+    {
         id: "gpt-6-1-terra", date: "Oct 2026", tags: ["Models"],
         title: "GPT-6.1 Terra replaces GPT-5.6 Terra at half the price",
         body: (<>OpenAI&apos;s <strong>GPT-6.1 Terra</strong> takes over the main GPT slot in the model picker. It is
