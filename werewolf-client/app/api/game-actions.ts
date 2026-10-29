@@ -966,8 +966,8 @@ export async function addMessageToChatAndSaveToDb(gameMessage: GameMessage, game
         const newCounter = currentCounter + 1;
 
         // Generate custom message ID: zero-padded-counter-author-to-recipient
-        const sanitizedAuthor = sanitizeForId(gameMessage.authorName);
-        const sanitizedRecipient = sanitizeForId(gameMessage.recipientName);
+        const sanitizedAuthor = sanitizeNameForId(gameMessage.authorName);
+        const sanitizedRecipient = sanitizeNameForId(gameMessage.recipientName);
         const paddedCounter = newCounter.toString().padStart(6, '0'); // Zero-pad to 6 digits for proper sorting
         const customId = `${paddedCounter}-${sanitizedAuthor}-to-${sanitizedRecipient}`;
 
@@ -1013,7 +1013,16 @@ export async function addMessageToChatAndSaveToDb(gameMessage: GameMessage, game
 }
 
 /**
- * Sanitize names for use in message IDs
+ * A player name as a message-id segment: lower-cased, letters and digits of any
+ * script kept (a Russian game's "Иван" stays readable in the id), the rest dropped.
+ * Uniqueness comes from the counter prefix, not from this segment.
+ */
+function sanitizeNameForId(name: string): string {
+    return name.normalize('NFC').toLowerCase().replace(/[^\p{L}\p{N}\p{M}]/gu, '');
+}
+
+/**
+ * Sanitize the theme for use in the game id (part of the URL — ASCII only).
  * Converts to lowercase, replaces spaces and special chars with hyphens
  */
 function sanitizeForId(name: string): string {

@@ -14,7 +14,9 @@
  *      pack can never break a game — it only shows an English line.
  * The app chrome (buttons, modals, the rules page) stays English: it is not game content.
  *
- * Player names are identifiers (ASCII, see the casting prompt) and are never translated.
+ * Player names are identifiers (one word of letters and digits in ANY script — name-utils.ts)
+ * and are never translated or inflected; a non-English cast is named in the game's own
+ * script (the 'story' block below overrides the casting prompt's ASCII rule).
  * Voice directions and visual descriptions stay English: they are prompts for the speech
  * and image models, not text the players read.
  *
@@ -92,11 +94,11 @@ export function languageInstruction(language: string | undefined, scope: Languag
     if (isEnglish(language)) return '';
     const name = gameLanguageName(language);
     const common = `\n\n## Language\n\nThis game is played in ${name}. Everything the players read must be written in natural, fluent ${name} — never in English. ` +
-        `Player and character names are identifiers: keep them exactly as given, untranslated. ` +
+        `Player and character names are identifiers: copy them letter for letter wherever you write them, in prose and in every JSON field — never translated, transliterated, declined or inflected, with no title or surname added. ` +
         `JSON field names, enum values and any "target" field stay exactly as the schema specifies.`;
     switch (scope) {
         case 'story':
-            return common + ` Write the scene in ${name}.`;
+            return common + ` Write the scene in ${name}. Name the characters in ${name}, in its own script, as native speakers would write them (keep the language's own accents and diacritics): one word of letters and digits only, no spaces, apostrophes or hyphens. This replaces the English-ASCII name rule above — do not transliterate names into Latin letters.`;
         case 'sheets':
             return common + ` Write each character's story in ${name}. The voiceStyle and visualDescription fields are instructions for a speech model and an image model, not text the players see: write those two in English.`;
         case 'bot':

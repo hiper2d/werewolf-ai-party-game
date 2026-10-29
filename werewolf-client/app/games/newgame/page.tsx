@@ -9,7 +9,7 @@ import {createGame, getPreviewProgress, previewGameAction} from '@/app/api/game-
 import {generateDraftIllustrations, getAvatarDraft, reframeDraftAvatar} from '@/app/api/avatar-draft-actions';
 import type {PreviewProgress} from '@/app/ai/preview-generation';
 import {AVATAR_DRAFT_IN_PROGRESS, AVATAR_GM_KEY, AvatarDraftState, AvatarFraming, avatarSheetKey, DEFAULT_GAME_MODE, GAME_MODES, GAME_ROLES, GameMode, GamePreview, GamePreviewWithGeneratedBots, getRandomVoiceForGender, RANDOM_ROLE, UserTier, USER_TIERS, maxWerewolvesFor, MIN_WEREWOLVES} from "@/app/api/game-models";
-import {duplicateNameErrors, sanitizePlayerName} from "@/app/utils/name-utils";
+import {duplicateNameErrors, sanitizePlayerName, validatePlayerName} from "@/app/utils/name-utils";
 import {circleFocus} from "@/app/utils/avatar-framing";
 import IllustrationsPanel, {CastEntry, draftFraming, draftImageUrl} from '@/app/games/newgame/components/IllustrationsPanel';
 import CastList, {RowPortrait} from '@/app/games/newgame/components/CastList';
@@ -43,16 +43,8 @@ function pickDefaultGmModel(pool: string[]): string {
     return candidates.length > 0 ? pickRandom(candidates) : LLM_CONSTANTS.RANDOM;
 }
 
-// Helper function to validate names (only letters, numbers, no spaces)
-const validateName = (name: string): string | null => {
-    if (!name.trim()) {
-        return "Name cannot be empty";
-    }
-    if (!/^[a-zA-Z0-9]+$/.test(name.trim())) {
-        return "Name can only contain letters and numbers (no spaces)";
-    }
-    return null;
-};
+// One word of letters and digits in any script — the rule createGame enforces (name-utils).
+const validateName = validatePlayerName;
 
 // Per-bot name errors for the cast list: the format rule, then uniqueness across
 // the table (human included) — the same check createGame enforces. Recomputed
@@ -575,20 +567,13 @@ export default function CreateNewGamePage() {
             }
             const game: GamePreviewWithGeneratedBots = result.preview;
 
-            // Transliterate non-ASCII characters so old previews don't trip the validator.
-            const sanitizeName = (raw: string): string => {
-                // Strip combining marks after NFKD decomposition, then drop anything non-ASCII-alphanumeric.
-                const cleaned = raw.normalize('NFKD').replace(/\p{M}/gu, '').replace(/[^a-zA-Z0-9]/g, '');
-                return cleaned || raw;
-            };
-
             // Set all thinking modes to false by default
             const updatedGame: GamePreviewWithGeneratedBots = {
                 ...game,
                 gameMasterThinking: false,
                 bots: game.bots.map(bot => ({
                     ...bot,
-                    name: sanitizeName(bot.name),
+                    name: sanitizePlayerName(bot.name) || bot.name,
                     enableThinking: false
                 }))
             };

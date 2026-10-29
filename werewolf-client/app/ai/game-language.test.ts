@@ -37,6 +37,10 @@ describe('game language', () => {
             expect(replyLanguageLine(code)).toContain(name);
         }
         expect(languageInstruction('fr', 'sheets')).toMatch(/visualDescription.*English/);
+        // The cast is named in the game's script: the story block overrides the casting prompt's ASCII rule.
+        expect(languageInstruction('ru', 'story')).toMatch(/Name the characters in Russian, in its own script/);
+        expect(languageInstruction('ru', 'story')).toMatch(/do not transliterate/);
+        expect(languageInstruction('ru', 'bot')).toMatch(/never translated, transliterated, declined or inflected/);
     });
 
     it('gameText renders English with params when the game has no pack, and leaves unknown placeholders readable', () => {

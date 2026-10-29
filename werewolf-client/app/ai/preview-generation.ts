@@ -228,7 +228,7 @@ function userMessage(content: string): AIMessage {
 /** Name identity for matching a sheet back to its cast entry: models occasionally
  * re-case or re-space a name they were told to copy verbatim. */
 function nameKey(name: string): string {
-    return name.toLowerCase().replace(/[^a-z0-9]/g, '');
+    return name.normalize('NFC').toLowerCase().replace(/[^\p{L}\p{N}\p{M}]/gu, '');
 }
 
 function normalizeCast(raw: {name: string; gender: string}[], expected: number): CastEntry[] {

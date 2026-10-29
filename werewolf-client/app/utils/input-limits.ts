@@ -16,7 +16,7 @@
  * numbers here — nothing else should hard-code a length.
  */
 export const INPUT_LIMITS = {
-    /** Human and bot names. Identifiers, ASCII alphanumerics only. */
+    /** Human and bot names. Identifiers: one word of letters and digits in any script (name-utils.ts). */
     playerName: 24,
     /** Game title. Prefixes the Firestore game id. */
     gameTitle: 80,

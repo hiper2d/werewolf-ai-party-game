@@ -82,14 +82,15 @@ beforeEach(() => {
 
 describe('normalizeDraftSpec', () => {
     it('keys the cast the way the game will: sanitized bot + human names, then the GM', () => {
-        const { keys, subject } = normalizeDraftSpec({ ...spec(), humanPlayerName: 'Bób Ω' });
-        expect(keys).toEqual(['Mina', 'Jonathan', 'Bob', AVATAR_GM_KEY]);
-        expect(subject.humanPlayerName).toBe('Bob');
+        // Letters of any script stay (a Russian game names its players in Cyrillic); spaces and punctuation go.
+        const { keys, subject } = normalizeDraftSpec({ ...spec(), humanPlayerName: 'Bób !' });
+        expect(keys).toEqual(['Mina', 'Jonathan', 'Bób', AVATAR_GM_KEY]);
+        expect(subject.humanPlayerName).toBe('Bób');
     });
 
     it('rejects names that sanitize to nothing and duplicate names', () => {
         expect(() => normalizeDraftSpec({ ...spec(), humanPlayerName: '???' })).toThrow(/letter or number/);
-        expect(() => normalizeDraftSpec({ ...spec(), bots: [{ name: 'Mina', gender: 'female', story: '' }, { name: 'Mína', gender: 'male', story: '' }] })).toThrow(/unique/);
+        expect(() => normalizeDraftSpec({ ...spec(), bots: [{ name: 'Mina', gender: 'female', story: '' }, { name: 'Mina ', gender: 'male', story: '' }] })).toThrow(/unique/);
     });
 
     it('rejects an empty theme or an empty cast', () => {
