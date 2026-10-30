@@ -1,7 +1,7 @@
 {
   "language": "it",
   "lines": {
-    "night_fallback": "Cala la notte sul villaggio.",
+    "night_fallback": "Cala la notte.",
     "night_intro": "In questa fase, i giocatori con poteri speciali agiranno in quest'ordine:",
     "night_briefing": "• Maniaco: rapisce un giocatore per la notte, bloccando le sue azioni e qualsiasi azione rivolta contro di lui.\n• Lupo mannaro: può eliminare altri giocatori durante la notte.\n• Medico: può proteggere un giocatore dall'eliminazione durante la notte. Una volta per partita: Errore del medico - uccide un giocatore invece di proteggerlo.\n• Detective: può indagare su un giocatore per scoprirne il ruolo durante la notte. Una volta per partita: Colpo del detective - elimina un giocatore invece di indagare.",
     "night_outro": "Le azioni notturne verranno risolte automaticamente.",
@@ -14,7 +14,7 @@
     "pack_note_alone": "🐺 **Il tuo branco**: {roster}. Sei l'unico lupo mannaro rimasto: scegli tu il bersaglio.",
     "pack_you": "(Tu)",
     "day_begins": "☀️ **Inizia il giorno {day}.**",
-    "day_opening_fallback": "Il villaggio si risveglia per un nuovo giorno. Gli eventi della notte hanno lasciato il segno. È il momento di discutere di quanto accaduto e decidere chi tra voi potrebbe essere una minaccia per il villaggio.",
+    "day_opening_fallback": "Sorge un nuovo giorno. Gli eventi della notte hanno lasciato il segno. Ora è il momento di discutere di quanto accaduto e decidere chi tra voi potrebbe essere una minaccia.",
     "day_outro": "Discutete degli eventi della notte, condividete i vostri sospetti e preparatevi a votare quando sarete pronti.",
     "vote_none": "Nessun voto espresso in questo turno.",
     "vote_line_one": "{name}: {count} voto",
@@ -35,7 +35,7 @@
     "game_over_human_title": "🎭 **PARTITA FINITA**",
     "game_over_human_body": "Il giocatore umano è stato eliminato dalla partita.",
     "game_over_villagers_title": "🎭 **PARTITA FINITA - VINCONO I CONTADINI!** 🎉",
-    "game_over_villagers_body": "Tutti i lupi mannari sono stati eliminati! Il villaggio è salvo.",
+    "game_over_villagers_body": "Tutti i lupi mannari sono stati eliminati! I contadini hanno vinto.",
     "game_over_werewolves_title": "🎭 **PARTITA FINITA - VINCONO I LUPI MANNARI!** 🐺",
     "game_over_werewolves_body": "I lupi mannari hanno preso il sopravvento! Ora sono tanti quanti i contadini rimasti, o anche di più.",
     "final_roles": "**Ruoli svelati:**",
@@ -54,7 +54,7 @@
     "role_villager": "contadino"
   },
   "sources": {
-    "night_fallback": "a64b4992",
+    "night_fallback": "d513addf",
     "night_intro": "87c3f395",
     "night_briefing": "aa1ec756",
     "night_outro": "d3449bb5",
@@ -67,7 +67,7 @@
     "pack_note_alone": "74353254",
     "pack_you": "b978ae75",
     "day_begins": "1401d2d2",
-    "day_opening_fallback": "b56fb07f",
+    "day_opening_fallback": "77032923",
     "day_outro": "17b335bf",
     "vote_none": "caa9093e",
     "vote_line_one": "51d85bab",
@@ -88,7 +88,7 @@
     "game_over_human_title": "63f3d066",
     "game_over_human_body": "ab1e4123",
     "game_over_villagers_title": "d6f9789a",
-    "game_over_villagers_body": "64190a7a",
+    "game_over_villagers_body": "ef600c6e",
     "game_over_werewolves_title": "e382ab1e",
     "game_over_werewolves_body": "51ac478f",
     "final_roles": "bb65d0d7",

@@ -1,7 +1,7 @@
 {
   "language": "nl",
   "lines": {
-    "night_fallback": "De nacht valt over het dorp.",
+    "night_fallback": "De nacht valt.",
     "night_intro": "Tijdens deze fase komen de spelers met een speciale rol in deze volgorde in actie:",
     "night_briefing": "• Maniak: Ontvoert 's nachts één speler, waardoor diens acties én alle acties op deze speler worden geblokkeerd.\n• Weerwolf: Kan 's nachts andere spelers uitschakelen.\n• Dokter: Kan 's nachts een speler beschermen tegen uitschakeling. Eén keer per spel: Doktersblunder - één speler doden in plaats van beschermen.\n• Detective: Kan 's nachts een speler onderzoeken om diens rol te achterhalen. Eén keer per spel: Detectiveschot - één speler uitschakelen in plaats van onderzoeken.",
     "night_outro": "De nachtacties worden automatisch afgehandeld.",
@@ -14,7 +14,7 @@
     "pack_note_alone": "🐺 **Jouw roedel**: {roster}. Je bent de laatste weerwolf — kies zelf een doelwit.",
     "pack_you": "(Jij)",
     "day_begins": "☀️ **Dag {day} breekt aan.**",
-    "day_opening_fallback": "Het dorp ontwaakt in een nieuwe dag. De gebeurtenissen van afgelopen nacht hebben hun sporen nagelaten. Het is nu tijd om te bespreken wat er is gebeurd en te bepalen wie van jullie een gevaar voor het dorp zou kunnen zijn.",
+    "day_opening_fallback": "Een nieuwe dag breekt aan. De gebeurtenissen van afgelopen nacht hebben hun sporen nagelaten. Nu is het tijd om te bespreken wat er is gebeurd en te bepalen wie van jullie een bedreiging zou kunnen zijn.",
     "day_outro": "Bespreek wat er vannacht is gebeurd, deel je vermoedens en maak je klaar om te stemmen zodra je er klaar voor bent.",
     "vote_none": "Er is deze ronde niet gestemd.",
     "vote_line_one": "{name}: {count} stem",
@@ -35,7 +35,7 @@
     "game_over_human_title": "🎭 **EINDE SPEL**",
     "game_over_human_body": "De menselijke speler is uitgeschakeld.",
     "game_over_villagers_title": "🎭 **EINDE SPEL - DE BURGERS WINNEN!** 🎉",
-    "game_over_villagers_body": "Alle weerwolven zijn uitgeschakeld! Het dorp is veilig.",
+    "game_over_villagers_body": "Alle weerwolven zijn uitgeschakeld! De burgers hebben gewonnen.",
     "game_over_werewolves_title": "🎭 **EINDE SPEL - DE WEERWOLVEN WINNEN!** 🐺",
     "game_over_werewolves_body": "De weerwolven hebben de macht gegrepen! Ze zijn even talrijk als of talrijker dan de overgebleven burgers.",
     "final_roles": "**Alle rollen onthuld:**",
@@ -54,7 +54,7 @@
     "role_villager": "burger"
   },
   "sources": {
-    "night_fallback": "a64b4992",
+    "night_fallback": "d513addf",
     "night_intro": "87c3f395",
     "night_briefing": "aa1ec756",
     "night_outro": "d3449bb5",
@@ -67,7 +67,7 @@
     "pack_note_alone": "74353254",
     "pack_you": "b978ae75",
     "day_begins": "1401d2d2",
-    "day_opening_fallback": "b56fb07f",
+    "day_opening_fallback": "77032923",
     "day_outro": "17b335bf",
     "vote_none": "caa9093e",
     "vote_line_one": "51d85bab",
@@ -88,7 +88,7 @@
     "game_over_human_title": "63f3d066",
     "game_over_human_body": "ab1e4123",
     "game_over_villagers_title": "d6f9789a",
-    "game_over_villagers_body": "64190a7a",
+    "game_over_villagers_body": "ef600c6e",
     "game_over_werewolves_title": "e382ab1e",
     "game_over_werewolves_body": "51ac478f",
     "final_roles": "bb65d0d7",

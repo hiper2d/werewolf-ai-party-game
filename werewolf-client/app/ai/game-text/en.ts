@@ -18,7 +18,9 @@ const ONE_TIME = (role: string) => Object.values(ROLE_CONFIGS[role].oneTimeAbili
 
 export const GAME_TEXT_EN = {
     // Night begins
-    night_fallback: 'Night falls over the village.',
+    // Setting-neutral on purpose: a game is a space station or a boarding school as often as a
+    // village, so no line names the place (the role is still called villager).
+    night_fallback: 'Night falls.',
     night_intro: 'During this phase, players with special abilities will act in this order:',
     night_briefing:
         `• Maniac: ${ROLE_DESC(GAME_ROLES.MANIAC)}.\n` +
@@ -40,7 +42,7 @@ export const GAME_TEXT_EN = {
     pack_you: '(You)',
     // Day begins
     day_begins: '☀️ **Day {day} begins.**',
-    day_opening_fallback: 'The village awakens to a new day. The events of the night have left their mark. Now is the time to discuss what happened and decide who among you might be a threat to the village.',
+    day_opening_fallback: 'A new day begins. The events of the night have left their mark. Now is the time to discuss what happened and decide who among you might be a threat.',
     day_outro: "Discuss the night's events, share your suspicions, and prepare to vote when ready.",
     // Vote results. A language without grammatical number (Chinese, Japanese, Korean,
     // Turkish after a numeral) translates both tally lines to the same text.
@@ -67,7 +69,7 @@ export const GAME_TEXT_EN = {
     game_over_human_title: '🎭 **GAME OVER**',
     game_over_human_body: 'The human player has been eliminated from the game.',
     game_over_villagers_title: '🎭 **GAME OVER - VILLAGERS WIN!** 🎉',
-    game_over_villagers_body: 'All werewolves have been eliminated! The village is safe.',
+    game_over_villagers_body: 'All werewolves have been eliminated! The villagers have won.',
     game_over_werewolves_title: '🎭 **GAME OVER - WEREWOLVES WIN!** 🐺',
     game_over_werewolves_body: 'The werewolves have achieved dominance! They equal or outnumber the remaining villagers.',
     final_roles: '**Final Role Reveals:**',

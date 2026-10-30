@@ -1,7 +1,7 @@
 {
   "language": "pt",
   "lines": {
-    "night_fallback": "A noite cai sobre a aldeia.",
+    "night_fallback": "Cai a noite.",
     "night_intro": "Nesta fase, os jogadores com habilidades especiais agem na seguinte ordem:",
     "night_briefing": "• Maníaco: Sequestra um jogador durante a noite, bloqueando as ações dele e qualquer ação direcionada a ele.\n• Lobisomem: Pode eliminar outros jogadores durante a noite.\n• Médico: Pode proteger um jogador da eliminação durante a noite. Uma vez por partida: Erro Médico - mata um jogador em vez de protegê-lo.\n• Detetive: Pode investigar um jogador durante a noite para descobrir o papel dele. Uma vez por partida: Disparo do Detetive - elimina um jogador em vez de investigá-lo.",
     "night_outro": "As ações noturnas serão resolvidas automaticamente.",
@@ -14,7 +14,7 @@
     "pack_note_alone": "🐺 **Sua alcateia**: {roster}. Você é o último lobisomem de pé — escolha o alvo sozinho.",
     "pack_you": "(Você)",
     "day_begins": "☀️ **Começa o Dia {day}.**",
-    "day_opening_fallback": "A aldeia desperta para um novo dia. Os acontecimentos da noite deixaram suas marcas. Agora é hora de discutir o que aconteceu e decidir quem entre vocês pode ser uma ameaça para a aldeia.",
+    "day_opening_fallback": "Um novo dia começa. Os acontecimentos da noite deixaram suas marcas. Agora é hora de discutir o que aconteceu e decidir quem entre vocês pode ser uma ameaça.",
     "day_outro": "Discutam os acontecimentos da noite, compartilhem suas suspeitas e preparem-se para votar quando estiverem prontos.",
     "vote_none": "Nenhum voto foi registrado nesta rodada.",
     "vote_line_one": "{name}: {count} voto",
@@ -35,7 +35,7 @@
     "game_over_human_title": "🎭 **FIM DE JOGO**",
     "game_over_human_body": "O jogador humano foi eliminado da partida.",
     "game_over_villagers_title": "🎭 **FIM DE JOGO - VITÓRIA DOS ALDEÕES!** 🎉",
-    "game_over_villagers_body": "Todos os lobisomens foram eliminados! A aldeia está a salvo.",
+    "game_over_villagers_body": "Todos os lobisomens foram eliminados! Os aldeões venceram.",
     "game_over_werewolves_title": "🎭 **FIM DE JOGO - VITÓRIA DOS LOBISOMENS!** 🐺",
     "game_over_werewolves_body": "Os lobisomens tomaram conta da aldeia! Eles já são tantos quanto os aldeões restantes, ou mais.",
     "final_roles": "**Revelação Final dos Papéis:**",
@@ -54,7 +54,7 @@
     "role_villager": "aldeão"
   },
   "sources": {
-    "night_fallback": "a64b4992",
+    "night_fallback": "d513addf",
     "night_intro": "87c3f395",
     "night_briefing": "aa1ec756",
     "night_outro": "d3449bb5",
@@ -67,7 +67,7 @@
     "pack_note_alone": "74353254",
     "pack_you": "b978ae75",
     "day_begins": "1401d2d2",
-    "day_opening_fallback": "b56fb07f",
+    "day_opening_fallback": "77032923",
     "day_outro": "17b335bf",
     "vote_none": "caa9093e",
     "vote_line_one": "51d85bab",
@@ -88,7 +88,7 @@
     "game_over_human_title": "63f3d066",
     "game_over_human_body": "ab1e4123",
     "game_over_villagers_title": "d6f9789a",
-    "game_over_villagers_body": "64190a7a",
+    "game_over_villagers_body": "ef600c6e",
     "game_over_werewolves_title": "e382ab1e",
     "game_over_werewolves_body": "51ac478f",
     "final_roles": "bb65d0d7",

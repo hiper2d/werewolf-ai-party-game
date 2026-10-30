@@ -1,7 +1,7 @@
 {
   "language": "ja",
   "lines": {
-    "night_fallback": "村に夜が訪れました。",
+    "night_fallback": "夜になりました。",
     "night_intro": "このフェーズでは、特殊能力を持つプレイヤーが次の順番で行動します：",
     "night_briefing": "• 狂人：一晩のあいだプレイヤー1人を連れ去り、その人の行動と、その人を対象とするすべての行動を封じます。\n• 人狼：夜のあいだに他のプレイヤーを襲撃できます。\n• 医者：夜のあいだにプレイヤー1人を襲撃から守ることができます。1ゲームに1回限り：「医者の過ち」― 守る代わりにプレイヤー1人を殺害できます。\n• 探偵：夜のあいだにプレイヤー1人を調査し、その役職を知ることができます。1ゲームに1回限り：「探偵の処刑」― 調査する代わりにプレイヤー1人を排除できます。",
     "night_outro": "夜の行動は自動的に処理されます。",
@@ -14,7 +14,7 @@
     "pack_note_alone": "🐺 **あなたの仲間**：{roster}。生き残っている人狼はあなただけです。襲撃先は自分で決めてください。",
     "pack_you": "（あなた）",
     "day_begins": "☀️ **{day}日目の朝です。**",
-    "day_opening_fallback": "村に新しい朝が訪れました。夜の出来事はその爪痕を残しています。さあ、何が起きたのかを話し合い、この中で誰が村の脅威となりうるのかを見極めましょう。",
+    "day_opening_fallback": "新しい朝が来ました。昨夜の出来事は、村に確かな爪痕を残しています。何が起きたのかを話し合い、この中の誰が脅威となり得るのかを見極めてください。",
     "day_outro": "夜の出来事について話し合い、疑わしい人物を挙げ、準備ができたら投票に備えてください。",
     "vote_none": "このラウンドでは投票がありませんでした。",
     "vote_line_one": "{name}：{count}票",
@@ -35,7 +35,7 @@
     "game_over_human_title": "🎭 **ゲーム終了**",
     "game_over_human_body": "人間のプレイヤーがゲームから脱落しました。",
     "game_over_villagers_title": "🎭 **ゲーム終了 ― 村人陣営の勝利！** 🎉",
-    "game_over_villagers_body": "人狼はすべて排除されました！村に平和が戻りました。",
+    "game_over_villagers_body": "人狼はすべて排除されました！村人の勝利です。",
     "game_over_werewolves_title": "🎭 **ゲーム終了 ― 人狼陣営の勝利！** 🐺",
     "game_over_werewolves_body": "人狼が村を支配しました！人狼の数が残った村人と同数、またはそれを上回りました。",
     "final_roles": "**最終役職公開：**",
@@ -54,7 +54,7 @@
     "role_villager": "村人"
   },
   "sources": {
-    "night_fallback": "a64b4992",
+    "night_fallback": "d513addf",
     "night_intro": "87c3f395",
     "night_briefing": "aa1ec756",
     "night_outro": "d3449bb5",
@@ -67,7 +67,7 @@
     "pack_note_alone": "74353254",
     "pack_you": "b978ae75",
     "day_begins": "1401d2d2",
-    "day_opening_fallback": "b56fb07f",
+    "day_opening_fallback": "77032923",
     "day_outro": "17b335bf",
     "vote_none": "caa9093e",
     "vote_line_one": "51d85bab",
@@ -88,7 +88,7 @@
     "game_over_human_title": "63f3d066",
     "game_over_human_body": "ab1e4123",
     "game_over_villagers_title": "d6f9789a",
-    "game_over_villagers_body": "64190a7a",
+    "game_over_villagers_body": "ef600c6e",
     "game_over_werewolves_title": "e382ab1e",
     "game_over_werewolves_body": "51ac478f",
     "final_roles": "bb65d0d7",

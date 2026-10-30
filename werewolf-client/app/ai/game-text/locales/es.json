@@ -1,7 +1,7 @@
 {
   "language": "es",
   "lines": {
-    "night_fallback": "Cae la noche sobre la aldea.",
+    "night_fallback": "Cae la noche.",
     "night_intro": "Durante esta fase, los jugadores con habilidades especiales actuarán en este orden:",
     "night_briefing": "• Maníaco: Secuestra a un jugador durante la noche, lo que bloquea sus acciones y cualquier acción dirigida contra él.\n• Hombre lobo: Puede eliminar a otros jugadores durante la noche.\n• Médico: Puede proteger a un jugador de ser eliminado durante la noche. Una vez por partida: Error del médico, que consiste en matar a un jugador en lugar de protegerlo.\n• Detective: Puede investigar a un jugador durante la noche para descubrir su rol. Una vez por partida: Disparo del detective, que consiste en eliminar a un jugador en lugar de investigarlo.",
     "night_outro": "Las acciones nocturnas se resolverán automáticamente.",
@@ -14,7 +14,7 @@
     "pack_note_alone": "🐺 **Tu manada**: {roster}. Eres el último hombre lobo que queda: elige tú solo a tu víctima.",
     "pack_you": "(Tú)",
     "day_begins": "☀️ **Comienza el día {day}.**",
-    "day_opening_fallback": "La aldea despierta a un nuevo día. Lo ocurrido durante la noche ha dejado huella. Ha llegado el momento de debatir lo sucedido y decidir quién de vosotros podría ser una amenaza para la aldea.",
+    "day_opening_fallback": "Amanece un nuevo día. Lo ocurrido durante la noche ha dejado su huella. Ha llegado el momento de debatir lo sucedido y decidir quién de vosotros podría ser una amenaza.",
     "day_outro": "Debatid lo ocurrido esta noche, compartid vuestras sospechas y preparaos para votar cuando estéis listos.",
     "vote_none": "No se ha emitido ningún voto en esta ronda.",
     "vote_line_one": "{name}: {count} voto",
@@ -35,7 +35,7 @@
     "game_over_human_title": "🎭 **FIN DE LA PARTIDA**",
     "game_over_human_body": "El jugador humano ha sido eliminado de la partida.",
     "game_over_villagers_title": "🎭 **FIN DE LA PARTIDA: ¡GANAN LOS ALDEANOS!** 🎉",
-    "game_over_villagers_body": "¡Todos los hombres lobo han sido eliminados! La aldea está a salvo.",
+    "game_over_villagers_body": "¡Todos los hombres lobo han sido eliminados! Los aldeanos han ganado.",
     "game_over_werewolves_title": "🎭 **FIN DE LA PARTIDA: ¡GANAN LOS HOMBRES LOBO!** 🐺",
     "game_over_werewolves_body": "¡Los hombres lobo se han hecho con la aldea! Ya igualan o superan en número a los aldeanos que quedan.",
     "final_roles": "**Revelación final de roles:**",
@@ -54,7 +54,7 @@
     "role_villager": "aldeano"
   },
   "sources": {
-    "night_fallback": "a64b4992",
+    "night_fallback": "d513addf",
     "night_intro": "87c3f395",
     "night_briefing": "aa1ec756",
     "night_outro": "d3449bb5",
@@ -67,7 +67,7 @@
     "pack_note_alone": "74353254",
     "pack_you": "b978ae75",
     "day_begins": "1401d2d2",
-    "day_opening_fallback": "b56fb07f",
+    "day_opening_fallback": "77032923",
     "day_outro": "17b335bf",
     "vote_none": "caa9093e",
     "vote_line_one": "51d85bab",
@@ -88,7 +88,7 @@
     "game_over_human_title": "63f3d066",
     "game_over_human_body": "ab1e4123",
     "game_over_villagers_title": "d6f9789a",
-    "game_over_villagers_body": "64190a7a",
+    "game_over_villagers_body": "ef600c6e",
     "game_over_werewolves_title": "e382ab1e",
     "game_over_werewolves_body": "51ac478f",
     "final_roles": "bb65d0d7",

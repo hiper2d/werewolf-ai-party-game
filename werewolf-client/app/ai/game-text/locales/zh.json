@@ -1,7 +1,7 @@
 {
   "language": "zh",
   "lines": {
-    "night_fallback": "夜幕降临，村庄陷入沉寂。",
+    "night_fallback": "天黑请闭眼。",
     "night_intro": "本阶段，拥有特殊能力的玩家将按以下顺序行动：",
     "night_briefing": "• 狂人：在夜间绑走一名玩家，使其无法行动，所有针对该玩家的行动也会失效。\n• 狼人：可在夜间淘汰其他玩家。\n• 医生：可在夜间保护一名玩家免遭淘汰。每局限一次：医者失手——放弃保护，改为杀死一名玩家。\n• 侦探：可在夜间调查一名玩家，得知其身份。每局限一次：侦探出手——放弃调查，改为淘汰一名玩家。",
     "night_outro": "夜间行动将自动结算。",
@@ -14,7 +14,7 @@
     "pack_note_alone": "🐺 **你的狼队**：{roster}。你是仅剩的狼人——请独自选定目标。",
     "pack_you": "（你）",
     "day_begins": "☀️ **第 {day} 天开始。**",
-    "day_opening_fallback": "新的一天到来，村民们纷纷醒来。昨夜发生的一切留下了痕迹。现在，请大家讨论发生了什么，找出你们之中可能威胁村庄的人。",
+    "day_opening_fallback": "天亮了，新的一天开始了。昨夜发生的一切留下了痕迹。现在请大家讨论发生了什么，并判断你们之中谁可能是威胁。",
     "day_outro": "请讨论昨夜发生的事，说出你的怀疑，准备好后进行投票。",
     "vote_none": "本轮无人投票。",
     "vote_line_one": "{name}：{count} 票",
@@ -35,7 +35,7 @@
     "game_over_human_title": "🎭 **游戏结束**",
     "game_over_human_body": "真人玩家已出局。",
     "game_over_villagers_title": "🎭 **游戏结束——村民获胜！** 🎉",
-    "game_over_villagers_body": "所有狼人均已出局！村庄恢复了安宁。",
+    "game_over_villagers_body": "所有狼人已被淘汰！村民获胜。",
     "game_over_werewolves_title": "🎭 **游戏结束——狼人获胜！** 🐺",
     "game_over_werewolves_body": "狼人已占据上风！狼人数量已等于或超过剩余村民。",
     "final_roles": "**最终身份公布：**",
@@ -54,7 +54,7 @@
     "role_villager": "村民"
   },
   "sources": {
-    "night_fallback": "a64b4992",
+    "night_fallback": "d513addf",
     "night_intro": "87c3f395",
     "night_briefing": "aa1ec756",
     "night_outro": "d3449bb5",
@@ -67,7 +67,7 @@
     "pack_note_alone": "74353254",
     "pack_you": "b978ae75",
     "day_begins": "1401d2d2",
-    "day_opening_fallback": "b56fb07f",
+    "day_opening_fallback": "77032923",
     "day_outro": "17b335bf",
     "vote_none": "caa9093e",
     "vote_line_one": "51d85bab",
@@ -88,7 +88,7 @@
     "game_over_human_title": "63f3d066",
     "game_over_human_body": "ab1e4123",
     "game_over_villagers_title": "d6f9789a",
-    "game_over_villagers_body": "64190a7a",
+    "game_over_villagers_body": "ef600c6e",
     "game_over_werewolves_title": "e382ab1e",
     "game_over_werewolves_body": "51ac478f",
     "final_roles": "bb65d0d7",

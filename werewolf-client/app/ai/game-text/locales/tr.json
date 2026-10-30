@@ -1,7 +1,7 @@
 {
   "language": "tr",
   "lines": {
-    "night_fallback": "Köyün üzerine gece çöküyor.",
+    "night_fallback": "Gece çöküyor.",
     "night_intro": "Bu evrede özel yeteneği olan oyuncular şu sırayla hareket edecek:",
     "night_briefing": "• Manyak: Gece boyunca bir oyuncuyu kaçırır; o oyuncunun eylemlerini ve ona yönelik tüm eylemleri engeller.\n• Kurt Adam: Gece boyunca diğer oyuncuları öldürebilir.\n• Doktor: Gece boyunca bir oyuncuyu ölümden koruyabilir. Oyunda bir kez: Doktorun Hatası - korumak yerine bir oyuncuyu öldürür.\n• Dedektif: Gece boyunca bir oyuncuyu soruşturup rolünü öğrenebilir. Oyunda bir kez: Dedektifin İnfazı - soruşturmak yerine bir oyuncuyu öldürür.",
     "night_outro": "Gece eylemleri otomatik olarak işlenecek.",
@@ -14,7 +14,7 @@
     "pack_note_alone": "🐺 **Sürün**: {roster}. Geriye kalan tek kurt adam sensin — hedefini kendin seç.",
     "pack_you": "(Sen)",
     "day_begins": "☀️ **{day}. Gün başlıyor.**",
-    "day_opening_fallback": "Köy yeni bir güne uyanıyor. Gecenin olayları izlerini bıraktı. Şimdi olanları konuşmanın ve aranızdan kimin köy için tehdit oluşturabileceğine karar vermenin zamanı.",
+    "day_opening_fallback": "Yeni bir gün doğuyor. Gecenin olayları izini bıraktı. Şimdi neler olduğunu konuşma ve aranızda kimin tehlikeli olabileceğine karar verme zamanı.",
     "day_outro": "Gecenin olaylarını tartışın, şüphelerinizi paylaşın ve hazır olduğunuzda oylamaya geçin.",
     "vote_none": "Bu turda hiç oy kullanılmadı.",
     "vote_line_one": "{name}: {count} oy",
@@ -35,7 +35,7 @@
     "game_over_human_title": "🎭 **OYUN BİTTİ**",
     "game_over_human_body": "İnsan oyuncu oyundan elendi.",
     "game_over_villagers_title": "🎭 **OYUN BİTTİ - KÖYLÜLER KAZANDI!** 🎉",
-    "game_over_villagers_body": "Bütün kurt adamlar elendi! Köy artık güvende.",
+    "game_over_villagers_body": "Bütün kurt adamlar elendi! Köylüler kazandı.",
     "game_over_werewolves_title": "🎭 **OYUN BİTTİ - KURT ADAMLAR KAZANDI!** 🐺",
     "game_over_werewolves_body": "Kurt adamlar köyü ele geçirdi! Sayıları kalan köylülere eşit ya da onlardan fazla.",
     "final_roles": "**Son Rol Açıklamaları:**",
@@ -54,7 +54,7 @@
     "role_villager": "köylü"
   },
   "sources": {
-    "night_fallback": "a64b4992",
+    "night_fallback": "d513addf",
     "night_intro": "87c3f395",
     "night_briefing": "aa1ec756",
     "night_outro": "d3449bb5",
@@ -67,7 +67,7 @@
     "pack_note_alone": "74353254",
     "pack_you": "b978ae75",
     "day_begins": "1401d2d2",
-    "day_opening_fallback": "b56fb07f",
+    "day_opening_fallback": "77032923",
     "day_outro": "17b335bf",
     "vote_none": "caa9093e",
     "vote_line_one": "51d85bab",
@@ -88,7 +88,7 @@
     "game_over_human_title": "63f3d066",
     "game_over_human_body": "ab1e4123",
     "game_over_villagers_title": "d6f9789a",
-    "game_over_villagers_body": "64190a7a",
+    "game_over_villagers_body": "ef600c6e",
     "game_over_werewolves_title": "e382ab1e",
     "game_over_werewolves_body": "51ac478f",
     "final_roles": "bb65d0d7",

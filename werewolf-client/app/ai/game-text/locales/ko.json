@@ -1,7 +1,7 @@
 {
   "language": "ko",
   "lines": {
-    "night_fallback": "마을에 밤이 찾아왔습니다.",
+    "night_fallback": "밤이 되었습니다.",
     "night_intro": "이번 단계에서는 특수 능력을 가진 플레이어들이 다음 순서대로 행동합니다:",
     "night_briefing": "• 광인: 밤 동안 플레이어 한 명을 납치합니다. 납치된 플레이어는 행동할 수 없으며, 그 플레이어를 대상으로 한 모든 행동도 무효가 됩니다.\n• 늑대인간: 밤에 다른 플레이어를 제거할 수 있습니다.\n• 의사: 밤에 플레이어 한 명을 제거로부터 보호할 수 있습니다. 게임당 한 번: 의사의 실수 - 보호 대신 플레이어 한 명을 죽입니다.\n• 탐정: 밤에 플레이어 한 명을 조사해 그 역할을 알아낼 수 있습니다. 게임당 한 번: 탐정의 처단 - 조사 대신 플레이어 한 명을 제거합니다.",
     "night_outro": "밤의 행동은 자동으로 처리됩니다.",
@@ -14,7 +14,7 @@
     "pack_note_alone": "🐺 **나의 늑대 무리**: {roster}. 남은 늑대인간은 당신뿐입니다. 혼자서 대상을 고르세요.",
     "pack_you": "(나)",
     "day_begins": "☀️ **{day}일째 낮이 밝았습니다.**",
-    "day_opening_fallback": "마을에 새로운 아침이 밝았습니다. 지난밤의 사건은 분명한 흔적을 남겼습니다. 이제 무슨 일이 있었는지 이야기를 나누고, 여러분 중 누가 마을을 위협하는 존재인지 가려낼 시간입니다.",
+    "day_opening_fallback": "새로운 날이 밝았습니다. 지난밤의 사건이 마을에 흔적을 남겼습니다. 이제 무슨 일이 있었는지 함께 이야기하고, 여러분 중 누가 위협이 될지 가려낼 시간입니다.",
     "day_outro": "지난밤의 사건에 대해 토론하고 의심 가는 점을 공유하세요. 준비가 되면 투표를 진행합니다.",
     "vote_none": "이번 라운드에는 투표가 없었습니다.",
     "vote_line_one": "{name}: {count}표",
@@ -35,7 +35,7 @@
     "game_over_human_title": "🎭 **게임 종료**",
     "game_over_human_body": "인간 플레이어가 게임에서 탈락했습니다.",
     "game_over_villagers_title": "🎭 **게임 종료 - 마을 주민 승리!** 🎉",
-    "game_over_villagers_body": "모든 늑대인간이 제거되었습니다! 마을에 평화가 찾아왔습니다.",
+    "game_over_villagers_body": "모든 늑대인간이 제거되었습니다! 마을 주민들이 승리했습니다.",
     "game_over_werewolves_title": "🎭 **게임 종료 - 늑대인간 승리!** 🐺",
     "game_over_werewolves_body": "늑대인간들이 마을을 장악했습니다! 남은 마을 주민과 수가 같거나 더 많아졌습니다.",
     "final_roles": "**최종 역할 공개:**",
@@ -54,7 +54,7 @@
     "role_villager": "마을 주민"
   },
   "sources": {
-    "night_fallback": "a64b4992",
+    "night_fallback": "d513addf",
     "night_intro": "87c3f395",
     "night_briefing": "aa1ec756",
     "night_outro": "d3449bb5",
@@ -67,7 +67,7 @@
     "pack_note_alone": "74353254",
     "pack_you": "b978ae75",
     "day_begins": "1401d2d2",
-    "day_opening_fallback": "b56fb07f",
+    "day_opening_fallback": "77032923",
     "day_outro": "17b335bf",
     "vote_none": "caa9093e",
     "vote_line_one": "51d85bab",
@@ -88,7 +88,7 @@
     "game_over_human_title": "63f3d066",
     "game_over_human_body": "ab1e4123",
     "game_over_villagers_title": "d6f9789a",
-    "game_over_villagers_body": "64190a7a",
+    "game_over_villagers_body": "ef600c6e",
     "game_over_werewolves_title": "e382ab1e",
     "game_over_werewolves_body": "51ac478f",
     "final_roles": "bb65d0d7",

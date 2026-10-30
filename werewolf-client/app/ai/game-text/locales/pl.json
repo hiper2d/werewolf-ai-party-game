@@ -1,7 +1,7 @@
 {
   "language": "pl",
   "lines": {
-    "night_fallback": "Nad wioską zapada noc.",
+    "night_fallback": "Zapada noc.",
     "night_intro": "W tej fazie gracze ze specjalnymi zdolnościami wykonują swoje ruchy w następującej kolejności:",
     "night_briefing": "• Maniak: Porywa jednego gracza na noc, blokując jego akcje oraz wszystkie akcje wymierzone w niego.\n• Wilkołak: W nocy może eliminować innych graczy.\n• Lekarz: W nocy może ochronić jednego gracza przed eliminacją. Raz na grę: Pomyłka Lekarza – zamiast chronić, zabija wybranego gracza.\n• Detektyw: W nocy może sprawdzić jednego gracza i poznać jego rolę. Raz na grę: Wyrok Detektywa – zamiast prowadzić śledztwo, eliminuje wybranego gracza.",
     "night_outro": "Nocne akcje zostaną rozpatrzone automatycznie.",
@@ -14,7 +14,7 @@
     "pack_note_alone": "🐺 **Twoja wataha**: {roster}. Jesteś ostatnim wilkołakiem – ofiarę wybierasz sam.",
     "pack_you": "(Ty)",
     "day_begins": "☀️ **Zaczyna się dzień {day}.**",
-    "day_opening_fallback": "Wioska budzi się do nowego dnia. Wydarzenia minionej nocy odcisnęły swoje piętno. Czas omówić, co się stało, i zdecydować, kto spośród was może stanowić zagrożenie dla wioski.",
+    "day_opening_fallback": "Nastaje nowy dzień. Wydarzenia minionej nocy odcisnęły swoje piętno. Czas omówić, co się stało, i zdecydować, kto spośród was może stanowić zagrożenie.",
     "day_outro": "Omówcie wydarzenia nocy, podzielcie się podejrzeniami i przygotujcie się do głosowania.",
     "vote_none": "W tej rundzie nie oddano żadnych głosów.",
     "vote_line_one": "{name}: {count} głos",
@@ -35,7 +35,7 @@
     "game_over_human_title": "🎭 **KONIEC GRY**",
     "game_over_human_body": "Gracz-człowiek odpadł z gry.",
     "game_over_villagers_title": "🎭 **KONIEC GRY – WYGRYWAJĄ WIEŚNIACY!** 🎉",
-    "game_over_villagers_body": "Wszystkie wilkołaki zostały wyeliminowane! Wioska jest bezpieczna.",
+    "game_over_villagers_body": "Wszystkie wilkołaki zostały wyeliminowane! Mieszkańcy wioski zwyciężyli.",
     "game_over_werewolves_title": "🎭 **KONIEC GRY – WYGRYWAJĄ WILKOŁAKI!** 🐺",
     "game_over_werewolves_body": "Wilkołaki przejęły władzę nad wioską! Jest ich tyle samo lub więcej niż pozostałych wieśniaków.",
     "final_roles": "**Ujawnienie ról:**",
@@ -54,7 +54,7 @@
     "role_villager": "wieśniak"
   },
   "sources": {
-    "night_fallback": "a64b4992",
+    "night_fallback": "d513addf",
     "night_intro": "87c3f395",
     "night_briefing": "aa1ec756",
     "night_outro": "d3449bb5",
@@ -67,7 +67,7 @@
     "pack_note_alone": "74353254",
     "pack_you": "b978ae75",
     "day_begins": "1401d2d2",
-    "day_opening_fallback": "b56fb07f",
+    "day_opening_fallback": "77032923",
     "day_outro": "17b335bf",
     "vote_none": "caa9093e",
     "vote_line_one": "51d85bab",
@@ -88,7 +88,7 @@
     "game_over_human_title": "63f3d066",
     "game_over_human_body": "ab1e4123",
     "game_over_villagers_title": "d6f9789a",
-    "game_over_villagers_body": "64190a7a",
+    "game_over_villagers_body": "ef600c6e",
     "game_over_werewolves_title": "e382ab1e",
     "game_over_werewolves_body": "51ac478f",
     "final_roles": "bb65d0d7",
