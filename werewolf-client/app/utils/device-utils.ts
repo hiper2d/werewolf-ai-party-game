@@ -5,6 +5,18 @@
  */
 
 /** Dedupe `value` to the end of `list` and keep only the newest `cap` entries. */
+/**
+ * MANUAL LINKING (2026-10-30): an ops script can fold one device into another by setting
+ * `aliasOf` on the folded doc (`scripts/link-devices.ts`). A browser that still carries the
+ * folded id is treated as the canonical device from its next page load: the cookie is
+ * rewritten, the account is stamped with the canonical id and the shared budget is the
+ * canonical one. One hop only, never a chain; a doc that aliases itself is ignored.
+ */
+export function canonicalDeviceId(deviceId: string, doc: { aliasOf?: unknown } | undefined, isValid: (v: unknown) => v is string): string {
+    const alias = doc?.aliasOf;
+    return isValid(alias) && alias !== deviceId ? alias : deviceId;
+}
+
 export function appendCapped(list: unknown, value: string, cap: number): string[] {
     const current = Array.isArray(list) ? (list.filter(v => typeof v === 'string') as string[]) : [];
     const without = current.filter(v => v !== value);

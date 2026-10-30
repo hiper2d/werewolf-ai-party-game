@@ -4,7 +4,7 @@ import {randomUUID} from "crypto";
 import {cookies, headers} from "next/headers";
 import {FieldValue} from "firebase-admin/firestore";
 import {db} from "@/firebase/server";
-import {appendCapped, appendSighting, pickLinkedDevice} from "@/app/utils/device-utils";
+import {appendCapped, appendSighting, canonicalDeviceId, pickLinkedDevice} from "@/app/utils/device-utils";
 import {logger} from "@/app/utils/logger";
 
 /**
@@ -69,6 +69,23 @@ async function findRecentDeviceForIp(ip: string, city: string | undefined): Prom
     } catch (error: any) {
         console.error(`findRecentDeviceForIp: lookup failed for ${ip}: ${error?.message ?? error}`);
         return undefined;
+    }
+}
+
+/**
+ * Follow a manual `aliasOf` on the device doc (see canonicalDeviceId). Best effort: a failed
+ * read means "no alias", never a failed page load.
+ */
+async function resolveDeviceAlias(deviceId: string): Promise<string> {
+    if (!db) {
+        return deviceId;
+    }
+    try {
+        const snap = await db.collection(DEVICES).doc(deviceId).get();
+        return canonicalDeviceId(deviceId, snap.data(), isValidDeviceId);
+    } catch (error: any) {
+        console.error(`resolveDeviceAlias: lookup failed for ${deviceId}: ${error?.message ?? error}`);
+        return deviceId;
     }
 }
 
@@ -149,6 +166,10 @@ export async function getRequestDeviceId(): Promise<string | undefined> {
  *   neither, recent IP match-> inherit the device last seen from this IP (see IP LINKING)
  *   neither, no match       -> mint a new one
  *
+ * Whatever the id came from, a manual `aliasOf` on its doc is followed once (MANUAL LINKING
+ * in device-utils), so the cookie, the device record and the user's `lastDeviceId` all
+ * carry the canonical id.
+ *
  * Best effort throughout: this must never break a page load, so every failure returns an
  * id (or undefined) rather than throwing.
  */
@@ -174,6 +195,9 @@ export async function registerDevice(clientDeviceId?: string, userEmail?: string
                 deviceId = randomUUID();
             }
         }
+        // A device folded into another by hand answers to the canonical id from here on,
+        // whichever of the two the browser presented.
+        deviceId = await resolveDeviceAlias(deviceId);
         jar.set(DEVICE_COOKIE, deviceId, {
             httpOnly: true,
             sameSite: 'lax',

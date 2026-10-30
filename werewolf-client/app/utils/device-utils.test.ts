@@ -1,4 +1,4 @@
-import { appendCapped, appendSighting, IP_LINK_WINDOW_MS, pickLinkedDevice } from './device-utils';
+import { appendCapped, appendSighting, canonicalDeviceId, IP_LINK_WINDOW_MS, pickLinkedDevice } from './device-utils';
 
 describe('appendCapped', () => {
     it('appends and dedupes to the end, newest last', () => {
@@ -57,5 +57,24 @@ describe('appendSighting', () => {
         expect(appendSighting([a, b], { deviceId: 'a', at: 3 }, 5)).toEqual([b, { deviceId: 'a', at: 3 }]);
         expect(appendSighting([a, b], { deviceId: 'c', at: 3 }, 2)).toEqual([b, { deviceId: 'c', at: 3 }]);
         expect(appendSighting('junk', a, 2)).toEqual([a]);
+    });
+});
+
+describe('canonicalDeviceId', () => {
+    const uuid = (n: string) => `${n}${n}${n}${n}${n}${n}${n}${n}-0000-4000-8000-000000000000`;
+    const isValid = (v: unknown): v is string => typeof v === 'string' && /^[0-9a-f-]{36}$/.test(v);
+
+    it('follows a valid aliasOf to the canonical device', () => {
+        expect(canonicalDeviceId(uuid('a'), { aliasOf: uuid('b') }, isValid)).toBe(uuid('b'));
+    });
+
+    it('keeps the id when there is no doc or no alias', () => {
+        expect(canonicalDeviceId(uuid('a'), undefined, isValid)).toBe(uuid('a'));
+        expect(canonicalDeviceId(uuid('a'), {}, isValid)).toBe(uuid('a'));
+    });
+
+    it('ignores a malformed alias and a self-alias', () => {
+        expect(canonicalDeviceId(uuid('a'), { aliasOf: 'not-a-device' }, isValid)).toBe(uuid('a'));
+        expect(canonicalDeviceId(uuid('a'), { aliasOf: uuid('a') }, isValid)).toBe(uuid('a'));
     });
 });
