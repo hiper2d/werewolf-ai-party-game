@@ -39,8 +39,8 @@ import {
 import {auth} from "@/auth";
 import {AgentFactory} from "@/app/ai/agent-factory";
 import {generateGamePreview, PreviewProgress} from "@/app/ai/preview-generation";
-import {generateGameTextPack} from "@/app/ai/game-text-pack";
-import {DEFAULT_GAME_LANGUAGE, gameText, normalizeGameLanguage, roleName} from "@/app/ai/game-language";
+import {DEFAULT_GAME_LANGUAGE, normalizeGameLanguage} from "@/app/ai/game-language";
+import {gameText, roleName} from "@/app/ai/game-text";
 import {deletePreviewProgress, isValidProgressId, previewProgressWriter, readPreviewProgress} from "@/app/utils/preview-progress";
 import {getUserTierAndApiKeys} from "@/app/utils/tier-utils";
 import {duplicateNameErrors, sanitizePlayerName} from "@/app/utils/name-utils";
@@ -54,7 +54,7 @@ import {getVoiceConfig, isVoiceOfProvider, LEGACY_VOICE_PROVIDER, SUPPORTED_VOIC
 import {recordFeatureEvent} from "@/app/api/feature-events";
 import {normalizeSpendings} from "@/app/utils/spending-utils";
 import {serializeMessageForFirestore} from "@/app/api/message-serialization";
-import {LLM_CONSTANTS, assertAllowedAsGameMaster, configureStoryAgent, GAME_TEXT_PACK_MODEL, isAllowedAsGameMaster, SupportedAiModels} from "@/app/ai/ai-models";
+import {LLM_CONSTANTS, assertAllowedAsGameMaster, configureStoryAgent, isAllowedAsGameMaster, SupportedAiModels} from "@/app/ai/ai-models";
 import {
     consumeModelUsage,
     getCandidateModelsForTier,
@@ -485,19 +485,11 @@ export async function previewGame(gamePreview: GamePreview, progressId?: string)
         configureStoryAgent(agent);
         return agent;
     };
-    const createPackAgent = (systemPrompt: string) => {
-        const agent: AbstractAgent = AgentFactory.createAgent(GAME_MASTER, systemPrompt, GAME_TEXT_PACK_MODEL, apiKeys, false);
-        agent.userId = session.user!.email!;
-        return agent;
-    };
     let aiResponse;
-    let textPack;
     try {
-        // A non-English game also gets its fixed Game Master lines translated — one small
-        // call on the pinned pack model that runs beside the story pipeline, so it adds no
-        // wait (and never fails the preview).
-        [aiResponse, textPack] = await Promise.all([
-            generateGamePreview(createStoryAgent, {
+        // The fixed Game Master lines of a non-English game come from the static locale
+        // (app/ai/game-text), not from a model: nothing to generate here.
+        aiResponse = await generateGamePreview(createStoryAgent, {
                 theme: gamePreview.theme,
                 description: gamePreview.description,
                 excludedName: gamePreview.name,
@@ -507,9 +499,7 @@ export async function previewGame(gamePreview: GamePreview, progressId?: string)
                 playStylesText,
                 voiceConfig,
                 language,
-            }, onProgress),
-            generateGameTextPack(createPackAgent, language),
-        ]);
+            }, onProgress);
     } finally {
         if (trackProgress) {
             // The doc only exists to be polled during the run; nothing should outlive it.
@@ -535,16 +525,6 @@ export async function previewGame(gamePreview: GamePreview, progressId?: string)
             kind: 'preview',
             modelId: resolvedGmAiType,
             usage: tokenUsage,
-        });
-    }
-    if (textPack.tokenUsage) {
-        // Its own row: the pack ran on the pinned pack model, not the Game Master.
-        await recordSpend({
-            userEmail: session.user.email,
-            costUSD: textPack.tokenUsage.costUSD,
-            kind: 'preview',
-            modelId: GAME_TEXT_PACK_MODEL,
-            usage: textPack.tokenUsage,
         });
     }
     // RANDOM never draws a `excludedFromGmAndRandom` model; a model picked by name is taken as is.
@@ -637,7 +617,6 @@ export async function previewGame(gamePreview: GamePreview, progressId?: string)
         ...gamePreview,
         ...(artStyleSetAside ? { artStyle: '', artStyleNotice: ART_STYLE_SET_ASIDE_MESSAGE } : {}),
         language,
-        ...(textPack.pack ? { gameText: textPack.pack } : {}),
         gameMasterAiType: resolvedGmAiType,
         voiceProvider: voiceProvider,
         gameMasterVoice: aiResponse.gameMasterVoice,
@@ -842,7 +821,6 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
             longReplies: gamePreview.longReplies ?? false,
             gameMode: gamePreview.gameMode ?? DEFAULT_GAME_MODE,
             language: normalizeGameLanguage(gamePreview.language),
-            ...(gamePreview.gameText ? {gameText: gamePreview.gameText} : {}),
             gameMasterAiType: gamePreview.gameMasterAiType,
             voiceProvider: gamePreview.voiceProvider, // TTS provider (locked at creation)
             gameMasterVoice: gamePreview.gameMasterVoice,

@@ -1,5 +1,5 @@
 import { Game, GAME_ROLES } from '@/app/api/game-models';
-import { gameText, GameTextKey, roleName } from '@/app/ai/game-language';
+import { gameText, GameTextKey, roleName } from '@/app/ai/game-text';
 
 /**
  * Result of a win condition check

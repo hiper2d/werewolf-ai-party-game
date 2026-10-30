@@ -1,4 +1,4 @@
-import { gameText, GameTextSource } from "@/app/ai/game-language";
+import { gameText, GameTextSource } from "@/app/ai/game-text";
 
 /**
  * The bullet list of night roles the Game Master posts when night falls, in the

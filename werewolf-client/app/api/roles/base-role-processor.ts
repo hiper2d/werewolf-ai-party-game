@@ -1,6 +1,6 @@
 import { Game, Bot, GAME_MASTER, GameMessage, MessageType, RECIPIENT_ALL, RECIPIENT_WEREWOLVES, ROLE_CONFIGS, GAME_ROLES } from "@/app/api/game-models";
 import { addMessageToChatAndSaveToDb } from "@/app/api/game-actions";
-import { gameText, nightTurnText } from "@/app/ai/game-language";
+import { gameText, nightTurnText } from "@/app/ai/game-text";
 
 /**
  * Result of a night action processing

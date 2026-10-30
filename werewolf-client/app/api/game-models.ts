@@ -128,9 +128,6 @@ export interface GamePreviewWithGeneratedBots extends GamePreview {
     /** Set when the content screen judged the typed art style as something the image model would
      * refuse: `artStyle` comes back empty and the form shows this line under the field. */
     artStyleNotice?: string;
-    /** Non-English games: the code-written game lines translated by the Game Master at
-     * preview time (GAME_TEXT_EN keys). Absent = English lines. */
-    gameText?: Record<string, string>;
     // Paid tier only: attach the illustration set drawn on the preview page
     // (see AvatarDraft). The version the client last saw — createGame adopts
     // the draft only when it still matches; AVATAR_DRAFT_IN_PROGRESS means the
@@ -316,8 +313,11 @@ export interface Game {
     // were played under the tactical prompt, so gameFromFirestore defaults them to tactical.
     gameMode?: GameMode;
     // Locked at creation. ISO 639-1 code (app/ai/game-language.ts); absent on games from before
-    // the setting = English. The prompts carry it; `gameText` carries the translated fixed lines.
+    // the setting = English. The prompts carry it; the fixed lines come from the static locale
+    // for it (app/ai/game-text).
     language?: string;
+    // LEGACY (games created 2026-10-28..30): the fixed lines as a model translated them per
+    // game. Read as a fallback by gameText() only; never written anymore.
     gameText?: Record<string, string>;
     gameMasterAiType: string;
     voiceProvider?: VoiceProvider; // The game's voice set, picked on the form and fixed at creation (voice ids belong to it)

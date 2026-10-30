@@ -41,7 +41,8 @@ import { buildStoryContext, lynchSummaryForDay, sanitizeNarrativeHint } from "@/
 import { BOT_DAY_SUMMARY_PROMPT, botSystemPrompt } from "@/app/ai/prompts/bot-prompts";
 import { generateBotContextSection, generateWerewolfTeammatesSection, getAlivePlayerNames, getEffectiveModel } from "@/app/utils/bot-utils";
 import { format } from "@/app/ai/prompts/utils";
-import { gameText, languageInstruction } from "@/app/ai/game-language";
+import { languageInstruction } from "@/app/ai/game-language";
+import { gameText } from "@/app/ai/game-text";
 import { convertToAIMessages, convertMessageContent, formatMessagesForNightSummary } from "@/app/utils/message-utils";
 import { after } from "next/server";
 import { midGameImagesEnabled, runNightIllustration } from "@/app/utils/illustration-generation";

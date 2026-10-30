@@ -1,6 +1,6 @@
 import {AIMessage, GAME_MASTER, GameMessage, MESSAGE_ROLE, MessageType} from "@/app/api/game-models";
 import {unwrapJsonReply} from "@/app/utils/text-format";
-import {eliminationText, gameText, GameTextSource} from "@/app/ai/game-language";
+import {eliminationText, gameText, GameTextSource} from "@/app/ai/game-text";
 
 /**
  * Converts message content to a human-readable string format
