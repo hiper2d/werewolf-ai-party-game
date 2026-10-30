@@ -325,10 +325,11 @@ const DEPRECATED_MODEL_MAP: Record<string, string> = {
     // Qwen3.7 Plus retired 2026-08-30 alongside the 3.7→3.8 Flash swap; the Flash entry is the
     // cheap Qwen tier that replaces it.
     'qwen-plus': LLM_CONSTANTS.QWEN_FLASH,
-    // Mistral Large 3 and Magistral Medium 1.2 dropped 2026-09-18 (lib 0.6.0), Mistral Medium 3.5
-    // on 2026-10-10 (lib 0.21.0: p50 16s, ~6% failed calls, $0.036 a turn at the only reasoning
-    // level it takes). Small 4 is the only Mistral entry left until Medium 4 ships.
-    'mistral-large': LLM_CONSTANTS.MISTRAL_SMALL,
+    // Magistral Medium 1.2 dropped 2026-09-18 (lib 0.6.0), Mistral Medium 3.5 on 2026-10-10
+    // (lib 0.21.0: p50 16s, ~6% failed calls, $0.036 a turn at the only reasoning level it
+    // takes). `mistral-large` is NOT here: Large 3 seats were migrated to Small in September
+    // (scripts/migrate-model-ids.ts), and since 2026-10-30 the id is live again as Mistral
+    // Large 4 (lib 0.31.0).
     'mistral-magistral': LLM_CONSTANTS.MISTRAL_SMALL,
     'mistral-medium': LLM_CONSTANTS.MISTRAL_SMALL,
 };

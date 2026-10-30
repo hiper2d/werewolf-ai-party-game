@@ -35,13 +35,13 @@ const OLD_TO_NEW: Record<string, string> = {
     'Gemini 3.1 Pro Preview': 'gemini-pro',
     'Gemini 3 Flash Preview': 'gemini-flash',
     // Mistral Large 3 and Magistral Medium 1.2 dropped 2026-09-18 (lib 0.6.0), Mistral Medium
-    // 3.5 on 2026-10-10 (lib 0.21.0: slow, ~6% failed calls, $0.036 a turn). Small 4 is the
-    // only Mistral entry left, and every tier can hold it.
+    // 3.5 on 2026-10-10 (lib 0.21.0: slow, ~6% failed calls, $0.036 a turn). The bare
+    // 'mistral-large' id was mapped to Small until 2026-10-30, when Mistral Large 4 took it
+    // back (lib 0.31.0) — the Large 3 seats had all been rewritten by then (run 2026-09-18).
     'Mistral Large 3': 'mistral-small',
     'Mistral Medium 3.1': 'mistral-small',
     'Mistral Medium 3.5': 'mistral-small',
     'Magistral Medium 1.2 (Thinking)': 'mistral-small',
-    'mistral-large': 'mistral-small',
     'mistral-magistral': 'mistral-small',
     'mistral-medium': 'mistral-small',
     // All Grok variants collapsed onto the single always-reasoning Grok entry ('grok').
