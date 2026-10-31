@@ -11,13 +11,16 @@ interface VotingModalProps {
     onVote: (targetPlayer: string, reason: string) => void;
     game: any;
     isSubmitting?: boolean;
+    /** Why the last submit was refused (the content screen in enforce mode); the draft stays. */
+    notice?: string | null;
 }
 
 export default function VotingModal({
     onClose,
     onVote,
     game,
-    isSubmitting = false
+    isSubmitting = false,
+    notice = null,
 }: VotingModalProps) {
     const { isModalOpen } = useUIControls();
     const isOpen = isModalOpen('voting');
@@ -85,6 +88,11 @@ export default function VotingModal({
                 </div>
             </div>
 
+            {notice && (
+                <div role="alert" className="mb-3 px-3 py-2 rounded-[var(--radius-md)] border bg-[var(--warn-soft)] border-[var(--warn-line)] text-[13px] text-[var(--warn-fg)]">
+                    {notice}
+                </div>
+            )}
             <div className="flex justify-end gap-2">
                 <button
                     className="px-4 py-2 text-[13px] font-medium rounded-[var(--radius-md)] bg-[var(--bg-3)] border border-[var(--line-3)] text-[var(--fg-0)] hover:bg-[var(--bg-4)] transition-all duration-[120ms]"

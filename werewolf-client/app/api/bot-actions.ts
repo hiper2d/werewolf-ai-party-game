@@ -1355,6 +1355,16 @@ async function humanPlayerVoteImpl(gameId: string, targetPlayer: string, reason:
         throw new Error('Invalid target player');
     }
 
+    // Content screen on the reason: it is shown to every player and sent in the AI players'
+    // prompts. In enforce mode a would-block verdict refuses the vote before anything is written;
+    // the modal keeps the draft and shows why. Monitor mode only records.
+    const reasonScreen = await screenHumanInput({
+        source: 'vote', text: reason, userEmail: session.user.email, apiKeys: await getApiKeysForUser(session.user.email), gameId, day: game.currentDay,
+    });
+    if (reasonScreen.blocked) {
+        return { game, messages: [], rejected: { reason: reasonScreen.reason ?? 'score', message: reasonScreen.message! } };
+    }
+
     try {
         logger.info(`Processing vote for human player ${game.humanPlayerName}`, { gameId, player: game.humanPlayerName, target: targetPlayer });
         
@@ -1522,6 +1532,16 @@ async function performHumanPlayerNightActionImpl(gameId: string, targetPlayer: s
         if (!alivePlayerNames.includes(targetPlayer)) {
             throw new Error(`Invalid target. Available targets: ${alivePlayerNames.join(', ')}`);
         }
+    }
+
+    // Content screen on the narrative hint (skipped when blank): it reaches the Game Master's
+    // night-story prompt. Enforce mode refuses it before anything is written; the modal keeps
+    // the draft and shows why.
+    const hintScreen = await screenHumanInput({
+        source: 'night', text: message, userEmail: session.user.email, apiKeys: await getApiKeysForUser(session.user.email), gameId, day: game.currentDay,
+    });
+    if (hintScreen.blocked) {
+        return { game, messages: [], rejected: { reason: hintScreen.reason ?? 'score', message: hintScreen.message! } };
     }
 
     try {

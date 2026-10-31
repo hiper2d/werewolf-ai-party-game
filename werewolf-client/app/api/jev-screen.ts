@@ -4,8 +4,9 @@
  * Every AI call in the game goes out on platform keys, and a provider that keeps seeing
  * content it has labeled prohibited flags the account — the per-game provider block list
  * (app/api/provider-blocks.ts) only stops the second hit. This runs BEFORE the first one:
- * a human chat message or a new game's setup is judged in one ~200 ms call and the verdict
- * is recorded. In `monitor` mode (the default) that is all that happens; in `enforce` mode
+ * every piece of text a human types — a chat or night message, a new game's setup and its cast
+ * as edited before Create, a vote reason, a voice direction — is judged in one ~200 ms call and
+ * the verdict is recorded. In `monitor` mode (the default) that is all that happens; in `enforce` mode
  * a would-block verdict rejects the input before it is saved or reaches any provider.
  * The mode is the `jevScreenMode` field of the Firestore doc `config/limits`.
  *
@@ -32,8 +33,12 @@ import { JevScreenShadow, JevScreenSource, JevScreenVerdict, saveJevScreenCall }
 import { logger } from "@/app/utils/logger";
 import {
     JEV_SCREEN_CONTEXT_ART_STYLE,
+    JEV_SCREEN_CONTEXT_CAST,
     JEV_SCREEN_CONTEXT_CHAT,
+    JEV_SCREEN_CONTEXT_NIGHT,
     JEV_SCREEN_CONTEXT_PREVIEW,
+    JEV_SCREEN_CONTEXT_VOICE_STYLE,
+    JEV_SCREEN_CONTEXT_VOTE,
     JEV_SCREEN_FLAG_QUESTIONS,
     JEV_SCREEN_IMAGE_QUESTION,
     JEV_SCREEN_PROMPT_VERSION,
@@ -79,8 +84,16 @@ export const JEV_SCREEN_CONFIG = {
      * three styles Gemini refused read 0.94 ("nude women, big boobs"), 0.89 ("women in bras …
      * seductive smiles for their prey"), 0.80 ("women in bikinis, big boobs, sexy"); fine styles
      * read 0.18 (1950s pin-up poster girls), 0.14 (gothic romance, sensual atmosphere), 0.15
-     * (gore, severed limbs), 0.08 (swimsuits on the beach), 0.09 (ink and watercolor). Read the
-     * recorded `imageRefusal` against the image refusals in the logs before moving the bar.
+     * (gore, severed limbs), 0.08 (swimsuits on the beach), 0.09 (ink and watercolor). Reworded
+     * 2026-10-30 to nudity and sex only, after Gemini drew a bikini cast with "large boobs" six
+     * times (the first wording set it aside as a style, and the player moved the text onto the
+     * cast, which nothing screened). The 10-13 "refusals" of clothed styles were thinner than the
+     * commit said: one 400 on a reroll of a style that was drawn seven other times that day. Probe
+     * on the new wording (Jev, 70-230 ms): nude 0.95, topless 0.98, today's bikini cast 0.10,
+     * bikini style 0.17, pin-up 0.23, gore 0.17; the 10-13 probe strings now read 0.21 ("bikinis,
+     * big boobs, sexy") and 0.49 ("women in bras … for their prey"), under the bar on purpose: a
+     * rare 400 there is a reroll away, a set-aside costs every clothed pin-up.
+     * Read the recorded `imageRefusal` against the image refusals in the logs before moving the bar.
      */
     IMAGE_REFUSAL_PROBABILITY: 0.6,
     /**
@@ -213,10 +226,26 @@ const CONTEXT_BY_SOURCE: Record<JevScreenSource, string> = {
     chat: JEV_SCREEN_CONTEXT_CHAT,
     preview: JEV_SCREEN_CONTEXT_PREVIEW,
     art_style: JEV_SCREEN_CONTEXT_ART_STYLE,
+    cast: JEV_SCREEN_CONTEXT_CAST,
+    vote: JEV_SCREEN_CONTEXT_VOTE,
+    night: JEV_SCREEN_CONTEXT_NIGHT,
+    voice_style: JEV_SCREEN_CONTEXT_VOICE_STYLE,
 };
 
-/** Sources whose text carries an art style, so the image question is asked alongside. */
-const IMAGE_SOURCES: ReadonlySet<JevScreenSource> = new Set(['preview', 'art_style']);
+/** Sources whose text reaches an image prompt (an art style, the cast's appearances), so the image
+ * question is asked alongside. */
+const IMAGE_SOURCES: ReadonlySet<JevScreenSource> = new Set(['preview', 'art_style', 'cast']);
+
+/** What a rejection message calls the input. */
+const WHAT_BY_SOURCE: Record<JevScreenSource, string> = {
+    chat: 'This message',
+    preview: 'This game setup',
+    art_style: 'This art style',
+    cast: 'This cast',
+    vote: 'This vote reason',
+    night: 'This message',
+    voice_style: 'This voice direction',
+};
 
 export function buildScreenRequest(source: JevScreenSource, text: string): { state: Record<string, unknown>; questions: ScreenQuestions } {
     const state = { context: CONTEXT_BY_SOURCE[source], text };
@@ -259,7 +288,7 @@ export function isImageUnsafe(decision: Pick<ScreenDecision, 'imageRefusal'>, co
 
 /** What the player reads when the input is rejected. Names the category, never the score. */
 export function screenRejectionMessage(source: JevScreenSource, reason: string | null): string {
-    const what = source === 'chat' ? 'This message' : source === 'art_style' ? 'This art style' : 'This game setup';
+    const what = WHAT_BY_SOURCE[source];
     const because: Record<string, string> = {
         sexual: 'it contains sexual content',
         minors: 'it sexualizes a minor',
@@ -358,9 +387,10 @@ export async function screenHumanInput(input: ScreenInput): Promise<ScreenOutcom
     const decision = decideScreen(result.answers);
     const blocked = mode === 'enforce' && decision.verdict === 'would_block';
     const imageUnsafe = isImageUnsafe(decision);
+    const setAside = !imageUnsafe ? '' : input.source === 'cast' ? ' (appearances set aside)' : ' (art style set aside)';
     const summary = `${decision.verdict}${decision.reason ? ` (${decision.reason})` : ''} score=${decision.riskScore.toFixed(2)} high=${decision.highRisk.toFixed(2)} ` +
         FLAG_NAMES.map(flag => `${flag}=${decision.flags[flag].toFixed(2)}`).join(' ') +
-        (decision.imageRefusal === null ? '' : ` image=${decision.imageRefusal.toFixed(2)}${imageUnsafe ? ' (art style set aside)' : ''}`);
+        (decision.imageRefusal === null ? '' : ` image=${decision.imageRefusal.toFixed(2)}${setAside}`);
     const shadowSummary = shadow ? `; ${shadowAttempt!.judge.label} ${shadow.verdict}${shadow.riskScore !== null ? ` score=${shadow.riskScore.toFixed(2)}` : ''}` : '';
     console.log(`🛡️ ${judge.label} screen [${mode}] ${input.source}: ${summary} — ${result.durationMs} ms, ${result.inputTokens} tokens${blocked ? ' → REJECTED' : ''}${shadowSummary}`);
 
@@ -372,7 +402,7 @@ export async function screenHumanInput(input: ScreenInput): Promise<ScreenOutcom
     });
 
     const logLevel = decision.verdict === 'would_block' || imageUnsafe ? 'warn' : 'info';
-    logger[logLevel](`Jev screen ${decision.verdict}${blocked ? ' (rejected)' : ''}${imageUnsafe ? ' (art style set aside)' : ''}`, {
+    logger[logLevel](`Jev screen ${decision.verdict}${blocked ? ' (rejected)' : ''}${setAside}`, {
         gameId: input.gameId, userId: input.userEmail, activity: 'jev_screen', source: input.source, mode,
         model: result.model, verdict: decision.verdict, reason: decision.reason, riskScore: decision.riskScore, highRisk: decision.highRisk,
         imageRefusal: decision.imageRefusal, imageUnsafe, durationMs: result.durationMs,
@@ -417,4 +447,35 @@ export async function screenArtStyle(input: { theme: string; artStyle: string | 
         gameId: input.gameId,
     });
     return { unsafe: outcome.imageUnsafe };
+}
+
+/**
+ * Screens the cast as the player submits it to createGame. Every field here is editable on the
+ * preview page after the preview was judged, and the appearances go verbatim into the portrait
+ * prompts: on 2026-10-30 a player whose art style had been set aside put the same text on every
+ * character's appearance instead, and nothing looked at it. One call over the whole cast (the
+ * backstories are mostly model-written, which is fine — the judge reads for what a provider would
+ * refuse, not for authorship). The image question is asked, so a cast past the bar has its
+ * appearances set aside by the caller, the way an art style is; the portraits then follow the
+ * backstories. Empty-cast calls are skipped like any empty text.
+ */
+export async function screenCast(input: {
+    scene: string;
+    gameMasterVoiceStyle?: string;
+    bots: { name: string; story: string; visualDescription?: string; voiceStyle?: string }[];
+    userEmail: string;
+    apiKeys: ScreenInput['apiKeys'];
+}): Promise<ScreenOutcome> {
+    const gmVoice = input.gameMasterVoiceStyle?.trim();
+    const blocks = [
+        `Opening story: ${input.scene.trim()}`,
+        ...(gmVoice ? [`Game Master voice: ${gmVoice}`] : []),
+        ...input.bots.map(bot => [
+            `Character ${bot.name.trim()}`,
+            `Backstory: ${bot.story.trim()}`,
+            ...(bot.visualDescription?.trim() ? [`Appearance: ${bot.visualDescription.trim()}`] : []),
+            ...(bot.voiceStyle?.trim() ? [`Voice: ${bot.voiceStyle.trim()}`] : []),
+        ].join('\n')),
+    ];
+    return screenHumanInput({ source: 'cast', text: blocks.join('\n\n'), userEmail: input.userEmail, apiKeys: input.apiKeys });
 }

@@ -47,7 +47,7 @@ import {duplicateNameErrors, sanitizePlayerName} from "@/app/utils/name-utils";
 import {sanitizeArtStyle} from "@/app/utils/art-style";
 import {clampUserText, INPUT_LIMITS} from "@/app/utils/input-limits";
 import {getUserTier, getUserBalance, getVoiceProvider, updateVoiceProvider, assertFreeSpendWithinLimit} from "@/app/api/user-actions";
-import { ART_STYLE_SET_ASIDE_MESSAGE, screenArtStyle, screenHumanInput } from "@/app/api/jev-screen";
+import { ART_STYLE_SET_ASIDE_MESSAGE, screenArtStyle, screenCast, screenHumanInput } from "@/app/api/jev-screen";
 import {recordSpend} from "@/app/api/cost-tracking";
 import {getFreeTierLimits} from "@/app/api/limits-actions";
 import {getVoiceConfig, isVoiceOfProvider, LEGACY_VOICE_PROVIDER, SUPPORTED_VOICE_PROVIDERS, VoiceProvider} from "@/app/ai/voice-config";
@@ -778,6 +778,28 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
             }
         }
 
+        // The cast as submitted: the opening story, the voice directions and every character's
+        // name, backstory and appearance were all editable after the preview judged the setup,
+        // and the appearances are pasted into the portrait prompts. One screen over the whole
+        // cast; enforce mode refuses a would-block, and past the image bar the appearances are
+        // set aside (the portraits then follow the backstories) — the art style's rule.
+        const castScreen = await screenCast({
+            scene: gamePreview.scene,
+            gameMasterVoiceStyle: gamePreview.gameMasterVoiceStyle,
+            bots: gamePreview.bots,
+            userEmail: session.user.email,
+            apiKeys,
+        });
+        if (castScreen.blocked) {
+            throw new Error(castScreen.message);
+        }
+        if (castScreen.imageUnsafe) {
+            logger.warn(`Character appearances set aside at game creation`, { userId: session.user.email, theme: gamePreview.theme });
+            for (const bot of bots) {
+                delete bot.visualDescription;
+            }
+        }
+
         // Generate custom game ID: theme-timestamp
         const sanitizedTheme = sanitizeForId(gamePreview.theme);
         const customGameId = `${sanitizedTheme}-${timestamp}`;
@@ -1091,6 +1113,14 @@ export async function updateCharacterVoice(gameId: string, name: string, patch: 
         }
         const gameData = gameSnap.data();
         await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: (gameData?.createdWithTier ?? 'free') });
+
+        // The direction is pasted into every speech call for this character: screened like
+        // any other typed text (skipped when blank).
+        const { apiKeys } = await getUserTierAndApiKeys(session.user.email);
+        const screen = await screenHumanInput({ source: 'voice_style', text: voiceStyle, userEmail: session.user.email, apiKeys, gameId });
+        if (screen.blocked) {
+            throw new Error(screen.message);
+        }
 
         // Voice ids are provider-specific: the new voice must belong to this game's set.
         const voiceProvider: VoiceProvider = gameData?.voiceProvider || LEGACY_VOICE_PROVIDER;

@@ -52,6 +52,8 @@ import { GameEndChecker } from "@/app/utils/game-end-checker";
 import { recordBotTokenUsage, recordGameMasterTokenUsage } from "@/app/api/cost-tracking";
 import { ensureUserCanAccessGame } from "@/app/api/tier-guards";
 import { logger } from "@/app/utils/logger";
+import { clampUserText, INPUT_LIMITS } from "@/app/utils/input-limits";
+import { screenHumanInput } from "@/app/api/jev-screen";
 
 /**
  * Helper function to handle night end logic with results processing
@@ -844,6 +846,7 @@ async function humanPlayerTalkWerewolvesImpl(gameId: string, message: string): P
     if (!session || !session.user?.email) {
         throw new Error('Not authenticated');
     }
+    message = clampUserText(message, INPUT_LIMITS.chatMessage);
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
@@ -881,6 +884,15 @@ async function humanPlayerTalkWerewolvesImpl(gameId: string, message: string): P
     // the re-synced state opens the final-action modal.
     if (game.gameStateParamQueue.length === 1) {
         return staleActionNoOp('humanPlayerTalkWerewolves', 'werewolf coordination is over; final action expected', game);
+    }
+
+    // Content screen, as for a day message: the note goes to the werewolf bots' prompts. Enforce
+    // mode refuses a would-block before it is saved; the composer keeps the draft and shows why.
+    const screen = await screenHumanInput({
+        source: 'night', text: message, userEmail: session.user.email, apiKeys: await getApiKeysForUser(session.user.email), gameId, day: game.currentDay,
+    });
+    if (screen.blocked) {
+        return { game, messages: [], rejected: { reason: screen.reason ?? 'score', message: screen.message! } };
     }
 
     try {

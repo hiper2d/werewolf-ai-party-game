@@ -127,8 +127,12 @@ export async function getJevRouterCall(id: string): Promise<StoredJevRouterCall 
 }
 
 /** `art_style`: the theme and art style alone, re-screened where a style enters an image prompt
- * after the preview (game creation, draft illustrations) — the player may have retyped it. */
-export type JevScreenSource = 'chat' | 'preview' | 'art_style';
+ * after the preview (game creation, draft illustrations) — the player may have retyped it.
+ * `cast`: the opening story, the voice directions and every character's name, backstory and
+ * appearance as submitted to createGame (all editable after the preview; appearances enter the
+ * portrait prompts). `vote`: a vote reason. `night`: a werewolf-chat message or a night-action
+ * hint. `voice_style`: a voice direction edited from a character card mid-game. */
+export type JevScreenSource = 'chat' | 'preview' | 'art_style' | 'cast' | 'vote' | 'night' | 'voice_style';
 export type JevScreenVerdict = 'ok' | 'grey' | 'would_block' | 'error';
 
 export interface JevScreenCallRecord {

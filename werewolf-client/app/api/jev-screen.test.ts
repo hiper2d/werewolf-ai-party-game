@@ -30,7 +30,7 @@ jest.mock('@/app/utils/logger', () => ({
     logger: { info: jest.fn(), warn: (...args: any[]) => mockWarn(...args), error: jest.fn(), debug: jest.fn(), agentActivity: (...args: any[]) => mockAgentActivity(...args) },
 }));
 
-import { buildScreenRequest, decideScreen, isImageUnsafe, JEV_SCREEN_CONFIG, screenArtStyle, screenHumanInput, screenRejectionMessage } from '@/app/api/jev-screen';
+import { buildScreenRequest, decideScreen, isImageUnsafe, JEV_SCREEN_CONFIG, screenArtStyle, screenCast, screenHumanInput, screenRejectionMessage } from '@/app/api/jev-screen';
 import { JEV_SCREEN_FLAG_QUESTIONS, JEV_SCREEN_IMAGE_QUESTION, JEV_SCREEN_PROMPT_VERSION, JEV_SCREEN_RISK_LEVELS } from '@/app/ai/prompts/jev-screen-prompts';
 
 /** Jev-shaped answers: a risk score with the given per-level probabilities plus flag nouls (default 0.01). */
@@ -139,12 +139,29 @@ describe('buildScreenRequest', () => {
         expect(String(state.context)).toContain('new Werewolf party game');
     });
 
-    it('asks the image question only where an art style can be: setup and art_style, never chat', () => {
-        expect(buildScreenRequest('chat', 'x').questions.image).toBeUndefined();
+    it('asks the image question only where text reaches an image prompt: setup, art_style and the cast', () => {
+        for (const source of ['chat', 'vote', 'night', 'voice_style'] as const) {
+            expect(buildScreenRequest(source, 'x').questions.image).toBeUndefined();
+        }
         expect(buildScreenRequest('preview', 'x').questions.image).toEqual({ type: 'noul', instructions: JEV_SCREEN_IMAGE_QUESTION });
         const style = buildScreenRequest('art_style', 'x');
         expect(style.questions.image).toEqual({ type: 'noul', instructions: JEV_SCREEN_IMAGE_QUESTION });
         expect(String(style.state.context)).toContain('image prompt');
+        const cast = buildScreenRequest('cast', 'x');
+        expect(cast.questions.image).toEqual({ type: 'noul', instructions: JEV_SCREEN_IMAGE_QUESTION });
+        expect(String(cast.state.context)).toContain('appearance');
+    });
+
+    it('frames each night and vote input as what it is, and never as chat', () => {
+        expect(String(buildScreenRequest('vote', 'x').state.context)).toContain('vote');
+        expect(String(buildScreenRequest('night', 'x').state.context)).toContain('werewolf teammates');
+        expect(String(buildScreenRequest('voice_style', 'x').state.context)).toContain('text-to-speech');
+    });
+
+    it('the image question draws the line at nudity and sex, not at a body in a bikini (2026-10-30)', () => {
+        expect(JEV_SCREEN_IMAGE_QUESTION).toMatch(/nudity/);
+        expect(JEV_SCREEN_IMAGE_QUESTION).toMatch(/No for everything clothed/);
+        expect(JEV_SCREEN_IMAGE_QUESTION).not.toMatch(/big boobs/);
     });
 });
 
@@ -171,6 +188,10 @@ describe('screenRejectionMessage', () => {
     it('names the category in plain words, never a score', () => {
         expect(screenRejectionMessage('chat', 'sexual')).toBe("This message can't be sent to the AI players because it contains sexual content. Please rephrase it.");
         expect(screenRejectionMessage('preview', 'score')).toBe("This game setup can't be sent to the AI players. Please rephrase it.");
+        expect(screenRejectionMessage('cast', 'minors')).toBe("This cast can't be sent to the AI players because it sexualizes a minor. Please rephrase it.");
+        expect(screenRejectionMessage('vote', 'real_harm')).toBe("This vote reason can't be sent to the AI players because it describes real-world harm. Please rephrase it.");
+        expect(screenRejectionMessage('night', 'score')).toBe("This message can't be sent to the AI players. Please rephrase it.");
+        expect(screenRejectionMessage('voice_style', 'score')).toBe("This voice direction can't be sent to the AI players. Please rephrase it.");
     });
 });
 
@@ -380,6 +401,50 @@ describe('screenHumanInput', () => {
         expect(out.verdict).toBe('ok');
         expect(mockRecordScreenSpend.mock.calls[0][0]).toBeUndefined();
         expect(mockSaveRecord.mock.calls[0][0]).toMatchObject({ gameId: null, day: null, source: 'preview' });
+    });
+});
+
+describe('screenCast', () => {
+    const cast = {
+        scene: 'The pool shimmered under a blood moon.',
+        gameMasterVoiceStyle: ' velvet and slow ',
+        bots: [
+            { name: 'Ravenna', story: 'Eldest of the family.', visualDescription: 'Beautiful woman in a bikini, full lips, looking over her shoulder.', voiceStyle: 'husky' },
+            { name: 'Celeste', story: 'The quiet one.', visualDescription: '', voiceStyle: undefined },
+        ],
+        userEmail: 'p@example.com',
+        apiKeys: {},
+    };
+
+    it('screens the whole cast as one `cast` row with the image question, lines per field, blank fields left out', async () => {
+        mockAskJev.mockResolvedValue(jevResult({ ...answers([0.6, 0.35, 0.05, 0], { sexual: 0.2 }), image: { type: 'noul', noul: 0.12 } }));
+        const out = await screenCast(cast);
+        expect(out).toMatchObject({ verdict: 'ok', blocked: false, imageUnsafe: false });
+
+        const [, state, questions] = mockAskJev.mock.calls[0];
+        expect(state.text).toBe([
+            'Opening story: The pool shimmered under a blood moon.',
+            'Game Master voice: velvet and slow',
+            'Character Ravenna\nBackstory: Eldest of the family.\nAppearance: Beautiful woman in a bikini, full lips, looking over her shoulder.\nVoice: husky',
+            'Character Celeste\nBackstory: The quiet one.',
+        ].join('\n\n'));
+        expect(questions.image).toEqual({ type: 'noul', instructions: JEV_SCREEN_IMAGE_QUESTION });
+        expect(mockSaveRecord.mock.calls[0][0]).toMatchObject({ source: 'cast', gameId: null, imageRefusal: 0.12 });
+    });
+
+    it('a cast past the image bar reads imageUnsafe in monitor mode too, so createGame sets the appearances aside', async () => {
+        mockAskJev.mockResolvedValue(jevResult({ ...answers([0.1, 0.4, 0.5, 0], { sexual: 0.8 }), image: { type: 'noul', noul: 0.93 } }));
+        const out = await screenCast({ ...cast, bots: [{ name: 'Ravenna', story: 'x', visualDescription: 'nude, nothing on' }] });
+        expect(out).toMatchObject({ verdict: 'grey', blocked: false, imageUnsafe: true });
+        expect(mockWarn).toHaveBeenCalledWith('Jev screen grey (appearances set aside)', expect.objectContaining({ source: 'cast', imageUnsafe: true }));
+    });
+
+    it('enforce mode refuses a would-block cast with a cast-worded message', async () => {
+        mockMode.mockResolvedValue('enforce');
+        mockAskJev.mockResolvedValue(jevResult(answers([0, 0.03, 0.97, 0], { sexual: 0.97, minors: 0.96 })));
+        const out = await screenCast(cast);
+        expect(out.blocked).toBe(true);
+        expect(out.message).toBe("This cast can't be sent to the AI players because it sexualizes a minor. Please rephrase it.");
     });
 });
 

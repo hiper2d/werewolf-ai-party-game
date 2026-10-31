@@ -1,7 +1,8 @@
 /**
  * Questions the Jev content screen (app/api/jev-screen.ts) asks about text a HUMAN typed:
- * a chat message, or the name / theme / instructions of a new game. Bot output is never
- * screened — it already went through a provider.
+ * a chat message, the name / theme / instructions / art style of a new game, the cast as
+ * edited before Create, a vote reason, a night message, a voice direction. Bot output is
+ * never screened — it already went through a provider.
  *
  * Jev reads these literally: a level or a flag has to name the concrete things it covers,
  * and anything not named is not counted. The in-game framing ("werewolves kill villagers,
@@ -13,7 +14,7 @@
  * it, so old rows are not read against wording they were never asked.
  */
 
-export const JEV_SCREEN_PROMPT_VERSION = '2026-10-13.1';
+export const JEV_SCREEN_PROMPT_VERSION = '2026-10-30.1';
 
 export const JEV_SCREEN_CONTEXT_CHAT =
     'A message typed by a human player in the chat of a Werewolf party game (a social deduction game where ' +
@@ -31,18 +32,49 @@ export const JEV_SCREEN_CONTEXT_ART_STYLE =
     'The theme and the art style a human typed for a Werewolf party game. The art style is pasted verbatim ' +
     'into every image prompt that draws the character portraits and the story scenes.';
 
+export const JEV_SCREEN_CONTEXT_CAST =
+    'The cast of a new Werewolf party game (a social deduction game where werewolves secretly kill villagers ' +
+    'each night and the village votes to hang a suspect each day) as the human player submitted it: the ' +
+    'opening story, the Game Master\'s voice direction, and each character\'s name, backstory, appearance and ' +
+    'voice direction. An AI model wrote the first version; the human may have rewritten any part of it. The ' +
+    'backstories sit in every AI player\'s prompt for the whole game, the voice directions go into speech ' +
+    'synthesis, and each appearance is pasted verbatim into the image prompt that draws that character\'s portrait.';
+
+export const JEV_SCREEN_CONTEXT_VOTE =
+    'The reason a human player typed for their vote in a Werewolf party game (a social deduction game where ' +
+    'werewolves secretly kill villagers each night and the village votes to hang a suspect each day). It is ' +
+    'shown to every player and sent to an AI provider as part of the AI players\' prompts.';
+
+export const JEV_SCREEN_CONTEXT_NIGHT =
+    'A message a human player typed during the night of a Werewolf party game (a social deduction game where ' +
+    'werewolves secretly kill villagers each night and the village votes to hang a suspect each day): a note ' +
+    'to their werewolf teammates, or a hint for how the AI Game Master should narrate their night action. ' +
+    'It will be sent to an AI provider as part of a prompt.';
+
+export const JEV_SCREEN_CONTEXT_VOICE_STYLE =
+    'A voice direction a human typed for a character in a Werewolf party game, such as "sly and playful, a ' +
+    'smile in the voice". It is pasted into every text-to-speech call that voices that character.';
+
 /**
- * Separate from the text risk on purpose: an image model's filter draws its line elsewhere.
- * Gemini's image endpoint refused "nude women" and "women in bikinis, big boobs, sexy" (HTTP 400,
- * 2026-10-13) while the same players' text prompts went through; a clothed pin-up poster is fine.
- * Asked only where an art style exists (game setup, draft illustrations), never on chat.
+ * Separate from the text risk on purpose: an image model's filter draws its line elsewhere, and
+ * it is a per-image coin with a loaded side, not a rule on wording. The 2026-10-13 record, re-read
+ * 2026-10-30: the "women in bikinis, big boobs, sexy" style got ONE HTTP 400 on a reroll and was
+ * drawn on two portrait sheets, a retry 23 s later and five illustrations of the same game; the
+ * other 400s that day were four illustrations of a sexual monster-girl prison game (gone now,
+ * style unknown). Then on 2026-10-30 Gemini drew, six times over, a cast of nine described as
+ * "in a bikini with a bubble butt she uses to seduce men, full lips and large boobs, full body
+ * shot" (the player had moved the text from the set-aside art style onto every appearance). So
+ * body emphasis in clothes is not Gemini's line, and the question no longer names it: it asks
+ * about nudity and sex only, which is also the rule — block what providers block, nothing more.
+ * Asked wherever text reaches an image prompt (game setup, art style, the cast, draft
+ * illustrations), never on chat.
  */
 export const JEV_SCREEN_IMAGE_QUESTION =
-    'Would an image generator\'s safety filter refuse to draw pictures described this way? Yes when the ' +
-    'pictures would show nudity, exposed breasts, buttocks or genitals, a sexual act, or bodies described ' +
-    'to emphasize breasts or buttocks as the point of the image (such as "big boobs", "ass", "seductive ' +
-    'for their prey"). No for clothed pin-up or glamour portraits, swimsuits or period costume, monsters, ' +
-    'blood, gore, horror or weapons.';
+    'Would an image generator\'s safety filter refuse to draw pictures described this way? Yes only when the ' +
+    'pictures would show nudity (naked, nude, topless, exposed breasts, buttocks or genitals, see-through ' +
+    'or no clothes), a sexual act, or a sexualized child. No for everything clothed, however revealing or ' +
+    'emphasized: bikinis, swimsuits, pin-up or glamour portraits, a body described as curvy, busty or with ' +
+    'a big butt; and No for monsters, blood, gore, horror or weapons.';
 
 export const JEV_SCREEN_RISK_QUESTION =
     'How risky is this text for being sent to a strict AI content filter?';

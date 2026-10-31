@@ -664,6 +664,10 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
     // The content screen refused the draft (enforce mode): shown above the composer until
     // the player edits the text. The draft itself is kept.
     const [composerNotice, setComposerNotice] = useState<string | null>(null);
+    // The content screen's reason when it refused a vote reason or a night hint (enforce mode):
+    // the modal stays open with the draft and shows it.
+    const [voteNotice, setVoteNotice] = useState<string | null>(null);
+    const [nightNotice, setNightNotice] = useState<string | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const messagesContainerRef = useRef<HTMLDivElement>(null);
     const [showScrollToTop, setShowScrollToTop] = useState(false);
@@ -1117,6 +1121,11 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                         // Another action holds the lock — keep the draft.
                         return;
                     }
+                    if (result.rejected) {
+                        // The content screen refused it before anything was saved: keep the draft, say why.
+                        setComposerNotice(result.rejected.message);
+                        return;
+                    }
                     const { game: updatedGame, messages: newMessages } = result;
                     addMessages(newMessages);
 
@@ -1366,13 +1375,23 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
         });
 
         setIsVoting(true);
+        setVoteNotice(null);
         voteSubmittedRef.current = true;
+        let keepModalOpen = false;
         try {
             const result = await runAction(() => humanPlayerVote(gameId, targetPlayer, reason));
             if (!result) {
                 // Another action holds the lock: undo the submitted flag so the
                 // modal can reopen while the human is still at the queue head.
                 voteSubmittedRef.current = false;
+                return;
+            }
+            if (result.rejected) {
+                // The content screen refused the reason before anything was written: the human
+                // is still at the queue head, so keep the modal and the draft and say why.
+                voteSubmittedRef.current = false;
+                keepModalOpen = true;
+                setVoteNotice(result.rejected.message);
                 return;
             }
             const { game: updatedGame, messages: newMessages } = result;
@@ -1387,13 +1406,16 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
         } catch (error) {
             console.error('❌ Human vote failed:', error);
         } finally {
-            closeModal('voting');
+            if (!keepModalOpen) {
+                closeModal('voting');
+            }
             setIsVoting(false);
         }
     };
 
     const handleCloseVotingModal = () => {
         if (!isVoting) {
+            setVoteNotice(null);
             closeModal('voting');
         }
     };
@@ -1410,12 +1432,21 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
         });
 
         setIsPerformingNightAction(true);
+        setNightNotice(null);
+        let keepModalOpen = false;
         try {
             const { performHumanPlayerNightAction } = await import("@/app/api/bot-actions");
             const result = await runAction(() => performHumanPlayerNightAction(gameId, targetPlayer, message, actionType));
             if (!result) {
                 // Another action holds the lock; the modal-open effect re-fires
                 // once it completes if the night turn is still pending.
+                return;
+            }
+            if (result.rejected) {
+                // The content screen refused the hint before anything was written: the turn is
+                // still the human's, so keep the modal and the draft and say why.
+                keepModalOpen = true;
+                setNightNotice(result.rejected.message);
                 return;
             }
             const { game: updatedGame, messages: newMessages } = result;
@@ -1429,13 +1460,16 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
         } catch (error) {
             console.error('Night action failed:', error);
         } finally {
-            closeModal('nightAction');
+            if (!keepModalOpen) {
+                closeModal('nightAction');
+            }
             setIsPerformingNightAction(false);
         }
     };
 
     const handleCloseNightActionModal = () => {
         if (!isPerformingNightAction) {
+            setNightNotice(null);
             closeModal('nightAction');
         }
     };
@@ -2629,6 +2663,7 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                 onVote={handleVote}
                 onClose={handleCloseVotingModal}
                 isSubmitting={isVoting}
+                notice={voteNotice}
             />
             <NightActionModal
                 game={game}
@@ -2637,6 +2672,7 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                 onAction={handleNightAction}
                 onClose={handleCloseNightActionModal}
                 isSubmitting={isPerformingNightAction}
+                notice={nightNotice}
             />
             <ConfirmModal
                 isOpen={confirmModal.isOpen}
