@@ -161,6 +161,9 @@ export interface JevScreenCallRecord {
     /** Probability that an image model would refuse the described pictures; only on sources that
      * carry an art style (preview, art_style), null on chat and on older rows. Since 2026-10-13. */
     imageRefusal?: number | null;
+    /** Probability that the pictures would show a real, identifiable person in swimwear, underwear
+     * or an intimate pose; same sources as imageRefusal, null elsewhere. Since 2026-10-30. */
+    imagePerson?: number | null;
     /** The config in force when the verdict was made. */
     thresholds: Record<string, unknown>;
     mode: 'monitor' | 'enforce';
@@ -183,6 +186,7 @@ export interface JevScreenShadow {
     verdict: JevScreenVerdict;
     reason: string | null;
     imageRefusal?: number | null;
+    imagePerson?: number | null;
     riskScore: number | null;
     highRisk: number | null;
     flags: Record<string, number> | null;

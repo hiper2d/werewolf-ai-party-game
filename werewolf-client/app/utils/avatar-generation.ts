@@ -10,6 +10,7 @@ import {isInsufficientBalanceError} from "@/app/api/errors";
 import {API_KEY_CONSTANTS, IMAGE_MODEL_CONSTANTS, IMAGE_THINKING_LEVEL} from "@/app/ai/ai-models";
 import {logger} from "@/app/utils/logger";
 import {sanitizeArtStyle} from "@/app/utils/art-style";
+import {recordImageRefusal} from "@/app/utils/image-refusals";
 
 // The portrait pipeline (grid layout, sheet prompt, divider detection, card cutting)
 // lives in @hiper2d/ai-agents/images; this file supplies the Werewolf subject — who
@@ -414,8 +415,11 @@ export async function drawIllustrationSet(
                 await opts.onStage?.('scene');
                 return out;
             })
-            .catch(error => {
+            .catch(async error => {
                 logger.warn(`Scene image generation failed`, {...logContext, error: error?.message});
+                if (db && typeof logContext.gameId === 'string') {
+                    await recordImageRefusal(db.collection('games').doc(logContext.gameId), 'scene', error);
+                }
                 return [];
             });
 
@@ -506,6 +510,7 @@ export async function runAvatarGeneration(gameId: string, userEmail: string): Pr
         // logs at warn; anything else is an outage worth an error.
         const refused = isImageRefusal(error);
         const fields = {gameId, error: error.message, refused, costUSD: ledger.spentUSD};
+        if (refused) await recordImageRefusal(gameRef, 'cast', error);
         if (refused) logger.warn(`Avatar generation refused for game ${gameId}`, fields);
         else logger.error(`Avatar generation failed for game ${gameId}`, fields);
         await gameRef.update({avatarsStatus: 'failed'});
@@ -619,6 +624,7 @@ export async function runAvatarRegeneration(gameId: string, userEmail: string, m
             ? {refused: true, message: 'The image model declined to draw this cast. Adjust the art style or the character descriptions and try again.'}
             : {refused: false, message: 'Redraw failed. Your portraits are unchanged — try again in a moment.'};
         const fields = {gameId, error: error.message, refused: failure.refused, costUSD: ledger.spentUSD};
+        if (failure.refused) await recordImageRefusal(gameRef, 'reroll', error);
         if (failure.refused) logger.warn(`Avatar regeneration refused for game ${gameId}`, fields);
         else logger.error(`Avatar regeneration failed for game ${gameId}`, fields);
         await gameRef.update({avatarsRegeneratingAt: null});

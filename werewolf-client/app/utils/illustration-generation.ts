@@ -20,6 +20,7 @@ import {billImages} from "@/app/utils/avatar-generation";
 import {generateImage} from "@hiper2d/ai-agents/images";
 import {logger} from "@/app/utils/logger";
 import {sanitizeArtStyle} from "@/app/utils/art-style";
+import {recordImageRefusal} from "@/app/utils/image-refusals";
 
 /**
  * Whether a game gets occasional mid-game illustrations. Free for everyone for
@@ -276,6 +277,7 @@ export async function runNightIllustration(
         await generateAndPostIllustration(gameId, userEmail, key, story, "the narration of last night's events", postDay, 'night', {msgId: summaryMsgId});
     } catch (error: any) {
         logger.warn(`Night illustration failed for game ${gameId} (decorative, ignored)`, {gameId, nightDay, error: error.message});
+        await recordImageRefusal(db.collection('games').doc(gameId), 'night_illustration', error, {day: nightDay});
     }
 }
 
@@ -311,5 +313,6 @@ export async function runDayIllustration(
         await generateAndPostIllustration(gameId, userEmail, key, sourceText, "the latest scene from today's discussion between the players", day, 'day', {});
     } catch (error: any) {
         logger.warn(`Day illustration failed for game ${gameId} (decorative, ignored)`, {gameId, day, error: error.message});
+        await recordImageRefusal(db.collection('games').doc(gameId), 'day_illustration', error, {day});
     }
 }

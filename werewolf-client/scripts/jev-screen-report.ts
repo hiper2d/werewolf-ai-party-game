@@ -48,7 +48,7 @@ const topFlags = (flags: Record<string, number> | null) =>
 function printRow(row: StoredJevScreenCall): void {
     const where = row.gameId ? `${row.source} in game ${row.gameId}${row.day !== null && row.day !== undefined ? ` day ${row.day}` : ''}` : row.source;
     const verdict = `${row.verdict}${row.reason ? `(${row.reason})` : ''}${row.enforced ? ' REJECTED' : ''}`;
-    const image = row.imageRefusal === null || row.imageRefusal === undefined ? '' : ` image=${row.imageRefusal.toFixed(2)}`;
+    const image = row.imageRefusal === null || row.imageRefusal === undefined ? '' : ` image=${row.imageRefusal.toFixed(2)} person=${(row.imagePerson ?? 0).toFixed(2)}`;
     console.log(`  ${when(row.createdAt)}  ${verdict.padEnd(24)} score=${(row.riskScore ?? 0).toFixed(2)} high=${(row.highRisk ?? 0).toFixed(2)}${image}  ${topFlags(row.flags)}`);
     console.log(`      ${row.userEmail}  ${where}  [${row.id}]`);
     console.log(`      "${excerpt(row.text)}"`);
@@ -143,16 +143,18 @@ async function report() {
     const gamesSnap = await db.collection('games').where('createdAt', '>=', since).get();
     const refused = gamesSnap.docs
         .map(doc => ({ id: doc.id, ...(doc.data() as any) }))
-        .filter(g => g.providerBlocks && Object.keys(g.providerBlocks).length > 0);
-    console.log(`\nGames created in the window with a provider refusal: ${refused.length}`);
+        .filter(g => (g.providerBlocks && Object.keys(g.providerBlocks).length > 0) || (g.imageRefusals?.length ?? 0) > 0);
+    console.log(`\nGames created in the window with a provider refusal (text or image): ${refused.length}`);
     const byGame = new Map<string, StoredJevScreenCall[]>();
     for (const row of rows) {
         if (row.gameId) byGame.set(row.gameId, [...(byGame.get(row.gameId) ?? []), row]);
     }
     for (const game of refused) {
-        const blocks = Object.values(game.providerBlocks as Record<string, any>)
-            .map(b => `${b.provider} day ${b.day}${b.reason ? ` (${b.reason})` : ''}${b.botName ? ` on ${b.botName}` : ''}`)
-            .join('; ');
+        const blocks = [
+            ...Object.values((game.providerBlocks ?? {}) as Record<string, any>)
+                .map(b => `${b.provider} day ${b.day}${b.reason ? ` (${b.reason})` : ''}${b.botName ? ` on ${b.botName}` : ''}`),
+            ...((game.imageRefusals ?? []) as any[]).map(r => `image ${r.kind}${r.day !== undefined ? ` day ${r.day}` : ''}`),
+        ].join('; ');
         const screened = byGame.get(game.id) ?? [];
         const worst = screened.reduce<StoredJevScreenCall | null>((best, r) => (!best || (r.riskScore ?? 0) > (best.riskScore ?? 0) ? r : best), null);
         console.log(`\n  ${game.id}  "${excerpt(game.theme ?? '', 60)}"  refused: ${blocks}`);

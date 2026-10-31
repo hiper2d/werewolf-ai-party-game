@@ -31,7 +31,7 @@ jest.mock('@/app/utils/logger', () => ({
 }));
 
 import { buildScreenRequest, decideScreen, isImageUnsafe, JEV_SCREEN_CONFIG, screenArtStyle, screenCast, screenHumanInput, screenRejectionMessage } from '@/app/api/jev-screen';
-import { JEV_SCREEN_FLAG_QUESTIONS, JEV_SCREEN_IMAGE_QUESTION, JEV_SCREEN_PROMPT_VERSION, JEV_SCREEN_RISK_LEVELS } from '@/app/ai/prompts/jev-screen-prompts';
+import { JEV_SCREEN_FLAG_QUESTIONS, JEV_SCREEN_IMAGE_PERSON_QUESTION, JEV_SCREEN_IMAGE_QUESTION, JEV_SCREEN_PROMPT_VERSION, JEV_SCREEN_RISK_LEVELS } from '@/app/ai/prompts/jev-screen-prompts';
 
 /** Jev-shaped answers: a risk score with the given per-level probabilities plus flag nouls (default 0.01). */
 function answers(levels: number[], flags: Partial<Record<string, number>> = {}) {
@@ -152,6 +152,23 @@ describe('buildScreenRequest', () => {
         expect(String(cast.state.context)).toContain('appearance');
     });
 
+    it('asks the real-person picture question wherever the nudity one is asked, and nowhere else', () => {
+        for (const source of ['preview', 'art_style', 'cast'] as const) {
+            expect(buildScreenRequest(source, 'x').questions.image_person).toEqual({ type: 'noul', instructions: JEV_SCREEN_IMAGE_PERSON_QUESTION });
+        }
+        for (const source of ['chat', 'vote', 'night', 'voice_style'] as const) {
+            expect(buildScreenRequest(source, 'x').questions.image_person).toBeUndefined();
+        }
+    });
+
+    it('the wording carries the agreed rules: underwear is clothed, naked counts however covered, a child character is a minor', () => {
+        expect(JEV_SCREEN_IMAGE_QUESTION).toMatch(/underwear, lingerie/);
+        expect(JEV_SCREEN_IMAGE_QUESTION).toMatch(/even when hands, hair/);
+        expect(JEV_SCREEN_IMAGE_PERSON_QUESTION).toMatch(/from the TV show/);
+        expect(JEV_SCREEN_FLAG_QUESTIONS.minors).toMatch(/child in the source material/);
+        expect(JEV_SCREEN_FLAG_QUESTIONS.real_person_sexual).toMatch(/real, identifiable person/);
+    });
+
     it('frames each night and vote input as what it is, and never as chat', () => {
         expect(String(buildScreenRequest('vote', 'x').state.context)).toContain('vote');
         expect(String(buildScreenRequest('night', 'x').state.context)).toContain('werewolf teammates');
@@ -159,7 +176,7 @@ describe('buildScreenRequest', () => {
     });
 
     it('the image question draws the line at nudity and sex, not at a body in a bikini (2026-10-30)', () => {
-        expect(JEV_SCREEN_IMAGE_QUESTION).toMatch(/nudity/);
+        expect(JEV_SCREEN_IMAGE_QUESTION).toMatch(/naked, nude, topless/);
         expect(JEV_SCREEN_IMAGE_QUESTION).toMatch(/No for everything clothed/);
         expect(JEV_SCREEN_IMAGE_QUESTION).not.toMatch(/big boobs/);
     });
@@ -181,6 +198,35 @@ describe('image question', () => {
         const pinup = decideScreen({ ...answers([0.4, 0.5, 0.1, 0], { sexual: 0.3 }), image: { type: 'noul', noul: 0.2 } });
         expect(isImageUnsafe(pinup)).toBe(false);
         expect(isImageUnsafe({ imageRefusal: JEV_SCREEN_CONFIG.IMAGE_REFUSAL_PROBABILITY })).toBe(true);
+    });
+
+    it('a real person in swimwear sets the text aside on the second picture rule even when the nudity rule is quiet', () => {
+        const arya = decideScreen({ ...answers([0.3, 0.5, 0.2, 0], { real_person: 0.9, real_person_sexual: 0.7 }), image: { type: 'noul', noul: 0.12 }, image_person: { type: 'noul', noul: 0.91 } });
+        expect(arya.verdict).toBe('ok');
+        expect(arya.imageRefusal).toBe(0.12);
+        expect(arya.imagePerson).toBe(0.91);
+        expect(isImageUnsafe(arya)).toBe(true);
+
+        // A real person in a suit: recorded on the flags, nothing set aside.
+        const suit = decideScreen({ ...answers([0.9, 0.1, 0, 0], { real_person: 0.95 }), image: { type: 'noul', noul: 0.03 }, image_person: { type: 'noul', noul: 0.05 } });
+        expect(suit.verdict).toBe('ok');
+        expect(suit.flags.real_person).toBe(0.95);
+        expect(isImageUnsafe(suit)).toBe(false);
+        expect(decideScreen(answers([0.9, 0.1, 0, 0])).imagePerson).toBeNull();
+    });
+});
+
+describe('real people', () => {
+    it('sexualizing a named real person is a hard block, like minors', () => {
+        const d = decideScreen(answers([0.2, 0.5, 0.3, 0], { sexual: 0.6, real_person: 0.97, real_person_sexual: 0.93 }));
+        expect(d.verdict).toBe('would_block');
+        expect(d.reason).toBe('real_person_sexual');
+        expect(screenRejectionMessage('preview', 'real_person_sexual')).toBe("This game setup can't be sent to the AI players because it sexualizes a real person. Please rephrase it.");
+    });
+
+    it('a named real person in ordinary clothes never blocks', () => {
+        const d = decideScreen(answers([0.8, 0.2, 0, 0], { real_person: 0.98, real_person_sexual: 0.05 }));
+        expect(d.verdict).toBe('ok');
     });
 });
 

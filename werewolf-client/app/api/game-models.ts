@@ -347,6 +347,10 @@ export interface Game {
     // Providers whose content filter refused this game's story; see ProviderBlock. Survives
     // Retry and error clearing. Empty for games that never hit a refusal.
     providerBlocks?: Record<string, ProviderBlock>;
+    // Image-model refusals (a safety block on the portrait sheet, a reroll, a scene or an
+    // illustration), appended by recordImageRefusal (app/utils/image-refusals.ts). The content
+    // screen's image probabilities are read against these; the logs alone keep three days.
+    imageRefusals?: ImageRefusal[];
     nightResults?: Record<string, { target: string; actionType?: string; narrativeHint?: string }>; // Dynamic night results for each role that has night actions
     previousNightResults?: Record<string, { target: string; actionType?: string; narrativeHint?: string }>; // Previous night's results for reference
     messageCounter?: number; // Counter for generating incremental message IDs
@@ -907,6 +911,17 @@ export interface SystemErrorMessage {
  * every AI call and by the model-change actions, so nothing from that provider is sent this
  * story again. Per game by design — the block is about this content, not the provider.
  */
+export type ImageRefusalKind = 'cast' | 'reroll' | 'scene' | 'day_illustration' | 'night_illustration';
+
+/** One image-model refusal on this game; see `Game.imageRefusals`. */
+export interface ImageRefusal {
+    kind: ImageRefusalKind;
+    at: number;
+    /** The model's error text, clipped. */
+    message: string;
+    day?: number;
+}
+
 export interface ProviderBlock {
     provider: string;   // display name ("Google")
     reason: string;     // provider's label: PROHIBITED_CONTENT, SAFETY, DataInspectionFailed, refusal

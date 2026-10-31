@@ -40,6 +40,7 @@ import {
     JEV_SCREEN_CONTEXT_VOICE_STYLE,
     JEV_SCREEN_CONTEXT_VOTE,
     JEV_SCREEN_FLAG_QUESTIONS,
+    JEV_SCREEN_IMAGE_PERSON_QUESTION,
     JEV_SCREEN_IMAGE_QUESTION,
     JEV_SCREEN_PROMPT_VERSION,
     JEV_SCREEN_RISK_LEVELS,
@@ -64,8 +65,13 @@ export const JEV_SCREEN_CONFIG = {
      * alike on Jev and on OpenAI Decisions for blatant content, so one bar serves both judges;
      * Decisions scores ran ~0.5 lower. The other flags, hate included, stay as questions: a grey
      * row carries the strongest one as its reason and the report joins them against refusals.
+     * `real_person_sexual` joined 2026-10-30 (Alex): sexualizing a named real person — "Arya Stark
+     * from the TV show in a bikini" — is the non-consensual-imagery category providers act on at
+     * the account level, like minors, and the story model writes it into the cast on its own
+     * when it is in the instructions, so a set-aside of the style would not reach it. A real
+     * person in ordinary clothes (`real_person`) is recorded on the row only.
      */
-    HARD_FLAGS: { minors: 0.9, real_harm: 0.9 } as Partial<Record<JevScreenFlag, number>>,
+    HARD_FLAGS: { minors: 0.9, real_harm: 0.9, real_person_sexual: 0.9 } as Partial<Record<JevScreenFlag, number>>,
     /**
      * Grey with a reason when the probability mass on the top two risk levels ("likely to be
      * refused" + "must be blocked") reaches this — the rows to read by hand. Was the score block
@@ -92,7 +98,14 @@ export const JEV_SCREEN_CONFIG = {
      * on the new wording (Jev, 70-230 ms): nude 0.95, topless 0.98, today's bikini cast 0.10,
      * bikini style 0.17, pin-up 0.23, gore 0.17; the 10-13 probe strings now read 0.21 ("bikinis,
      * big boobs, sexy") and 0.49 ("women in bras … for their prey"), under the bar on purpose: a
-     * rare 400 there is a reroll away, a set-aside costs every clothed pin-up.
+     * rare 400 there is a reroll away, a set-aside costs every clothed pin-up. Second probe, the
+     * 2026-10-30.2 wording with the real-person rule (Jev, ~100 ms): naked-but-covered 0.98,
+     * wet see-through 0.92, lingerie 0.12, backless gown 0.08, the bikini cast 0.12; person rule:
+     * "Arya Stark from the TV show in a bikini" 0.89 (and minors 0.91, real_person_sexual 0.95 →
+     * would_block), "Maisie Williams in lingerie" 0.98, "the Game of Thrones actresses at a pool
+     * party" 0.86 (real_person_sexual only 0.72 — set aside, not blocked), Scarlett Johansson in a
+     * gown 0.20 with real_person 0.97 (recorded, nothing set aside), Lara Croft in a bikini 0.37.
+     * Near misses to know: "Arya Stark seduces the player" read minors 0.84, under the 0.9 bar.
      * Read the recorded `imageRefusal` against the image refusals in the logs before moving the bar.
      */
     IMAGE_REFUSAL_PROBABILITY: 0.6,
@@ -111,7 +124,7 @@ export const JEV_SCREEN_CONFIG = {
     DECISIONS_TIMEOUT_MS: 3_000,
 } as const;
 
-export type ScreenQuestions = { risk: JevScoreQuestion; image?: JevNoulQuestion } & Record<JevScreenFlag, JevNoulQuestion>;
+export type ScreenQuestions = { risk: JevScoreQuestion; image?: JevNoulQuestion; image_person?: JevNoulQuestion } & Record<JevScreenFlag, JevNoulQuestion>;
 
 export interface ScreenDecision {
     verdict: Exclude<JevScreenVerdict, 'error'>;
@@ -124,6 +137,8 @@ export interface ScreenDecision {
     /** The image question's probability; null when it was not asked (chat). Outside the verdict:
      * it steers image prompts, it never blocks text. */
     imageRefusal: number | null;
+    /** The second picture rule, a real person sexualized; null when not asked. */
+    imagePerson: number | null;
 }
 
 export interface ScreenInput {
@@ -204,7 +219,8 @@ function toShadow(attempt: ScreenAttempt): JevScreenShadow {
     const decision = decideScreen(attempt.result.answers);
     return {
         model: attempt.result.model, verdict: decision.verdict, reason: decision.reason,
-        riskScore: decision.riskScore, highRisk: decision.highRisk, flags: decision.flags, imageRefusal: decision.imageRefusal,
+        riskScore: decision.riskScore, highRisk: decision.highRisk, flags: decision.flags,
+        imageRefusal: decision.imageRefusal, imagePerson: decision.imagePerson,
         answers: attempt.result.answers, inputTokens: attempt.result.inputTokens,
         costUSD: attempt.result.costUSD, durationMs: attempt.result.durationMs,
     };
@@ -252,7 +268,10 @@ export function buildScreenRequest(source: JevScreenSource, text: string): { sta
     const questions = {
         risk: { type: 'score', instructions: JEV_SCREEN_RISK_QUESTION, criteria: [...JEV_SCREEN_RISK_LEVELS] },
         ...Object.fromEntries(FLAG_NAMES.map(flag => [flag, { type: 'noul', instructions: JEV_SCREEN_FLAG_QUESTIONS[flag] }])),
-        ...(IMAGE_SOURCES.has(source) ? { image: { type: 'noul', instructions: JEV_SCREEN_IMAGE_QUESTION } } : {}),
+        ...(IMAGE_SOURCES.has(source) ? {
+            image: { type: 'noul', instructions: JEV_SCREEN_IMAGE_QUESTION },
+            image_person: { type: 'noul', instructions: JEV_SCREEN_IMAGE_PERSON_QUESTION },
+        } : {}),
     } as ScreenQuestions;
     return { state, questions };
 }
@@ -264,26 +283,28 @@ export function decideScreen(answers: Record<string, any>, config = JEV_SCREEN_C
     const highRisk = TOP_LEVELS.reduce((sum, level) => sum + (Number(risk.probabilities?.[level]) || 0), 0);
     const flags = Object.fromEntries(FLAG_NAMES.map(flag => [flag, Number(answers?.[flag]?.noul) || 0])) as Record<JevScreenFlag, number>;
     const imageRefusal = answers?.image?.noul === undefined ? null : (Number(answers.image.noul) || 0);
+    const imagePerson = answers?.image_person?.noul === undefined ? null : (Number(answers.image_person.noul) || 0);
 
     // A hard flag names the reason even when the score agrees, so the message to the player is specific.
     for (const [flag, threshold] of Object.entries(config.HARD_FLAGS) as [JevScreenFlag, number][]) {
         if (flags[flag] >= threshold) {
-            return { verdict: 'would_block', reason: flag, riskScore, highRisk, flags, imageRefusal };
+            return { verdict: 'would_block', reason: flag, riskScore, highRisk, flags, imageRefusal, imagePerson };
         }
     }
     if (highRisk >= config.HIGH_RISK_PROBABILITY) {
         const strongest = FLAG_NAMES.reduce((best, flag) => (flags[flag] > flags[best] ? flag : best), FLAG_NAMES[0]);
-        return { verdict: 'grey', reason: flags[strongest] >= 0.5 ? strongest : 'score', riskScore, highRisk, flags, imageRefusal };
+        return { verdict: 'grey', reason: flags[strongest] >= 0.5 ? strongest : 'score', riskScore, highRisk, flags, imageRefusal, imagePerson };
     }
     if (riskScore >= config.GREY_SCORE) {
-        return { verdict: 'grey', reason: null, riskScore, highRisk, flags, imageRefusal };
+        return { verdict: 'grey', reason: null, riskScore, highRisk, flags, imageRefusal, imagePerson };
     }
-    return { verdict: 'ok', reason: null, riskScore, highRisk, flags, imageRefusal };
+    return { verdict: 'ok', reason: null, riskScore, highRisk, flags, imageRefusal, imagePerson };
 }
 
-/** Pure: does the decision put the art style past the image bar? */
-export function isImageUnsafe(decision: Pick<ScreenDecision, 'imageRefusal'>, config = JEV_SCREEN_CONFIG): boolean {
-    return decision.imageRefusal !== null && decision.imageRefusal >= config.IMAGE_REFUSAL_PROBABILITY;
+/** Pure: does the decision put the text past either picture rule (nudity, or a sexualized real person)? */
+export function isImageUnsafe(decision: { imageRefusal: number | null; imagePerson?: number | null }, config = JEV_SCREEN_CONFIG): boolean {
+    const past = (p: number | null | undefined) => p !== null && p !== undefined && p >= config.IMAGE_REFUSAL_PROBABILITY;
+    return past(decision.imageRefusal) || past(decision.imagePerson);
 }
 
 /** What the player reads when the input is rejected. Names the category, never the score. */
@@ -294,6 +315,7 @@ export function screenRejectionMessage(source: JevScreenSource, reason: string |
         minors: 'it sexualizes a minor',
         hate: 'it contains hate speech',
         real_harm: 'it describes real-world harm',
+        real_person_sexual: 'it sexualizes a real person',
         jailbreak: 'it tries to override the AI players\' instructions',
     };
     const why = reason && because[reason] ? ` because ${because[reason]}` : '';
@@ -390,7 +412,7 @@ export async function screenHumanInput(input: ScreenInput): Promise<ScreenOutcom
     const setAside = !imageUnsafe ? '' : input.source === 'cast' ? ' (appearances set aside)' : ' (art style set aside)';
     const summary = `${decision.verdict}${decision.reason ? ` (${decision.reason})` : ''} score=${decision.riskScore.toFixed(2)} high=${decision.highRisk.toFixed(2)} ` +
         FLAG_NAMES.map(flag => `${flag}=${decision.flags[flag].toFixed(2)}`).join(' ') +
-        (decision.imageRefusal === null ? '' : ` image=${decision.imageRefusal.toFixed(2)}${setAside}`);
+        (decision.imageRefusal === null ? '' : ` image=${decision.imageRefusal.toFixed(2)} person=${(decision.imagePerson ?? 0).toFixed(2)}${setAside}`);
     const shadowSummary = shadow ? `; ${shadowAttempt!.judge.label} ${shadow.verdict}${shadow.riskScore !== null ? ` score=${shadow.riskScore.toFixed(2)}` : ''}` : '';
     console.log(`🛡️ ${judge.label} screen [${mode}] ${input.source}: ${summary} — ${result.durationMs} ms, ${result.inputTokens} tokens${blocked ? ' → REJECTED' : ''}${shadowSummary}`);
 
@@ -398,14 +420,14 @@ export async function screenHumanInput(input: ScreenInput): Promise<ScreenOutcom
         ...base, model: result.model, answers: result.answers,
         inputTokens: result.inputTokens, costUSD: result.costUSD, durationMs: result.durationMs,
         verdict: decision.verdict, reason: decision.reason, riskScore: decision.riskScore, highRisk: decision.highRisk,
-        flags: decision.flags, imageRefusal: decision.imageRefusal, enforced: blocked, shadow,
+        flags: decision.flags, imageRefusal: decision.imageRefusal, imagePerson: decision.imagePerson, enforced: blocked, shadow,
     });
 
     const logLevel = decision.verdict === 'would_block' || imageUnsafe ? 'warn' : 'info';
     logger[logLevel](`Jev screen ${decision.verdict}${blocked ? ' (rejected)' : ''}${setAside}`, {
         gameId: input.gameId, userId: input.userEmail, activity: 'jev_screen', source: input.source, mode,
         model: result.model, verdict: decision.verdict, reason: decision.reason, riskScore: decision.riskScore, highRisk: decision.highRisk,
-        imageRefusal: decision.imageRefusal, imageUnsafe, durationMs: result.durationMs,
+        imageRefusal: decision.imageRefusal, imagePerson: decision.imagePerson, imageUnsafe, durationMs: result.durationMs,
     });
     logger.agentActivity(SCREEN_AGENT_NAME, result.model, 'jev_screen', {
         gameId: input.gameId,
