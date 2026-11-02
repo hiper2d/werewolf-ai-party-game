@@ -56,6 +56,7 @@ import {normalizeSpendings} from "@/app/utils/spending-utils";
 import {serializeMessageForFirestore} from "@/app/api/message-serialization";
 import {LLM_CONSTANTS, assertAllowedAsGameMaster, configureStoryAgent, isAllowedAsGameMaster, SupportedAiModels} from "@/app/ai/ai-models";
 import {
+    cheapFirstDealOrder,
     consumeModelUsage,
     getCandidateModelsForTier,
     getRandomPoolForTier,
@@ -533,6 +534,8 @@ export async function previewGame(gamePreview: GamePreview, progressId?: string)
     // Initial setup for model distribution
     let modelDeck: string[] = [];
     let baseCandidates: string[] = [];
+    // Models picked by name next to Random: dealt before the Random pool, cheap or not.
+    let pinnedModels = new Set<string>();
 
     // Resolve base candidates
     if (Array.isArray(gamePreview.playersAiType)) {
@@ -551,6 +554,7 @@ export async function previewGame(gamePreview: GamePreview, progressId?: string)
 
         // Remove duplicates to ensure fair distribution basis
         baseCandidates = [...new Set(baseCandidates)];
+        pinnedModels = new Set(selectedModels.filter(model => model !== LLM_CONSTANTS.RANDOM));
 
     } else {
         // Legacy support
@@ -562,9 +566,10 @@ export async function previewGame(gamePreview: GamePreview, progressId?: string)
         }
     }
 
-    const bots: BotPreview[] = aiResponse.players.map((bot) => {
-        let aiType: string;
-
+    // Deal the seats in rounds: every candidate once before any repeats, cheapest band first
+    // (cheapFirstDealOrder), so a game with fewer bots than models seats the cheap ones and a
+    // big game's repeats go to the cheapest too.
+    const dealtModels: string[] = aiResponse.players.map(() => {
         // Filter currently available candidates based on capacity
         const currentValidCandidates = baseCandidates.filter(model => hasCapacity(model, tier, usageCounts));
 
@@ -580,18 +585,23 @@ export async function previewGame(gamePreview: GamePreview, progressId?: string)
         modelDeck = modelDeck.filter(m => currentValidCandidates.includes(m));
 
         if (modelDeck.length === 0) {
-            // Refill deck with a shuffled copy of valid candidates
-            modelDeck = [...currentValidCandidates];
-            // Fisher-Yates shuffle
-            for (let i = modelDeck.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [modelDeck[i], modelDeck[j]] = [modelDeck[j], modelDeck[i]];
-            }
+            modelDeck = cheapFirstDealOrder(currentValidCandidates, pinnedModels);
         }
 
-        aiType = modelDeck.pop()!;
-
+        const aiType = modelDeck.shift()!;
         consumeModelUsage(aiType, tier, usageCounts, 'for bots');
+        return aiType;
+    });
+
+    // The deal order says WHICH models sit at the table, not who plays whom: shuffle so the
+    // cheap models are not always the first characters the story lists.
+    for (let i = dealtModels.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [dealtModels[i], dealtModels[j]] = [dealtModels[j], dealtModels[i]];
+    }
+
+    const bots: BotPreview[] = aiResponse.players.map((bot, index) => {
+        const aiType = dealtModels[index];
 
         return {
             // Names act as identifiers throughout the game (vote targets, GM bot

@@ -224,3 +224,28 @@ export function validateModelUsageForTier(
         consumeModelUsage(botModel, tier, usage, 'for bots');
     }
 }
+
+/**
+ * Cost rank of a model for seat dealing: its free-tier policy (the measured-cost band, or an
+ * explicit override such as Sonnet's paid-only pin) — 0 unlimited, 1 a few bots, 2 one bot,
+ * 3 paid only. The band, not the raw cent figure, so models of about the same price still take
+ * turns at the cheap seats. Used on every tier: a paid player's Random fills cheap-first too.
+ */
+export function turnCostRank(model: string): number {
+    const policy = SupportedAiModels[resolveModelId(model)]?.freeTier;
+    if (!policy?.available || policy.maxBotsPerGame === 0) return 3;
+    if (policy.maxBotsPerGame === -1) return 0;
+    return policy.maxBotsPerGame > 1 ? 1 : 2;
+}
+
+/**
+ * The order one round of bot seats is dealt in (2026-11-02): cheap models first, so a game with
+ * fewer bots than models fills its seats from the cheapest bands and a big game's repeats go to
+ * the cheapest too. `pinned` models (picked by name next to Random) come before everything —
+ * the player asked for them. Order within a band is shuffled, so the cheap seats still vary.
+ */
+export function cheapFirstDealOrder(models: string[], pinned: ReadonlySet<string> = new Set(), rng: () => number = Math.random): string[] {
+    const keyed = models.map(model => ({ model, rank: pinned.has(model) ? -1 : turnCostRank(model), tiebreak: rng() }));
+    keyed.sort((a, b) => a.rank - b.rank || a.tiebreak - b.tiebreak);
+    return keyed.map(k => k.model);
+}

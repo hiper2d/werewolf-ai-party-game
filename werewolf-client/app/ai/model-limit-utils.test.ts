@@ -16,7 +16,9 @@ import {
 } from './ai-models';
 import { USER_TIERS } from '@/app/api/game-models';
 import {
+    cheapFirstDealOrder,
     consumeModelUsage,
+    turnCostRank,
     getCandidateModelsForTier,
     getGameMasterCandidateModelsForTier,
     getRandomPoolForTier,
@@ -367,5 +369,42 @@ describe('excludedFromGmAndRandom models (Game Master speed rule + RANDOM pool)'
         expect(() => assertAllowedAsGameMaster(LLM_CONSTANTS.QWEN_FLASH)).toThrow('Qwen3.8 Flash is too slow to be the Game Master.');
         expect(() => assertAllowedAsGameMaster(LLM_CONSTANTS.RANDOM)).not.toThrow();
         expect(() => assertAllowedAsGameMaster(LLM_CONSTANTS.CLAUDE_HAIKU)).not.toThrow();
+    });
+});
+
+describe('cheap-first seat dealing (2026-11-02)', () => {
+    const pool = () => getRandomPoolForTier(USER_TIERS.FREE);
+
+    it('orders one round by cost band, unlimited models first', () => {
+        const order = cheapFirstDealOrder(pool());
+        const ranks = order.map(turnCostRank);
+        expect(ranks).toEqual([...ranks].sort((a, b) => a - b));
+        expect(new Set(order)).toEqual(new Set(pool()));
+        expect(turnCostRank(order[0])).toBe(0);
+    });
+
+    it('seats a game smaller than the pool from the cheapest band', () => {
+        const unlimited = pool().filter(m => turnCostRank(m) === 0);
+        expect(unlimited.length).toBeGreaterThan(1);
+        for (let i = 0; i < 20; i++) {
+            const seats = cheapFirstDealOrder(pool()).slice(0, unlimited.length);
+            expect(new Set(seats)).toEqual(new Set(unlimited));
+        }
+    });
+
+    it('shuffles within a band, so the cheap seats still vary', () => {
+        const firsts = new Set(Array.from({ length: 50 }, () => cheapFirstDealOrder(pool())[0]));
+        expect(firsts.size).toBeGreaterThan(1);
+    });
+
+    it('deals models picked by name before the Random pool, however expensive', () => {
+        const pinned = new Set([LLM_CONSTANTS.GPT]);
+        const order = cheapFirstDealOrder([...pool()], pinned);
+        expect(order[0]).toBe(LLM_CONSTANTS.GPT);
+    });
+
+    it('ranks paid-only models last', () => {
+        expect(turnCostRank(LLM_CONSTANTS.CLAUDE_SONNET)).toBe(3);
+        expect(turnCostRank(LLM_CONSTANTS.CLAUDE_HAIKU)).toBe(0);
     });
 });
