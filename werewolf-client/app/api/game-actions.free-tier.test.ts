@@ -58,12 +58,15 @@ describe('free tier model limits', () => {
         ).toThrow('not available on the free tier');
     });
 
-    it('temporarily seats Sonnet 5.5 and Gemini 4 Argon once per free game to collect measured turns', () => {
-        // Explicit freeTier opt-outs in ai-models.ts (2026-10-13); drop this test with them.
-        for (const model of [LLM_CONSTANTS.CLAUDE_SONNET, LLM_CONSTANTS.GEMINI_ARGON]) {
-            expect(() => validateModelUsageForTier('free', model, [])).not.toThrow();
-            expect(() => validateModelUsageForTier('free', model, [model])).toThrow();
-        }
+    it('keeps Sonnet 5.5 on the paid tier only, by decision (2026-11-02), though its measured turn is in the 1-bot band', () => {
+        expect(() => validateModelUsageForTier('free', LLM_CONSTANTS.CLAUDE_SONNET, [])).toThrow();
+        expect(getCandidateModelsForTier('free')).not.toContain(LLM_CONSTANTS.CLAUDE_SONNET);
+        expect(() => validateModelUsageForTier('paid', LLM_CONSTANTS.CLAUDE_SONNET, [LLM_CONSTANTS.CLAUDE_SONNET])).not.toThrow();
+    });
+
+    it('seats Gemini 4 Argon once per free game on its measured band', () => {
+        expect(() => validateModelUsageForTier('free', LLM_CONSTANTS.GEMINI_ARGON, [])).not.toThrow();
+        expect(() => validateModelUsageForTier('free', LLM_CONSTANTS.GEMINI_ARGON, [LLM_CONSTANTS.GEMINI_ARGON])).toThrow();
     });
 
     it('allows paid tier users to reuse any models without per-game caps', () => {

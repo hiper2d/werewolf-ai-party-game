@@ -265,26 +265,12 @@ export function getFreeTierPolicy(modelId: string): { available: boolean; maxBot
 // free-tier caps. A model with an explicit `freeTier` set before this loop opts out of banding
 // and keeps that policy.
 //
-// Gemini 4 Argon and Claude Sonnet 5.5 (2026-10-13): one bot per free game, TEMPORARILY, to
-// collect measured turns. Both are $2/$10, and the sticker estimate (2.6¢) puts them just past
-// the 2¢ ceiling; with no paid players the measurement would never reach
-// MEASURED_TURN_COSTS_MIN_CALLS. Sonnet's 25 measured turns already average 1.4¢ (the 1-bot
-// band), so this is likely where it lands anyway. Remove each line once measured-turn-costs.json
-// has 100+ turns for that model — the band then decides on its own.
-//
-// Kimi K3.1 Pro (2026-10-23): the same deal, for the same reason. Also $2/$10 since the K3 →
-// K3.1 Pro repoint (lib 0.27.0), so the estimate is the same 2.6¢; the 15 turns measured on
-// K3's $3/$15 average 2.2¢, which is ~1.5¢ at the new prices — the 1-bot band. Kimi K3.1 Pro
-// Highspeed (LLM_CONSTANTS.KIMI_HIGHSPEED, $4/$20) is deliberately NOT here: paid tier only
-// (estimate 5.2¢), pinned in model-limit-utils.test.ts.
-//
-// GPT-6.1 Terra (2026-10-26, lib 0.28.0): the `gpt` slot halved in price ($2/$12 → $1/$5), so
-// the 709 turns measured on 5.6 Terra (1.6¢) were dropped from measured-turn-costs.json, as
-// with Haiku 5.5. The sticker estimate (1.3¢) keeps it in the 1-bot band; the same 5.6 token
-// profile at the new prices is ~0.8¢, so expect it to move to 3 bots once re-measured.
-SupportedAiModels[LLM_CONSTANTS.GEMINI_ARGON].freeTier = { available: true, maxBotsPerGame: 1 };
-SupportedAiModels[LLM_CONSTANTS.CLAUDE_SONNET].freeTier = { available: true, maxBotsPerGame: 1 };
-SupportedAiModels[LLM_CONSTANTS.KIMI].freeTier = { available: true, maxBotsPerGame: 1 };
+// Claude Sonnet 5.5 (2026-11-02): paid tier only, by decision. Its measured turn (1.97¢ over
+// 937 turns) sits just under the 2¢ ceiling of the 1-bot band, but it was ~93% of the
+// platform's Claude spend in the week to 2026-11-02 ($11.35 of $12.22, almost all free games).
+// Gemini 4 Argon and Kimi K3.1 Pro, which got the same temporary 1-bot opt-in to collect
+// measured turns (2026-10-13 / 10-23), passed 100 turns and are banded like everyone else.
+SupportedAiModels[LLM_CONSTANTS.CLAUDE_SONNET].freeTier = { available: false, maxBotsPerGame: 0 };
 for (const [modelId, config] of Object.entries(SupportedAiModels)) {
     config.freeTier = config.freeTier ?? getFreeTierPolicy(modelId);
 }

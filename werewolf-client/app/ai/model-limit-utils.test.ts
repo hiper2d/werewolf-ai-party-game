@@ -79,7 +79,7 @@ describe('getModelPickerOptions (single source of truth for every picker)', () =
         // Grok 4.6 lists $6 output (the old "3 bots" band) but averages 2,200 output tokens a
         // turn, 94% hidden reasoning: 3.5¢ per turn, the most expensive model in the app.
         // Gemini 3.1 Pro ($12 output, old "1 bot" band) is 2.8¢. Both are paid-only now.
-        expect(getTurnCost(LLM_CONSTANTS.GROK)?.source).toBe('measured');
+        // (Grok fell under 100 turns in the 30-day window once paid-only; its estimate is paid too.)
         expect(SupportedAiModels[LLM_CONSTANTS.GROK].freeTier).toMatchObject({ available: false, maxBotsPerGame: 0 });
         expect(SupportedAiModels[LLM_CONSTANTS.GEMINI_PRO].freeTier).toMatchObject({ available: false, maxBotsPerGame: 0 });
         // GLM-5.3 lists $4.40 output (old ×2.5 → "1 bot") but writes ~270 tokens a turn: 0.75¢, 3 bots.
@@ -292,23 +292,13 @@ describe('deprecated model IDs in persisted games', () => {
     });
 });
 
-// Kimi K3.1 Pro (2026-10-23): $2/$10 like Argon and Sonnet 5.5, so the sticker estimate (2.6¢)
-// would keep it off the free tier; the explicit 1-bot opt-in in ai-models.ts collects the 100
-// measured turns the band needs. Remove the pin together with the opt-in line.
-describe('Kimi K3.1 Pro free-tier policy (temporary 1-bot opt-in)', () => {
-    it('is estimated past the ceiling but opted in at one bot per free game', () => {
+// Kimi K3.1 Pro had a temporary 1-bot opt-in (2026-10-23) to collect measured turns; it passed
+// 100 on 2026-11-02 and is banded on its measured cost like every other model.
+describe('Kimi K3.1 Pro free-tier policy', () => {
+    it('is banded on its measured cost: one bot per free game', () => {
         const cost = getTurnCost(LLM_CONSTANTS.KIMI)!;
-        expect(cost.source).toBe('estimated');
-        expect(cost.usd).toBeGreaterThan(FREE_TIER_TURN_COST_BANDS.SINGLE_MAX);
-        expect(SupportedAiModels[LLM_CONSTANTS.KIMI].freeTier).toEqual({ available: true, maxBotsPerGame: 1 });
-        expect(getCandidateModelsForTier(USER_TIERS.FREE)).toContain(LLM_CONSTANTS.KIMI);
-    });
-
-    it('allows one Kimi bot in a free game and refuses a second', () => {
-        expect(() => validateModelUsageForTier(USER_TIERS.FREE, LLM_CONSTANTS.GPT_MINI, [LLM_CONSTANTS.KIMI])).not.toThrow();
-        expect(() =>
-            validateModelUsageForTier(USER_TIERS.FREE, LLM_CONSTANTS.GPT_MINI, [LLM_CONSTANTS.KIMI, LLM_CONSTANTS.KIMI])
-        ).toThrow(/can only be used once per game on the free tier/);
+        expect(cost.source).toBe('measured');
+        expect(SupportedAiModels[LLM_CONSTANTS.KIMI].freeTier).toEqual(bandTurnCost(cost.usd));
     });
 
     it('remains selectable on paid tier', () => {
