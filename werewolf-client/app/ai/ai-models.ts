@@ -356,6 +356,9 @@ export function resolveModelId(modelId: string): string {
  * Kimi K3.1 Pro added 2026-10-25: 7 of 40 prod calls ran 55-89s overnight (end-of-day summaries
  * and late votes past the 60s timeout), and a replay of those summaries at effort high took 24-84s
  * (2 of 9 over 60s). Effort `low` was tried and was worse (median 93s), so it stays at high.
+ * Mistral Large 4 added 2026-11-03: it came back 2026-10-30 allowed as GM and in RANDOM (story
+ * pipeline 118s), but 4 bot turns hit the 60s timeout in its first ~300 prod calls (p50 17s,
+ * p90 28s, p95 34s, max 54s on the calls that finished; output p50 ~2,200 tokens).
  *
  * Checked on every NEW Game Master choice (create, preview, model change, retry override,
  * provider reassignment), not inside validateModelUsageForTier: that one also re-validates the
@@ -369,6 +372,7 @@ for (const modelId of [
     LLM_CONSTANTS.DEEPSEEK_PRO,
     LLM_CONSTANTS.GEMINI_ARGON,
     LLM_CONSTANTS.KIMI,
+    LLM_CONSTANTS.MISTRAL_LARGE,
 ]) {
     SupportedAiModels[modelId].excludedFromGmAndRandom = true;
 }
