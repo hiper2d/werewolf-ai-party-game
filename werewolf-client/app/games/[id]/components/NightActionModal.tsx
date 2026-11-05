@@ -35,6 +35,17 @@ export default function NightActionModal({
         if (currentRole === GAME_ROLES.DETECTIVE) return 'investigate';
         return 'protect';
     });
+    // Same as the voting modal: start each night's opening empty instead of with last night's
+    // pick, hint and action. A refused submit keeps the modal open, so that draft survives.
+    const [wasOpen, setWasOpen] = useState(isOpen);
+    if (isOpen !== wasOpen) {
+        setWasOpen(isOpen);
+        if (isOpen) {
+            setSelectedPlayer('');
+            setMessage('');
+            setActionType(currentRole === GAME_ROLES.DETECTIVE ? 'investigate' : 'protect');
+        }
+    }
 
     if (!isOpen) return null;
 
@@ -68,16 +79,20 @@ export default function NightActionModal({
     };
 
     const availableTargets = getAvailableTargets();
+    // Same as the voting modal: the modal stays mounted between nights, so last night's pick
+    // survives. Count it only while it is still a listed target (not killed since, not the
+    // doctor's previous target), otherwise the placeholder shows and the old name is sent.
+    const currentPick = availableTargets.some(p => p.name === selectedPlayer) ? selectedPlayer : '';
 
     const handleSubmit = async () => {
-        if (!selectedPlayer) return;
+        if (!currentPick) return;
         const finalMessage = message.trim() || '';
         if (currentRole === GAME_ROLES.DOCTOR && isDoctorWithKillAbility) {
-            await onAction(selectedPlayer, finalMessage, actionType as 'protect' | 'kill');
+            await onAction(currentPick, finalMessage, actionType as 'protect' | 'kill');
         } else if (currentRole === GAME_ROLES.DETECTIVE && actionType === 'kill') {
-            await onAction(selectedPlayer, finalMessage, 'kill');
+            await onAction(currentPick, finalMessage, 'kill');
         } else {
-            await onAction(selectedPlayer, finalMessage);
+            await onAction(currentPick, finalMessage);
         }
     };
 
@@ -105,7 +120,7 @@ export default function NightActionModal({
                     </label>
                     <SelectDropdown
                         options={availableTargets.map(t => ({ value: t.name, label: t.name }))}
-                        value={selectedPlayer}
+                        value={currentPick}
                         onChange={setSelectedPlayer}
                         placeholder="Select a player..."
                         disabled={isSubmitting}
@@ -183,9 +198,9 @@ export default function NightActionModal({
                     Cancel
                 </button>
                 <button
-                    className={`px-4 py-2 text-[13px] font-medium rounded-[var(--radius-md)] ${isKillAction ? 'bg-[var(--danger)]' : 'bg-[var(--accent)]'} text-white hover:brightness-110 transition-all duration-[120ms] ${(!selectedPlayer || isSubmitting) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    className={`px-4 py-2 text-[13px] font-medium rounded-[var(--radius-md)] ${isKillAction ? 'bg-[var(--danger)]' : 'bg-[var(--accent)]'} text-white hover:brightness-110 transition-all duration-[120ms] ${(!currentPick || isSubmitting) ? 'opacity-50 cursor-not-allowed' : ''}`}
                     onClick={handleSubmit}
-                    disabled={!selectedPlayer || isSubmitting}
+                    disabled={!currentPick || isSubmitting}
                 >
                     {isSubmitting ? 'Submitting...' : (
                         currentRole === GAME_ROLES.DOCTOR && isKillAction ? "Doctor's Mistake (Kill)" :

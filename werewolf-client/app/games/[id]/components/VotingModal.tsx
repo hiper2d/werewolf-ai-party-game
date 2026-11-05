@@ -26,6 +26,17 @@ export default function VotingModal({
     const isOpen = isModalOpen('voting');
     const [selectedPlayer, setSelectedPlayer] = useState<string>('');
     const [reason, setReason] = useState<string>('');
+    // The modal stays mounted for the whole game, so a successful vote leaves yesterday's pick
+    // and reason in state. Start each opening empty (React's "adjust state on a prop change"
+    // pattern). A refused submit keeps the modal open, so that draft survives on purpose.
+    const [wasOpen, setWasOpen] = useState(isOpen);
+    if (isOpen !== wasOpen) {
+        setWasOpen(isOpen);
+        if (isOpen) {
+            setSelectedPlayer('');
+            setReason('');
+        }
+    }
 
     if (!isOpen) return null;
 
@@ -39,10 +50,14 @@ export default function VotingModal({
     ];
 
     const votableParticipants = participants.filter(p => p.isAlive && !p.isHuman);
+    // The modal stays mounted between days, so the last vote's pick survives a successful
+    // submit. Count it only while it is still a votable player: a target eliminated since
+    // would show as the empty placeholder but still be sent ("Invalid target player").
+    const currentPick = votableParticipants.some(p => p.name === selectedPlayer) ? selectedPlayer : '';
 
     const handleSubmit = async () => {
-        if (selectedPlayer && reason.trim()) {
-            await onVote(selectedPlayer, reason.trim());
+        if (currentPick && reason.trim()) {
+            await onVote(currentPick, reason.trim());
         }
     };
 
@@ -65,7 +80,7 @@ export default function VotingModal({
                     </label>
                     <SelectDropdown
                         options={votableParticipants.map(p => ({ value: p.name, label: p.name }))}
-                        value={selectedPlayer}
+                        value={currentPick}
                         onChange={setSelectedPlayer}
                         placeholder="Select a player..."
                         disabled={isSubmitting}
@@ -102,9 +117,9 @@ export default function VotingModal({
                     Cancel
                 </button>
                 <button
-                    className={`px-4 py-2 text-[13px] font-medium rounded-[var(--radius-md)] bg-[var(--danger)] text-white hover:brightness-110 transition-all duration-[120ms] ${(!selectedPlayer || !reason.trim() || isSubmitting) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    className={`px-4 py-2 text-[13px] font-medium rounded-[var(--radius-md)] bg-[var(--danger)] text-white hover:brightness-110 transition-all duration-[120ms] ${(!currentPick || !reason.trim() || isSubmitting) ? 'opacity-50 cursor-not-allowed' : ''}`}
                     onClick={handleSubmit}
-                    disabled={!selectedPlayer || !reason.trim() || isSubmitting}
+                    disabled={!currentPick || !reason.trim() || isSubmitting}
                 >
                     {isSubmitting ? 'Submitting...' : 'Cast Vote'}
                 </button>
