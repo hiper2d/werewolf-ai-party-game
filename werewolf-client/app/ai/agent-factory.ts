@@ -1,4 +1,4 @@
-import { AgentFactory as LibAgentFactory, AbstractAgent, setLlmLogger, setBeforeAskHook, setRetryHook } from '@hiper2d/ai-agents';
+import { AgentFactory as LibAgentFactory, AbstractAgent, ClaudeAgent, setLlmLogger, setBeforeAskHook, setRetryHook } from '@hiper2d/ai-agents';
 import type { ApiKeyMap } from '@hiper2d/ai-agents';
 import { firestore } from 'firebase-admin';
 import { db } from '@/firebase/server';
@@ -17,6 +17,16 @@ import { assertFreeSpendWithinLimit } from '@/app/api/user-actions';
  * the player's attention. The re-send runs the free-tier spend guard again.
  */
 const LLM_INVALID_RESPONSE_RETRIES = 1;
+
+/**
+ * Claude prompt caching is OFF (since 2026-11-06, lib 0.33.0). A 1h cache write bills at 2x
+ * input and a read at 0.1x, so it pays only when more than ~53% of the prompt is read back;
+ * 30 days of production bot turns read 42% (Sonnet) and 43% (Haiku): input cost ~1.2x of no
+ * cache. The 5m cache (1.25x write, ~22% break-even) read 0-16% back at our pace (a bot's
+ * calls 12-78 minutes apart). No breakpoint = plain 1x. Re-measure before turning it back
+ * on: requestStats rows now carry cacheWriteTokens.
+ */
+const CLAUDE_CACHE: ClaudeAgent['cacheTtl'] = 'off';
 
 // Route the library's agent-activity logging through the app's BetterStack pipeline.
 // Module-load side effect: every agent-creation path goes through this factory, so the
@@ -80,6 +90,9 @@ export class AgentFactory {
 
         const agent = LibAgentFactory.createAgent(name, instruction, modelId, apiKeys, enableThinking);
         agent.invalidResponseRetries = LLM_INVALID_RESPONSE_RETRIES;
+        if (agent instanceof ClaudeAgent) {
+            agent.cacheTtl = CLAUDE_CACHE;
+        }
         return agent;
     }
 }

@@ -22,6 +22,7 @@ function normalizeTokenUsage(usage: TokenUsageInput): TokenUsage {
     const costUSD = round6(Number(usage?.costUSD) || 0);
     const reasoningTokens = Number(usage?.reasoningTokens) || 0;
     const cachedInputTokens = Number(usage?.cachedInputTokens) || 0;
+    const cacheWriteTokens = Number(usage?.cacheWriteTokens) || 0;
     const durationMs = Number(usage?.durationMs) || 0;
 
     return {
@@ -33,6 +34,7 @@ function normalizeTokenUsage(usage: TokenUsageInput): TokenUsage {
         // undefined, and a 0 on every non-reasoning model is just noise.
         ...(reasoningTokens > 0 ? { reasoningTokens } : {}),
         ...(cachedInputTokens > 0 ? { cachedInputTokens } : {}),
+        ...(cacheWriteTokens > 0 ? { cacheWriteTokens } : {}),
         ...(durationMs > 0 ? { durationMs } : {})
     };
 }
