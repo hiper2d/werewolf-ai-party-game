@@ -90,6 +90,13 @@ describe('getModelPickerOptions (single source of truth for every picker)', () =
         expect(SupportedAiModels[LLM_CONSTANTS.MINIMAX].freeTier?.maxBotsPerGame).toBe(-1);
     });
 
+    it('keeps the explicit overrides above the banding loop', () => {
+        // Sonnet 5.5: paid tier only by decision (measured in the 1-bot band).
+        expect(SupportedAiModels[LLM_CONSTANTS.CLAUDE_SONNET].freeTier).toEqual({ available: false, maxBotsPerGame: 0 });
+        // GPT-6.1 Terra: 3 bots by decision, though its measured turn sits just over 1¢.
+        expect(SupportedAiModels[LLM_CONSTANTS.GPT].freeTier).toEqual({ available: true, maxBotsPerGame: 3 });
+    });
+
     it('falls back to the sticker-price estimate for a model with too few measured turns', () => {
         const measured = MEASURED_TURN_COSTS.models[LLM_CONSTANTS.CLAUDE_OPUS];
         expect((measured?.calls ?? 0) < MEASURED_TURN_COSTS_MIN_CALLS).toBe(true);

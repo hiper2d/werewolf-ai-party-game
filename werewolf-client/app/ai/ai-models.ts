@@ -271,6 +271,10 @@ export function getFreeTierPolicy(modelId: string): { available: boolean; maxBot
 // Gemini 4 Argon and Kimi K3.1 Pro, which got the same temporary 1-bot opt-in to collect
 // measured turns (2026-10-13 / 10-23), passed 100 turns and are banded like everyone else.
 SupportedAiModels[LLM_CONSTANTS.CLAUDE_SONNET].freeTier = { available: false, maxBotsPerGame: 0 };
+// GPT-6.1 Terra (2026-11-07): up to 3 bots, by decision. Its measured turn (1.06¢ over 1,170
+// turns, 2026-11-02 read) is a hair over the 1¢ ceiling of the 3-bot band, which would hold it
+// to 1 bot a game.
+SupportedAiModels[LLM_CONSTANTS.GPT].freeTier = { available: true, maxBotsPerGame: FREE_TIER_LIMITED_MAX_BOTS };
 for (const [modelId, config] of Object.entries(SupportedAiModels)) {
     config.freeTier = config.freeTier ?? getFreeTierPolicy(modelId);
 }
