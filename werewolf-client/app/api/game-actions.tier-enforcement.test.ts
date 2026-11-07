@@ -22,7 +22,7 @@ import {
     assertFreeSpendWithinLimit,
 } from '@/app/api/user-actions';
 import { getVoiceConfig } from '@/app/ai/voice-config';
-import { API_KEY_CONSTANTS, LLM_CONSTANTS } from '@/app/ai/ai-models';
+import { API_KEY_CONSTANTS, LLM_CONSTANTS, SupportedAiModels } from '@/app/ai/ai-models';
 import { recordSpend } from '@/app/api/cost-tracking';
 import {
     GamePreview,
@@ -303,18 +303,26 @@ describe('previewGame tier enforcement', () => {
             mockTier(USER_TIERS.FREE);
             setupDbForPreview(0);
             stubAgentReturning(1);
-
-            await expect(
-                previewGame(
-                    makePreview({
-                        playerCount: 2, // 1 bot
-                        gameMasterAiType: LLM_CONSTANTS.GPT,
-                        playersAiType: [LLM_CONSTANTS.GPT],
-                    })
-                )
-            ).rejects.toThrow(
-                'No AI models are available for additional bots on the free tier with the current selection.'
-            );
+            // Every 1-bot model today is also too slow to be the Game Master, so make a
+            // GM-capable model single-use for this test only.
+            const terra = SupportedAiModels[LLM_CONSTANTS.GPT];
+            const saved = terra.freeTier;
+            terra.freeTier = { available: true, maxBotsPerGame: 1 };
+            try {
+                await expect(
+                    previewGame(
+                        makePreview({
+                            playerCount: 2, // 1 bot
+                            gameMasterAiType: LLM_CONSTANTS.GPT,
+                            playersAiType: [LLM_CONSTANTS.GPT],
+                        })
+                    )
+                ).rejects.toThrow(
+                    'No AI models are available for additional bots on the free tier with the current selection.'
+                );
+            } finally {
+                terra.freeTier = saved;
+            }
         });
 
         it('rejects when a capped model (GLM-5.3, max 3) is exhausted across GM + bots', async () => {
@@ -548,12 +556,12 @@ describe('createGame tier enforcement', () => {
         const { setGame } = setupDbForCreate();
 
         const preview = makeGeneratedPreview({
-            gameMasterAiType: LLM_CONSTANTS.GPT,
+            gameMasterAiType: LLM_CONSTANTS.GEMINI_ARGON,
         });
-        preview.bots[0].playerAiType = LLM_CONSTANTS.GPT;
+        preview.bots[0].playerAiType = LLM_CONSTANTS.GEMINI_ARGON;
 
         await expect(createGame(preview)).rejects.toThrow(
-            `Failed to create game: The AI model ${LLM_CONSTANTS.GPT} can only be used once per game on the free tier.`
+            `Failed to create game: The AI model ${LLM_CONSTANTS.GEMINI_ARGON} can only be used once per game on the free tier.`
         );
         expect(setGame).not.toHaveBeenCalled();
     });
