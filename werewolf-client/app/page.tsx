@@ -58,7 +58,7 @@ function tiersFor(limits: FreeTierLimits) {
       featured: true,
       badge: 'No subscription' as string | undefined,
       features: [
-        'The full catalog — every model, including Fable 5.1 and GPT-6 Astra',
+        'The full catalog — every model, including Fable 5.2 and GPT-6 Astra',
         'No daily or monthly cap, no game limit, no bot caps',
         'Unlimited portrait rerolls and night replays',
         'Prepaid balance — top up anytime',

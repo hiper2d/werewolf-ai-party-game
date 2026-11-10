@@ -36,7 +36,7 @@ function tierInfo(limits: FreeTierLimits): Record<TierId, { name: string; cost: 
             cost: ['Pay as you go', 'cost + 15%'],
             blurb: 'Unlock the whole catalog with no per-game limits. Pre-load a balance; pay only for what you use.',
             feats: [
-                { ok: true, node: <span><b>Every model</b>, including Claude Fable 5.1 and GPT-6 Astra.</span> },
+                { ok: true, node: <span><b>Every model</b>, including Claude Fable 5.2 and GPT-6 Astra.</span> },
                 { ok: true, node: <span><b>No daily or monthly cap</b>, no game limit, no bot caps — play while the balance is positive.</span> },
                 { ok: true, node: <span><b>Unlimited portrait rerolls.</b></span> },
                 { ok: true, node: <span><b>Replay a night.</b></span> },
