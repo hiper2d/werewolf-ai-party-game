@@ -13,6 +13,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        id: "fable-5-2", date: "Nov 2026", tags: ["Models"],
+        title: "Claude Fable 5.2 replaces Claude Fable 5.1",
+        body: (<>Anthropic&apos;s <strong>Claude Fable 5.2</strong> takes over the Fable slot in the model picker,
+            for bots and the Game Master. It&apos;s the <strong>same price</strong> as Fable 5.1 — still always-on
+            reasoning, still Anthropic&apos;s most capable model, still paid tier only. Bots already set to Fable
+            switched over automatically; nothing to change in existing lobbies.</>),
+        media: null,
+        links: [{label: "Create a game", href: "/games"}],
+    },
+    {
         id: "game-language", date: "Oct 2026", tags: ["Languages"],
         title: "Play in your own language: 14 languages on the new-game form",
         body: (<>The new-game form has a <strong>Language</strong> picker. Pick one of <strong>14 languages</strong> —
