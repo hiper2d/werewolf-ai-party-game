@@ -16,7 +16,8 @@ export const CHANGELOG: ChangelogEntry[] = [
         id: "fable-5-2", date: "Nov 2026", tags: ["Models"],
         title: "Claude Fable 5.2 replaces Claude Fable 5.1",
         body: (<>Anthropic&apos;s <strong>Claude Fable 5.2</strong> takes over the Fable slot in the model picker,
-            for bots and the Game Master. It&apos;s the <strong>same price</strong> as Fable 5.1 — still always-on
+            for bots and the Game Master. It&apos;s <strong>20% cheaper</strong> than Fable 5.1 — $8 per million input tokens and $40 per million
+            output, down from $10 and $50 — and still always-on
             reasoning, still Anthropic&apos;s most capable model, still paid tier only. Bots already set to Fable
             switched over automatically; nothing to change in existing lobbies.</>),
         media: null,
