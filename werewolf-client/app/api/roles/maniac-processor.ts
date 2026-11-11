@@ -6,16 +6,17 @@ import {
     GAME_ROLES,
     GameMessage,
     MessageType,
-    RECIPIENT_MANIAC
+    RECIPIENT_MANIAC,
+    MESSAGE_ROLE
 } from "@/app/api/game-models";
 import { AgentFactory } from "@/app/ai/agent-factory";
 import { addMessageToChatAndSaveToDb, consumeRetryHint, getBotMessages } from "@/app/api/game-actions";
 import { getApiKeysForUser } from "@/app/utils/tier-utils";
 import { auth } from "@/auth";
 import { convertToAIMessages } from "@/app/utils/message-utils";
-import { botSystemPrompt, BOT_MANIAC_ACTION_PROMPT, STRICT_TARGET_NAME_INSTRUCTION } from "@/app/ai/prompts/bot-prompts";
+import { BOT_MANIAC_ACTION_PROMPT, STRICT_TARGET_NAME_INSTRUCTION } from "@/app/ai/prompts/bot-prompts";
 import { format } from "@/app/ai/prompts/utils";
-import { generateBotContextSection, getAlivePlayerNames, getEffectiveModel } from "@/app/utils/bot-utils";
+import { buildBotSystemPrompt, buildBotTurnTail, getEffectiveModel } from "@/app/utils/bot-utils";
 import { ManiacActionZodSchema } from "@/app/ai/prompts/zod-schemas";
 import { invalidTargetExplanation, repeatTargetExplanation, selfSelectionExplanation } from "@/app/api/retry-hint";
 import { normalizeTargetName } from "@/app/api/target-resolution";
@@ -91,20 +92,7 @@ export class ManiacProcessor extends BaseRoleProcessor {
             const apiKeys = await getApiKeysForUser(session.user.email);
 
             // Create maniac prompt
-            const maniacPrompt = format(botSystemPrompt(this.game.gameMode, this.game.language), {
-                name: maniacBot.name,
-                personal_story: maniacBot.story,
-                play_style: "",
-                role: maniacBot.role,
-                human_player_name: this.game.humanPlayerName,
-                werewolf_teammates_section: '',
-                players_names: getAlivePlayerNames(this.game, maniacBot.name),
-                dead_players_names_with_roles: this.game.bots
-                    .filter(b => !b.isAlive)
-                    .map(b => `${b.name} (${b.role})`)
-                    .join(", "),
-                bot_context: generateBotContextSection(maniacBot, this.game)
-            });
+            const maniacPrompt = buildBotSystemPrompt(maniacBot, this.game);
 
             // Create agent (honors a one-shot "Retry with different model" override)
             const maniacModel = getEffectiveModel(this.game, maniacBot.name, maniacBot.aiType, maniacBot.enableThinking);
@@ -161,6 +149,9 @@ export class ManiacProcessor extends BaseRoleProcessor {
 
             // Create conversation history
             const history = convertToAIMessages(maniacBot.name, [...botMessages, gmMessage]);
+            // The turn tail (never persisted): the current alive/dead lists, which the
+            // system prompt no longer carries (it is frozen at the start of the day).
+            history.push({ role: MESSAGE_ROLE.USER, content: buildBotTurnTail(maniacBot, this.game, { reminder: false }) });
 
             const [maniacResponse, thinking, tokenUsage, thinkingSignature] = await agent.askWithZodSchema(ManiacActionZodSchema, history);
 

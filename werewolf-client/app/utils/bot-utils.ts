@@ -1,5 +1,8 @@
-import { Bot, Game, GAME_ROLES, PLAY_STYLES, PLAY_STYLE_CONFIGS, RoleKnowledge } from "@/app/api/game-models";
+import { Bot, Game, GAME_ROLES, GAME_STATES, PLAY_STYLES, PLAY_STYLE_CONFIGS, RoleKnowledge } from "@/app/api/game-models";
 import { latestChapterSummary } from "@/app/utils/story-utils";
+import { botReminderPostfix, botSystemPrompt, BOT_AFTER_GAME_SYSTEM_PROMPT_ADDITION, replyLengthInstruction } from "@/app/ai/prompts/bot-prompts";
+import { format } from "@/app/ai/prompts/utils";
+import { replyLanguageLine } from "@/app/ai/game-language";
 import { assertProviderNotBlocked } from "@/app/api/provider-blocks";
 
 /**
@@ -95,22 +98,55 @@ export function generateWerewolfTeammatesSection(bot: Bot, game: Game): string {
 }
 
 /**
+ * Which nights of a bot's role knowledge to render. `beforeDay` keeps the nights of earlier
+ * days (the part that is fixed for the whole current day and lives in the system prompt);
+ * `fromDay` keeps the night of the current day (it lands after the night resolves, so it
+ * rides in the per-turn tail). An entry without a day is treated as old.
+ */
+export interface RoleKnowledgeRange {
+    beforeDay?: number;
+    fromDay?: number;
+}
+
+function inRoleKnowledgeRange(day: number | undefined, range: RoleKnowledgeRange | undefined): boolean {
+    if (!range) return true;
+    const d = day ?? 0;
+    if (range.beforeDay !== undefined && d >= range.beforeDay) return false;
+    if (range.fromDay !== undefined && d < range.fromDay) return false;
+    return true;
+}
+
+/**
  * Generates role-specific knowledge section based on the bot's role
  * This provides clear, structured information about night action results
  *
  * @param bot The current bot
+ * @param range Optional: only the nights in this range (see RoleKnowledgeRange)
  * @returns Formatted role knowledge section or empty string
  */
-export function generateRoleKnowledgeSection(bot: Bot): string {
+export function generateRoleKnowledgeSection(bot: Bot, range?: RoleKnowledgeRange): string {
     if (!bot.roleKnowledge) {
         return '';
     }
 
+    // The "latest night" rendering (range.fromDay) is read right after that night, at the
+    // end-of-day summary: the "you did X last night, not again tonight" reminders would point
+    // at the wrong night there, so they are left to the next day's system prompt.
+    const latestOnly = range?.fromDay !== undefined;
+    const titleSuffix = latestOnly ? ' (latest night)' : '';
+    const knowledge: RoleKnowledge = {
+        ...bot.roleKnowledge,
+        investigations: bot.roleKnowledge.investigations?.filter(e => inRoleKnowledgeRange(e.day, range)),
+        protections: bot.roleKnowledge.protections?.filter(e => inRoleKnowledgeRange(e.day, range)),
+        abductions: bot.roleKnowledge.abductions?.filter(e => inRoleKnowledgeRange(e.day, range)),
+        attacks: bot.roleKnowledge.attacks?.filter(e => inRoleKnowledgeRange(e.day, range)),
+    };
+
     const sections: string[] = [];
 
     // Detective investigations
-    if (bot.role === GAME_ROLES.DETECTIVE && bot.roleKnowledge.investigations && bot.roleKnowledge.investigations.length > 0) {
-        const investigationLines = bot.roleKnowledge.investigations.map(inv => {
+    if (bot.role === GAME_ROLES.DETECTIVE && knowledge.investigations && knowledge.investigations.length > 0) {
+        const investigationLines = knowledge.investigations.map(inv => {
             // Handle kill actions
             if (inv.actionType === 'kill') {
                 return `- **Night ${inv.day}:** Used ONE-TIME KILL on **${inv.target}** 🗡️`;
@@ -124,17 +160,17 @@ export function generateRoleKnowledgeSection(bot: Bot): string {
         }).join('\n');
 
         // Only count successful investigations (exclude kills)
-        const evilPlayers = bot.roleKnowledge.investigations
+        const evilPlayers = knowledge.investigations
             .filter(inv => inv.success !== false && inv.isEvil && inv.actionType !== 'kill')
             .map(inv => inv.target);
 
-        const clearedPlayers = bot.roleKnowledge.investigations
+        const clearedPlayers = knowledge.investigations
             .filter(inv => inv.success !== false && !inv.isEvil && inv.actionType !== 'kill')
             .map(inv => inv.target);
 
-        const killUsed = bot.roleKnowledge.investigations.some(inv => inv.actionType === 'kill');
+        const killUsed = knowledge.investigations.some(inv => inv.actionType === 'kill');
 
-        let summary = `## 🔍 Your Detective Action Results\n\n${investigationLines}`;
+        let summary = `## 🔍 Your Detective Action Results${titleSuffix}\n\n${investigationLines}`;
 
         if (evilPlayers.length > 0) {
             summary += `\n\n**DETECTED AS EVIL (werewolf or maniac):** ${evilPlayers.join(', ')}`;
@@ -150,8 +186,8 @@ export function generateRoleKnowledgeSection(bot: Bot): string {
     }
 
     // Doctor protections
-    if (bot.role === GAME_ROLES.DOCTOR && bot.roleKnowledge.protections && bot.roleKnowledge.protections.length > 0) {
-        const protectionLines = bot.roleKnowledge.protections.map(prot => {
+    if (bot.role === GAME_ROLES.DOCTOR && knowledge.protections && knowledge.protections.length > 0) {
+        const protectionLines = knowledge.protections.map(prot => {
             // Handle unsuccessful protections (blocked by some future role)
             if (prot.success === false) {
                 return `- **Night ${prot.day}:** Tried to protect **${prot.target}** → ❌ Protection failed`;
@@ -164,10 +200,10 @@ export function generateRoleKnowledgeSection(bot: Bot): string {
             return `- **Night ${prot.day}:** Protected **${prot.target}**${savedNote}`;
         }).join('\n');
 
-        const lastProtection = bot.roleKnowledge.protections[bot.roleKnowledge.protections.length - 1];
+        const lastProtection = knowledge.protections[knowledge.protections.length - 1];
 
-        let summary = `## 🏥 Your Doctor Protection History\n\n${protectionLines}`;
-        if (lastProtection.success !== false && lastProtection.actionType !== 'kill') {
+        let summary = `## 🏥 Your Doctor Protection History${titleSuffix}\n\n${protectionLines}`;
+        if (!latestOnly && lastProtection.success !== false && lastProtection.actionType !== 'kill') {
             summary += `\n\n**REMINDER:** You protected **${lastProtection.target}** last night, so you CANNOT protect them again tonight.`;
         }
 
@@ -175,8 +211,8 @@ export function generateRoleKnowledgeSection(bot: Bot): string {
     }
 
     // Maniac abductions
-    if (bot.role === GAME_ROLES.MANIAC && bot.roleKnowledge.abductions && bot.roleKnowledge.abductions.length > 0) {
-        const abductionLines = bot.roleKnowledge.abductions.map(abd => {
+    if (bot.role === GAME_ROLES.MANIAC && knowledge.abductions && knowledge.abductions.length > 0) {
+        const abductionLines = knowledge.abductions.map(abd => {
             if (abd.maniacDied) {
                 return `- **Night ${abd.day}:** Abducted **${abd.target}** → 💀 You died, and ${abd.target} died with you!`;
             }
@@ -186,10 +222,10 @@ export function generateRoleKnowledgeSection(bot: Bot): string {
             return `- **Night ${abd.day}:** Abducted **${abd.target}** 🎭 (blocked any actions involving them)`;
         }).join('\n');
 
-        const lastAbduction = bot.roleKnowledge.abductions[bot.roleKnowledge.abductions.length - 1];
+        const lastAbduction = knowledge.abductions[knowledge.abductions.length - 1];
 
-        let summary = `## 🎭 Your Maniac Abduction History\n\n${abductionLines}`;
-        if (lastAbduction.success) {
+        let summary = `## 🎭 Your Maniac Abduction History${titleSuffix}\n\n${abductionLines}`;
+        if (!latestOnly && lastAbduction.success) {
             summary += `\n\n**REMINDER:** You abducted **${lastAbduction.target}** last night, so you CANNOT abduct them again tonight.`;
         }
 
@@ -197,8 +233,8 @@ export function generateRoleKnowledgeSection(bot: Bot): string {
     }
 
     // Werewolf attacks (the pack's shared history)
-    if (bot.role === GAME_ROLES.WEREWOLF && bot.roleKnowledge.attacks && bot.roleKnowledge.attacks.length > 0) {
-        const attackLines = bot.roleKnowledge.attacks.map(atk => {
+    if (bot.role === GAME_ROLES.WEREWOLF && knowledge.attacks && knowledge.attacks.length > 0) {
+        const attackLines = knowledge.attacks.map(atk => {
             const outcome = atk.outcome === 'killed'
                 ? `💀 ${atk.target} died`
                 : atk.outcome === 'survived'
@@ -206,18 +242,27 @@ export function generateRoleKnowledgeSection(bot: Bot): string {
                     : '❌ Attack failed';
             return `- **Night ${atk.day}:** Attacked **${atk.target}** → ${outcome}`;
         }).join('\n');
-        sections.push(`## 🐺 Your Pack's Attack History\n\n${attackLines}`);
+        sections.push(`## 🐺 Your Pack's Attack History${titleSuffix}\n\n${attackLines}`);
     }
 
     return sections.length > 0 ? sections.join('\n\n') : '';
 }
 
 /**
- * Generates the complete context section for the bot prompt including:
+ * Generates the context section of the bot SYSTEM prompt:
  * - Role-specific knowledge (investigations, protections, etc.)
+ * - Day-by-day history (GM discussion summary, votes, night story)
+ * - The GM's latest story chapter
  * - Bot's personal summary
- * - Voting history statistics
- * - Night narrative summaries
+ *
+ * Everything here is cut at the START of the current day (completed days only), so the
+ * system prompt stays byte-identical from the first discussion turn through the vote, the
+ * night action and the end-of-day summary — the prefix a provider's prompt cache matches on.
+ * What happens today is already in the day's messages; what changes during the day and is
+ * not a message (alive/dead lists, tonight's role results) rides in the per-turn tail, see
+ * generateBotTurnState. Before 2026-11-11 today's vote, night story, chapter and role
+ * results were added here as they happened, which changed the system prompt ahead of the
+ * whole day's history and made every later call that day a cache miss.
  *
  * @param bot The current bot
  * @param game The game state
@@ -225,18 +270,18 @@ export function generateRoleKnowledgeSection(bot: Bot): string {
  */
 export function generateBotContextSection(bot: Bot, game: Game): string {
     const sections: string[] = [];
+    const today = game.currentDay || 1;
 
     // 1. Role-Specific Knowledge (FIRST - most important for special roles)
-    const roleKnowledge = generateRoleKnowledgeSection(bot);
+    const roleKnowledge = generateRoleKnowledgeSection(bot, { beforeDay: today });
     if (roleKnowledge) {
         sections.push(roleKnowledge);
     }
 
     // 2. Chronological day-by-day history: GM day summary → Voting → Night narrative (with facts)
-    const maxDay = game.currentDay || 1;
     const dayEntries: string[] = [];
 
-    for (let day = 1; day <= maxDay; day++) {
+    for (let day = 1; day < today; day++) {
         const dayParts: string[] = [];
 
         // GM day discussion summary
@@ -285,7 +330,7 @@ export function generateBotContextSection(bot: Bot, game: Game): string {
     }
 
     // 2b. The GM's chronicle — current plot state, for tone only. Strategy stays fact-based.
-    const latestChapter = latestChapterSummary(game);
+    const latestChapter = latestChapterSummary(game, today);
     if (latestChapter) {
         sections.push(`## The Story So Far (Game Master's chronicle)
 
@@ -313,6 +358,72 @@ ${latestChapter}
     }
 
     return '\n\n' + sections.join('\n\n');
+}
+
+/**
+ * The part of a bot's knowledge that changes DURING a day, for the per-turn tail: who is
+ * alive and dead right now, plus the results of tonight's own night action once the night
+ * has resolved (they are not chat messages, and the end-of-day summary needs them).
+ * Rebuilt on every turn and never saved, so it never sits in front of cached history.
+ */
+export function generateBotTurnState(bot: Bot, game: Game): string {
+    const dead = game.bots
+        .filter(b => !b.isAlive)
+        .map(b => `${b.name} (${b.role})`)
+        .join(", ");
+    let state = `## Current Game State\n**Alive Players:** ${getAlivePlayerNames(game, bot.name)}\n**Dead Players:** ${dead || 'none'}`;
+    const tonight = generateRoleKnowledgeSection(bot, { fromDay: game.currentDay || 1 });
+    if (tonight) {
+        state += `\n\n${tonight}`;
+    }
+    return state;
+}
+
+/**
+ * The bot system prompt for any turn type (intro, discussion, vote, night action, summary,
+ * post-game chat). ONE builder on purpose: a provider's prompt cache matches on an exact
+ * prefix, so every call a bot makes during a day must send the same bytes here.
+ */
+export function buildBotSystemPrompt(bot: Bot, game: Game): string {
+    const basePrompt = format(botSystemPrompt(game.gameMode, game.language), {
+        name: bot.name,
+        personal_story: bot.story,
+        play_style: "",
+        role: bot.role,
+        human_player_name: game.humanPlayerName,
+        werewolf_teammates_section: generateWerewolfTeammatesSection(bot, game),
+        bot_context: generateBotContextSection(bot, game)
+    });
+
+    // Add after-game discussion mode instructions if game is over
+    if (game.gameState === GAME_STATES.AFTER_GAME_DISCUSSION) {
+        return basePrompt + BOT_AFTER_GAME_SYSTEM_PROMPT_ADDITION;
+    }
+
+    return basePrompt;
+}
+
+/**
+ * The trailing message of every bot turn. It rides after the GM command as its own user
+ * message and is never persisted, so the saved history stays byte-stable for prompt caches
+ * (providers that need alternating roles merge it back in prepareMessages).
+ *
+ * Structure: the current game state first (generateBotTurnState), then — for turns that
+ * speak at the table (`reminder: true`: intro, discussion, vote, post-game chat) — the
+ * playstyle and decision reminder, which ends with the reply-language line. Night actions
+ * and the end-of-day summary get the state and the language line only.
+ */
+export function buildBotTurnTail(bot: Bot, game: Game, options: { reminder: boolean }): string {
+    const state = generateBotTurnState(bot, game);
+    if (!options.reminder) {
+        return `${state}\n\n${replyLanguageLine(game.language)}`.trim();
+    }
+    const reminder = format(botReminderPostfix(game.gameMode, game.language), {
+        play_style: generatePlayStyleDescription(bot),
+        human_player_name: game.humanPlayerName,
+        reply_length_instruction: replyLengthInstruction(game.longReplies)
+    });
+    return `${state}\n\n${reminder.trim()}`;
 }
 
 /**

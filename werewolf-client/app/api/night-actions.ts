@@ -38,8 +38,8 @@ import { GM_COMMAND_GENERATE_NIGHT_RESULTS } from "@/app/ai/prompts/gm-commands"
 import { buildNightRoleBriefing } from "@/app/api/night-briefing";
 import { NightResultsStoryZodSchema } from "@/app/ai/prompts/zod-schemas";
 import { buildStoryContext, lynchSummaryForDay, sanitizeNarrativeHint } from "@/app/utils/story-utils";
-import { BOT_DAY_SUMMARY_PROMPT, botSystemPrompt } from "@/app/ai/prompts/bot-prompts";
-import { generateBotContextSection, generateWerewolfTeammatesSection, getAlivePlayerNames, getEffectiveModel } from "@/app/utils/bot-utils";
+import { BOT_DAY_SUMMARY_PROMPT } from "@/app/ai/prompts/bot-prompts";
+import { buildBotSystemPrompt, buildBotTurnTail, getEffectiveModel } from "@/app/utils/bot-utils";
 import { format } from "@/app/ai/prompts/utils";
 import { languageInstruction } from "@/app/ai/game-language";
 import { gameText } from "@/app/ai/game-text";
@@ -1383,20 +1383,7 @@ async function summarizePastDayImpl(gameId: string): Promise<GameActionResponse>
         const apiKeys = await getApiKeysForUser(session.user.email);
 
         // Create bot system prompt
-        const botPrompt = format(botSystemPrompt(currentGame.gameMode, currentGame.language), {
-            name: bot.name,
-            personal_story: bot.story,
-            play_style: "",
-            role: bot.role,
-            human_player_name: currentGame.humanPlayerName,
-            werewolf_teammates_section: generateWerewolfTeammatesSection(bot, currentGame),
-            players_names: getAlivePlayerNames(currentGame, bot.name),
-            dead_players_names_with_roles: currentGame.bots
-                .filter(b => !b.isAlive)
-                .map(b => `${b.name} (${b.role})`)
-                .join(", "),
-            bot_context: generateBotContextSection(bot, currentGame)
-        });
+        const botPrompt = buildBotSystemPrompt(bot, currentGame);
 
         // Create summary request message with previous summary context
         const previousSummary = bot.summary || '(This is your first summary - no previous summary exists)';
@@ -1426,6 +1413,10 @@ async function summarizePastDayImpl(gameId: string): Promise<GameActionResponse>
 
         // Create conversation history with all day messages + summary request
         const history = convertToAIMessages(bot.name, [...botMessages, summaryMessage]);
+        // The turn tail (never persisted): who is alive and dead after the night, plus the
+        // results of this bot's own night action — the system prompt is frozen at the
+        // start of the day and no longer carries them.
+        history.push({ role: MESSAGE_ROLE.USER, content: buildBotTurnTail(bot, currentGame, { reminder: false }) });
 
         // Get summary as plain text
         const [summaryResponse, , tokenUsage] = await agent.askText(history);

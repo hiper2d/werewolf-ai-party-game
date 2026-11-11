@@ -261,8 +261,8 @@ ${CACHE_TIER_MARKER}
 - Treat %human_player_name% as a fellow inhabitant of the world whose narrative contributions are particularly worthy of your attention and reaction
 
 ## Game State
-**Alive Players:** %players_names%
-**Dead Players:** %dead_players_names_with_roles%
+
+Who is alive and who is dead changes during a day, so the current lists come at the END of the conversation, under "Current Game State" in the last message of every turn. Trust that block over anything older.
 %bot_context%`;
 
 /** The bot system prompt template for a game mode (placeholders below CACHE_TIER_MARKER

@@ -7,16 +7,16 @@ import {
     GAME_ROLES,
     GameMessage,
     MessageType,
-    RECIPIENT_WEREWOLVES
+    RECIPIENT_WEREWOLVES,
+    MESSAGE_ROLE
 } from "@/app/api/game-models";
 import {AgentFactory} from "@/app/ai/agent-factory";
 import {addMessageToChatAndSaveToDb, consumeRetryHint, getBotMessages} from "@/app/api/game-actions";
 import {getApiKeysForUser} from "@/app/utils/tier-utils";
-import {generateBotContextSection, generateWerewolfTeammatesSection, getAlivePlayerNames, getEffectiveModel} from "@/app/utils/bot-utils";
+import {buildBotSystemPrompt, buildBotTurnTail, getEffectiveModel} from "@/app/utils/bot-utils";
 import {auth} from "@/auth";
 import {convertToAIMessages} from "@/app/utils/message-utils";
 import {
-    botSystemPrompt,
     BOT_WEREWOLF_ACTION_PROMPT,
     BOT_WEREWOLF_DISCUSSION_PROMPT,
     STRICT_TARGET_NAME_INSTRUCTION
@@ -188,20 +188,7 @@ export class WerewolfProcessor extends BaseRoleProcessor {
             const apiKeys = await getApiKeysForUser(session.user.email);
 
             // Create werewolf prompt
-            const werewolfPrompt = format(botSystemPrompt(this.game.gameMode, this.game.language), {
-                name: werewolfBot.name,
-                personal_story: werewolfBot.story,
-                play_style: "",
-                role: werewolfBot.role,
-                human_player_name: this.game.humanPlayerName,
-                werewolf_teammates_section: generateWerewolfTeammatesSection(werewolfBot, this.game),
-                players_names: getAlivePlayerNames(this.game, werewolfBot.name),
-                dead_players_names_with_roles: this.game.bots
-                    .filter(b => !b.isAlive)
-                    .map(b => `${b.name} (${b.role})`)
-                    .join(", "),
-                bot_context: generateBotContextSection(werewolfBot, this.game)
-            });
+            const werewolfPrompt = buildBotSystemPrompt(werewolfBot, this.game);
 
             // Create agent (honors a one-shot "Retry with different model" override)
             const werewolfModel = getEffectiveModel(this.game, werewolfBot.name, werewolfBot.aiType, werewolfBot.enableThinking);
@@ -261,6 +248,9 @@ export class WerewolfProcessor extends BaseRoleProcessor {
 
             // Create conversation history
             const history = convertToAIMessages(werewolfBot.name, [...botMessages, gmMessage]);
+            // The turn tail (never persisted): the current alive/dead lists, which the
+            // system prompt no longer carries (it is frozen at the start of the day).
+            history.push({ role: MESSAGE_ROLE.USER, content: buildBotTurnTail(werewolfBot, this.game, { reminder: false }) });
 
             const [werewolfResponse, thinking, tokenUsage, thinkingSignature] = await agent.askWithZodSchema(schema, history);
 

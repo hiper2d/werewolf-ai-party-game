@@ -30,7 +30,7 @@ import {
     GM_COMMAND_INTRODUCE_YOURSELF,
     GM_COMMAND_REPLY_TO_DISCUSSION
 } from "@/app/ai/prompts/gm-commands";
-import {botReminderPostfix, botSystemPrompt, BOT_VOTE_PROMPT, BOT_AFTER_GAME_SYSTEM_PROMPT_ADDITION, replyLengthInstruction} from "@/app/ai/prompts/bot-prompts";
+import {BOT_VOTE_PROMPT} from "@/app/ai/prompts/bot-prompts";
 import {HUMAN_SUGGESTION_PROMPT} from "@/app/ai/prompts/gm-prompts";
 import {BotVoteZodSchema} from "@/app/ai/prompts/zod-schemas";
 import {invalidTargetExplanation, selfSelectionExplanation} from "@/app/api/retry-hint";
@@ -60,9 +60,8 @@ import {selectRespondingBots} from "@/app/api/bot-selection";
 import {withGameErrorHandling} from "@/app/utils/server-action-wrapper";
 import {staleActionNoOp} from "@/app/api/action-guards";
 import {
-    generateBotContextSection,
-    generatePlayStyleDescription,
-    generateWerewolfTeammatesSection,
+    buildBotSystemPrompt,
+    buildBotTurnTail,
     getAlivePlayerNames,
     getEffectiveModel
 } from "@/app/utils/bot-utils";
@@ -97,33 +96,6 @@ function parseIndividualVotes(raw: string): IndividualVote[] {
     } catch (e) {
         throw new Error(`Corrupted vote data in game state — cannot parse individual votes: ${String(raw).slice(0, 100)}`);
     }
-}
-
-/**
- * Helper function to generate bot system prompt with after-game addition if needed
- */
-function generateBotSystemPrompt(bot: Bot, game: Game): string {
-    const basePrompt = format(botSystemPrompt(game.gameMode, game.language), {
-        name: bot.name,
-        personal_story: bot.story,
-        play_style: "",
-        role: bot.role,
-        human_player_name: game.humanPlayerName,
-        werewolf_teammates_section: generateWerewolfTeammatesSection(bot, game),
-        players_names: getAlivePlayerNames(game, bot.name),
-        dead_players_names_with_roles: game.bots
-            .filter(b => !b.isAlive)
-            .map(b => `${b.name} (${b.role})`)
-            .join(", "),
-        bot_context: generateBotContextSection(bot, game)
-    });
-
-    // Add after-game discussion mode instructions if game is over
-    if (game.gameState === GAME_STATES.AFTER_GAME_DISCUSSION) {
-        return basePrompt + BOT_AFTER_GAME_SYSTEM_PROMPT_ADDITION;
-    }
-
-    return basePrompt;
 }
 
 /**
@@ -345,7 +317,7 @@ function shouldTriggerAutoVote(game: Game): boolean {
     
             const apiKeys = await getApiKeysForUser(session.user.email);
     
-            const botPrompt = generateBotSystemPrompt(bot, game);
+            const botPrompt = buildBotSystemPrompt(bot, game);
     
             const welcomeModel = getEffectiveModel(game, bot.name, bot.aiType);
             const agent = AgentFactory.createAgent(bot.name, botPrompt, welcomeModel.aiType, apiKeys, welcomeModel.enableThinking);
@@ -366,13 +338,12 @@ function shouldTriggerAutoVote(game: Game): boolean {
             // Get messages for this bot (ALL + direct messages to this bot)
             const botMessages = await getBotMessages(gameId, bot.name, game.currentDay);
     
-            // Include the GM command in history without saving it yet. The playstyle
-            // reminder rides as its own trailing message (never persisted) so the GM
+            // Include the GM command in history without saving it yet. The turn tail
+            // (current state + playstyle reminder) rides as its own trailing message (never persisted) so the GM
             // command block stays byte-stable for prompt caches; providers that need
             // alternating roles merge it back in prepareMessages.
-            const playStyleReminder = format(botReminderPostfix(game.gameMode, game.language), { play_style: generatePlayStyleDescription(bot), human_player_name: game.humanPlayerName, reply_length_instruction: replyLengthInstruction(game.longReplies) });
             const history = convertToAIMessages(bot.name, [...botMessages, gmMessage]);
-            history.push({ role: MESSAGE_ROLE.USER, content: playStyleReminder.trim() });
+            history.push({ role: MESSAGE_ROLE.USER, content: buildBotTurnTail(bot, game, { reminder: true }) });
             const [rawAnswer, thinking, tokenUsage, thinkingSignature] = await agent.askText(history);
             const answer = unwrapJsonReply(rawAnswer);
 
@@ -769,19 +740,18 @@ async function processNextBotInQueue(
     // Get bot's response
     const apiKeys = await getApiKeysForUser(userEmail);
 
-    const botPrompt = generateBotSystemPrompt(bot, game);
+    const botPrompt = buildBotSystemPrompt(bot, game);
 
     const replyModel = getEffectiveModel(game, bot.name, bot.aiType);
     const agent = AgentFactory.createAgent(bot.name, botPrompt, replyModel.aiType, apiKeys, replyModel.enableThinking);
     agent.gameId = gameId;
     agent.userId = userEmail;
-    // Include the GM command in history without saving it yet. The playstyle reminder
-    // rides as its own trailing message (never persisted) so the GM command block stays
+    // Include the GM command in history without saving it yet. The turn tail (current
+    // state + playstyle reminder) rides as its own trailing message (never persisted) so the GM command block stays
     // byte-stable for prompt caches; providers that need alternating roles merge it back
     // in prepareMessages.
-    const playStyleReminder = format(botReminderPostfix(game.gameMode, game.language), { play_style: generatePlayStyleDescription(bot), human_player_name: game.humanPlayerName, reply_length_instruction: replyLengthInstruction(game.longReplies) });
     const history = convertToAIMessages(bot.name, [...botMessages, gmMessage]);
-    history.push({ role: MESSAGE_ROLE.USER, content: playStyleReminder.trim() });
+    history.push({ role: MESSAGE_ROLE.USER, content: buildBotTurnTail(bot, game, { reminder: true }) });
     const [rawBotReply, thinking, tokenUsage, thinkingSignature] = await agent.askText(history);
     const botReply = unwrapJsonReply(rawBotReply);
     if (!botReply) {
@@ -1106,23 +1076,7 @@ async function voteImpl(gameId: string): Promise<GameActionResponse> {
             // Get API keys and create bot agent
             const apiKeys = await getApiKeysForUser(session.user!.email!);
             
-            const botPrompt = format(
-                botSystemPrompt(currentGame.gameMode, currentGame.language),
-                {
-                    name: bot.name,
-                    personal_story: bot.story,
-                    play_style: "",
-                    role: bot.role,
-                    human_player_name: currentGame.humanPlayerName,
-                    werewolf_teammates_section: generateWerewolfTeammatesSection(bot, currentGame),
-                    players_names: alivePlayerNames.join(", "),
-                    dead_players_names_with_roles: currentGame.bots
-                        .filter(b => !b.isAlive)
-                        .map(b => `${b.name} (${b.role})`)
-                        .join(", "),
-                    bot_context: generateBotContextSection(bot, currentGame)
-                }
-            );
+            const botPrompt = buildBotSystemPrompt(bot, currentGame);
 
             // Build the strict candidate list and (for werewolves) a teammate reminder
             // injected directly into the vote command so the bot copies a name verbatim.
@@ -1170,12 +1124,11 @@ async function voteImpl(gameId: string): Promise<GameActionResponse> {
             // Get messages for this bot
             const botMessages = await getBotMessages(gameId, bot.name, currentGame.currentDay);
             
-            // Create history including the voting command; the playstyle reminder rides
-            // as its own trailing message (never persisted) so the GM command block stays
+            // Create history including the voting command; the turn tail (current state +
+            // playstyle reminder) rides as its own trailing message (never persisted) so the GM command block stays
             // byte-stable for prompt caches.
-            const playStyleReminder = format(botReminderPostfix(currentGame.gameMode, currentGame.language), { play_style: generatePlayStyleDescription(bot), human_player_name: currentGame.humanPlayerName, reply_length_instruction: replyLengthInstruction(currentGame.longReplies) });
             const history = convertToAIMessages(bot.name, [...botMessages, gmMessage]);
-            history.push({ role: MESSAGE_ROLE.USER, content: playStyleReminder.trim() });
+            history.push({ role: MESSAGE_ROLE.USER, content: buildBotTurnTail(bot, currentGame, { reminder: true }) });
             
             let voteResponse: any;
             let thinking: string;

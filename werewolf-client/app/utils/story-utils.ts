@@ -19,10 +19,12 @@ export function buildStoryContext(game: Game): string {
 
 /**
  * The latest chapter only — what bots get as "the story so far" flavor.
- * Empty string when no chapter exists yet (day 1).
+ * Empty string when no chapter exists yet (day 1). `beforeDay` keeps only chapters written
+ * on earlier days: the bot system prompt uses it so tonight's chapter doesn't change the
+ * prompt in the middle of a day (see generateBotContextSection).
  */
-export function latestChapterSummary(game: Game): string {
-    const chapters = game.storyChapters || [];
+export function latestChapterSummary(game: Game, beforeDay?: number): string {
+    const chapters = (game.storyChapters || []).filter(c => beforeDay === undefined || c.day < beforeDay);
     if (chapters.length === 0) return '';
     return chapters.reduce((a, b) => (b.day > a.day ? b : a)).summary;
 }

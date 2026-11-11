@@ -13,8 +13,6 @@ const IDENTITY_PARAMS = {
     role: 'villager',
     werewolf_teammates_section: '',
     human_player_name: 'Alice',
-    players_names: ['A', 'B'],
-    dead_players_names_with_roles: 'None',
     bot_context: ''
 };
 

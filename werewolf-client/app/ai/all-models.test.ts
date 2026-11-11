@@ -35,16 +35,12 @@ import {
 import { BotVoteZodSchema } from "@/app/ai/prompts/zod-schemas";
 import { generateGamePreview, CHARACTER_SHEET_BATCH_SIZE } from "@/app/ai/preview-generation";
 import { getDefaultVoiceProvider, getVoiceConfig } from "@/app/ai/voice-config";
-import { botSystemPrompt, BOT_VOTE_PROMPT, botReminderPostfix, replyLengthInstruction } from "@/app/ai/prompts/bot-prompts";
+import { botSystemPrompt, BOT_VOTE_PROMPT } from "@/app/ai/prompts/bot-prompts";
 import { GM_COMMAND_INTRODUCE_YOURSELF } from "@/app/ai/prompts/gm-commands";
 import { format } from "@/app/ai/prompts/utils";
 import { convertToAIMessages } from "@/app/utils/message-utils";
 import { withPerf, writePerfReport } from "@/app/ai/live-perf-report";
-import {
-    generateBotContextSection,
-    generateWerewolfTeammatesSection,
-    generatePlayStyleDescription,
-} from "@/app/utils/bot-utils";
+import { buildBotSystemPrompt, buildBotTurnTail } from "@/app/utils/bot-utils";
 import {
     DAY2_VOTE_GAME,
     DAY2_MESSAGES,
@@ -90,8 +86,6 @@ const systemPrompt = format(botSystemPrompt(DAY2_VOTE_GAME.gameMode), {
     role: GAME_ROLES.VILLAGER,
     human_player_name: "Player",
     werewolf_teammates_section: "",
-    players_names: "Alice, Bob, Charlie, Player",
-    dead_players_names_with_roles: "",
     bot_context: "",
 });
 
@@ -117,8 +111,8 @@ afterAll(() => {
 
 // ---------------------------------------------------------------------------
 // Day-2 vote scenario, built with the same code path as bot-actions.ts vote():
-// system prompt (with generateBotContextSection), getBotMessages-shaped
-// message log, BOT_VOTE_PROMPT command with playstyle reminder,
+// system prompt (buildBotSystemPrompt), getBotMessages-shaped message log,
+// BOT_VOTE_PROMPT command, the turn tail (buildBotTurnTail),
 // convertToAIMessages, askWithZodSchema(BotVoteZodSchema).
 // ---------------------------------------------------------------------------
 
@@ -130,20 +124,7 @@ const alivePlayerNames = [
     DAY2_VOTE_GAME.humanPlayerName,
 ];
 
-const voteSystemPrompt = format(botSystemPrompt(DAY2_VOTE_GAME.gameMode), {
-    name: kenji.name,
-    personal_story: kenji.story,
-    play_style: "",
-    role: kenji.role,
-    human_player_name: DAY2_VOTE_GAME.humanPlayerName,
-    werewolf_teammates_section: generateWerewolfTeammatesSection(kenji, DAY2_VOTE_GAME),
-    players_names: alivePlayerNames.join(", "),
-    dead_players_names_with_roles: DAY2_VOTE_GAME.bots
-        .filter(b => !b.isAlive)
-        .map(b => `${b.name} (${b.role})`)
-        .join(", "),
-    bot_context: generateBotContextSection(kenji, DAY2_VOTE_GAME),
-});
+const voteSystemPrompt = buildBotSystemPrompt(kenji, DAY2_VOTE_GAME);
 
 const validTargetsList = alivePlayerNames.map(n => `- ${n}`).join("\n");
 
@@ -160,10 +141,6 @@ const voteCommand: GameMessage = {
         total_voters: "8",
         valid_targets: validTargetsList,
         werewolf_vote_note: "",
-    }) + format(botReminderPostfix(DAY2_VOTE_GAME.gameMode), {
-        play_style: generatePlayStyleDescription(kenji),
-        human_player_name: DAY2_VOTE_GAME.humanPlayerName,
-        reply_length_instruction: replyLengthInstruction(DAY2_VOTE_GAME.longReplies),
     }),
     messageType: MessageType.GM_COMMAND,
     day: DAY2_VOTE_GAME.currentDay,
@@ -171,6 +148,8 @@ const voteCommand: GameMessage = {
 };
 
 const voteHistory: AIMessage[] = convertToAIMessages(kenji.name, [...DAY2_MESSAGES, voteCommand]);
+// The turn tail (current state + playstyle reminder) rides as its own trailing message.
+voteHistory.push({ role: 'user', content: buildBotTurnTail(kenji, DAY2_VOTE_GAME, { reminder: true }) });
 
 describe("All models - day 2 vote with full game context", () => {
     for (const { key, llmType } of allModels) {

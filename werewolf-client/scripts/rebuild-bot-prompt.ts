@@ -4,15 +4,12 @@
 // Output: logs/<botName>-day<N>-prompt.txt with the system prompt (tier 1, the
 // CACHE_TIER_BREAK marker, tier 2) followed by every history turn with sizes.
 import { db } from '../firebase/server';
-import { botSystemPrompt, botReminderPostfix, replyLengthInstruction } from '../app/ai/prompts/bot-prompts';
 import { GM_COMMAND_REPLY_TO_DISCUSSION } from '../app/ai/prompts/gm-commands';
 import { format } from '../app/ai/prompts/utils';
 import { convertToAIMessages } from '../app/utils/message-utils';
 import { GAME_MASTER, GameMessage, MessageType, Game } from '../app/api/game-models';
 import { getBotMessages, getGame } from '../app/api/game-actions';
-import {
-    generateBotContextSection, generateWerewolfTeammatesSection, generatePlayStyleDescription,
-} from '../app/utils/bot-utils';
+import { buildBotSystemPrompt, buildBotTurnTail } from '../app/utils/bot-utils';
 import * as fs from 'fs';
 
 (async () => {
@@ -21,16 +18,7 @@ import * as fs from 'fs';
   const game = await getGame(gameId) as Game;
   const bot = game.bots.find(b => b.name === botName);
   if (!bot) { console.error(`bot ${botName} not in game ${gameId}: ${game.bots.map(b => b.name).join(', ')}`); process.exit(1); }
-  const alive = [...game.bots.filter(b => b.isAlive && b.name !== bot.name).map(b => b.name), game.humanPlayerName].join(', ');
-
-  const systemPrompt = format(botSystemPrompt(game.gameMode), {
-    name: bot.name, personal_story: bot.story, play_style: "", role: bot.role,
-    human_player_name: game.humanPlayerName,
-    werewolf_teammates_section: generateWerewolfTeammatesSection(bot, game),
-    players_names: alive,
-    dead_players_names_with_roles: game.bots.filter(b => !b.isAlive).map(b => `${b.name} (${b.role})`).join(", "),
-    bot_context: generateBotContextSection(bot, game),
-  });
+  const systemPrompt = buildBotSystemPrompt(bot, game);
 
   const gmMessage: GameMessage = {
     id: null, recipientName: bot.name, authorName: GAME_MASTER,
@@ -38,12 +26,8 @@ import * as fs from 'fs';
     messageType: MessageType.GM_COMMAND, day: game.currentDay, timestamp: Date.now(),
   };
   const botMessages = await getBotMessages(gameId, bot.name, game.currentDay);
-  const reminder = format(botReminderPostfix(game.gameMode), {
-    play_style: generatePlayStyleDescription(bot), human_player_name: game.humanPlayerName,
-    reply_length_instruction: replyLengthInstruction(game.longReplies),
-  });
   const history = convertToAIMessages(bot.name, [...botMessages, gmMessage]);
-  history.push({ role: 'user' as any, content: reminder.trim() });
+  history.push({ role: 'user' as any, content: buildBotTurnTail(bot, game, { reminder: true }) });
 
   let out = `# ${bot.name} day-${game.currentDay} discussion-reply prompt (rebuilt ${new Date().toISOString()})\n`;
   out += `# model: ${bot.aiType}   gameState: ${game.gameState}   botMessages: ${botMessages.length}   history turns: ${history.length}\n\n`;

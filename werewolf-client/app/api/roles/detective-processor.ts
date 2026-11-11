@@ -6,16 +6,17 @@ import {
     GAME_ROLES,
     GameMessage,
     MessageType,
-    RECIPIENT_DETECTIVE
+    RECIPIENT_DETECTIVE,
+    MESSAGE_ROLE
 } from "@/app/api/game-models";
 import {AgentFactory} from "@/app/ai/agent-factory";
 import {addMessageToChatAndSaveToDb, consumeRetryHint, getBotMessages} from "@/app/api/game-actions";
 import {getApiKeysForUser} from "@/app/utils/tier-utils";
 import {auth} from "@/auth";
 import {convertToAIMessages} from "@/app/utils/message-utils";
-import {BOT_DETECTIVE_ACTION_PROMPT, botSystemPrompt, STRICT_TARGET_NAME_INSTRUCTION} from "@/app/ai/prompts/bot-prompts";
+import {BOT_DETECTIVE_ACTION_PROMPT, STRICT_TARGET_NAME_INSTRUCTION} from "@/app/ai/prompts/bot-prompts";
 import {format} from "@/app/ai/prompts/utils";
-import {generateBotContextSection, getAlivePlayerNames, getEffectiveModel} from "@/app/utils/bot-utils";
+import {buildBotSystemPrompt, buildBotTurnTail, getEffectiveModel} from "@/app/utils/bot-utils";
 import {DetectiveActionZodSchema} from "@/app/ai/prompts/zod-schemas";
 import { invalidTargetExplanation, repeatTargetExplanation, selfSelectionExplanation } from "@/app/api/retry-hint";
 import { normalizeTargetName } from "@/app/api/target-resolution";
@@ -213,20 +214,7 @@ export class DetectiveProcessor extends BaseRoleProcessor {
             const apiKeys = await getApiKeysForUser(session.user.email);
 
             // Create detective prompt
-            const detectivePrompt = format(botSystemPrompt(this.game.gameMode, this.game.language), {
-                name: detectiveBot.name,
-                personal_story: detectiveBot.story,
-                play_style: "",
-                role: detectiveBot.role,
-                human_player_name: this.game.humanPlayerName,
-                werewolf_teammates_section: '',
-                players_names: getAlivePlayerNames(this.game, detectiveBot.name),
-                dead_players_names_with_roles: this.game.bots
-                    .filter(b => !b.isAlive)
-                    .map(b => `${b.name} (${b.role})`)
-                    .join(", "),
-                bot_context: generateBotContextSection(detectiveBot, this.game)
-            });
+            const detectivePrompt = buildBotSystemPrompt(detectiveBot, this.game);
 
             // Create agent (honors a one-shot "Retry with different model" override)
             const detectiveModel = getEffectiveModel(this.game, detectiveBot.name, detectiveBot.aiType, detectiveBot.enableThinking);
@@ -273,6 +261,9 @@ export class DetectiveProcessor extends BaseRoleProcessor {
 
             // Create conversation history
             const history = convertToAIMessages(detectiveBot.name, [...botMessages, gmMessage]);
+            // The turn tail (never persisted): the current alive/dead lists, which the
+            // system prompt no longer carries (it is frozen at the start of the day).
+            history.push({ role: MESSAGE_ROLE.USER, content: buildBotTurnTail(detectiveBot, this.game, { reminder: false }) });
 
             const [detectiveResponse, thinking, tokenUsage, thinkingSignature] = await agent.askWithZodSchema(DetectiveActionZodSchema, history);
 
