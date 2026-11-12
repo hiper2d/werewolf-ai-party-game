@@ -321,11 +321,13 @@ Consider:
 
 Your response must be a valid JSON object with your vote choice and reasoning.`;
 
-const BOT_REMINDER_HEAD: string = `
+const BOT_REMINDER_PLAYSTYLE: string = `
 
 **Keep in mind that you must follow your core playstyle:** %play_style%
 
-**RELATIONSHIP & CONVERSATION CONTINUITY:**
+`;
+
+const BOT_REMINDER_CONTINUITY: string = `**RELATIONSHIP & CONVERSATION CONTINUITY:**
 - REMEMBER your previous interactions with each player - reference past conversations naturally
 - CONTINUE unfinished discussions from previous days - don't let important threads drop
 - BUILD on established relationships - if someone defended you yesterday, acknowledge it
@@ -361,7 +363,16 @@ const DECISION_REMINDER_ROLEPLAY: string = `**DECISION-MAKING REMINDER:**
  * they read says so. */
 export function botReminderPostfix(mode: GameMode | undefined = DEFAULT_GAME_MODE, language?: string): string {
     const roleplay = mode !== GAME_MODES.TACTICAL;
-    return BOT_REMINDER_HEAD + (roleplay ? DECISION_REMINDER_ROLEPLAY : DECISION_REMINDER_TACTICAL) + '%reply_length_instruction%' + BOT_REPLY_FORMAT + replyLanguageLine(language);
+    return BOT_REMINDER_PLAYSTYLE + BOT_REMINDER_CONTINUITY + (roleplay ? DECISION_REMINDER_ROLEPLAY : DECISION_REMINDER_TACTICAL) + '%reply_length_instruction%' + BOT_REPLY_FORMAT + replyLanguageLine(language);
+}
+
+/** The reminder for a night action (the caller fills %play_style%): the playstyle and the
+ * decision reminder only. The table-talk parts of botReminderPostfix (conversation
+ * continuity, reply length, "plain text, no quotation marks") do not fit a private JSON
+ * choice of a target. */
+export function botNightReminderPostfix(mode: GameMode | undefined = DEFAULT_GAME_MODE, language?: string): string {
+    const roleplay = mode !== GAME_MODES.TACTICAL;
+    return BOT_REMINDER_PLAYSTYLE + (roleplay ? DECISION_REMINDER_ROLEPLAY : DECISION_REMINDER_TACTICAL) + '\n' + replyLanguageLine(language);
 }
 
 // The prompt's examples sit in quotation marks so they read as examples; some

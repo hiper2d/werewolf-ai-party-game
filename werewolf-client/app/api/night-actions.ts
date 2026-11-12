@@ -1416,7 +1416,7 @@ async function summarizePastDayImpl(gameId: string): Promise<GameActionResponse>
         // The turn tail (never persisted): who is alive and dead after the night, plus the
         // results of this bot's own night action — the system prompt is frozen at the
         // start of the day and no longer carries them.
-        history.push({ role: MESSAGE_ROLE.USER, content: buildBotTurnTail(bot, currentGame, { reminder: false }) });
+        history.push({ role: MESSAGE_ROLE.USER, content: buildBotTurnTail(bot, currentGame, 'summary') });
 
         // Get summary as plain text
         const [summaryResponse, , tokenUsage] = await agent.askText(history);

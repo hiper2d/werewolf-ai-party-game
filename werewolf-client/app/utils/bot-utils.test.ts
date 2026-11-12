@@ -197,15 +197,30 @@ describe('bot prompt layout — stable through a day', () => {
         expect(generateBotTurnState(mira(next), next)).not.toContain('Investigated');
     });
 
-    it('puts the state before the playstyle reminder, and sends the state alone on night and summary turns', () => {
+    it('puts the state first, then the reminder that fits the turn', () => {
         const g = morning();
-        const full = buildBotTurnTail(mira(g), g, { reminder: true });
-        expect(full.startsWith('## Current Game State')).toBe(true);
-        expect(full.indexOf('core playstyle')).toBeGreaterThan(full.indexOf('**Dead Players:**'));
+        const state = generateBotTurnState(mira(g), g);
 
-        const bare = buildBotTurnTail(mira(g), g, { reminder: false });
-        expect(bare).toBe(generateBotTurnState(mira(g), g));
-        expect(buildBotTurnTail(mira(g), { ...g, language: 'ja' } as Game, { reminder: false })).toMatch(/Reply in Japanese/);
+        const table = buildBotTurnTail(mira(g), g, 'table');
+        expect(table.startsWith(state)).toBe(true);
+        expect(table).toContain('core playstyle');
+        expect(table).toContain('RELATIONSHIP & CONVERSATION CONTINUITY');
+        expect(table).toContain('NOT wrapped in quotation marks');
+
+        // A night action is a private JSON choice: playstyle and decision reminder, no table talk.
+        const night = buildBotTurnTail(mira(g), g, 'night');
+        expect(night.startsWith(state)).toBe(true);
+        expect(night).toContain('core playstyle');
+        expect(night).toContain('DECISION-MAKING REMINDER');
+        expect(night).not.toContain('CONVERSATION CONTINUITY');
+        expect(night).not.toContain('quotation marks');
+
+        expect(buildBotTurnTail(mira(g), g, 'summary')).toBe(state);
+
+        const ja = { ...g, language: 'ja' } as Game;
+        for (const kind of ['table', 'night', 'summary'] as const) {
+            expect(buildBotTurnTail(mira(ja), ja, kind)).toMatch(/Reply in Japanese, never in English\.$/);
+        }
     });
 
     it('says "none" when nobody has died', () => {

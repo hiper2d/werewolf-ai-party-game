@@ -1,6 +1,6 @@
 import { Bot, Game, GAME_ROLES, GAME_STATES, PLAY_STYLES, PLAY_STYLE_CONFIGS, RoleKnowledge } from "@/app/api/game-models";
 import { latestChapterSummary } from "@/app/utils/story-utils";
-import { botReminderPostfix, botSystemPrompt, BOT_AFTER_GAME_SYSTEM_PROMPT_ADDITION, replyLengthInstruction } from "@/app/ai/prompts/bot-prompts";
+import { botNightReminderPostfix, botReminderPostfix, botSystemPrompt, BOT_AFTER_GAME_SYSTEM_PROMPT_ADDITION, replyLengthInstruction } from "@/app/ai/prompts/bot-prompts";
 import { format } from "@/app/ai/prompts/utils";
 import { replyLanguageLine } from "@/app/ai/game-language";
 import { assertProviderNotBlocked } from "@/app/api/provider-blocks";
@@ -403,26 +403,35 @@ export function buildBotSystemPrompt(bot: Bot, game: Game): string {
     return basePrompt;
 }
 
+/** Which reminder follows the state in a turn tail, see buildBotTurnTail. */
+export type BotTurnKind = 'table' | 'night' | 'summary';
+
 /**
  * The trailing message of every bot turn. It rides after the GM command as its own user
  * message and is never persisted, so the saved history stays byte-stable for prompt caches
  * (providers that need alternating roles merge it back in prepareMessages).
  *
- * Structure: the current game state first (generateBotTurnState), then — for turns that
- * speak at the table (`reminder: true`: intro, discussion, vote, post-game chat) — the
- * playstyle and decision reminder, which ends with the reply-language line. Night actions
- * and the end-of-day summary get the state and the language line only.
+ * Structure: the current game state first (generateBotTurnState), then a reminder by kind:
+ * - `table` (intro, discussion, vote, post-game chat): playstyle, conversation continuity,
+ *   decision reminder, reply length and format, reply-language line
+ * - `night` (night actions, the werewolves' night chat): playstyle and decision reminder,
+ *   reply-language line
+ * - `summary` (end-of-day summary): the reply-language line only
  */
-export function buildBotTurnTail(bot: Bot, game: Game, options: { reminder: boolean }): string {
+export function buildBotTurnTail(bot: Bot, game: Game, kind: BotTurnKind): string {
     const state = generateBotTurnState(bot, game);
-    if (!options.reminder) {
+    if (kind === 'summary') {
         return `${state}\n\n${replyLanguageLine(game.language)}`.trim();
     }
-    const reminder = format(botReminderPostfix(game.gameMode, game.language), {
-        play_style: generatePlayStyleDescription(bot),
-        human_player_name: game.humanPlayerName,
-        reply_length_instruction: replyLengthInstruction(game.longReplies)
-    });
+    const reminder = kind === 'night'
+        ? format(botNightReminderPostfix(game.gameMode, game.language), {
+            play_style: generatePlayStyleDescription(bot)
+        })
+        : format(botReminderPostfix(game.gameMode, game.language), {
+            play_style: generatePlayStyleDescription(bot),
+            human_player_name: game.humanPlayerName,
+            reply_length_instruction: replyLengthInstruction(game.longReplies)
+        });
     return `${state}\n\n${reminder.trim()}`;
 }
 

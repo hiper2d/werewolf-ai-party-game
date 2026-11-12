@@ -343,7 +343,7 @@ function shouldTriggerAutoVote(game: Game): boolean {
             // command block stays byte-stable for prompt caches; providers that need
             // alternating roles merge it back in prepareMessages.
             const history = convertToAIMessages(bot.name, [...botMessages, gmMessage]);
-            history.push({ role: MESSAGE_ROLE.USER, content: buildBotTurnTail(bot, game, { reminder: true }) });
+            history.push({ role: MESSAGE_ROLE.USER, content: buildBotTurnTail(bot, game, 'table') });
             const [rawAnswer, thinking, tokenUsage, thinkingSignature] = await agent.askText(history);
             const answer = unwrapJsonReply(rawAnswer);
 
@@ -751,7 +751,7 @@ async function processNextBotInQueue(
     // byte-stable for prompt caches; providers that need alternating roles merge it back
     // in prepareMessages.
     const history = convertToAIMessages(bot.name, [...botMessages, gmMessage]);
-    history.push({ role: MESSAGE_ROLE.USER, content: buildBotTurnTail(bot, game, { reminder: true }) });
+    history.push({ role: MESSAGE_ROLE.USER, content: buildBotTurnTail(bot, game, 'table') });
     const [rawBotReply, thinking, tokenUsage, thinkingSignature] = await agent.askText(history);
     const botReply = unwrapJsonReply(rawBotReply);
     if (!botReply) {
@@ -1128,7 +1128,7 @@ async function voteImpl(gameId: string): Promise<GameActionResponse> {
             // playstyle reminder) rides as its own trailing message (never persisted) so the GM command block stays
             // byte-stable for prompt caches.
             const history = convertToAIMessages(bot.name, [...botMessages, gmMessage]);
-            history.push({ role: MESSAGE_ROLE.USER, content: buildBotTurnTail(bot, currentGame, { reminder: true }) });
+            history.push({ role: MESSAGE_ROLE.USER, content: buildBotTurnTail(bot, currentGame, 'table') });
             
             let voteResponse: any;
             let thinking: string;

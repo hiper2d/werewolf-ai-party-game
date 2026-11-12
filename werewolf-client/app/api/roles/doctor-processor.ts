@@ -220,8 +220,9 @@ export class DoctorProcessor extends BaseRoleProcessor {
             // Create conversation history
             const history = convertToAIMessages(doctorBot.name, [...botMessages, gmMessage]);
             // The turn tail (never persisted): the current alive/dead lists, which the
-            // system prompt no longer carries (it is frozen at the start of the day).
-            history.push({ role: MESSAGE_ROLE.USER, content: buildBotTurnTail(doctorBot, this.game, { reminder: false }) });
+            // system prompt no longer carries (it is frozen at the start of the day),
+            // then the playstyle and decision reminder.
+            history.push({ role: MESSAGE_ROLE.USER, content: buildBotTurnTail(doctorBot, this.game, 'night') });
 
             const [doctorResponse, thinking, tokenUsage, thinkingSignature] = await agent.askWithZodSchema(DoctorActionZodSchema, history);
 

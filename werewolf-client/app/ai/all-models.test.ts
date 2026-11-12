@@ -149,7 +149,7 @@ const voteCommand: GameMessage = {
 
 const voteHistory: AIMessage[] = convertToAIMessages(kenji.name, [...DAY2_MESSAGES, voteCommand]);
 // The turn tail (current state + playstyle reminder) rides as its own trailing message.
-voteHistory.push({ role: 'user', content: buildBotTurnTail(kenji, DAY2_VOTE_GAME, { reminder: true }) });
+voteHistory.push({ role: 'user', content: buildBotTurnTail(kenji, DAY2_VOTE_GAME, 'table') });
 
 describe("All models - day 2 vote with full game context", () => {
     for (const { key, llmType } of allModels) {
