@@ -98,8 +98,7 @@ describe('generateBotContextSection — night secrecy', () => {
             { day: 3, target: 'Leo', outcome: 'failed' },
         ] });
         const ctx = generateBotContextSection(wolf, { ...game, currentDay: 4 } as Game);
-        expect(ctx).toContain("Your Pack's Attack History");
-        expect(ctx).toContain('Attacked **Viktor** → 💀 Viktor died');
+        expect(ctx).toContain("**Your pack's night attack:** Attacked **Viktor** → 💀 Viktor died");
         expect(ctx).toContain('Attacked **Ron** → ❌ Ron survived (the doctor protected them)');
         expect(ctx).toContain('Attacked **Leo** → ❌ Attack failed');
         expect(ctx).not.toMatch(/abduct|maniac/i);
@@ -125,7 +124,7 @@ describe('bot prompt layout — stable through a day', () => {
         humanPlayerRole: GAME_ROLES.VILLAGER,
         bots: [
             bot('Mira', GAME_ROLES.DETECTIVE, {
-                summary: 'Day 1 notes: Harry was too eager.',
+                personalSummaries: [{ day: 1, summary: 'Day 1 notes: Harry was too eager.' }],
                 roleKnowledge: { investigations: [{ day: 1, target: 'Harry', isEvil: true }] },
             }),
             bot('Harry', GAME_ROLES.WEREWOLF),
@@ -143,7 +142,11 @@ describe('bot prompt layout — stable through a day', () => {
     const afterNight = (): Game => {
         const g = morning();
         g.bots = g.bots.map(b => b.name === 'Ron' ? { ...b, isAlive: false }
-            : b.name === 'Mira' ? { ...b, roleKnowledge: { investigations: [...b.roleKnowledge!.investigations!, { day: 2, target: 'Ron', isEvil: false }] } }
+            : b.name === 'Mira' ? {
+                ...b,
+                personalSummaries: [...b.personalSummaries!, { day: 2, summary: 'Day 2 notes: Ron was a mistake.' }],
+                roleKnowledge: { investigations: [...b.roleKnowledge!.investigations!, { day: 2, target: 'Ron', isEvil: false }] },
+            }
             : b) as Bot[];
         (g as any).gameState = 'NEW_DAY_BOT_SUMMARIES';
         g.votingHistory = [...g.votingHistory!, { day: 2, voteCounts: { Ron: 3 }, votes: [], eliminatedPlayer: 'Ron', eliminatedPlayerRole: 'doctor' }] as any;
@@ -171,6 +174,7 @@ describe('bot prompt layout — stable through a day', () => {
         expect(prompt).not.toContain('Chapter two');
         expect(prompt).not.toContain('Ron eliminated');
         expect(prompt).not.toContain('Investigated **Ron**');
+        expect(prompt).not.toContain('Day 2 notes');
         expect(prompt).not.toContain('Alive Players');
     });
 
@@ -183,9 +187,11 @@ describe('bot prompt layout — stable through a day', () => {
         const nightState = generateBotTurnState(mira(afterNight()), afterNight());
         expect(nightState).toContain('**Alive Players:** Harry, Leo');
         expect(nightState).toContain('**Dead Players:** Ron (doctor), Viktor (villager)');
-        expect(nightState).toContain('Your Detective Action Results (latest night)');
-        expect(nightState).toContain('Investigated **Ron** → ✓ Innocent');
+        expect(nightState).toContain('## Tonight (Night 2)\n**Your night action:** Investigated **Ron** → ✓ Innocent');
         expect(nightState).not.toContain('Investigated **Harry**');
+        // The running status covers every night
+        expect(morningState).toContain('**DETECTED AS EVIL (werewolf or maniac):** Harry');
+        expect(nightState).toContain('**CLEARED PLAYERS:** Ron');
     });
 
     it('moves the whole day into the system prompt the next morning', () => {
@@ -195,6 +201,39 @@ describe('bot prompt layout — stable through a day', () => {
         expect(prompt).toContain('Chapter two: the mill burns.');
         expect(prompt).toContain('Investigated **Ron** → ✓ Innocent');
         expect(generateBotTurnState(mira(next), next)).not.toContain('Investigated');
+    });
+
+    it('only appends when a day turns over: yesterday\'s system prompt is a prefix of today\'s', () => {
+        const day2 = buildBotSystemPrompt(mira(morning()), morning());
+        const next = { ...afterNight(), currentDay: 3 } as Game;
+        const day3 = buildBotSystemPrompt(mira(next), next);
+        expect(day3.startsWith(day2)).toBe(true);
+        const added = day3.slice(day2.length);
+        expect(added).toContain('### Day 2');
+        expect(added).toContain('**Discussion:** Day two was all about Ron.');
+        expect(added).toContain('Result: Ron eliminated (was doctor)');
+        expect(added).toContain('**Story chapter:** Chapter two: the mill burns.');
+        expect(added).toContain('**Your night action:** Investigated **Ron** → ✓ Innocent');
+        expect(added).toContain('**Your notes:**\nDay 2 notes: Ron was a mistake.');
+        expect(added).not.toContain('Day 1 notes');
+    });
+
+    it('keeps a legacy consolidated summary, frozen, ahead of the entries', () => {
+        const g = morning();
+        g.bots = g.bots.map(b => b.name === 'Mira' ? { ...b, personalSummaries: undefined, summary: 'Old rewritten summary.' } : b) as Bot[];
+        const ctx = generateBotContextSection(mira(g), g);
+        expect(ctx.indexOf('## Your Earlier Notes\n\nOld rewritten summary.')).toBeGreaterThan(-1);
+        expect(ctx.indexOf('Your Earlier Notes')).toBeLessThan(ctx.indexOf('## Game History'));
+    });
+
+    it('reminds the doctor of last night\'s target until tonight resolves', () => {
+        const g = morning();
+        const doc = { ...g.bots.find(b => b.name === 'Ron')!, roleKnowledge: { protections: [{ day: 1, target: 'Leo' }] } } as Bot;
+        expect(generateBotTurnState(doc, g)).toContain('You protected **Leo** last night, so you CANNOT protect them again tonight.');
+        const resolved = { ...doc, roleKnowledge: { protections: [{ day: 1, target: 'Leo' }, { day: 2, target: 'Mira' }] } } as Bot;
+        const state = generateBotTurnState(resolved, g);
+        expect(state).toContain('**Your night action:** Protected **Mira**');
+        expect(state).not.toContain('CANNOT protect');
     });
 
     it('puts the state first, then the reminder that fits the turn', () => {

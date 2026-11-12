@@ -1385,13 +1385,11 @@ async function summarizePastDayImpl(gameId: string): Promise<GameActionResponse>
         // Create bot system prompt
         const botPrompt = buildBotSystemPrompt(bot, currentGame);
 
-        // Create summary request message with previous summary context
-        const previousSummary = bot.summary || '(This is your first summary - no previous summary exists)';
+        // The request for today's entry; earlier entries are already in the system prompt
         const summaryPrompt = format(BOT_DAY_SUMMARY_PROMPT, {
             bot_name: bot.name,
             day_number: currentGame.currentDay,
-            human_player_name: currentGame.humanPlayerName,
-            previous_summary: previousSummary
+            human_player_name: currentGame.humanPlayerName
         });
 
         const summaryMessage: GameMessage = {
@@ -1442,12 +1440,16 @@ async function summarizePastDayImpl(gameId: string): Promise<GameActionResponse>
             summary = `Summary for day ${currentGame.currentDay}`;
         }
 
-        // Update the bot with the new consolidated summary (replaces previous summary)
+        // Append today's entry to the bot's notes (a re-run of the same day replaces its entry).
+        // Earlier entries are never rewritten: they are part of the cached prompt prefix.
         const updatedBots = currentGame.bots.map(b => {
             if (b.name === botName) {
                 return {
                     ...b,
-                    summary: summary // Single consolidated summary that gets rewritten each day
+                    personalSummaries: [
+                        ...(b.personalSummaries || []).filter(s => s.day !== currentGame.currentDay),
+                        { day: currentGame.currentDay, summary }
+                    ]
                 };
             }
             return b;

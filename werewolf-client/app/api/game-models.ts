@@ -240,6 +240,12 @@ export interface RoleKnowledge {
     [key: string]: any;
 }
 
+/** A bot's own notes for one day, written at the end of that day's night. */
+export interface BotDaySummary {
+    day: number;
+    summary: string;
+}
+
 export interface Bot {
     name: string;
     story: string;
@@ -253,7 +259,8 @@ export interface Bot {
     playStyle: string;
     visualDescription?: string; // Appearance only — the portrait/illustration reference (absent on legacy games)
     eliminationDay?: number; // Track which day this bot was eliminated (undefined if alive)
-    summary?: string; // Single consolidated summary that bot rewrites each day
+    personalSummaries?: BotDaySummary[]; // The bot's own end-of-day notes, one entry per day, append-only
+    summary?: string; // @deprecated Legacy (before 2026-11-12): one consolidated summary rewritten each day; frozen and still shown
     daySummaries?: string[]; // @deprecated Legacy: array of summaries for backward compatibility
     enableThinking?: boolean;
     tokenUsage?: TokenUsage; // Track token usage for this bot

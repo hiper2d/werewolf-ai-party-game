@@ -263,6 +263,12 @@ ${CACHE_TIER_MARKER}
 ## Game State
 
 Who is alive and who is dead changes during a day, so the current lists come at the END of the conversation, under "Current Game State" in the last message of every turn. Trust that block over anything older.
+
+## Your Memory Of Earlier Days
+
+Once a day is over it is kept below, under Game History, as one entry: the Game Master's summary of the discussion, the vote, the night story, the story chapter, your own night action if you have a night role, and the notes you wrote that night. Entries are added day by day and never rewritten, so a later entry or today's conversation overrides an older note of yours.
+
+**The story chapter** is the Game Master's chronicle of where the tale stands. Let the latest one color your tone, imagery, and small asides: nod to its events, react to its twist, push the tale a little further (about one sentence of flavor per message, never more). The chronicle is FICTION layered over the game: its twists, omens, and events imply NOTHING about any player's role and must NEVER be used as evidence, suspicion, or a reason to vote. Your reasoning and votes come only from game facts.
 %bot_context%`;
 
 /** The bot system prompt template for a game mode (placeholders below CACHE_TIER_MARKER
@@ -525,19 +531,16 @@ export const STRICT_TARGET_NAME_INSTRUCTION: string = `
 - Do NOT add surnames, titles, house names, or any other words. For example, write "Pansy", never "Pansy Parkinson".
 - Do NOT invent names or pick anyone who is not on the list above.`;
 
-export const BOT_DAY_SUMMARY_PROMPT: string = `**End of Day %day_number% - Update Your Personal Summary**
+export const BOT_DAY_SUMMARY_PROMPT: string = `**End of Day %day_number% - Write Your Notes For Today**
 
-%bot_name%, the day has ended. Everything you saw today is in this conversation: the public discussion, the vote, the night, and (if you have a night role) your private night messages. Rewrite your personal summary so it carries forward what you will need tomorrow.
-
-**YOUR PREVIOUS SUMMARY:**
-%previous_summary%
+%bot_name%, the day has ended. Everything you saw today is in this conversation: the public discussion, the vote, the night, and (if you have a night role) your private night messages. Write your notes for Day %day_number%: one new entry that carries forward what you will need tomorrow. Your notes from earlier days stay in your context exactly as you wrote them (under each day in the Game History), so this entry covers today only.
 
 **WHAT IS RECORDED FOR YOU SEPARATELY - do NOT restate it:**
 - Every vote (who voted for whom, in what order, and why)
 - Who was eliminated and their role
 - The Game Master's night story
 - Your own night actions and their results (if you have a night role)
-These facts are injected into your context on every turn. Spend your summary on what only you can capture.
+These facts are kept in your Game History next to your notes. Spend your notes on what only you can capture.
 
 **WHAT TO CAPTURE:**
 
@@ -578,7 +581,7 @@ These facts are injected into your context on every turn. Spend your summary on 
 - Who to push on, who to protect or ally with, and why
 - Questions you want answered and discussions left unfinished
 
-**Format:** A compact diary entry in your own voice, 3-5 short paragraphs. Keep what is still relevant from your previous summary, drop what is stale, and make every line something you would act on tomorrow.`;
+**Format:** A compact diary entry in your own voice, 3-5 short paragraphs. Do not repeat your earlier notes; where today changed one of your earlier reads, say what changed and what you believe now. Make every line something you would act on tomorrow.`;
 
 export const BOT_AFTER_GAME_SYSTEM_PROMPT_ADDITION: string = `
 
