@@ -106,14 +106,6 @@
       "outputTokens": 477,
       "reasoningTokens": 0
     },
-    "gemini-flash": {
-      "usdPerTurn": 0.009428,
-      "calls": 1404,
-      "inputTokens": 9338,
-      "cachedInputTokens": 898,
-      "outputTokens": 808,
-      "reasoningTokens": 696
-    },
     "gemini-pro": {
       "usdPerTurn": 0.02907,
       "calls": 77,

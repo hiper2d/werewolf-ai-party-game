@@ -13,6 +13,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        id: "gemini-4-hydrogen", date: "Nov 2026", tags: ["Models"],
+        title: "Gemini 4 Hydrogen replaces Gemini 3.8 Flash",
+        body: (<>Google&apos;s <strong>Gemini 4 Hydrogen</strong> takes over the Gemini Flash slot in the model picker,
+            for bots and the Game Master. It is the second Gemini 4 model in the game after Argon, and in our runs it
+            answers a vote in about four seconds. It also costs <strong>twice as much</strong> as 3.8 Flash: $1.50
+            per million input tokens and $7.50 per million output. For that reason free-tier players can now seat
+            <strong> one Hydrogen bot per game</strong>, where 3.8 Flash allowed three. Bots already set to Gemini
+            Flash switch to Hydrogen on their next turn; a free game that already has several of them keeps
+            playing.</>),
+        media: null,
+        links: [{label: "Create a game", href: "/games"}],
+    },
+    {
         id: "fable-5-2", date: "Nov 2026", tags: ["Models"],
         title: "Claude Fable 5.2 replaces Claude Fable 5.1",
         body: (<>Anthropic&apos;s <strong>Claude Fable 5.2</strong> takes over the Fable slot in the model picker,

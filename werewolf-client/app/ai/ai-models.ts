@@ -275,6 +275,13 @@ SupportedAiModels[LLM_CONSTANTS.CLAUDE_SONNET].freeTier = { available: false, ma
 // turns, 2026-11-02 read) is a hair over the 1¢ ceiling of the 3-bot band, which would hold it
 // to 1 bot a game.
 SupportedAiModels[LLM_CONSTANTS.GPT].freeTier = { available: true, maxBotsPerGame: FREE_TIER_LIMITED_MAX_BOTS };
+// Gemini 4 Hydrogen (2026-11-12, lib 0.35.0): the `gemini-flash` slot doubled in price
+// ($0.75/$3.75 → $1.50/$7.50), so the 1,404 turns measured on 3.8 Flash (0.94¢, the 3-bot band)
+// were dropped from measured-turn-costs.json, as with Terra and Haiku 5.5. The sticker estimate
+// (1.95¢) puts it in the 1-bot band; the 3.8 Flash token profile at the new prices is ~1.9¢, so
+// expect it to stay there. NOTE: until 2026-12-12 a 30-day run of scripts/measure-turn-costs.ts
+// still averages in 3.8 Flash turns under the same picker id — do not write a `gemini-flash`
+// row from a window that starts before 2026-11-12.
 for (const [modelId, config] of Object.entries(SupportedAiModels)) {
     config.freeTier = config.freeTier ?? getFreeTierPolicy(modelId);
 }
