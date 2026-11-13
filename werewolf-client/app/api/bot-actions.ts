@@ -32,7 +32,7 @@ import {
 } from "@/app/ai/prompts/gm-commands";
 import {BOT_VOTE_PROMPT} from "@/app/ai/prompts/bot-prompts";
 import {HUMAN_SUGGESTION_PROMPT} from "@/app/ai/prompts/gm-prompts";
-import {BotVoteZodSchema} from "@/app/ai/prompts/zod-schemas";
+import {askBotChoice, askBotText} from "@/app/ai/bot-turn";
 import {invalidTargetExplanation, selfSelectionExplanation} from "@/app/api/retry-hint";
 import {normalizeTargetName} from "@/app/api/target-resolution";
 import {AgentFactory} from "@/app/ai/agent-factory";
@@ -344,8 +344,7 @@ function shouldTriggerAutoVote(game: Game): boolean {
             // alternating roles merge it back in prepareMessages.
             const history = convertToAIMessages(bot.name, [...botMessages, gmMessage]);
             history.push({ role: MESSAGE_ROLE.USER, content: buildBotTurnTail(bot, game, 'table') });
-            const [rawAnswer, thinking, tokenUsage, thinkingSignature] = await agent.askText(history);
-            const answer = unwrapJsonReply(rawAnswer);
+            const [answer, thinking, tokenUsage, thinkingSignature] = await askBotText(agent, history, welcomeModel.aiType);
 
             if (!answer) {
                 throw new BotResponseError(
@@ -752,8 +751,7 @@ async function processNextBotInQueue(
     // in prepareMessages.
     const history = convertToAIMessages(bot.name, [...botMessages, gmMessage]);
     history.push({ role: MESSAGE_ROLE.USER, content: buildBotTurnTail(bot, game, 'table') });
-    const [rawBotReply, thinking, tokenUsage, thinkingSignature] = await agent.askText(history);
-    const botReply = unwrapJsonReply(rawBotReply);
+    const [botReply, thinking, tokenUsage, thinkingSignature] = await askBotText(agent, history, replyModel.aiType);
     if (!botReply) {
         throw new BotResponseError(
             'Bot failed to respond to discussion',
@@ -1128,14 +1126,17 @@ async function voteImpl(gameId: string): Promise<GameActionResponse> {
             // playstyle reminder) rides as its own trailing message (never persisted) so the GM command block stays
             // byte-stable for prompt caches.
             const history = convertToAIMessages(bot.name, [...botMessages, gmMessage]);
-            history.push({ role: MESSAGE_ROLE.USER, content: buildBotTurnTail(bot, currentGame, 'table') });
+            history.push({ role: MESSAGE_ROLE.USER, content: buildBotTurnTail(bot, currentGame, 'vote') });
             
             let voteResponse: any;
             let thinking: string;
             let tokenUsage: any;
             let thinkingSignature: string | undefined;
             try {
-                [voteResponse, thinking, tokenUsage, thinkingSignature] = await agent.askWithZodSchema(BotVoteZodSchema, history);
+                // The shared answer schema (bot-turn.ts), read back into the vote's stored shape
+                let voteAnswer;
+                [voteAnswer, thinking, tokenUsage, thinkingSignature] = await askBotChoice(agent, history);
+                voteResponse = voteAnswer ? { who: voteAnswer.target ?? '', why: voteAnswer.comment ?? '' } : null;
             } catch (error) {
                 // Handle specific model errors by using their message
                 if (error instanceof ModelError) {

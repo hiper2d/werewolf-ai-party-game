@@ -262,6 +262,27 @@ describe('bot prompt layout — stable through a day', () => {
         }
     });
 
+    it('ends every turn with how to answer it: the shared fields on a schema provider, prose elsewhere', () => {
+        const g = morning();
+        g.bots = g.bots.map(b => ({ ...b, aiType: 'gpt-mini' })) as Bot[];
+        expect(buildBotTurnTail(mira(g), g, 'table')).toContain('Put your reply in `comment`');
+        expect(buildBotTurnTail(mira(g), g, 'table')).not.toContain('plain prose only');
+        expect(buildBotTurnTail(mira(g), g, 'night_talk')).toContain('Put your reply in `comment`');
+        expect(buildBotTurnTail(mira(g), g, 'summary')).toMatch(/Put your notes in `comment` as plain prose\. Set `target`, `action` and `story` to null\.$/);
+        expect(buildBotTurnTail(mira(g), g, 'vote')).toContain('ONE name you vote for in `target`');
+        expect(buildBotTurnTail(mira(g), g, 'night')).toContain('private reasoning in `comment`');
+
+        // No schema enforcement ('x' is not a catalog model): text turns stay prose, choices use the fields
+        const text = morning();
+        expect(buildBotTurnTail(mira(text), text, 'table')).toContain('plain prose only');
+        expect(buildBotTurnTail(mira(text), text, 'night_talk')).toContain('plain prose only');
+        expect(buildBotTurnTail(mira(text), text, 'vote')).toContain('ONE name you vote for in `target`');
+        expect(buildBotTurnTail(mira(text), text, 'night')).toContain('private reasoning in `comment`');
+
+        const ja = { ...g, language: 'ja' } as Game;
+        expect(buildBotTurnTail(mira(ja), ja, 'vote')).toMatch(/Reply in Japanese, never in English\.$/);
+    });
+
     it('says "none" when nobody has died', () => {
         const g = morning();
         g.bots = g.bots.map(b => ({ ...b, isAlive: true }));

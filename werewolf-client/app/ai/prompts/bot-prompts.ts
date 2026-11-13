@@ -243,7 +243,7 @@ All inputs come from the Game Master (GM) as specific commands requiring action.
 
 ## Output Format
 
-Follow the response format specified by each command: some commands ask for plain conversational text, others for a JSON object matching a provided schema. Message content should be natural and conversational without including your name at the start.
+Every command ends with an ANSWER FORMAT line that says how to answer that turn: follow it exactly. Message content should be natural and conversational without including your name at the start.
 ${CACHE_TIER_MARKER}
 ## Character Identity
 
@@ -320,12 +320,12 @@ Consider:
 %valid_targets%
 
 **HOW TO WRITE YOUR VOTE (STRICT):**
-- The "who" field MUST be ONE name copied EXACTLY from the candidate list above, character-for-character.
+- The "target" field MUST be ONE name copied EXACTLY from the candidate list above, character-for-character.
 - Do NOT add surnames, titles, house names, or any other words. For example, write "Pansy", never "Pansy Parkinson".
 - Do NOT invent names or vote for anyone not on the list — dead players and yourself are already excluded.
 - If the player you have in mind is not on the list verbatim, pick the closest matching entry exactly as written.
 
-Your response must be a valid JSON object with your vote choice and reasoning.`;
+Your answer is a JSON object: the name in "target", your brief but convincing reason in "comment".`;
 
 const BOT_REMINDER_PLAYSTYLE: string = `
 
@@ -364,28 +364,23 @@ const DECISION_REMINDER_ROLEPLAY: string = `**DECISION-MAKING REMINDER:**
 `;
 
 /** The per-turn reminder template for a game mode (the caller fills %play_style%,
- * %human_player_name% and %reply_length_instruction% with format()). A non-English game
+ * %human_player_name%, %reply_length_instruction% and %answer_format% — the line from
+ * botAnswerFormatLine that says how to answer this turn — with format()). A non-English game
  * gets one more line: short-context models hold the language better when the last thing
  * they read says so. */
 export function botReminderPostfix(mode: GameMode | undefined = DEFAULT_GAME_MODE, language?: string): string {
     const roleplay = mode !== GAME_MODES.TACTICAL;
-    return BOT_REMINDER_PLAYSTYLE + BOT_REMINDER_CONTINUITY + (roleplay ? DECISION_REMINDER_ROLEPLAY : DECISION_REMINDER_TACTICAL) + '%reply_length_instruction%' + BOT_REPLY_FORMAT + replyLanguageLine(language);
+    return BOT_REMINDER_PLAYSTYLE + BOT_REMINDER_CONTINUITY + (roleplay ? DECISION_REMINDER_ROLEPLAY : DECISION_REMINDER_TACTICAL) + '%reply_length_instruction%' + '%answer_format%\n' + replyLanguageLine(language);
 }
 
-/** The reminder for a night action (the caller fills %play_style%): the playstyle and the
+/** The reminder for a night action (the caller fills %play_style% and %answer_format%): the playstyle and the
  * decision reminder only. The table-talk parts of botReminderPostfix (conversation
  * continuity, reply length, "plain text, no quotation marks") do not fit a private JSON
  * choice of a target. */
 export function botNightReminderPostfix(mode: GameMode | undefined = DEFAULT_GAME_MODE, language?: string): string {
     const roleplay = mode !== GAME_MODES.TACTICAL;
-    return BOT_REMINDER_PLAYSTYLE + (roleplay ? DECISION_REMINDER_ROLEPLAY : DECISION_REMINDER_TACTICAL) + '\n' + replyLanguageLine(language);
+    return BOT_REMINDER_PLAYSTYLE + (roleplay ? DECISION_REMINDER_ROLEPLAY : DECISION_REMINDER_TACTICAL) + '\n\n%answer_format%\n' + replyLanguageLine(language);
 }
-
-// The prompt's examples sit in quotation marks so they read as examples; some
-// models mirror that and quote their own line. The chat strips a wrapping pair
-// anyway (text-format.ts), this just asks for it not to be there.
-const BOT_REPLY_FORMAT: string = `- Your reply is your character speaking directly: plain text, NOT wrapped in quotation marks.
-`;
 
 // Default: terse table talk. The strict cap keeps day discussions readable for
 // players who don't want to scroll walls of text.
@@ -417,9 +412,7 @@ Discuss:
 - Strategy for tomorrow's day phase (who to defend, who to accuse)
 - Coordination with other werewolves
 
-This is a private werewolf-only discussion. Share your thoughts, analysis, and suggestions with your fellow werewolves.
-
-Your response must be a valid JSON object with your discussion message as plain prose in the "reply" field — not another JSON object inside it.`;
+This is a private werewolf-only discussion. Share your thoughts, analysis, and suggestions with your fellow werewolves.`;
 
 export const BOT_WEREWOLF_ACTION_PROMPT: string = `🌙 **Night Phase - Werewolf Final Decision**
 
@@ -432,9 +425,9 @@ Consider:
 - Who has been most suspicious of werewolves during discussions?
 - Strategic value of eliminating this player
 
-Your response must be a valid JSON object with your target choice and reasoning.
+Your answer is a JSON object: the name in "target", your private reasoning in "comment".
 
-**Optional — narrativeHint:** you may add one short in-world sentence describing how your night action looks or feels (mood and imagery only). The Game Master may weave it anonymously into the morning story. It MUST NOT name any player, describe a location tied to a player, or hint at anyone's role — including your own. Skip it if nothing evocative comes to mind.`;
+**Optional — "story":** you may add one short in-world sentence describing how your night action looks or feels (mood and imagery only). The Game Master may weave it anonymously into the morning story. It MUST NOT name any player, describe a location tied to a player, or hint at anyone's role — including your own. Skip it if nothing evocative comes to mind.`;
 
 export const BOT_DOCTOR_ACTION_PROMPT: string = `🏥 **Night Phase - Doctor Protection**
 
@@ -457,9 +450,9 @@ Consider:
 
 **Remember:** Keep your role as Doctor completely secret. Never reveal your protection choices or role to other players during day discussions.
 
-Your response must be a valid JSON object with your target choice and reasoning.
+Your answer is a JSON object: the name in "target", your private reasoning in "comment".
 
-**Optional — narrativeHint:** you may add one short in-world sentence describing how your night action looks or feels (mood and imagery only). The Game Master may weave it anonymously into the morning story. It MUST NOT name any player, describe a location tied to a player, or hint at anyone's role — including your own. Skip it if nothing evocative comes to mind.`;
+**Optional — "story":** you may add one short in-world sentence describing how your night action looks or feels (mood and imagery only). The Game Master may weave it anonymously into the morning story. It MUST NOT name any player, describe a location tied to a player, or hint at anyone's role — including your own. Skip it if nothing evocative comes to mind.`;
 
 export const BOT_MANIAC_ACTION_PROMPT: string = `🎭 **Night Phase - Maniac Abduction**
 
@@ -483,9 +476,9 @@ export const BOT_MANIAC_ACTION_PROMPT: string = `🎭 **Night Phase - Maniac Abd
 
 **Your Goal:** Use your abduction strategically to help the village team win while staying alive.
 
-Your response must be a valid JSON object with your target choice and reasoning.
+Your answer is a JSON object: the name in "target", your private reasoning in "comment".
 
-**Optional — narrativeHint:** you may add one short in-world sentence describing how your night action looks or feels (mood and imagery only). The Game Master may weave it anonymously into the morning story. It MUST NOT name any player, describe a location tied to a player, or hint at anyone's role — including your own. Skip it if nothing evocative comes to mind.`;
+**Optional — "story":** you may add one short in-world sentence describing how your night action looks or feels (mood and imagery only). The Game Master may weave it anonymously into the morning story. It MUST NOT name any player, describe a location tied to a player, or hint at anyone's role — including your own. Skip it if nothing evocative comes to mind.`;
 
 export const BOT_DETECTIVE_ACTION_PROMPT: string = `🔍 **Night Phase - Detective Action**
 
@@ -504,7 +497,7 @@ export const BOT_DETECTIVE_ACTION_PROMPT: string = `🔍 **Night Phase - Detecti
 
 **IMPORTANT RULES:**
 - You can target any living player except yourself
-- Set action_type to "investigate" (or omit it) for investigation, or "kill" for the one-time kill
+- Set "action" to ONE of: "investigate" (the default, also when left null) or "kill" (the one-time kill)
 
 Consider:
 - Who has been acting most suspiciously during day discussions?
@@ -515,9 +508,9 @@ Consider:
 
 **Remember:** Keep your role as Detective completely secret. Never directly reveal your investigation results or role to other players during day discussions. Use the information strategically to guide voting and discussions.
 
-Your response must be a valid JSON object with your target choice, action_type, and reasoning.
+Your answer is a JSON object: the name in "target", the action in "action", your private reasoning in "comment".
 
-**Optional — narrativeHint:** you may add one short in-world sentence describing how your night action looks or feels (mood and imagery only). The Game Master may weave it anonymously into the morning story. It MUST NOT name any player, describe a location tied to a player, or hint at anyone's role — including your own. Skip it if nothing evocative comes to mind.`;
+**Optional — "story":** you may add one short in-world sentence describing how your night action looks or feels (mood and imagery only). The Game Master may weave it anonymously into the morning story. It MUST NOT name any player, describe a location tied to a player, or hint at anyone's role — including your own. Skip it if nothing evocative comes to mind.`;
 
 /**
  * Appended (in the role processors) right after the "Available targets" list so the

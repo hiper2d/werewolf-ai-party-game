@@ -22,7 +22,8 @@ import {
     STRICT_TARGET_NAME_INSTRUCTION
 } from "@/app/ai/prompts/bot-prompts";
 import {format} from "@/app/ai/prompts/utils";
-import {BotAnswerZodSchema, WerewolfActionZod, WerewolfActionZodSchema} from "@/app/ai/prompts/zod-schemas";
+import {BotAnswerZod, WerewolfActionZod} from "@/app/ai/prompts/zod-schemas";
+import { askBotChoice, askBotText } from "@/app/ai/bot-turn";
 import { invalidTargetExplanation, repeatTargetExplanation, selfSelectionExplanation } from "@/app/api/retry-hint";
 import { normalizeTargetName } from "@/app/api/target-resolution";
 import {recordBotTokenUsage} from "@/app/api/cost-tracking";
@@ -200,7 +201,6 @@ export class WerewolfProcessor extends BaseRoleProcessor {
             const isLastWerewolf = remainingQueue.length === 0;
 
             let gmMessage: GameMessage;
-            let schema: any;
             let responseType: string;
 
             if (isLastWerewolf) {
@@ -225,7 +225,6 @@ export class WerewolfProcessor extends BaseRoleProcessor {
                     timestamp: Date.now()
                 };
 
-                schema = WerewolfActionZodSchema;
                 responseType = 'WerewolfAction';
             } else {
                 // Regular werewolf discussion
@@ -239,7 +238,6 @@ export class WerewolfProcessor extends BaseRoleProcessor {
                     timestamp: Date.now()
                 };
 
-                schema = BotAnswerZodSchema;
                 responseType = 'BotAnswer';
             }
 
@@ -251,9 +249,21 @@ export class WerewolfProcessor extends BaseRoleProcessor {
             // The turn tail (never persisted): the current alive/dead lists, which the
             // system prompt no longer carries (it is frozen at the start of the day),
             // then the playstyle and decision reminder.
-            history.push({ role: MESSAGE_ROLE.USER, content: buildBotTurnTail(werewolfBot, this.game, 'night') });
+            history.push({ role: MESSAGE_ROLE.USER, content: buildBotTurnTail(werewolfBot, this.game, isLastWerewolf ? 'night' : 'night_talk') });
 
-            const [werewolfResponse, thinking, tokenUsage, thinkingSignature] = await agent.askWithZodSchema(schema, history);
+            // The shared answer schema (bot-turn.ts), read back into the stored shapes: the
+            // pack's decision is a choice, the night chat is a text turn.
+            let werewolfResponse: WerewolfActionZod | BotAnswerZod | null;
+            let thinking: string, tokenUsage, thinkingSignature: string | undefined;
+            if (isLastWerewolf) {
+                let answer;
+                [answer, thinking, tokenUsage, thinkingSignature] = await askBotChoice(agent, history);
+                werewolfResponse = answer && { reasoning: answer.comment ?? '', target: answer.target ?? '', narrativeHint: answer.story };
+            } else {
+                let reply;
+                [reply, thinking, tokenUsage, thinkingSignature] = await askBotText(agent, history, werewolfModel.aiType);
+                werewolfResponse = reply ? { reply } : null;
+            }
 
             if (!werewolfResponse) {
                 throw new Error(`Werewolf ${werewolfBot.name} failed to respond to ${isLastWerewolf ? 'action' : 'discussion'} prompt`);

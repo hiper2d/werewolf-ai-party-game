@@ -20,6 +20,7 @@ import {buildBotSystemPrompt, buildBotTurnTail, getEffectiveModel} from "@/app/u
 import {DetectiveActionZodSchema} from "@/app/ai/prompts/zod-schemas";
 import { invalidTargetExplanation, repeatTargetExplanation, selfSelectionExplanation } from "@/app/api/retry-hint";
 import { normalizeTargetName } from "@/app/api/target-resolution";
+import { askBotChoice, resolveBotAction } from "@/app/ai/bot-turn";
 import {recordBotTokenUsage} from "@/app/api/cost-tracking";
 import {getProviderSignatureFields} from "@/app/ai/ai-models";
 
@@ -234,7 +235,7 @@ export class DetectiveProcessor extends BaseRoleProcessor {
 
             let detectiveActionPrompt = `${format(BOT_DETECTIVE_ACTION_PROMPT, { bot_name: detectiveBot.name })}\n\n**Available targets:** ${targetNames}`;
             if (!killAbilityAvailable) {
-                detectiveActionPrompt += `\n\n⚠️ **Your one-time kill ability has already been used.** You can only investigate tonight.`;
+                detectiveActionPrompt += `\n\n⚠️ **Your one-time kill ability has already been used.** You can only investigate tonight: the only valid \`action\` is "investigate".`;
             }
             detectiveActionPrompt += STRICT_TARGET_NAME_INSTRUCTION;
 
@@ -266,7 +267,14 @@ export class DetectiveProcessor extends BaseRoleProcessor {
             // then the playstyle and decision reminder.
             history.push({ role: MESSAGE_ROLE.USER, content: buildBotTurnTail(detectiveBot, this.game, 'night') });
 
-            const [detectiveResponse, thinking, tokenUsage, thinkingSignature] = await agent.askWithZodSchema(DetectiveActionZodSchema, history);
+            // The shared answer schema (bot-turn.ts), read back into this role's stored shape
+            const [detectiveAnswer, thinking, tokenUsage, thinkingSignature] = await askBotChoice(agent, history);
+            const detectiveResponse = detectiveAnswer && {
+                reasoning: detectiveAnswer.comment ?? '',
+                target: detectiveAnswer.target ?? '',
+                action_type: resolveBotAction(detectiveAnswer, ['investigate', 'kill'] as const, 'investigate', detectiveBot.name),
+                narrativeHint: detectiveAnswer.story,
+            };
 
             if (!detectiveResponse) {
                 throw new Error(`Detective ${detectiveBot.name} failed to respond to investigation prompt`);

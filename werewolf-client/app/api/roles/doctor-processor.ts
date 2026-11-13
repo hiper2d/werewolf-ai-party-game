@@ -12,6 +12,7 @@ import { buildBotSystemPrompt, buildBotTurnTail, getEffectiveModel } from "@/app
 import { DoctorActionZodSchema } from "@/app/ai/prompts/zod-schemas";
 import { invalidTargetExplanation, repeatTargetExplanation, selfSelectionExplanation } from "@/app/api/retry-hint";
 import { normalizeTargetName } from "@/app/api/target-resolution";
+import { askBotChoice, resolveBotAction } from "@/app/ai/bot-turn";
 import { DoctorAction } from "@/app/ai/prompts/ai-schemas";
 import { recordBotTokenUsage } from "@/app/api/cost-tracking";
 import { getProviderSignatureFields } from "@/app/ai/ai-models";
@@ -194,6 +195,7 @@ export class DoctorProcessor extends BaseRoleProcessor {
             }
 
             doctorActionPrompt += `\n\n**Available targets for protection${killAbilityAvailable ? ' or kill' : ''}:** ${targetNames}`;
+            doctorActionPrompt += `\n\n**Valid actions tonight (the \`action\` field) — pick ONE:** ${killAbilityAvailable ? '"protect" (the default, also when left null) or "kill" (the one-time Doctor\'s Mistake)' : '"protect"'}`;
             doctorActionPrompt += STRICT_TARGET_NAME_INSTRUCTION;
 
             // One-shot hint from a user-triggered Retry explaining why the previous answer was
@@ -224,7 +226,14 @@ export class DoctorProcessor extends BaseRoleProcessor {
             // then the playstyle and decision reminder.
             history.push({ role: MESSAGE_ROLE.USER, content: buildBotTurnTail(doctorBot, this.game, 'night') });
 
-            const [doctorResponse, thinking, tokenUsage, thinkingSignature] = await agent.askWithZodSchema(DoctorActionZodSchema, history);
+            // The shared answer schema (bot-turn.ts), read back into this role's stored shape
+            const [doctorAnswer, thinking, tokenUsage, thinkingSignature] = await askBotChoice(agent, history);
+            const doctorResponse = doctorAnswer && {
+                reasoning: doctorAnswer.comment ?? '',
+                target: doctorAnswer.target ?? '',
+                action_type: resolveBotAction(doctorAnswer, ['protect', 'kill'] as const, 'protect', doctorBot.name),
+                narrativeHint: doctorAnswer.story,
+            };
 
             if (!doctorResponse) {
                 throw new Error(`Doctor ${doctorBot.name} failed to respond to protection prompt`);

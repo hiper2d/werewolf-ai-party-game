@@ -7,7 +7,8 @@
 // Output: logs/replay-<bot>-<gameId>.txt with the final system prompt and every answer.
 import { db } from '../firebase/server';
 import { AgentFactory } from '../app/ai/agent-factory';
-import { BOT_DAY_SUMMARY_PROMPT } from '../app/ai/prompts/bot-prompts';
+import { BOT_DAY_SUMMARY_PROMPT, BOT_VOTE_PROMPT } from '../app/ai/prompts/bot-prompts';
+import { askBotChoice, askBotText } from '../app/ai/bot-turn';
 import { GM_COMMAND_REPLY_TO_DISCUSSION } from '../app/ai/prompts/gm-commands';
 import { format } from '../app/ai/prompts/utils';
 import { convertToAIMessages } from '../app/utils/message-utils';
@@ -43,7 +44,7 @@ const positional = argv.filter((a, i) => !a.startsWith('--') && (modelFlag === -
     const notes: BotDaySummary[] = [];
     let previousPrompt = '';
     const view = (day: number): { g: Game; bot: Bot } => {
-        const bot = { ...real, summary: undefined, daySummaries: undefined, personalSummaries: [...notes] } as Bot;
+        const bot = { ...real, aiType: model, summary: undefined, daySummaries: undefined, personalSummaries: [...notes] } as Bot;
         const g = { ...game, currentDay: day, bots: game.bots.map(b => b.name === bot.name ? bot : b) } as Game;
         return { g, bot };
     };
@@ -66,7 +67,7 @@ const positional = argv.filter((a, i) => !a.startsWith('--') && (modelFlag === -
         history.push({ role: MESSAGE_ROLE.USER, content: tail });
         const agent = AgentFactory.createAgent(bot.name, system, model, apiKeys, real.enableThinking);
         const t0 = Date.now();
-        const [answer, , usage] = await agent.askText(history);
+        const [answer, , usage] = await askBotText(agent, history, model);
         const secs = ((Date.now() - t0) / 1000).toFixed(1);
         console.log(`day ${day} summary: system=${system.length} chars (prefix of previous: ${prefixOk})  messages=${messages.length}  ${usageLine(usage)}  ${secs}s  notes=${(answer || '').length} chars`);
         out += `\n==================== DAY ${day} SUMMARY ====================\n--- turn tail ---\n${tail}\n--- notes written ---\n${answer}\n`;
@@ -87,12 +88,21 @@ const positional = argv.filter((a, i) => !a.startsWith('--') && (modelFlag === -
     const agent = AgentFactory.createAgent(bot.name, system, model, apiKeys, real.enableThinking);
     const ask = async (label: string) => {
         const t0 = Date.now();
-        const [answer, , usage] = await agent.askText(history);
+        const [answer, , usage] = await askBotText(agent, history, model);
         console.log(`day ${lastDay} discussion reply ${label}: ${usageLine(usage)}  ${((Date.now() - t0) / 1000).toFixed(1)}s`);
         return answer;
     };
     const reply = await ask('#1');
     await ask('#2 (same prompt, cache check)');
+    // The vote, as the game asks it: the reply saved in history, then the vote command
+    const alive = [...g.bots.filter(b => b.isAlive && b.name !== bot.name).map(b => b.name), g.humanPlayerName];
+    const saved = { id: null, recipientName: 'ALL', authorName: bot.name, msg: { reply }, messageType: MessageType.BOT_ANSWER, day: lastDay, timestamp: Date.now() } as any;
+    const voteCommand: GameMessage = { ...command, msg: format(BOT_VOTE_PROMPT, { bot_name: bot.name, vote_position: '1', total_voters: String(alive.length + 1), valid_targets: alive.map(n => `- ${n}`).join('\n'), werewolf_vote_note: '' }) };
+    const voteHistory = convertToAIMessages(bot.name, [...messages, command, saved, voteCommand]);
+    voteHistory.push({ role: MESSAGE_ROLE.USER, content: buildBotTurnTail(bot, g, 'vote') });
+    const tv = Date.now();
+    const [vote, , voteUsage] = await askBotChoice(agent, voteHistory);
+    console.log(`day ${lastDay} vote: ${usageLine(voteUsage)}  ${((Date.now() - tv) / 1000).toFixed(1)}s  target=${vote?.target}${vote?.target && alive.includes(vote.target) ? '' : ' INVALID'}  action=${vote?.action}  story=${vote?.story}  reason=${(vote?.comment || '').length} chars`);
     out = `# ${bot.name} (${bot.role}) in ${gameId}, model ${model}, replayed ${new Date().toISOString()}\n\n==================== DAY ${lastDay} SYSTEM PROMPT (${system.length} chars) ====================\n${system}\n${out}\n==================== DAY ${lastDay} DISCUSSION REPLY ====================\n${reply}\n`;
     fs.mkdirSync('logs', { recursive: true });
     const path = `logs/replay-${bot.name.toLowerCase()}-${gameId}.txt`;

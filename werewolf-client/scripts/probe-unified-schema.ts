@@ -6,7 +6,7 @@
 // Each sequence gets a unique line at the top of the system prompt, so the vote's cached
 // tokens can only come from that sequence's own first call.
 // Usage: npx tsx --env-file=.env scripts/probe-unified-schema.ts [--game <id>] [--bot <name>]
-//        [--models gpt-mini,deepseek-flash] [--runs 3]
+//        [--models gpt-mini,deepseek-flash] [--runs 3] [--long] [--variants unified] [--day 2]
 import { z } from 'zod';
 import { db } from '../firebase/server';
 import { AgentFactory } from '../app/ai/agent-factory';
@@ -23,6 +23,8 @@ const argv = process.argv.slice(2);
 const arg = (flag: string) => { const i = argv.indexOf(flag); return i > -1 ? argv[i + 1] : undefined; };
 const MODELS = (arg('--models') ?? 'gpt-mini,deepseek-flash').split(',');
 const RUNS = parseInt(arg('--runs') ?? '3', 10);
+const LONG = argv.includes('--long');          // long discussion replies (the game's longReplies switch)
+const VARIANTS = (arg('--variants') ?? 'current,unified').split(',') as ('current' | 'unified')[];
 
 // Generic on purpose: which field a turn needs is said by the GM command, checked in code.
 const UnifiedSchema = z.object({
@@ -39,9 +41,9 @@ const UNIFIED_VOTE = '\n\n**Answer format:** a JSON object. Put the name you vot
         const snap = await db!.collection('games').orderBy('createdAt', 'desc').limit(80).get();
         gameId = snap.docs.map(d => ({ id: d.id, ...(d.data() as any) })).find(g => (g.currentDay || 1) >= 3)!.id;
     }
-    const game = await getGame(gameId!) as Game;
+    const game = { ...(await getGame(gameId!) as Game), ...(LONG ? { longReplies: true } : {}) } as Game;
     const bot = (arg('--bot') ? game.bots.find(b => b.name === arg('--bot')) : game.bots.find(b => b.isAlive)) as Bot;
-    const day = game.currentDay || 1;
+    const day = parseInt(arg('--day') ?? String(game.currentDay || 1), 10); // --day: use an earlier day's (longer) message log
     const apiKeys = (await db!.collection('config').doc('freeTierApiKeys').get()).data()?.keys as any;
     const baseSystem = buildBotSystemPrompt(bot, game);
     const dayMessages = await getBotMessages(gameId!, bot.name, day);
@@ -56,9 +58,10 @@ const UNIFIED_VOTE = '\n\n**Answer format:** a JSON object. Put the name you vot
 
     for (const model of MODELS) {
         for (let run = 1; run <= RUNS; run++) {
-            for (const variant of ['current', 'unified'] as const) {
+            for (const variant of VARIANTS) {
                 const system = `Session ${model}-${variant}-${run}-${Date.now()}\n\n${baseSystem}`;
                 const agent = AgentFactory.createAgent(bot.name, system, model, apiKeys, bot.enableThinking);
+                agent.invalidResponseRetries = 0; // count every malformed answer
                 const unified = variant === 'unified';
                 try {
                     // 1. discussion reply

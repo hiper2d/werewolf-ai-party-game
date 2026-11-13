@@ -44,6 +44,12 @@ export function repeatTargetExplanation(chosen: string, targets: string[]): stri
         + `the same player two nights in a row. ` + CHOOSE_ONE(targets);
 }
 
+/** The night action named is not one the command offered. */
+export function invalidActionExplanation(chosen: string, actions: string[]): string {
+    return `${PREFIX} You answered with the action "${chosen}", which is not one of the allowed actions. `
+        + `Answer again and set \`action\` to EXACTLY ONE of: ${actions.join(', ')}`;
+}
+
 /**
  * The reply could not be parsed into the required schema. No target list here — the failure was
  * the response format, not the choice.

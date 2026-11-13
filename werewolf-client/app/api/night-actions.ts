@@ -1,6 +1,7 @@
 'use server';
 
 import { db } from "@/firebase/server";
+import { askBotText } from "@/app/ai/bot-turn";
 import {
     Game,
     GAME_STATES,
@@ -1417,7 +1418,7 @@ async function summarizePastDayImpl(gameId: string): Promise<GameActionResponse>
         history.push({ role: MESSAGE_ROLE.USER, content: buildBotTurnTail(bot, currentGame, 'summary') });
 
         // Get summary as plain text
-        const [summaryResponse, , tokenUsage] = await agent.askText(history);
+        const [summaryResponse, , tokenUsage] = await askBotText(agent, history, summaryModel.aiType);
 
         // Update bot's token usage
         if (tokenUsage) {

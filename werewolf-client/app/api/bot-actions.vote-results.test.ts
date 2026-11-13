@@ -198,9 +198,9 @@ afterEach(() => {
     jest.restoreAllMocks();
 });
 
-/** Agent resolves a bot vote {who, why}. */
+/** Agent resolves a bot vote in the shared answer schema (target = who, comment = why). */
 function botVotes(who: string, why = 'suspicious') {
-    mockAskWithZodSchema.mockResolvedValue([{ who, why }, 'thinking', undefined, undefined]);
+    mockAskWithZodSchema.mockResolvedValue([{ comment: why, target: who, action: null, story: null }, 'thinking', undefined, undefined]);
 }
 
 // ---------------------------------------------------------------------------
@@ -276,7 +276,7 @@ describe('vote: bot vote accumulation', () => {
         // after the reply sees the night already under way.
         let reads = 0;
         (getGame as jest.Mock).mockImplementation(async () => (++reads <= 2 ? voteGame : nightGame));
-        mockAskWithZodSchema.mockResolvedValue([{ who: 'Bob', why: 'late' }, '', { inputTokens: 1, outputTokens: 1 }, undefined]);
+        mockAskWithZodSchema.mockResolvedValue([{ comment: 'late', target: 'Bob', action: null, story: null }, '', { inputTokens: 1, outputTokens: 1 }, undefined]);
 
         const result = await vote(GAME_ID);
 

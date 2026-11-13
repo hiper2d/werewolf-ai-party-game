@@ -1,4 +1,5 @@
 import { Bot, Game, GAME_ROLES, GAME_STATES, PLAY_STYLES, PLAY_STYLE_CONFIGS, RoleKnowledge } from "@/app/api/game-models";
+import { botAnswerFormatLine } from "@/app/ai/bot-turn";
 import { botNightReminderPostfix, botReminderPostfix, botSystemPrompt, BOT_AFTER_GAME_SYSTEM_PROMPT_ADDITION, replyLengthInstruction } from "@/app/ai/prompts/bot-prompts";
 import { format } from "@/app/ai/prompts/utils";
 import { replyLanguageLine } from "@/app/ai/game-language";
@@ -369,7 +370,7 @@ export function buildBotSystemPrompt(bot: Bot, game: Game): string {
 }
 
 /** Which reminder follows the state in a turn tail, see buildBotTurnTail. */
-export type BotTurnKind = 'table' | 'night' | 'summary';
+export type BotTurnKind = 'table' | 'vote' | 'night' | 'night_talk' | 'summary';
 
 /**
  * The trailing message of every bot turn. It rides after the GM command as its own user
@@ -377,25 +378,32 @@ export type BotTurnKind = 'table' | 'night' | 'summary';
  * (providers that need alternating roles merge it back in prepareMessages).
  *
  * Structure: the current game state first (generateBotTurnState), then a reminder by kind:
- * - `table` (intro, discussion, vote, post-game chat): playstyle, conversation continuity,
- *   decision reminder, reply length and format, reply-language line
- * - `night` (night actions, the werewolves' night chat): playstyle and decision reminder,
- *   reply-language line
- * - `summary` (end-of-day summary): the reply-language line only
+ * - `table` (intro, discussion, post-game chat) and `vote`: playstyle, conversation
+ *   continuity, decision reminder, reply length
+ * - `night` (night actions) and `night_talk` (the werewolves' night chat): playstyle and
+ *   decision reminder
+ * - `summary` (end-of-day notes): no reminder
+ * and last, on every kind: how to answer this turn (botAnswerFormatLine — which of the
+ * shared answer fields to fill, or plain prose on providers without schema enforcement)
+ * and the reply-language line.
  */
 export function buildBotTurnTail(bot: Bot, game: Game, kind: BotTurnKind): string {
     const state = generateBotTurnState(bot, game);
+    const aiType = getEffectiveModel(game, bot.name, bot.aiType).aiType;
     if (kind === 'summary') {
-        return `${state}\n\n${replyLanguageLine(game.language)}`.trim();
+        return [state, botAnswerFormatLine(aiType, 'notes'), replyLanguageLine(game.language)]
+            .map(s => s.trim()).filter(Boolean).join('\n\n');
     }
-    const reminder = kind === 'night'
+    const reminder = kind === 'night' || kind === 'night_talk'
         ? format(botNightReminderPostfix(game.gameMode, game.language), {
-            play_style: generatePlayStyleDescription(bot)
+            play_style: generatePlayStyleDescription(bot),
+            answer_format: botAnswerFormatLine(aiType, kind === 'night' ? 'night' : 'reply')
         })
         : format(botReminderPostfix(game.gameMode, game.language), {
             play_style: generatePlayStyleDescription(bot),
             human_player_name: game.humanPlayerName,
-            reply_length_instruction: replyLengthInstruction(game.longReplies)
+            reply_length_instruction: replyLengthInstruction(game.longReplies),
+            answer_format: botAnswerFormatLine(aiType, kind === 'vote' ? 'vote' : 'reply')
         });
     return `${state}\n\n${reminder.trim()}`;
 }

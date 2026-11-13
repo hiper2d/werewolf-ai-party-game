@@ -20,6 +20,7 @@ import { buildBotSystemPrompt, buildBotTurnTail, getEffectiveModel } from "@/app
 import { ManiacActionZodSchema } from "@/app/ai/prompts/zod-schemas";
 import { invalidTargetExplanation, repeatTargetExplanation, selfSelectionExplanation } from "@/app/api/retry-hint";
 import { normalizeTargetName } from "@/app/api/target-resolution";
+import { askBotChoice } from "@/app/ai/bot-turn";
 import { recordBotTokenUsage } from "@/app/api/cost-tracking";
 import { getProviderSignatureFields } from "@/app/ai/ai-models";
 
@@ -154,7 +155,13 @@ export class ManiacProcessor extends BaseRoleProcessor {
             // then the playstyle and decision reminder.
             history.push({ role: MESSAGE_ROLE.USER, content: buildBotTurnTail(maniacBot, this.game, 'night') });
 
-            const [maniacResponse, thinking, tokenUsage, thinkingSignature] = await agent.askWithZodSchema(ManiacActionZodSchema, history);
+            // The shared answer schema (bot-turn.ts), read back into this role's stored shape
+            const [maniacAnswer, thinking, tokenUsage, thinkingSignature] = await askBotChoice(agent, history);
+            const maniacResponse = maniacAnswer && {
+                reasoning: maniacAnswer.comment ?? '',
+                target: maniacAnswer.target ?? '',
+                narrativeHint: maniacAnswer.story,
+            };
 
             if (!maniacResponse) {
                 throw new Error(`Maniac ${maniacBot.name} failed to respond to abduction prompt`);
