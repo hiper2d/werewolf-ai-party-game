@@ -218,6 +218,16 @@ describe('bot prompt layout — stable through a day', () => {
         expect(added).not.toContain('Day 1 notes');
     });
 
+    it('keeps the prefix in a non-English game: the language block sits before the entries', () => {
+        const day2Game = { ...morning(), language: 'fr' } as Game;
+        const day3Game = { ...afterNight(), currentDay: 3, language: 'fr' } as Game;
+        const day2 = buildBotSystemPrompt(mira(day2Game), day2Game);
+        const day3 = buildBotSystemPrompt(mira(day3Game), day3Game);
+        expect(day2).toContain('## Language');
+        expect(day2.indexOf('## Language')).toBeLessThan(day2.indexOf('## Game History'));
+        expect(day3.startsWith(day2)).toBe(true);
+    });
+
     it('keeps a legacy consolidated summary, frozen, ahead of the entries', () => {
         const g = morning();
         g.bots = g.bots.map(b => b.name === 'Mira' ? { ...b, personalSummaries: undefined, summary: 'Old rewritten summary.' } : b) as Bot[];
@@ -268,7 +278,7 @@ describe('bot prompt layout — stable through a day', () => {
         expect(buildBotTurnTail(mira(g), g, 'table')).toContain('Put your reply in `comment`');
         expect(buildBotTurnTail(mira(g), g, 'table')).not.toContain('plain prose only');
         expect(buildBotTurnTail(mira(g), g, 'night_talk')).toContain('Put your reply in `comment`');
-        expect(buildBotTurnTail(mira(g), g, 'summary')).toMatch(/Put your notes in `comment` as plain prose\. Set `target`, `action` and `story` to null\.$/);
+        expect(buildBotTurnTail(mira(g), g, 'summary')).toMatch(/Put your notes in `comment` as plain prose\. Set `target`, `action` and `story` to "" \(an empty string\)\.$/);
         expect(buildBotTurnTail(mira(g), g, 'vote')).toContain('ONE name you vote for in `target`');
         expect(buildBotTurnTail(mira(g), g, 'night')).toContain('private reasoning in `comment`');
 

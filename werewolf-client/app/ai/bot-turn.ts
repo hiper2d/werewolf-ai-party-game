@@ -5,7 +5,7 @@
  * format. A plain-text discussion reply followed by a schema vote (and four different night
  * schemas) threw the cached day away at every switch — measured 2026-11-12: 0% of the
  * vote's input read from cache on OpenAI, Mistral and Gemini, 77-90% with one schema on both
- * calls (scripts/probe-unified-schema.ts). So every turn sends the SAME four nullable
+ * calls (scripts/probe-unified-schema.ts). So every turn sends the SAME four string
  * fields with generic descriptions, the unsaved turn tail says which ones this turn needs
  * (botAnswerFormatLine), and code validates them. Never add a per-turn or per-role schema,
  * a per-turn enum, or a turn-specific description here: any difference is a cache miss.
@@ -23,11 +23,17 @@ import { BotResponseError } from '@/app/api/game-models';
 import { invalidActionExplanation } from '@/app/api/retry-hint';
 import { unwrapJsonReply } from '@/app/utils/text-format';
 
+// Plain strings, "" when a turn does not use a field — NOT nullable. With nullable fields
+// GPT-6.1 Terra could not settle on null: it wrote "action", "comment", "." or prose into the
+// unused fields (9 of 10 discussion replies) and about one call in five never finished (15
+// production timeouts in 77 calls on 2026-11-13/14, none in the 170 before; 0 of 20 with
+// plain strings). The same family as the 2026-09-05 whitespace runaway: an OpenAI model
+// given a field it has nothing to put in. Do not make these nullable or optional again.
 export const BotTurnZodSchema = z.object({
-    comment: z.string().nullable().describe('Your text reply, when the command asks for one. Otherwise null.'),
-    target: z.string().nullable().describe('One exact player name, when the command asks you to choose a player. Otherwise null.'),
-    action: z.string().nullable().describe('The action to apply to the target, when the command asks you to pick an action. Otherwise null.'),
-    story: z.string().nullable().describe('One short in-world sentence of mood and imagery, when the command invites one. Otherwise null.'),
+    comment: z.string().describe('Your text reply, when the command asks for one. Otherwise an empty string.'),
+    target: z.string().describe('One exact player name, when the command asks you to choose a player. Otherwise an empty string.'),
+    action: z.string().describe('The action to apply to the target, when the command asks you to pick an action. Otherwise an empty string.'),
+    story: z.string().describe('One short in-world sentence of mood and imagery, when the command invites one. Otherwise an empty string.'),
 });
 
 export interface BotTurnAnswer {
@@ -44,7 +50,7 @@ export function usesSharedSchema(aiType: string): boolean {
     return enforcesSchema(resolveModelId(aiType));
 }
 
-/** Models fill unused fields with "", "null" or "none" as often as with null. */
+/** Unused fields arrive as "" (asked for), sometimes "null" or "none"; all read as null. */
 function cleanField(value: unknown): string | null {
     if (typeof value !== 'string') return null;
     const trimmed = value.trim();
@@ -64,7 +70,7 @@ function cleanAnswer(raw: any): BotTurnAnswer {
  * A turn whose answer is text only (intro, discussion, post-game chat, the werewolves'
  * night chat, end-of-day notes). Returns the text, or null when the model gave none.
  * Fields the turn did not ask for are ignored: Mistral fills `target`/`action` on
- * discussion turns even when told to leave them null.
+ * discussion turns even when told to leave them empty.
  */
 export async function askBotText(agent: AbstractAgent, history: AIMessage[], aiType: string): Promise<AskResult<string | null>> {
     if (usesSharedSchema(aiType)) {
@@ -106,10 +112,10 @@ export type BotAnswerKind = 'reply' | 'notes' | 'vote' | 'night';
 
 const JSON_HEAD = '**ANSWER FORMAT:** a JSON object with exactly four fields: `comment`, `target`, `action`, `story`. ';
 const JSON_FIELDS: Record<BotAnswerKind, string> = {
-    reply: 'Put your reply in `comment` as plain prose (no quotation marks around it, no JSON inside it). Set `target`, `action` and `story` to null.',
-    notes: 'Put your notes in `comment` as plain prose. Set `target`, `action` and `story` to null.',
-    vote: 'Put the ONE name you vote for in `target`, copied exactly from the candidate list, and your brief reason in `comment`. Set `action` and `story` to null.',
-    night: 'Put the ONE name you choose in `target`, copied exactly from the list of targets, and your private reasoning in `comment`. `action`: one of the actions the command lists, or null when it lists none or you take the default. `story`: the optional one-sentence hint the command describes, or null.',
+    reply: 'Put your reply in `comment` as plain prose (no quotation marks around it, no JSON inside it). Set `target`, `action` and `story` to "" (an empty string).',
+    notes: 'Put your notes in `comment` as plain prose. Set `target`, `action` and `story` to "" (an empty string).',
+    vote: 'Put the ONE name you vote for in `target`, copied exactly from the candidate list, and your brief reason in `comment`. Set `action` and `story` to "" (an empty string).',
+    night: 'Put the ONE name you choose in `target`, copied exactly from the list of targets, and your private reasoning in `comment`. `action`: one of the actions the command lists, or "" (an empty string) when it lists none or you take the default. `story`: the optional one-sentence hint the command describes, or "".',
 };
 
 /**

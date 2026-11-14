@@ -73,7 +73,7 @@ const median = (xs: number[]) => { const s = [...xs].sort((a, b) => a - b); retu
         { name: 'night action', system: buildBotSystemPrompt(doctor, gDoctor), choice: true,
           history: build(doctor, gDoctor, format(BOT_DOCTOR_ACTION_PROMPT, { bot_name: bot.name }) + ROLE_CONFIGS[GAME_ROLES.DOCTOR].oneTimeAbilities!.kill!.promptAddition
               + `\n\n**Available targets for protection or kill:** ${alive.join(', ')}`
-              + `\n\n**Valid actions tonight (the \`action\` field) — pick ONE:** "protect" (the default, also when left null) or "kill" (the one-time Doctor's Mistake)` + STRICT_TARGET_NAME_INSTRUCTION, 'night') },
+              + `\n\n**Valid actions tonight (the \`action\` field) — pick ONE:** "protect" (the default, also when left empty) or "kill" (the one-time Doctor's Mistake)` + STRICT_TARGET_NAME_INSTRUCTION, 'night') },
         { name: 'day notes', system: buildBotSystemPrompt(bot, gSummary), choice: false,
           history: build(bot, gSummary, format(BOT_DAY_SUMMARY_PROMPT, { bot_name: bot.name, day_number: day, human_player_name: game.humanPlayerName }), 'summary') },
     ];

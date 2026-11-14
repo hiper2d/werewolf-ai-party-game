@@ -195,7 +195,7 @@ export class DoctorProcessor extends BaseRoleProcessor {
             }
 
             doctorActionPrompt += `\n\n**Available targets for protection${killAbilityAvailable ? ' or kill' : ''}:** ${targetNames}`;
-            doctorActionPrompt += `\n\n**Valid actions tonight (the \`action\` field) — pick ONE:** ${killAbilityAvailable ? '"protect" (the default, also when left null) or "kill" (the one-time Doctor\'s Mistake)' : '"protect"'}`;
+            doctorActionPrompt += `\n\n**Valid actions tonight (the \`action\` field) — pick ONE:** ${killAbilityAvailable ? '"protect" (the default, also when left empty) or "kill" (the one-time Doctor\'s Mistake)' : '"protect"'}`;
             doctorActionPrompt += STRICT_TARGET_NAME_INSTRUCTION;
 
             // One-shot hint from a user-triggered Retry explaining why the previous answer was

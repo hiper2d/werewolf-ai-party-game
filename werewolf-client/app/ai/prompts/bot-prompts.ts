@@ -269,11 +269,12 @@ Who is alive and who is dead changes during a day, so the current lists come at 
 Once a day is over it is kept below, under Game History, as one entry: the Game Master's summary of the discussion, the vote, the night story, the story chapter, your own night action if you have a night role, and the notes you wrote that night. Entries are added day by day and never rewritten, so a later entry or today's conversation overrides an older note of yours.
 
 **The story chapter** is the Game Master's chronicle of where the tale stands. Let the latest one color your tone, imagery, and small asides: nod to its events, react to its twist, push the tale a little further (about one sentence of flavor per message, never more). The chronicle is FICTION layered over the game: its twists, omens, and events imply NOTHING about any player's role and must NEVER be used as evidence, suspicion, or a reason to vote. Your reasoning and votes come only from game facts.
-%bot_context%`;
+`;
 
 /** The bot system prompt template for a game mode (placeholders below CACHE_TIER_MARKER
  * are filled by the caller with format()). A non-English game appends its language block
- * to the per-game tail, so the shared tier above the marker stays byte-identical. */
+ * to the per-game tail, so the shared tier above the marker stays byte-identical; the
+ * append-only history (%bot_context%) comes after it. */
 export function botSystemPrompt(mode: GameMode | undefined = DEFAULT_GAME_MODE, language?: string): string {
     const roleplay = mode !== GAME_MODES.TACTICAL;
     return BOT_PROMPT_HEAD
@@ -286,7 +287,10 @@ export function botSystemPrompt(mode: GameMode | undefined = DEFAULT_GAME_MODE, 
         + (roleplay ? RESPONSE_FOCUS_ROLEPLAY : RESPONSE_FOCUS_TACTICAL)
         + '\n\n' + BOT_CONTENT_LIMITS
         + BOT_PROMPT_TAIL
-        + languageInstruction(language, 'bot');
+        + languageInstruction(language, 'bot')
+        // The history entries go LAST, after the language block: they are append-only, and
+        // anything after them would break "yesterday's prompt is a prefix of today's".
+        + '%bot_context%';
 }
 
 export const BOT_VOTE_PROMPT: string = `%bot_name%, it's time to vote for someone to eliminate from the game. \
@@ -497,7 +501,7 @@ export const BOT_DETECTIVE_ACTION_PROMPT: string = `🔍 **Night Phase - Detecti
 
 **IMPORTANT RULES:**
 - You can target any living player except yourself
-- Set "action" to ONE of: "investigate" (the default, also when left null) or "kill" (the one-time kill)
+- Set "action" to ONE of: "investigate" (the default, also when left empty) or "kill" (the one-time kill)
 
 Consider:
 - Who has been acting most suspiciously during day discussions?

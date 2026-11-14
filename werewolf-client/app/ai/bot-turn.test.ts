@@ -8,10 +8,15 @@ const agent = (schemaAnswer: unknown, text = '') => ({
 }) as any;
 
 describe('shared bot answer schema', () => {
-    it('is the same four nullable string fields for every turn', () => {
+    it('is the same four plain string fields for every turn, never nullable', () => {
         expect(Object.keys(BotTurnZodSchema.shape)).toEqual(['comment', 'target', 'action', 'story']);
-        expect(BotTurnZodSchema.parse({ comment: null, target: null, action: null, story: null }))
-            .toEqual({ comment: null, target: null, action: null, story: null });
+        expect(BotTurnZodSchema.parse({ comment: 'Hi.', target: '', action: '', story: '' }))
+            .toEqual({ comment: 'Hi.', target: '', action: '', story: '' });
+        // GPT-6.1 Terra wrote junk into nullable fields and hung (2026-11-14): keep them strings
+        for (const field of Object.values(BotTurnZodSchema.shape)) {
+            expect(field.isNullable()).toBe(false);
+            expect(field.isOptional()).toBe(false);
+        }
     });
 
     it('covers the providers that enforce schemas and leaves the rest on text', () => {

@@ -24,7 +24,7 @@ const arg = (flag: string) => { const i = argv.indexOf(flag); return i > -1 ? ar
 const MODELS = (arg('--models') ?? 'gpt-mini,deepseek-flash').split(',');
 const RUNS = parseInt(arg('--runs') ?? '3', 10);
 const LONG = argv.includes('--long');          // long discussion replies (the game's longReplies switch)
-const VARIANTS = (arg('--variants') ?? 'current,unified').split(',') as ('current' | 'unified')[];
+const VARIANTS = (arg('--variants') ?? 'current,unified').split(',') as ('current' | 'unified' | 'strings')[];
 
 // Generic on purpose: which field a turn needs is said by the GM command, checked in code.
 const UnifiedSchema = z.object({
@@ -32,6 +32,16 @@ const UnifiedSchema = z.object({
     target: z.string().nullable().describe('One exact player name, when the command asks you to choose a player. Otherwise null.'),
     action: z.string().nullable().describe('The action to apply to the target, when the command asks you to pick an action. Otherwise null.'),
 });
+// 'strings' variant (2026-11-14): the same four fields as required plain strings, "" when a
+// turn does not use one. GPT-6.1 Terra wrote junk into the nullable fields and hung.
+const StringsSchema = z.object({
+    comment: z.string().describe('Your text reply, when the command asks for one. Otherwise an empty string.'),
+    target: z.string().describe('One exact player name, when the command asks you to choose a player. Otherwise an empty string.'),
+    action: z.string().describe('The action to apply to the target, when the command asks you to pick an action. Otherwise an empty string.'),
+    story: z.string().describe('One short in-world sentence of mood and imagery, when the command invites one. Otherwise an empty string.'),
+});
+const STRINGS_DISCUSSION = '\n\n**ANSWER FORMAT:** a JSON object with exactly four fields: `comment`, `target`, `action`, `story`. Put your reply in `comment`. Set `target`, `action` and `story` to "" (an empty string).';
+const STRINGS_VOTE = '\n\n**ANSWER FORMAT:** a JSON object with exactly four fields: `comment`, `target`, `action`, `story`. Put the name you vote for in `target` and your brief reason in `comment`. Set `action` and `story` to "" (an empty string).';
 const UNIFIED_DISCUSSION = '\n\n**Answer format:** a JSON object. Put your reply in `comment`; set `target` and `action` to null.';
 const UNIFIED_VOTE = '\n\n**Answer format:** a JSON object. Put the name you vote for in `target` and your brief reason in `comment`; set `action` to null.';
 
@@ -62,17 +72,19 @@ const UNIFIED_VOTE = '\n\n**Answer format:** a JSON object. Put the name you vot
                 const system = `Session ${model}-${variant}-${run}-${Date.now()}\n\n${baseSystem}`;
                 const agent = AgentFactory.createAgent(bot.name, system, model, apiKeys, bot.enableThinking);
                 agent.invalidResponseRetries = 0; // count every malformed answer
-                const unified = variant === 'unified';
+                const strings = variant === 'strings';
+                const unified = variant === 'unified' || strings;
+                const Schema: z.ZodSchema<any> = strings ? StringsSchema : UnifiedSchema;
                 try {
                     // 1. discussion reply
-                    const cmd1 = gm(discussionCmd + (unified ? UNIFIED_DISCUSSION : ''));
+                    const cmd1 = gm(discussionCmd + (strings ? STRINGS_DISCUSSION : unified ? UNIFIED_DISCUSSION : ''));
                     const h1 = [...convertToAIMessages(bot.name, [...dayMessages, cmd1]), tail];
                     const t1 = Date.now();
                     let reply: string, usage1: any;
                     if (unified) {
-                        const [r, , us] = await agent.askWithZodSchema(UnifiedSchema, h1);
+                        const [r, , us] = await agent.askWithZodSchema(Schema, h1);
                         reply = r.comment ?? ''; usage1 = us;
-                        if (!r.comment || r.target !== null || r.action !== null) console.log(`   ! unified discussion fields off: comment=${!!r.comment} target=${r.target} action=${r.action}`);
+                        if (!r.comment || (strings ? (r.target || r.action || r.story) : (r.target !== null || r.action !== null))) console.log(`   ! ${variant} discussion fields off: comment=${!!r.comment} target=${JSON.stringify(r.target)} action=${JSON.stringify(r.action)} story=${JSON.stringify(r.story)}`);
                     } else {
                         const [r, , us] = await agent.askText(h1);
                         reply = r ?? ''; usage1 = us;
@@ -80,12 +92,13 @@ const UNIFIED_VOTE = '\n\n**Answer format:** a JSON object. Put the name you vot
                     const s1 = ((Date.now() - t1) / 1000).toFixed(1);
                     // 2. vote, with the reply saved in history as the game does
                     const saved: GameMessage = { id: null, recipientName: 'ALL', authorName: bot.name, msg: { reply }, messageType: MessageType.BOT_ANSWER, day, timestamp: Date.now() } as any;
-                    const cmd2 = gm(voteCmd + (unified ? UNIFIED_VOTE : ''));
+                    const cmd2 = gm(voteCmd + (strings ? STRINGS_VOTE : unified ? UNIFIED_VOTE : ''));
                     const h2 = [...convertToAIMessages(bot.name, [...dayMessages, cmd1, saved, cmd2]), tail];
                     const t2 = Date.now();
                     let target: string | null, usage2: any;
                     if (unified) {
-                        const [r, , us] = await agent.askWithZodSchema(UnifiedSchema, h2);
+                        const [r, , us] = await agent.askWithZodSchema(Schema, h2);
+                        if (strings && (r.action || r.story)) console.log(`   ! strings vote fields off: action=${JSON.stringify(r.action)} story=${JSON.stringify(r.story)}`);
                         target = r.target; usage2 = us;
                     } else {
                         const [r, , us] = await agent.askWithZodSchema(BotVoteZodSchema, h2);

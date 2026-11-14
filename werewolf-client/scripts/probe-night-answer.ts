@@ -27,7 +27,7 @@ const MODELS = (arg('--models') ?? 'gpt-mini,mistral-small,gemini-flash,deepseek
     const commands: [string, string, readonly string[], string][] = [
         [GAME_ROLES.DOCTOR, format(BOT_DOCTOR_ACTION_PROMPT, { bot_name: base.name }) + ROLE_CONFIGS[GAME_ROLES.DOCTOR].oneTimeAbilities!.kill!.promptAddition
             + `\n\n**Available targets for protection or kill:** ${targets.join(', ')}`
-            + `\n\n**Valid actions tonight (the \`action\` field) — pick ONE:** "protect" (the default, also when left null) or "kill" (the one-time Doctor's Mistake)` + STRICT_TARGET_NAME_INSTRUCTION, ['protect', 'kill'], 'protect'],
+            + `\n\n**Valid actions tonight (the \`action\` field) — pick ONE:** "protect" (the default, also when left empty) or "kill" (the one-time Doctor's Mistake)` + STRICT_TARGET_NAME_INSTRUCTION, ['protect', 'kill'], 'protect'],
         [GAME_ROLES.DETECTIVE, `${format(BOT_DETECTIVE_ACTION_PROMPT, { bot_name: base.name })}\n\n**Available targets:** ${targets.join(', ')}` + STRICT_TARGET_NAME_INSTRUCTION, ['investigate', 'kill'], 'investigate'],
     ];
     for (const model of MODELS) {
