@@ -19,14 +19,16 @@ import { assertFreeSpendWithinLimit } from '@/app/api/user-actions';
 const LLM_INVALID_RESPONSE_RETRIES = 1;
 
 /**
- * Claude prompt caching is OFF (since 2026-11-06, lib 0.33.0). A 1h cache write bills at 2x
- * input and a read at 0.1x, so it pays only when more than ~53% of the prompt is read back;
- * 30 days of production bot turns read 42% (Sonnet) and 43% (Haiku): input cost ~1.2x of no
- * cache. The 5m cache (1.25x write, ~22% break-even) read 0-16% back at our pace (a bot's
- * calls 12-78 minutes apart). No breakpoint = plain 1x. Re-measure before turning it back
- * on: requestStats rows now carry cacheWriteTokens.
+ * Claude prompt caching: the 5-minute cache, ON TRIAL since 2026-11-15. A 5m write bills at
+ * 1.25x input and a read at 0.1x, so it pays only when more than ~22% of the prompt is read
+ * back. History: the 1h cache (2x write, ~53% break-even) read 42-43% back over 30 days of
+ * production bot turns (input cost ~1.2x of no cache), and the 5m cache read 0-16% on the old
+ * prompt layout (2026-09-06), so caching was 'off' from 2026-11-06 to 2026-11-15. The trial
+ * asks whether the frozen system prompt and append-only history (2026-11-11/12) lift the 5m
+ * read share over break-even. Judge it on requestStats (cachedInputTokens and
+ * cacheWriteTokens against inputTokens); below ~22% read back, set this to 'off' again.
  */
-const CLAUDE_CACHE: ClaudeAgent['cacheTtl'] = 'off';
+const CLAUDE_CACHE: ClaudeAgent['cacheTtl'] = '5m';
 
 // Route the library's agent-activity logging through the app's BetterStack pipeline.
 // Module-load side effect: every agent-creation path goes through this factory, so the
