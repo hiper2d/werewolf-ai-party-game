@@ -17,7 +17,7 @@
  * described in the prompt by their agents, for turns that need a choice.
  */
 import { z } from 'zod';
-import { AbstractAgent, AIMessage, enforcesSchema, TokenUsage } from '@hiper2d/ai-agents';
+import { AbstractAgent, AIMessage, ClaudeAgent, enforcesSchema, TokenUsage } from '@hiper2d/ai-agents';
 import { resolveModelId } from '@/app/ai/ai-models';
 import { BotResponseError } from '@/app/api/game-models';
 import { invalidActionExplanation } from '@/app/api/retry-hint';
@@ -72,7 +72,21 @@ function cleanAnswer(raw: any): BotTurnAnswer {
  * Fields the turn did not ask for are ignored: Mistral fills `target`/`action` on
  * discussion turns even when told to leave them empty.
  */
+/**
+ * A bot turn's whole request is replayed by the bot's next call (the turn tail is stored on
+ * its GM command), so Claude's message cache breakpoint goes on the LAST message, like every
+ * other provider's cache sees it; the library default (one message back) is for an unsaved
+ * tail. The end-of-day notes call is the one request that is not replayed: the day is
+ * compacted right after it, and it reads the day's cache like any other turn.
+ */
+function anchorCacheOnLastMessage(agent: AbstractAgent): void {
+    if (agent instanceof ClaudeAgent) {
+        agent.cacheAnchor = 'last';
+    }
+}
+
 export async function askBotText(agent: AbstractAgent, history: AIMessage[], aiType: string): Promise<AskResult<string | null>> {
+    anchorCacheOnLastMessage(agent);
     if (usesSharedSchema(aiType)) {
         const [raw, thinking, usage, signature] = await agent.askWithZodSchema(BotTurnZodSchema, history);
         return [cleanAnswer(raw).comment, thinking, usage, signature];
@@ -83,6 +97,7 @@ export async function askBotText(agent: AbstractAgent, history: AIMessage[], aiT
 
 /** A turn that needs a choice (vote, night action): the shared schema on every provider. */
 export async function askBotChoice(agent: AbstractAgent, history: AIMessage[]): Promise<AskResult<BotTurnAnswer | null>> {
+    anchorCacheOnLastMessage(agent);
     const [raw, thinking, usage, signature] = await agent.askWithZodSchema(BotTurnZodSchema, history);
     return [raw ? cleanAnswer(raw) : null, thinking, usage, signature];
 }
