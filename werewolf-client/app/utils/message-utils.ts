@@ -92,7 +92,8 @@ function flushGmMessages(
     currentBotName: string,
     gmMessages: Array<string>,
     otherPlayerMessages: { name: string; message: string }[],
-    aiMessages: AIMessage[]
+    aiMessages: AIMessage[],
+    turnTails: string[] = []
 ) {
     if (gmMessages.length > 0) {
         let gmBlock: string = gmMessages.join("\n\n");
@@ -107,7 +108,13 @@ function flushGmMessages(
         let fullGmMessage = gmBlock += "\n\n" + otherPlayerConcatBlock;
         gmMessages.splice(0, gmMessages.length); // clear
         
-        const aiMessage = {role: MESSAGE_ROLE.USER, content: fullGmMessage.trim()};
+        // The turn tail of a command in this block closes the block, after the other
+        // players' messages: the same bytes the call that carried the command ended with.
+        const tailBlock = turnTails.map(t => t.trim()).filter(Boolean).join("\n\n");
+        turnTails.splice(0, turnTails.length);
+        const content = [fullGmMessage.trim(), tailBlock].filter(Boolean).join("\n\n");
+
+        const aiMessage = {role: MESSAGE_ROLE.USER, content};
         aiMessages.push(aiMessage);
     };
 }
@@ -115,6 +122,8 @@ function flushGmMessages(
 export function convertToAIMessages(currentBotName: string, messages: GameMessage[]): AIMessage[] {
     let otherPlayerMessages: { name: string, message: string }[] = [];
     let gmMessages: Array<string> = [];
+    // Turn tails of the GM commands waiting in gmMessages (GameMessage.turnTail)
+    let turnTails: Array<string> = [];
     let aiMessages: AIMessage[] = [];
 
     // Track the hash of the last processed message
@@ -154,9 +163,12 @@ export function convertToAIMessages(currentBotName: string, messages: GameMessag
                 content = message.msg as string;
             }
             gmMessages.push(content);
+            if (message.turnTail) {
+                turnTails.push(message.turnTail);
+            }
         } else if (message.authorName === currentBotName) {
             // Flush GM and other players messages
-            flushGmMessages(currentBotName, gmMessages, otherPlayerMessages, aiMessages);
+            flushGmMessages(currentBotName, gmMessages, otherPlayerMessages, aiMessages, turnTails);
 
             // Prepare own message (assistant type)
             if (message.messageType === MessageType.BOT_ANSWER || message.messageType === MessageType.BOT_WELCOME) {
@@ -214,7 +226,7 @@ export function convertToAIMessages(currentBotName: string, messages: GameMessag
         }
     }));
 
-    flushGmMessages(currentBotName, gmMessages, otherPlayerMessages, aiMessages);
+    flushGmMessages(currentBotName, gmMessages, otherPlayerMessages, aiMessages, turnTails);
     return aiMessages;
 }
 

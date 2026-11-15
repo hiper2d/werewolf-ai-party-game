@@ -338,12 +338,11 @@ function shouldTriggerAutoVote(game: Game): boolean {
             // Get messages for this bot (ALL + direct messages to this bot)
             const botMessages = await getBotMessages(gameId, bot.name, game.currentDay);
     
-            // Include the GM command in history without saving it yet. The turn tail
-            // (current state + playstyle reminder) rides as its own trailing message (never persisted) so the GM
-            // command block stays byte-stable for prompt caches; providers that need
-            // alternating roles merge it back in prepareMessages.
+            // The turn tail (state lists, role status, reminder, how to answer) rides on the command:
+            // it closes the command's block now and is saved with it, so the bot's next call
+            // replays exactly what this one sent (the provider prompt cache matches on that).
+            gmMessage.turnTail = buildBotTurnTail(bot, game, 'table');
             const history = convertToAIMessages(bot.name, [...botMessages, gmMessage]);
-            history.push({ role: MESSAGE_ROLE.USER, content: buildBotTurnTail(bot, game, 'table') });
             const [answer, thinking, tokenUsage, thinkingSignature] = await askBotText(agent, history, welcomeModel.aiType);
 
             if (!answer) {
@@ -745,12 +744,11 @@ async function processNextBotInQueue(
     const agent = AgentFactory.createAgent(bot.name, botPrompt, replyModel.aiType, apiKeys, replyModel.enableThinking);
     agent.gameId = gameId;
     agent.userId = userEmail;
-    // Include the GM command in history without saving it yet. The turn tail (current
-    // state + playstyle reminder) rides as its own trailing message (never persisted) so the GM command block stays
-    // byte-stable for prompt caches; providers that need alternating roles merge it back
-    // in prepareMessages.
+    // The turn tail (state lists, role status, reminder, how to answer) rides on the command:
+    // it closes the command's block now and is saved with it, so the bot's next call
+    // replays exactly what this one sent (the provider prompt cache matches on that).
+    gmMessage.turnTail = buildBotTurnTail(bot, game, 'table');
     const history = convertToAIMessages(bot.name, [...botMessages, gmMessage]);
-    history.push({ role: MESSAGE_ROLE.USER, content: buildBotTurnTail(bot, game, 'table') });
     const [botReply, thinking, tokenUsage, thinkingSignature] = await askBotText(agent, history, replyModel.aiType);
     if (!botReply) {
         throw new BotResponseError(
@@ -1122,11 +1120,11 @@ async function voteImpl(gameId: string): Promise<GameActionResponse> {
             // Get messages for this bot
             const botMessages = await getBotMessages(gameId, bot.name, currentGame.currentDay);
             
-            // Create history including the voting command; the turn tail (current state +
-            // playstyle reminder) rides as its own trailing message (never persisted) so the GM command block stays
-            // byte-stable for prompt caches.
+            // The turn tail (state lists, role status, reminder, how to answer) rides on the command:
+            // it closes the command's block now and is saved with it, so the bot's next call
+            // replays exactly what this one sent (the provider prompt cache matches on that).
+            gmMessage.turnTail = buildBotTurnTail(bot, currentGame, 'vote');
             const history = convertToAIMessages(bot.name, [...botMessages, gmMessage]);
-            history.push({ role: MESSAGE_ROLE.USER, content: buildBotTurnTail(bot, currentGame, 'vote') });
             
             let voteResponse: any;
             let thinking: string;

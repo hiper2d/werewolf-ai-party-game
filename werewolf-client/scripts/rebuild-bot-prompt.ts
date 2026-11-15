@@ -26,8 +26,8 @@ import * as fs from 'fs';
     messageType: MessageType.GM_COMMAND, day: game.currentDay, timestamp: Date.now(),
   };
   const botMessages = await getBotMessages(gameId, bot.name, game.currentDay);
+  gmMessage.turnTail = buildBotTurnTail(bot, game, 'table');
   const history = convertToAIMessages(bot.name, [...botMessages, gmMessage]);
-  history.push({ role: 'user' as any, content: buildBotTurnTail(bot, game, 'table') });
 
   let out = `# ${bot.name} day-${game.currentDay} discussion-reply prompt (rebuilt ${new Date().toISOString()})\n`;
   out += `# model: ${bot.aiType}   gameState: ${game.gameState}   botMessages: ${botMessages.length}   history turns: ${history.length}\n\n`;

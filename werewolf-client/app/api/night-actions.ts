@@ -1411,11 +1411,11 @@ async function summarizePastDayImpl(gameId: string): Promise<GameActionResponse>
         agent.userId = session.user.email;
 
         // Create conversation history with all day messages + summary request
+        // The turn tail (who is alive and dead after the night, this bot's own night-action
+        // result, how to answer) closes the request's block, where every other turn has it.
+        // This command is not saved: the day's messages are compacted by this very call.
+        summaryMessage.turnTail = buildBotTurnTail(bot, currentGame, 'summary');
         const history = convertToAIMessages(bot.name, [...botMessages, summaryMessage]);
-        // The turn tail (never persisted): who is alive and dead after the night, plus the
-        // results of this bot's own night action — the system prompt is frozen at the
-        // start of the day and no longer carries them.
-        history.push({ role: MESSAGE_ROLE.USER, content: buildBotTurnTail(bot, currentGame, 'summary') });
 
         // Get summary as plain text
         const [summaryResponse, , tokenUsage] = await askBotText(agent, history, summaryModel.aiType);

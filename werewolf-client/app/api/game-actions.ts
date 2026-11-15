@@ -1018,7 +1018,10 @@ export async function addMessageToChatAndSaveToDb(gameMessage: GameMessage, game
         };
         await messageRef.set(messageData);
 
-        return { ...gameMessage, id: customId, timestamp };
+        // The stored turn tail is the bot's private state (role findings); callers hand the
+        // returned message to the browser, so it stays behind.
+        const { turnTail: _turnTail, ...publicMessage } = gameMessage;
+        return { ...publicMessage, id: customId, timestamp };
     } catch (error: any) {
         logger.error("Error adding message to chat: ", { error: error.message, gameId, author: gameMessage.authorName });
         throw new Error(`Failed to add message: ${error.message}`);
@@ -1328,7 +1331,9 @@ export async function getBotMessages(gameId: string, botName: string, day: numbe
                 msg: doc.data().msg,
                 messageType: doc.data().messageType,
                 day: doc.data().day,
-                timestamp: doc.data().timestamp
+                timestamp: doc.data().timestamp,
+                // The turn tail sent with a GM command to this bot, replayed in its history
+                ...(doc.data().turnTail ? { turnTail: doc.data().turnTail } : {})
             });
         });
     });

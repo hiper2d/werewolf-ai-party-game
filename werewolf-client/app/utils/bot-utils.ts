@@ -324,8 +324,8 @@ export function generateBotContextSection(bot: Bot, game: Game): string {
  * The part of a bot's knowledge that changes DURING a day or from night to night, for the
  * per-turn tail: who is alive and dead right now, the result of tonight's own night action
  * once the night has resolved (it is not a chat message, and the end-of-day summary needs
- * it), and the role's running status. Rebuilt on every turn and never saved, so it never
- * sits in front of cached history.
+ * it), and the role's running status. Rebuilt on every turn; each turn's copy is stored
+ * with its GM command as that moment's snapshot, never edited afterwards.
  */
 export function generateBotTurnState(bot: Bot, game: Game): string {
     const today = game.currentDay || 1;
@@ -373,9 +373,12 @@ export function buildBotSystemPrompt(bot: Bot, game: Game): string {
 export type BotTurnKind = 'table' | 'vote' | 'night' | 'night_talk' | 'summary';
 
 /**
- * The trailing message of every bot turn. It rides after the GM command as its own user
- * message and is never persisted, so the saved history stays byte-stable for prompt caches
- * (providers that need alternating roles merge it back in prepareMessages).
+ * The tail of every bot turn. The caller sets it on the GM command (`GameMessage.turnTail`):
+ * convertToAIMessages puts it at the end of the command's block, and it is saved with the
+ * command and replayed there, so a bot's next call starts with exactly what this one sent
+ * (since 2026-11-15; OpenAI's prompt cache only matches at the end of an earlier request, and
+ * an unsaved tail cost it the whole day's messages). Old tails stay in the day's history
+ * until the end-of-day summary compacts the day; the one that counts is the latest.
  *
  * Structure: the current game state first (generateBotTurnState), then a reminder by kind:
  * - `table` (intro, discussion, post-game chat) and `vote`: playstyle, conversation

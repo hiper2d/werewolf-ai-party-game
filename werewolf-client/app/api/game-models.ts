@@ -1038,6 +1038,13 @@ export interface GameMessage {
     day: number;                // The game day when this message was created
     timestamp: number | null;   // UTC epoch timestamp in milliseconds, null for new messages
     cost?: number;              // Cost in USD for this message (for AI-generated messages)
+    /**
+     * On a GM command to one bot: the turn tail that was sent with it (buildBotTurnTail —
+     * state lists, role status, reminder, answer-format line). Stored and replayed at the end
+     * of the command's block (convertToAIMessages), so the bot's next call starts with exactly
+     * what this one sent. Server-side only: never returned to the browser, never shown in chat.
+     */
+    turnTail?: string;
 }
 
 /**

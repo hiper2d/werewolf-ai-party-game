@@ -460,6 +460,51 @@ Below are messages from the other players you haven't yet seen, listed in order:
       expect(result[0].content).not.toContain('**2.');
     });
   });
+
+  // The turn tail sent with a GM command is stored on it (GameMessage.turnTail) and replayed,
+  // so a bot's next call starts with exactly the bytes its previous call sent. OpenAI's prompt
+  // cache only matches at the end of an earlier request (probe 2026-11-15: 44% -> 95%).
+  describe('turn tail stored on a GM command', () => {
+    const command = (msg: string, turnTail?: string): GameMessage => ({ ...gm(msg), recipientName: BOT, ...(turnTail ? { turnTail } : {}) });
+
+    it('closes the block of its command, after the other players\' messages', () => {
+      const result = convertToAIMessages(BOT, [
+        from(OTHER_BOT, { reply: 'I suspect the miller.' }, MessageType.BOT_ANSWER),
+        command('Bot C, reply.', 'STATE AND REMINDER'),
+      ]);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].content.startsWith('Bot C, reply.')).toBe(true);
+      expect(result[0].content).toContain('**1. Bot A:** I suspect the miller.');
+      expect(result[0].content.endsWith('\n\nSTATE AND REMINDER')).toBe(true);
+    });
+
+    it('the next call replays the previous call byte for byte, then adds to it', () => {
+      const first = [
+        gm('Day 1 begins.'),
+        from(OTHER_BOT, { reply: 'Hello all.' }, MessageType.BOT_ANSWER),
+        command('Bot C, reply.', 'TAIL ONE'),
+      ];
+      const callOne = convertToAIMessages(BOT, first);
+      const callTwo = convertToAIMessages(BOT, [
+        ...first,
+        from(BOT, { reply: 'Hello.' }, MessageType.BOT_ANSWER),
+        from(HUMAN, 'Who is quiet today?', MessageType.HUMAN_PLAYER_MESSAGE),
+        command('Bot C, vote.', 'TAIL TWO'),
+      ]);
+
+      expect(callTwo.slice(0, callOne.length)).toEqual(callOne);
+      expect(callTwo[callOne.length]).toMatchObject({ role: MESSAGE_ROLE.ASSISTANT, content: 'Hello.' });
+      const last = callTwo[callTwo.length - 1].content;
+      expect(last.endsWith('\n\nTAIL TWO')).toBe(true);
+      expect(last).not.toContain('TAIL ONE');
+    });
+
+    it('a command without a stored tail (a game from before 2026-11-15) is unchanged', () => {
+      const result = convertToAIMessages(BOT, [command('Bot C, reply.')]);
+      expect(result[0].content).toBe('Bot C, reply.');
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------

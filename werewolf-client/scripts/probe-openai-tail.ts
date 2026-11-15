@@ -2,8 +2,9 @@
 // Sends a real game's day to the Responses API directly (no agent), as call A and then
 // call B = A's history + an assistant reply + a new command, in three layouts of the
 // unsaved turn tail: merged into the last user message (what the agent does today), as
-// its own trailing user item, and absent.
-// Usage: npx tsx --env-file=.env scripts/probe-openai-tail.ts [--model gpt-6-luna]
+// its own trailing user item, absent, and 'replayed' (saved with its command, so the next
+// call carries it in place).
+// Usage: npx tsx --env-file=.env scripts/probe-openai-tail.ts [--model gpt-6-luna] [--layouts merged,replayed]
 import { db } from '../firebase/server';
 import { convertToAIMessages } from '../app/utils/message-utils';
 import { Bot, Game, GAME_MASTER, GameMessage, MessageType } from '../app/api/game-models';
@@ -42,13 +43,18 @@ const MODEL = arg('--model') ?? 'gpt-6-luna';
         if (!res.ok) throw new Error(JSON.stringify(json).slice(0, 300));
         return `in=${json.usage.input_tokens} cached=${json.usage.input_tokens_details?.cached_tokens ?? 0}`;
     };
-    console.log(`${MODEL}, game ${gameId} day ${day}, ${messages.length} messages, ${hA.length} input items`);
-    for (const layout of ['merged', 'separate', 'none']) {
+    // 'replayed': the tail is saved with its command, so call B carries call A's tail in place.
+    const withCmdTail = (c: GameMessage): GameMessage => ({ ...c, msg: `${c.msg}\n\n${tail}` });
+    const hAr = merge(convertToAIMessages(bot.name, [...messages, withCmdTail(cmd1)]));
+    const hBr = merge(convertToAIMessages(bot.name, [...messages, withCmdTail(cmd1), saved, withCmdTail(cmd2)]));
+    console.log(`${MODEL}, game ${gameId} day ${day}, ${messages.length} messages, ${hA.length} input items, tail ${tail.length} chars`);
+    for (const layout of (arg('--layouts') ?? 'merged,separate,none,replayed').split(',')) {
         const nonce = `${layout}-${Date.now()}`;
         const instructions = `Session ${nonce}\n\n${buildBotSystemPrompt(bot, game)}`;
-        console.log(`${layout.padEnd(9)} A:       ${await call(instructions, withTail(hA, layout), nonce)}`);
-        console.log(`${layout.padEnd(9)} B (A+1): ${await call(instructions, withTail(hB, layout), nonce)}`);
-        console.log(`${layout.padEnd(9)} B again: ${await call(instructions, withTail(hB, layout), nonce)}`);
+        const [a, b] = layout === 'replayed' ? [hAr, hBr] : [withTail(hA, layout), withTail(hB, layout)];
+        console.log(`${layout.padEnd(9)} A:       ${await call(instructions, a, nonce)}`);
+        console.log(`${layout.padEnd(9)} B (A+1): ${await call(instructions, b, nonce)}`);
+        console.log(`${layout.padEnd(9)} B again: ${await call(instructions, b, nonce)}`);
     }
     process.exit(0);
 })().catch(e => { console.error(e); process.exit(1); });

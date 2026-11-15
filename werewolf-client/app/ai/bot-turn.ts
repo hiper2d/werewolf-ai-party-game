@@ -6,7 +6,7 @@
  * schemas) threw the cached day away at every switch — measured 2026-11-12: 0% of the
  * vote's input read from cache on OpenAI, Mistral and Gemini, 77-90% with one schema on both
  * calls (scripts/probe-unified-schema.ts). So every turn sends the SAME four string
- * fields with generic descriptions, the unsaved turn tail says which ones this turn needs
+ * fields with generic descriptions, the turn tail says which ones this turn needs
  * (botAnswerFormatLine), and code validates them. Never add a per-turn or per-role schema,
  * a per-turn enum, or a turn-specific description here: any difference is a cache miss.
  *
@@ -119,9 +119,10 @@ const JSON_FIELDS: Record<BotAnswerKind, string> = {
 };
 
 /**
- * The last line of a turn tail: how to answer THIS turn. It lives in the unsaved tail, not
- * in the saved GM command, because it differs by provider (schema or plain text) and a game
- * can switch a bot's model mid-day.
+ * The last line of a turn tail: how to answer THIS turn. It lives in the tail, not in the GM
+ * command's text, because it differs by provider (schema or plain text) and a game can switch
+ * a bot's model mid-day; the tail a call carried is stored with its command and replayed, so
+ * the line that counts is the one closing the latest block.
  */
 export function botAnswerFormatLine(aiType: string, kind: BotAnswerKind): string {
     if (kind === 'vote' || kind === 'night' || usesSharedSchema(aiType)) {

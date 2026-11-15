@@ -245,11 +245,11 @@ export class WerewolfProcessor extends BaseRoleProcessor {
             const botMessages = await getBotMessages(this.gameId, werewolfBot.name, this.game.currentDay);
 
             // Create conversation history
+            // The turn tail (state lists, role status, reminder, how to answer) rides on the command:
+            // it closes the command's block now and is saved with it, so the bot's next call
+            // replays exactly what this one sent (the provider prompt cache matches on that).
+            gmMessage.turnTail = buildBotTurnTail(werewolfBot, this.game, isLastWerewolf ? 'night' : 'night_talk');
             const history = convertToAIMessages(werewolfBot.name, [...botMessages, gmMessage]);
-            // The turn tail (never persisted): the current alive/dead lists, which the
-            // system prompt no longer carries (it is frozen at the start of the day),
-            // then the playstyle and decision reminder.
-            history.push({ role: MESSAGE_ROLE.USER, content: buildBotTurnTail(werewolfBot, this.game, isLastWerewolf ? 'night' : 'night_talk') });
 
             // The shared answer schema (bot-turn.ts), read back into the stored shapes: the
             // pack's decision is a choice, the night chat is a text turn.

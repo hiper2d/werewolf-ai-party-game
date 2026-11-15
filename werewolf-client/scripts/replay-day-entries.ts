@@ -12,7 +12,7 @@ import { askBotChoice, askBotText } from '../app/ai/bot-turn';
 import { GM_COMMAND_REPLY_TO_DISCUSSION } from '../app/ai/prompts/gm-commands';
 import { format } from '../app/ai/prompts/utils';
 import { convertToAIMessages } from '../app/utils/message-utils';
-import { Bot, BotDaySummary, Game, GAME_MASTER, GameMessage, MESSAGE_ROLE, MessageType } from '../app/api/game-models';
+import { Bot, BotDaySummary, Game, GAME_MASTER, GameMessage, MessageType } from '../app/api/game-models';
 import { getBotMessages, getGame } from '../app/api/game-actions';
 import { buildBotSystemPrompt, buildBotTurnTail } from '../app/utils/bot-utils';
 import * as fs from 'fs';
@@ -62,9 +62,9 @@ const positional = argv.filter((a, i) => !a.startsWith('--') && (modelFlag === -
             msg: format(BOT_DAY_SUMMARY_PROMPT, { bot_name: bot.name, day_number: day, human_player_name: g.humanPlayerName }),
             messageType: MessageType.GM_COMMAND, day, timestamp: Date.now(),
         };
-        const history = convertToAIMessages(bot.name, [...messages, command]);
         const tail = buildBotTurnTail(bot, g, 'summary');
-        history.push({ role: MESSAGE_ROLE.USER, content: tail });
+        command.turnTail = tail;
+        const history = convertToAIMessages(bot.name, [...messages, command]);
         const agent = AgentFactory.createAgent(bot.name, system, model, apiKeys, real.enableThinking);
         const t0 = Date.now();
         const [answer, , usage] = await askBotText(agent, history, model);
@@ -83,8 +83,9 @@ const positional = argv.filter((a, i) => !a.startsWith('--') && (modelFlag === -
         msg: format(GM_COMMAND_REPLY_TO_DISCUSSION, { bot_name: bot.name, messages_used: '1', messages_total: '6', vote_progress_pct: '20%' }),
         messageType: MessageType.GM_COMMAND, day: lastDay, timestamp: Date.now(),
     };
+    // As the game does it: the turn tail is stored on its command and replayed with it
+    command.turnTail = buildBotTurnTail(bot, g, 'table');
     const history = convertToAIMessages(bot.name, [...messages, command]);
-    history.push({ role: MESSAGE_ROLE.USER, content: buildBotTurnTail(bot, g, 'table') });
     const agent = AgentFactory.createAgent(bot.name, system, model, apiKeys, real.enableThinking);
     const ask = async (label: string) => {
         const t0 = Date.now();
@@ -97,9 +98,8 @@ const positional = argv.filter((a, i) => !a.startsWith('--') && (modelFlag === -
     // The vote, as the game asks it: the reply saved in history, then the vote command
     const alive = [...g.bots.filter(b => b.isAlive && b.name !== bot.name).map(b => b.name), g.humanPlayerName];
     const saved = { id: null, recipientName: 'ALL', authorName: bot.name, msg: { reply }, messageType: MessageType.BOT_ANSWER, day: lastDay, timestamp: Date.now() } as any;
-    const voteCommand: GameMessage = { ...command, msg: format(BOT_VOTE_PROMPT, { bot_name: bot.name, vote_position: '1', total_voters: String(alive.length + 1), valid_targets: alive.map(n => `- ${n}`).join('\n'), werewolf_vote_note: '' }) };
+    const voteCommand: GameMessage = { ...command, turnTail: buildBotTurnTail(bot, g, 'vote'), msg: format(BOT_VOTE_PROMPT, { bot_name: bot.name, vote_position: '1', total_voters: String(alive.length + 1), valid_targets: alive.map(n => `- ${n}`).join('\n'), werewolf_vote_note: '' }) };
     const voteHistory = convertToAIMessages(bot.name, [...messages, command, saved, voteCommand]);
-    voteHistory.push({ role: MESSAGE_ROLE.USER, content: buildBotTurnTail(bot, g, 'vote') });
     const tv = Date.now();
     const [vote, , voteUsage] = await askBotChoice(agent, voteHistory);
     console.log(`day ${lastDay} vote: ${usageLine(voteUsage)}  ${((Date.now() - tv) / 1000).toFixed(1)}s  target=${vote?.target}${vote?.target && alive.includes(vote.target) ? '' : ' INVALID'}  action=${vote?.action}  story=${vote?.story}  reason=${(vote?.comment || '').length} chars`);

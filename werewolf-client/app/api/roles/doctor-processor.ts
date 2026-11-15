@@ -220,11 +220,11 @@ export class DoctorProcessor extends BaseRoleProcessor {
             const botMessages = await getBotMessages(this.gameId, doctorBot.name, this.game.currentDay);
 
             // Create conversation history
+            // The turn tail (state lists, role status, reminder, how to answer) rides on the command:
+            // it closes the command's block now and is saved with it, so the bot's next call
+            // replays exactly what this one sent (the provider prompt cache matches on that).
+            gmMessage.turnTail = buildBotTurnTail(doctorBot, this.game, 'night');
             const history = convertToAIMessages(doctorBot.name, [...botMessages, gmMessage]);
-            // The turn tail (never persisted): the current alive/dead lists, which the
-            // system prompt no longer carries (it is frozen at the start of the day),
-            // then the playstyle and decision reminder.
-            history.push({ role: MESSAGE_ROLE.USER, content: buildBotTurnTail(doctorBot, this.game, 'night') });
 
             // The shared answer schema (bot-turn.ts), read back into this role's stored shape
             const [doctorAnswer, thinking, tokenUsage, thinkingSignature] = await askBotChoice(agent, history);
