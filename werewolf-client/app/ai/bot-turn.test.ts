@@ -31,7 +31,7 @@ describe('shared bot answer schema', () => {
     it('asks a text turn through the schema on an enforcing provider and ignores stray fields', async () => {
         const a = agent({ comment: '  Hello there.  ', target: 'Cedric', action: 'respond', story: '' });
         const [reply, thinking, , signature] = await askBotText(a, [], LLM_CONSTANTS.MISTRAL_SMALL);
-        expect(a.askWithZodSchema).toHaveBeenCalledWith(BotTurnZodSchema, []);
+        expect(a.askWithZodSchema).toHaveBeenCalledWith(BotTurnZodSchema, [], expect.any(Function));
         expect(a.askText).not.toHaveBeenCalled();
         expect(reply).toBe('Hello there.');
         expect(thinking).toBe('thought');
@@ -51,6 +51,21 @@ describe('shared bot answer schema', () => {
         expect(answer).toEqual({ comment: 'He lied twice.', target: 'Oren', action: null, story: null });
         const [empty] = await askBotText(agent({ comment: '', target: null, action: null, story: null }), [], LLM_CONSTANTS.GPT);
         expect(empty).toBeNull();
+    });
+
+    it('a text turn rejects an empty comment, so the library re-sends it; a choice turn has no such check', async () => {
+        const a = agent({ comment: 'Hi.', target: '', action: '', story: '' });
+        await askBotText(a, [], LLM_CONSTANTS.MISTRAL_SMALL);
+        const reject = a.askWithZodSchema.mock.calls[0][2];
+        expect(reject({ comment: '', target: '', action: '', story: '' })).toContain('`comment` field is empty');
+        expect(reject({ comment: '  ', target: 'Oren', action: '', story: '' })).toContain('empty');
+        expect(reject({ comment: 'null', target: '', action: '', story: '' })).toContain('empty');
+        expect(reject(null)).toContain('empty');
+        expect(reject({ comment: 'Hi.', target: '', action: '', story: '' })).toBeNull();
+
+        const choice = agent({ comment: '', target: 'Oren', action: '', story: '' });
+        await askBotChoice(choice, []);
+        expect(choice.askWithZodSchema).toHaveBeenCalledWith(BotTurnZodSchema, []);
     });
 
     it('validates the action in code: default when missing, exact match, rejected otherwise', () => {

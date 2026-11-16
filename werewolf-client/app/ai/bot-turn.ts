@@ -85,10 +85,20 @@ function anchorCacheOnLastMessage(agent: AbstractAgent): void {
     }
 }
 
+/**
+ * A text turn whose `comment` is empty is an invalid answer, not a reply: the four empty
+ * strings pass the schema, so the library is told here, and it re-sends once like any other
+ * empty or malformed answer (first seen 2026-11-16: Mistral Small planned a reply in its
+ * thinking, then returned all four fields empty; the player got the "did not respond" banner).
+ */
+function rejectEmptyComment(raw: unknown): string | null {
+    return cleanField((raw as { comment?: unknown } | null)?.comment) === null ? 'the `comment` field is empty on a turn that asks for text' : null;
+}
+
 export async function askBotText(agent: AbstractAgent, history: AIMessage[], aiType: string): Promise<AskResult<string | null>> {
     anchorCacheOnLastMessage(agent);
     if (usesSharedSchema(aiType)) {
-        const [raw, thinking, usage, signature] = await agent.askWithZodSchema(BotTurnZodSchema, history);
+        const [raw, thinking, usage, signature] = await agent.askWithZodSchema(BotTurnZodSchema, history, rejectEmptyComment);
         return [cleanAnswer(raw).comment, thinking, usage, signature];
     }
     const [text, thinking, usage, signature] = await agent.askText(history);
