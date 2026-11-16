@@ -590,7 +590,7 @@ describe('requestStats recording (per-request statistics doc)', () => {
             actor: 'bot',
             botName: 'Bot1',
             modelId: 'qwen-max',
-            modelApiName: 'qwen3.8-max',
+            modelApiName: 'qwen4-max',
             apiKeyName: 'QWEN_API_KEY',
             thinkingEnabled: true,
             inputTokens: 8000,

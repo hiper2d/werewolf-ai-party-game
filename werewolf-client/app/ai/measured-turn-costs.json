@@ -10,14 +10,6 @@
       "outputTokens": 614,
       "reasoningTokens": 0
     },
-    "qwen-max": {
-      "usdPerTurn": 0.010772,
-      "calls": 866,
-      "inputTokens": 10215,
-      "cachedInputTokens": 7019,
-      "outputTokens": 438,
-      "reasoningTokens": 0
-    },
     "glm": {
       "usdPerTurn": 0.009368,
       "calls": 1336,

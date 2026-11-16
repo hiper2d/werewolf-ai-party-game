@@ -282,6 +282,13 @@ SupportedAiModels[LLM_CONSTANTS.GPT].freeTier = { available: true, maxBotsPerGam
 // expect it to stay there. NOTE: until 2026-12-12 a 30-day run of scripts/measure-turn-costs.ts
 // still averages in 3.8 Flash turns under the same picker id — do not write a `gemini-flash`
 // row from a window that starts before 2026-11-12.
+// Qwen4 Max (2026-11-16, lib 0.39.0): the `qwen-max` slot moved from Qwen3.8 Max ($2/$6, hits
+// $0.25) to Qwen4 Max ($1.50/$4.50, hits $0.075), so the 866 turns measured on 3.8 Max (1.08¢,
+// the 1-bot band) were dropped from measured-turn-costs.json, as with Hydrogen. The sticker
+// estimate (1.65¢) keeps it at 1 bot; 3.8 Max's token profile at the new prices is ~0.7¢, so
+// expect the 3-bot band once it has 100 measured turns. Same NOTE as Hydrogen: until 2026-12-16
+// a 30-day run still averages in 3.8 Max turns under this id — do not write a `qwen-max` row
+// from a window that starts before 2026-11-16.
 for (const [modelId, config] of Object.entries(SupportedAiModels)) {
     config.freeTier = config.freeTier ?? getFreeTierPolicy(modelId);
 }
@@ -350,7 +357,7 @@ export function resolveModelId(modelId: string): string {
  * one still allowed. Re-measure with the live story suite (app/ai/all-models.test.ts) when a
  * model changes — MiniMax left the list 2026-10-27 that way: the `minimax` slot moved from M3 to
  * M3.1 Flash (lib 0.29.0) and the same suite ran the pipeline in 35s (casting 7.7s, four
- * character-sheet batches finishing 7-27s), the day-2 vote in 4.3s and the welcome in 2.5s. Both Qwen models are slow at story time only because Qwen runs our parallel
+ * character-sheet batches finishing 7-27s), the day-2 vote in 4.3s and the welcome in 2.5s. (The `qwen-max` slot is Qwen4 Max since 2026-11-16 and stays excluded until its story pipeline is re-measured.) Both Qwen models are slow at story time only because Qwen runs our parallel
  * requests one at a time (Flash 2026-10-07: casting 14.5s, then 4 batches of ~20s work each
  * finishing 20s apart, reasoning already at its minimum 1,024-token budget); a single GM turn
  * is ~15-20s. Muse Spark 1.3 (catalog tag `slow`, effort pinned medium) is fine as a bot
