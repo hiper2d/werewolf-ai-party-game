@@ -17,7 +17,7 @@ export const metadata: Metadata = {
 };
 
 const MODELS = [
-  'Claude 5.5 Opus', 'GPT-6.1 Sol', 'Gemini 4 Argon', 'DeepSeek V4 Pro',
+  'Claude 5.5 Opus', 'GPT-6.2 Sol', 'Gemini 4 Argon', 'DeepSeek V4 Pro',
   'Mistral 4 Small', 'GLM-5.3', 'Kimi K3.1 Pro', 'Grok 4.7', 'Qwen4 Max', 'MiniMax M3.1 Flash', 'Sakana Fugu Max', 'Meta Muse Wonder 1.0',
 ];
 
@@ -58,7 +58,7 @@ function tiersFor(limits: FreeTierLimits) {
       featured: true,
       badge: 'No subscription' as string | undefined,
       features: [
-        'The full catalog — every model, including Fable 5.2 and GPT-6 Astra',
+        'The full catalog — every model, including Fable 5.2 and GPT-6.2 Astra',
         'No daily or monthly cap, no game limit, no bot caps',
         'Unlimited portrait rerolls and night replays',
         'Prepaid balance — top up anytime',
