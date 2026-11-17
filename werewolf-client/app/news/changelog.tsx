@@ -13,6 +13,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        id: "gpt-6-2", date: "Nov 2026", tags: ["Models"],
+        title: "GPT-6.2 Astra and GPT-6.2 Sol replace GPT-6 Astra and GPT-6.1 Sol",
+        body: (<>OpenAI&apos;s <strong>GPT-6.2</strong> takes over both top GPT slots in the model picker, for bots
+            and the Game Master. <strong>GPT-6.2 Astra</strong> is <strong>20% cheaper</strong> than GPT-6 Astra —
+            $8 per million input tokens and $40 per million output, down from $10 and $50.
+            <strong> GPT-6.2 Sol</strong> costs the same as 6.1 Sol. Both are on the paid tier, as before. Bots
+            already set to Astra or Sol switch to 6.2 on their next turn; nothing to change in existing lobbies.</>),
+        media: null,
+        links: [{label: "Create a game", href: "/games"}],
+    },
+    {
         id: "gemini-4-hydrogen", date: "Nov 2026", tags: ["Models"],
         title: "Gemini 4 Hydrogen replaces Gemini 3.8 Flash",
         body: (<>Google&apos;s <strong>Gemini 4 Hydrogen</strong> takes over the Gemini Flash slot in the model picker,
