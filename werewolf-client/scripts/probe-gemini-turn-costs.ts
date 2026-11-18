@@ -21,6 +21,8 @@ import { buildBotSystemPrompt, buildBotTurnTail } from '../app/utils/bot-utils';
 // USD per 1M tokens (ai.google.dev pricing page, 2026-11-12).
 const PRICES: Record<string, { input: number; cached: number; output: number }> = {
     'gemini-4-hydrogen': { input: 1.50, cached: 0.075, output: 7.50 },
+    'gemini-4-neon': { input: 3.00, cached: 0.15, output: 15.00 },   // 2026-11-18
+    'gemini-4-argon': { input: 2.00, cached: 0.10, output: 10.00 },   // until 2026-12-01, then $4/$20
     'gemini-3.8-flash': { input: 0.75, cached: 0.075, output: 3.75 },
 };
 const PICKER_ID = 'gemini-flash'; // both models sit (sat) in this slot: schema-enforcing provider

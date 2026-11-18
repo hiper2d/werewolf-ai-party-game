@@ -377,6 +377,11 @@ export function resolveModelId(modelId: string): string {
  * Mistral Large 4 added 2026-11-03: it came back 2026-10-30 allowed as GM and in RANDOM (story
  * pipeline 118s), but 4 bot turns hit the 60s timeout in its first ~300 prod calls (p50 17s,
  * p90 28s, p95 34s, max 54s on the calls that finished; output p50 ~2,200 tokens).
+ * Gemini 4 Neon (lib 0.41.0, effort low) is NOT on the list, on the 2026-11-18 measurements: the
+ * story pipeline took 96-101s (casting 11s, then the four batches finish ~22s apart — Google ran
+ * them one after another, like Qwen), the day-2 vote 6.8s, and a day-3 prompt took 9-13s per
+ * table/vote/night turn and 36s for the end-of-day notes. Watch its p90 in requestStats over the
+ * first week; Argon is excluded for exactly that reason.
  *
  * Checked on every NEW Game Master choice (create, preview, model change, retry override,
  * provider reassignment), not inside validateModelUsageForTier: that one also re-validates the
