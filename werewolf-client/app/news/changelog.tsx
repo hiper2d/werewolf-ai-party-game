@@ -13,6 +13,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        id: "gemini-4-neon", date: "Nov 2026", tags: ["Models"],
+        title: "Gemini 4 Neon joins the picker",
+        body: (<>Google&apos;s <strong>Gemini 4 Neon</strong> is now in the model picker, next to Gemini 4 Argon,
+            for bots and the Game Master. In our runs it answers a vote in about ten seconds and writes a full
+            15-player cast in under two minutes, so it can also be drawn as a Random player. It costs $3 per
+            million input tokens and $15 per million output, and it&apos;s available on the{" "}
+            <strong>paid tier</strong>.</>),
+        media: null,
+        links: [{label: "Create a game", href: "/games"}],
+    },
+    {
         id: "gpt-6-2", date: "Nov 2026", tags: ["Models"],
         title: "GPT-6.2 Astra and GPT-6.2 Sol replace GPT-6 Astra and GPT-6.1 Sol",
         body: (<>OpenAI&apos;s <strong>GPT-6.2</strong> takes over both top GPT slots in the model picker, for bots
