@@ -1,12 +1,12 @@
 import {NextRequest, NextResponse} from 'next/server';
 import {db} from '@/firebase/server';
 import {SCENE_WELCOME_KEY} from '@/app/api/game-models';
-import {STARTER_GAMES_COLLECTION} from '@/app/utils/starter-games';
+import {isStarterTemplateVisible, STARTER_GAMES_COLLECTION} from '@/app/utils/starter-games';
 
 /**
  * The card picture of a starter game: its welcome scene (base64 JPEG in
  * starterGames/{id}/avatars/scene-welcome). Public on purpose: a live template is shown on
- * the start screen and holds nothing secret. Draft templates are not served.
+ * the start screen and holds nothing secret. Draft templates are served outside production only.
  */
 export async function GET(_request: NextRequest, {params}: {params: Promise<{id: string}>}) {
     if (!db) {
@@ -22,7 +22,7 @@ export async function GET(_request: NextRequest, {params}: {params: Promise<{id:
         templateRef.collection('avatars').doc(SCENE_WELCOME_KEY).get(),
     ]);
     const image = scene.data() as {data?: string; mime?: string} | undefined;
-    if (!template.exists || template.data()?.status !== 'live' || !image?.data) {
+    if (!template.exists || !isStarterTemplateVisible(template.data()?.status, process.env.NODE_ENV === 'production') || !image?.data) {
         return NextResponse.json({error: 'Not found'}, {status: 404});
     }
     return new NextResponse(Buffer.from(image.data, 'base64'), {

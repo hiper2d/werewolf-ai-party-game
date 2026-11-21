@@ -21,6 +21,7 @@ import {
     dealStarterModels,
     dealStarterRoles,
     isIllustrationDocId,
+    isStarterTemplateVisible,
     pickStarterGameMaster,
     pickStarterPortraitRound,
     renameHumanAvatarKey,
@@ -52,19 +53,24 @@ export type StarterGameResult = { ok: true; gameId: string } | { ok: false; erro
 
 const GAME_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
-async function loadLiveTemplates(): Promise<StarterTemplate[]> {
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+
+async function loadVisibleTemplates(): Promise<StarterTemplate[]> {
     if (!db) throw new Error('Firestore is not initialized');
-    const snapshot = await db.collection(STARTER_GAMES_COLLECTION).where('status', '==', 'live').get();
+    // A handful of documents: read them all and filter here (drafts show outside production).
+    const snapshot = await db.collection(STARTER_GAMES_COLLECTION).get();
     return snapshot.docs
         .map(doc => ({...(doc.data() as Omit<StarterTemplate, 'id'>), id: doc.id}))
+        .filter(template => isStarterTemplateVisible(template.status, IS_PRODUCTION))
         .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 }
 
 /** The cards on the start screen: the live templates, in order. */
 export async function listStarterGames(): Promise<StarterCard[]> {
-    const templates = await loadLiveTemplates();
+    const templates = await loadVisibleTemplates();
     return templates.map(t => ({
         id: t.id,
+        ...(t.status === 'live' ? {} : {draft: true}),
         title: t.title,
         hook: t.hook,
         playerCount: t.bots.length + 1,
@@ -120,7 +126,7 @@ async function createStarterGameImpl(templateId: string, playerName: string): Pr
     const templateRef = db.collection(STARTER_GAMES_COLLECTION).doc(templateId);
     const templateDoc = await templateRef.get();
     const template = templateDoc.exists ? {...(templateDoc.data() as Omit<StarterTemplate, 'id'>), id: templateDoc.id} : null;
-    if (!template || template.status !== 'live') {
+    if (!template || !isStarterTemplateVisible(template.status, IS_PRODUCTION)) {
         throw new Error('Unknown starter game.');
     }
 

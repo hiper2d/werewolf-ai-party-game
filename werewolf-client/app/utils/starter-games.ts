@@ -67,10 +67,21 @@ export interface StarterTemplate {
 /** What the start screen needs to draw a card. Nothing here is secret. */
 export interface StarterCard {
     id: string;
+    /** A draft, shown outside production only (see isStarterTemplateVisible). */
+    draft?: boolean;
     title: string;
     hook: string;
     playerCount: number;
     language: string;
+}
+
+/**
+ * Whether a template is offered to players. Production shows `live` templates only. Local
+ * development shares the production database, so there a `draft` is shown too: a template
+ * can be built and played locally without ever being published to real players.
+ */
+export function isStarterTemplateVisible(status: string | undefined, isProduction: boolean): boolean {
+    return status === 'live' || (!isProduction && status === 'draft');
 }
 
 const NAME_CHAR = '[\\p{L}\\p{N}\\p{M}]';

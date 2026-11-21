@@ -3,6 +3,7 @@ import {
     dealStarterModels,
     dealStarterRoles,
     isIllustrationDocId,
+    isStarterTemplateVisible,
     pickStarterGameMaster,
     pickStarterPortraitRound,
     renameHumanAvatarKey,
@@ -173,5 +174,18 @@ describe('pickStarterPortraitRound', () => {
         expect(pickStarterPortraitRound(undefined)).toBeUndefined();
         expect(pickStarterPortraitRound({})).toBeUndefined();
         expect(pickStarterPortraitRound({A: {n: 1, sel: 0}, B: {n: 3, sel: 2, first: 2}})).toBeUndefined();
+    });
+});
+
+describe('isStarterTemplateVisible', () => {
+    it('shows only live templates in production', () => {
+        expect(isStarterTemplateVisible('live', true)).toBe(true);
+        expect(isStarterTemplateVisible('draft', true)).toBe(false);
+        expect(isStarterTemplateVisible(undefined, true)).toBe(false);
+    });
+    it('shows drafts too outside production', () => {
+        expect(isStarterTemplateVisible('draft', false)).toBe(true);
+        expect(isStarterTemplateVisible('live', false)).toBe(true);
+        expect(isStarterTemplateVisible('archived', false)).toBe(false);
     });
 });

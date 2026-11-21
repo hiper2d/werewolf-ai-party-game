@@ -71,7 +71,10 @@ export default function StarterGames({cards, defaultName}: {cards: StarterCard[]
                                 <img src={`/api/starter-games/${card.id}/scene`} alt="" className="w-full h-full object-cover" loading="lazy" />
                             </div>
                             <div className="flex flex-col gap-2 p-4 flex-grow">
-                                <h3 className="m-0 text-[16px] font-semibold text-[var(--fg-0)] tracking-[-0.01em]">{card.title}</h3>
+                                <h3 className="m-0 text-[16px] font-semibold text-[var(--fg-0)] tracking-[-0.01em]">
+                                    {card.title}
+                                    {card.draft && <span className="ml-2 align-middle text-[10.5px] font-medium uppercase tracking-[0.06em] px-1.5 py-0.5 rounded-[var(--radius-sm)] border border-[var(--line-2)] text-[var(--fg-2)]">Draft · local only</span>}
+                                </h3>
                                 <p className="m-0 text-[13px] leading-[1.55] text-[var(--fg-2)] flex-grow">{card.hook}</p>
                                 <div className="flex items-center justify-between gap-3 pt-2">
                                     <span className="text-[11.5px] text-[var(--fg-2)]">{card.playerCount} players · you&apos;re a villager</span>
