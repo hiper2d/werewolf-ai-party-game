@@ -4,6 +4,7 @@ import {auth} from '@/auth';
 import {listStarterGames} from '@/app/api/starter-game-actions';
 import StarterGames from '@/app/games/components/StarterGames';
 import {starterDefaultName} from '@/app/utils/starter-games';
+import {isGuestEmail} from '@/app/utils/guest';
 
 /**
  * Quick start: ready-made stories a player starts with one click. With no live starter
@@ -13,6 +14,9 @@ export default async function StartPage() {
     const session = await auth();
     if (!session?.user?.email) {
         redirect('/?login=true&callbackUrl=%2Fgames%2Fstart');
+    }
+    if (isGuestEmail(session.user.email)) {
+        redirect('/');
     }
     const cards = await listStarterGames();
     if (cards.length === 0) {

@@ -1,3 +1,4 @@
+import {GUEST_BUDGET_MESSAGE, GUEST_PAUSED_MESSAGE, isGuestBudgetError} from "@/app/utils/guest";
 import { ModelRefusalError, type BudgetVerdict } from '@hiper2d/ai-agents';
 
 export class TierMismatchError extends Error {
@@ -107,7 +108,7 @@ export class FreeSpendLimitError extends Error {
  * was spent, retry after `resetsAt`), but the player-facing copy has to differ: telling
  * someone who spent 40 cents that they "used today's free $40" would read as a bug.
  */
-export type SpendLimitScope = 'account' | 'device' | 'device-shared' | 'global';
+export type SpendLimitScope = 'account' | 'device' | 'device-shared' | 'global' | 'guest' | 'guest-global';
 
 /** "$5" for whole dollars, "$2.50" otherwise — the free-tier cap as it reads in copy. */
 export function formatLimitUSD(amount: number): string {
@@ -119,6 +120,14 @@ export function freeSpendLimitMessage(
     scope: SpendLimitScope = 'account'
 ): string {
     const limit = formatLimitUSD(verdict.limitUSD);
+    // A guest (app/utils/guest.ts) has no profile page and no tomorrow: the way on is a
+    // sign-in. Neither line names an amount, for the same reason the global one does not.
+    if (scope === 'guest') {
+        return GUEST_BUDGET_MESSAGE;
+    }
+    if (scope === 'guest-global') {
+        return GUEST_PAUSED_MESSAGE;
+    }
     if (scope === 'global') {
         // Deliberately does not quote the platform budget or the player's own spend:
         // this refusal is not about them, and naming the number invites probing it.
@@ -145,7 +154,7 @@ export function isFreeSpendLimitError(text: string | undefined | null): boolean 
     if (!text) {
         return false;
     }
-    return /(today's|this month's) free \$[\d.]+ of AI|free play is paused for today/i.test(text);
+    return /(today's|this month's) free \$[\d.]+ of AI|free play is paused for today/i.test(text) || isGuestBudgetError(text);
 }
 
 /**

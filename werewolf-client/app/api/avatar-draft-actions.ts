@@ -1,6 +1,7 @@
 'use server'
 
 import {after} from "next/server";
+import {assertNotGuest} from "@/app/utils/guest";
 import {auth} from "@/auth";
 import {insufficientBalanceMessage} from "@/app/api/errors";
 import {AvatarDraftSpec, AvatarDraftState, AvatarFraming, ReframeTarget, USER_TIERS} from "@/app/api/game-models";
@@ -30,6 +31,7 @@ export async function generateDraftIllustrations(spec: AvatarDraftSpec): Promise
         throw new Error('Not authenticated');
     }
     const userEmail = session.user.email;
+    assertNotGuest(userEmail);
     const tier = await getUserTier(userEmail);
     if (tier !== USER_TIERS.PAID) {
         throw new Error('Drawing illustrations on the preview is a paid feature.');

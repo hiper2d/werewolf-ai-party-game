@@ -28,6 +28,28 @@ export function globalSpendRef() {
     return db ? db.collection(CONFIG).doc(GLOBAL_SPEND_DOC) : null;
 }
 
+/** All guests' spend for the UTC day (app/utils/guest.ts): the ceiling on what trial play can cost. */
+export const GUEST_SPEND_DOC = 'guestSpend';
+
+export function guestSpendRef() {
+    return db ? db.collection(CONFIG).doc(GUEST_SPEND_DOC) : null;
+}
+
+/** Same fail-open contract as the global ledger: an unreadable counter never stops a game. */
+export async function readGuestDailySpend(): Promise<UserDailySpend | undefined> {
+    const ref = guestSpendRef();
+    if (!ref) {
+        return undefined;
+    }
+    try {
+        const snap = await ref.get();
+        return snap.exists ? (snap.data()?.dailySpend as UserDailySpend | undefined) : undefined;
+    } catch (error: any) {
+        console.error(`GUEST_SPEND: could not read the guest ledger, allowing the call: ${error?.message ?? error}`);
+        return undefined;
+    }
+}
+
 export function deviceSpendRef(deviceId: string) {
     return db ? db.collection(DEVICES).doc(deviceId) : null;
 }

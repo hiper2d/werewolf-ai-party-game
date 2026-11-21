@@ -1,6 +1,7 @@
 'use server';
 
 import {assertNoStarterRewind} from "@/app/utils/starter-limits";
+import {GUEST_WALL_MESSAGE, isGuestEmail} from "@/app/utils/guest";
 import { db } from "@/firebase/server";
 import { askBotText } from "@/app/ai/bot-turn";
 import {
@@ -986,6 +987,13 @@ async function startNewDayImpl(gameId: string): Promise<GameActionResponse> {
         const currentGame = { id: gameId, ...gameData } as Game;
 
         await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: currentGame.createdWithTier });
+
+        // A guest's game stops here, with the night's story told: day 2 needs a sign-in,
+        // which moves the game to the account (app/utils/guest.ts). Returned, not thrown:
+        // a throw would put an error banner on a game that is simply waiting.
+        if (isGuestEmail(session.user.email)) {
+            return { game: gameFromFirestore(gameId, gameData), messages: [], rejected: { reason: 'guest_wall', message: GUEST_WALL_MESSAGE } };
+        }
 
         // Stale call (e.g. double-clicked "Next Day" — the first click already
         // advanced the state): re-sync the client, don't error.

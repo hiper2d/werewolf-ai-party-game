@@ -3,7 +3,9 @@
 import {db} from "@/firebase/server";
 import {firestore} from "firebase-admin";
 import {after} from "next/server";
-import {auth} from "@/auth";
+import {auth, signIn} from "@/auth";
+import {findGuest, readGuestCookie, resolveGuestForRequest} from "@/app/api/guest-accounts";
+import {GUEST_ONE_GAME_MESSAGE, GUEST_PROVIDER_ID, guestWallReached, isGuestEmail} from "@/app/utils/guest";
 import {
     AVATAR_GM_KEY,
     AVATAR_VARIANTS_COLLECTION,
@@ -29,6 +31,7 @@ import {
     pickStarterGameMaster,
     pickStarterPortraitRound,
     renameHumanAvatarKey,
+    guestStarterGame,
     resumableStarterGames,
     replacePlaceholderName,
     STARTER_GAMES_COLLECTION,
@@ -71,28 +74,55 @@ async function loadVisibleTemplates(): Promise<StarterTemplate[]> {
         .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 }
 
-/** The cards on the start screen: the live templates, in order. */
+/**
+ * Who is looking: the signed-in account, the guest of this session, or the guest this
+ * browser's cookie names when its session has expired. Undefined for a first-time visitor.
+ */
+async function viewerEmail(): Promise<string | undefined> {
+    const email = (await auth())?.user?.email;
+    if (email) return email;
+    return (await findGuest(await readGuestCookie()))?.email;
+}
+
+/**
+ * The cards on the start screen: the live templates, in order, with what this viewer can do
+ * on each. An account continues its unfinished game from a story or starts a new one. A
+ * guest has one game: its card continues it (or asks for a sign-in once it reached day 2),
+ * the other stories are locked behind a sign-in.
+ */
 export async function listStarterGames(): Promise<StarterCard[]> {
     const templates = await loadVisibleTemplates();
-    // The signed-in viewer's unfinished starter games, so a card continues instead of
-    // dealing a second game. Best effort: a failed read just offers a new game.
+    // Best effort: a failed read just offers a new game.
     let resumable: Record<string, string> = {};
+    let guestGame: {id: string; starterTemplateId?: string; currentDay?: number} | undefined;
+    let isGuest = false;
     try {
-        const email = (await auth())?.user?.email;
+        const email = await viewerEmail();
         if (email && db && templates.length > 0) {
-            const games = await db.collection('games').where('ownerEmail', '==', email).select('starterTemplateId', 'gameState', 'createdAt').get();
-            resumable = resumableStarterGames(games.docs.map(doc => ({id: doc.id, ...(doc.data() as {starterTemplateId?: string; gameState?: string; createdAt?: number})})));
+            const games = (await db.collection('games').where('ownerEmail', '==', email).select('starterTemplateId', 'gameState', 'createdAt', 'currentDay').get())
+                .docs.map(doc => ({id: doc.id, ...(doc.data() as {starterTemplateId?: string; gameState?: string; createdAt?: number; currentDay?: number})}));
+            isGuest = isGuestEmail(email);
+            if (isGuest) {
+                guestGame = guestStarterGame(games);
+            } else {
+                resumable = resumableStarterGames(games);
+            }
         }
     } catch { /* offer a new game */ }
-    return templates.map(t => ({
-        id: t.id,
-        ...(resumable[t.id] ? {resumeGameId: resumable[t.id]} : {}),
-        ...(t.status === 'live' ? {} : {draft: true}),
-        title: t.title,
-        hook: t.hook,
-        playerCount: t.bots.length + 1,
-        language: t.language,
-    }));
+    return templates.map(t => {
+        const isGuestCard = guestGame?.starterTemplateId === t.id;
+        return {
+            id: t.id,
+            ...(resumable[t.id] ? {resumeGameId: resumable[t.id]} : {}),
+            ...(isGuestCard ? {resumeGameId: guestGame!.id, ...(guestWallReached(guestGame!) ? {walled: true} : {})} : {}),
+            ...(guestGame && !isGuestCard ? {locked: true} : {}),
+            ...(t.status === 'live' ? {} : {draft: true}),
+            title: t.title,
+            hook: t.hook,
+            playerCount: t.bots.length + 1,
+            language: t.language,
+        };
+    });
 }
 
 /**
@@ -127,12 +157,22 @@ export async function createStarterGame(templateId: string, playerName: string, 
     }
 }
 
-async function createStarterGameImpl(templateId: string, playerName: string, forceNew: boolean): Promise<string> {
-    const session = await auth();
-    const ownerEmail = session?.user?.email;
-    if (!ownerEmail) {
-        throw new Error('Not authenticated');
+/**
+ * Who the game is for. A visitor with no session becomes a guest here (app/utils/guest.ts):
+ * the account is found by the browser's cookie or minted, and the session is started in the
+ * same request, so one click on a story card is the whole sign-up.
+ */
+async function resolveStarterOwner(): Promise<string> {
+    const email = (await auth())?.user?.email;
+    if (email) {
+        return email;
     }
+    const guest = await resolveGuestForRequest();
+    await signIn(GUEST_PROVIDER_ID, { guestId: guest.id, redirect: false });
+    return guest.email;
+}
+
+async function createStarterGameImpl(templateId: string, playerName: string, forceNew: boolean): Promise<string> {
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
@@ -148,10 +188,27 @@ async function createStarterGameImpl(templateId: string, playerName: string, for
         throw new Error('Unknown starter game.');
     }
 
+    // Resolved only once the template is known to exist, so a bad request mints no guest.
+    const ownerEmail = await resolveStarterOwner();
+    const isGuest = isGuestEmail(ownerEmail);
+
+    // A guest has ONE game. Pressing its card again (or a card restored by the Back button)
+    // opens it; another story needs a sign-in. There is no second deal for a guest.
+    if (isGuest) {
+        const own = await db.collection('games').where('ownerEmail', '==', ownerEmail).select('starterTemplateId', 'createdAt').get();
+        const existing = guestStarterGame(own.docs.map(doc => ({id: doc.id, ...(doc.data() as {starterTemplateId?: string; createdAt?: number})})));
+        if (existing) {
+            if (existing.starterTemplateId !== templateId) {
+                throw new Error(GUEST_ONE_GAME_MESSAGE);
+            }
+            return existing.id;
+        }
+    }
+
     // A player who already has this story on the table gets that game back, whatever the
     // page they clicked on believed (a card restored by the Back button still says "Play").
     // Only an explicit "new game" deals a second one.
-    if (!forceNew) {
+    if (!forceNew && !isGuest) {
         const own = await db.collection('games').where('ownerEmail', '==', ownerEmail).select('starterTemplateId', 'gameState', 'createdAt').get();
         const existing = resumableStarterGames(own.docs.map(doc => ({id: doc.id, ...(doc.data() as {starterTemplateId?: string; gameState?: string; createdAt?: number})})))[templateId];
         if (existing) {

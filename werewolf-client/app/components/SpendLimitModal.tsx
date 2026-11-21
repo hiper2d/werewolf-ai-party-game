@@ -3,6 +3,8 @@
 import React, {useEffect} from 'react';
 import Link from 'next/link';
 import {freeSpendLimitScope, freeSpendLimitWindow, isInsufficientBalanceError} from '@/app/api/errors';
+import {isGuestBudgetError} from '@/app/utils/guest';
+import {useLoginDialog} from '@/app/providers/LoginDialogProvider';
 
 /**
  * The popup a player sees when a spend gate refuses a call. Three variants:
@@ -39,7 +41,10 @@ function resetLabel(window: 'day' | 'month'): string {
 }
 
 export default function SpendLimitModal({message, onClose}: SpendLimitModalProps) {
-    const scope = freeSpendLimitScope(message) ?? (isInsufficientBalanceError(message) ? 'balance' : undefined);
+    // A guest (app/utils/guest.ts) has no profile page: the way on is a sign-in, back to this page.
+    const guest = isGuestBudgetError(message);
+    const {openLoginDialog} = useLoginDialog();
+    const scope = guest ? 'guest' : freeSpendLimitScope(message) ?? (isInsufficientBalanceError(message) ? 'balance' : undefined);
     const window = freeSpendLimitWindow(message) ?? 'day';
 
     useEffect(() => {
@@ -55,7 +60,14 @@ export default function SpendLimitModal({message, onClose}: SpendLimitModalProps
     }
 
     type Content = { title: string; body: string; aside: string; cta: string; ctaHref: string; alt?: { label: string; href: string } };
-    const contents: Record<'global' | 'account' | 'balance', Content> = {
+    const contents: Record<'global' | 'account' | 'balance' | 'guest', Content> = {
+        guest: {
+            title: 'Your free trial is used up',
+            body: 'You have been playing without an account, on a small trial amount of AI. The game is paused, not lost.',
+            aside: 'Sign in and the game moves to your account, right where you left it. Signing in is free.',
+            cta: 'Sign in to keep playing',
+            ctaHref: '',
+        },
         balance: {
             title: 'Your prepaid balance has run out',
             body: 'On the Paid tier every AI call is paid from your prepaid balance, and it can\'t cover this one. Nothing was charged and nothing was lost.',
@@ -113,12 +125,22 @@ export default function SpendLimitModal({message, onClose}: SpendLimitModalProps
                 <div className="h-px bg-[var(--line-1)]"/>
 
                 <div className="flex items-center gap-2 flex-wrap">
+                    {guest ? (
+                        <button
+                            type="button"
+                            onClick={() => { onClose(); openLoginDialog(globalThis.location.pathname); }}
+                            className="inline-flex items-center justify-center gap-2 flex-1 min-w-[160px] font-semibold text-[14px] px-5 py-[11px] rounded-[var(--radius-md)] bg-[var(--accent)] text-[var(--accent-fg)] border border-transparent shadow-[var(--shadow-1)] hover:bg-[var(--accent-strong)] transition-all duration-[120ms]"
+                        >
+                            {content.cta}
+                        </button>
+                    ) : (
                     <Link
                         href={content.ctaHref}
                         className="inline-flex items-center justify-center gap-2 flex-1 min-w-[160px] font-semibold text-[14px] px-5 py-[11px] rounded-[var(--radius-md)] bg-[var(--accent)] text-[var(--accent-fg)] border border-transparent shadow-[var(--shadow-1)] hover:bg-[var(--accent-strong)] transition-all duration-[120ms]"
                     >
                         {content.cta}
                     </Link>
+                    )}
                     {content.alt && (
                         <Link
                             href={content.alt.href}

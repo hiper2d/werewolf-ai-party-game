@@ -9,6 +9,7 @@ import {useSession} from "next-auth/react";
 import { usePathname } from "next/navigation";
 import { getUserTier } from '@/app/api/user-actions';
 import type { UserTier } from '@/app/api/game-models';
+import { isGuestEmail } from '@/app/utils/guest';
 
 const tierConfig: Record<UserTier, { label: string; className: string }> = {
     free: { label: 'Free', className: 'border border-[var(--line-2)] text-[var(--fg-2)]' },
@@ -29,10 +30,14 @@ const NavBar = () => {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [userTier, setUserTier] = useState<UserTier | null>(null);
 
+    // A guest (app/utils/guest.ts) has no lobby and no profile: both ask for a sign-in.
+    const isGuest = isGuestEmail(session?.user?.email);
+    const navLinks = isGuest ? NAV_LINKS.filter(link => link.href !== '/games' && link.href !== '/profile') : NAV_LINKS;
+
     const isActive = (href: string) => pathname === href || pathname?.startsWith(href + '/');
 
     useEffect(() => {
-        if (status === 'authenticated' && session?.user?.email) {
+        if (status === 'authenticated' && session?.user?.email && !isGuestEmail(session.user.email)) {
             getUserTier(session.user.email).then(setUserTier).catch(() => {});
         }
     }, [status, session?.user?.email]);
@@ -52,7 +57,7 @@ const NavBar = () => {
                         />
                     </div>
                 </Link>
-                {status === 'authenticated' && (
+                {status === 'authenticated' && !isGuest && (
                     <div className="hidden sm:flex items-center gap-2">
                         <Link href="/" className="text-[13px] font-medium text-[var(--fg-0)] hover:text-[var(--fg-1)] transition-colors duration-[120ms]">
                             {session.user?.name}
@@ -74,7 +79,7 @@ const NavBar = () => {
             <div className="flex items-center gap-3">
                 {/* Desktop nav */}
                 <nav className="hidden md:flex items-center gap-1 mr-2">
-                    {NAV_LINKS.map((item, i) => (
+                    {navLinks.map((item, i) => (
                         <React.Fragment key={item.href}>
                             {i > 0 && <span className="w-px h-4 bg-[var(--line-2)]"></span>}
                             <Link
@@ -118,7 +123,7 @@ const NavBar = () => {
             {mobileMenuOpen && (
                 <nav className="absolute top-full left-0 right-0 bg-[var(--bg-1)] border-t border-[var(--line-1)] px-6 py-3 md:hidden z-50 shadow-subtle">
                     <ul className="flex flex-col space-y-1">
-                        {NAV_LINKS.map((item) => (
+                        {navLinks.map((item) => (
                             <li key={item.href}>
                                 <Link
                                     href={item.href}

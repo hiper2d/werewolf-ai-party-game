@@ -8,6 +8,7 @@ import {FREE_TIER_LIMITS, FreeTierLimits} from "@/app/api/game-models";
  *
  *   { freeDailySpendUSD: 5, freeMonthlySpendUSD: 20, freeGamesPerDay: 5,
  *     freeGlobalDailySpendUSD: 40, freeDeviceDailySpendUSD: 5,
+ *     guestSpendUSD: 1, guestGlobalDailySpendUSD: 5, guestsPerDevicePerDay: 1,
  *     jevScreenMode: 'monitor' }
  *
  * `jevScreenMode` is the switch of the Jev content screen (app/api/jev-screen.ts):
@@ -31,6 +32,9 @@ export const DEFAULT_FREE_TIER_LIMITS: FreeTierLimits = {
     monthlySpendUSD: FREE_TIER_LIMITS.MONTHLY_SPEND_USD,
     globalDailySpendUSD: FREE_TIER_LIMITS.GLOBAL_DAILY_SPEND_USD,
     deviceDailySpendUSD: FREE_TIER_LIMITS.DEVICE_DAILY_SPEND_USD,
+    guestSpendUSD: FREE_TIER_LIMITS.GUEST_SPEND_USD,
+    guestGlobalDailySpendUSD: FREE_TIER_LIMITS.GUEST_GLOBAL_DAILY_SPEND_USD,
+    guestsPerDevicePerDay: FREE_TIER_LIMITS.GUESTS_PER_DEVICE_PER_DAY,
 };
 
 export type JevScreenMode = 'off' | 'monitor' | 'enforce';
@@ -54,6 +58,9 @@ export function limitsFromConfig(data: Record<string, any> | undefined | null): 
         monthlySpendUSD: numberOr(data?.freeMonthlySpendUSD, DEFAULT_FREE_TIER_LIMITS.monthlySpendUSD),
         globalDailySpendUSD: numberOr(data?.freeGlobalDailySpendUSD, DEFAULT_FREE_TIER_LIMITS.globalDailySpendUSD),
         deviceDailySpendUSD: numberOr(data?.freeDeviceDailySpendUSD, DEFAULT_FREE_TIER_LIMITS.deviceDailySpendUSD),
+        guestSpendUSD: numberOr(data?.guestSpendUSD, DEFAULT_FREE_TIER_LIMITS.guestSpendUSD),
+        guestGlobalDailySpendUSD: numberOr(data?.guestGlobalDailySpendUSD, DEFAULT_FREE_TIER_LIMITS.guestGlobalDailySpendUSD),
+        guestsPerDevicePerDay: numberOr(data?.guestsPerDevicePerDay, DEFAULT_FREE_TIER_LIMITS.guestsPerDevicePerDay),
     };
 }
 

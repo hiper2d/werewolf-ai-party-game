@@ -9,6 +9,7 @@ import { getUserTier } from "@/app/api/user-actions";
 import { listStarterGames } from "@/app/api/starter-game-actions";
 import StarterGames from "@/app/games/components/StarterGames";
 import { starterDefaultName } from "@/app/utils/starter-games";
+import { isGuestEmail } from "@/app/utils/guest";
 
 function formatCreationDate(timestamp?: number): string {
     if (!timestamp) return '';
@@ -33,6 +34,11 @@ const GamePages = async ({searchParams}: {searchParams?: Promise<{error?: string
     const userEmail = session.user?.email;
     if (!userEmail) {
         redirect('/?login=true&callbackUrl=%2Fgames');
+    }
+
+    // A guest (app/utils/guest.ts) has one game and no lobby: the landing page holds its card.
+    if (isGuestEmail(userEmail)) {
+        redirect('/');
     }
 
     const userTier = await getUserTier(userEmail);

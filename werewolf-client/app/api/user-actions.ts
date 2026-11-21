@@ -6,12 +6,13 @@ import {FreeTierLimits, User, UserMonthlySpending, UserTier, USER_TIERS} from "@
 import {VoiceProvider, getDefaultVoiceProvider} from "@/app/ai/voice-config";
 import {
     applyDailySpend, applySpending, deviceSpendVerdict, formatPeriod, freeSpendVerdicts,
-    globalSpendVerdict, normalizeSpendings
+    globalSpendVerdict, guestGlobalSpendVerdict, guestSpendVerdict, normalizeSpendings
 } from "@/app/utils/spending-utils";
 import {getFreeTierLimits} from "@/app/api/limits-actions";
 import {FreeSpendLimitError} from "@/app/api/errors";
 import type {SpendLimitScope} from "@/app/api/errors";
-import {readDeviceRecord, readGlobalDailySpend} from "@/app/api/spend-ledgers";
+import {readDeviceRecord, readGlobalDailySpend, readGuestDailySpend} from "@/app/api/spend-ledgers";
+import {assertNotGuest, guestTotalSpend} from "@/app/utils/guest";
 import {firstRefusal} from "@hiper2d/ai-agents";
 import type {BudgetVerdict} from "@hiper2d/ai-agents";
 import {logger} from "@/app/utils/logger";
@@ -126,6 +127,8 @@ export async function updateUserTier(userId: string, tier: UserTier): Promise<vo
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
+    // A guest (app/utils/guest.ts) stays on the free tier: its caps are the trial's budget.
+    assertNotGuest(userId, 'Sign in to change your tier.');
     try {
         const userRef = db.collection('users').doc(userId);
         await userRef.update({
@@ -276,6 +279,22 @@ export async function assertFreeSpendWithinLimit(userId: string, timestamp: numb
     // they are only fetched while the account itself is still inside its own caps.
     let scope: SpendLimitScope = 'account';
     let refused = firstRefusal(freeSpendVerdicts(userData, limits, timestamp));
+
+    // A guest (app/utils/guest.ts) is held to two more ceilings, checked first: what one
+    // guest may spend in total, and what all guests together may spend in a day.
+    if (userData.guest === true) {
+        const own = guestSpendVerdict(guestTotalSpend(userData.spendings), limits, timestamp);
+        if (own && !own.allowed) {
+            refused = own;
+            scope = 'guest';
+        } else {
+            const shared = guestGlobalSpendVerdict(await readGuestDailySpend(), limits, timestamp);
+            if (shared && !shared.allowed) {
+                refused = shared;
+                scope = 'guest-global';
+            }
+        }
+    }
 
     if (!refused) {
         const verdict = globalSpendVerdict(await readGlobalDailySpend(), limits, timestamp);

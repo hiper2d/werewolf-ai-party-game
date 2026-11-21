@@ -460,6 +460,31 @@ below stay as the ceiling.
   and per game account; Marlow already reads this Firestore project).
 - **Multiplayer:** signed-in users only, built last.
 
+## Build state, 2026-11-21 (evening)
+
+Built on `develop`, not pushed:
+
+- **Lobby:** the ready-made stories stay above the game list for every signed-in player; a
+  card continues the unfinished game from that story or deals a new one.
+- **Guest play:** story cards on the landing page, one click, no sign-in. A guest is a
+  `users` row with `guest: true`; one game; day 1 + night 1; "Sign in to play Day 2" in
+  place of Next Day; signing in moves the game to the account. Caps in `config/limits`:
+  `guestSpendUSD` 1, `guestGlobalDailySpendUSD` 5, `guestsPerDevicePerDay` 1 (Alex has not
+  confirmed the numbers). Content screen in enforce for guests. Details: CLAUDE.md,
+  "Guest play".
+- **Decided 2026-11-21:** the fingerprint does not reopen a guest's game (same-model phones
+  share one); the `ww_guest` cookie does. After the guest's game, the other stories read
+  "Sign in to play".
+- **Order changed (Alex, 2026-11-21):** the credits switch (track 4: $5 once at sign-up, no
+  daily refill, then pay) moves up to ship WITH guest play, before helper hints.
+
+Owed before guest play goes live:
+
+- The sign-in hand-over (`claimGuest`) has not been run with a real Google/GitHub sign-in.
+- Marlow's daily digest counts every `users` row as a signup: it must skip `guest: true`
+  (and report guests separately).
+- Templates are still drafts; `--publish` makes the landing cards appear in production.
+
 ## Sequencing
 
 1. Track 0 phase A (collection, monitor) and track 1 start together.

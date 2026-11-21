@@ -105,6 +105,10 @@ export interface StarterCard {
     draft?: boolean;
     /** The viewer's own unfinished game from this template, newest first: Play continues it. */
     resumeGameId?: string;
+    /** A guest's one game is from another story: this one needs a sign-in. */
+    locked?: boolean;
+    /** The guest's game has reached day 2: continuing it needs a sign-in. */
+    walled?: boolean;
     title: string;
     hook: string;
     playerCount: number;
@@ -318,4 +322,14 @@ export function resumableStarterGames(games: {id: string; starterTemplateId?: st
         if (!current || createdAt > current.createdAt) newest[game.starterTemplateId] = {id: game.id, createdAt};
     }
     return Object.fromEntries(Object.entries(newest).map(([templateId, game]) => [templateId, game.id]));
+}
+
+/**
+ * A guest's ONE game: the newest they own, whatever its story or state (a finished or walled
+ * game still uses up the trial). Undefined when they have not started one.
+ */
+export function guestStarterGame<T extends {id: string; starterTemplateId?: string; createdAt?: number}>(games: T[]): T | undefined {
+    return games
+        .filter(game => !!game.starterTemplateId)
+        .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0))[0];
 }

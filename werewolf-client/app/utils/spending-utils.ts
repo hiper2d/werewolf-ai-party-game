@@ -55,6 +55,25 @@ export function freeSpendVerdicts(
 }
 
 /**
+ * A guest's own ceiling: everything they have ever spent against `guestSpendUSD` (a guest
+ * has one game, so no window applies; the verdict's window is nominal). Off at 0.
+ */
+export function guestSpendVerdict(totalSpentUSD: number, limits: FreeTierLimits, timestamp: number = Date.now()): BudgetVerdict | undefined {
+    if (!(limits.guestSpendUSD > 0)) {
+        return undefined;
+    }
+    return evaluateBudget(totalSpentUSD, { window: 'month', limitUSD: limits.guestSpendUSD, bucket: USER_TIERS.FREE }, timestamp);
+}
+
+/** All guests' spend for the UTC day against `guestGlobalDailySpendUSD`. Off at 0. */
+export function guestGlobalSpendVerdict(guestDaily: UserDailySpend | undefined | null, limits: FreeTierLimits, timestamp: number = Date.now()): BudgetVerdict | undefined {
+    if (!(limits.guestGlobalDailySpendUSD > 0)) {
+        return undefined;
+    }
+    return evaluateBudget(getFreeDailySpend(guestDaily, timestamp), { window: 'day', limitUSD: limits.guestGlobalDailySpendUSD, bucket: USER_TIERS.FREE }, timestamp);
+}
+
+/**
  * Verdict for the platform-wide daily ceiling. Separate from freeSpendVerdicts because
  * the spend it judges lives in one shared counter doc, not on the user.
  *

@@ -2,6 +2,8 @@
 
 import {useEffect, useState} from 'react';
 import {useRouter} from 'next/navigation';
+import {useSession} from 'next-auth/react';
+import {useLoginDialog} from '@/app/providers/LoginDialogProvider';
 import {createStarterGame} from '@/app/api/starter-game-actions';
 import type {StarterCard} from '@/app/utils/starter-games';
 import {INPUT_LIMITS} from '@/app/utils/input-limits';
@@ -10,9 +12,15 @@ import {validatePlayerName} from '@/app/utils/name-utils';
 /**
  * The start screen's cards: pick a ready-made story, type a name, play. One click creates
  * the game from its template (no setup form, no generation wait) and opens it.
+ *
+ * `guest` is the landing page's mode, for a visitor with no account (app/utils/guest.ts):
+ * the same one click also makes them a guest, they get ONE game (no "Start over"), the
+ * other stories ask for a sign-in, and so does their own game once it reaches day 2.
  */
-export default function StarterGames({cards, defaultName}: {cards: StarterCard[]; defaultName: string}) {
+export default function StarterGames({cards, defaultName, guest = false}: {cards: StarterCard[]; defaultName: string; guest?: boolean}) {
     const router = useRouter();
+    const {update: refreshSession} = useSession();
+    const {openLoginDialog} = useLoginDialog();
     const [name, setName] = useState(defaultName);
     const [startingId, setStartingId] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -22,6 +30,15 @@ export default function StarterGames({cards, defaultName}: {cards: StarterCard[]
     // again on every mount, so the card offers Continue.
     useEffect(() => {
         router.refresh();
+        // A full page restored from the browser's back/forward cache does not remount.
+        const onPageShow = (event: PageTransitionEvent) => {
+            if (event.persisted) {
+                setStartingId(null);
+                router.refresh();
+            }
+        };
+        window.addEventListener('pageshow', onPageShow);
+        return () => window.removeEventListener('pageshow', onPageShow);
     }, [router]);
 
     const nameError = validatePlayerName(name);
@@ -41,6 +58,9 @@ export default function StarterGames({cards, defaultName}: {cards: StarterCard[]
         try {
             const result = await createStarterGame(templateId, name, {forceNew});
             if (result.ok) {
+                // A visitor became a guest inside that call: tell the session hooks (navbar,
+                // device record) before the game page opens. Best effort.
+                if (guest) await refreshSession().catch(() => null);
                 router.push(`/games/${result.gameId}`);
                 return; // keep the button busy until the game page takes over
             }
@@ -53,7 +73,7 @@ export default function StarterGames({cards, defaultName}: {cards: StarterCard[]
 
     return (
         <div className="w-full">
-            <label className="flex items-center gap-3 mb-5 flex-wrap">
+            {!(guest && cards.some(card => card.resumeGameId)) && <label className="flex items-center gap-3 mb-5 flex-wrap">
                 <span className="text-[13px] font-medium text-[var(--fg-1)]">Your name</span>
                 <input
                     value={name}
@@ -64,7 +84,7 @@ export default function StarterGames({cards, defaultName}: {cards: StarterCard[]
                     className="w-[200px] px-3 py-2 text-[14px] rounded-[var(--radius-md)] bg-[var(--bg-1)] text-[var(--fg-0)] border border-[var(--line-2)] focus:border-[var(--accent)] focus:outline-none transition-colors duration-[120ms]"
                 />
                 <span className="text-[12px] text-[var(--fg-2)]">Letters and numbers, no spaces.</span>
-            </label>
+            </label>}
 
             {error && (
                 <div role="alert" className="mb-4 px-4 py-3 text-[13px] text-[var(--fg-0)] border border-[oklch(62%_0.19_25_/_0.45)] bg-[oklch(62%_0.19_25_/_0.08)] rounded-[var(--radius-lg)]">
@@ -94,9 +114,9 @@ export default function StarterGames({cards, defaultName}: {cards: StarterCard[]
                                 </h3>
                                 <p className="m-0 text-[13px] leading-[1.55] text-[var(--fg-2)] flex-grow">{card.hook}</p>
                                 <div className="flex items-center justify-between gap-3 pt-2">
-                                    <span className="text-[11.5px] text-[var(--fg-2)]">{card.resumeGameId ? 'Your game is in progress' : <>{card.playerCount} players · you&apos;re a villager</>}</span>
+                                    <span className="text-[11.5px] text-[var(--fg-2)]">{card.walled ? 'Day 2 is waiting for you' : card.resumeGameId ? 'Your game is in progress' : card.locked ? 'Free with an account' : <>{card.playerCount} players · you&apos;re a villager</>}</span>
                                     <div className="flex items-center gap-3">
-                                        {card.resumeGameId && (
+                                        {card.resumeGameId && !guest && (
                                             <button
                                                 type="button"
                                                 onClick={() => play(card.id, true)}
@@ -108,11 +128,13 @@ export default function StarterGames({cards, defaultName}: {cards: StarterCard[]
                                         )}
                                         <button
                                             type="button"
-                                            onClick={() => play(card.id)}
+                                            onClick={() => card.locked
+                                                ? openLoginDialog('/games')
+                                                : card.walled ? openLoginDialog(`/games/${card.resumeGameId}`) : play(card.id)}
                                             disabled={!!startingId}
                                             className="px-4 py-2 text-[13px] font-semibold rounded-[var(--radius-md)] bg-[var(--accent)] text-[var(--accent-fg)] hover:brightness-110 disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-[120ms]"
                                         >
-                                            {starting ? 'Opening…' : card.resumeGameId ? 'Continue' : 'Play'}
+                                            {starting ? 'Opening…' : card.locked ? 'Sign in to play' : card.walled ? 'Sign in to continue' : card.resumeGameId ? 'Continue' : 'Play'}
                                         </button>
                                     </div>
                                 </div>

@@ -9,6 +9,7 @@ import { formatLimitUSD } from '@/app/api/errors';
 import { getFreeTierModels } from '@/app/ai/ai-models';
 import LocalTime from './components/LocalTime';
 import { auth } from '@/auth';
+import { isGuestEmail } from '@/app/utils/guest';
 import { GoogleIcon, GithubIcon } from '@/app/components/ui-icons';
 import ProfileTierCards from './components/ProfileTierCards';
 import BalanceTopUp from './components/BalanceTopUp';
@@ -50,6 +51,10 @@ export default async function UserProfilePage({ searchParams }: PageProps) {
 
     const params = await searchParams;
     const email = session.user?.email!;
+    // A guest (app/utils/guest.ts) has no profile yet: signing in makes one.
+    if (isGuestEmail(email)) {
+        redirect('/?login=true&callbackUrl=%2Fprofile');
+    }
     const checkoutStatus: CheckoutStatus | null = params.payment === 'success'
         ? (params.session_id ? await getCheckoutStatus(params.session_id) : { status: 'unknown' })
         : null;

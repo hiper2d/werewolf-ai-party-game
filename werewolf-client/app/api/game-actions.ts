@@ -1,6 +1,7 @@
 'use server'
 
 import {db} from "@/firebase/server";
+import {assertNotGuest} from "@/app/utils/guest";
 import {insufficientBalanceMessage, isFreeSpendLimitError, isInsufficientBalanceError} from "@/app/api/errors";
 import {firestore} from "firebase-admin";
 import {
@@ -323,6 +324,7 @@ export async function previewGame(gamePreview: GamePreview, progressId?: string)
     if (!session || !session.user?.email) {
         throw new Error('Not authenticated');
     }
+    assertNotGuest(session.user.email);
 
     // The form caps these too, but the client is untrusted and all three go
     // straight into the story prompt. Clamp before a single token is spent.
@@ -643,6 +645,7 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
     if (!session || !session.user?.email) {
         throw new Error('Not authenticated');
     }
+    assertNotGuest(session.user.email);
     if (!db) {
         throw new Error('Firestore is not initialized');
     }

@@ -1,6 +1,8 @@
 'use client';
 
 import { providerDisplayName } from "@/app/api/provider-blocks";
+import { isGuestEmail } from "@/app/utils/guest";
+import { useLoginDialog } from "@/app/providers/LoginDialogProvider";
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getGame, updateBotModel, updateGameMasterModel, updateCharacterVoice, clearGameErrorState, setGameErrorState, afterGameDiscussion, retryWithModelOverride, reassignProviderModels } from "@/app/api/game-actions";
 import { isHiddenRoleRetry } from "@/app/api/retry-model";
@@ -182,6 +184,9 @@ function GamePageContent({
     // A starter game (app/utils/starter-limits.ts) keeps its pre-drawn portraits, has no
     // rewinds and offers only the cheapest model group; the server enforces all three.
     const isStarterGame = !!game.starterTemplateId;
+    // A visitor playing without an account (app/utils/guest.ts).
+    const isGuestPlayer = isGuestEmail(session?.user?.email);
+    const {openLoginDialog} = useLoginDialog();
     const canRedraw = isOwner && game.avatarsStatus === 'ready' && !isStarterGame;
     const redrawPortraits = async () => {
         if (redrawing || redrawsLeft <= 0) return;
@@ -1056,7 +1061,7 @@ function GamePageContent({
             return {
                 tone: showNightGameOverCTA ? 'danger' : 'good',
                 label: 'Night complete',
-                note: showNightGameOverCTA ? pendingGameOverReason : undefined,
+                note: showNightGameOverCTA ? pendingGameOverReason : isGuestPlayer ? 'Your free game ends here. Sign in to keep playing: your game is saved.' : undefined,
                 actions: (
                     <>
                         {/* A replay re-runs the whole night (all paid LLM calls), so it is paid-tier only. */}
@@ -1078,7 +1083,19 @@ function GamePageContent({
                                 Replay Night
                             </button>
                         )}
-                        {showNightGameOverCTA ? gameOverButton : (
+                        {showNightGameOverCTA ? gameOverButton : isGuestPlayer ? (
+                            // A guest's game stops at the morning of day 2 (app/utils/guest.ts):
+                            // signing in moves it to the account and comes back to this page.
+                            <button
+                                className={btnFlowPrimary}
+                                style={btnFlowPrimaryStyle}
+                                onClick={() => openLoginDialog(`/games/${game.id}`)}
+                                title="Your game is saved. Sign in to play day 2: it is free."
+                            >
+                                <SunriseIcon />
+                                Sign in to play Day 2
+                            </button>
+                        ) : (
                             <button
                                 className={btnFlowPrimary}
                                 style={btnFlowPrimaryStyle}
