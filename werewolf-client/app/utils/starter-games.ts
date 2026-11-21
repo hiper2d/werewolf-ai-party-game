@@ -33,6 +33,16 @@ export interface StarterStyleSet {
     artStyle: string;
 }
 
+export interface StarterClip {
+    /** The voice the clip was read in: a game plays it only while the speaker still has it. */
+    voice: string;
+    /** Bumped on every re-record, so browsers and the CDN never serve the old take. */
+    version: number;
+}
+
+/** The clip key of the opening story; a bot's introduction is keyed by the bot's name. */
+export const STARTER_STORY_CLIP = 'story';
+
 export interface StarterTemplate {
     id: string;
     /** Only `live` templates are offered to players; `draft` is for review. */
@@ -74,6 +84,14 @@ export interface StarterTemplate {
      * template has only the portraits of its source game.
      */
     styleSets?: Record<string, StarterStyleSet>;
+    /**
+     * Pre-recorded voice clips, by clip key (STARTER_STORY_CLIP for the opening story, a
+     * bot's name for its introduction): the audio is in `starterGames/{id}/audio/{key}`,
+     * recorded once by scripts/record-starter-voices.ts. A game plays the clip instead of
+     * calling the voice model, so the first minute costs nothing and starts at once. Only
+     * lines that do not name the human are recorded (the name differs per player).
+     */
+    clips?: Record<string, StarterClip>;
     avatarVariants: Record<string, AvatarVariantEntry>;
     avatarVersions: Record<string, number>;
     sourceGameId: string;
@@ -248,4 +266,38 @@ export function pruneStyleSets(styleSets: Record<string, StarterStyleSet> | unde
         if (window && Number(round) >= window.from && Number(round) < window.to) kept[round] = set;
     }
     return kept;
+}
+
+/** True when `text` names the human placeholder as a whole word (see replacePlaceholderName). */
+export function mentionsPlaceholder(text: string, placeholder: string): boolean {
+    if (!placeholder) return false;
+    return new RegExp(`(?<!${NAME_CHAR})${escapeRegExp(placeholder)}(?!${NAME_CHAR})`, 'u').test(text);
+}
+
+/**
+ * Which pre-recorded clip, if any, reads this message: the opening story (the Game Master's
+ * day-1 GAME_STORY) or a bot's introduction. Message types as strings so this stays free of
+ * the enum import on the client path.
+ */
+export function starterClipKeyFor(message: {messageType: string; authorName: string; day: number}, gameMasterName: string): string | null {
+    if (message.day !== 1) return null;
+    if (message.messageType === 'GAME_STORY' && message.authorName === gameMasterName) return STARTER_STORY_CLIP;
+    if (message.messageType === 'BOT_WELCOME') return message.authorName;
+    return null;
+}
+
+/**
+ * The URL of the pre-recorded clip for a message of a starter game, or undefined when the
+ * line must be read live: not a starter game, no clip for it, or the speaker's voice was
+ * changed since (`currentVoice`), in which case the old take would be the wrong voice.
+ */
+export function starterClipUrl(
+    game: {starterTemplateId?: string; starterClips?: Record<string, StarterClip>},
+    clipKey: string | null,
+    currentVoice: string | undefined,
+): string | undefined {
+    if (!game.starterTemplateId || !clipKey) return undefined;
+    const clip = game.starterClips?.[clipKey];
+    if (!clip || clip.voice !== currentVoice) return undefined;
+    return `/api/starter-games/${game.starterTemplateId}/audio/${encodeURIComponent(clipKey)}?v=${clip.version}`;
 }

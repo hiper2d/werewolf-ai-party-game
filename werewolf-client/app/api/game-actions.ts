@@ -1736,6 +1736,7 @@ function gameFromFirestore(id: string, data: any): Game {
         // Stray legacy values (e.g. the retired 'api' tier) read as free so the game stays openable.
         createdWithTier: data.createdWithTier === 'paid' ? 'paid' : 'free',
         ...(data.starterTemplateId ? {starterTemplateId: data.starterTemplateId} : {}),
+        ...(data.starterClips ? {starterClips: data.starterClips} : {}),
         ...(data.helperMode ? {helperMode: true} : {}),
         votingHistory: data.votingHistory || [],
         nightNarratives: data.nightNarratives || [],

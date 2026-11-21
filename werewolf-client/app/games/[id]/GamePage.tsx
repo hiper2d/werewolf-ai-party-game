@@ -101,8 +101,16 @@ function GamePageContent({
     // Introduce the player to their secret role the first time a freshly
     // created game (still in WELCOME) is opened. Dismissal is remembered per
     // game in localStorage; storage failures (private mode) just skip the card.
+    // A starter game is created past WELCOME (its introductions come with the
+    // template), so there the card shows on the first open of day 1 instead.
+    const isFreshStarterGame = !!initialGame.starterTemplateId
+        && initialGame.currentDay === 1
+        && initialGame.gameState === GAME_STATES.DAY_DISCUSSION;
+    // Set when the role card of a fresh starter game is closed: the chat then
+    // opens cinematic mode on the opening story with voices on (see GameChat).
+    const [playStarterIntro, setPlayStarterIntro] = useState(false);
     useEffect(() => {
-        if (initialGame.gameState !== GAME_STATES.WELCOME) return;
+        if (initialGame.gameState !== GAME_STATES.WELCOME && !isFreshStarterGame) return;
         try {
             if (!localStorage.getItem(`roleCardSeen:${initialGame.id}`)) setRoleCardFor({ role: initialGame.humanPlayerRole, own: true });
         } catch { /* storage unavailable — skip the card */ }
@@ -110,6 +118,7 @@ function GamePageContent({
     }, []);
 
     const closeRoleCard = () => {
+        if (roleCardFor?.own && isFreshStarterGame) setPlayStarterIntro(true);
         setRoleCardFor(null);
         try { localStorage.setItem(`roleCardSeen:${game.id}`, '1'); } catch { /* ignore */ }
     };
@@ -1506,6 +1515,7 @@ function GamePageContent({
                     isOwner={isOwner}
                     onGameChange={patch => setGame(prev => ({ ...prev, ...patch }))}
                     onUpdateVoice={updateCharacterVoice}
+                    playIntro={playStarterIntro}
                     runGameAction={runGameAction}
                     onGameStateChange={applyActionResult}
                     pendingMessages={pendingMessages}

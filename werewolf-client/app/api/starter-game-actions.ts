@@ -252,6 +252,7 @@ async function createStarterGameImpl(templateId: string, playerName: string): Pr
         expireAt,
         createdWithTier: tier,
         starterTemplateId: templateId,
+        ...(template.clips && Object.keys(template.clips).length > 0 ? {starterClips: template.clips} : {}),
         helperMode: true,
         avatarsStatus: 'ready',
         avatarsVersion: template.avatarsVersion,

@@ -373,6 +373,9 @@ export interface Game {
     // pre-built first game. Such a game is held to the cheapest model group, has no rewinds
     // and no portrait redraws (docs/plan-growth-roadmap.md, "Limits in starter games").
     starterTemplateId?: string;
+    // The template's pre-recorded voice clips this game may play instead of calling the
+    // voice model (opening story, introductions): clip key → the voice it was read in.
+    starterClips?: Record<string, {voice: string; version: number}>;
     // On-screen hints that say what the player can do next. On for starter games.
     helperMode?: boolean;
     votingHistory?: VotingDayResult[]; // History of voting results for each day

@@ -23,8 +23,9 @@ import {isAllowedAsGameMaster} from "../app/ai/ai-models";
  *   npx tsx --env-file=.env scripts/snapshot-starter-game.ts --unpublish tavern
  *   npx tsx --env-file=.env scripts/snapshot-starter-game.ts --list
  *
- * Re-running with the same --id replaces the template (its portraits too). Games already
- * created from it keep their own copies.
+ * Re-running with the same --id replaces the template: its portraits, its drawn art styles
+ * and its recorded voices are removed and must be made again. Games already created from it
+ * keep their own copies of the portraits.
  */
 
 function arg(name: string): string | undefined {
@@ -182,6 +183,8 @@ async function snapshot(gameId: string) {
     const templateRef = db!.collection(STARTER_GAMES_COLLECTION).doc(templateId);
     await deleteCollection(templateRef.collection('avatars'));
     await deleteCollection(templateRef.collection(AVATAR_VARIANTS_COLLECTION));
+    // A new snapshot is a new template: its recorded voices and drawn styles go too.
+    await deleteCollection(templateRef.collection('audio'));
     // Image docs are large: a few per batch keeps each commit under Firestore's 10 MiB limit.
     for (let i = 0; i < copies.length; i += 4) {
         const batch = db!.batch();
@@ -189,7 +192,8 @@ async function snapshot(gameId: string) {
         await batch.commit();
     }
     await templateRef.set(template);
-    console.log(`Written as a DRAFT. Publish with: --publish ${templateId}`);
+    console.log(`Written as a DRAFT (playable on a local server as is). Next: draw its art styles (draw-starter-style.ts)`);
+    console.log(`and record its voices (record-starter-voices.ts). Publish with: --publish ${templateId}`);
 }
 
 async function main() {

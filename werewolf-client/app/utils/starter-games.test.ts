@@ -6,6 +6,10 @@ import {
     isStarterTemplateVisible,
     pickStarterGameMaster,
     commonPortraitRounds,
+    mentionsPlaceholder,
+    starterClipKeyFor,
+    starterClipUrl,
+    STARTER_STORY_CLIP,
     parseStarterSceneDocId,
     pickStarterPortraitRound,
     pruneStyleSets,
@@ -228,5 +232,33 @@ describe('style sets', () => {
         expect(parseStarterSceneDocId('scene-welcome')).toBeNull();
         expect(parseStarterSceneDocId('Rowan__2')).toBeNull();
         expect(parseStarterSceneDocId('sheet-2')).toBeNull();
+    });
+});
+
+describe('voice clips', () => {
+    it('knows whether a line names the human', () => {
+        expect(mentionsPlaceholder('Welcome, Rowan.', 'Rowan')).toBe(true);
+        expect(mentionsPlaceholder('Under the rowan tree, Rowanberry wine.', 'Rowan')).toBe(false);
+        expect(mentionsPlaceholder('Anything', '')).toBe(false);
+    });
+
+    it('maps the opening story and the introductions to clip keys', () => {
+        expect(starterClipKeyFor({messageType: 'GAME_STORY', authorName: 'Game Master', day: 1}, 'Game Master')).toBe(STARTER_STORY_CLIP);
+        expect(starterClipKeyFor({messageType: 'BOT_WELCOME', authorName: 'Elda', day: 1}, 'Game Master')).toBe('Elda');
+        // Later days and every other line are read live.
+        expect(starterClipKeyFor({messageType: 'GAME_STORY', authorName: 'Game Master', day: 2}, 'Game Master')).toBeNull();
+        expect(starterClipKeyFor({messageType: 'BOT_ANSWER', authorName: 'Elda', day: 1}, 'Game Master')).toBeNull();
+        expect(starterClipKeyFor({messageType: 'NIGHT_SUMMARY', authorName: 'Game Master', day: 1}, 'Game Master')).toBeNull();
+    });
+
+    it('gives the clip URL only for a starter game, an existing clip and an unchanged voice', () => {
+        const game = {starterTemplateId: 'tavern', starterClips: {Elda: {voice: 'Kore', version: 7}}};
+        expect(starterClipUrl(game, 'Elda', 'Kore')).toBe('/api/starter-games/tavern/audio/Elda?v=7');
+        expect(starterClipUrl(game, 'Elda', 'Puck')).toBeUndefined();      // the player changed her voice
+        expect(starterClipUrl(game, 'Borin', 'Kore')).toBeUndefined();     // no clip (the line named the human)
+        expect(starterClipUrl(game, null, 'Kore')).toBeUndefined();
+        expect(starterClipUrl({starterClips: game.starterClips}, 'Elda', 'Kore')).toBeUndefined(); // not a starter game
+        expect(starterClipUrl({starterTemplateId: 'tavern', starterClips: {'Иван': {voice: 'Kore', version: 1}}}, 'Иван', 'Kore'))
+            .toBe('/api/starter-games/tavern/audio/%D0%98%D0%B2%D0%B0%D0%BD?v=1');
     });
 });

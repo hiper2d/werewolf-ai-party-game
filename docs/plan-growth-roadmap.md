@@ -416,6 +416,15 @@ below stay as the ceiling.
   another style's portrait (a mixed cast is their choice). The source game's own portraits
   are round 0 and are never picked once a styled round exists; three styled draws push
   them out.
+- **Intro voices and the cinematic start (built 2026-11-21):**
+  `scripts/record-starter-voices.ts <templateId>` records the opening story and the six
+  introductions once (MP3 via ffmpeg, measured: a 16 s introduction = 97 KB, $0.0025). A
+  line that names the human placeholder is skipped and read live, so keep the story and
+  the introductions free of the human's name. On the first open the role card shows, and
+  closing it opens cinematic mode on the opening story with voices on.
+- **Browsers are not restricted for guests** (Alex, 2026-11-21): Brave, VPN and
+  blocked-signal visitors may play as guests like everyone else. The one-game,
+  one-day-and-night limit and the daily guest budget are the protection.
 - **Order:** finish the pre-set games (voices, cinematic start, random set), then the helper
   hints.
 - **Anonymous players are users.** Every visitor who starts a game without signing in gets

@@ -1,5 +1,6 @@
 'use client';
 
+import { starterClipKeyFor, starterClipUrl } from "@/app/utils/starter-games";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { talkToAll, humanPlayerVote, getSuggestion } from "@/app/api/bot-actions";
 import { clampUserText, INPUT_LIMITS, MAX_STT_RECORDING_MS } from "@/app/utils/input-limits";
@@ -73,6 +74,9 @@ interface GameChatProps {
     isOwner?: boolean;
     onGameChange?: (patch: Partial<Game>) => void;
     onUpdateVoice?: (gameId: string, name: string, selection: VoiceSelection) => Promise<Game>;
+    // A fresh starter game: once true, open cinematic mode on the first line with
+    // voices on, whatever this browser's saved switches say (see the intro effect).
+    playIntro?: boolean;
 }
 
 export interface PhaseControls {
@@ -536,7 +540,7 @@ function retryNoteFor(gameState: string, notice: LlmRetryNotice): string {
     return `${who} ${what}, asking again`;
 }
 
-export default function GameChat({ gameId, game, runGameAction, onGameStateChange, pendingMessages, onPendingMessagesConsumed, clearNightMessages, onErrorHandled, onRetryWithModel, onReassignProvider, onRetryBotSelection, isExternalLoading, retryNotice, phaseControls, chatControls, onBeforeAction, cancelButton, onAvatarClick, isOwner, onGameChange, onUpdateVoice }: GameChatProps) {
+export default function GameChat({ gameId, game, runGameAction, onGameStateChange, pendingMessages, onPendingMessagesConsumed, clearNightMessages, onErrorHandled, onRetryWithModel, onReassignProvider, onRetryBotSelection, isExternalLoading, retryNotice, phaseControls, chatControls, onBeforeAction, cancelButton, onAvatarClick, isOwner, onGameChange, onUpdateVoice, playIntro }: GameChatProps) {
     // Without a parent-provided lock, run actions directly (standalone use).
     const runAction = useMemo(
         () => runGameAction ?? (<T,>(action: () => Promise<T>) => action()),
@@ -725,6 +729,21 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
             setCinematicOpen(true);
         }
     }, [messages, isLoadingMessages, autoPlay, cinematicOpen, isCurrentDaySelected, game.humanPlayerName]);
+
+    // A starter game's first open: the opening story and the introductions are already
+    // in the chat, pre-recorded, so the scene opens on line one and reads them out. Voice
+    // and auto-play are switched on for this visit only; the saved switches are not
+    // rewritten, and the player can turn either off from the scene as usual.
+    const introPlayedRef = useRef(false);
+    useEffect(() => {
+        if (!playIntro || introPlayedRef.current || isLoadingMessages || messages.length === 0) return;
+        introPlayedRef.current = true;
+        setAutoPlay(true);
+        setVoiceMuted(false);
+        cinematicDismissedRef.current = false;
+        setCinematicStartId(undefined);
+        setCinematicOpen(true);
+    }, [playIntro, isLoadingMessages, messages.length]);
 
     // A finished speaking burst lifts the "stop popping up" suppression.
     useEffect(() => {
@@ -1554,8 +1573,15 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
             // Show loading state
             setLoadingMessageId(messageId);
 
+            // A starter game's opening story and introductions were recorded with the
+            // template: play the stored clip (no voice-model call) while the speaker still
+            // has the voice it was read in.
+            const prerecordedUrl = message
+                ? starterClipUrl(game, starterClipKeyFor(message, GAME_MASTER), voice)
+                : undefined;
+
             const started = await ttsService.speakText(text, {
-                voice, voiceStyle, voiceProvider, gameId,
+                voice, voiceStyle, voiceProvider, gameId, prerecordedUrl,
                 // Auto-read lines are nobody's click; the metrics keep them apart.
                 source: opts?.silent ? 'cinematic_auto' : (opts?.source ?? 'chat'),
                 // Playback failures (autoplay policy, codec) fire after this await
