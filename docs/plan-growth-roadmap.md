@@ -237,9 +237,21 @@ guest could play one starter game before signing in:
   intros, has 6 bots on cheap models, so expect well under $0.50. Guards: a per-guest cap
   (e.g. $1), one guest game per device and per IP per day, and a global daily guest budget
   in `config/limits` (e.g. $5/day); past it the Play button asks for sign-in.
-- **Content:** a guest's chat goes through the content screen like everyone's; for guests
-  the would-block verdict rejects even while the screen is in monitor mode, since there is
-  no account to hold responsible.
+- **Content screen enforced for guests** (Alex, 2026-11-21), whatever `jevScreenMode`
+  says for accounts. An anonymous visitor has nothing to lose, so the guest path is where
+  abuse will be tried first (free model access through the bots, jailbreaks, content that
+  gets the platform keys flagged):
+  - `would_block` (the hard flags) rejects, as in enforce mode.
+  - Stricter than accounts: a `grey` verdict whose reason is `jailbreak` or `sexual` rejects
+    too. The composer keeps the draft and shows the notice, as today's rejection does.
+  - Fail closed: when both judges fail, a guest's message is not sent ("try again"), where
+    an account's goes through unscreened.
+  - Two rejected messages end the guest's free play: the game stays, and continuing needs
+    a sign-in.
+  - Guest input is the name and the chat only (vote reason and nothing else typed), each
+    with today's length limits, and the 5 s send cooldown from the multiplayer plan.
+  - Every guest verdict is a `jevScreenCalls` row with `guest: true`, so the report shows
+    what guests try, separately from accounts.
 - **Conversion:** a "Sign in to save your game" banner after the first vote and on game
   over. Signing in moves the guest's game to the account (`ownerEmail` rewrite), counts the
   guest's spend against the account's signup credit, and links the device as today.
