@@ -26,16 +26,20 @@ export default function StarterGames({cards, defaultName}: {cards: StarterCard[]
 
     const nameError = validatePlayerName(name);
 
-    const play = async (templateId: string) => {
+    // Play opens the player's unfinished game from this story when there is one (the server
+    // decides, so a stale card behaves the same); `forceNew` deals a fresh one.
+    const play = async (templateId: string, forceNew = false) => {
         if (startingId) return;
-        if (nameError) {
+        // An existing game already has its name; only a new one needs a valid name here.
+        const resuming = !forceNew && cards.some(card => card.id === templateId && card.resumeGameId);
+        if (nameError && !resuming) {
             setError(nameError);
             return;
         }
         setError(null);
         setStartingId(templateId);
         try {
-            const result = await createStarterGame(templateId, name);
+            const result = await createStarterGame(templateId, name, {forceNew});
             if (result.ok) {
                 router.push(`/games/${result.gameId}`);
                 return; // keep the button busy until the game page takes over
@@ -91,36 +95,25 @@ export default function StarterGames({cards, defaultName}: {cards: StarterCard[]
                                 <p className="m-0 text-[13px] leading-[1.55] text-[var(--fg-2)] flex-grow">{card.hook}</p>
                                 <div className="flex items-center justify-between gap-3 pt-2">
                                     <span className="text-[11.5px] text-[var(--fg-2)]">{card.resumeGameId ? 'Your game is in progress' : <>{card.playerCount} players · you&apos;re a villager</>}</span>
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-3">
                                         {card.resumeGameId && (
                                             <button
                                                 type="button"
-                                                onClick={() => play(card.id)}
+                                                onClick={() => play(card.id, true)}
                                                 disabled={!!startingId}
-                                                className="px-3 py-2 text-[12.5px] font-medium rounded-[var(--radius-md)] bg-transparent text-[var(--fg-1)] border border-[var(--line-2)] hover:bg-[var(--bg-2)] hover:text-[var(--fg-0)] disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-[120ms]"
+                                                className="text-[12px] text-[var(--fg-2)] underline underline-offset-2 hover:text-[var(--fg-0)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[120ms]"
                                             >
-                                                {starting ? 'Starting…' : 'New game'}
+                                                Start over
                                             </button>
                                         )}
-                                        {card.resumeGameId ? (
-                                            <button
-                                                type="button"
-                                                onClick={() => router.push(`/games/${card.resumeGameId}`)}
-                                                disabled={!!startingId}
-                                                className="px-4 py-2 text-[13px] font-semibold rounded-[var(--radius-md)] bg-[var(--accent)] text-[var(--accent-fg)] hover:brightness-110 disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-[120ms]"
-                                            >
-                                                Continue
-                                            </button>
-                                        ) : (
-                                            <button
-                                                type="button"
-                                                onClick={() => play(card.id)}
-                                                disabled={!!startingId}
-                                                className="px-4 py-2 text-[13px] font-semibold rounded-[var(--radius-md)] bg-[var(--accent)] text-[var(--accent-fg)] hover:brightness-110 disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-[120ms]"
-                                            >
-                                                {starting ? 'Starting…' : 'Play'}
-                                            </button>
-                                        )}
+                                        <button
+                                            type="button"
+                                            onClick={() => play(card.id)}
+                                            disabled={!!startingId}
+                                            className="px-4 py-2 text-[13px] font-semibold rounded-[var(--radius-md)] bg-[var(--accent)] text-[var(--accent-fg)] hover:brightness-110 disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-[120ms]"
+                                        >
+                                            {starting ? 'Opening…' : card.resumeGameId ? 'Continue' : 'Play'}
+                                        </button>
                                     </div>
                                 </div>
                             </div>

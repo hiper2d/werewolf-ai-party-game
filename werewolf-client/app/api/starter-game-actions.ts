@@ -96,7 +96,8 @@ export async function listStarterGames(): Promise<StarterCard[]> {
 }
 
 /**
- * Creates a game from a starter template for the signed-in player and returns its id.
+ * Creates a game from a starter template for the signed-in player and returns its id — or
+ * the id of the unfinished game they already have from that template, unless `forceNew`.
  *
  * No model and no image is called: the cast, the opening story, the introductions and the
  * portraits are copied from the template, and the game opens in day 1's discussion. What is
@@ -106,9 +107,9 @@ export async function listStarterGames(): Promise<StarterCard[]> {
  * Returns a result union instead of throwing: production masks the message of an error
  * thrown from a server action (see previewGameAction).
  */
-export async function createStarterGame(templateId: string, playerName: string): Promise<StarterGameResult> {
+export async function createStarterGame(templateId: string, playerName: string, options: { forceNew?: boolean } = {}): Promise<StarterGameResult> {
     try {
-        return { ok: true, gameId: await createStarterGameImpl(templateId, playerName) };
+        return { ok: true, gameId: await createStarterGameImpl(templateId, playerName, options.forceNew === true) };
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         const playerWall = isInsufficientBalanceError(message) || isFreeSpendLimitError(message);
@@ -126,7 +127,7 @@ export async function createStarterGame(templateId: string, playerName: string):
     }
 }
 
-async function createStarterGameImpl(templateId: string, playerName: string): Promise<string> {
+async function createStarterGameImpl(templateId: string, playerName: string, forceNew: boolean): Promise<string> {
     const session = await auth();
     const ownerEmail = session?.user?.email;
     if (!ownerEmail) {
@@ -145,6 +146,17 @@ async function createStarterGameImpl(templateId: string, playerName: string): Pr
     const template = templateDoc.exists ? {...(templateDoc.data() as Omit<StarterTemplate, 'id'>), id: templateDoc.id} : null;
     if (!template || !isStarterTemplateVisible(template.status, IS_PRODUCTION)) {
         throw new Error('Unknown starter game.');
+    }
+
+    // A player who already has this story on the table gets that game back, whatever the
+    // page they clicked on believed (a card restored by the Back button still says "Play").
+    // Only an explicit "new game" deals a second one.
+    if (!forceNew) {
+        const own = await db.collection('games').where('ownerEmail', '==', ownerEmail).select('starterTemplateId', 'gameState', 'createdAt').get();
+        const existing = resumableStarterGames(own.docs.map(doc => ({id: doc.id, ...(doc.data() as {starterTemplateId?: string; gameState?: string; createdAt?: number})})))[templateId];
+        if (existing) {
+            return existing;
+        }
     }
 
     // The player's name: the only text typed for a starter game.
