@@ -17,8 +17,8 @@ export const metadata: Metadata = {
 };
 
 const MODELS = [
-  'Claude 5.5 Opus', 'GPT-6.2 Sol', 'Gemini 4 Argon', 'DeepSeek V4 Pro',
-  'Mistral 4 Small', 'GLM-5.3', 'Kimi K3.1 Pro', 'Grok 4.7', 'Qwen4 Max', 'MiniMax M3.1 Flash', 'Sakana Fugu Max', 'Meta Muse Wonder 1.0',
+  'Claude 5.5 Opus', 'GPT-6.2 Sol', 'GLM-5.3', 'Kimi K3.1 Pro', 'Grok 4.7', 'Qwen4 Max',
+  'DeepSeek V4 Pro', 'Gemini 4 Argon', 'Meta Muse Wonder 1.0', 'Mistral 4 Small', 'MiniMax M3.1 Flash',
 ];
 
 // Real plans: Free (platform-paid, capped) vs Paid (pay-as-you-go, no subscription).
