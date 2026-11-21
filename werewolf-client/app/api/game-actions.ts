@@ -53,7 +53,8 @@ import {getFreeTierLimits} from "@/app/api/limits-actions";
 import {getVoiceConfig, isVoiceOfProvider, LEGACY_VOICE_PROVIDER, SUPPORTED_VOICE_PROVIDERS, VoiceProvider} from "@/app/ai/voice-config";
 import {recordFeatureEvent} from "@/app/api/feature-events";
 import {normalizeSpendings} from "@/app/utils/spending-utils";
-import {serializeMessageForFirestore} from "@/app/api/message-serialization";
+import {messageDocId, serializeMessageForFirestore} from "@/app/api/message-serialization";
+import {assertStarterModels} from "@/app/utils/starter-limits";
 import {LLM_CONSTANTS, assertAllowedAsGameMaster, configureStoryAgent, isAllowedAsGameMaster, SupportedAiModels} from "@/app/ai/ai-models";
 import {
     cheapFirstDealOrder,
@@ -978,11 +979,7 @@ export async function addMessageToChatAndSaveToDb(gameMessage: GameMessage, game
         const currentCounter = gameData?.messageCounter || 0;
         const newCounter = currentCounter + 1;
 
-        // Generate custom message ID: zero-padded-counter-author-to-recipient
-        const sanitizedAuthor = sanitizeNameForId(gameMessage.authorName);
-        const sanitizedRecipient = sanitizeNameForId(gameMessage.recipientName);
-        const paddedCounter = newCounter.toString().padStart(6, '0'); // Zero-pad to 6 digits for proper sorting
-        const customId = `${paddedCounter}-${sanitizedAuthor}-to-${sanitizedRecipient}`;
+        const customId = messageDocId(newCounter, gameMessage.authorName, gameMessage.recipientName);
 
         const timestamp = Date.now();
         // Sliding TTL: every message refreshes the game's 30-day expiry window, so an
@@ -1026,15 +1023,6 @@ export async function addMessageToChatAndSaveToDb(gameMessage: GameMessage, game
         logger.error("Error adding message to chat: ", { error: error.message, gameId, author: gameMessage.authorName });
         throw new Error(`Failed to add message: ${error.message}`);
     }
-}
-
-/**
- * A player name as a message-id segment: lower-cased, letters and digits of any
- * script kept (a Russian game's "Иван" stays readable in the id), the rest dropped.
- * Uniqueness comes from the counter prefix, not from this segment.
- */
-function sanitizeNameForId(name: string): string {
-    return name.normalize('NFC').toLowerCase().replace(/[^\p{L}\p{N}\p{M}]/gu, '');
 }
 
 /**
@@ -1086,6 +1074,7 @@ export async function updateBotModel(gameId: string, botName: string, newAiType:
         assertProviderNotBlocked({ providerBlocks: gameData?.providerBlocks }, newAiType);
         const { apiKeys: currentApiKeys } = await getUserTierAndApiKeys(session.user.email);
         validateModelUsageForTier(gameTier, gameMasterAiType, updatedBots.map((bot: Bot) => bot.aiType));
+        assertStarterModels(gameData, [newAiType]);
         
         // Update the game in Firestore
         await gameRef.update({ bots: updatedBots });
@@ -1186,6 +1175,7 @@ export async function updateGameMasterModel(gameId: string, newAiType: string): 
         const { apiKeys: currentApiKeys } = await getUserTierAndApiKeys(session.user.email);
         assertAllowedAsGameMaster(newAiType);
         validateModelUsageForTier(gameTier, newAiType, bots.map((bot: Bot) => bot.aiType));
+        assertStarterModels(gameData, [newAiType]);
 
         // Update the Game Master AI type in Firestore
         await gameRef.update({ gameMasterAiType: newAiType });
@@ -1505,6 +1495,7 @@ export async function retryWithModelOverride(gameId: string, model: string, enab
     const botModels = game.bots.map(b => (b.name === target ? model : b.aiType));
     const { apiKeys } = await getUserTierAndApiKeys(session.user.email);
     validateModelUsageForTier(gameTier, gmModel, botModels);
+    assertStarterModels(game, [model]);
 
     // No hint on this path by design: a different model has not made the mistake being described,
     // and any hint left over from an earlier plain Retry is cleared here rather than inherited.
@@ -1744,6 +1735,8 @@ function gameFromFirestore(id: string, data: any): Game {
         gameMasterTokenUsage: data.gameMasterTokenUsage || data.tokenUsage?.gameMasterUsage || null,
         // Stray legacy values (e.g. the retired 'api' tier) read as free so the game stays openable.
         createdWithTier: data.createdWithTier === 'paid' ? 'paid' : 'free',
+        ...(data.starterTemplateId ? {starterTemplateId: data.starterTemplateId} : {}),
+        ...(data.helperMode ? {helperMode: true} : {}),
         votingHistory: data.votingHistory || [],
         nightNarratives: data.nightNarratives || [],
         storyChapters: data.storyChapters || [],
@@ -1825,6 +1818,7 @@ export async function reassignProviderModels(gameId: string, providerKey: string
     // Only when the GM itself moves: an existing slow GM on another provider is left alone.
     if (gameMasterAiType !== gameData?.gameMasterAiType) assertAllowedAsGameMaster(gameMasterAiType);
     validateModelUsageForTier(gameTier, gameMasterAiType, updatedBots.map(bot => bot.aiType));
+    assertStarterModels(gameData, [newModel]);
 
     await gameRef.update({ bots: updatedBots, gameMasterAiType });
     logger.info(`Reassigned ${providerKey} players to ${newModel}`, { gameId, providerKey, newModel, count: updatedBots.filter((b, i) => b !== bots[i]).length });

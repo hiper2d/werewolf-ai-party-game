@@ -170,7 +170,10 @@ function GamePageContent({
     const redrawsLeft = isPaidGame
         ? Infinity
         : Math.max(0, FREE_TIER_AVATAR_REGENS - (game.avatarRegenCount ?? 0));
-    const canRedraw = isOwner && game.avatarsStatus === 'ready';
+    // A starter game (app/utils/starter-limits.ts) keeps its pre-drawn portraits, has no
+    // rewinds and offers only the cheapest model group; the server enforces all three.
+    const isStarterGame = !!game.starterTemplateId;
+    const canRedraw = isOwner && game.avatarsStatus === 'ready' && !isStarterGame;
     const redrawPortraits = async () => {
         if (redrawing || redrawsLeft <= 0) return;
         setRedrawing(true);
@@ -1048,7 +1051,7 @@ function GamePageContent({
                 actions: (
                     <>
                         {/* A replay re-runs the whole night (all paid LLM calls), so it is paid-tier only. */}
-                        {isPaidGame && (
+                        {isPaidGame && !isStarterGame && (
                             <button
                                 className={btnFlowSecondary}
                                 disabled={!areControlsEnabled}
@@ -1620,6 +1623,7 @@ function GamePageContent({
                 botName={selectedBot?.name || ''}
                 gameTier={game.createdWithTier}
                 usageCounts={modelUsageCounts}
+                starterGame={isStarterGame}
             />
 
             {/* Bot Selection Dialog */}

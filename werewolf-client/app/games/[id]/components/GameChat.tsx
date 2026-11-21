@@ -286,7 +286,8 @@ function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcludin
         message.recipientName === RECIPIENT_ALL &&
         message.day === game.currentDay &&
         (game.gameState === GAME_STATES.DAY_DISCUSSION || game.gameState === GAME_STATES.AFTER_GAME_DISCUSSION);
-    const canShowResetButton = isBotMessage || isHumanDayDiscussionMessage;
+    // A starter game has no rewinds (app/utils/starter-limits.ts); the server refuses them too.
+    const canShowResetButton = (isBotMessage || isHumanDayDiscussionMessage) && !game.starterTemplateId;
     
     let displayContent: string;
     try {

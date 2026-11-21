@@ -32,3 +32,20 @@ export function serializeMessageForFirestore(gameMessage: GameMessage) {
         cost: gameMessage.cost || 0      // Ensure cost is never undefined
     };
 }
+
+/**
+ * A player name as a message-id segment: lower-cased, letters and digits of any
+ * script kept (a Russian game's "Иван" stays readable in the id), the rest dropped.
+ * Uniqueness comes from the counter prefix, not from this segment.
+ */
+function sanitizeNameForId(name: string): string {
+    return name.normalize('NFC').toLowerCase().replace(/[^\p{L}\p{N}\p{M}]/gu, '');
+}
+
+/**
+ * The Firestore id of the `counter`-th message of a game: zero-padded counter (six digits,
+ * so ids sort in order), then author and recipient.
+ */
+export function messageDocId(counter: number, authorName: string, recipientName: string): string {
+    return `${counter.toString().padStart(6, '0')}-${sanitizeNameForId(authorName)}-to-${sanitizeNameForId(recipientName)}`;
+}

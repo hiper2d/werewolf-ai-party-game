@@ -6,6 +6,9 @@ import {redirect} from "next/navigation";
 import {Game} from "@/app/api/game-models";
 import { auth } from "@/auth";
 import { getUserTier } from "@/app/api/user-actions";
+import { listStarterGames } from "@/app/api/starter-game-actions";
+import StarterGames from "@/app/games/components/StarterGames";
+import { starterDefaultName } from "@/app/utils/starter-games";
 
 function formatCreationDate(timestamp?: number): string {
     if (!timestamp) return '';
@@ -34,6 +37,8 @@ const GamePages = async ({searchParams}: {searchParams?: Promise<{error?: string
 
     const userTier = await getUserTier(userEmail);
     const games: Game[] = await getAllGames(userEmail);
+    // Ready-made first games (app/utils/starter-games.ts). A failed read must not take the list down.
+    const starterCards = await listStarterGames().catch(() => []);
     const resolvedSearchParams = await searchParams;
     const errorCode = resolvedSearchParams?.error;
     const blockedGameId = resolvedSearchParams?.blocked;
@@ -41,12 +46,22 @@ const GamePages = async ({searchParams}: {searchParams?: Promise<{error?: string
         <div className="flex flex-col h-full overflow-hidden max-w-[1040px] mx-auto w-full">
             <div className="flex justify-between items-center mb-6 pt-4">
                 <h1 className="text-[20px] font-semibold text-[var(--fg-0)] tracking-[-0.01em]">Game List</h1>
-                <Link
-                    href="/games/newgame"
-                    className="px-4 py-2 text-[13px] font-medium rounded-[var(--radius-md)] bg-[var(--accent)] text-[var(--accent-fg)] hover:brightness-110 transition-all duration-[120ms]"
-                >
-                    Create Game
-                </Link>
+                <div className="flex items-center gap-3">
+                    {starterCards.length > 0 && games.length > 0 && (
+                        <Link
+                            href="/games/start"
+                            className="px-4 py-2 text-[13px] font-medium rounded-[var(--radius-md)] bg-transparent text-[var(--fg-1)] border border-[var(--line-2)] hover:bg-[var(--bg-1)] hover:border-[var(--line-3)] hover:text-[var(--fg-0)] transition-all duration-[120ms]"
+                        >
+                            Quick start
+                        </Link>
+                    )}
+                    <Link
+                        href="/games/newgame"
+                        className="px-4 py-2 text-[13px] font-medium rounded-[var(--radius-md)] bg-[var(--accent)] text-[var(--accent-fg)] hover:brightness-110 transition-all duration-[120ms]"
+                    >
+                        Create Game
+                    </Link>
+                </div>
             </div>
 
             {errorCode === 'tier_mismatch' && (
@@ -64,7 +79,18 @@ const GamePages = async ({searchParams}: {searchParams?: Promise<{error?: string
                 </div>
             )}
 
-            {games.length === 0 ? (
+            {games.length === 0 && starterCards.length > 0 ? (
+                <div className="flex-grow overflow-auto">
+                    <h2 className="m-0 text-[18px] font-semibold text-[var(--fg-0)] mb-1">Play your first game</h2>
+                    <p className="m-0 text-[13.5px] text-[var(--fg-2)] leading-[1.55] mb-5 max-w-[620px]">
+                        Pick a story and you&apos;re at the table in seconds, with AI players who think they&apos;re human.
+                        Can you spot the werewolves before they get you? Or{' '}
+                        <Link href="/games/newgame" className="underline underline-offset-2 text-[var(--fg-1)] hover:text-[var(--fg-0)]">create your own game</Link>
+                        {' '}with any theme and cast.
+                    </p>
+                    <StarterGames cards={starterCards} defaultName={starterDefaultName(session.user?.name)} />
+                </div>
+            ) : games.length === 0 ? (
                 <div className="flex-grow flex items-start justify-center pt-[16vh]">
                     <div className="text-center max-w-[420px] mx-auto px-6">
                         <div className="mx-auto w-14 h-14 rounded-full grid place-items-center border border-[var(--line-2)] bg-[var(--bg-2)] shadow-[var(--shadow-1)] mb-5">

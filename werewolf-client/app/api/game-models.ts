@@ -369,6 +369,12 @@ export interface Game {
     expireAt?: any; // Firestore Timestamp for TTL auto-deletion (30 days after creation)
     ownerEmail: string; // Email of the user who created this game
     createdWithTier: UserTier; // Store the user's tier at the time the game was created
+    // Set on a game created from a starter template (app/utils/starter-games.ts): the
+    // pre-built first game. Such a game is held to the cheapest model group, has no rewinds
+    // and no portrait redraws (docs/plan-growth-roadmap.md, "Limits in starter games").
+    starterTemplateId?: string;
+    // On-screen hints that say what the player can do next. On for starter games.
+    helperMode?: boolean;
     votingHistory?: VotingDayResult[]; // History of voting results for each day
     nightNarratives?: NightNarrativeResult[]; // GM night result narratives for each night
     storyChapters?: StoryChapter[]; // GM plot memory: one chapter per night, drives story continuity

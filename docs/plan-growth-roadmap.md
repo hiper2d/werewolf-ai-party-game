@@ -1,6 +1,8 @@
 # Plan: growth roadmap (starter games, multiplayer, UI, credits)
 
-Status: draft, 2026-11-20 (track 1 decisions added the same day). Nothing implemented. Order agreed with Alex: (1) starter
+Status: 2026-11-21: track 1's first step is built (templates, `createStarterGame`, the start
+screen, the starter-game limits; committed, not yet reviewed or deployed). Voice clips,
+helper mode, the report and everything else below are not built. Order agreed with Alex: (1) starter
 games, (2) multiplayer, (3) UI if it still seems worth it, (4) free/paid tiers →
 credits. Track 1 is designed in detail; the others are scoped and point at their own
 plans.
@@ -81,12 +83,23 @@ to the app:
   makes (a few cents each, a handful per game). Only the portraits and the welcome scene
   are pre-drawn.
 
-`scripts/build-starter-game.ts --theme "…" --id tavern`: runs the normal preview pipeline
-with the starter table, draws the portrait sheet and the scene, creates a throwaway game,
-runs the introductions, records the audio, and copies all of it into
-`starterGames/tavern`. Alex reads and listens to the result before it goes live
-(`status: draft | live`). Cost: one preview, three sheets, one scene, six intros and seven
-voice clips per template, once.
+**How a template is made (built 2026-11-21): a snapshot of a real game**, not a separate
+generation pipeline. Alex creates the game with the normal form (7 players, 2 werewolves,
+Doctor + Detective, a distinctive one-word name for himself such as "Rowan"), edits the
+cast on the preview, lets the characters introduce themselves, rerolls portraits until
+every character has good candidates, and then runs
+`scripts/snapshot-starter-game.ts <gameId> --id tavern --title "…" --hook "…"`. The script
+refuses a game that is not exactly "day 1, right after the introductions, nobody has
+talked", copies the cast, the story, the introductions and every image doc into
+`starterGames/tavern` as a draft, and `--publish tavern` makes it live. Everything the
+form, the preview editor and the portrait tools can do is available for curating a
+template, and there is no second pipeline to keep in step with the first.
+
+What is NOT copied from the source game: roles and models (dealt per game), the bots'
+private thinking on their introductions (written under another role deal), and the turn
+tails (rebuilt for the new game's roles and the player's name). The source game's human
+name is the placeholder: it is replaced, as a whole word, in the story, the bot stories and
+the introductions, and the human's portrait docs are renamed to the player's name.
 
 ### The three launch themes (Alex, 2026-11-20)
 
@@ -128,7 +141,7 @@ built for.
 | | Starter game | After registration, in games made with the form |
 |---|---|---|
 | Models | the cheapest group only; the model picker on a bot or the GM lists only that group | the other groups, by the usual per-group rules |
-| Rewinds: delete a message, trim after a message, replay the night, the one-shot model override on retry | off | on |
+| Rewinds: delete a message, trim after a message, replay the night | off | on |
 | Portraits | pick among the pre-drawn variants, reframe | redraw / reroll as today |
 | Illustrations | drawn live when the GM decides, as in any game; no manual redraw | the same |
 
@@ -137,8 +150,8 @@ built for.
   pre-drawn game), and the right column is what the form gives them. To confirm with Alex:
   whether a signed-in player should get rewinds inside a starter game.
 - Recovery is not a rewind and stays on for everyone: the Retry button on an error banner
-  (a provider failed, a bot timed out) and reassigning a refused provider's bots, both
-  limited to the cheapest group here.
+  (a provider failed, a bot timed out), retrying a failed turn with a different model, and
+  reassigning a refused provider's bots, all limited to the cheapest group here.
 - Enforced on the server, not only hidden in the UI: `updateBotModel`,
   `updateGameMasterModel`, `retryWithModelOverride`, the delete/trim actions, `replayNight`
   and the avatar reroll check `game.starterTemplateId` and refuse.

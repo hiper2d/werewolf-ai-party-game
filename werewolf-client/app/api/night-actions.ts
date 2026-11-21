@@ -1,5 +1,6 @@
 'use server';
 
+import {assertNoStarterRewind} from "@/app/utils/starter-limits";
 import { db } from "@/firebase/server";
 import { askBotText } from "@/app/ai/bot-turn";
 import {
@@ -545,6 +546,7 @@ async function replayNightImpl(gameId: string): Promise<GameActionResponse> {
     }
 
     await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: game.createdWithTier });
+    assertNoStarterRewind(game);
 
     // A replay re-runs every night action from scratch, so it is a paid-tier feature.
     if (game.createdWithTier !== USER_TIERS.PAID) {
@@ -1499,6 +1501,8 @@ function gameFromFirestore(id: string, data: any): Game {
         ownerEmail: data.ownerEmail || '',
         // Stray legacy values (e.g. the retired 'api' tier) read as free so the game stays openable.
         createdWithTier: data.createdWithTier === 'paid' ? 'paid' : 'free',
+        ...(data.starterTemplateId ? {starterTemplateId: data.starterTemplateId} : {}),
+        ...(data.helperMode ? {helperMode: true} : {}),
         votingHistory: data.votingHistory || [],
         nightNarratives: data.nightNarratives || [],
         dayDiscussionSummaries: data.dayDiscussionSummaries || [],

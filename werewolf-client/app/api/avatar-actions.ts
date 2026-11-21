@@ -1,6 +1,8 @@
 'use server'
 
 import {auth} from "@/auth";
+import {db} from "@/firebase/server";
+import {assertNoStarterRedraw} from "@/app/utils/starter-limits";
 import {insufficientBalanceMessage} from "@/app/api/errors";
 import {AvatarGenerationResult, ReframeResult, reframeGameAvatar, runAvatarGeneration, runAvatarRegeneration, selectAvatarVariantFor} from "@/app/utils/avatar-generation";
 import {AvatarFraming, FREE_TIER_AVATAR_REGENS, ReframeTarget, USER_TIERS} from "@/app/api/game-models";
@@ -47,6 +49,11 @@ export async function regenerateGameAvatars(gameId: string): Promise<AvatarGener
     const session = await auth();
     if (!session || !session.user?.email) {
         throw new Error('Not authenticated');
+    }
+    // A starter game's portraits were drawn in advance; it never draws new ones.
+    const starterCheck = await db?.collection('games').doc(gameId).get();
+    if (starterCheck?.data()?.ownerEmail === session.user.email) {
+        assertNoStarterRedraw(starterCheck.data());
     }
     const tier = await getUserTier(session.user.email);
     if (tier === USER_TIERS.PAID) {
