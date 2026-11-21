@@ -47,14 +47,6 @@ const GamePages = async ({searchParams}: {searchParams?: Promise<{error?: string
             <div className="flex justify-between items-center mb-6 pt-4">
                 <h1 className="text-[20px] font-semibold text-[var(--fg-0)] tracking-[-0.01em]">Game List</h1>
                 <div className="flex items-center gap-3">
-                    {starterCards.length > 0 && games.length > 0 && (
-                        <Link
-                            href="/games/start"
-                            className="px-4 py-2 text-[13px] font-medium rounded-[var(--radius-md)] bg-transparent text-[var(--fg-1)] border border-[var(--line-2)] hover:bg-[var(--bg-1)] hover:border-[var(--line-3)] hover:text-[var(--fg-0)] transition-all duration-[120ms]"
-                        >
-                            Quick start
-                        </Link>
-                    )}
                     <Link
                         href="/games/newgame"
                         className="px-4 py-2 text-[13px] font-medium rounded-[var(--radius-md)] bg-[var(--accent)] text-[var(--accent-fg)] hover:brightness-110 transition-all duration-[120ms]"
@@ -79,16 +71,27 @@ const GamePages = async ({searchParams}: {searchParams?: Promise<{error?: string
                 </div>
             )}
 
-            {games.length === 0 && starterCards.length > 0 ? (
+            {starterCards.length > 0 ? (
                 <div className="flex-grow overflow-auto">
-                    <h2 className="m-0 text-[18px] font-semibold text-[var(--fg-0)] mb-1">Play your first game</h2>
+                    {/* The ready-made stories stay in the lobby for every player: a card opens the
+                        player's unfinished game from that story, or deals a new one. */}
+                    <h2 className="m-0 text-[18px] font-semibold text-[var(--fg-0)] mb-1">
+                        {games.length === 0 ? 'Play your first game' : 'Ready-made stories'}
+                    </h2>
                     <p className="m-0 text-[13.5px] text-[var(--fg-2)] leading-[1.55] mb-5 max-w-[620px]">
-                        Pick a story and you&apos;re at the table in seconds, with AI players who think they&apos;re human.
-                        Can you spot the werewolves before they get you? Or{' '}
+                        {games.length === 0
+                            ? <>Pick a story and you&apos;re at the table in seconds, with AI players who think they&apos;re human. Can you spot the werewolves before they get you? Or{' '}</>
+                            : <>Pick a story and you&apos;re at the table in seconds. Or{' '}</>}
                         <Link href="/games/newgame" className="underline underline-offset-2 text-[var(--fg-1)] hover:text-[var(--fg-0)]">create your own game</Link>
                         {' '}with any theme and cast.
                     </p>
                     <StarterGames cards={starterCards} defaultName={starterDefaultName(session.user?.name)} />
+                    {games.length > 0 && (
+                        <>
+                            <h2 className="m-0 mt-8 mb-3 text-[18px] font-semibold text-[var(--fg-0)]">Your games</h2>
+                            <GameList games={games} userTier={userTier} userEmail={userEmail} />
+                        </>
+                    )}
                 </div>
             ) : games.length === 0 ? (
                 <div className="flex-grow flex items-start justify-center pt-[16vh]">
@@ -121,35 +124,7 @@ const GamePages = async ({searchParams}: {searchParams?: Promise<{error?: string
                 </div>
             ) : (
             <div className="flex-grow overflow-auto">
-                <ul className="space-y-3">
-                    {games.map((game) => {
-                        const isSameTier = game.createdWithTier === userTier;
-                        return (
-                        <li
-                            key={game.id}
-                            className={`bg-[var(--bg-1)] border border-[var(--line-1)] rounded-[var(--radius-lg)] px-4 py-4 shadow-subtle transition-all duration-[120ms] ${
-                                isSameTier ? 'hover:border-[var(--line-3)]' : 'opacity-50'
-                            }`}
-                        >
-                            <div className="flex justify-between items-start gap-2">
-                                {isSameTier ? (
-                                    <Link href={`/games/${game.id}`} className="flex-grow">
-                                        <GameListEntryContent game={game} />
-                                    </Link>
-                                ) : (
-                                    <div className="flex-grow cursor-not-allowed">
-                                        <GameListEntryContent game={game} locked />
-                                        <p className="mt-2 text-[11px] text-[var(--fg-2)]">
-                                            Switch to the <span className="font-medium uppercase">{game.createdWithTier}</span> tier to continue this game.
-                                        </p>
-                                    </div>
-                                )}
-                                <RemoveGame gameId={game.id} ownerEmail={userEmail} />
-                            </div>
-                        </li>
-                        );
-                    })}
-                </ul>
+                <GameList games={games} userTier={userTier} userEmail={userEmail} />
             </div>
             )}
         </div>
@@ -157,6 +132,40 @@ const GamePages = async ({searchParams}: {searchParams?: Promise<{error?: string
 }
 
 export default GamePages;
+
+function GameList({games, userTier, userEmail}: {games: Game[]; userTier: string; userEmail: string}) {
+    return (
+        <ul className="space-y-3">
+            {games.map((game) => {
+                const isSameTier = game.createdWithTier === userTier;
+                return (
+                <li
+                    key={game.id}
+                    className={`bg-[var(--bg-1)] border border-[var(--line-1)] rounded-[var(--radius-lg)] px-4 py-4 shadow-subtle transition-all duration-[120ms] ${
+                        isSameTier ? 'hover:border-[var(--line-3)]' : 'opacity-50'
+                    }`}
+                >
+                    <div className="flex justify-between items-start gap-2">
+                        {isSameTier ? (
+                            <Link href={`/games/${game.id}`} className="flex-grow">
+                                <GameListEntryContent game={game} />
+                            </Link>
+                        ) : (
+                            <div className="flex-grow cursor-not-allowed">
+                                <GameListEntryContent game={game} locked />
+                                <p className="mt-2 text-[11px] text-[var(--fg-2)]">
+                                    Switch to the <span className="font-medium uppercase">{game.createdWithTier}</span> tier to continue this game.
+                                </p>
+                            </div>
+                        )}
+                        <RemoveGame gameId={game.id} ownerEmail={userEmail} />
+                    </div>
+                </li>
+                );
+            })}
+        </ul>
+    );
+}
 
 function GameListEntryContent({
     game,
