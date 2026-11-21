@@ -400,6 +400,44 @@ below stay as the ceiling.
 | Signup credit, per linked identity | once | a second account on the same browser/fingerprint |
 | Games per day, per account | 5 (today's limit) | runaway use |
 
+## Decisions and open points, 2026-11-21 (Alex)
+
+- **Pre-generated vs live.** Everything before the player's first message is pre-generated
+  and stored on the template: the opening story, the introductions, their voice clips, the
+  portraits (several sets) and the welcome scene. Generation starts when the player starts
+  playing: bot replies, live voice, the GM's illustrations.
+- **Portrait set:** each new game picks ONE of the template's sets at random (the same set
+  for the whole cast, so the style is consistent) and the player can switch any character
+  to another set. Not built yet: today the game copies the selection saved on the template.
+- **Order:** finish the pre-set games (voices, cinematic start, random set), then the helper
+  hints.
+- **Anonymous players are users.** Every visitor who starts a game without signing in gets
+  a record (`guests/{guestId}`): first seen, device id, fingerprint, IPs, edge geo, system
+  timezone, every game started (the first one included), how far each got, and, if they
+  sign in, the account they became (`convertedTo`). Every anonymous game start is also a
+  `starter_game_created` feature event with `guest: true`. The report reads guests and
+  accounts as one funnel: landed → started a game → wrote a message → first vote → first
+  night → signed in → second game.
+- **Fingerprint data: nothing has been collected so far.** `devices/{id}` holds the cookie
+  id, the emails and IPs seen on it and the edge geo (the IP's timezone, not the system's).
+  The browser signals (canvas, GPU, screen, system timezone, languages) were designed on
+  2026-10-29 and never built, so there is nothing to analyse yet. The two-week wait is only
+  needed to tune a FUZZY match for accounts (credits). Guests can be linked from day one by
+  an EXACT match on the strong signals, because a false match there costs a sign-in prompt,
+  not a refusal. Known limit: phones of one model in one timezone look identical, so on
+  mobile the exact match is combined with the IP.
+- **Open: what "Play now" does.** (a) starts one of the three stories at random, or (b)
+  opens the three cards. Proposed: the three cards ON the landing page, one click starts.
+- **Open: how much a guest gets.** Proposed: one game, day 1 and night 1; the morning of
+  day 2 asks for sign-in (free, the game continues on the account, the other two stories
+  open up). The first vote and the first night are the hook, the cut lands on a cliffhanger,
+  and a guest costs roughly a third of a full starter game.
+- **Credits (track 4), direction confirmed:** free and paid merge; a new account gets $5
+  once. **Discord bonus:** extra credits for joining the Discord server and asking Marlow
+  (a personal claim code from /profile, posted to the bot; one claim per Discord account
+  and per game account; Marlow already reads this Firestore project).
+- **Multiplayer:** signed-in users only, built last.
+
 ## Sequencing
 
 1. Track 0 phase A (collection, monitor) and track 1 start together.
