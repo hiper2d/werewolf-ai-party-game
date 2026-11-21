@@ -73,18 +73,19 @@ to the app:
   plays the stored clip instead of calling TTS. The first minute of every starter game then
   costs nothing in voice and plays without waiting on TTS. Later lines use live TTS as
   usual.
-- **An illustration pool**, drawn at build time: the welcome scene plus about 8-10 scenes
-  of the setting tagged by moment (`day`, `vote`, `night`, `death`, `finale`). A starter
-  game never calls the image model: where a normal game draws the day's illustration, the
-  starter game takes the next unused picture with the matching tag from its template's
-  pool. The pictures show the place and the mood, not a named character doing a specific
-  thing, so they fit any game played from the template.
+- The welcome scene, drawn once with the sheets. It opens cinematic mode and is the style
+  reference every later illustration of the game is drawn against.
+- **Illustrations stay live and decided by the Game Master** (Alex, 2026-11-20): the night
+  illustration and the dramatic mid-day one are drawn during the game from what actually
+  happened, exactly as in a normal game. They are the only image calls a starter game
+  makes (a few cents each, a handful per game). Only the portraits and the welcome scene
+  are pre-drawn.
 
 `scripts/build-starter-game.ts --theme "…" --id tavern`: runs the normal preview pipeline
 with the starter table, draws the portrait sheet and the scene, creates a throwaway game,
 runs the introductions, records the audio, and copies all of it into
 `starterGames/tavern`. Alex reads and listens to the result before it goes live
-(`status: draft | live`). Cost: one preview, one sheet, one scene, six intros and seven
+(`status: draft | live`). Cost: one preview, three sheets, one scene, six intros and seven
 voice clips per template, once.
 
 ### The three launch themes (Alex, 2026-11-20)
@@ -129,7 +130,7 @@ built for.
 | Models | the cheapest group only; the model picker on a bot or the GM lists only that group | the other groups, by the usual per-group rules |
 | Rewinds: delete a message, trim after a message, replay the night, the one-shot model override on retry | off | on |
 | Portraits | pick among the pre-drawn variants, reframe | redraw / reroll as today |
-| Illustrations | from the template's pool, no image call | drawn per day as today |
+| Illustrations | drawn live when the GM decides, as in any game; no manual redraw | the same |
 
 - "Registration" matters once guest play exists: a guest gets only the left column. A
   signed-in player's starter game follows the same left column (it is the same cheap,
@@ -141,7 +142,8 @@ built for.
 - Enforced on the server, not only hidden in the UI: `updateBotModel`,
   `updateGameMasterModel`, `retryWithModelOverride`, the delete/trim actions, `replayNight`
   and the avatar reroll check `game.starterTemplateId` and refuse.
-- Image spend in a starter game is zero by construction; the report should show it.
+- Image spend in a starter game is the GM's illustrations only (no sheet, no scene, no
+  redraws); the report shows it per game.
 
 ### Server side
 
@@ -227,7 +229,7 @@ guest could play one starter game before signing in:
   the actor from one helper that returns the session email or the guest id; game access
   checks compare against it.
 - **Only starter games,** with the limits above: cheapest group only, no rewinds, no
-  redraws, no image calls. The intros and their voices are pre-recorded. The form, the
+  redraws. The intros and their voices are pre-recorded. The form, the
   other model groups and rewinds are what signing in unlocks, and the game says so where
   those controls would be ("Sign in to change models beyond this set").
 - **Cost guard:** measured 2026-11-20, a free game costs a median $0.39 and $1.54 at p90
