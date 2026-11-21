@@ -741,8 +741,12 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
         setAutoPlay(true);
         setVoiceMuted(false);
         cinematicDismissedRef.current = false;
-        setCinematicStartId(undefined);
+        // The scene opens on the NEWEST line unless told where to start, and the story
+        // begins at the top: name the first spoken line (the opening story).
+        const firstLine = messages.find(m => m.id && SPEECH_TYPES.has(m.messageType as MessageType));
+        setCinematicStartId(firstLine?.id ?? undefined);
         setCinematicOpen(true);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [playIntro, isLoadingMessages, messages.length]);
 
     // A finished speaking burst lifts the "stop popping up" suppression.
