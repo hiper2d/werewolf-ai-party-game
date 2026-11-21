@@ -1,6 +1,6 @@
 # Plan: growth roadmap (starter games, multiplayer, UI, credits)
 
-Status: draft, 2026-11-20. Nothing implemented. Order agreed with Alex: (1) starter
+Status: draft, 2026-11-20 (track 1 decisions added the same day). Nothing implemented. Order agreed with Alex: (1) starter
 games, (2) multiplayer, (3) UI if it still seems worth it, (4) free/paid tiers →
 credits. Track 1 is designed in detail; the others are scoped and point at their own
 plans.
@@ -35,15 +35,15 @@ small enough to reach a vote, a night and a death in the first session.
 
 1. After the first sign-in (no games yet), the player lands on `/games/start` instead of
    `/games` or the form.
-2. 3–4 cards: art, title, one-line hook ("A storm traps seven guests at a mountain inn. One of
-   them is not what they seem."). A "Your name" field, prefilled from the account's first
-   name. "Play". Below: "Create your own game" → the existing form.
-3. Play → the game page opens in DAY 1 DISCUSSION with the opening story and every
-   character's introduction already in the chat, portraits already drawn, and the role card
-   on top. The composer is live immediately.
-4. Light guidance on the first game only: the GM's lines say what to do next ("Ask
-   someone a question, or press Vote when you've heard enough"), a one-time hint points at
-   the Vote button, and the night screen explains the role's action in one line.
+2. 3 cards: art, title, one-line hook ("Rain on the roof, ale on the table, and one of the
+   regulars is not what they seem."). A "Your name" field, prefilled from the account's
+   first name. "Play". Below: "Create your own game" → the existing form.
+3. Play → the game page opens in DAY 1 DISCUSSION, in cinematic mode, with voices on. The
+   opening story and every character's introduction are already in the chat, pre-voiced,
+   and the portraits are already drawn. The role card is on top: the player is a villager.
+   The composer is live as soon as the introductions have played (or are skipped).
+4. Helper mode is on (section below): hints on the screen say what the player can and
+   should do at each step.
 
 The `/games` list gets a "Quick start" entry too, so returning players can use the
 templates again.
@@ -64,23 +64,44 @@ to the app:
   introduction message, recorded once by running the real WELCOME flow on a throwaway game.
   The human's name is a fixed placeholder (`Newcomer`) while recording, and is replaced
   whole-word in the copied messages and tails at creation.
-- Optional later: the intro voice lines as stored audio, so the first minute has voices
-  without TTS calls.
+- Voice: the opening story (GM voice) and the six introductions as stored audio in
+  `starterGames/{id}/audio/{messageKey}`, generated once by the build script. Firestore
+  docs cap at 1 MiB and Gemini TTS returns raw PCM (~48 KB/s), so the script encodes to a
+  compressed format first. The copied messages carry an `audioKey`; the chat's speak path
+  plays the stored clip instead of calling TTS. The first minute of every starter game then
+  costs nothing in voice and plays without waiting on TTS. Later lines use live TTS as
+  usual.
+- The welcome scene illustration that cinematic mode opens on, drawn once with the sheet.
 
-`scripts/build-starter-game.ts --theme "…" --id inn-storm`: runs the normal preview
-pipeline with the starter table, draws the portrait sheet, creates a throwaway game, runs
-the introductions, and copies all of it into `starterGames/inn-storm`. Alex reads the
-result before it goes live (`status: draft | live`). Cost: one preview + one sheet + six
-intros per template, once.
+`scripts/build-starter-game.ts --theme "…" --id tavern`: runs the normal preview pipeline
+with the starter table, draws the portrait sheet and the scene, creates a throwaway game,
+runs the introductions, records the audio, and copies all of it into
+`starterGames/tavern`. Alex reads and listens to the result before it goes live
+(`status: draft | live`). Cost: one preview, one sheet, one scene, six intros and seven
+voice clips per template, once.
+
+### The three launch themes (Alex, 2026-11-20)
+
+| Id | Theme | Feel |
+|---|---|---|
+| `tavern` | Fantasy world: a gathering at a tavern | warm, classic Werewolf, the default card |
+| `starship` | A spaceship crew | sci-fi, isolated, "one of us is not human" |
+| `ninja-academy` | An anime ninja school | light, energetic, rivalries and teachers |
+
+Each theme is written as a short GM instruction for the build script (setting, tone, why
+these seven people are together tonight). Cards show the scene illustration.
 
 ### The starter table
 
 - **7 players: the human + 6 bots.** 2 werewolves, a doctor and a detective (no maniac),
   2 villagers. Small enough that day 1 is a few rounds, big enough that one lucky vote
   does not end it.
-- **Human role:** villager, doctor or detective, never a wolf in the first game (lying to
-  six models is the hardest job and the worst first impression). Detective is probably
-  the most fun first role: there is a night action and a reveal. Open question below.
+- **Human role: always villager** (Alex, 2026-11-20). The simplest role to learn: talk,
+  suspect, vote. No night action to explain; the night plays out in cinematic mode as a
+  story. The bots' roles are shuffled per game among the other six slots.
+- **Voice and cinematic mode on.** The starter game opens in cinematic mode with autoplay
+  on, regardless of the browser's saved switch (`autoPlay` in localStorage); the player can
+  still turn either off, and that choice is saved as usual.
 - **Models:** a fixed set from the cheapest group with 100+ measured turns and a `fast` tag,
   one per bot, mixed providers for variety. GM: a fast model already allowed as GM. Stored
   on the template, re-checked against the catalog at creation (a removed model falls back
@@ -130,15 +151,76 @@ the same build script with `--language`. Start with the languages new users actu
 (`feature-events-report.ts --days 30`), and show a non-English player the form-first flow
 until their language has templates.
 
+### Helper mode (hints on screen)
+
+A hint layer that says what the player can and should do right now. On for every starter
+game (`game.helperMode: true`), off for games made with the form, with a "Hide hints"
+switch in the game menu (saved per browser). Hints are UI chrome, so English only, like the
+rest of the interface.
+
+Each hint is one entry in a table (`app/games/[id]/helper-hints.ts`): when it shows (game
+state, day, a condition such as "the player has not sent a message yet"), the text, and
+the element it points at (a `data-hint="vote-button"` attribute on the target). A small
+`HelperHints` component picks the first matching hint that has not been dismissed, shows it
+as a callout anchored to that element, and records the dismissal per game in localStorage.
+The same component renders inside `CinematicMode`, since that is where the starter game
+opens.
+
+First set of hints:
+
+| When | Points at | Says |
+|---|---|---|
+| First open, role card closed | the chat | "Everyone here has a secret role. Two of them are werewolves. Talk to find them." |
+| Day 1, the player has not written yet | the composer | "Ask someone a question, or say who you suspect. Characters answer when you write." |
+| After the first round of replies | a character's name/portrait | "Mention a name to make that character answer you." |
+| Day discussion, enough messages for a vote | the Vote button | "Heard enough? Start the vote." |
+| VOTE | the vote panel | "Pick who you think is a werewolf. The player with the most votes is out." |
+| VOTE_RESULTS | the result line | "That player's role is revealed. Was it a werewolf?" |
+| NIGHT (villager) | the night story | "Night: werewolves choose a victim, the doctor protects someone, the detective checks someone. You sleep." |
+| New day | the night result | "Someone may have died in the night. Use what you know: who acted strangely?" |
+| Player eliminated | the chat | "You're out, but you can watch the rest of the game." |
+| GAME_OVER | the post-game panel | "Now make your own: any theme, any cast." → the form |
+
+The Game Master's lines stay as they are; helper mode is UI only, so prompts and caches are
+untouched. Hints reach every starter game, so their copy is reviewed like a News entry.
+
+### Playing without signing in (proposal, decision pending)
+
+The "signed up but never played" third suggests the sign-in step itself loses people. A
+guest could play one starter game before signing in:
+
+- **Identity:** a guest user `guest:<deviceId>` (the existing device-id cookie +
+  localStorage UUID), created when a signed-out visitor presses Play. Server actions get
+  the actor from one helper that returns the session email or the guest id; game access
+  checks compare against it.
+- **Only starter games:** no form, no previews, no paid models. The table is already the
+  cheapest group and the intros and their voices are pre-recorded.
+- **Cost guard:** measured 2026-11-20, a free game costs a median $0.39 and $1.54 at p90
+  (11 bots, with portraits and an intro round). A starter game skips the portraits and the
+  intros, has 6 bots on cheap models, so expect well under $0.50. Guards: a per-guest cap
+  (e.g. $1), one guest game per device and per IP per day, and a global daily guest budget
+  in `config/limits` (e.g. $5/day); past it the Play button asks for sign-in.
+- **Content:** a guest's chat goes through the content screen like everyone's; for guests
+  the would-block verdict rejects even while the screen is in monitor mode, since there is
+  no account to hold responsible.
+- **Conversion:** a "Sign in to save your game" banner after the first vote and on game
+  over. Signing in moves the guest's game to the account (`ownerEmail` rewrite), counts the
+  guest's spend against the account's signup credit, and links the device as today.
+- **Abuse limit:** the multi-account tracking (device id, 12h same-IP inheritance) slows
+  repeat guests but is beaten by a cleared browser on a VPN (the 2026-10-29 ring). The
+  global daily guest budget is what actually bounds the cost, so the worst case is that
+  budget a day.
+- **Cost of building it:** `auth()` + `session.user.email` is in every server action, so the
+  actor helper touches many files. Ship starter games for signed-in players first, read
+  their numbers, then add guest play as its own step.
+
 ### Open questions (Alex)
 
-1. Human role in the starter game: always detective, or random among villager/doctor/detective?
-2. How many templates at launch, and which themes? (Suggest 3: a classic village, a
-   locked-room mystery, one sci-fi.)
-3. Pre-recorded intro voices now, or later?
-4. Should a signed-out visitor be able to play a starter game before signing in? Biggest
-   lever on the "signed up but never played" third, but the free budget would then need a
-   per-device guard only. Proposed: no, revisit after the numbers.
+1. Guest play: go ahead after the signed-in version ships? With what per-guest cap and
+   daily guest budget?
+2. Hints: is the first set the right one? Anything to add for the villager's first night?
+3. Languages: English templates only at launch, or the three themes in the top new-user
+   languages too?
 
 ---
 
@@ -224,8 +306,9 @@ as abuse protection.
 
 ## Sequencing
 
-1. Track 1: templates script → `createStarterGame` → `/games/start` + routing → guidance
-   lines → report. Ship, read two weeks of first games.
+1. Track 1: templates script (+ voice clips) → `createStarterGame` → `/games/start` +
+   routing → helper mode → report. Ship, read two weeks of first games. Then guest play
+   if Alex decides for it.
 2. Track 4 can start alongside track 1's measurement window (it is mostly server-side).
    Announce it in News and on Discord before switching; grandfather grants go out the same
    day.
