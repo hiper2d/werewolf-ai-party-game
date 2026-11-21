@@ -1,3 +1,4 @@
+import {readFileSync} from "fs";
 import {db} from "../firebase/server";
 import {AVATAR_VARIANTS_COLLECTION, GAME_ROLES, GAME_STATES, MessageType} from "../app/api/game-models";
 import {isIllustrationDocId, STARTER_GAMES_COLLECTION, StarterBot, StarterTemplate} from "../app/utils/starter-games";
@@ -19,6 +20,9 @@ import {isAllowedAsGameMaster} from "../app/ai/ai-models";
  * Usage (from werewolf-client/, sandbox off):
  *   npx tsx --env-file=.env scripts/snapshot-starter-game.ts <gameId> --id tavern \
  *       --title "The Last Lantern" --hook "Rain on the roof, ale on the table…" [--order 1] [--dry-run]
+ *       [--drop-maniac]            leave the Maniac off the template's role list
+ *       [--story-file <path>]      use this text as the opening story instead of the generated one
+ *   npx tsx --env-file=.env scripts/snapshot-starter-game.ts --set-story tavern --story-file <path>
  *   npx tsx --env-file=.env scripts/snapshot-starter-game.ts --publish tavern
  *   npx tsx --env-file=.env scripts/snapshot-starter-game.ts --unpublish tavern
  *   npx tsx --env-file=.env scripts/snapshot-starter-game.ts --list
@@ -77,8 +81,12 @@ async function snapshot(gameId: string) {
         problems.push(`the game must be in day 1's discussion, right after the introductions (it is ${game.gameState}, day ${game.currentDay})`);
     }
     if (game.avatarsStatus !== 'ready') problems.push(`portraits are not ready (avatarsStatus = ${game.avatarsStatus})`);
-    if (game.specialRoles?.includes(GAME_ROLES.MANIAC)) problems.push('starter games have no Maniac');
-    const roleSlots = (game.werewolfCount ?? 0) + (game.specialRoles?.length ?? 0);
+    // Starter games have no Maniac. Roles are dealt per game from the template's list, not
+    // copied from the source game, so --drop-maniac simply leaves it off the list (the
+    // freed seat becomes a villager). The opening story may still mention it: check it.
+    const specialRoles: string[] = (game.specialRoles ?? []).filter((role: string) => !(flag('drop-maniac') && role === GAME_ROLES.MANIAC));
+    if (specialRoles.includes(GAME_ROLES.MANIAC)) problems.push('starter games have no Maniac (recreate the game without it, or pass --drop-maniac)');
+    const roleSlots = (game.werewolfCount ?? 0) + specialRoles.length;
     if (roleSlots > game.bots.length) problems.push(`${roleSlots} role slots do not fit ${game.bots.length} bots (the human is always a villager)`);
 
     const messagesSnapshot = await gameRef.collection('messages').orderBy('timestamp').get();
@@ -120,6 +128,17 @@ async function snapshot(gameId: string) {
         process.exit(1);
     }
 
+    // --story-file replaces the generated opening story (the first thing a player hears).
+    const storyFile = arg('story-file');
+    const story: string = storyFile ? readFileSync(storyFile, 'utf8').trim() : game.story;
+    if (!story) throw new Error('The opening story is empty');
+    if (/maniac/i.test(story) && !specialRoles.includes(GAME_ROLES.MANIAC)) {
+        console.warn('  WARNING: the opening story mentions a Maniac, but this template has none.');
+    }
+    for (const bot of bots) {
+        if (/maniac/i.test(bot.intro) && !specialRoles.includes(GAME_ROLES.MANIAC)) console.warn(`  WARNING: ${bot.name}'s introduction mentions a Maniac.`);
+    }
+
     const gmModel: string | undefined = isStarterModel(game.gameMasterAiType) && isAllowedAsGameMaster(game.gameMasterAiType)
         ? game.gameMasterAiType
         : undefined;
@@ -139,10 +158,10 @@ async function snapshot(gameId: string) {
         gameMasterVoice: game.gameMasterVoice,
         ...(game.gameMasterVoiceStyle ? {gameMasterVoiceStyle: game.gameMasterVoiceStyle} : {}),
         ...(gmModel ? {gameMasterAiType: gmModel} : {}),
-        story: game.story,
+        story,
         humanPlaceholder: game.humanPlayerName,
         werewolfCount: game.werewolfCount,
-        specialRoles: game.specialRoles ?? [],
+        specialRoles,
         bots,
         avatarsVersion: game.avatarsVersion ?? 1,
         avatarVariants: game.avatarVariants ?? {},
@@ -201,6 +220,17 @@ async function main() {
     if (flag('list')) return list();
     if (arg('publish')) return setStatus(arg('publish')!, 'live');
     if (arg('unpublish')) return setStatus(arg('unpublish')!, 'draft');
+    if (arg('set-story')) {
+        const storyFile = arg('story-file');
+        if (!storyFile) throw new Error('--set-story needs --story-file <path>');
+        const ref = db.collection(STARTER_GAMES_COLLECTION).doc(arg('set-story')!);
+        if (!(await ref.get()).exists) throw new Error(`No starter template "${arg('set-story')}"`);
+        const text = readFileSync(storyFile, 'utf8').trim();
+        if (!text) throw new Error('The story file is empty');
+        await ref.update({story: text});
+        console.log(`${arg('set-story')}: opening story replaced (${text.length} chars). Record its voice again: record-starter-voices.ts ${arg('set-story')} --only story`);
+        return;
+    }
     const gameId = process.argv[2];
     if (!gameId || gameId.startsWith('--')) {
         console.error('Usage: snapshot-starter-game.ts <gameId> --id <templateId> --title "…" --hook "…" [--order N] [--dry-run]');
