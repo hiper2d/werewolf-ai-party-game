@@ -59,6 +59,12 @@ export default function PrivacyPolicy() {
         The site uses a session cookie from NextAuth for authentication. No third-party tracking cookies
         are used.
       </p>
+      <p>
+        To meter free play and to recognize repeat sign-ups, the site also stores a random browser id and a
+        browser profile (screen size, graphics card, time zone, language, browser and operating system).
+        It is used only on this site, is never shared with third parties, and is not used to track you
+        anywhere else.
+      </p>
 
       <h2>Contact</h2>
       <p>

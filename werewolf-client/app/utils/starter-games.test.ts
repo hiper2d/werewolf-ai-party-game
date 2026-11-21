@@ -4,6 +4,7 @@ import {
     dealStarterRoles,
     isIllustrationDocId,
     pickStarterGameMaster,
+    pickStarterPortraitRound,
     renameHumanAvatarKey,
     replacePlaceholderName,
     starterAvatarDocId,
@@ -150,5 +151,27 @@ describe('starter limits', () => {
     it('refuse rewinds and redraws in a starter game', () => {
         expect(() => assertNoStarterRewind(starter)).toThrow(/starter game/);
         expect(() => assertNoStarterRedraw(starter)).toThrow(/starter game/);
+    });
+});
+
+describe('pickStarterPortraitRound', () => {
+    it('picks one round every character has', () => {
+        const variants = {A: {n: 3, sel: 2}, B: {n: 3, sel: 0}, 'game-master': {n: 3, sel: 1}};
+        expect(pickStarterPortraitRound(variants, rngOf(0))).toBe(0);
+        expect(pickStarterPortraitRound(variants, rngOf(0.5))).toBe(1);
+        expect(pickStarterPortraitRound(variants, rngOf(0.99))).toBe(2);
+    });
+
+    it('stays inside the window of rounds still stored', () => {
+        // Four draws with a cap of three: round 0 was dropped.
+        const variants = {A: {n: 4, sel: 3, first: 1}, B: {n: 4, sel: 3, first: 1}};
+        expect(pickStarterPortraitRound(variants, rngOf(0))).toBe(1);
+        expect(pickStarterPortraitRound(variants, rngOf(0.99))).toBe(3);
+    });
+
+    it('returns undefined with no variants or no round in common', () => {
+        expect(pickStarterPortraitRound(undefined)).toBeUndefined();
+        expect(pickStarterPortraitRound({})).toBeUndefined();
+        expect(pickStarterPortraitRound({A: {n: 1, sel: 0}, B: {n: 3, sel: 2, first: 2}})).toBeUndefined();
     });
 });

@@ -3,6 +3,7 @@
 import {useEffect} from 'react';
 import {useSession} from 'next-auth/react';
 import {registerDevice} from '@/app/api/device-actions';
+import {collectBrowserSignals} from '@/app/utils/collect-browser-signals';
 
 /**
  * Mirrors this browser's device id between localStorage and the server-owned httpOnly
@@ -44,7 +45,10 @@ export default function DeviceProvider() {
         let cancelled = false;
         (async () => {
             try {
-                const canonical = await registerDevice(readLocal(), email);
+                // The browser's signals ride along (browser-signals.ts): stored on the device
+                // record, monitor only. A failed read sends none.
+                const signals = await collectBrowserSignals().catch(() => null);
+                const canonical = await registerDevice(readLocal(), email, signals ?? undefined);
                 if (!cancelled && canonical) {
                     writeLocal(canonical);
                 }

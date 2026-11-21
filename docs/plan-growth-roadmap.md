@@ -408,7 +408,7 @@ below stay as the ceiling.
   playing: bot replies, live voice, the GM's illustrations.
 - **Portrait set:** each new game picks ONE of the template's sets at random (the same set
   for the whole cast, so the style is consistent) and the player can switch any character
-  to another set. Not built yet: today the game copies the selection saved on the template.
+  to another set. Built 2026-11-21 (`pickStarterPortraitRound`).
 - **Order:** finish the pre-set games (voices, cinematic start, random set), then the helper
   hints.
 - **Anonymous players are users.** Every visitor who starts a game without signing in gets
@@ -426,12 +426,18 @@ below stay as the ceiling.
   an EXACT match on the strong signals, because a false match there costs a sign-in prompt,
   not a refusal. Known limit: phones of one model in one timezone look identical, so on
   mobile the exact match is combined with the IP.
-- **Open: what "Play now" does.** (a) starts one of the three stories at random, or (b)
-  opens the three cards. Proposed: the three cards ON the landing page, one click starts.
-- **Open: how much a guest gets.** Proposed: one game, day 1 and night 1; the morning of
-  day 2 asks for sign-in (free, the game continues on the account, the other two stories
-  open up). The first vote and the first night are the hook, the cut lands on a cliffhanger,
-  and a guest costs roughly a third of a full starter game.
+- **Browser signals are collected since 2026-11-21 (built, on `develop`):** stored per
+  device with a full hash and a machine hash, indexed by machine in `fingerprints/`, monitor
+  only. First real reading: Brave hides the graphics card and randomizes canvas, screen,
+  cores and memory, so a Brave visitor is recognisable as Brave but not as a machine; for
+  such browsers the IP rule is the only link. Alex's call: good enough. Someone who goes
+  to that length gets one more limited guest game, and guests have no role choice, no
+  table size and no model choice anyway.
+- **"Play now" (decided):** the three story cards sit on the landing page; one click starts
+  that story.
+- **What a guest gets (decided):** one game, day 1 and night 1, no rewinds and no resets.
+  The morning of day 2 asks for sign-in: free, the game continues on the account, the other
+  stories open up.
 - **Credits (track 4), direction confirmed:** free and paid merge; a new account gets $5
   once. **Discord bonus:** extra credits for joining the Discord server and asking Marlow
   (a personal claim code from /profile, posted to the bot; one claim per Discord account

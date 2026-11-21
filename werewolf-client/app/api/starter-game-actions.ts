@@ -5,6 +5,8 @@ import {firestore} from "firebase-admin";
 import {auth} from "@/auth";
 import {
     AVATAR_VARIANTS_COLLECTION,
+    avatarVariantKey,
+    AvatarVariantEntry,
     Bot,
     Game,
     GAME_MASTER,
@@ -20,6 +22,7 @@ import {
     dealStarterRoles,
     isIllustrationDocId,
     pickStarterGameMaster,
+    pickStarterPortraitRound,
     renameHumanAvatarKey,
     replacePlaceholderName,
     STARTER_GAMES_COLLECTION,
@@ -190,6 +193,14 @@ async function createStarterGameImpl(templateId: string, playerName: string): Pr
     const gameId = `${templateId}-${timestamp}`;
     const gameRef = db.collection('games').doc(gameId);
 
+    // One of the template's portrait sets, at random, for the whole cast (one draw round =
+    // one drawing style). The other sets stay on each character card as alternatives.
+    const portraitRound = pickStarterPortraitRound(template.avatarVariants);
+    const shownVariants: Record<string, AvatarVariantEntry> = {};
+    for (const [key, entry] of Object.entries(template.avatarVariants ?? {})) {
+        shownVariants[key] = portraitRound === undefined ? entry : {...entry, sel: portraitRound};
+    }
+
     // The introductions are already in the chat, so every bot has spoken once today.
     const dayActivityCounter: Record<string, number> = {};
     for (const bot of bots) dayActivityCounter[bot.name] = 1;
@@ -232,7 +243,7 @@ async function createStarterGameImpl(templateId: string, playerName: string): Pr
         helperMode: true,
         avatarsStatus: 'ready',
         avatarsVersion: template.avatarsVersion,
-        avatarVariants: renameHumanAvatarKey(template.avatarVariants, template.humanPlaceholder, humanPlayerName),
+        avatarVariants: renameHumanAvatarKey(shownVariants, template.humanPlaceholder, humanPlayerName),
         avatarVersions: renameHumanAvatarKey(template.avatarVersions, template.humanPlaceholder, humanPlayerName),
         totalGameCost: 0,
         gameMasterTokenUsage: { inputTokens: 0, outputTokens: 0, totalTokens: 0, costUSD: 0 },
@@ -241,13 +252,27 @@ async function createStarterGameImpl(templateId: string, playerName: string): Pr
     // Portraits, their candidates, the kept sheets and the welcome scene: copied doc by doc,
     // the human's renamed from the placeholder to the player's name.
     const writes: PendingWrite[] = [];
-    for (const collection of ['avatars', AVATAR_VARIANTS_COLLECTION]) {
-        const snapshot = await templateRef.collection(collection).get();
-        for (const doc of snapshot.docs) {
-            if (isIllustrationDocId(doc.id)) continue;
-            const targetId = starterAvatarDocId(doc.id, template.humanPlaceholder, humanPlayerName);
-            writes.push({ref: gameRef.collection(collection).doc(targetId), data: doc.data()});
-        }
+    const [shownDocs, candidateDocs] = await Promise.all([
+        templateRef.collection('avatars').get(),
+        templateRef.collection(AVATAR_VARIANTS_COLLECTION).get(),
+    ]);
+    const candidates = new Map(candidateDocs.docs.map(doc => [doc.id, doc.data()]));
+    for (const doc of shownDocs.docs) {
+        if (isIllustrationDocId(doc.id)) continue;
+        // games/{id}/avatars/{key} holds a copy of the SELECTED candidate (what every reader
+        // serves), so a character's shown portrait comes from the picked round.
+        const picked = portraitRound !== undefined && template.avatarVariants?.[doc.id]
+            ? candidates.get(avatarVariantKey(doc.id, portraitRound))
+            : undefined;
+        const data = picked?.data
+            ? {data: picked.data, mime: picked.mime || 'image/jpeg', createdAt: timestamp}
+            : doc.data();
+        const targetId = starterAvatarDocId(doc.id, template.humanPlaceholder, humanPlayerName);
+        writes.push({ref: gameRef.collection('avatars').doc(targetId), data});
+    }
+    for (const doc of candidateDocs.docs) {
+        const targetId = starterAvatarDocId(doc.id, template.humanPlaceholder, humanPlayerName);
+        writes.push({ref: gameRef.collection(AVATAR_VARIANTS_COLLECTION).doc(targetId), data: doc.data()});
     }
 
     // Messages get consecutive ids and strictly increasing timestamps (the chat sorts on them).

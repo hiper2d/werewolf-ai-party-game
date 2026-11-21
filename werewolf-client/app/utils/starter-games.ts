@@ -170,3 +170,19 @@ export function starterDefaultName(displayName: string | null | undefined, maxLe
     const firstWord = (displayName ?? '').trim().split(/\s+/)[0] ?? '';
     return firstWord.normalize('NFC').replace(/[^\p{L}\p{N}\p{M}]/gu, '').slice(0, maxLength);
 }
+
+/**
+ * Which of the template's portrait sets a new game shows. Candidate index == draw round
+ * (every draw adds one candidate per character, cut from the same sheet), so one index for
+ * the whole cast keeps the game in one drawing style. Picked at random among the rounds
+ * every character still has; undefined when there is none in common (the game then keeps
+ * the selection saved on the template). The player can switch any character afterwards.
+ */
+export function pickStarterPortraitRound(avatarVariants: Record<string, AvatarVariantEntry> | undefined, rng: () => number = Math.random): number | undefined {
+    const entries = Object.values(avatarVariants ?? {});
+    if (entries.length === 0) return undefined;
+    const from = Math.max(...entries.map(e => e.first ?? 0));
+    const to = Math.min(...entries.map(e => e.n));
+    if (!(to > from)) return undefined;
+    return from + Math.floor(rng() * (to - from));
+}
