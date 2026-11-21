@@ -219,7 +219,7 @@ First set of hints:
 The Game Master's lines stay as they are; helper mode is UI only, so prompts and caches are
 untouched. Hints reach every starter game, so their copy is reviewed like a News entry.
 
-### Playing without signing in (proposal, decision pending)
+### Playing without signing in (after account linking, track 0)
 
 The "signed up but never played" third suggests the sign-in step itself loses people. A
 guest could play one starter game before signing in:
@@ -341,13 +341,48 @@ as abuse protection.
 
 ---
 
+## Track 0 — Account linking (prerequisite for guest play and credits)
+
+Design: `docs/plan-multi-account-linking.md` (agreed 2026-10-29, **not built**: today the
+only defences are the browser id cookie and the 12h same-IP rule, and a fresh browser on a
+VPN passes both). Alex, 2026-11-21: build it, and cap free games.
+
+Why it moves up: both guest play (no email at all) and one-time credits ($5 per new
+account) pay out per identity, so the value of a new identity has to be near zero before
+either ships.
+
+- **Phase A, start now, alongside track 1:** fingerprint collection in monitor mode (canvas
+  hash, GPU string, screen, OS, browser, timezone, languages, cores/memory, raw values),
+  `deviceLinks` rows, the Marlow alert, the blocklist, the privacy line. It needs about two
+  weeks of data before a threshold can be chosen, so it must start before it is needed.
+- **Phase B:** the pairwise analysis against the cookie id (`scripts/fingerprint-analysis.ts`).
+- **Phase C:** fingerprint links enforced: a keyless browser that matches a known one
+  inherits its budget. Gate for guest play and for the credits switch.
+
+What a fingerprint is and is not: it survives a cleared browser, a private window and a
+VPN, which is everything the October ring used. It is not unerasable: another device or an
+anti-fingerprint browser gives a new one, and identical hardware (the same phone model)
+can give the same one. So it links identities; it never refuses by itself, and the caps
+below stay as the ceiling.
+
+**Caps on free play** (config/limits, all adjustable):
+
+| Cap | Proposed | Stops |
+|---|---|---|
+| Per guest, lifetime | 1 starter game, $1 | one visitor playing for free forever |
+| Per device and per IP, per day | 1 guest game | a private window in a loop |
+| All guests together, per day | $5 | everything else; past it, Play asks for sign-in |
+| Signup credit, per linked identity | once | a second account on the same browser/fingerprint |
+| Games per day, per account | 5 (today's limit) | runaway use |
+
 ## Sequencing
 
-1. Track 1: templates script (+ voice clips) → `createStarterGame` → `/games/start` +
-   routing → helper mode → report. Ship, read two weeks of first games. Then guest play
-   if Alex decides for it.
-2. Track 4 can start alongside track 1's measurement window (it is mostly server-side).
-   Announce it in News and on Discord before switching; grandfather grants go out the same
+1. Track 0 phase A (collection, monitor) and track 1 start together.
+2. Track 1: templates script (+ voice clips) → `createStarterGame` → `/games/start` +
+   routing → helper mode → report. Ship for signed-in players, read two weeks of first
+   games.
+3. Track 0 phases B and C, then guest play (with the caps above).
+4. Track 4 after track 0 phase C. Announce it in News and on Discord before switching; grandfather grants go out the same
    day.
-3. Track 2: privacy split first, then the rest of the multiplayer plan.
-4. Track 3 when the numbers say the first screen is the next leak.
+5. Track 2: privacy split first, then the rest of the multiplayer plan.
+6. Track 3 when the numbers say the first screen is the next leak.
