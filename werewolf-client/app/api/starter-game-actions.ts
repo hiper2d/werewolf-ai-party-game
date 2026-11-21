@@ -29,6 +29,7 @@ import {
     pickStarterGameMaster,
     pickStarterPortraitRound,
     renameHumanAvatarKey,
+    resumableStarterGames,
     replacePlaceholderName,
     STARTER_GAMES_COLLECTION,
     StarterCard,
@@ -73,8 +74,19 @@ async function loadVisibleTemplates(): Promise<StarterTemplate[]> {
 /** The cards on the start screen: the live templates, in order. */
 export async function listStarterGames(): Promise<StarterCard[]> {
     const templates = await loadVisibleTemplates();
+    // The signed-in viewer's unfinished starter games, so a card continues instead of
+    // dealing a second game. Best effort: a failed read just offers a new game.
+    let resumable: Record<string, string> = {};
+    try {
+        const email = (await auth())?.user?.email;
+        if (email && db && templates.length > 0) {
+            const games = await db.collection('games').where('ownerEmail', '==', email).select('starterTemplateId', 'gameState', 'createdAt').get();
+            resumable = resumableStarterGames(games.docs.map(doc => ({id: doc.id, ...(doc.data() as {starterTemplateId?: string; gameState?: string; createdAt?: number})})));
+        }
+    } catch { /* offer a new game */ }
     return templates.map(t => ({
         id: t.id,
+        ...(resumable[t.id] ? {resumeGameId: resumable[t.id]} : {}),
         ...(t.status === 'live' ? {} : {draft: true}),
         title: t.title,
         hook: t.hook,

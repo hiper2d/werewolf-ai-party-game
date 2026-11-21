@@ -1,6 +1,6 @@
 'use client';
 
-import {useState} from 'react';
+import {useEffect, useState} from 'react';
 import {useRouter} from 'next/navigation';
 import {createStarterGame} from '@/app/api/starter-game-actions';
 import type {StarterCard} from '@/app/utils/starter-games';
@@ -16,6 +16,13 @@ export default function StarterGames({cards, defaultName}: {cards: StarterCard[]
     const [name, setName] = useState(defaultName);
     const [startingId, setStartingId] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+
+    // Coming back with the browser's Back button restores this page from the router's
+    // cache, which still says "Play" for a story the player has just started. Ask the server
+    // again on every mount, so the card offers Continue.
+    useEffect(() => {
+        router.refresh();
+    }, [router]);
 
     const nameError = validatePlayerName(name);
 
@@ -83,15 +90,38 @@ export default function StarterGames({cards, defaultName}: {cards: StarterCard[]
                                 </h3>
                                 <p className="m-0 text-[13px] leading-[1.55] text-[var(--fg-2)] flex-grow">{card.hook}</p>
                                 <div className="flex items-center justify-between gap-3 pt-2">
-                                    <span className="text-[11.5px] text-[var(--fg-2)]">{card.playerCount} players · you&apos;re a villager</span>
-                                    <button
-                                        type="button"
-                                        onClick={() => play(card.id)}
-                                        disabled={!!startingId}
-                                        className="px-4 py-2 text-[13px] font-semibold rounded-[var(--radius-md)] bg-[var(--accent)] text-[var(--accent-fg)] hover:brightness-110 disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-[120ms]"
-                                    >
-                                        {starting ? 'Starting…' : 'Play'}
-                                    </button>
+                                    <span className="text-[11.5px] text-[var(--fg-2)]">{card.resumeGameId ? 'Your game is in progress' : <>{card.playerCount} players · you&apos;re a villager</>}</span>
+                                    <div className="flex items-center gap-2">
+                                        {card.resumeGameId && (
+                                            <button
+                                                type="button"
+                                                onClick={() => play(card.id)}
+                                                disabled={!!startingId}
+                                                className="px-3 py-2 text-[12.5px] font-medium rounded-[var(--radius-md)] bg-transparent text-[var(--fg-1)] border border-[var(--line-2)] hover:bg-[var(--bg-2)] hover:text-[var(--fg-0)] disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-[120ms]"
+                                            >
+                                                {starting ? 'Starting…' : 'New game'}
+                                            </button>
+                                        )}
+                                        {card.resumeGameId ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => router.push(`/games/${card.resumeGameId}`)}
+                                                disabled={!!startingId}
+                                                className="px-4 py-2 text-[13px] font-semibold rounded-[var(--radius-md)] bg-[var(--accent)] text-[var(--accent-fg)] hover:brightness-110 disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-[120ms]"
+                                            >
+                                                Continue
+                                            </button>
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                onClick={() => play(card.id)}
+                                                disabled={!!startingId}
+                                                className="px-4 py-2 text-[13px] font-semibold rounded-[var(--radius-md)] bg-[var(--accent)] text-[var(--accent-fg)] hover:brightness-110 disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-[120ms]"
+                                            >
+                                                {starting ? 'Starting…' : 'Play'}
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         </li>

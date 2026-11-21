@@ -103,6 +103,8 @@ export interface StarterCard {
     id: string;
     /** A draft, shown outside production only (see isStarterTemplateVisible). */
     draft?: boolean;
+    /** The viewer's own unfinished game from this template, newest first: Play continues it. */
+    resumeGameId?: string;
     title: string;
     hook: string;
     playerCount: number;
@@ -300,4 +302,20 @@ export function starterClipUrl(
     const clip = game.starterClips?.[clipKey];
     if (!clip || clip.voice !== currentVoice) return undefined;
     return `/api/starter-games/${game.starterTemplateId}/audio/${encodeURIComponent(clipKey)}?v=${clip.version}`;
+}
+
+/**
+ * The game a player would continue for each template: their newest game from it that is not
+ * over. Going back to the start screen and pressing the card again must not deal a second
+ * game while the first is still on the table.
+ */
+export function resumableStarterGames(games: {id: string; starterTemplateId?: string; gameState?: string; createdAt?: number}[]): Record<string, string> {
+    const newest: Record<string, {id: string; createdAt: number}> = {};
+    for (const game of games) {
+        if (!game.starterTemplateId || game.gameState === 'GAME_OVER') continue;
+        const createdAt = game.createdAt ?? 0;
+        const current = newest[game.starterTemplateId];
+        if (!current || createdAt > current.createdAt) newest[game.starterTemplateId] = {id: game.id, createdAt};
+    }
+    return Object.fromEntries(Object.entries(newest).map(([templateId, game]) => [templateId, game.id]));
 }

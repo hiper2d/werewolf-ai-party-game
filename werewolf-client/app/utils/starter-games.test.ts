@@ -15,6 +15,7 @@ import {
     pruneStyleSets,
     starterSceneDocId,
     renameHumanAvatarKey,
+    resumableStarterGames,
     replacePlaceholderName,
     starterAvatarDocId,
 } from "@/app/utils/starter-games";
@@ -260,5 +261,22 @@ describe('voice clips', () => {
         expect(starterClipUrl({starterClips: game.starterClips}, 'Elda', 'Kore')).toBeUndefined(); // not a starter game
         expect(starterClipUrl({starterTemplateId: 'tavern', starterClips: {'Иван': {voice: 'Kore', version: 1}}}, 'Иван', 'Kore'))
             .toBe('/api/starter-games/tavern/audio/%D0%98%D0%B2%D0%B0%D0%BD?v=1');
+    });
+});
+
+describe('resumableStarterGames', () => {
+    it("gives each template the player's newest unfinished game", () => {
+        expect(resumableStarterGames([
+            {id: 'tavern-1', starterTemplateId: 'tavern', gameState: 'DAY_DISCUSSION', createdAt: 1},
+            {id: 'tavern-3', starterTemplateId: 'tavern', gameState: 'GAME_OVER', createdAt: 3},
+            {id: 'tavern-2', starterTemplateId: 'tavern', gameState: 'NIGHT', createdAt: 2},
+            {id: 'ship-1', starterTemplateId: 'starship', gameState: 'VOTE', createdAt: 5},
+            {id: 'own-1', gameState: 'DAY_DISCUSSION', createdAt: 9},
+        ])).toEqual({tavern: 'tavern-2', starship: 'ship-1'});
+    });
+
+    it('is empty when every starter game is over or there are none', () => {
+        expect(resumableStarterGames([{id: 'a', starterTemplateId: 'tavern', gameState: 'GAME_OVER', createdAt: 1}])).toEqual({});
+        expect(resumableStarterGames([])).toEqual({});
     });
 });
