@@ -22,6 +22,7 @@ import {
     dealStarterRoles,
     isIllustrationDocId,
     isStarterTemplateVisible,
+    parseStarterSceneDocId,
     pickStarterGameMaster,
     pickStarterPortraitRound,
     renameHumanAvatarKey,
@@ -29,6 +30,7 @@ import {
     STARTER_GAMES_COLLECTION,
     StarterCard,
     starterAvatarDocId,
+    starterSceneDocId,
     StarterTemplate,
 } from "@/app/utils/starter-games";
 import {getStarterGameMasterModels, getStarterModels} from "@/app/ai/model-limit-utils";
@@ -201,7 +203,11 @@ async function createStarterGameImpl(templateId: string, playerName: string): Pr
 
     // One of the template's portrait sets, at random, for the whole cast (one draw round =
     // one drawing style). The other sets stay on each character card as alternatives.
-    const portraitRound = pickStarterPortraitRound(template.avatarVariants);
+    const portraitRound = pickStarterPortraitRound(template.avatarVariants, Math.random, template.styleSets);
+    // A styled round brings its own art direction (the GM's live illustrations follow it)
+    // and its own scene pair.
+    const styleSet = portraitRound === undefined ? undefined : template.styleSets?.[String(portraitRound)];
+    const artStyle = styleSet?.artStyle ?? template.artStyle;
     const shownVariants: Record<string, AvatarVariantEntry> = {};
     for (const [key, entry] of Object.entries(template.avatarVariants ?? {})) {
         shownVariants[key] = portraitRound === undefined ? entry : {...entry, sel: portraitRound};
@@ -220,7 +226,7 @@ async function createStarterGameImpl(templateId: string, playerName: string): Pr
     const game: Omit<Game, 'id'> & { expireAt: firestore.Timestamp } = {
         description: template.description,
         theme: template.theme,
-        ...(template.artStyle ? {artStyle: template.artStyle} : {}),
+        ...(artStyle ? {artStyle} : {}),
         werewolfCount: template.werewolfCount,
         specialRoles: template.specialRoles,
         longReplies: template.longReplies ?? false,
@@ -263,8 +269,18 @@ async function createStarterGameImpl(templateId: string, playerName: string): Pr
         templateRef.collection(AVATAR_VARIANTS_COLLECTION).get(),
     ]);
     const candidates = new Map(candidateDocs.docs.map(doc => [doc.id, doc.data()]));
+    const shown = new Map(shownDocs.docs.map(doc => [doc.id, doc.data()]));
     for (const doc of shownDocs.docs) {
         if (isIllustrationDocId(doc.id)) continue;
+        // Per-style scenes (`scene-welcome__2`) stay in the template; the picked style's
+        // pair is written under the plain scene keys below.
+        const styleScene = parseStarterSceneDocId(doc.id);
+        if (styleScene) continue;
+        const ownScene = styleSet ? shown.get(starterSceneDocId(doc.id, portraitRound!)) : undefined;
+        if (ownScene?.data) {
+            writes.push({ref: gameRef.collection('avatars').doc(doc.id), data: ownScene});
+            continue;
+        }
         // games/{id}/avatars/{key} holds a copy of the SELECTED candidate (what every reader
         // serves), so a character's shown portrait comes from the picked round.
         const picked = portraitRound !== undefined && template.avatarVariants?.[doc.id]
@@ -343,6 +359,7 @@ async function createStarterGameImpl(templateId: string, playerName: string): Pr
         gameId,
         detail: {
             templateId,
+            ...(styleSet ? {style: styleSet.label} : {}),
             tier,
             players: bots.length + 1,
             language: game.language ?? 'en',

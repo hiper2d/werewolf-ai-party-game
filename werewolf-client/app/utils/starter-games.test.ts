@@ -5,7 +5,11 @@ import {
     isIllustrationDocId,
     isStarterTemplateVisible,
     pickStarterGameMaster,
+    commonPortraitRounds,
+    parseStarterSceneDocId,
     pickStarterPortraitRound,
+    pruneStyleSets,
+    starterSceneDocId,
     renameHumanAvatarKey,
     replacePlaceholderName,
     starterAvatarDocId,
@@ -187,5 +191,42 @@ describe('isStarterTemplateVisible', () => {
         expect(isStarterTemplateVisible('draft', false)).toBe(true);
         expect(isStarterTemplateVisible('live', false)).toBe(true);
         expect(isStarterTemplateVisible('archived', false)).toBe(false);
+    });
+});
+
+describe('style sets', () => {
+    const anime = {label: 'anime', artStyle: 'cel-shaded anime'};
+    const real = {label: 'realism', artStyle: 'photorealistic oil painting'};
+
+    it('picks only among styled rounds when the template has any', () => {
+        // Round 0 is the source game's own set; rounds 1 and 2 were drawn as styles.
+        const variants = {A: {n: 3, sel: 2}, B: {n: 3, sel: 2}};
+        const styleSets = {'1': anime, '2': real};
+        expect(pickStarterPortraitRound(variants, rngOf(0), styleSets)).toBe(1);
+        expect(pickStarterPortraitRound(variants, rngOf(0.99), styleSets)).toBe(2);
+        // No styles: every common round is eligible, as before.
+        expect(pickStarterPortraitRound(variants, rngOf(0), {})).toBe(0);
+    });
+
+    it('ignores a style whose round is outside the stored window', () => {
+        const variants = {A: {n: 4, sel: 3, first: 1}, B: {n: 4, sel: 3, first: 1}};
+        expect(pickStarterPortraitRound(variants, rngOf(0), {'0': anime, '3': real})).toBe(3);
+        expect(pruneStyleSets({'0': anime, '3': real}, variants)).toEqual({'3': real});
+        expect(pruneStyleSets({'0': anime}, undefined)).toEqual({});
+    });
+
+    it('reports the rounds the whole cast has in common', () => {
+        expect(commonPortraitRounds({A: {n: 3, sel: 0}, B: {n: 2, sel: 0}})).toEqual({from: 0, to: 2});
+        expect(commonPortraitRounds({A: {n: 1, sel: 0}, B: {n: 3, sel: 2, first: 2}})).toBeUndefined();
+        expect(commonPortraitRounds({})).toBeUndefined();
+    });
+
+    it('names and parses per-style scene docs', () => {
+        expect(starterSceneDocId('scene-welcome', 2)).toBe('scene-welcome__2');
+        expect(parseStarterSceneDocId('scene-welcome__2')).toEqual({sceneKey: 'scene-welcome', round: 2});
+        expect(parseStarterSceneDocId('scene-night__10')).toEqual({sceneKey: 'scene-night', round: 10});
+        expect(parseStarterSceneDocId('scene-welcome')).toBeNull();
+        expect(parseStarterSceneDocId('Rowan__2')).toBeNull();
+        expect(parseStarterSceneDocId('sheet-2')).toBeNull();
     });
 });

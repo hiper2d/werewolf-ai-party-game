@@ -406,9 +406,16 @@ below stay as the ceiling.
   and stored on the template: the opening story, the introductions, their voice clips, the
   portraits (several sets) and the welcome scene. Generation starts when the player starts
   playing: bot replies, live voice, the GM's illustrations.
-- **Portrait set:** each new game picks ONE of the template's sets at random (the same set
-  for the whole cast, so the style is consistent) and the player can switch any character
-  to another set. Built 2026-11-21 (`pickStarterPortraitRound`).
+- **Art styles (built 2026-11-21):** a template has three sets in DIFFERENT styles, e.g.
+  one anime, one realistic, one other (Alex: variety, not one consistent look). Each is
+  drawn straight onto the template by
+  `scripts/draw-starter-style.ts <templateId> --label anime --style "…"`: the cast's
+  portraits and that style's own welcome/night scenes, two image calls (~$0.11 measured).
+  A new game gets one style at random for the whole cast, with its scenes and its style
+  text, so the GM's live illustrations match. The player can switch any character to
+  another style's portrait (a mixed cast is their choice). The source game's own portraits
+  are round 0 and are never picked once a styled round exists; three styled draws push
+  them out.
 - **Order:** finish the pre-set games (voices, cinematic start, random set), then the helper
   hints.
 - **Anonymous players are users.** Every visitor who starts a game without signing in gets

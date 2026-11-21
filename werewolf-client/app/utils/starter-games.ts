@@ -26,6 +26,13 @@ export interface StarterBot {
     intro: string;
 }
 
+export interface StarterStyleSet {
+    /** Short name for the script's listing: "anime", "realism". */
+    label: string;
+    /** The art direction the set was drawn with; becomes the game's `artStyle`. */
+    artStyle: string;
+}
+
 export interface StarterTemplate {
     id: string;
     /** Only `live` templates are offered to players; `draft` is for review. */
@@ -58,6 +65,15 @@ export interface StarterTemplate {
     /** In introduction order. */
     bots: StarterBot[];
     avatarsVersion: number;
+    /**
+     * The art styles this template was drawn in, keyed by portrait round (as a string:
+     * Firestore map). Each has its own portraits (that round's candidates) and its own scene
+     * pair (`scene-welcome__{round}`, `scene-night__{round}`), drawn by
+     * scripts/draw-starter-style.ts. A new game gets ONE of them at random, with its art
+     * style text, so the Game Master's live illustrations match. Absent or empty: the
+     * template has only the portraits of its source game.
+     */
+    styleSets?: Record<string, StarterStyleSet>;
     avatarVariants: Record<string, AvatarVariantEntry>;
     avatarVersions: Record<string, number>;
     sourceGameId: string;
@@ -182,18 +198,54 @@ export function starterDefaultName(displayName: string | null | undefined, maxLe
     return firstWord.normalize('NFC').replace(/[^\p{L}\p{N}\p{M}]/gu, '').slice(0, maxLength);
 }
 
-/**
- * Which of the template's portrait sets a new game shows. Candidate index == draw round
- * (every draw adds one candidate per character, cut from the same sheet), so one index for
- * the whole cast keeps the game in one drawing style. Picked at random among the rounds
- * every character still has; undefined when there is none in common (the game then keeps
- * the selection saved on the template). The player can switch any character afterwards.
- */
-export function pickStarterPortraitRound(avatarVariants: Record<string, AvatarVariantEntry> | undefined, rng: () => number = Math.random): number | undefined {
+/** The portrait rounds every character of the cast still has: [from, to). */
+export function commonPortraitRounds(avatarVariants: Record<string, AvatarVariantEntry> | undefined): {from: number; to: number} | undefined {
     const entries = Object.values(avatarVariants ?? {});
     if (entries.length === 0) return undefined;
     const from = Math.max(...entries.map(e => e.first ?? 0));
     const to = Math.min(...entries.map(e => e.n));
-    if (!(to > from)) return undefined;
-    return from + Math.floor(rng() * (to - from));
+    return to > from ? {from, to} : undefined;
+}
+
+/**
+ * Which of the template's portrait sets a new game shows. Candidate index == draw round
+ * (every draw adds one candidate per character, cut from the same sheet), so one index for
+ * the whole cast is one drawing. With `styleSets` the pick is among the styled rounds (one
+ * anime, one realistic, ...); without, among every round the cast has in common. Undefined
+ * when there is none (the game then keeps the selection saved on the template). The player
+ * can switch any character afterwards.
+ */
+export function pickStarterPortraitRound(
+    avatarVariants: Record<string, AvatarVariantEntry> | undefined,
+    rng: () => number = Math.random,
+    styleSets?: Record<string, StarterStyleSet>,
+): number | undefined {
+    const window = commonPortraitRounds(avatarVariants);
+    if (!window) return undefined;
+    let rounds: number[] = [];
+    for (let round = window.from; round < window.to; round++) rounds.push(round);
+    const styled = rounds.filter(round => !!styleSets?.[String(round)]);
+    if (styled.length > 0) rounds = styled;
+    return rounds[Math.floor(rng() * rounds.length)];
+}
+
+/** A style's scene doc in a template: `scene-welcome__2`. Games hold plain `scene-welcome`. */
+export function starterSceneDocId(sceneKey: string, round: number): string {
+    return `${sceneKey}__${round}`;
+}
+
+/** Parses a per-style scene doc id; null for anything else. */
+export function parseStarterSceneDocId(docId: string): {sceneKey: string; round: number} | null {
+    const match = docId.match(/^(scene-[a-z]+)__(\d+)$/);
+    return match ? {sceneKey: match[1], round: Number(match[2])} : null;
+}
+
+/** The style sets whose portraits still exist (rounds past the candidate cap are dropped). */
+export function pruneStyleSets(styleSets: Record<string, StarterStyleSet> | undefined, avatarVariants: Record<string, AvatarVariantEntry> | undefined): Record<string, StarterStyleSet> {
+    const window = commonPortraitRounds(avatarVariants);
+    const kept: Record<string, StarterStyleSet> = {};
+    for (const [round, set] of Object.entries(styleSets ?? {})) {
+        if (window && Number(round) >= window.from && Number(round) < window.to) kept[round] = set;
+    }
+    return kept;
 }
