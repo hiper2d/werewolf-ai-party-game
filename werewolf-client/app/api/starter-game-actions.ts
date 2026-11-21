@@ -2,10 +2,15 @@
 
 import {db} from "@/firebase/server";
 import {firestore} from "firebase-admin";
+import {after} from "next/server";
 import {auth} from "@/auth";
 import {
+    AVATAR_GM_KEY,
     AVATAR_VARIANTS_COLLECTION,
     avatarVariantKey,
+    isAvatarSheetKey,
+    SCENE_NIGHT_KEY,
+    SCENE_WELCOME_KEY,
     AvatarVariantEntry,
     Bot,
     Game,
@@ -20,9 +25,7 @@ import {
 import {
     dealStarterModels,
     dealStarterRoles,
-    isIllustrationDocId,
     isStarterTemplateVisible,
-    parseStarterSceneDocId,
     pickStarterGameMaster,
     pickStarterPortraitRound,
     renameHumanAvatarKey,
@@ -262,41 +265,50 @@ async function createStarterGameImpl(templateId: string, playerName: string): Pr
         gameMasterTokenUsage: { inputTokens: 0, outputTokens: 0, totalTokens: 0, costUSD: 0 },
     };
 
-    // Portraits, their candidates, the kept sheets and the welcome scene: copied doc by doc,
-    // the human's renamed from the placeholder to the player's name.
-    const writes: PendingWrite[] = [];
-    const [shownDocs, candidateDocs] = await Promise.all([
-        templateRef.collection('avatars').get(),
-        templateRef.collection(AVATAR_VARIANTS_COLLECTION).get(),
+    // Images. Only what the first screen shows is copied before the player gets the game:
+    // one portrait per character (the picked round's) and the scene pair, about a dozen
+    // small docs. The other candidates and the kept sheets (several MB: what the character
+    // card's "other portrait" arrows and the reframe tool read) follow in the background,
+    // after the response. Copying everything up front made Play take twelve seconds.
+    const avatarsCol = templateRef.collection('avatars');
+    const candidatesCol = templateRef.collection(AVATAR_VARIANTS_COLLECTION);
+    const portraitKeys = [...new Set([...Object.keys(template.avatarVariants ?? {}), ...template.bots.map(b => b.name), template.humanPlaceholder, AVATAR_GM_KEY])];
+    const sceneKeys = [SCENE_WELCOME_KEY, SCENE_NIGHT_KEY];
+    const readImages = async (refs: firestore.DocumentReference[]) =>
+        refs.length === 0 ? [] : (await db!.getAll(...refs)).map(snap => (snap.data()?.data ? snap.data()! : undefined));
+
+    // First choice: the picked round's candidate and the picked style's scenes.
+    const firstChoice = await readImages([
+        ...portraitKeys.map(key => portraitRound !== undefined && template.avatarVariants?.[key]
+            ? candidatesCol.doc(avatarVariantKey(key, portraitRound))
+            : avatarsCol.doc(key)),
+        ...sceneKeys.map(key => styleSet ? avatarsCol.doc(starterSceneDocId(key, portraitRound!)) : avatarsCol.doc(key)),
     ]);
-    const candidates = new Map(candidateDocs.docs.map(doc => [doc.id, doc.data()]));
-    const shown = new Map(shownDocs.docs.map(doc => [doc.id, doc.data()]));
-    for (const doc of shownDocs.docs) {
-        if (isIllustrationDocId(doc.id)) continue;
-        // Per-style scenes (`scene-welcome__2`) stay in the template; the picked style's
-        // pair is written under the plain scene keys below.
-        const styleScene = parseStarterSceneDocId(doc.id);
-        if (styleScene) continue;
-        const ownScene = styleSet ? shown.get(starterSceneDocId(doc.id, portraitRound!)) : undefined;
-        if (ownScene?.data) {
-            writes.push({ref: gameRef.collection('avatars').doc(doc.id), data: ownScene});
-            continue;
+    // Fallback for anything missing: what the template itself shows under the plain key.
+    const allKeys = [...portraitKeys, ...sceneKeys];
+    const missing = allKeys.filter((_, index) => !firstChoice[index]);
+    const fallback = new Map((await readImages(missing.map(key => avatarsCol.doc(key)))).map((data, index) => [missing[index], data]));
+
+    const writes: PendingWrite[] = [];
+    allKeys.forEach((key, index) => {
+        const image = firstChoice[index] ?? fallback.get(key);
+        if (!image) return; // no such picture in the template: the UI falls back to the preset sketch
+        const targetId = starterAvatarDocId(key, template.humanPlaceholder, humanPlayerName);
+        writes.push({ref: gameRef.collection('avatars').doc(targetId), data: {data: image.data, mime: image.mime || 'image/jpeg', createdAt: timestamp}});
+    });
+
+    const copyRemainingImages = async () => {
+        const [candidateDocs, shownDocs] = await Promise.all([candidatesCol.get(), avatarsCol.get()]);
+        const rest: PendingWrite[] = [];
+        for (const doc of candidateDocs.docs) {
+            const targetId = starterAvatarDocId(doc.id, template.humanPlaceholder, humanPlayerName);
+            rest.push({ref: gameRef.collection(AVATAR_VARIANTS_COLLECTION).doc(targetId), data: doc.data()});
         }
-        // games/{id}/avatars/{key} holds a copy of the SELECTED candidate (what every reader
-        // serves), so a character's shown portrait comes from the picked round.
-        const picked = portraitRound !== undefined && template.avatarVariants?.[doc.id]
-            ? candidates.get(avatarVariantKey(doc.id, portraitRound))
-            : undefined;
-        const data = picked?.data
-            ? {data: picked.data, mime: picked.mime || 'image/jpeg', createdAt: timestamp}
-            : doc.data();
-        const targetId = starterAvatarDocId(doc.id, template.humanPlaceholder, humanPlayerName);
-        writes.push({ref: gameRef.collection('avatars').doc(targetId), data});
-    }
-    for (const doc of candidateDocs.docs) {
-        const targetId = starterAvatarDocId(doc.id, template.humanPlaceholder, humanPlayerName);
-        writes.push({ref: gameRef.collection(AVATAR_VARIANTS_COLLECTION).doc(targetId), data: doc.data()});
-    }
+        for (const doc of shownDocs.docs) {
+            if (isAvatarSheetKey(doc.id)) rest.push({ref: gameRef.collection('avatars').doc(doc.id), data: doc.data()});
+        }
+        await commitChunked(rest);
+    };
 
     // Messages get consecutive ids and strictly increasing timestamps (the chat sorts on them).
     const messages: GameMessage[] = [{
@@ -367,6 +379,16 @@ async function createStarterGameImpl(templateId: string, playerName: string): Pr
             gameMaster: gameMasterAiType,
         },
     });
+
+    // The rest of the images, off the request. Outside a request scope (scripts, tests)
+    // there is no `after`: copy inline.
+    const copyLogged = () => copyRemainingImages().catch(error =>
+        logger.error(`Starter game ${gameId}: copying the remaining portraits failed`, {templateId, error: error?.message}));
+    try {
+        after(copyLogged);
+    } catch {
+        await copyLogged();
+    }
 
     return gameId;
 }

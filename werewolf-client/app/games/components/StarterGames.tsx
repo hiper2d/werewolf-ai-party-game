@@ -61,6 +61,12 @@ export default function StarterGames({cards, defaultName}: {cards: StarterCard[]
                 </div>
             )}
 
+            {startingId && (
+                <div role="status" className="mb-4 px-4 py-3 text-[13px] text-[var(--fg-1)] border border-[var(--line-2)] bg-[var(--bg-1)] rounded-[var(--radius-lg)]">
+                    Setting the table… your game opens in a moment.
+                </div>
+            )}
+
             <ul className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                 {cards.map(card => {
                     const starting = startingId === card.id;
