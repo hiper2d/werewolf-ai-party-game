@@ -59,7 +59,9 @@ to the app:
   visualDescription — exactly the `BotPreview` shape `createGame` takes.
 - Portraits: the `avatars` and `avatarVariants` subcollections, the same layout a preview
   draft has, so the copy is `copyDraftIntoGame`'s loop pointed at a template instead of a
-  draft.
+  draft. **Several variants per character** (3 sheet rounds), drawn at build time, so the
+  player can still pick a different portrait for anyone, including their own seat, at no
+  cost. Picking a variant and reframing stay; redraw is off (see Limits below).
 - The introductions: the WELCOME GM command (with its stored `turnTail`) and each bot's
   introduction message, recorded once by running the real WELCOME flow on a throwaway game.
   The human's name is a fixed placeholder (`Newcomer`) while recording, and is replaced
@@ -71,7 +73,12 @@ to the app:
   plays the stored clip instead of calling TTS. The first minute of every starter game then
   costs nothing in voice and plays without waiting on TTS. Later lines use live TTS as
   usual.
-- The welcome scene illustration that cinematic mode opens on, drawn once with the sheet.
+- **An illustration pool**, drawn at build time: the welcome scene plus about 8-10 scenes
+  of the setting tagged by moment (`day`, `vote`, `night`, `death`, `finale`). A starter
+  game never calls the image model: where a normal game draws the day's illustration, the
+  starter game takes the next unused picture with the matching tag from its template's
+  pool. The pictures show the place and the mood, not a named character doing a specific
+  thing, so they fit any game played from the template.
 
 `scripts/build-starter-game.ts --theme "…" --id tavern`: runs the normal preview pipeline
 with the starter table, draws the portrait sheet and the scene, creates a throwaway game,
@@ -102,13 +109,39 @@ these seven people are together tonight). Cards show the scene illustration.
 - **Voice and cinematic mode on.** The starter game opens in cinematic mode with autoplay
   on, regardless of the browser's saved switch (`autoPlay` in localStorage); the player can
   still turn either off, and that choice is saved as usual.
-- **Models:** a fixed set from the cheapest group with 100+ measured turns and a `fast` tag,
-  one per bot, mixed providers for variety. GM: a fast model already allowed as GM. Stored
-  on the template, re-checked against the catalog at creation (a removed model falls back
-  through `resolveModelId`).
+- **Models: the cheapest group only** (Alex, 2026-11-20). Today that is eight models at
+  0.08-0.20¢ a bot turn, all with 1,100+ measured turns: GPT mini, DeepSeek Flash, Qwen
+  Flash, GLM Flash, Mistral Small, MiniMax, Gemini Lite, Claude Haiku. Six of them sit at
+  the table, one per bot, so every character is a different provider. GM: one of the group
+  that is allowed as Game Master. Stored on the template, re-checked against the group at
+  creation (a model that left the group or the catalog is replaced by another member).
 - **Day 1 is short:** a lower auto-vote ceiling for starter games (the existing
   bot-message-count ceiling, set per game) and the GM's "you can vote now" line after the
   first round.
+
+### Limits in starter games (Alex, 2026-11-20)
+
+A starter game is the free sample: nothing in it can cost more than the cheap table it was
+built for.
+
+| | Starter game | After registration, in games made with the form |
+|---|---|---|
+| Models | the cheapest group only; the model picker on a bot or the GM lists only that group | the other groups, by the usual per-group rules |
+| Rewinds: delete a message, trim after a message, replay the night, the one-shot model override on retry | off | on |
+| Portraits | pick among the pre-drawn variants, reframe | redraw / reroll as today |
+| Illustrations | from the template's pool, no image call | drawn per day as today |
+
+- "Registration" matters once guest play exists: a guest gets only the left column. A
+  signed-in player's starter game follows the same left column (it is the same cheap,
+  pre-drawn game), and the right column is what the form gives them. To confirm with Alex:
+  whether a signed-in player should get rewinds inside a starter game.
+- Recovery is not a rewind and stays on for everyone: the Retry button on an error banner
+  (a provider failed, a bot timed out) and reassigning a refused provider's bots, both
+  limited to the cheapest group here.
+- Enforced on the server, not only hidden in the UI: `updateBotModel`,
+  `updateGameMasterModel`, `retryWithModelOverride`, the delete/trim actions, `replayNight`
+  and the avatar reroll check `game.starterTemplateId` and refuse.
+- Image spend in a starter game is zero by construction; the report should show it.
 
 ### Server side
 
@@ -193,8 +226,10 @@ guest could play one starter game before signing in:
   localStorage UUID), created when a signed-out visitor presses Play. Server actions get
   the actor from one helper that returns the session email or the guest id; game access
   checks compare against it.
-- **Only starter games:** no form, no previews, no paid models. The table is already the
-  cheapest group and the intros and their voices are pre-recorded.
+- **Only starter games,** with the limits above: cheapest group only, no rewinds, no
+  redraws, no image calls. The intros and their voices are pre-recorded. The form, the
+  other model groups and rewinds are what signing in unlocks, and the game says so where
+  those controls would be ("Sign in to change models beyond this set").
 - **Cost guard:** measured 2026-11-20, a free game costs a median $0.39 and $1.54 at p90
   (11 bots, with portraits and an intro round). A starter game skips the portraits and the
   intros, has 6 bots on cheap models, so expect well under $0.50. Guards: a per-guest cap
