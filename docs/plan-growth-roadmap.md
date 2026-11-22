@@ -469,8 +469,10 @@ Built on `develop`, not pushed:
 - **Guest play:** story cards on the landing page, one click, no sign-in. A guest is a
   `users` row with `guest: true`; one game; day 1 + night 1; "Sign in to play Day 2" in
   place of Next Day; signing in moves the game to the account. Caps in `config/limits`:
-  `guestSpendUSD` 1, `guestGlobalDailySpendUSD` 5, `guestsPerDevicePerDay` 1 (Alex has not
-  confirmed the numbers). Content screen in enforce for guests. Details: CLAUDE.md,
+  `guestSpendUSD` 1, `guestGlobalDailySpendUSD` 5 (Alex has not confirmed the numbers),
+  `guestOncePerDevice` on: a known device without its guest cookie (cleared cookies, private
+  window) is asked to sign in, never given a second guest or the earlier game (Alex,
+  2026-11-21). Content screen in enforce for guests. Details: CLAUDE.md,
   "Guest play".
 - **Decided 2026-11-21:** the fingerprint does not reopen a guest's game (same-model phones
   share one); the `ww_guest` cookie does. After the guest's game, the other stories read

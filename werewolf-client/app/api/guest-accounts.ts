@@ -64,8 +64,7 @@ export async function clearGuestCookie(): Promise<void> {
 
 /**
  * The guest account for this browser: the one its cookie names, or a new one. Throws
- * `GUEST_DEVICE_LIMIT_MESSAGE` when the device has already started a guest today (the rule
- * is skipped outside production, where one developer starts many).
+ * `GUEST_DEVICE_LIMIT_MESSAGE` when the device is already known (`deviceMayMintGuest`).
  *
  * A new guest is a `users` doc like any other (free tier, empty ledgers) plus `guest: true`,
  * the device it was made on, and the environment that made it: local development writes to
@@ -84,11 +83,12 @@ export async function resolveGuestForRequest(): Promise<GuestIdentity> {
     const now = Date.now();
     const deviceId = await getRequestDeviceId();
     const deviceRef = deviceId ? db.collection('devices').doc(deviceId) : null;
-    if (deviceRef && IS_PRODUCTION) {
+    // GUEST_DEVICE_RULE=off in .env lets a developer start guest after guest on one machine.
+    if (deviceRef && process.env.GUEST_DEVICE_RULE !== 'off') {
         const limits = await getFreeTierLimits();
         const device = (await deviceRef.get()).data();
-        if (!deviceMayMintGuest(device?.lastGuestAt, now, limits.guestsPerDevicePerDay)) {
-            logger.warn(`GUEST_REFUSED: device ${deviceId} already started a guest today`, { deviceId, lastGuestAt: device?.lastGuestAt });
+        if (!deviceMayMintGuest(device, limits.guestOncePerDevice)) {
+            logger.warn(`GUEST_REFUSED: device ${deviceId} is already known, asked to sign in`, { deviceId, lastGuestAt: device?.lastGuestAt, users: (device?.users ?? []).length });
             throw new Error(GUEST_DEVICE_LIMIT_MESSAGE);
         }
     }

@@ -4,6 +4,7 @@ import {useEffect, useState} from 'react';
 import {useRouter} from 'next/navigation';
 import {useSession} from 'next-auth/react';
 import {useLoginDialog} from '@/app/providers/LoginDialogProvider';
+import {GUEST_DEVICE_LIMIT_MESSAGE} from '@/app/utils/guest';
 import {createStarterGame} from '@/app/api/starter-game-actions';
 import type {StarterCard} from '@/app/utils/starter-games';
 import {INPUT_LIMITS} from '@/app/utils/input-limits';
@@ -65,6 +66,8 @@ export default function StarterGames({cards, defaultName, guest = false}: {cards
                 return; // keep the button busy until the game page takes over
             }
             setError(result.error);
+            // A known device is asked to sign in, not offered another free game.
+            if (result.error === GUEST_DEVICE_LIMIT_MESSAGE) openLoginDialog('/games');
         } catch {
             setError('Could not start the game. Please try again.');
         }

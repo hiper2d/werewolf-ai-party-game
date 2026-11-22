@@ -499,12 +499,12 @@ export const FREE_TIER_LIMITS = {
     // machine draws down one budget instead of one each. Set to 0 to disable entirely.
     DEVICE_DAILY_SPEND_USD: 5,
     // Guest play (app/utils/guest.ts): what ONE guest may spend on their one game, what all
-    // guests together may spend in a UTC day, and how many guests one device may start in
-    // 24 hours. Each is off at 0. A free game's median cost is $0.39 and a guest plays a
+    // guests together may spend in a UTC day, and whether a device that is already known
+    // (a guest or an account was on it) is asked to sign in instead. Each is off at 0. A free game's median cost is $0.39 and a guest plays a
     // third of one, so $1 is room, not a target.
     GUEST_SPEND_USD: 1,
     GUEST_GLOBAL_DAILY_SPEND_USD: 5,
-    GUESTS_PER_DEVICE_PER_DAY: 1,
+    GUEST_ONCE_PER_DEVICE: 1,
 } as const;
 
 /** Resolved free-tier limits (defaults overlaid with `config/limits`). */
@@ -516,7 +516,7 @@ export interface FreeTierLimits {
     deviceDailySpendUSD: number;
     guestSpendUSD: number;
     guestGlobalDailySpendUSD: number;
-    guestsPerDevicePerDay: number;
+    guestOncePerDevice: number;
 }
 
 /**

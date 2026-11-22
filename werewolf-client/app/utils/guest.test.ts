@@ -1,7 +1,6 @@
 import {deviceMayMintGuest, guestEmailFor, guestTotalSpend, guestWallReached, isGuestBudgetError, isGuestEmail, isGuestWallError, GUEST_BUDGET_MESSAGE, GUEST_WALL_MESSAGE} from './guest';
 
 const ID = '3f2b8c1e-9a4d-4e7f-8b21-0c5d6e7f8a90';
-const DAY = 24 * 60 * 60 * 1000;
 
 describe('guest identity', () => {
     it('round-trips the email it writes', () => {
@@ -36,15 +35,19 @@ describe('guest wall', () => {
 
 describe('deviceMayMintGuest', () => {
     const now = 1_800_000_000_000;
-    it('allows a device with no guest yet', () => {
-        expect(deviceMayMintGuest(undefined, now, 1)).toBe(true);
+    const DAY = 24 * 60 * 60 * 1000;
+    it('allows a device nobody has used', () => {
+        expect(deviceMayMintGuest(undefined, 1)).toBe(true);
+        expect(deviceMayMintGuest({users: []}, 1)).toBe(true);
     });
-    it('refuses a second guest inside a day and allows one after it', () => {
-        expect(deviceMayMintGuest(now - DAY + 1000, now, 1)).toBe(false);
-        expect(deviceMayMintGuest(now - DAY, now, 1)).toBe(true);
+    it('refuses a device that had a guest, however long ago', () => {
+        expect(deviceMayMintGuest({lastGuestAt: now - 400 * DAY}, 1)).toBe(false);
+    });
+    it('refuses a device an account has signed in on', () => {
+        expect(deviceMayMintGuest({users: ['someone@gmail.com']}, 1)).toBe(false);
     });
     it('is off at 0', () => {
-        expect(deviceMayMintGuest(now - 1000, now, 0)).toBe(true);
+        expect(deviceMayMintGuest({lastGuestAt: now}, 0)).toBe(true);
     });
 });
 

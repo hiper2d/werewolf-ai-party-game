@@ -37,7 +37,7 @@ export const GUEST_LAST_DAY = 1;
 export const GUEST_WALL_MESSAGE = 'Sign in to play day 2. Your game is saved and continues from here.';
 export const GUEST_ONLY_STARTER_MESSAGE = 'Sign in to create your own games.';
 export const GUEST_ONE_GAME_MESSAGE = 'Sign in to play another story. Your first game stays yours.';
-export const GUEST_DEVICE_LIMIT_MESSAGE = 'A free game was already played from this device today. Sign in to play: it is free.';
+export const GUEST_DEVICE_LIMIT_MESSAGE = 'You have played here before. Sign in to keep playing: it is free.';
 export const GUEST_BUDGET_MESSAGE = 'Your free trial of AI is used up. Sign in to keep playing: your game is saved.';
 export const GUEST_PAUSED_MESSAGE = 'Free trial play is paused for today. Sign in to keep playing: your game is saved.';
 
@@ -56,14 +56,16 @@ export function guestWallReached(game: { currentDay?: number }): boolean {
 }
 
 /**
- * Whether this device may mint a NEW guest now. One guest per device per day: the device id
- * is inherited across a wiped browser by the same-IP rule (device-actions.ts), so this is
- * also what stops "clear cookies, play again". `perDay` 0 turns the rule off.
+ * Whether this device may mint a NEW guest. It may not once it is known: a guest was made on
+ * it before, or an account has signed in on it. A browser that arrives here without its
+ * guest cookie on a known device has cleared its cookies (or is a private window, or
+ * inherited the device through the same-IP rule in device-actions.ts), and the answer to
+ * all of those is the same: sign in (Alex, 2026-11-21). `enabled` 0 turns the rule off.
  */
-export function deviceMayMintGuest(lastGuestAt: number | undefined | null, now: number, perDay: number): boolean {
-    if (!(perDay > 0)) return true;
-    if (!lastGuestAt) return true;
-    return now - lastGuestAt >= 24 * 60 * 60 * 1000;
+export function deviceMayMintGuest(device: { lastGuestAt?: number | null; users?: unknown } | undefined | null, enabled: number): boolean {
+    if (!(enabled > 0)) return true;
+    if (!device) return true;
+    return !device.lastGuestAt && !(Array.isArray(device.users) && device.users.length > 0);
 }
 
 /** All free spend a guest has ever made: a guest has one game, so no window applies. */
