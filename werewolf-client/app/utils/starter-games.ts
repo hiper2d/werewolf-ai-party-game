@@ -38,6 +38,8 @@ export interface StarterClip {
     voice: string;
     /** Bumped on every re-record, so browsers and the CDN never serve the old take. */
     version: number;
+    /** Set on a clip recorded for a translation (StarterLocale): the language code. */
+    lang?: string;
 }
 
 /** The clip key of the opening story; a bot's introduction is keyed by the bot's name. */
@@ -92,10 +94,125 @@ export interface StarterTemplate {
      * lines that do not name the human are recorded (the name differs per player).
      */
     clips?: Record<string, StarterClip>;
+    /**
+     * The other languages this story can be played in: a translation exists in
+     * `starterGames/{id}/locales/{code}` (StarterLocale). Kept by
+     * scripts/translate-starter-game.ts; the template's own `language` is not listed.
+     */
+    languages?: string[];
     avatarVariants: Record<string, AvatarVariantEntry>;
     avatarVersions: Record<string, number>;
     sourceGameId: string;
     createdAt: number;
+}
+
+export const STARTER_LOCALES_COLLECTION = 'locales';
+
+/**
+ * A translation of a template's player-facing text (`starterGames/{id}/locales/{code}`),
+ * written by scripts/translate-starter-game.ts. Translated: the opening story, each
+ * character's backstory and introduction. NOT translated: names (identifiers, also the
+ * portrait keys), play styles, voice and picture directions (prompts, English in every
+ * game), the card copy (app chrome). A game in this language is an ordinary game with
+ * `language` set, so everything written after the introductions comes from the models in
+ * that language.
+ */
+export interface StarterLocale {
+    language: string;
+    story: string;
+    /** By character name. */
+    bots: Record<string, {story: string; intro: string}>;
+    /**
+     * The hash (starterTextHash) of the English text each piece was translated from, by
+     * piece key (starterLocalePieces). A piece whose English changed since is stale, and a
+     * stale locale is not used: the game falls back to the template's language.
+     */
+    sources: Record<string, string>;
+    /** Voice clips of THIS translation; audio docs are `audio/{code}__{clipKey}`. */
+    clips?: Record<string, StarterClip>;
+    updatedAt: number;
+}
+
+/**
+ * How a translation names the human player. English text carries the source game's human
+ * name (`humanPlaceholder`), swapped as a whole word; that test fails where a particle is
+ * glued to the name (Japanese "Rowanさん", Korean "Rowan은"), so the translator is given this
+ * token in the name's place and a game puts the player's name where it stands.
+ */
+export const STARTER_PLAYER_TOKEN = '{player}';
+
+/** The player's name into a piece of template text: the token (translations), then the placeholder (English). */
+export function withStarterPlayerName(text: string, placeholder: string, name: string): string {
+    return replacePlaceholderName(text.split(STARTER_PLAYER_TOKEN).join(name), placeholder, name);
+}
+
+/** True when the line names the human, by placeholder or by token: it cannot be pre-recorded. */
+export function namesStarterPlayer(text: string, placeholder: string): boolean {
+    return text.includes(STARTER_PLAYER_TOKEN) || mentionsPlaceholder(text, placeholder);
+}
+
+/** FNV-1a, as the game-text locales use: a change detector, not a secret. */
+export function starterTextHash(text: string): string {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < text.length; i++) {
+        h ^= text.charCodeAt(i);
+        h = Math.imul(h, 0x01000193) >>> 0;
+    }
+    return h.toString(16).padStart(8, '0');
+}
+
+type StarterTextSource = Pick<StarterTemplate, 'story'> & {bots: Pick<StarterBot, 'name' | 'story' | 'intro'>[]};
+
+/** The translatable pieces of a template, by piece key: `story`, `<name>.story`, `<name>.intro`. */
+export function starterLocalePieces(template: StarterTextSource): Record<string, string> {
+    const pieces: Record<string, string> = {story: template.story};
+    for (const bot of template.bots) {
+        pieces[`${bot.name}.story`] = bot.story;
+        pieces[`${bot.name}.intro`] = bot.intro;
+    }
+    return pieces;
+}
+
+/** The piece keys a locale lacks or holds a translation of older English text for. */
+export function staleStarterLocalePieces(template: StarterTextSource, locale: Pick<StarterLocale, 'story' | 'bots' | 'sources'> | undefined | null): string[] {
+    const pieces = starterLocalePieces(template);
+    return Object.keys(pieces).filter(key => {
+        if (!locale) return true;
+        const [name, field] = key === 'story' ? [undefined, 'story'] : [key.slice(0, key.lastIndexOf('.')), key.slice(key.lastIndexOf('.') + 1)];
+        const text = name === undefined ? locale.story : locale.bots?.[name]?.[field as 'story' | 'intro'];
+        return !text?.trim() || locale.sources?.[key] !== starterTextHash(pieces[key]);
+    });
+}
+
+/**
+ * The text a new game is written with: the template's own, or a COMPLETE and current
+ * translation. Anything less (no locale, a missing character, English edited since) gives
+ * the template's language back, so a game is never half translated.
+ */
+export function starterTextFor(
+    template: StarterTextSource & Pick<StarterTemplate, 'language' | 'clips'>,
+    language: string | undefined,
+    locale: StarterLocale | undefined | null,
+): {language: string; story: string; bots: {story: string; intro: string}[]; clips?: Record<string, StarterClip>} {
+    const own = {language: template.language, story: template.story, bots: template.bots.map(b => ({story: b.story, intro: b.intro})), clips: template.clips};
+    if (!language || language === template.language || !locale || locale.language !== language) return own;
+    if (staleStarterLocalePieces(template, locale).length > 0) return own;
+    return {
+        language,
+        story: locale.story,
+        bots: template.bots.map(b => ({story: locale.bots[b.name].story, intro: locale.bots[b.name].intro})),
+        clips: locale.clips,
+    };
+}
+
+/** The audio doc of a clip: the template's own under the clip key, a translation's under `{code}__{key}`. */
+export function starterAudioDocId(clipKey: string, lang?: string): string {
+    return lang ? `${lang}__${clipKey}` : clipKey;
+}
+
+/** The languages a card offers: the template's own first, then its translations. */
+export function starterCardLanguages(template: Pick<StarterTemplate, 'language' | 'languages'>): string[] {
+    return [...new Set([template.language || 'en', ...(template.languages ?? [])])];
 }
 
 /** What the start screen needs to draw a card. Nothing here is secret. */
@@ -113,6 +230,8 @@ export interface StarterCard {
     hook: string;
     playerCount: number;
     language: string;
+    /** Every language the story can be started in, the template's own first. */
+    languages: string[];
 }
 
 /**
@@ -305,7 +424,7 @@ export function starterClipUrl(
     if (!game.starterTemplateId || !clipKey) return undefined;
     const clip = game.starterClips?.[clipKey];
     if (!clip || clip.voice !== currentVoice) return undefined;
-    return `/api/starter-games/${game.starterTemplateId}/audio/${encodeURIComponent(clipKey)}?v=${clip.version}`;
+    return `/api/starter-games/${game.starterTemplateId}/audio/${encodeURIComponent(clipKey)}?v=${clip.version}${clip.lang ? `&lang=${clip.lang}` : ''}`;
 }
 
 /**

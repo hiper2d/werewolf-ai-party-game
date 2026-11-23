@@ -1,7 +1,7 @@
-import {readFileSync} from "fs";
+import {readFileSync, writeFileSync} from "fs";
 import {db} from "../firebase/server";
 import {AVATAR_VARIANTS_COLLECTION, GAME_ROLES, GAME_STATES, MessageType} from "../app/api/game-models";
-import {isIllustrationDocId, STARTER_GAMES_COLLECTION, StarterBot, StarterTemplate} from "../app/utils/starter-games";
+import {isIllustrationDocId, STARTER_GAMES_COLLECTION, STARTER_LOCALES_COLLECTION, StarterBot, StarterTemplate} from "../app/utils/starter-games";
 import {isStarterModel} from "../app/ai/model-limit-utils";
 import {isAllowedAsGameMaster} from "../app/ai/ai-models";
 
@@ -23,12 +23,17 @@ import {isAllowedAsGameMaster} from "../app/ai/ai-models";
  *       [--drop-maniac]            leave the Maniac off the template's role list
  *       [--story-file <path>]      use this text as the opening story instead of the generated one
  *   npx tsx --env-file=.env scripts/snapshot-starter-game.ts --set-story tavern --story-file <path>
+ *   npx tsx --env-file=.env scripts/snapshot-starter-game.ts --export-text tavern --file <path>
+ *   npx tsx --env-file=.env scripts/snapshot-starter-game.ts --import-text tavern --file <path>
+ *       the template's words as JSON, to edit by hand and write back: card copy, opening
+ *       story, the Game Master's voice direction, and per character the backstory,
+ *       introduction, appearance and voice direction (names, voices and roles are not editable)
  *   npx tsx --env-file=.env scripts/snapshot-starter-game.ts --publish tavern
  *   npx tsx --env-file=.env scripts/snapshot-starter-game.ts --unpublish tavern
  *   npx tsx --env-file=.env scripts/snapshot-starter-game.ts --list
  *
  * Re-running with the same --id replaces the template: its portraits, its drawn art styles
- * and its recorded voices are removed and must be made again. Games already created from it
+ * its recorded voices and its translations are removed and must be made again. Games already created from it
  * keep their own copies of the portraits.
  */
 
@@ -204,6 +209,7 @@ async function snapshot(gameId: string) {
     await deleteCollection(templateRef.collection(AVATAR_VARIANTS_COLLECTION));
     // A new snapshot is a new template: its recorded voices and drawn styles go too.
     await deleteCollection(templateRef.collection('audio'));
+    await deleteCollection(templateRef.collection(STARTER_LOCALES_COLLECTION));
     // Image docs are large: a few per batch keeps each commit under Firestore's 10 MiB limit.
     for (let i = 0; i < copies.length; i += 4) {
         const batch = db!.batch();
@@ -212,12 +218,69 @@ async function snapshot(gameId: string) {
     }
     await templateRef.set(template);
     console.log(`Written as a DRAFT (playable on a local server as is). Next: draw its art styles (draw-starter-style.ts)`);
-    console.log(`and record its voices (record-starter-voices.ts). Publish with: --publish ${templateId}`);
+    console.log(`record its voices (record-starter-voices.ts) and translate it (translate-starter-game.ts). Publish with: --publish ${templateId}`);
+}
+
+const TEXT_FIELDS = ['title', 'hook', 'story', 'gameMasterVoiceStyle'] as const;
+const BOT_TEXT_FIELDS = ['story', 'intro', 'visualDescription', 'voiceStyle'] as const;
+
+async function exportText(templateId: string, file: string) {
+    const doc = await db!.collection(STARTER_GAMES_COLLECTION).doc(templateId).get();
+    if (!doc.exists) throw new Error(`No starter template "${templateId}"`);
+    const t = doc.data() as StarterTemplate;
+    const out = {
+        ...Object.fromEntries(TEXT_FIELDS.map(field => [field, t[field] ?? ''])),
+        bots: Object.fromEntries(t.bots.map(bot => [bot.name, Object.fromEntries(BOT_TEXT_FIELDS.map(field => [field, bot[field] ?? '']))])),
+    };
+    writeFileSync(file, JSON.stringify(out, null, 2) + '\n');
+    console.log(`${templateId}: text written to ${file}`);
+}
+
+async function importText(templateId: string, file: string) {
+    const ref = db!.collection(STARTER_GAMES_COLLECTION).doc(templateId);
+    const doc = await ref.get();
+    if (!doc.exists) throw new Error(`No starter template "${templateId}"`);
+    const t = doc.data() as StarterTemplate;
+    const edited = JSON.parse(readFileSync(file, 'utf8'));
+    const changed: string[] = [];
+    const update: Record<string, unknown> = {};
+    for (const field of TEXT_FIELDS) {
+        const value = typeof edited[field] === 'string' ? edited[field].trim() : undefined;
+        if (value === undefined || value === (t[field] ?? '')) continue;
+        if (!value && field !== 'gameMasterVoiceStyle') throw new Error(`${field} cannot be empty`);
+        update[field] = value;
+        changed.push(field);
+    }
+    const unknown = Object.keys(edited.bots ?? {}).filter(name => !t.bots.some(bot => bot.name === name));
+    if (unknown.length) throw new Error(`Not in the cast: ${unknown.join(', ')}`);
+    const bots = t.bots.map(bot => {
+        const next: StarterBot = {...bot};
+        for (const field of BOT_TEXT_FIELDS) {
+            const value = typeof edited.bots?.[bot.name]?.[field] === 'string' ? edited.bots[bot.name][field].trim() : undefined;
+            if (value === undefined || value === (bot[field] ?? '')) continue;
+            if (!value && (field === 'story' || field === 'intro')) throw new Error(`${bot.name}.${field} cannot be empty`);
+            if (value) next[field] = value; else delete next[field];
+            changed.push(`${bot.name}.${field}`);
+        }
+        return next;
+    });
+    if (changed.length === 0) {
+        console.log(`${templateId}: nothing changed`);
+        return;
+    }
+    await ref.update({...update, bots});
+    console.log(`${templateId}: changed ${changed.join(', ')}`);
+    console.log('Changed story or introductions need new voice takes and new translations; a changed appearance needs its art styles drawn again.');
 }
 
 async function main() {
     if (!db) throw new Error('Firestore is not initialized');
     if (flag('list')) return list();
+    if (arg('export-text') || arg('import-text')) {
+        const file = arg('file');
+        if (!file) throw new Error('--file <path> is required');
+        return arg('export-text') ? exportText(arg('export-text')!, file) : importText(arg('import-text')!, file);
+    }
     if (arg('publish')) return setStatus(arg('publish')!, 'live');
     if (arg('unpublish')) return setStatus(arg('unpublish')!, 'draft');
     if (arg('set-story')) {
@@ -228,7 +291,7 @@ async function main() {
         const text = readFileSync(storyFile, 'utf8').trim();
         if (!text) throw new Error('The story file is empty');
         await ref.update({story: text});
-        console.log(`${arg('set-story')}: opening story replaced (${text.length} chars). Record its voice again: record-starter-voices.ts ${arg('set-story')} --only story`);
+        console.log(`${arg('set-story')}: opening story replaced (${text.length} chars). Record its voice again (record-starter-voices.ts ${arg('set-story')} --only story) and translate it again (translate-starter-game.ts ${arg('set-story')}): until then the story is dealt in its own language only`);
         return;
     }
     const gameId = process.argv[2];

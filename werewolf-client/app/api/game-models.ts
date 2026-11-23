@@ -375,7 +375,7 @@ export interface Game {
     starterTemplateId?: string;
     // The template's pre-recorded voice clips this game may play instead of calling the
     // voice model (opening story, introductions): clip key → the voice it was read in.
-    starterClips?: Record<string, {voice: string; version: number}>;
+    starterClips?: Record<string, {voice: string; version: number; lang?: string}>;
     // On-screen hints that say what the player can do next. On for starter games.
     helperMode?: boolean;
     votingHistory?: VotingDayResult[]; // History of voting results for each day

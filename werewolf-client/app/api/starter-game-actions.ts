@@ -33,9 +33,13 @@ import {
     renameHumanAvatarKey,
     guestStarterGame,
     resumableStarterGames,
-    replacePlaceholderName,
+    withStarterPlayerName,
     STARTER_GAMES_COLLECTION,
+    STARTER_LOCALES_COLLECTION,
     StarterCard,
+    starterCardLanguages,
+    StarterLocale,
+    starterTextFor,
     starterAvatarDocId,
     starterSceneDocId,
     StarterTemplate,
@@ -54,7 +58,7 @@ import {GM_COMMAND_INTRODUCE_YOURSELF} from "@/app/ai/prompts/gm-commands";
 import {messageDocId, serializeMessageForFirestore} from "@/app/api/message-serialization";
 import {commitChunked, PendingWrite} from "@/app/utils/avatar-generation";
 import {recordFeatureEvent} from "@/app/api/feature-events";
-import {normalizeGameLanguage} from "@/app/ai/game-language";
+import {isGameLanguage, normalizeGameLanguage} from "@/app/ai/game-language";
 import {DEFAULT_GAME_MODE} from "@/app/api/game-models";
 import {logger} from "@/app/utils/logger";
 
@@ -121,6 +125,7 @@ export async function listStarterGames(): Promise<StarterCard[]> {
             hook: t.hook,
             playerCount: t.bots.length + 1,
             language: t.language,
+            languages: starterCardLanguages(t),
         };
     });
 }
@@ -137,9 +142,9 @@ export async function listStarterGames(): Promise<StarterCard[]> {
  * Returns a result union instead of throwing: production masks the message of an error
  * thrown from a server action (see previewGameAction).
  */
-export async function createStarterGame(templateId: string, playerName: string, options: { forceNew?: boolean } = {}): Promise<StarterGameResult> {
+export async function createStarterGame(templateId: string, playerName: string, options: { forceNew?: boolean; language?: string } = {}): Promise<StarterGameResult> {
     try {
-        return { ok: true, gameId: await createStarterGameImpl(templateId, playerName, options.forceNew === true) };
+        return { ok: true, gameId: await createStarterGameImpl(templateId, playerName, options.forceNew === true, options.language) };
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         const playerWall = isInsufficientBalanceError(message) || isFreeSpendLimitError(message);
@@ -172,7 +177,7 @@ async function resolveStarterOwner(): Promise<string> {
     return guest.email;
 }
 
-async function createStarterGameImpl(templateId: string, playerName: string, forceNew: boolean): Promise<string> {
+async function createStarterGameImpl(templateId: string, playerName: string, forceNew: boolean, requestedLanguage?: string): Promise<string> {
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
@@ -265,11 +270,24 @@ async function createStarterGameImpl(templateId: string, playerName: string, for
     const botModels = dealStarterModels(template.bots.length, getStarterModels());
     const gameMasterAiType = pickStarterGameMaster(template.gameMasterAiType, getStarterGameMasterModels());
 
-    const withName = (text: string) => replacePlaceholderName(text, template.humanPlaceholder, humanPlayerName);
+    // The language the player picked next to the name. A story is played in another
+    // language only from a complete, current translation (StarterLocale); otherwise the
+    // game is in the template's own language. The code is checked against the fixed list
+    // before it reaches a document path.
+    let locale: StarterLocale | undefined;
+    if (isGameLanguage(requestedLanguage) && requestedLanguage !== template.language && template.languages?.includes(requestedLanguage)) {
+        locale = (await templateRef.collection(STARTER_LOCALES_COLLECTION).doc(requestedLanguage).get()).data() as StarterLocale | undefined;
+    }
+    const text = starterTextFor(template, requestedLanguage, locale);
+    if (isGameLanguage(requestedLanguage) && text.language !== requestedLanguage) {
+        logger.warn(`Starter game ${templateId}: no usable ${requestedLanguage} translation, dealt in ${text.language}`, {templateId, language: requestedLanguage});
+    }
+
+    const withName = (value: string) => withStarterPlayerName(value, template.humanPlaceholder, humanPlayerName);
 
     const bots: Bot[] = template.bots.map((bot, index) => ({
         name: bot.name,
-        story: withName(bot.story),
+        story: withName(text.bots[index].story),
         role: botRoles[index],
         isAlive: true,
         aiType: botModels[index],
@@ -315,12 +333,12 @@ async function createStarterGameImpl(templateId: string, playerName: string, for
         specialRoles: template.specialRoles,
         longReplies: template.longReplies ?? false,
         gameMode: template.gameMode ?? DEFAULT_GAME_MODE,
-        language: normalizeGameLanguage(template.language),
+        language: normalizeGameLanguage(text.language),
         gameMasterAiType,
         ...(template.voiceProvider ? {voiceProvider: template.voiceProvider} : {}),
         gameMasterVoice: template.gameMasterVoice,
         ...(template.gameMasterVoiceStyle ? {gameMasterVoiceStyle: template.gameMasterVoiceStyle} : {}),
-        story: withName(template.story),
+        story: withName(text.story),
         bots,
         humanPlayerName,
         humanPlayerRole: GAME_ROLES.VILLAGER,
@@ -336,7 +354,7 @@ async function createStarterGameImpl(templateId: string, playerName: string, for
         expireAt,
         createdWithTier: tier,
         starterTemplateId: templateId,
-        ...(template.clips && Object.keys(template.clips).length > 0 ? {starterClips: template.clips} : {}),
+        ...(text.clips && Object.keys(text.clips).length > 0 ? {starterClips: text.clips} : {}),
         helperMode: true,
         avatarsStatus: 'ready',
         avatarsVersion: template.avatarsVersion,
@@ -423,7 +441,7 @@ async function createStarterGameImpl(templateId: string, playerName: string, for
             authorName: bot.name,
             // The introduction's text only. The source bot's private thinking is not copied:
             // it was written under another role deal.
-            msg: { reply: withName(template.bots[index].intro), thinking: "" },
+            msg: { reply: withName(text.bots[index].intro), thinking: "" },
             messageType: MessageType.BOT_WELCOME,
             day: 1,
             timestamp: null,

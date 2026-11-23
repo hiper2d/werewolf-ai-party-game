@@ -498,3 +498,25 @@ Owed before guest play goes live:
    day.
 5. Track 2: privacy split first, then the rest of the multiplayer plan.
 6. Track 3 when the numbers say the first screen is the next leak.
+
+## Build state, 2026-11-23
+
+Still on `develop`, unpushed. All three templates are DRAFTS (local server only).
+
+- **Three stories.** `tavern` (The Last Lantern), `starship` (Meridian Is Off Course),
+  `ninja-academy` (Night at Moonshade Academy). Each: 8 players, 2 werewolves, doctor +
+  detective, three art styles, recorded voices. The two new source games were created by
+  script (`scripts/make-starter-source.jest.ts`, forms in `scripts/starter-sources/`), then
+  edited by hand (`snapshot-starter-game.ts --export-text / --import-text`): opening stories
+  rewritten in the tavern's shape, a duplicate security officer turned into the medic
+  (starship), a duplicate transfer student turned into the stealth instructor (ninja).
+- **Languages.** A Language picker next to the name on the start screen (landing page and
+  lobby). Every template is translated into the 13 other game languages (story, backstories,
+  introductions) and voiced in each: 8 clips per language per story. Names stay Latin.
+- **Open.** Nobody but the model has read the translations: a native read of at least one
+  or two languages before publishing. The anime welcome scene of `ninja-academy` has a
+  small blond, headband-wearing student in the crowd that reads close to a known anime
+  hero (drawn twice, both times); the card shows the watercolor scene instead, and the
+  anime scene should be redrawn or dropped before going live.
+- **Cost of this build:** about $7 (two source games, seven style draws, 39 translations,
+  ~330 voice clips).

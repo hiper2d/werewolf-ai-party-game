@@ -9,6 +9,9 @@ import {createStarterGame} from '@/app/api/starter-game-actions';
 import type {StarterCard} from '@/app/utils/starter-games';
 import {INPUT_LIMITS} from '@/app/utils/input-limits';
 import {validatePlayerName} from '@/app/utils/name-utils';
+import {DEFAULT_GAME_LANGUAGE, GAME_LANGUAGES} from '@/app/ai/game-language';
+
+const LANGUAGE_STORAGE_KEY = 'starterLanguage';
 
 /**
  * The start screen's cards: pick a ready-made story, type a name, play. One click creates
@@ -25,6 +28,26 @@ export default function StarterGames({cards, defaultName, guest = false}: {cards
     const [name, setName] = useState(defaultName);
     const [startingId, setStartingId] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+
+    // The languages the stories can be played in (a story without a translation is dealt
+    // in its own language: the server decides). The picker shows only with a real choice.
+    const offered = GAME_LANGUAGES.filter(l => cards.some(card => card.languages?.includes(l.code)));
+    const offeredCodes = offered.map(l => l.code).join(',');
+    const [language, setLanguage] = useState(DEFAULT_GAME_LANGUAGE);
+    // After mount (the server cannot know): the last pick, else the browser's language.
+    useEffect(() => {
+        const codes = offeredCodes.split(',');
+        let saved: string | null = null;
+        try { saved = localStorage.getItem(LANGUAGE_STORAGE_KEY); } catch { /* private mode */ }
+        const wanted = [saved, ...(navigator.languages ?? [navigator.language])]
+            .map(code => (code ?? '').toLowerCase().split('-')[0])
+            .find(code => codes.includes(code));
+        if (wanted) setLanguage(wanted);
+    }, [offeredCodes]);
+    const chooseLanguage = (code: string) => {
+        setLanguage(code);
+        try { localStorage.setItem(LANGUAGE_STORAGE_KEY, code); } catch { /* private mode */ }
+    };
 
     // Coming back with the browser's Back button restores this page from the router's
     // cache, which still says "Play" for a story the player has just started. Ask the server
@@ -57,7 +80,7 @@ export default function StarterGames({cards, defaultName, guest = false}: {cards
         setError(null);
         setStartingId(templateId);
         try {
-            const result = await createStarterGame(templateId, name, {forceNew});
+            const result = await createStarterGame(templateId, name, {forceNew, language});
             if (result.ok) {
                 // A visitor became a guest inside that call: tell the session hooks (navbar,
                 // device record) before the game page opens. Best effort.
@@ -76,7 +99,8 @@ export default function StarterGames({cards, defaultName, guest = false}: {cards
 
     return (
         <div className="w-full">
-            {!(guest && cards.some(card => card.resumeGameId)) && <label className="flex items-center gap-3 mb-5 flex-wrap">
+            {!(guest && cards.some(card => card.resumeGameId)) && <div className="flex items-center gap-x-6 gap-y-3 mb-5 flex-wrap">
+            <label className="flex items-center gap-3 flex-wrap">
                 <span className="text-[13px] font-medium text-[var(--fg-1)]">Your name</span>
                 <input
                     value={name}
@@ -87,7 +111,19 @@ export default function StarterGames({cards, defaultName, guest = false}: {cards
                     className="w-[200px] px-3 py-2 text-[14px] rounded-[var(--radius-md)] bg-[var(--bg-1)] text-[var(--fg-0)] border border-[var(--line-2)] focus:border-[var(--accent)] focus:outline-none transition-colors duration-[120ms]"
                 />
                 <span className="text-[12px] text-[var(--fg-2)]">Letters and numbers, no spaces.</span>
+            </label>
+            {offered.length > 1 && <label className="flex items-center gap-3">
+                <span className="text-[13px] font-medium text-[var(--fg-1)]">Language</span>
+                <select
+                    value={language}
+                    onChange={e => chooseLanguage(e.target.value)}
+                    aria-label="The language the game is played in"
+                    className="px-3 py-2 text-[14px] rounded-[var(--radius-md)] bg-[var(--bg-1)] text-[var(--fg-0)] border border-[var(--line-2)] focus:border-[var(--accent)] focus:outline-none transition-colors duration-[120ms]"
+                >
+                    {offered.map(l => <option key={l.code} value={l.code}>{l.native}</option>)}
+                </select>
             </label>}
+            </div>}
 
             {error && (
                 <div role="alert" className="mb-4 px-4 py-3 text-[13px] text-[var(--fg-0)] border border-[oklch(62%_0.19_25_/_0.45)] bg-[oklch(62%_0.19_25_/_0.08)] rounded-[var(--radius-lg)]">

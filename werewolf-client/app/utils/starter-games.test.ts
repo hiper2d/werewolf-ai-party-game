@@ -18,6 +18,16 @@ import {
     resumableStarterGames,
     replacePlaceholderName,
     starterAvatarDocId,
+    namesStarterPlayer,
+    staleStarterLocalePieces,
+    STARTER_PLAYER_TOKEN,
+    starterAudioDocId,
+    starterCardLanguages,
+    StarterLocale,
+    starterLocalePieces,
+    starterTextFor,
+    starterTextHash,
+    withStarterPlayerName,
 } from "@/app/utils/starter-games";
 import {getStarterGameMasterModels, getStarterModels, isStarterModel, turnCostRank} from "@/app/ai/model-limit-utils";
 import {isAllowedAsGameMaster, LLM_CONSTANTS, SupportedAiModels} from "@/app/ai/ai-models";
@@ -278,5 +288,71 @@ describe('resumableStarterGames', () => {
     it('is empty when every starter game is over or there are none', () => {
         expect(resumableStarterGames([{id: 'a', starterTemplateId: 'tavern', gameState: 'GAME_OVER', createdAt: 1}])).toEqual({});
         expect(resumableStarterGames([])).toEqual({});
+    });
+});
+
+describe('starter translations', () => {
+    const template = {
+        language: 'en',
+        story: 'A storm. Kai sits by the fire.',
+        clips: {story: {voice: 'Charon', version: 1}},
+        bots: [
+            {name: 'Elda', story: 'Elda keeps the inn.', intro: 'I am Elda.'},
+            {name: 'Borin', story: 'Borin is a smith.', intro: 'Borin. Smith.'},
+        ],
+    };
+    const localeOf = (overrides: Partial<StarterLocale> = {}): StarterLocale => ({
+        language: 'ru',
+        story: `Буря. ${STARTER_PLAYER_TOKEN} сидит у огня.`,
+        bots: {Elda: {story: 'Elda держит трактир.', intro: 'Я Elda.'}, Borin: {story: 'Borin кузнец.', intro: 'Borin. Кузнец.'}},
+        sources: Object.fromEntries(Object.entries(starterLocalePieces(template)).map(([key, text]) => [key, starterTextHash(text)])),
+        clips: {story: {voice: 'Charon', version: 2, lang: 'ru'}},
+        updatedAt: 1,
+        ...overrides,
+    });
+
+    it('lists the pieces by key', () => {
+        expect(Object.keys(starterLocalePieces(template))).toEqual(['story', 'Elda.story', 'Elda.intro', 'Borin.story', 'Borin.intro']);
+    });
+
+    it('calls a piece stale when it is missing or its English changed', () => {
+        expect(staleStarterLocalePieces(template, localeOf())).toEqual([]);
+        expect(staleStarterLocalePieces(template, undefined)).toHaveLength(5);
+        expect(staleStarterLocalePieces({...template, story: 'A calm night.'}, localeOf())).toEqual(['story']);
+        const noBorin = localeOf();
+        delete noBorin.bots.Borin;
+        expect(staleStarterLocalePieces(template, noBorin)).toEqual(['Borin.story', 'Borin.intro']);
+    });
+
+    it('deals a complete translation with its own clips', () => {
+        const text = starterTextFor(template, 'ru', localeOf());
+        expect(text.language).toBe('ru');
+        expect(text.bots.map(b => b.intro)).toEqual(['Я Elda.', 'Borin. Кузнец.']);
+        expect(text.clips).toEqual({story: {voice: 'Charon', version: 2, lang: 'ru'}});
+    });
+
+    it("falls back to the template's language rather than deal a partial translation", () => {
+        expect(starterTextFor(template, 'ru', undefined).language).toBe('en');
+        expect(starterTextFor(template, 'ru', localeOf({language: 'ja'})).language).toBe('en');
+        expect(starterTextFor({...template, story: 'Edited since.'}, 'ru', localeOf()).story).toBe('Edited since.');
+        expect(starterTextFor(template, 'en', localeOf()).clips).toEqual(template.clips);
+        expect(starterTextFor(template, undefined, localeOf()).language).toBe('en');
+    });
+
+    it("puts the player's name on the token and on the placeholder", () => {
+        expect(withStarterPlayerName(`${STARTER_PLAYER_TOKEN}さん、どうぞ。`, 'Kai', 'Мира')).toBe('Мираさん、どうぞ。');
+        expect(withStarterPlayerName('Kai sits. Kaiser does not.', 'Kai', 'Mira')).toBe('Mira sits. Kaiser does not.');
+        expect(namesStarterPlayer(`Привет, ${STARTER_PLAYER_TOKEN}`, 'Kai')).toBe(true);
+        expect(namesStarterPlayer('Hello, Kai', 'Kai')).toBe(true);
+        expect(namesStarterPlayer('Hello, all', 'Kai')).toBe(false);
+    });
+
+    it('keys audio and clip URLs by language', () => {
+        expect(starterAudioDocId('story')).toBe('story');
+        expect(starterAudioDocId('Elda', 'ru')).toBe('ru__Elda');
+        expect(starterClipUrl({starterTemplateId: 'tavern', starterClips: {Elda: {voice: 'Kore', version: 7, lang: 'ru'}}}, 'Elda', 'Kore'))
+            .toBe('/api/starter-games/tavern/audio/Elda?v=7&lang=ru');
+        expect(starterCardLanguages({language: 'en', languages: ['ru', 'ja']})).toEqual(['en', 'ru', 'ja']);
+        expect(starterCardLanguages({language: 'en'})).toEqual(['en']);
     });
 });
