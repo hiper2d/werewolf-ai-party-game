@@ -5,6 +5,7 @@ import {SupportedAiModels, resolveModelId} from "@/app/ai/ai-models";
 import {PAID_TIER_MARKUP} from "@/app/config/credit-packages";
 import {applyDailySpend, applySpending, formatPeriod} from "@/app/utils/spending-utils";
 import {deviceSpendRef, globalSpendRef, guestSpendRef} from "@/app/api/spend-ledgers";
+import {creditsAfterSpend} from "@/app/utils/credits";
 import {logger} from "@/app/utils/logger";
 
 type TokenUsageInput = Partial<TokenUsage> | null | undefined;
@@ -243,6 +244,11 @@ export async function recordSpend(input: RecordSpendInput, timestamp: number = D
                 }
                 userUpdate.balance = round6(balance - chargedAmount);
                 recordedAmount = chargedAmount;
+            } else if (typeof userData.credits === 'number' && userData.guest !== true) {
+                // Free credits (app/utils/credits.ts) pay for free-tier play at cost. Spend
+                // that already happened is always recorded; the credits just stop at zero
+                // (the guard before the call is what refuses the next one).
+                userUpdate.credits = creditsAfterSpend(userData.credits, costUSD);
             }
 
             userUpdate.spendings = applySpending(userData.spendings, formatPeriod(timestamp), recordedAmount, tier);

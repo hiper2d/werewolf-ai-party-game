@@ -3,6 +3,7 @@
 import {useEffect} from 'react';
 import {useSession} from 'next-auth/react';
 import {registerDevice} from '@/app/api/device-actions';
+import {settleSignupCredit} from '@/app/api/credit-actions';
 import {collectBrowserSignals} from '@/app/utils/collect-browser-signals';
 
 /**
@@ -37,6 +38,24 @@ function writeLocal(id: string): void {
     }
 }
 
+const CREDIT_SETTLED_KEY = 'ww_credit_settled';
+
+function creditSettled(email: string): boolean {
+    try {
+        return window.localStorage.getItem(CREDIT_SETTLED_KEY) === email;
+    } catch {
+        return false;
+    }
+}
+
+function markCreditSettled(email: string): void {
+    try {
+        window.localStorage.setItem(CREDIT_SETTLED_KEY, email);
+    } catch {
+        /* private mode: asked again on the next page load, which is harmless */
+    }
+}
+
 export default function DeviceProvider() {
     const {data: session} = useSession();
     const email = session?.user?.email ?? undefined;
@@ -51,6 +70,13 @@ export default function DeviceProvider() {
                 const canonical = await registerDevice(readLocal(), email, signals ?? undefined);
                 if (!cancelled && canonical) {
                     writeLocal(canonical);
+                }
+                // A new account's sign-up credit is decided now that the server knows which
+                // browser it signed up on (app/utils/credits.ts). A no-op for everyone else.
+                // Asked once per account per browser: after that the answer is on the account.
+                if (email && !creditSettled(email)) {
+                    await settleSignupCredit();
+                    markCreditSettled(email);
                 }
             } catch {
                 /* identity is best effort; never surface this to the player */

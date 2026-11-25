@@ -36,6 +36,8 @@ export interface User {
     dailySpend?: UserDailySpend;
     voiceProvider?: VoiceProvider; // User's preferred TTS voice provider
     balance?: number; // USD balance for paid tier users
+    /** Free credits left, USD (app/utils/credits.ts). Absent until the sign-up credit is decided. */
+    credits?: number;
     stripeCustomerId?: string; // Stripe customer ID for paid tier users
 }
 
@@ -505,6 +507,13 @@ export const FREE_TIER_LIMITS = {
     GUEST_SPEND_USD: 1,
     GUEST_GLOBAL_DAILY_SPEND_USD: 5,
     GUEST_ONCE_PER_DEVICE: 1,
+    // Free credits (app/utils/credits.ts): an account gets SIGNUP_CREDIT_USD once instead of
+    // the daily and monthly refill above, and DISCORD_CREDIT_USD once more through the
+    // Discord claim. CREDITS_ON = 0 is the way back to the daily and monthly caps without a
+    // deploy; the platform-wide daily ceiling and the games-a-day limit apply either way.
+    CREDITS_ON: 1,
+    SIGNUP_CREDIT_USD: 5,
+    DISCORD_CREDIT_USD: 5,
 } as const;
 
 /** Resolved free-tier limits (defaults overlaid with `config/limits`). */
@@ -517,6 +526,10 @@ export interface FreeTierLimits {
     guestSpendUSD: number;
     guestGlobalDailySpendUSD: number;
     guestOncePerDevice: number;
+    /** 1: accounts play on one-time free credits. 0: the daily and monthly caps, as before. */
+    creditsOn: number;
+    signupCreditUSD: number;
+    discordCreditUSD: number;
 }
 
 /**

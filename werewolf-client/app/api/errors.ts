@@ -1,4 +1,5 @@
 import {GUEST_BUDGET_MESSAGE, GUEST_PAUSED_MESSAGE, isGuestBudgetError} from "@/app/utils/guest";
+import {CREDITS_SPENT_MESSAGE, isCreditsSpentError} from "@/app/utils/credits";
 import { ModelRefusalError, type BudgetVerdict } from '@hiper2d/ai-agents';
 
 export class TierMismatchError extends Error {
@@ -56,7 +57,7 @@ export function isInsufficientBalanceError(text: string | undefined | null): boo
 export function insufficientBalanceMessage(what: string): string {
     return `Insufficient balance: your prepaid balance can't cover ${what}, so nothing was charged. `
         + 'Add funds on your profile page, or switch to the Free tier there to keep playing on '
-        + "the platform's keys within the free caps.";
+        + 'your free allowance.';
 }
 
 /**
@@ -108,7 +109,7 @@ export class FreeSpendLimitError extends Error {
  * was spent, retry after `resetsAt`), but the player-facing copy has to differ: telling
  * someone who spent 40 cents that they "used today's free $40" would read as a bug.
  */
-export type SpendLimitScope = 'account' | 'device' | 'device-shared' | 'global' | 'guest' | 'guest-global';
+export type SpendLimitScope = 'account' | 'device' | 'device-shared' | 'global' | 'guest' | 'guest-global' | 'credits';
 
 /** "$5" for whole dollars, "$2.50" otherwise — the free-tier cap as it reads in copy. */
 export function formatLimitUSD(amount: number): string {
@@ -122,6 +123,9 @@ export function freeSpendLimitMessage(
     const limit = formatLimitUSD(verdict.limitUSD);
     // A guest (app/utils/guest.ts) has no profile page and no tomorrow: the way on is a
     // sign-in. Neither line names an amount, for the same reason the global one does not.
+    if (scope === 'credits') {
+        return CREDITS_SPENT_MESSAGE;
+    }
     if (scope === 'guest') {
         return GUEST_BUDGET_MESSAGE;
     }
@@ -154,7 +158,7 @@ export function isFreeSpendLimitError(text: string | undefined | null): boolean 
     if (!text) {
         return false;
     }
-    return /(today's|this month's) free \$[\d.]+ of AI|free play is paused for today/i.test(text) || isGuestBudgetError(text);
+    return /(today's|this month's) free \$[\d.]+ of AI|free play is paused for today/i.test(text) || isGuestBudgetError(text) || isCreditsSpentError(text);
 }
 
 /**
@@ -166,9 +170,12 @@ export function isFreeSpendLimitError(text: string | undefined | null): boolean 
  * an ordinary daily limit so the copy never names the axis a farmer would change. The
  * true scope is on the thrown error and in the server log, not here.
  */
-export function freeSpendLimitScope(text: string | undefined | null): 'account' | 'global' | undefined {
+export function freeSpendLimitScope(text: string | undefined | null): 'account' | 'global' | 'credits' | undefined {
     if (!isFreeSpendLimitError(text)) {
         return undefined;
+    }
+    if (isCreditsSpentError(text)) {
+        return 'credits';
     }
     return /free play is paused for today/i.test(text!) ? 'global' : 'account';
 }

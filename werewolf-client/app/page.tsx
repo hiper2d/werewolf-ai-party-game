@@ -42,7 +42,12 @@ function tiersFor(limits: FreeTierLimits) {
       featured: false,
       badge: undefined as string | undefined,
       features: [
-        `${daily} of AI a day on us — up to ${monthly} a month`,
+        ...(limits.creditsOn
+          ? [
+              `${formatLimitUSD(limits.signupCreditUSD)} of AI on us when you sign up`,
+              ...(limits.discordCreditUSD > 0 ? [`${formatLimitUSD(limits.discordCreditUSD)} more for joining our Discord`] : []),
+            ]
+          : [`${daily} of AI a day on us — up to ${monthly} a month`]),
         `Up to ${limits.gamesPerDay} games a day`,
         'A curated, price-banded model set',
         'Voice acting and illustrations included',
@@ -62,7 +67,7 @@ function tiersFor(limits: FreeTierLimits) {
       badge: 'No subscription' as string | undefined,
       features: [
         'The full catalog — every model, including Fable 5.2 and GPT-6.2 Astra',
-        'No daily or monthly cap, no game limit, no bot caps',
+        limits.creditsOn ? 'No game limit and no bot caps' : 'No daily or monthly cap, no game limit, no bot caps',
         'Unlimited portrait rerolls and night replays',
         'Prepaid balance — top up anytime',
         'Pay only for what you use, base price + 15%',
@@ -293,7 +298,7 @@ export default async function Home() {
             Play free. Go Paid for the whole table.
           </h2>
           <p className="m-0 text-[15px] text-[var(--fg-2)] leading-[1.6] [text-wrap:pretty]">
-            Start with {formatLimitUSD(limits.dailySpendUSD)} of AI a day on a curated set of models — no card, never charged. Switch to pay-as-you-go for the
+            Start with {limits.creditsOn ? `${formatLimitUSD(limits.signupCreditUSD)} of free AI` : `${formatLimitUSD(limits.dailySpendUSD)} of AI a day`} on a curated set of models — no card, never charged. Switch to pay-as-you-go for the
             full catalog with no per-game limits. No subscription: pre-load a balance and pay only for what you use.
           </p>
         </div>

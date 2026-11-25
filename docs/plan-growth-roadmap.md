@@ -520,3 +520,61 @@ Still on `develop`, unpushed. All three templates are DRAFTS (local server only)
   anime scene should be redrawn or dropped before going live.
 - **Cost of this build:** about $7 (two source games, seven style draws, 39 translations,
   ~330 voice clips).
+
+## Build state, 2026-11-25: credits, sign-up check, Discord claim
+
+Still on `develop`, unpushed. Decided by Alex on 2026-11-25:
+
+- **Existing players get $5, once, and that is it.** No grandfather grant, no refill.
+- **Out of credits:** the message offers the Discord server ("ask Marlow") for $5 more,
+  or a top-up.
+- **A new account of a person who already has one must not get $5 again.** Detection is
+  switched on, not monitored first.
+- **Marlow reports guests too:** every guest game creation, not every visit.
+
+Built (details in CLAUDE.md, "Free credits"):
+
+- `users.credits`, spent at cost by `recordSpend`; the guard refuses at zero. The daily,
+  monthly and per-browser caps do not apply under credits; the platform-wide daily ceiling,
+  5 games a day and the model bands stay. `config/limits.creditsOn: 0` goes back to the caps.
+- **Two wallets, on purpose.** Free credits are a separate number from the purchased
+  balance: free credits keep the model bands (so $5 is not gone in one game of an expensive
+  model), are spent at cost with no markup, and Marlow can still tell who paid. The Free /
+  Paid switch on the profile stays for now; a top-up moves the account to Paid as before.
+- A Paid account can now open a game created on the Free tier, so running out mid-game and
+  topping up continues that game.
+- **Sign-up check** (`decideSignupCredit`). Denied: a second account on the same browser id;
+  two signs together (machine fingerprint, same IP within 7 days, numbered sibling name);
+  the machine alone only for a specific PC seen within 72 hours. One weak sign alone is
+  granted and flagged. Run read-only against the October ring: `reqaccv2` and `reqaccv5`
+  both come out denied (same browser).
+- **Discord claim.** A personal code on the profile page and in the popup; `/credits
+  code:WOLF-…` in the server is answered by the game itself as the Marlow bot (an HTTP
+  interaction, no bot process). Once per game account and once per Discord user.
+- **Marlow** (`~/projects/marlow`, `handlers/werewolf_stats.py`, commit b629e5f; Marlow runs from its working tree, so this is live from its next 05:05 UTC run, and its nightly backup pushes it):
+  guests are out of the sign-up counts; the digest lists each guest game and the day's
+  credit grants, denials (with the reason and the linked account), flags and Discord claims.
+
+Known limits, said plainly:
+
+- **Apple hardware and phones.** Two MacBooks of one model, or two phones of one model, in
+  one time zone have the same fingerprint. A cleared browser on a VPN on such a machine is
+  NOT denied (it is flagged, and Marlow lists it); denying it would refuse honest newcomers
+  on the most common hardware. On a Windows or Linux PC with a named graphics card it IS
+  denied within 72 hours. There is no production fingerprint data yet (collection ships with
+  this deploy), so the rule is set by reasoning, not measured; read the flags for two weeks
+  and tighten.
+- **Old accounts of one person each get $5.** The ring's six accounts are "existing" and are
+  not checked. A blocklist (plan-multi-account-linking.md §1) is the answer if that matters.
+- **A new Discord account is a new claim.** The claim is once per Discord user; nothing
+  checks how old the Discord account is (the row records who claimed).
+
+Owed before going live:
+
+1. Alex signs in locally and looks at the profile page, the popup and a real game running
+   out (set `credits` low with `scripts/credits.ts grant <email> -4.9`).
+2. Deploy, then `scripts/discord-credits-setup.ts endpoint …` and `register`, then try
+   `/credits` in the server. Post the how-to in Discord and a News entry.
+3. `scripts/credits.ts backfill-stems --write` (adds `handleStem` to recent accounts so the
+   sibling rule sees them).
+4. The guest → account sign-in hand-over is still untested with a real OAuth sign-in.

@@ -10,6 +10,7 @@ import { listStarterGames } from "@/app/api/starter-game-actions";
 import StarterGames from "@/app/games/components/StarterGames";
 import { starterDefaultName } from "@/app/utils/starter-games";
 import { isGuestEmail } from "@/app/utils/guest";
+import { canOpenGameOnTier } from "@/app/utils/tier-access";
 
 function formatCreationDate(timestamp?: number): string {
     if (!timestamp) return '';
@@ -143,7 +144,7 @@ function GameList({games, userTier, userEmail}: {games: Game[]; userTier: string
     return (
         <ul className="space-y-3">
             {games.map((game) => {
-                const isSameTier = game.createdWithTier === userTier;
+                const isSameTier = canOpenGameOnTier(game.createdWithTier, userTier);
                 return (
                 <li
                     key={game.id}

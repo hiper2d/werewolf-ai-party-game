@@ -280,6 +280,32 @@ describe('cost-tracking', () => {
             );
         });
 
+        it('free tier with credits: the cost comes off the free credits, at cost, never below zero', async () => {
+            const first = setupTransaction({ totalGameCost: 0 }, { tier: 'free', credits: 5 });
+            await recordGameMasterTokenUsage(gameId, { inputTokens: 1, outputTokens: 1, costUSD: 0.5 }, userEmail);
+            const write = userWrite(first.txn, first.userRef);
+            expect(write.credits).toBe(4.5);
+            expect(write).not.toHaveProperty('balance');
+
+            const last = setupTransaction({ totalGameCost: 0 }, { tier: 'free', credits: 0.2 });
+            await recordGameMasterTokenUsage(gameId, { inputTokens: 1, outputTokens: 1, costUSD: 0.5 }, userEmail);
+            expect(userWrite(last.txn, last.userRef).credits).toBe(0);
+        });
+
+        it('credits are left alone for a guest, for the paid tier, and for an account not decided yet', async () => {
+            const guest = setupTransaction({ totalGameCost: 0 }, { tier: 'free', guest: true, credits: 5 });
+            await recordGameMasterTokenUsage(gameId, { inputTokens: 1, outputTokens: 1, costUSD: 0.5 }, userEmail);
+            expect(userWrite(guest.txn, guest.userRef)).not.toHaveProperty('credits');
+
+            const paid = setupTransaction({ totalGameCost: 0 }, { tier: 'paid', balance: 10, credits: 5 });
+            await recordGameMasterTokenUsage(gameId, { inputTokens: 1, outputTokens: 1, costUSD: 0.5 }, userEmail);
+            expect(userWrite(paid.txn, paid.userRef)).not.toHaveProperty('credits');
+
+            const undecided = setupTransaction({ totalGameCost: 0 }, { tier: 'free' });
+            await recordGameMasterTokenUsage(gameId, { inputTokens: 1, outputTokens: 1, costUSD: 0.5 }, userEmail);
+            expect(userWrite(undecided.txn, undecided.userRef)).not.toHaveProperty('credits');
+        });
+
         it("a stray legacy 'api' tier string bills as free: no balance deduction, spend in the free bucket", async () => {
             const { txn, userRef } = setupTransaction({ totalGameCost: 0 }, { tier: 'api' });
 

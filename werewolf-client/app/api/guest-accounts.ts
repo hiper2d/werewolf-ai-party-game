@@ -6,6 +6,7 @@ import {getRequestDeviceId} from "@/app/api/device-actions";
 import {getFreeTierLimits} from "@/app/api/limits-actions";
 import {USER_TIERS} from "@/app/api/game-models";
 import {deviceMayMintGuest, GUEST_DEVICE_LIMIT_MESSAGE, GUEST_DISPLAY_NAME, guestEmailFor, isGuestEmail} from "@/app/utils/guest";
+import {chargeGuestSpend} from "@/app/api/credits";
 import {logger} from "@/app/utils/logger";
 
 /**
@@ -148,6 +149,13 @@ export async function claimGuest(guestId: string | undefined, accountEmail: stri
     batch.set(db.collection('users').doc(guest.email), { claimedBy: accountEmail, claimedAt: FieldValue.serverTimestamp() }, { merge: true });
     batch.set(db.collection('users').doc(accountEmail), { claimedGuests: FieldValue.arrayUnion(guest.email) }, { merge: true });
     await batch.commit();
+    // The trial's AI comes off the account's free credits (app/utils/credits.ts). Best
+    // effort: a failure here must not undo the hand-over.
+    try {
+        await chargeGuestSpend(accountEmail, guest.email);
+    } catch (error: any) {
+        logger.error(`claimGuest: could not take the guest's spend off the credits: ${error?.message ?? error}`, { userEmail: accountEmail, guestEmail: guest.email });
+    }
 
     const gameIds = games.docs.map(doc => doc.id);
     logger.info(`GUEST_CLAIMED: ${guest.email} signed in, ${gameIds.length} game(s) moved`, { userEmail: accountEmail, guestEmail: guest.email, gameIds });

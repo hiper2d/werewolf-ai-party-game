@@ -2250,12 +2250,18 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                                     </svg>
                                     <div className="flex-1 min-w-0">
                                         <div className="text-[13px] font-medium text-[var(--fg-0)] break-words">
-                                            {freeSpendScope === 'global'
+                                            {freeSpendScope === 'credits'
+                                                ? 'Your free credits are used up'
+                                                : freeSpendScope === 'global'
                                                 ? 'Free play is paused for today'
                                                 : freeSpendWindow === 'day' ? "Today's free AI allowance is used up" : "This month's free AI allowance is used up"}
                                         </div>
                                         <div className="text-[12px] mt-1 text-[var(--fg-1)] break-words">
-                                            {freeSpendScope === 'global' ? (
+                                            {freeSpendScope === 'credits' ? (
+                                                <>
+                                                    The game is paused, not lost. Every account starts with a one-time amount of free AI, and yours is spent. Get more free on our <a href={DISCORD_URL} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">Discord</a> (your code is on your profile page), or add funds there, then press Retry to pick up where the game left off.
+                                                </>
+                                            ) : freeSpendScope === 'global' ? (
                                                 <>
                                                     The game is paused, not broken — everyone on the free tier shares a daily pool of AI on the platform&apos;s keys, and today&apos;s pool is spent. This is not about your account; you still have allowance left. Adding funds on your profile page lifts it immediately; otherwise come back after the reset and press Retry to pick up where the game left off.
                                                 </>
@@ -2265,9 +2271,11 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                                                 </>
                                             )}
                                         </div>
+                                        {freeSpendScope !== 'credits' && (
                                         <div className="text-[12px] mt-1 text-[var(--fg-2)] break-words">
                                             Resets {resetLabel} (your local time){freeSpendWindow === 'day' ? ', midnight UTC' : ', the 1st at midnight UTC'}.
                                         </div>
+                                        )}
                                     </div>
                                     <div className="flex-shrink-0 flex flex-col gap-1.5">
                                         <Link
@@ -2382,7 +2390,7 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                                         </div>
                                         <div className="text-[12px] mt-1 text-[var(--fg-1)] break-words">
                                             Every AI turn is paid from your prepaid balance, and it can&apos;t cover
-                                            {displayWho ? ` ${displayWho}'s next reply` : ' the next reply'}. Retrying or switching the model won&apos;t help. On your profile page you can add funds, or switch to the Free tier and keep playing on the platform&apos;s keys within the free caps; then come back and press Retry to pick up where the game left off.
+                                            {displayWho ? ` ${displayWho}'s next reply` : ' the next reply'}. Retrying or switching the model won&apos;t help. On your profile page you can add funds, or switch to the Free tier and keep playing on your free allowance; then come back and press Retry to pick up where the game left off.
                                         </div>
                                     </div>
                                     <div className="flex-shrink-0 flex flex-col gap-1.5">

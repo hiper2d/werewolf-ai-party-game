@@ -3,9 +3,14 @@ import { db } from "@/firebase/server";
 import { UserMonthlySpending } from "@/app/api/game-models";
 import { getFreeTierLimits } from "@/app/api/limits-actions";
 import { FreeSpendLimitError } from "@/app/api/errors";
+import { ensureCredits } from "@/app/api/credits";
 
 jest.mock('@/app/api/limits-actions', () => ({
     getFreeTierLimits: jest.fn(async () => ({ gamesPerDay: 5, dailySpendUSD: 5, monthlySpendUSD: 20 })),
+}));
+
+jest.mock('@/app/api/credits', () => ({
+    ensureCredits: jest.fn(async () => undefined),
 }));
 
 // Mock dependencies (same pattern as night-replay.test.ts)
@@ -453,5 +458,51 @@ describe('assertFreeSpendWithinLimit', () => {
     it('passes when the user doc does not exist', async () => {
         setupDoc(null);
         await expect(assertFreeSpendWithinLimit(userId, JUNE_2026)).resolves.toBeUndefined();
+    });
+
+    describe('on free credits', () => {
+        const CREDIT_LIMITS = { gamesPerDay: 5, dailySpendUSD: 5, monthlySpendUSD: 20, creditsOn: 1, signupCreditUSD: 5, discordCreditUSD: 5 };
+        beforeEach(() => {
+            (getFreeTierLimits as jest.Mock).mockResolvedValue(CREDIT_LIMITS);
+        });
+        afterEach(() => {
+            (getFreeTierLimits as jest.Mock).mockImplementation(async () => ({ gamesPerDay: 5, dailySpendUSD: 5, monthlySpendUSD: 20 }));
+        });
+
+        it('passes while credits are left, whatever the old daily and monthly ledgers say', async () => {
+            setupDoc({ tier: 'free', credits: 0.01, dailySpend: dayLedger(50), spendings: [{ period: '2026-06', amountUSD: 500, freeAmountUSD: 500 }] });
+            await expect(assertFreeSpendWithinLimit(userId, JUNE_2026)).resolves.toBeUndefined();
+        });
+
+        it('refuses at zero credits with the credits message and counts the hit', async () => {
+            const { set } = setupDoc({ tier: 'free', credits: 0, dailySpend: dayLedger(0.2) });
+            const error = await assertFreeSpendWithinLimit(userId, JUNE_2026).catch(e => e);
+            expect(error).toBeInstanceOf(FreeSpendLimitError);
+            expect(error.scope).toBe('credits');
+            expect(error.message).toMatch(/used all your free credits/);
+            expect(set).toHaveBeenCalledWith({ dailySpend: expect.objectContaining({ limitHits: 1 }) }, { merge: true });
+        });
+
+        it('decides the sign-up credit first for an account that has none yet', async () => {
+            (ensureCredits as jest.Mock).mockResolvedValueOnce(5);
+            setupDoc({ tier: 'free' });
+            await expect(assertFreeSpendWithinLimit(userId, JUNE_2026)).resolves.toBeUndefined();
+            expect(ensureCredits).toHaveBeenCalledWith(userId);
+
+            (ensureCredits as jest.Mock).mockResolvedValueOnce(0);
+            setupDoc({ tier: 'free' });
+            await expect(assertFreeSpendWithinLimit(userId, JUNE_2026)).rejects.toThrow(/used all your free credits/);
+        });
+
+        it('a guest keeps its own trial caps and never reads credits', async () => {
+            setupDoc({ tier: 'free', guest: true, credits: 0 });
+            await expect(assertFreeSpendWithinLimit(userId, JUNE_2026)).resolves.toBeUndefined();
+            expect(ensureCredits).not.toHaveBeenCalled();
+        });
+
+        it('paid tier is exempt', async () => {
+            setupDoc({ tier: 'paid', credits: 0 });
+            await expect(assertFreeSpendWithinLimit(userId, JUNE_2026)).resolves.toBeUndefined();
+        });
     });
 });
