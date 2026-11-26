@@ -39,7 +39,12 @@ export const GUEST_ONLY_STARTER_MESSAGE = 'Sign in to create your own games.';
 export const GUEST_ONE_GAME_MESSAGE = 'Sign in to play another story. Your first game stays yours.';
 export const GUEST_DEVICE_LIMIT_MESSAGE = 'You have played here before. Sign in to keep playing: it is free.';
 export const GUEST_BUDGET_MESSAGE = 'Your free trial of AI is used up. Sign in to keep playing: your game is saved.';
-export const GUEST_PAUSED_MESSAGE = 'Free trial play is paused for today. Sign in to keep playing: your game is saved.';
+export const GUEST_PAUSED_MESSAGE = 'Free trial play is paused for today. Sign in to keep playing (your game is saved), or come back tomorrow.';
+/**
+ * The same shared daily budget, met when a guest tries to START a game: there is no game to
+ * save yet, and no guest is minted. The day is the UTC day, like every daily cap.
+ */
+export const GUEST_FULL_TODAY_MESSAGE = 'Today\u2019s free guest games are all taken. Try again tomorrow (a new day starts at 00:00 UTC), or sign in to play now.';
 
 export function isGuestWallError(text: string | undefined | null): boolean {
     return !!text && text.includes(GUEST_WALL_MESSAGE);

@@ -505,9 +505,11 @@ export const FREE_TIER_LIMITS = {
     // Guest play (app/utils/guest.ts): what ONE guest may spend on their one game, what all
     // guests together may spend in a UTC day, and whether a device that is already known
     // (a guest or an account was on it) is asked to sign in instead. Each is off at 0. A free game's median cost is $0.39 and a guest plays a
-    // third of one, so $1 is room, not a target.
-    GUEST_SPEND_USD: 1,
-    GUEST_GLOBAL_DAILY_SPEND_USD: 5,
+    // third of one, so the per-guest cap is room, not a target.
+    // Raised from $1 / $5 on 2026-11-26 (Alex): a guest cannot redraw, retry or play past
+    // night 1, so the trial is bounded by its shape and the caps are only a backstop.
+    GUEST_SPEND_USD: 2,
+    GUEST_GLOBAL_DAILY_SPEND_USD: 10,
     GUEST_ONCE_PER_DEVICE: 1,
     // Free credits (app/utils/credits.ts): an account gets SIGNUP_CREDIT_USD once instead of
     // the daily and monthly refill above, and DISCORD_CREDIT_USD once more through the

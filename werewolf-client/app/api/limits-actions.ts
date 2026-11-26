@@ -8,7 +8,7 @@ import {FREE_TIER_LIMITS, FreeTierLimits} from "@/app/api/game-models";
  *
  *   { freeDailySpendUSD: 5, freeMonthlySpendUSD: 20, freeGamesPerDay: 5,
  *     freeGlobalDailySpendUSD: 40, freeDeviceDailySpendUSD: 5,
- *     guestSpendUSD: 1, guestGlobalDailySpendUSD: 5, guestOncePerDevice: 1,
+ *     guestSpendUSD: 2, guestGlobalDailySpendUSD: 10, guestOncePerDevice: 1,
  *     creditsOn: 1, signupCreditUSD: 5, discordCreditUSD: 5,
  *     jevScreenMode: 'monitor' }
  *

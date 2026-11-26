@@ -5,7 +5,9 @@ import {firestore} from "firebase-admin";
 import {after} from "next/server";
 import {auth, signIn} from "@/auth";
 import {findGuest, readGuestCookie, resolveGuestForRequest} from "@/app/api/guest-accounts";
-import {GUEST_ONE_GAME_MESSAGE, GUEST_PROVIDER_ID, guestWallReached, isGuestEmail} from "@/app/utils/guest";
+import {GUEST_FULL_TODAY_MESSAGE, GUEST_ONE_GAME_MESSAGE, GUEST_PROVIDER_ID, guestWallReached, isGuestEmail} from "@/app/utils/guest";
+import {guestGlobalSpendVerdict} from "@/app/utils/spending-utils";
+import {readGuestDailySpend} from "@/app/api/spend-ledgers";
 import {
     AVATAR_GM_KEY,
     AVATAR_VARIANTS_COLLECTION,
@@ -170,11 +172,22 @@ export async function createStarterGame(templateId: string, playerName: string, 
  * the account is found by the browser's cookie or minted, and the session is started in the
  * same request, so one click on a story card is the whole sign-up.
  */
+/** Throws `GUEST_FULL_TODAY_MESSAGE` when all guests together have spent the day's budget. */
+async function assertGuestGamesOpenToday(): Promise<void> {
+    const verdict = guestGlobalSpendVerdict(await readGuestDailySpend(), await getFreeTierLimits());
+    if (verdict && !verdict.allowed) {
+        throw new Error(GUEST_FULL_TODAY_MESSAGE);
+    }
+}
+
 async function resolveStarterOwner(): Promise<string> {
     const email = (await auth())?.user?.email;
     if (email) {
         return email;
     }
+    // Before a guest is minted: on a day the shared guest budget is spent, a visitor is
+    // told to come back, and no account is made for a game that cannot start.
+    await assertGuestGamesOpenToday();
     const guest = await resolveGuestForRequest();
     await signIn(GUEST_PROVIDER_ID, { guestId: guest.id, redirect: false });
     return guest.email;
@@ -211,6 +224,8 @@ async function createStarterGameImpl(templateId: string, playerName: string, for
             }
             return {gameId: existing.id, existing: true};
         }
+        // A returning guest with no game yet (refused on an earlier, full day).
+        await assertGuestGamesOpenToday();
     }
 
     // A player who already has this story on the table gets that game back, whatever the
