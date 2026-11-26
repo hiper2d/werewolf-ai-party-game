@@ -454,6 +454,13 @@ export const RANDOM_ROLE = 'random';
 export const AUTO_VOTE_COEFFICIENT = 3.5;
 
 /**
+ * The player can start the vote only once this share of the day's discussion (the
+ * auto-vote threshold above) has been said. Since 2026-11-26: a vote on the first message
+ * skips the game. Enforced by the Vote buttons, not by the server.
+ */
+export const MIN_VOTE_PROGRESS_PCT = 50;
+
+/**
  * Configuration for how many bots the Game Master should select to respond
  * Used in bot selection prompts and Zod schema validation
  */

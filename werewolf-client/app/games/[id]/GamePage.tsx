@@ -16,7 +16,7 @@ const btnDanger = "px-3 py-1.5 text-[13px] font-medium rounded-[var(--radius-md)
 const btnAccent = "px-3 py-1.5 text-[13px] font-medium rounded-[var(--radius-md)] bg-[var(--accent)] text-[var(--on-accent)] hover:brightness-110 transition-all duration-[120ms]";
 const btnWarn = "px-3 py-1.5 text-[13px] font-medium rounded-[var(--radius-md)] bg-[oklch(75%_0.10_65)] text-[var(--bg-0)] hover:brightness-110 transition-all duration-[120ms]";
 import { getModelDisplayName } from "@/app/ai/ai-models";
-import { GAME_STATES, GAME_ROLES, AUTO_VOTE_COEFFICIENT, BOT_SELECTION_CONFIG, FREE_TIER_AVATAR_REGENS, USER_TIERS } from "@/app/api/game-models";
+import { GAME_STATES, GAME_ROLES, AUTO_VOTE_COEFFICIENT, MIN_VOTE_PROGRESS_PCT, BOT_SELECTION_CONFIG, FREE_TIER_AVATAR_REGENS, USER_TIERS } from "@/app/api/game-models";
 import type { Game, GameActionResponse, GameMessage, LlmRetryNotice } from "@/app/api/game-models";
 import { watchLlmRetryNotice } from './llm-retry-notice';
 import type { Session } from "next-auth";
@@ -315,7 +315,7 @@ function GamePageContent({
     // Calculate vote urgency based on message count vs threshold
     const voteUrgency = useMemo(() => {
         if (game.gameState !== GAME_STATES.DAY_DISCUSSION) {
-            return { percentage: 0, remainingPct: 100, isUrgent: false, isWarning: false, messagesLeft: 0 };
+            return { percentage: 0, progressPct: 0, canVote: false, isUrgent: false, isWarning: false, messagesLeft: 0 };
         }
         const alivePlayersCount = game.bots.filter(bot => bot.isAlive).length + 1; // +1 for human
         const threshold = alivePlayersCount * AUTO_VOTE_COEFFICIENT;
@@ -324,13 +324,22 @@ function GamePageContent({
         const messagesLeft = Math.max(0, threshold - currentMessages);
         return {
             percentage: Math.min(percentage, 100),
-            // Discussion budget still on the table, shown on the Vote button.
-            remainingPct: Math.max(0, Math.round(100 - percentage)),
+            // How much of the day's discussion has been said, shown on the Vote button:
+            // it grows from 0 to 100, and the vote opens at MIN_VOTE_PROGRESS_PCT.
+            progressPct: Math.min(100, Math.round(percentage)),
+            canVote: percentage >= MIN_VOTE_PROGRESS_PCT,
             isUrgent: percentage >= 90,
             isWarning: percentage >= 70,
             messagesLeft
         };
     }, [game.gameState, game.bots, game.dayActivityCounter]);
+
+    // The Vote buttons' tooltip (composer toolbar and side panel).
+    const voteTitle = !voteUrgency.canVote
+        ? `The vote opens when the discussion is ${MIN_VOTE_PROGRESS_PCT}% done (${voteUrgency.progressPct}% now)`
+        : voteUrgency.isUrgent
+            ? `Vote now! Auto-voting in ${Math.ceil(voteUrgency.messagesLeft)} messages`
+            : `Start the voting phase \u2014 the discussion is ${voteUrgency.progressPct}% done (~${Math.ceil(voteUrgency.messagesLeft)} messages until auto-vote)`;
 
     // Show Cancel button after 10 seconds of bot processing
     useEffect(() => {
@@ -963,15 +972,13 @@ function GamePageContent({
             return (
                 <>
                     <button
-                        className={`${voteUrgency.isUrgent ? btnDanger + ' animate-pulse' : voteUrgency.isWarning ? btnWarn : btnGhost} ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        disabled={!areControlsEnabled}
+                        className={`${voteUrgency.isUrgent ? btnDanger + ' animate-pulse' : voteUrgency.isWarning ? btnWarn : btnGhost} ${!areControlsEnabled || !voteUrgency.canVote ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        disabled={!areControlsEnabled || !voteUrgency.canVote}
                         onClick={() => setVoteConfirmOpen(true)}
-                        title={voteUrgency.isUrgent
-                            ? `Vote now! Auto-voting in ${Math.ceil(voteUrgency.messagesLeft)} messages`
-                            : `Start the voting phase \u2014 ${voteUrgency.remainingPct}% of the discussion left (~${Math.ceil(voteUrgency.messagesLeft)} messages until auto-vote)`}
+                        title={voteTitle}
                     >
                         Vote
-                        <span className="ml-1.5 text-[11px] tabular-nums opacity-60">{voteUrgency.remainingPct}%</span>
+                        <span className="ml-1.5 text-[11px] tabular-nums opacity-60">{voteUrgency.progressPct}%</span>
                         {(voteUrgency.isUrgent || voteUrgency.isWarning) && ' \u26A0\uFE0F'}
                     </button>
                     <button
@@ -1456,19 +1463,17 @@ function GamePageContent({
                                     : voteUrgency.isWarning
                                         ? 'bg-[oklch(75%_0.10_65)] border-[oklch(75%_0.10_65)] text-[var(--bg-0)] hover:brightness-110'
                                         : 'bg-[var(--bg-3)] border-[var(--line-3)] text-[var(--fg-0)] hover:bg-[var(--bg-4)]'
-                            } ${!areControlsEnabled || isKeepGoingLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            } ${!areControlsEnabled || isKeepGoingLoading || !voteUrgency.canVote ? 'opacity-50 cursor-not-allowed' : ''}`}
                             onClick={() => setVoteConfirmOpen(true)}
-                            disabled={!areControlsEnabled || isKeepGoingLoading}
-                            title={voteUrgency.isUrgent
-                                ? `Vote now! Auto-voting in ${Math.ceil(voteUrgency.messagesLeft)} messages`
-                                : `Start the voting phase \u2014 ${voteUrgency.remainingPct}% of the discussion left (~${Math.ceil(voteUrgency.messagesLeft)} messages until auto-vote)`}
+                            disabled={!areControlsEnabled || isKeepGoingLoading || !voteUrgency.canVote}
+                            title={voteTitle}
                         >
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <polyline points="9 11 12 14 22 4"/>
                                 <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
                             </svg>
                             Vote
-                            <span className="text-[11px] tabular-nums opacity-60">{voteUrgency.remainingPct}%</span>
+                            <span className="text-[11px] tabular-nums opacity-60">{voteUrgency.progressPct}%</span>
                             {(voteUrgency.isUrgent || voteUrgency.isWarning) && '⚠️'}
                         </button>
                     )}
