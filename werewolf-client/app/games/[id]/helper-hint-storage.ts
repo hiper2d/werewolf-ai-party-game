@@ -36,3 +36,35 @@ export function onRetiredHintsChange(gameId: string, callback: () => void): () =
     window.addEventListener(CHANGED_EVENT, listener);
     return () => window.removeEventListener(CHANGED_EVENT, listener);
 }
+
+/** "Show hints as I play" at the end of the tour: every hint of this game is live again. */
+export function clearRetiredHints(gameId: string): void {
+    try {
+        localStorage.removeItem(dismissedKey(gameId));
+        localStorage.removeItem(`helperComposerOpens:${gameId}`);
+        window.dispatchEvent(new CustomEvent(CHANGED_EVENT, {detail: gameId}));
+    } catch { /* private mode */ }
+}
+
+// Per browser, not per game: the player turned the hints off, and has been shown where
+// the button that replays them is.
+const OFF_KEY = 'helperHintsOff';
+const OFF_TOLD_KEY = 'helperHintsOffTold';
+
+export function readHintsOff(): {off: boolean; told: boolean} {
+    try {
+        return {off: localStorage.getItem(OFF_KEY) === '1', told: localStorage.getItem(OFF_TOLD_KEY) === '1'};
+    } catch {
+        return {off: false, told: false};
+    }
+}
+
+export function writeHintsOff(off: boolean): void {
+    try {
+        if (off) localStorage.setItem(OFF_KEY, '1'); else localStorage.removeItem(OFF_KEY);
+    } catch { /* private mode */ }
+}
+
+export function writeHintsOffTold(): void {
+    try { localStorage.setItem(OFF_TOLD_KEY, '1'); } catch { /* private mode */ }
+}

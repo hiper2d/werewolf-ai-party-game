@@ -1,14 +1,17 @@
 /**
- * Helper mode: callouts on the screen that say what the player can do right now. On for
- * games with `helperMode` (every ready-made story, see app/utils/starter-games.ts), off for
- * games made with the form. UI chrome only: the Game Master's lines, the prompts and the
- * caches are untouched, and the text is English like the rest of the interface.
+ * Helper hints: callouts on the screen that say what the player can do. Two ways to see them:
  *
- * Pure: `visibleHelperHints` is the whole decision, so every case is tested without a
- * browser. A hint with a `target` is a callout that points at that element (the element
- * carries `data-hint="<target>"`); one without is a line above the composer. Every hint
- * that fits the moment and has not been dismissed shows, so two callouts can point at two
- * things at once.
+ *  - AS THEY PLAY, in games with `helperMode` (every ready-made story, see
+ *    app/utils/starter-games.ts): each hint pops up at its own moment (`helperHintsFor`)
+ *    until the player retires it.
+ *  - THE TOUR, in every game: the "?" button in the chat header walks through the whole
+ *    catalog (`HELPER_HINTS`), one hint at a time, whatever the game's stage. A hint whose
+ *    element is not on screen shows as a card with its `when` line instead of an arrow.
+ *
+ * UI chrome only: the Game Master's lines, the prompts and the caches are untouched, and
+ * the text is English like the rest of the interface. Everything here is pure, so every
+ * case is tested without a browser. A hint points at the element that carries
+ * `data-hint="<target>"`.
  *
  * The set is built ONE STEP AT A TIME with Alex, who plays a game after each step and
  * decides what the next hint is (2026-11-26). Do not add hints on your own. Wording is
@@ -35,9 +38,19 @@ export interface HelperHintState {
 /**
  * Elements a hint can point at: the header's mute button, the message input, the middle
  * bot's row in the players list (the callout sits to the right of a row), the side panel's
- * conversation buttons, the icons on the right of the open input, the side panel's Vote button.
+ * conversation buttons, the icons on the right of the open input, the side panel's Vote
+ * button, the header's "?" button that replays the hints.
  */
-export type HelperHintTarget = 'mute' | 'composer' | 'player' | 'talk' | 'compose-tools' | 'vote';
+export type HelperHintTarget = 'mute' | 'composer' | 'player' | 'talk' | 'compose-tools' | 'vote' | 'help';
+
+export interface HelperHint {
+    /** Stable: retirements are stored under it. */
+    id: string;
+    text: string;
+    target: HelperHintTarget;
+    /** Shown in the tour when the element is not on screen: the moment the hint belongs to. */
+    when: string;
+}
 
 /** The input's icons are explained the third time the player opens it. */
 export const HINT_COMPOSER_OPENS = 3;
@@ -48,47 +61,61 @@ export const HINT_COMPOSER_OPENS = 3;
  */
 export const HINT_TALK_WITHOUT_TYPING = 'talk_without_typing';
 
-export interface HelperHint {
-    /** Stable: dismissals are stored under it. */
-    id: string;
-    text: string;
-    /** The element the hint points at, by its `data-hint` value. None: a line above the composer. */
-    target?: HelperHintTarget;
-    /** A link under the hint, where there is a next page to go to. */
-    link?: {label: string; href: string};
-}
+/** The catalog, in the order the tour plays it (the order a first game meets them). */
+export const HELPER_HINTS: readonly HelperHint[] = [
+    {id: 'voices', target: 'mute', when: 'Any time', text: 'This mutes and unmutes the voices for the whole game.'},
+    {id: 'introduce', target: 'composer', when: 'During the day discussion', text: 'Introduce yourself to the other players.'},
+    {id: 'player_card', target: 'player', when: 'Any time', text: 'Click on a player to see their card or change their model.'},
+    {id: HINT_TALK_WITHOUT_TYPING, target: 'talk', when: 'During the day discussion, when nobody is answering', text: 'You can keep the conversation going without typing: these buttons let the others talk.'},
+    {id: 'compose_tools', target: 'compose-tools', when: 'When the message box is open', text: 'Auto-generate your answer or use your own voice.'},
+    {id: 'vote_open', target: 'vote', when: 'During the day discussion, once it is half done', text: 'You can end the day’s discussion and begin the vote. At 100% the vote begins automatically.'},
+];
 
-/** Every hint that fits the moment. */
+/**
+ * Not in the tour: shown once, the first time a player turns the hints off, pointing at
+ * the button that brings them back.
+ */
+export const HINTS_OFF_HINT: HelperHint = {
+    id: 'hints_off', target: 'help', when: 'Any time',
+    text: 'Hints are off. Press this to see them again any time.',
+};
+
+const byId = (id: string): HelperHint => HELPER_HINTS.find(hint => hint.id === id)!;
+
+/** Every hint whose moment this is, in catalog order. */
 export function helperHintsFor(state: HelperHintState): HelperHint[] {
-    const hints: HelperHint[] = [];
+    const day = state.gameState === 'DAY_DISCUSSION';
+    const ids = new Set<string>();
     // The first screen of a story game, once the opening scene is closed: the player has
     // heard the introductions and has not written yet.
-    if (state.gameState === 'DAY_DISCUSSION' && state.currentDay === 1 && state.humanAlive && state.humanMessagesToday === 0) {
-        hints.push({id: 'voices', target: 'mute', text: 'This mutes and unmutes the voices for the whole game.'});
-        hints.push({id: 'introduce', target: 'composer', text: 'Introduce yourself to the other players.'});
+    if (day && state.currentDay === 1 && state.humanAlive && state.humanMessagesToday === 0) {
+        ids.add('voices');
+        ids.add('introduce');
     }
     // The player has written and the bots that answer are chosen: while they think, there
-    // is time to look around. Stays through day 1 until dismissed.
-    if (state.gameState === 'DAY_DISCUSSION' && state.currentDay === 1 && state.humanMessagesToday >= 1 && state.repliesStarted) {
-        hints.push({id: 'player_card', target: 'player', text: 'Click on a player to see their card or change their model.'});
+    // is time to look around. Stays through day 1 until retired.
+    if (day && state.currentDay === 1 && state.humanMessagesToday >= 1 && state.repliesStarted) {
+        ids.add('player_card');
     }
     // After the second message, once the table is quiet again: the player has only ever
     // moved the talk on by typing.
-    if (state.gameState === 'DAY_DISCUSSION' && state.humanAlive && state.humanMessagesToday >= 2 && !state.busy) {
-        hints.push({id: HINT_TALK_WITHOUT_TYPING, target: 'talk', text: 'You can keep the conversation going without typing: these buttons let the others talk.'});
+    if (day && state.humanAlive && state.humanMessagesToday >= 2 && !state.busy) {
+        ids.add(HINT_TALK_WITHOUT_TYPING);
     }
     // The third time the input is opened: by now the player types every answer by hand.
-    if (state.gameState === 'DAY_DISCUSSION' && state.humanAlive && state.composerOpen && state.composerOpens >= HINT_COMPOSER_OPENS) {
-        hints.push({id: 'compose_tools', target: 'compose-tools', text: 'Auto-generate your answer or use your own voice.'});
+    if (day && state.humanAlive && state.composerOpen && state.composerOpens >= HINT_COMPOSER_OPENS) {
+        ids.add('compose_tools');
     }
     // The Vote buttons have just unlocked.
-    if (state.gameState === 'DAY_DISCUSSION' && state.voteOpen && !state.busy) {
-        hints.push({id: 'vote_open', target: 'vote', text: 'You can end the day\u2019s discussion and begin the vote. At 100% the vote begins automatically.'});
+    if (day && state.voteOpen && !state.busy) {
+        ids.add('vote_open');
     }
-    return hints;
+    return HELPER_HINTS.filter(hint => ids.has(hint.id));
 }
 
-/** The hints to show now: every fitting one the player has not dismissed. */
-export function visibleHelperHints(state: HelperHintState, dismissed: ReadonlySet<string>): HelperHint[] {
-    return helperHintsFor(state).filter(hint => !dismissed.has(hint.id));
+/** The hints to show now: every one whose moment this is and that the player has not retired. */
+export function visibleHelperHints(state: HelperHintState, retired: ReadonlySet<string>): HelperHint[] {
+    return helperHintsFor(state).filter(hint => !retired.has(hint.id));
 }
+
+export {byId as helperHintById};

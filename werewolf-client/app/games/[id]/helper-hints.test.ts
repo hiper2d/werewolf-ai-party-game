@@ -1,4 +1,4 @@
-import {HelperHintState, visibleHelperHints} from "@/app/games/[id]/helper-hints";
+import {HELPER_HINTS, HINTS_OFF_HINT, HelperHintState, visibleHelperHints} from "@/app/games/[id]/helper-hints";
 
 const base: HelperHintState = {gameState: 'DAY_DISCUSSION', currentDay: 1, humanAlive: true, humanMessagesToday: 0, repliesStarted: false, busy: false,
     composerOpens: 0, composerOpen: false, voteOpen: false};
@@ -56,5 +56,20 @@ describe('visibleHelperHints', () => {
         }
         expect(ids({currentDay: 2})).toEqual([]);
         expect(ids({currentDay: 2, humanMessagesToday: 2})).toEqual(['talk_without_typing']);
+    });
+});
+
+describe('the catalog', () => {
+    it('has unique ids and says when each hint applies', () => {
+        const ids = HELPER_HINTS.map(h => h.id);
+        expect(new Set(ids).size).toBe(ids.length);
+        for (const hint of HELPER_HINTS) {
+            expect(hint.when.length).toBeGreaterThan(0);
+            expect(hint.text.length).toBeGreaterThan(0);
+        }
+    });
+    it('keeps the hints-are-off note out of the tour', () => {
+        expect(HELPER_HINTS.some(h => h.id === HINTS_OFF_HINT.id)).toBe(false);
+        expect(HINTS_OFF_HINT.target).toBe('help');
     });
 });

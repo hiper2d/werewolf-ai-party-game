@@ -667,6 +667,9 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
     // Helper mode counts how often the player opens the input (helper-hints.ts explains its
     // icons on the third time). Kept per game in localStorage; best effort.
     const [composerOpens, setComposerOpens] = useState(0);
+    // The "?" button in the header replays every hint as a tour (HelperHints).
+    const [hintTourOpen, setHintTourOpen] = useState(false);
+    const closeHintTour = useCallback(() => setHintTourOpen(false), []);
     useEffect(() => {
         if (!game.helperMode || !composerExpanded) return;
         const key = `helperComposerOpens:${gameId}`;
@@ -2009,10 +2012,8 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
     const showComposer = isInputEnabled() || isRecording || isTranscribing;
     const artInProgress = game.avatarsStatus === 'pending' || game.avatarsStatus === 'generating';
     // Helper mode (helper-hints.ts): what the hint strip needs to know about this moment.
-    const humanMessagesToday = game.helperMode
-        ? messages.filter(m => m.messageType === MessageType.HUMAN_PLAYER_MESSAGE && m.day === game.currentDay)
-        : [];
-    const helperHintState: HelperHintState | null = game.helperMode ? {
+    const humanMessagesToday = messages.filter(m => m.messageType === MessageType.HUMAN_PLAYER_MESSAGE && m.day === game.currentDay);
+    const helperHintState: HelperHintState = {
         gameState: game.gameState,
         currentDay: game.currentDay,
         humanAlive: game.humanPlayerIsAlive !== false,
@@ -2026,7 +2027,7 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
         composerOpens,
         composerOpen: composerExpanded,
         voteOpen: discussionProgress(game).canVote,
-    } : null;
+    };
 
     return (
         <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
@@ -2109,6 +2110,20 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                         ) : (
                             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5,6 9,2 9,2 15,6 15,11 19"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
                         )}
+                    </button>
+                    {/* Replays the helper hints as a tour, in any game (helper-hints.ts). */}
+                    <button
+                        type="button"
+                        data-hint="help"
+                        onClick={() => setHintTourOpen(open => !open)}
+                        aria-pressed={hintTourOpen}
+                        aria-label="Show the hints"
+                        title="Show the hints: what each part of this screen does"
+                        className={`w-[32px] h-[32px] flex items-center justify-center rounded-full border transition-colors duration-[120ms] max-[720px]:w-[28px] max-[720px]:h-[28px] border-[var(--line-3)] ${
+                            hintTourOpen ? 'bg-[var(--accent)] text-[var(--accent-fg)]' : 'bg-[var(--bg-3)] text-[var(--fg-1)] hover:text-[var(--fg-0)]'
+                        }`}
+                    >
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 2.5-3 4.5" /><path d="M12 18h.01" /></svg>
                     </button>
                     {shouldShowMessageCount && (
                         <span className="msg-count text-[12px] font-mono text-[var(--fg-2)] max-[720px]:hidden">
@@ -2569,9 +2584,15 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                     className="border-b border-[var(--line-1)]"
                 />
             )}
-            {helperHintState && isCurrentDaySelected && !cinematicOpen && (
-                <HelperHints gameId={gameId} state={helperHintState} />
-            )}
+            {/* Renders into the body: callouts as the player plays (helper mode only, on the
+                current day, outside the scene view) and the "?" button's tour (any game). */}
+            <HelperHints
+                gameId={gameId}
+                state={helperHintState}
+                auto={!!game.helperMode && isCurrentDaySelected && !cinematicOpen}
+                tourOpen={hintTourOpen && !cinematicOpen}
+                onTourClose={closeHintTour}
+            />
             {/* A waiting flow action while the composer is still open (after-game
                 discussion's Exit Game) sits above the composer. */}
             {showComposer && phaseControls && (
