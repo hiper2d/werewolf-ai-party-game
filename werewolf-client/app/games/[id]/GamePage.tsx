@@ -16,7 +16,7 @@ const btnDanger = "px-3 py-1.5 text-[13px] font-medium rounded-[var(--radius-md)
 const btnAccent = "px-3 py-1.5 text-[13px] font-medium rounded-[var(--radius-md)] bg-[var(--accent)] text-[var(--on-accent)] hover:brightness-110 transition-all duration-[120ms]";
 const btnWarn = "px-3 py-1.5 text-[13px] font-medium rounded-[var(--radius-md)] bg-[oklch(75%_0.10_65)] text-[var(--bg-0)] hover:brightness-110 transition-all duration-[120ms]";
 import { getModelDisplayName } from "@/app/ai/ai-models";
-import { GAME_STATES, GAME_ROLES, AUTO_VOTE_COEFFICIENT, MIN_VOTE_PROGRESS_PCT, BOT_SELECTION_CONFIG, FREE_TIER_AVATAR_REGENS, USER_TIERS } from "@/app/api/game-models";
+import { GAME_STATES, GAME_ROLES, MIN_VOTE_PROGRESS_PCT, BOT_SELECTION_CONFIG, FREE_TIER_AVATAR_REGENS, USER_TIERS } from "@/app/api/game-models";
 import type { Game, GameActionResponse, GameMessage, LlmRetryNotice } from "@/app/api/game-models";
 import { watchLlmRetryNotice } from './llm-retry-notice';
 import type { Session } from "next-auth";
@@ -34,6 +34,9 @@ import { DISCORD_URL } from "@/app/config/external-links";
 import { checkGameEndConditions } from "@/app/utils/game-utils";
 import { isTierMismatchError } from '@/app/api/errors';
 import { starterIntroKey } from '@/app/utils/starter-games';
+import { HINT_TALK_WITHOUT_TYPING } from '@/app/games/[id]/helper-hints';
+import { retireHelperHint } from '@/app/games/[id]/helper-hint-storage';
+import { discussionProgress } from '@/app/utils/discussion-progress';
 import Link from 'next/link';
 import { UIControlsProvider, useUIControls } from './context/UIControlsContext';
 import React from 'react';
@@ -317,17 +320,13 @@ function GamePageContent({
         if (game.gameState !== GAME_STATES.DAY_DISCUSSION) {
             return { percentage: 0, progressPct: 0, canVote: false, isUrgent: false, isWarning: false, messagesLeft: 0 };
         }
-        const alivePlayersCount = game.bots.filter(bot => bot.isAlive).length + 1; // +1 for human
-        const threshold = alivePlayersCount * AUTO_VOTE_COEFFICIENT;
-        const currentMessages = Object.values(game.dayActivityCounter || {}).reduce((sum, count) => sum + count, 0);
-        const percentage = threshold > 0 ? (currentMessages / threshold) * 100 : 0;
-        const messagesLeft = Math.max(0, threshold - currentMessages);
+        const { percentage, messagesLeft, canVote } = discussionProgress(game);
         return {
             percentage: Math.min(percentage, 100),
             // How much of the day's discussion has been said, shown on the Vote button:
             // it grows from 0 to 100, and the vote opens at MIN_VOTE_PROGRESS_PCT.
             progressPct: Math.min(100, Math.round(percentage)),
-            canVote: percentage >= MIN_VOTE_PROGRESS_PCT,
+            canVote,
             isUrgent: percentage >= 90,
             isWarning: percentage >= 70,
             messagesLeft
@@ -953,6 +952,8 @@ function GamePageContent({
     }
 
     async function handleKeepGoingAction() {
+        // The player knows this button now: no hint about it (helper-hint-storage.ts).
+        retireHelperHint(game.id, HINT_TALK_WITHOUT_TYPING);
         preActionGameRef.current = game;
         setIsKeepGoingLoading(true);
         try {
@@ -1256,6 +1257,9 @@ function GamePageContent({
                         return (
                         <li
                             key={index}
+                            // The helper hint about character cards points at the middle bot
+                            // (helper-hints.ts): rows 0 and 1 are the Game Master and the human.
+                            data-hint={index === 2 + Math.floor(game.bots.length / 2) ? 'player' : undefined}
                             className={`flex flex-col px-2 py-1.5 rounded-[var(--radius-md)] transition-all duration-[120ms] ${
                                 isHuman ? 'bg-[var(--accent-soft)] border border-[var(--accent-line)]' :
                                 isDead ? 'opacity-70 hover:opacity-100 hover:bg-[var(--bg-1)]' :
@@ -1426,10 +1430,10 @@ function GamePageContent({
 
             {/* Action footer — pinned to the panel's bottom (design .queue-footer) */}
             {(game.gameState === GAME_STATES.DAY_DISCUSSION || game.gameState === GAME_STATES.AFTER_GAME_DISCUSSION) && game.gameStateProcessQueue.length === 0 && (
-                <div className="flex-shrink-0 mt-3 pt-3 border-t border-[var(--line-1)]">
+                <div data-hint="talk" className="flex-shrink-0 mt-3 pt-3 border-t border-[var(--line-1)]">
                     <button
                         className={`w-full px-3 py-2 text-[13px] font-medium rounded-[var(--radius-md)] bg-[var(--bg-3)] border border-[var(--line-3)] text-[var(--fg-0)] hover:bg-[var(--bg-4)] transition-all duration-[120ms] flex items-center justify-center gap-2 ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        onClick={() => openModal('botSelection')}
+                        onClick={() => { retireHelperHint(game.id, HINT_TALK_WITHOUT_TYPING); openModal('botSelection'); }}
                         disabled={!areControlsEnabled}
                         title="Manually select which bots should respond"
                     >
@@ -1457,6 +1461,7 @@ function GamePageContent({
                     </button>
                     {game.gameState === GAME_STATES.DAY_DISCUSSION && (
                         <button
+                            data-hint="vote"
                             className={`w-full mt-2 px-3 py-2 text-[13px] font-medium rounded-[var(--radius-md)] border transition-all duration-[120ms] flex items-center justify-center gap-2 ${
                                 voteUrgency.isUrgent
                                     ? 'bg-[var(--danger)] border-[var(--danger)] text-white hover:brightness-110 animate-pulse'
@@ -1560,7 +1565,7 @@ function GamePageContent({
                     onAvatarClick={setCharacterCardFor}
                     isOwner={isOwner}
                     onGameChange={patch => setGame(prev => ({ ...prev, ...patch }))}
-                    onUpdateVoice={updateCharacterVoice}
+                    onUpdateVoice={isGuestPlayer ? undefined : updateCharacterVoice}
                     playIntro={playStarterIntro}
                     runGameAction={runGameAction}
                     onGameStateChange={applyActionResult}
@@ -1644,7 +1649,8 @@ function GamePageContent({
                     onGameChange={patch => setGame(prev => ({ ...prev, ...patch }))}
                     onSelectVariant={selectAvatarVariant}
                     onReframe={reframeAvatar}
-                    onUpdateVoice={updateCharacterVoice}
+                    // A guest cannot change voices or voice directions (the server refuses too).
+                    onUpdateVoice={isGuestPlayer ? undefined : updateCharacterVoice}
                     onSpeakSample={async (text, sel) => { await ttsService.speakText(text, { voice: sel.voice, voiceStyle: sel.voiceStyle || undefined, voiceProvider: game.voiceProvider, gameId: game.id, source: 'audition' }); }}
                     onStopSample={() => ttsService.stopSpeaking()}
                 />

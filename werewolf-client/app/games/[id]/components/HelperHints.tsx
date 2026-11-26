@@ -4,6 +4,7 @@ import {useEffect, useLayoutEffect, useMemo, useState} from 'react';
 import {createPortal} from 'react-dom';
 import Link from 'next/link';
 import {HelperHint, HelperHintState, visibleHelperHints} from '@/app/games/[id]/helper-hints';
+import {onRetiredHintsChange, readRetiredHints, retireHelperHint} from '@/app/games/[id]/helper-hint-storage';
 
 /**
  * The hints of a game in helper mode (app/games/[id]/helper-hints.ts). A hint with a
@@ -17,41 +18,57 @@ import {HelperHint, HelperHintState, visibleHelperHints} from '@/app/games/[id]/
  */
 
 const OFF_KEY = 'helperHintsOff';
-const dismissedKey = (gameId: string) => `helperHints:${gameId}`;
 const CALLOUT_WIDTH = 260;
 const GAP = 10;
 
-function readDismissed(gameId: string): string[] {
-    try {
-        const raw = JSON.parse(localStorage.getItem(dismissedKey(gameId)) ?? '[]');
-        return Array.isArray(raw) ? raw.filter(item => typeof item === 'string') : [];
-    } catch {
-        return [];
-    }
+/** `side`: the callout sits to the right of the element, arrow on its left edge (rows of a list). */
+interface Placement { left: number; top: number; arrowLeft: number; above: boolean; side?: boolean }
+
+/** A callout's box on the screen, for the overlap test. The height is an estimate (two to four lines). */
+const CALLOUT_HEIGHT = 120;
+function boxOf(place: Placement): {left: number; top: number; right: number; bottom: number} {
+    const top = place.side ? place.top - CALLOUT_HEIGHT / 2 : place.above ? place.top - CALLOUT_HEIGHT : place.top;
+    return {left: place.left, top, right: place.left + CALLOUT_WIDTH, bottom: top + CALLOUT_HEIGHT};
 }
 
-interface Placement { left: number; top: number; arrowLeft: number; above: boolean }
-
-/** Where each targeted hint's element is now; a target that is missing or hidden gets no entry. */
-function measure(hints: HelperHint[]): Record<string, Placement> {
-    const out: Record<string, Placement> = {};
+/**
+ * Where each targeted hint's element is now. A target that is missing or hidden gets no
+ * entry (the hint becomes a line), and a callout that would cover an earlier one is held
+ * back (`waiting`) until that one is retired: hints are ordered, the earlier one wins.
+ */
+function measure(hints: HelperHint[]): {placed: Record<string, Placement>; waiting: string[]} {
+    const all: Record<string, Placement> = {};
     for (const hint of hints) {
         if (!hint.target) continue;
         const el = document.querySelector<HTMLElement>(`[data-hint="${hint.target}"]`);
         const rect = el?.getBoundingClientRect();
         if (!rect || rect.width === 0 || rect.height === 0) continue;
+        if (hint.target === 'player' && rect.right + GAP + CALLOUT_WIDTH + 8 <= window.innerWidth) {
+            all[hint.id] = {left: rect.right + GAP, top: rect.top + rect.height / 2, arrowLeft: 0, above: false, side: true};
+            continue;
+        }
         const centre = rect.left + rect.width / 2;
         const left = Math.min(Math.max(8, centre - CALLOUT_WIDTH / 2), window.innerWidth - CALLOUT_WIDTH - 8);
         // Above an element in the lower half of the screen, below one in the upper half.
         const above = rect.top > window.innerHeight / 2;
-        out[hint.id] = {
+        all[hint.id] = {
             left,
             top: above ? rect.top - GAP : rect.bottom + GAP,
             arrowLeft: Math.min(Math.max(14, centre - left), CALLOUT_WIDTH - 14),
             above,
         };
     }
-    return out;
+    const placed: Record<string, Placement> = {};
+    const waiting: string[] = [];
+    for (const hint of hints) {
+        const place = all[hint.id];
+        if (!place) continue;
+        const box = boxOf(place);
+        const covers = Object.values(placed).map(boxOf).some(other =>
+            box.left < other.right && other.left < box.right && box.top < other.bottom && other.top < box.bottom);
+        if (covers) waiting.push(hint.id); else placed[hint.id] = place;
+    }
+    return {placed, waiting};
 }
 
 export default function HelperHints({gameId, state}: {gameId: string; state: HelperHintState}) {
@@ -60,9 +77,11 @@ export default function HelperHints({gameId, state}: {gameId: string; state: Hel
     // Storage is read after mount: the server render and the first paint show no hint.
     const [ready, setReady] = useState(false);
     useEffect(() => {
-        setDismissed(readDismissed(gameId));
+        setDismissed(readRetiredHints(gameId));
         try { setOff(localStorage.getItem(OFF_KEY) === '1'); } catch { /* private mode */ }
         setReady(true);
+        // A hint can be retired by the button it explains (helper-hint-storage.ts).
+        return onRetiredHintsChange(gameId, () => setDismissed(readRetiredHints(gameId)));
     }, [gameId]);
 
     const hints = useMemo(() => visibleHelperHints(state, new Set(dismissed)), [state, dismissed]);
@@ -70,10 +89,11 @@ export default function HelperHints({gameId, state}: {gameId: string; state: Hel
 
     // The targets move (the composer grows, the window resizes, the chat scrolls the page
     // on a phone): measure now, on resize and scroll, and on a slow timer for the rest.
-    const [placements, setPlacements] = useState<Record<string, Placement>>({});
+    const [layout, setLayout] = useState<{placed: Record<string, Placement>; waiting: string[]}>({placed: {}, waiting: []});
+    const placements = layout.placed;
     useLayoutEffect(() => {
         if (!ready || off) return;
-        const update = () => setPlacements(previous => {
+        const update = () => setLayout(previous => {
             const next = measure(hints);
             return JSON.stringify(next) === JSON.stringify(previous) ? previous : next;
         });
@@ -92,9 +112,8 @@ export default function HelperHints({gameId, state}: {gameId: string; state: Hel
     if (!ready || hints.length === 0) return null;
 
     const dismiss = (id: string) => {
-        const next = [...dismissed, id];
-        setDismissed(next);
-        try { localStorage.setItem(dismissedKey(gameId), JSON.stringify(next)); } catch { /* private mode */ }
+        setDismissed([...dismissed, id]);
+        retireHelperHint(gameId, id);
     };
     const switchOff = (value: boolean) => {
         setOff(value);
@@ -114,7 +133,7 @@ export default function HelperHints({gameId, state}: {gameId: string; state: Hel
     }
 
     const callouts = hints.filter(hint => placements[hint.id]);
-    const lines = hints.filter(hint => !placements[hint.id]);
+    const lines = hints.filter(hint => !placements[hint.id] && !layout.waiting.includes(hint.id));
     const link = (hint: HelperHint) => hint.link && <>{' '}<Link href={hint.link.href} className="underline underline-offset-2 font-medium">{hint.link.label}</Link></>;
 
     return (
@@ -138,12 +157,12 @@ export default function HelperHints({gameId, state}: {gameId: string; state: Hel
                             role="note"
                             data-helper-hint={hint.id}
                             className="fixed z-40 rounded-[var(--radius-lg)] bg-[var(--accent)] text-[var(--accent-fg)] shadow-2xl px-3.5 py-3"
-                            style={{left: place.left, top: place.top, width: CALLOUT_WIDTH, transform: place.above ? 'translateY(-100%)' : undefined}}
+                            style={{left: place.left, top: place.top, width: CALLOUT_WIDTH, transform: place.side ? 'translateY(-50%)' : place.above ? 'translateY(-100%)' : undefined}}
                         >
                             <span
                                 aria-hidden="true"
                                 className="absolute w-3 h-3 rotate-45 bg-[var(--accent)]"
-                                style={{left: place.arrowLeft - 6, ...(place.above ? {bottom: -5} : {top: -5})}}
+                                style={place.side ? {left: -5, top: 'calc(50% - 6px)'} : {left: place.arrowLeft - 6, ...(place.above ? {bottom: -5} : {top: -5})}}
                             />
                             <p className="relative m-0 text-[13px] leading-[1.45] font-medium">{hint.text}{link(hint)}</p>
                             <div className="relative mt-2 flex items-center justify-between text-[12px]">

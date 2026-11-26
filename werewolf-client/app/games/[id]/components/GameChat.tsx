@@ -24,6 +24,7 @@ const CINEMATIC_ENABLED_KEY = 'autoPlay';
 const LEGACY_AUTO_VOICE_KEY = 'cinematicAutoVoice';
 const VOICE_MUTED_KEY = 'voiceMuted';
 import HelperHints from "./HelperHints";
+import { discussionProgress } from "@/app/utils/discussion-progress";
 import type { HelperHintState } from "@/app/games/[id]/helper-hints";
 import { LoadingRail, PhaseBar, StreamPill, stripChromeClass, stripChromeStyle, type LoadingRailProps, type PhaseTone, type RailActor } from "./PhaseStrip";
 import { ttsService } from "@/app/services/tts-service";
@@ -663,6 +664,22 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
     const [recordingSecondsLeft, setRecordingSecondsLeft] = useState(MAX_STT_RECORDING_MS / 1000);
     const [composerExpanded, setComposerExpanded] = useState(false);
     const composerRef = useRef<HTMLFormElement>(null);
+    // Helper mode counts how often the player opens the input (helper-hints.ts explains its
+    // icons on the third time). Kept per game in localStorage; best effort.
+    const [composerOpens, setComposerOpens] = useState(0);
+    useEffect(() => {
+        if (!game.helperMode || !composerExpanded) return;
+        const key = `helperComposerOpens:${gameId}`;
+        let count = 1;
+        try {
+            count = (parseInt(localStorage.getItem(key) ?? '0', 10) || 0) + 1;
+            localStorage.setItem(key, String(count));
+        } catch { /* private mode: counts within this visit only */
+            count = composerOpens + 1;
+        }
+        setComposerOpens(count);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [composerExpanded, game.helperMode, gameId]);
     const [selectedDay, setSelectedDay] = useState(game.currentDay);
     const [isLoadingMessages, setIsLoadingMessages] = useState(false);
     const [showDaySelector, setShowDaySelector] = useState(false);
@@ -1992,11 +2009,23 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
     const showComposer = isInputEnabled() || isRecording || isTranscribing;
     const artInProgress = game.avatarsStatus === 'pending' || game.avatarsStatus === 'generating';
     // Helper mode (helper-hints.ts): what the hint strip needs to know about this moment.
+    const humanMessagesToday = game.helperMode
+        ? messages.filter(m => m.messageType === MessageType.HUMAN_PLAYER_MESSAGE && m.day === game.currentDay)
+        : [];
     const helperHintState: HelperHintState | null = game.helperMode ? {
         gameState: game.gameState,
         currentDay: game.currentDay,
         humanAlive: game.humanPlayerIsAlive !== false,
-        humanMessagesToday: messages.filter(m => m.messageType === MessageType.HUMAN_PLAYER_MESSAGE && m.day === game.currentDay).length,
+        humanMessagesToday: humanMessagesToday.length,
+        // The reply queue is filled once the speakers are chosen; it empties as they answer,
+        // so a bot answer after the human's first message counts too.
+        repliesStarted: humanMessagesToday.length > 0 && (game.gameStateProcessQueue.length > 0
+            || messages.some(m => m.messageType === MessageType.BOT_ANSWER && m.day === game.currentDay
+                && (m.timestamp ?? 0) > (humanMessagesToday[0].timestamp ?? 0))),
+        busy: isProcessing || !!isExternalLoading || game.gameStateProcessQueue.length > 0,
+        composerOpens,
+        composerOpen: composerExpanded,
+        voteOpen: discussionProgress(game).canVote,
     } : null;
 
     return (
@@ -2635,7 +2664,7 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
 
                     {/* Right group: icon buttons (Mic, Suggestion) - visible when input is enabled OR during recording/transcribing */}
                     {(isInputEnabled() || isRecording || isTranscribing) && (
-                        <div className="flex items-center gap-1">
+                        <div data-hint="compose-tools" className="flex items-center gap-1">
                             {/* Microphone button */}
                             <button
                                 type="button"

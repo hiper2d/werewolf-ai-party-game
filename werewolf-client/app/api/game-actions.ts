@@ -1109,6 +1109,9 @@ export async function updateCharacterVoice(gameId: string, name: string, patch: 
     if (!session || !session.user?.email) {
         throw new Error('Not authenticated');
     }
+    // A guest plays the story as recorded: a new voice or direction means live speech
+    // calls in place of the pre-recorded lines (2026-11-26).
+    assertNotGuest(session.user.email, 'Sign in to change voices.');
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
