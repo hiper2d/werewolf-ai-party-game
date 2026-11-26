@@ -1,18 +1,25 @@
 'use client';
 
-import {useEffect, useMemo, useState} from 'react';
+import {useEffect, useLayoutEffect, useMemo, useState} from 'react';
+import {createPortal} from 'react-dom';
 import Link from 'next/link';
-import {HelperHintState, pickHelperHint} from '@/app/games/[id]/helper-hints';
+import {HelperHint, HelperHintState, visibleHelperHints} from '@/app/games/[id]/helper-hints';
 
 /**
- * The hint strip of a game in helper mode (app/games/[id]/helper-hints.ts): one line above
- * the composer that says what the player can do now. "Got it" retires that hint for this
- * game; "Hide hints" turns the strip off in this browser (a small "Show hints" brings it
- * back). Both are remembered in localStorage; with storage unavailable the hints just show.
+ * The hints of a game in helper mode (app/games/[id]/helper-hints.ts). A hint with a
+ * target is a CALLOUT: a small bubble with an arrow, placed next to the element that
+ * carries `data-hint="<target>"`. A hint without one, or whose element is not on the
+ * screen (the side panel is hidden on a phone), is a line above the composer.
+ *
+ * "Got it" retires a hint for this game; "Hide hints" turns them all off in this browser
+ * (a small "Show hints" brings them back). Both are remembered in localStorage; with
+ * storage unavailable the hints just show.
  */
 
 const OFF_KEY = 'helperHintsOff';
 const dismissedKey = (gameId: string) => `helperHints:${gameId}`;
+const CALLOUT_WIDTH = 260;
+const GAP = 10;
 
 function readDismissed(gameId: string): string[] {
     try {
@@ -21,6 +28,30 @@ function readDismissed(gameId: string): string[] {
     } catch {
         return [];
     }
+}
+
+interface Placement { left: number; top: number; arrowLeft: number; above: boolean }
+
+/** Where each targeted hint's element is now; a target that is missing or hidden gets no entry. */
+function measure(hints: HelperHint[]): Record<string, Placement> {
+    const out: Record<string, Placement> = {};
+    for (const hint of hints) {
+        if (!hint.target) continue;
+        const el = document.querySelector<HTMLElement>(`[data-hint="${hint.target}"]`);
+        const rect = el?.getBoundingClientRect();
+        if (!rect || rect.width === 0 || rect.height === 0) continue;
+        const centre = rect.left + rect.width / 2;
+        const left = Math.min(Math.max(8, centre - CALLOUT_WIDTH / 2), window.innerWidth - CALLOUT_WIDTH - 8);
+        // Above an element in the lower half of the screen, below one in the upper half.
+        const above = rect.top > window.innerHeight / 2;
+        out[hint.id] = {
+            left,
+            top: above ? rect.top - GAP : rect.bottom + GAP,
+            arrowLeft: Math.min(Math.max(14, centre - left), CALLOUT_WIDTH - 14),
+            above,
+        };
+    }
+    return out;
 }
 
 export default function HelperHints({gameId, state}: {gameId: string; state: HelperHintState}) {
@@ -34,11 +65,34 @@ export default function HelperHints({gameId, state}: {gameId: string; state: Hel
         setReady(true);
     }, [gameId]);
 
-    const hint = useMemo(() => pickHelperHint(state, new Set(dismissed)), [state, dismissed]);
-    if (!ready || !hint) return null;
+    const hints = useMemo(() => visibleHelperHints(state, new Set(dismissed)), [state, dismissed]);
+    const hintKey = hints.map(hint => hint.id).join(',');
 
-    const dismiss = () => {
-        const next = [...dismissed, hint.id];
+    // The targets move (the composer grows, the window resizes, the chat scrolls the page
+    // on a phone): measure now, on resize and scroll, and on a slow timer for the rest.
+    const [placements, setPlacements] = useState<Record<string, Placement>>({});
+    useLayoutEffect(() => {
+        if (!ready || off) return;
+        const update = () => setPlacements(previous => {
+            const next = measure(hints);
+            return JSON.stringify(next) === JSON.stringify(previous) ? previous : next;
+        });
+        update();
+        window.addEventListener('resize', update);
+        window.addEventListener('scroll', update, true);
+        const timer = window.setInterval(update, 400);
+        return () => {
+            window.removeEventListener('resize', update);
+            window.removeEventListener('scroll', update, true);
+            window.clearInterval(timer);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [ready, off, hintKey]);
+
+    if (!ready || hints.length === 0) return null;
+
+    const dismiss = (id: string) => {
+        const next = [...dismissed, id];
         setDismissed(next);
         try { localStorage.setItem(dismissedKey(gameId), JSON.stringify(next)); } catch { /* private mode */ }
     };
@@ -59,17 +113,48 @@ export default function HelperHints({gameId, state}: {gameId: string; state: Hel
         );
     }
 
+    const callouts = hints.filter(hint => placements[hint.id]);
+    const lines = hints.filter(hint => !placements[hint.id]);
+    const link = (hint: HelperHint) => hint.link && <>{' '}<Link href={hint.link.href} className="underline underline-offset-2 font-medium">{hint.link.label}</Link></>;
+
     return (
-        <div role="note" data-helper-hint={hint.id} className="flex items-start gap-3 px-4 lg:px-7 py-2.5 border-b border-[var(--accent-line)] bg-[var(--accent-soft)]">
-            <span aria-hidden="true" className="mt-[1px] shrink-0 font-mono text-[10.5px] tracking-[0.13em] uppercase text-[var(--accent-text)]">Hint</span>
-            <p className="m-0 flex-grow text-[13px] leading-[1.5] text-[var(--fg-0)]">
-                {hint.text}
-                {hint.link && <>{' '}<Link href={hint.link.href} className="underline underline-offset-2 font-medium">{hint.link.label}</Link></>}
-            </p>
-            <div className="shrink-0 flex items-center gap-3 text-[12px]">
-                <button type="button" onClick={dismiss} className="font-medium text-[var(--fg-0)] hover:underline underline-offset-2">Got it</button>
-                <button type="button" onClick={() => switchOff(true)} className="text-[var(--fg-2)] hover:text-[var(--fg-0)] transition-colors">Hide hints</button>
-            </div>
-        </div>
+        <>
+            {lines.map(hint => (
+                <div key={hint.id} role="note" data-helper-hint={hint.id} className="flex items-start gap-3 px-4 lg:px-7 py-2.5 border-b border-[var(--accent-line)] bg-[var(--accent-soft)]">
+                    <span aria-hidden="true" className="mt-[1px] shrink-0 font-mono text-[10.5px] tracking-[0.13em] uppercase text-[var(--accent-text)]">Hint</span>
+                    <p className="m-0 flex-grow text-[13px] leading-[1.5] text-[var(--fg-0)]">{hint.text}{link(hint)}</p>
+                    <div className="shrink-0 flex items-center gap-3 text-[12px]">
+                        <button type="button" onClick={() => dismiss(hint.id)} className="font-medium text-[var(--fg-0)] hover:underline underline-offset-2">Got it</button>
+                        <button type="button" onClick={() => switchOff(true)} className="text-[var(--fg-2)] hover:text-[var(--fg-0)] transition-colors">Hide hints</button>
+                    </div>
+                </div>
+            ))}
+            {callouts.length > 0 && createPortal(
+                callouts.map(hint => {
+                    const place = placements[hint.id];
+                    return (
+                        <div
+                            key={hint.id}
+                            role="note"
+                            data-helper-hint={hint.id}
+                            className="fixed z-40 rounded-[var(--radius-lg)] bg-[var(--accent)] text-[var(--accent-fg)] shadow-2xl px-3.5 py-3"
+                            style={{left: place.left, top: place.top, width: CALLOUT_WIDTH, transform: place.above ? 'translateY(-100%)' : undefined}}
+                        >
+                            <span
+                                aria-hidden="true"
+                                className="absolute w-3 h-3 rotate-45 bg-[var(--accent)]"
+                                style={{left: place.arrowLeft - 6, ...(place.above ? {bottom: -5} : {top: -5})}}
+                            />
+                            <p className="relative m-0 text-[13px] leading-[1.45] font-medium">{hint.text}{link(hint)}</p>
+                            <div className="relative mt-2 flex items-center justify-between text-[12px]">
+                                <button type="button" onClick={() => switchOff(true)} className="opacity-70 hover:opacity-100 transition-opacity">Hide hints</button>
+                                <button type="button" onClick={() => dismiss(hint.id)} className="font-semibold px-2.5 py-1 rounded-[var(--radius-md)] bg-black/15 hover:bg-black/25 transition-colors">Got it</button>
+                            </div>
+                        </div>
+                    );
+                }),
+                document.body,
+            )}
+        </>
     );
 }

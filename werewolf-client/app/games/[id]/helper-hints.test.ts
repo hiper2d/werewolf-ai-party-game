@@ -1,51 +1,28 @@
-import {HelperHintState, pickHelperHint} from "@/app/games/[id]/helper-hints";
+import {HelperHintState, visibleHelperHints} from "@/app/games/[id]/helper-hints";
 
-const base: HelperHintState = {
-    gameState: 'DAY_DISCUSSION', currentDay: 1, humanAlive: true, humanMessagesToday: 0,
-    werewolfCount: 2, isGuest: false, busy: false,
-};
-const pick = (patch: Partial<HelperHintState>, dismissed: string[] = []) =>
-    pickHelperHint({...base, ...patch}, new Set(dismissed));
+const base: HelperHintState = {gameState: 'DAY_DISCUSSION', currentDay: 1, humanAlive: true, humanMessagesToday: 0};
+const hints = (patch: Partial<HelperHintState>, dismissed: string[] = []) =>
+    visibleHelperHints({...base, ...patch}, new Set(dismissed));
+const ids = (patch: Partial<HelperHintState>, dismissed: string[] = []) => hints(patch, dismissed).map(h => h.id);
 
-describe('pickHelperHint', () => {
-    it('opens day 1 by telling the player to write', () => {
-        const hint = pick({});
-        expect(hint?.id).toBe('first_message');
-        expect(hint?.text).toContain('Two of these characters are werewolves');
-        expect(pick({werewolfCount: 1})?.text).toContain('One of these characters is a werewolf');
+describe('visibleHelperHints', () => {
+    it('opens day 1 with two callouts: the mute button and the input', () => {
+        expect(hints({}).map(h => [h.id, h.target, h.text])).toEqual([
+            ['voices', 'mute', 'This mutes and unmutes the voices for the whole game.'],
+            ['introduce', 'composer', 'Introduce yourself to the other players.'],
+        ]);
     });
-    it('moves on as the player writes', () => {
-        expect(pick({humanMessagesToday: 1})?.id).toBe('mention');
-        expect(pick({humanMessagesToday: 3})?.id).toBe('start_vote_1');
+    it('dismisses each callout on its own', () => {
+        expect(ids({}, ['voices'])).toEqual(['introduce']);
+        expect(ids({}, ['voices', 'introduce'])).toEqual([]);
     });
-    it('shows nothing while the bots are answering', () => {
-        expect(pick({busy: true})).toBeNull();
+    it('stops once the player has written', () => {
+        expect(ids({humanMessagesToday: 1})).toEqual([]);
     });
-    it('does not repeat a dismissed hint', () => {
-        expect(pick({}, ['first_message'])).toBeNull();
-        expect(pick({humanMessagesToday: 3}, ['start_vote_1'])).toBeNull();
-        // The vote hint comes back on a later day: it is a new discussion.
-        expect(pick({humanMessagesToday: 3, currentDay: 2}, ['start_vote_1'])?.id).toBe('start_vote_2');
-    });
-    it('explains each phase after the discussion', () => {
-        expect(pick({gameState: 'VOTE'})?.id).toBe('vote');
-        expect(pick({gameState: 'VOTE_RESULTS'})?.id).toBe('vote_results');
-        expect(pick({gameState: 'NIGHT'})?.id).toBe('night');
-        expect(pick({gameState: 'NIGHT_RESULTS'})?.text).toContain('Next Day');
-        expect(pick({currentDay: 2})?.id).toBe('new_day_2');
-    });
-    it('tells a guest what the sign-in is for', () => {
-        expect(pick({gameState: 'NIGHT_RESULTS', isGuest: true})?.text).toContain('sign in to keep playing');
-        const over = pick({gameState: 'GAME_OVER', isGuest: true});
-        expect(over?.link).toBeUndefined();
-    });
-    it('covers elimination and the end of the game', () => {
-        expect(pick({humanAlive: false})?.id).toBe('eliminated');
-        expect(pick({gameState: 'VOTE', humanAlive: false})?.id).toBe('eliminated');
-        expect(pick({gameState: 'GAME_OVER', humanAlive: false})?.link?.href).toBe('/games/newgame');
-    });
-    it('is silent in states with nothing to say', () => {
-        expect(pick({gameState: 'NEW_DAY_BOT_SUMMARIES'})).toBeNull();
-        expect(pick({gameState: 'WELCOME'})).toBeNull();
+    it('says nothing in any other phase or on a later day', () => {
+        for (const gameState of ['WELCOME', 'VOTE', 'VOTE_RESULTS', 'NIGHT', 'NIGHT_RESULTS', 'GAME_OVER']) {
+            expect(ids({gameState})).toEqual([]);
+        }
+        expect(ids({currentDay: 2})).toEqual([]);
     });
 });

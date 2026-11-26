@@ -25,7 +25,6 @@ const LEGACY_AUTO_VOICE_KEY = 'cinematicAutoVoice';
 const VOICE_MUTED_KEY = 'voiceMuted';
 import HelperHints from "./HelperHints";
 import type { HelperHintState } from "@/app/games/[id]/helper-hints";
-import { isGuestEmail } from "@/app/utils/guest";
 import { LoadingRail, PhaseBar, StreamPill, stripChromeClass, stripChromeStyle, type LoadingRailProps, type PhaseTone, type RailActor } from "./PhaseStrip";
 import { ttsService } from "@/app/services/tts-service";
 import { sttService } from "@/app/services/stt-service";
@@ -1998,9 +1997,6 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
         currentDay: game.currentDay,
         humanAlive: game.humanPlayerIsAlive !== false,
         humanMessagesToday: messages.filter(m => m.messageType === MessageType.HUMAN_PLAYER_MESSAGE && m.day === game.currentDay).length,
-        werewolfCount: game.werewolfCount,
-        isGuest: isGuestEmail(game.ownerEmail),
-        busy: isProcessing || !!isExternalLoading || game.gameStateProcessQueue.length > 0,
     } : null;
 
     return (
@@ -2066,6 +2062,7 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                         and keeps a muted session from generating any speech at all. */}
                     <button
                         type="button"
+                        data-hint="mute"
                         onClick={toggleVoiceMuted}
                         aria-pressed={voiceMuted}
                         aria-label={voiceMuted ? 'Unmute voices' : 'Mute voices'}
@@ -2564,6 +2561,7 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
             ) : (
             <form
                 ref={composerRef}
+                data-hint="composer"
                 onSubmit={sendMessage}
                 className="lg:px-7 pt-3 pb-2"
             >
