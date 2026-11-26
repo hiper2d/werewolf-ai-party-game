@@ -10,6 +10,9 @@ import { getFreeTierLimits } from "@/app/api/limits-actions";
 import { formatLimitUSD } from "@/app/api/errors";
 import type { FreeTierLimits } from "@/app/api/game-models";
 import type { Metadata } from "next";
+import { listStarterGames } from "@/app/api/starter-game-actions";
+import StarterGames from "@/app/games/components/StarterGames";
+import { isGuestEmail, GUEST_DEFAULT_PLAYER_NAME } from "@/app/utils/guest";
 
 // Title/description come from the root layout; only the canonical is per-route.
 export const metadata: Metadata = {
@@ -39,7 +42,12 @@ function tiersFor(limits: FreeTierLimits) {
       featured: false,
       badge: undefined as string | undefined,
       features: [
-        `${daily} of AI a day on us — up to ${monthly} a month`,
+        ...(limits.creditsOn
+          ? [
+              `${formatLimitUSD(limits.signupCreditUSD)} of AI on us when you sign up`,
+              ...(limits.discordCreditUSD > 0 ? [`${formatLimitUSD(limits.discordCreditUSD)} more for joining our Discord`] : []),
+            ]
+          : [`${daily} of AI a day on us — up to ${monthly} a month`]),
         `Up to ${limits.gamesPerDay} games a day`,
         'A curated, price-banded model set',
         'Voice acting and illustrations included',
@@ -59,7 +67,7 @@ function tiersFor(limits: FreeTierLimits) {
       badge: 'No subscription' as string | undefined,
       features: [
         'The full catalog — every model, including Fable 5.2 and GPT-6.2 Astra',
-        'No daily or monthly cap, no game limit, no bot caps',
+        limits.creditsOn ? 'No game limit and no bot caps' : 'No daily or monthly cap, no game limit, no bot caps',
         'Unlimited portrait rerolls and night replays',
         'Prepaid balance — top up anytime',
         'Pay only for what you use, base price + 15%',
@@ -100,6 +108,10 @@ function GaugeIcon({ className }: { className?: string }) {
 
 export default async function Home() {
   const session = await auth();
+  // A guest (app/utils/guest.ts) has a session but no account: this page treats them as a
+  // visitor, and shows the ready-made stories either of them can play without signing in.
+  const hasAccount = !!session?.user?.email && !isGuestEmail(session.user.email);
+  const starterCards = hasAccount ? [] : await listStarterGames().catch(() => []);
   const limits = await getFreeTierLimits();
   const tiers = tiersFor(limits);
 
@@ -137,13 +149,20 @@ export default async function Home() {
             </p>
 
             <div className="flex gap-3 flex-wrap justify-center">
-              {session ? (
+              {hasAccount ? (
                 <Link
                   href="/games"
                   className="inline-flex items-center justify-center font-semibold text-[15px] px-6 py-[13px] rounded-[var(--radius-md)] bg-[var(--accent)] text-[var(--accent-fg)] border border-transparent shadow-[var(--shadow-1)] hover:bg-[var(--accent-strong)] transition-all duration-[120ms]"
                 >
                   Go to Game Lobby
                 </Link>
+              ) : starterCards.length > 0 ? (
+                <a
+                  href="#stories"
+                  className="inline-flex items-center justify-center font-semibold text-[15px] px-6 py-[13px] rounded-[var(--radius-md)] bg-[var(--accent)] text-[var(--accent-fg)] border border-transparent shadow-[var(--shadow-1)] hover:bg-[var(--accent-strong)] transition-all duration-[120ms]"
+                >
+                  Play Now
+                </a>
               ) : (
                 <PlayNowButton />
               )}
@@ -166,6 +185,19 @@ export default async function Home() {
           </div>
         </div>
       </section>
+
+      {/* Ready-made stories: playable right here, with no account */}
+      {starterCards.length > 0 && (
+        <section id="stories" className="pb-16 sm:pb-[84px] scroll-mt-20">
+          <div className="flex flex-col gap-2 mb-6">
+            <h2 className="m-0 text-[clamp(26px,3.4vw,34px)] font-bold tracking-[-0.025em] text-[var(--fg-0)]">Play right now</h2>
+            <p className="m-0 text-[15px] text-[var(--fg-2)] leading-[1.6] max-w-[62ch]">
+              Pick a story and you&apos;re at the table in seconds. No account needed for your first game: the cast is waiting, voiced and illustrated.
+            </p>
+          </div>
+          <StarterGames cards={starterCards} defaultName={GUEST_DEFAULT_PLAYER_NAME} guest />
+        </section>
+      )}
 
       {/* Why Play */}
       <section className="bg-[var(--bg-1)] border border-[var(--line-1)] rounded-[var(--radius-2xl)] pt-10 px-5 pb-10 sm:pt-16 sm:px-12 sm:pb-14 mb-14 sm:mb-[72px]">
@@ -266,7 +298,7 @@ export default async function Home() {
             Play free. Go Paid for the whole table.
           </h2>
           <p className="m-0 text-[15px] text-[var(--fg-2)] leading-[1.6] [text-wrap:pretty]">
-            Start with {formatLimitUSD(limits.dailySpendUSD)} of AI a day on a curated set of models — no card, never charged. Switch to pay-as-you-go for the
+            Start with {limits.creditsOn ? `${formatLimitUSD(limits.signupCreditUSD)} of free AI` : `${formatLimitUSD(limits.dailySpendUSD)} of AI a day`} on a curated set of models — no card, never charged. Switch to pay-as-you-go for the
             full catalog with no per-game limits. No subscription: pre-load a balance and pay only for what you use.
           </p>
         </div>
@@ -301,7 +333,7 @@ export default async function Home() {
                   <div className="text-[12px] text-[var(--fg-3)] mt-1.5">{tier.billed}</div>
                 </div>
                 <p className="m-0 text-[13.5px] text-[var(--fg-2)] leading-[1.55] [text-wrap:pretty]">{tier.blurb}</p>
-                {session ? (
+                {hasAccount ? (
                   <Link href={tier.ctaUrl} className={btnClass}>{tier.cta}</Link>
                 ) : (
                   <LoginCta label={tier.cta} callbackUrl={tier.ctaUrl} className={btnClass} />

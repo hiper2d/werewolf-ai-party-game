@@ -43,7 +43,7 @@ const INTRO = [
     'under uncertainty over a long game — so mixing providers at one table makes their differences ' +
     'unusually visible.',
 
-    'Playing is free on the Free tier (up to 5 games a day, a curated price-banded model set, voice ' +
+    'Playing is free to start: a new account gets a one-time amount of free AI (up to 5 games a day, a curated price-banded model set, voice ' +
     'acting included). The Paid tier is prepaid pay-as-you-go with the full catalog and no per-game bot ' +
     'caps. There is no subscription.',
 ].join('\n\n');

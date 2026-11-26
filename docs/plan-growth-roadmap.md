@@ -1,6 +1,8 @@
 # Plan: growth roadmap (starter games, multiplayer, UI, credits)
 
-Status: draft, 2026-11-20 (track 1 decisions added the same day). Nothing implemented. Order agreed with Alex: (1) starter
+Status: 2026-11-21: track 1's first step is built (templates, `createStarterGame`, the start
+screen, the starter-game limits; committed, not yet reviewed or deployed). Voice clips,
+helper mode, the report and everything else below are not built. Order agreed with Alex: (1) starter
 games, (2) multiplayer, (3) UI if it still seems worth it, (4) free/paid tiers →
 credits. Track 1 is designed in detail; the others are scoped and point at their own
 plans.
@@ -81,12 +83,23 @@ to the app:
   makes (a few cents each, a handful per game). Only the portraits and the welcome scene
   are pre-drawn.
 
-`scripts/build-starter-game.ts --theme "…" --id tavern`: runs the normal preview pipeline
-with the starter table, draws the portrait sheet and the scene, creates a throwaway game,
-runs the introductions, records the audio, and copies all of it into
-`starterGames/tavern`. Alex reads and listens to the result before it goes live
-(`status: draft | live`). Cost: one preview, three sheets, one scene, six intros and seven
-voice clips per template, once.
+**How a template is made (built 2026-11-21): a snapshot of a real game**, not a separate
+generation pipeline. Alex creates the game with the normal form (7 players, 2 werewolves,
+Doctor + Detective, a distinctive one-word name for himself such as "Rowan"), edits the
+cast on the preview, lets the characters introduce themselves, rerolls portraits until
+every character has good candidates, and then runs
+`scripts/snapshot-starter-game.ts <gameId> --id tavern --title "…" --hook "…"`. The script
+refuses a game that is not exactly "day 1, right after the introductions, nobody has
+talked", copies the cast, the story, the introductions and every image doc into
+`starterGames/tavern` as a draft, and `--publish tavern` makes it live. Everything the
+form, the preview editor and the portrait tools can do is available for curating a
+template, and there is no second pipeline to keep in step with the first.
+
+What is NOT copied from the source game: roles and models (dealt per game), the bots'
+private thinking on their introductions (written under another role deal), and the turn
+tails (rebuilt for the new game's roles and the player's name). The source game's human
+name is the placeholder: it is replaced, as a whole word, in the story, the bot stories and
+the introductions, and the human's portrait docs are renamed to the player's name.
 
 ### The three launch themes (Alex, 2026-11-20)
 
@@ -128,7 +141,7 @@ built for.
 | | Starter game | After registration, in games made with the form |
 |---|---|---|
 | Models | the cheapest group only; the model picker on a bot or the GM lists only that group | the other groups, by the usual per-group rules |
-| Rewinds: delete a message, trim after a message, replay the night, the one-shot model override on retry | off | on |
+| Rewinds: delete a message, trim after a message, replay the night | off | on |
 | Portraits | pick among the pre-drawn variants, reframe | redraw / reroll as today |
 | Illustrations | drawn live when the GM decides, as in any game; no manual redraw | the same |
 
@@ -137,8 +150,8 @@ built for.
   pre-drawn game), and the right column is what the form gives them. To confirm with Alex:
   whether a signed-in player should get rewinds inside a starter game.
 - Recovery is not a rewind and stays on for everyone: the Retry button on an error banner
-  (a provider failed, a bot timed out) and reassigning a refused provider's bots, both
-  limited to the cheapest group here.
+  (a provider failed, a bot timed out), retrying a failed turn with a different model, and
+  reassigning a refused provider's bots, all limited to the cheapest group here.
 - Enforced on the server, not only hidden in the UI: `updateBotModel`,
   `updateGameMasterModel`, `retryWithModelOverride`, the delete/trim actions, `replayNight`
   and the avatar reroll check `game.starterTemplateId` and refuse.
@@ -387,6 +400,93 @@ below stay as the ceiling.
 | Signup credit, per linked identity | once | a second account on the same browser/fingerprint |
 | Games per day, per account | 5 (today's limit) | runaway use |
 
+## Decisions and open points, 2026-11-21 (Alex)
+
+- **Pre-generated vs live.** Everything before the player's first message is pre-generated
+  and stored on the template: the opening story, the introductions, their voice clips, the
+  portraits (several sets) and the welcome scene. Generation starts when the player starts
+  playing: bot replies, live voice, the GM's illustrations.
+- **Art styles (built 2026-11-21):** a template has three sets in DIFFERENT styles, e.g.
+  one anime, one realistic, one other (Alex: variety, not one consistent look). Each is
+  drawn straight onto the template by
+  `scripts/draw-starter-style.ts <templateId> --label anime --style "…"`: the cast's
+  portraits and that style's own welcome/night scenes, two image calls (~$0.11 measured).
+  A new game gets one style at random for the whole cast, with its scenes and its style
+  text, so the GM's live illustrations match. The player can switch any character to
+  another style's portrait (a mixed cast is their choice). The source game's own portraits
+  are round 0 and are never picked once a styled round exists; three styled draws push
+  them out.
+- **Intro voices and the cinematic start (built 2026-11-21):**
+  `scripts/record-starter-voices.ts <templateId>` records the opening story and the six
+  introductions once (MP3 via ffmpeg, measured: a 16 s introduction = 97 KB, $0.0025). A
+  line that names the human placeholder is skipped and read live, so keep the story and
+  the introductions free of the human's name. On the first open the role card shows, and
+  closing it opens cinematic mode on the opening story with voices on.
+- **Browsers are not restricted for guests** (Alex, 2026-11-21): Brave, VPN and
+  blocked-signal visitors may play as guests like everyone else. The one-game,
+  one-day-and-night limit and the daily guest budget are the protection.
+- **Order:** finish the pre-set games (voices, cinematic start, random set), then the helper
+  hints.
+- **Anonymous players are users.** Every visitor who starts a game without signing in gets
+  a record (`guests/{guestId}`): first seen, device id, fingerprint, IPs, edge geo, system
+  timezone, every game started (the first one included), how far each got, and, if they
+  sign in, the account they became (`convertedTo`). Every anonymous game start is also a
+  `starter_game_created` feature event with `guest: true`. The report reads guests and
+  accounts as one funnel: landed → started a game → wrote a message → first vote → first
+  night → signed in → second game.
+- **Fingerprint data: nothing has been collected so far.** `devices/{id}` holds the cookie
+  id, the emails and IPs seen on it and the edge geo (the IP's timezone, not the system's).
+  The browser signals (canvas, GPU, screen, system timezone, languages) were designed on
+  2026-10-29 and never built, so there is nothing to analyse yet. The two-week wait is only
+  needed to tune a FUZZY match for accounts (credits). Guests can be linked from day one by
+  an EXACT match on the strong signals, because a false match there costs a sign-in prompt,
+  not a refusal. Known limit: phones of one model in one timezone look identical, so on
+  mobile the exact match is combined with the IP.
+- **Browser signals are collected since 2026-11-21 (built, on `develop`):** stored per
+  device with a full hash and a machine hash, indexed by machine in `fingerprints/`, monitor
+  only. First real reading: Brave hides the graphics card and randomizes canvas, screen,
+  cores and memory, so a Brave visitor is recognisable as Brave but not as a machine; for
+  such browsers the IP rule is the only link. Alex's call: good enough. Someone who goes
+  to that length gets one more limited guest game, and guests have no role choice, no
+  table size and no model choice anyway.
+- **"Play now" (decided):** the three story cards sit on the landing page; one click starts
+  that story.
+- **What a guest gets (decided):** one game, day 1 and night 1, no rewinds and no resets.
+  The morning of day 2 asks for sign-in: free, the game continues on the account, the other
+  stories open up.
+- **Credits (track 4), direction confirmed:** free and paid merge; a new account gets $5
+  once. **Discord bonus:** extra credits for joining the Discord server and asking Marlow
+  (a personal claim code from /profile, posted to the bot; one claim per Discord account
+  and per game account; Marlow already reads this Firestore project).
+- **Multiplayer:** signed-in users only, built last.
+
+## Build state, 2026-11-21 (evening)
+
+Built on `develop`, not pushed:
+
+- **Lobby:** the ready-made stories stay above the game list for every signed-in player; a
+  card continues the unfinished game from that story or deals a new one.
+- **Guest play:** story cards on the landing page, one click, no sign-in. A guest is a
+  `users` row with `guest: true`; one game; day 1 + night 1; "Sign in to play Day 2" in
+  place of Next Day; signing in moves the game to the account. Caps in `config/limits`:
+  `guestSpendUSD` 1, `guestGlobalDailySpendUSD` 5 (Alex has not confirmed the numbers),
+  `guestOncePerDevice` on: a known device without its guest cookie (cleared cookies, private
+  window) is asked to sign in, never given a second guest or the earlier game (Alex,
+  2026-11-21). Content screen in enforce for guests. Details: CLAUDE.md,
+  "Guest play".
+- **Decided 2026-11-21:** the fingerprint does not reopen a guest's game (same-model phones
+  share one); the `ww_guest` cookie does. After the guest's game, the other stories read
+  "Sign in to play".
+- **Order changed (Alex, 2026-11-21):** the credits switch (track 4: $5 once at sign-up, no
+  daily refill, then pay) moves up to ship WITH guest play, before helper hints.
+
+Owed before guest play goes live:
+
+- The sign-in hand-over (`claimGuest`) has not been run with a real Google/GitHub sign-in.
+- Marlow's daily digest counts every `users` row as a signup: it must skip `guest: true`
+  (and report guests separately).
+- Templates are still drafts; `--publish` makes the landing cards appear in production.
+
 ## Sequencing
 
 1. Track 0 phase A (collection, monitor) and track 1 start together.
@@ -398,3 +498,83 @@ below stay as the ceiling.
    day.
 5. Track 2: privacy split first, then the rest of the multiplayer plan.
 6. Track 3 when the numbers say the first screen is the next leak.
+
+## Build state, 2026-11-23
+
+Still on `develop`, unpushed. All three templates are DRAFTS (local server only).
+
+- **Three stories.** `tavern` (The Last Lantern), `starship` (Meridian Is Off Course),
+  `ninja-academy` (Night at Moonshade Academy). Each: 8 players, 2 werewolves, doctor +
+  detective, three art styles, recorded voices. The two new source games were created by
+  script (`scripts/make-starter-source.jest.ts`, forms in `scripts/starter-sources/`), then
+  edited by hand (`snapshot-starter-game.ts --export-text / --import-text`): opening stories
+  rewritten in the tavern's shape, a duplicate security officer turned into the medic
+  (starship), a duplicate transfer student turned into the stealth instructor (ninja).
+- **Languages.** A Language picker next to the name on the start screen (landing page and
+  lobby). Every template is translated into the 13 other game languages (story, backstories,
+  introductions) and voiced in each: 8 clips per language per story. Names stay Latin.
+- **Open.** Nobody but the model has read the translations: a native read of at least one
+  or two languages before publishing. The anime welcome scene of `ninja-academy` has a
+  small blond, headband-wearing student in the crowd that reads close to a known anime
+  hero (drawn twice, both times); the card shows the watercolor scene instead, and the
+  anime scene should be redrawn or dropped before going live.
+- **Cost of this build:** about $7 (two source games, seven style draws, 39 translations,
+  ~330 voice clips).
+
+## Build state, 2026-11-25: credits, sign-up check, Discord claim
+
+Still on `develop`, unpushed. Decided by Alex on 2026-11-25:
+
+- **Existing players get $5, once, and that is it.** No grandfather grant, no refill.
+- **Out of credits:** the message offers the Discord server ("ask Marlow") for $5 more,
+  or a top-up.
+- **A new account of a person who already has one must not get $5 again.** Detection is
+  switched on, not monitored first.
+- **Marlow reports guests too:** every guest game creation, not every visit.
+
+Built (details in CLAUDE.md, "Free credits"):
+
+- `users.credits`, spent at cost by `recordSpend`; the guard refuses at zero. The daily,
+  monthly and per-browser caps do not apply under credits; the platform-wide daily ceiling,
+  5 games a day and the model bands stay. `config/limits.creditsOn: 0` goes back to the caps.
+- **Two wallets, on purpose.** Free credits are a separate number from the purchased
+  balance: free credits keep the model bands (so $5 is not gone in one game of an expensive
+  model), are spent at cost with no markup, and Marlow can still tell who paid. The Free /
+  Paid switch on the profile stays for now; a top-up moves the account to Paid as before.
+- A Paid account can now open a game created on the Free tier, so running out mid-game and
+  topping up continues that game.
+- **Sign-up check** (`decideSignupCredit`). Denied: a second account on the same browser id;
+  two signs together (machine fingerprint, same IP within 7 days, numbered sibling name);
+  the machine alone only for a specific PC seen within 72 hours. One weak sign alone is
+  granted and flagged. Run read-only against the October ring: `reqaccv2` and `reqaccv5`
+  both come out denied (same browser).
+- **Discord claim.** A personal code on the profile page and in the popup; `/credits
+  code:WOLF-…` in the server is answered by the game itself as the Marlow bot (an HTTP
+  interaction, no bot process). Once per game account and once per Discord user.
+- **Marlow** (`~/projects/marlow`, `handlers/werewolf_stats.py`, commit b629e5f; Marlow runs from its working tree, so this is live from its next 05:05 UTC run, and its nightly backup pushes it):
+  guests are out of the sign-up counts; the digest lists each guest game and the day's
+  credit grants, denials (with the reason and the linked account), flags and Discord claims.
+
+Known limits, said plainly:
+
+- **Apple hardware and phones.** Two MacBooks of one model, or two phones of one model, in
+  one time zone have the same fingerprint. A cleared browser on a VPN on such a machine is
+  NOT denied (it is flagged, and Marlow lists it); denying it would refuse honest newcomers
+  on the most common hardware. On a Windows or Linux PC with a named graphics card it IS
+  denied within 72 hours. There is no production fingerprint data yet (collection ships with
+  this deploy), so the rule is set by reasoning, not measured; read the flags for two weeks
+  and tighten.
+- **Old accounts of one person each get $5.** The ring's six accounts are "existing" and are
+  not checked. A blocklist (plan-multi-account-linking.md §1) is the answer if that matters.
+- **A new Discord account is a new claim.** The claim is once per Discord user; nothing
+  checks how old the Discord account is (the row records who claimed).
+
+Owed before going live:
+
+1. Alex signs in locally and looks at the profile page, the popup and a real game running
+   out (set `credits` low with `scripts/credits.ts grant <email> -4.9`).
+2. Deploy, then `scripts/discord-credits-setup.ts endpoint …` and `register`, then try
+   `/credits` in the server. Post the how-to in Discord and a News entry.
+3. `scripts/credits.ts backfill-stems --write` (adds `handleStem` to recent accounts so the
+   sibling rule sees them).
+4. The guest → account sign-in hand-over is still untested with a real OAuth sign-in.

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { LLM_CONSTANTS, SupportedAiModels, getModelDisplayName, getModelTags, isAllowedAsGameMaster, type ModelTag } from '@/app/ai/ai-models';
-import { getModelPickerOptions } from '@/app/ai/model-limit-utils';
+import { getModelPickerOptions, isStarterModel } from '@/app/ai/model-limit-utils';
 import { GAME_MASTER, UserTier, USER_TIERS, type ProviderBlock } from '@/app/api/game-models';
 import { providerBlockMessage } from '@/app/api/provider-blocks';
 import { useUIControls } from '../context/UIControlsContext';
@@ -35,6 +35,8 @@ interface ModelSelectionDialogProps {
     // are left out of the list entirely and named in a notice, so the player is never
     // offered the option the server would reject.
     blockedProviders?: Record<string, ProviderBlock>;
+    // A starter game offers only the cheapest model group (app/utils/starter-limits.ts).
+    starterGame?: boolean;
 }
 
 export default function ModelSelectionDialog({
@@ -45,7 +47,8 @@ export default function ModelSelectionDialog({
     gameTier,
     usageCounts,
     mode = 'change',
-    blockedProviders
+    blockedProviders,
+    starterGame = false
 }: ModelSelectionDialogProps) {
     const { isModalOpen } = useUIControls();
     const isOpen = isModalOpen('modelSelection');
@@ -62,6 +65,7 @@ export default function ModelSelectionDialog({
         })
             .map(({ model, disabled }) => ({ model, disabled }))
             .filter(option => !(option.disabled && option.model !== currentModel))
+            .filter(option => !starterGame || isStarterModel(option.model) || option.model === currentModel)
             .filter(option => {
                 const apiKeyName = SupportedAiModels[option.model]?.apiKeyName;
                 return !(apiKeyName && blockedProviders?.[apiKeyName]);
@@ -69,7 +73,7 @@ export default function ModelSelectionDialog({
             // Models too slow to be the Game Master (`excludedFromGmAndRandom` in the model config) are not offered
             // for the GM; the server rejects them too.
             .filter(option => botName !== GAME_MASTER || isAllowedAsGameMaster(option.model));
-    }, [gameTier, usageCounts, currentModel, blockedProviders, botName]);
+    }, [gameTier, usageCounts, currentModel, blockedProviders, botName, starterGame]);
 
     const blockedNotices = useMemo(() => Object.values(blockedProviders ?? {}).map(providerBlockMessage), [blockedProviders]);
 
@@ -178,6 +182,11 @@ export default function ModelSelectionDialog({
                 {blockedNotices.length > 0 && (
                     <div className="mx-4 mb-1 px-3 py-2 rounded-[var(--radius-md)] bg-[oklch(70%_0.13_25_/_0.08)] border border-[oklch(70%_0.13_25_/_0.3)] text-[12px] text-[var(--fg-1)]">
                         {blockedNotices.map(notice => <div key={notice}>{notice}</div>)}
+                    </div>
+                )}
+                {starterGame && (
+                    <div className="mx-4 mb-1 px-3 py-2 rounded-[var(--radius-md)] bg-[var(--bg-2)] border border-[var(--line-1)] text-[12px] text-[var(--fg-2)]">
+                        Starter games use the light model set. Create your own game for the full catalog.
                     </div>
                 )}
                 {/* Model list */}

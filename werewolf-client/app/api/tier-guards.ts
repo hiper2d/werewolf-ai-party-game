@@ -3,6 +3,7 @@
 import {db} from '@/firebase/server';
 import {getUserTier} from '@/app/api/user-actions';
 import {TierMismatchError} from '@/app/api/errors';
+import {canOpenGameOnTier} from '@/app/utils/tier-access';
 import type {UserTier} from '@/app/api/game-models';
 
 interface EnsureOptions {
@@ -41,7 +42,7 @@ export async function ensureUserCanAccessGame(
         throw new Error('You do not have access to this game');
     }
 
-    if (storedTier !== currentUserTier) {
+    if (!canOpenGameOnTier(storedTier, currentUserTier)) {
         throw new TierMismatchError(gameId, storedTier, currentUserTier);
     }
 

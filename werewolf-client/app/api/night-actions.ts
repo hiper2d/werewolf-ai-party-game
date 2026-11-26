@@ -1,5 +1,7 @@
 'use server';
 
+import {assertNoStarterRewind} from "@/app/utils/starter-limits";
+import {GUEST_WALL_MESSAGE, isGuestEmail} from "@/app/utils/guest";
 import { db } from "@/firebase/server";
 import { askBotText } from "@/app/ai/bot-turn";
 import {
@@ -545,6 +547,7 @@ async function replayNightImpl(gameId: string): Promise<GameActionResponse> {
     }
 
     await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: game.createdWithTier });
+    assertNoStarterRewind(game);
 
     // A replay re-runs every night action from scratch, so it is a paid-tier feature.
     if (game.createdWithTier !== USER_TIERS.PAID) {
@@ -984,6 +987,13 @@ async function startNewDayImpl(gameId: string): Promise<GameActionResponse> {
         const currentGame = { id: gameId, ...gameData } as Game;
 
         await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: currentGame.createdWithTier });
+
+        // A guest's game stops here, with the night's story told: day 2 needs a sign-in,
+        // which moves the game to the account (app/utils/guest.ts). Returned, not thrown:
+        // a throw would put an error banner on a game that is simply waiting.
+        if (isGuestEmail(session.user.email)) {
+            return { game: gameFromFirestore(gameId, gameData), messages: [], rejected: { reason: 'guest_wall', message: GUEST_WALL_MESSAGE } };
+        }
 
         // Stale call (e.g. double-clicked "Next Day" — the first click already
         // advanced the state): re-sync the client, don't error.
@@ -1499,6 +1509,9 @@ function gameFromFirestore(id: string, data: any): Game {
         ownerEmail: data.ownerEmail || '',
         // Stray legacy values (e.g. the retired 'api' tier) read as free so the game stays openable.
         createdWithTier: data.createdWithTier === 'paid' ? 'paid' : 'free',
+        ...(data.starterTemplateId ? {starterTemplateId: data.starterTemplateId} : {}),
+        ...(data.starterClips ? {starterClips: data.starterClips} : {}),
+        ...(data.helperMode ? {helperMode: true} : {}),
         votingHistory: data.votingHistory || [],
         nightNarratives: data.nightNarratives || [],
         dayDiscussionSummaries: data.dayDiscussionSummaries || [],

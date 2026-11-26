@@ -36,6 +36,10 @@ export interface User {
     dailySpend?: UserDailySpend;
     voiceProvider?: VoiceProvider; // User's preferred TTS voice provider
     balance?: number; // USD balance for paid tier users
+    /** Free credits left, USD (app/utils/credits.ts). Absent until the sign-up credit is decided. */
+    credits?: number;
+    /** Set the first time the account creates a game with the form: the lobby then stops offering the ready-made stories. */
+    madeOwnGame?: boolean;
     stripeCustomerId?: string; // Stripe customer ID for paid tier users
 }
 
@@ -369,6 +373,15 @@ export interface Game {
     expireAt?: any; // Firestore Timestamp for TTL auto-deletion (30 days after creation)
     ownerEmail: string; // Email of the user who created this game
     createdWithTier: UserTier; // Store the user's tier at the time the game was created
+    // Set on a game created from a starter template (app/utils/starter-games.ts): the
+    // pre-built first game. Such a game is held to the cheapest model group, has no rewinds
+    // and no portrait redraws (docs/plan-growth-roadmap.md, "Limits in starter games").
+    starterTemplateId?: string;
+    // The template's pre-recorded voice clips this game may play instead of calling the
+    // voice model (opening story, introductions): clip key → the voice it was read in.
+    starterClips?: Record<string, {voice: string; version: number; lang?: string}>;
+    // On-screen hints that say what the player can do next. On for starter games.
+    helperMode?: boolean;
     votingHistory?: VotingDayResult[]; // History of voting results for each day
     nightNarratives?: NightNarrativeResult[]; // GM night result narratives for each night
     storyChapters?: StoryChapter[]; // GM plot memory: one chapter per night, drives story continuity
@@ -489,6 +502,20 @@ export const FREE_TIER_LIMITS = {
     // Shared by every account signed in from that browser, so a farm of accounts on one
     // machine draws down one budget instead of one each. Set to 0 to disable entirely.
     DEVICE_DAILY_SPEND_USD: 5,
+    // Guest play (app/utils/guest.ts): what ONE guest may spend on their one game, what all
+    // guests together may spend in a UTC day, and whether a device that is already known
+    // (a guest or an account was on it) is asked to sign in instead. Each is off at 0. A free game's median cost is $0.39 and a guest plays a
+    // third of one, so $1 is room, not a target.
+    GUEST_SPEND_USD: 1,
+    GUEST_GLOBAL_DAILY_SPEND_USD: 5,
+    GUEST_ONCE_PER_DEVICE: 1,
+    // Free credits (app/utils/credits.ts): an account gets SIGNUP_CREDIT_USD once instead of
+    // the daily and monthly refill above, and DISCORD_CREDIT_USD once more through the
+    // Discord claim. CREDITS_ON = 0 is the way back to the daily and monthly caps without a
+    // deploy; the platform-wide daily ceiling and the games-a-day limit apply either way.
+    CREDITS_ON: 1,
+    SIGNUP_CREDIT_USD: 5,
+    DISCORD_CREDIT_USD: 5,
 } as const;
 
 /** Resolved free-tier limits (defaults overlaid with `config/limits`). */
@@ -498,6 +525,13 @@ export interface FreeTierLimits {
     monthlySpendUSD: number;
     globalDailySpendUSD: number;
     deviceDailySpendUSD: number;
+    guestSpendUSD: number;
+    guestGlobalDailySpendUSD: number;
+    guestOncePerDevice: number;
+    /** 1: accounts play on one-time free credits. 0: the daily and monthly caps, as before. */
+    creditsOn: number;
+    signupCreditUSD: number;
+    discordCreditUSD: number;
 }
 
 /**

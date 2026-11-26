@@ -8,6 +8,7 @@ import { ThemeProvider } from "@/app/providers/ThemeProvider";
 import { DEFAULT_THEME_ID, LEGACY_THEME_IDS, THEME_BASES, THEME_STORAGE_KEY } from "@/app/utils/themes";
 import { LoginDialogProvider } from "@/app/providers/LoginDialogProvider";
 import DeviceProvider from "@/app/providers/DeviceProvider";
+import WelcomeNote from "@/app/components/WelcomeNote";
 import LoginDialog from "@/components/login-dialog";
 import WhatsNewPopup from "@/app/news/WhatsNewPopup";
 import { DISCORD_URL, SITE_URL } from "@/app/config/external-links";
@@ -135,6 +136,8 @@ export default function RootLayout(
                 {/* Renders nothing; keeps this browser's device id in sync. Inside
                     AuthProvider because it links the signed-in email to the device. */}
                 <DeviceProvider />
+                {/* One note for an account that has just arrived (a guest who signed in, a first sign-in). */}
+                <WelcomeNote />
                 <LoginDialogProvider>
                   <div className="flex flex-col h-[100dvh]">
                     <NavBar />

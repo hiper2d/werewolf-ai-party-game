@@ -249,3 +249,23 @@ export function cheapFirstDealOrder(models: string[], pinned: ReadonlySet<string
     keyed.sort((a, b) => a.rank - b.rank || a.tiebreak - b.tiebreak);
     return keyed.map(k => k.model);
 }
+
+/**
+ * The models a STARTER game (a pre-built first game, app/utils/starter-games.ts) may use:
+ * the cheapest cost group only, which is the free tier's "unlimited bots" band. A starter
+ * game is the free sample, so nothing in it may cost more than the table it was built for —
+ * on every tier, and for the model pickers inside the game too.
+ */
+export function getStarterModels(): string[] {
+    return Object.keys(SupportedAiModels).filter(isStarterModel);
+}
+
+export function isStarterModel(model: string): boolean {
+    if (model === LLM_CONSTANTS.RANDOM || !SupportedAiModels[model]) return false;
+    return turnCostRank(model) === 0;
+}
+
+/** Starter models that may also be the Game Master. */
+export function getStarterGameMasterModels(): string[] {
+    return getStarterModels().filter(isAllowedAsGameMaster);
+}

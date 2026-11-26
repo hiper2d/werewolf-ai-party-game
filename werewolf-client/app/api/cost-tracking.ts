@@ -4,7 +4,8 @@ import {Game, TokenUsage, UserTier, USER_TIERS} from "@/app/api/game-models";
 import {SupportedAiModels, resolveModelId} from "@/app/ai/ai-models";
 import {PAID_TIER_MARKUP} from "@/app/config/credit-packages";
 import {applyDailySpend, applySpending, formatPeriod} from "@/app/utils/spending-utils";
-import {deviceSpendRef, globalSpendRef} from "@/app/api/spend-ledgers";
+import {deviceSpendRef, globalSpendRef, guestSpendRef} from "@/app/api/spend-ledgers";
+import {creditsAfterSpend} from "@/app/utils/credits";
 import {logger} from "@/app/utils/logger";
 
 type TokenUsageInput = Partial<TokenUsage> | null | undefined;
@@ -215,6 +216,9 @@ export async function recordSpend(input: RecordSpendInput, timestamp: number = D
         const deviceId = chargesFreeTier ? userSnap?.data()?.lastDeviceId : undefined;
         const deviceRef = deviceId ? deviceSpendRef(deviceId) : null;
         const deviceSnap = deviceRef ? await transaction.get(deviceRef) : null;
+        // A guest's spend also lands on the shared guest ledger (app/utils/guest.ts).
+        const guestRef = chargesFreeTier && userSnap?.data()?.guest === true ? guestSpendRef() : null;
+        const guestSnap = guestRef ? await transaction.get(guestRef) : null;
 
         // The tier that actually billed: the user's current tier when charging, the game's
         // creation tier otherwise (zero-cost calls, platform-key games with no user email).
@@ -240,6 +244,11 @@ export async function recordSpend(input: RecordSpendInput, timestamp: number = D
                 }
                 userUpdate.balance = round6(balance - chargedAmount);
                 recordedAmount = chargedAmount;
+            } else if (typeof userData.credits === 'number' && userData.guest !== true) {
+                // Free credits (app/utils/credits.ts) pay for free-tier play at cost. Spend
+                // that already happened is always recorded; the credits just stop at zero
+                // (the guard before the call is what refuses the next one).
+                userUpdate.credits = creditsAfterSpend(userData.credits, costUSD);
             }
 
             userUpdate.spendings = applySpending(userData.spendings, formatPeriod(timestamp), recordedAmount, tier);
@@ -264,6 +273,12 @@ export async function recordSpend(input: RecordSpendInput, timestamp: number = D
         if (deviceRef && billedTier === USER_TIERS.FREE && costUSD > 0) {
             transaction.set(deviceRef, {
                 dailySpend: applyDailySpend(deviceSnap?.data()?.dailySpend, timestamp, costUSD, USER_TIERS.FREE)
+            }, { merge: true });
+        }
+
+        if (guestRef && billedTier === USER_TIERS.FREE && costUSD > 0) {
+            transaction.set(guestRef, {
+                dailySpend: applyDailySpend(guestSnap?.data()?.dailySpend, timestamp, costUSD, USER_TIERS.FREE)
             }, { merge: true });
         }
 

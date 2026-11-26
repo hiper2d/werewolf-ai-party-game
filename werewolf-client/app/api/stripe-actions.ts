@@ -1,6 +1,7 @@
 'use server'
 
 import Stripe from 'stripe';
+import {isGuestEmail} from "@/app/utils/guest";
 import { auth } from '@/auth';
 import { CREDIT_PACKAGES } from '@/app/config/credit-packages';
 import { getUser, setStripeCustomerId } from '@/app/api/user-actions';
@@ -21,7 +22,7 @@ export type CheckoutSessionResult = { ok: true; url: string } | { ok: false; err
 export async function createCheckoutSession(packageId: string): Promise<CheckoutSessionResult> {
     const session = await auth();
     const userId = session?.user?.email;
-    if (!userId) {
+    if (!userId || isGuestEmail(userId)) {
         return { ok: false, error: 'Please sign in again to buy credits.' };
     }
     const pkg = CREDIT_PACKAGES.find(p => p.id === packageId);

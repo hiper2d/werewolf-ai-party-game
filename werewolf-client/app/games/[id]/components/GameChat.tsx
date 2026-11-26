@@ -1,5 +1,6 @@
 'use client';
 
+import { starterClipKeyFor, starterClipUrl } from "@/app/utils/starter-games";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { talkToAll, humanPlayerVote, getSuggestion } from "@/app/api/bot-actions";
 import { clampUserText, INPUT_LIMITS, MAX_STT_RECORDING_MS } from "@/app/utils/input-limits";
@@ -73,6 +74,9 @@ interface GameChatProps {
     isOwner?: boolean;
     onGameChange?: (patch: Partial<Game>) => void;
     onUpdateVoice?: (gameId: string, name: string, selection: VoiceSelection) => Promise<Game>;
+    // A fresh starter game: once true, open cinematic mode on the first line with
+    // voices on, whatever this browser's saved switches say (see the intro effect).
+    playIntro?: boolean;
 }
 
 export interface PhaseControls {
@@ -286,7 +290,8 @@ function GameMessageItem({ message, gameId, onDeleteAfter, onDeleteAfterExcludin
         message.recipientName === RECIPIENT_ALL &&
         message.day === game.currentDay &&
         (game.gameState === GAME_STATES.DAY_DISCUSSION || game.gameState === GAME_STATES.AFTER_GAME_DISCUSSION);
-    const canShowResetButton = isBotMessage || isHumanDayDiscussionMessage;
+    // A starter game has no rewinds (app/utils/starter-limits.ts); the server refuses them too.
+    const canShowResetButton = (isBotMessage || isHumanDayDiscussionMessage) && !game.starterTemplateId;
     
     let displayContent: string;
     try {
@@ -535,7 +540,7 @@ function retryNoteFor(gameState: string, notice: LlmRetryNotice): string {
     return `${who} ${what}, asking again`;
 }
 
-export default function GameChat({ gameId, game, runGameAction, onGameStateChange, pendingMessages, onPendingMessagesConsumed, clearNightMessages, onErrorHandled, onRetryWithModel, onReassignProvider, onRetryBotSelection, isExternalLoading, retryNotice, phaseControls, chatControls, onBeforeAction, cancelButton, onAvatarClick, isOwner, onGameChange, onUpdateVoice }: GameChatProps) {
+export default function GameChat({ gameId, game, runGameAction, onGameStateChange, pendingMessages, onPendingMessagesConsumed, clearNightMessages, onErrorHandled, onRetryWithModel, onReassignProvider, onRetryBotSelection, isExternalLoading, retryNotice, phaseControls, chatControls, onBeforeAction, cancelButton, onAvatarClick, isOwner, onGameChange, onUpdateVoice, playIntro }: GameChatProps) {
     // Without a parent-provided lock, run actions directly (standalone use).
     const runAction = useMemo(
         () => runGameAction ?? (<T,>(action: () => Promise<T>) => action()),
@@ -724,6 +729,25 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
             setCinematicOpen(true);
         }
     }, [messages, isLoadingMessages, autoPlay, cinematicOpen, isCurrentDaySelected, game.humanPlayerName]);
+
+    // A starter game's first open: the opening story and the introductions are already
+    // in the chat, pre-recorded, so the scene opens on line one and reads them out. Voice
+    // and auto-play are switched on for this visit only; the saved switches are not
+    // rewritten, and the player can turn either off from the scene as usual.
+    const introPlayedRef = useRef(false);
+    useEffect(() => {
+        if (!playIntro || introPlayedRef.current || isLoadingMessages || messages.length === 0) return;
+        introPlayedRef.current = true;
+        setAutoPlay(true);
+        setVoiceMuted(false);
+        cinematicDismissedRef.current = false;
+        // The scene opens on the NEWEST line unless told where to start, and the story
+        // begins at the top: name the first spoken line (the opening story).
+        const firstLine = messages.find(m => m.id && SPEECH_TYPES.has(m.messageType as MessageType));
+        setCinematicStartId(firstLine?.id ?? undefined);
+        setCinematicOpen(true);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [playIntro, isLoadingMessages, messages.length]);
 
     // A finished speaking burst lifts the "stop popping up" suppression.
     useEffect(() => {
@@ -1553,8 +1577,15 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
             // Show loading state
             setLoadingMessageId(messageId);
 
+            // A starter game's opening story and introductions were recorded with the
+            // template: play the stored clip (no voice-model call) while the speaker still
+            // has the voice it was read in.
+            const prerecordedUrl = message
+                ? starterClipUrl(game, starterClipKeyFor(message, GAME_MASTER), voice)
+                : undefined;
+
             const started = await ttsService.speakText(text, {
-                voice, voiceStyle, voiceProvider, gameId,
+                voice, voiceStyle, voiceProvider, gameId, prerecordedUrl,
                 // Auto-read lines are nobody's click; the metrics keep them apart.
                 source: opts?.silent ? 'cinematic_auto' : (opts?.source ?? 'chat'),
                 // Playback failures (autoplay policy, codec) fire after this await
@@ -2219,12 +2250,18 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                                     </svg>
                                     <div className="flex-1 min-w-0">
                                         <div className="text-[13px] font-medium text-[var(--fg-0)] break-words">
-                                            {freeSpendScope === 'global'
+                                            {freeSpendScope === 'credits'
+                                                ? 'Your free credits are used up'
+                                                : freeSpendScope === 'global'
                                                 ? 'Free play is paused for today'
                                                 : freeSpendWindow === 'day' ? "Today's free AI allowance is used up" : "This month's free AI allowance is used up"}
                                         </div>
                                         <div className="text-[12px] mt-1 text-[var(--fg-1)] break-words">
-                                            {freeSpendScope === 'global' ? (
+                                            {freeSpendScope === 'credits' ? (
+                                                <>
+                                                    The game is paused, not lost. Every account starts with a one-time amount of free AI, and yours is spent. Get more free on our <a href={DISCORD_URL} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">Discord</a> (your code is on your profile page), or add funds there, then press Retry to pick up where the game left off.
+                                                </>
+                                            ) : freeSpendScope === 'global' ? (
                                                 <>
                                                     The game is paused, not broken — everyone on the free tier shares a daily pool of AI on the platform&apos;s keys, and today&apos;s pool is spent. This is not about your account; you still have allowance left. Adding funds on your profile page lifts it immediately; otherwise come back after the reset and press Retry to pick up where the game left off.
                                                 </>
@@ -2234,9 +2271,11 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                                                 </>
                                             )}
                                         </div>
+                                        {freeSpendScope !== 'credits' && (
                                         <div className="text-[12px] mt-1 text-[var(--fg-2)] break-words">
                                             Resets {resetLabel} (your local time){freeSpendWindow === 'day' ? ', midnight UTC' : ', the 1st at midnight UTC'}.
                                         </div>
+                                        )}
                                     </div>
                                     <div className="flex-shrink-0 flex flex-col gap-1.5">
                                         <Link
@@ -2351,7 +2390,7 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                                         </div>
                                         <div className="text-[12px] mt-1 text-[var(--fg-1)] break-words">
                                             Every AI turn is paid from your prepaid balance, and it can&apos;t cover
-                                            {displayWho ? ` ${displayWho}'s next reply` : ' the next reply'}. Retrying or switching the model won&apos;t help. On your profile page you can add funds, or switch to the Free tier and keep playing on the platform&apos;s keys within the free caps; then come back and press Retry to pick up where the game left off.
+                                            {displayWho ? ` ${displayWho}'s next reply` : ' the next reply'}. Retrying or switching the model won&apos;t help. On your profile page you can add funds, or switch to the Free tier and keep playing on your free allowance; then come back and press Retry to pick up where the game left off.
                                         </div>
                                     </div>
                                     <div className="flex-shrink-0 flex flex-col gap-1.5">

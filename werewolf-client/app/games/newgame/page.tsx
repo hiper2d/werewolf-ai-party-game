@@ -5,6 +5,7 @@ import { isFreeSpendLimitError, isInsufficientBalanceError, isProviderBudgetDepl
 import SpendLimitModal from '@/app/components/SpendLimitModal';
 import {useRouter} from 'next/navigation';
 import {useSession} from 'next-auth/react';
+import {isGuestEmail} from '@/app/utils/guest';
 import {createGame, getPreviewProgress, previewGameAction} from '@/app/api/game-actions';
 import {generateDraftIllustrations, getAvatarDraft, reframeDraftAvatar} from '@/app/api/avatar-draft-actions';
 import type {PreviewProgress} from '@/app/ai/preview-generation';
@@ -211,7 +212,12 @@ export default function CreateNewGamePage() {
         if (status === 'unauthenticated') {
             router.push('/api/auth/signin');
         }
-    }, [status, router]);
+        // A guest (app/utils/guest.ts) plays ready-made stories only; the server refuses
+        // the form's actions too.
+        if (isGuestEmail(session?.user?.email)) {
+            router.replace('/?login=true&callbackUrl=%2Fgames%2Fnewgame');
+        }
+    }, [status, router, session?.user?.email]);
 
     useEffect(() => {
         if (status !== 'authenticated' || isTierLoaded) {

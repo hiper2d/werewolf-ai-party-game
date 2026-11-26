@@ -3,6 +3,7 @@ import { db } from '@/firebase/server';
 import {GAME_STATES, Bot, Game} from "@/app/api/game-models";
 import {recalculateDayActivity} from "@/app/api/bot-actions";
 import {auth} from "@/auth";
+import {isStarterGame, STARTER_GAME_REWIND_MESSAGE} from "@/app/utils/starter-limits";
 
 export async function DELETE(
     request: NextRequest,
@@ -74,6 +75,11 @@ export async function DELETE(
         // Verify ownership
         if ((gameData as any).ownerEmail && (gameData as any).ownerEmail !== session.user!.email) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        }
+
+        // A starter game has no rewinds (app/utils/starter-limits.ts).
+        if (isStarterGame(gameData)) {
+            return NextResponse.json({ error: STARTER_GAME_REWIND_MESSAGE }, { status: 403 });
         }
 
         const currentDay = gameData.currentDay;

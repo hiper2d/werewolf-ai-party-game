@@ -9,6 +9,10 @@ export interface TTSOptions {
   voiceProvider?: VoiceProvider;  // TTS provider (defaults to user's preference)
   gameId?: string;
   source?: SpeechSource;          // Where the line was asked for (feature-use metrics)
+  // A stored recording of exactly this line in this voice (a starter game's opening story
+  // and introductions): played instead of calling the voice model. If it cannot be
+  // fetched, the line is generated live as usual.
+  prerecordedUrl?: string;
   // Called when the <audio> element fails *during* playback (autoplay policy,
   // codec/decode failure). These fire after speakText() has already resolved, so
   // the caller's await/catch can't see them — surface them here instead.
@@ -38,6 +42,8 @@ export class TTSService {
   private currentAudioKey: string | null = null;
   private currentAudioCleanup: (() => void) | null = null;
   private readonly audioCache = new Map<string, ArrayBuffer>();
+  // Container of a cached clip when it is not the providers' WAV (a pre-recorded MP3).
+  private readonly audioMimes = new Map<string, string>();
   private readonly pendingRequests = new Map<string, Promise<ArrayBuffer>>();
   private readonly maxCacheEntries = 50;
   private playRequestId = 0;
@@ -79,8 +85,8 @@ export class TTSService {
         return false;
       }
 
-      // Both providers return WAV format
-      const mimeType = 'audio/wav';
+      // Both providers return WAV; a pre-recorded clip says what it is.
+      const mimeType = this.audioMimes.get(cacheKey) ?? 'audio/wav';
       const audioBlob = new Blob([audioBuffer], { type: mimeType });
       const audioUrl = URL.createObjectURL(audioBlob);
       const audioElement = new Audio(audioUrl);
@@ -203,6 +209,20 @@ export class TTSService {
       return this.pendingRequests.get(cacheKey)!;
     }
 
+    if (options.prerecordedUrl) {
+      try {
+        const response = await fetch(options.prerecordedUrl);
+        if (response.ok) {
+          const buffer = await response.arrayBuffer();
+          if (buffer.byteLength > 0) {
+            this.audioMimes.set(cacheKey, response.headers.get('Content-Type') || 'audio/mpeg');
+            this.addToCache(cacheKey, buffer);
+            return buffer;
+          }
+        }
+      } catch { /* fall through to the live voice */ }
+    }
+
     const voiceProvider = options.voiceProvider || getDefaultVoiceProvider();
     // The action reports failure as a value (a thrown error loses its message in
     // production); rethrow here so callers keep seeing one rejected promise.
@@ -221,6 +241,7 @@ export class TTSService {
           throw new Error(result.error);
         }
         this.pendingRequests.delete(cacheKey);
+        this.audioMimes.delete(cacheKey); // a live take is WAV
         this.addToCache(cacheKey, result.audio);
         return result.audio;
       })
@@ -238,6 +259,7 @@ export class TTSService {
       const oldestEntry = this.audioCache.keys().next().value;
       if (oldestEntry !== undefined) {
         this.audioCache.delete(oldestEntry);
+        this.audioMimes.delete(oldestEntry);
       }
     }
     this.audioCache.set(key, buffer);

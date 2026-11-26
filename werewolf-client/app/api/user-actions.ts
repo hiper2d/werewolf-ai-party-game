@@ -6,12 +6,15 @@ import {FreeTierLimits, User, UserMonthlySpending, UserTier, USER_TIERS} from "@
 import {VoiceProvider, getDefaultVoiceProvider} from "@/app/ai/voice-config";
 import {
     applyDailySpend, applySpending, deviceSpendVerdict, formatPeriod, freeSpendVerdicts,
-    globalSpendVerdict, normalizeSpendings
+    globalSpendVerdict, guestGlobalSpendVerdict, guestSpendVerdict, normalizeSpendings
 } from "@/app/utils/spending-utils";
 import {getFreeTierLimits} from "@/app/api/limits-actions";
 import {FreeSpendLimitError} from "@/app/api/errors";
 import type {SpendLimitScope} from "@/app/api/errors";
-import {readDeviceRecord, readGlobalDailySpend} from "@/app/api/spend-ledgers";
+import {readDeviceRecord, readGlobalDailySpend, readGuestDailySpend} from "@/app/api/spend-ledgers";
+import {assertNotGuest, guestTotalSpend} from "@/app/utils/guest";
+import {ensureCredits} from "@/app/api/credits";
+import {handleStem, SIGNUP_CREDIT_PENDING} from "@/app/utils/credits";
 import {firstRefusal} from "@hiper2d/ai-agents";
 import type {BudgetVerdict} from "@hiper2d/ai-agents";
 import {logger} from "@/app/utils/logger";
@@ -38,7 +41,12 @@ export async function upsertUser(user: any): Promise<boolean> {
                 tier: 'free', // Default tier for new users
                 created_at: FieldValue.serverTimestamp(),
                 last_login_timestamp: FieldValue.serverTimestamp(),
-                spendings: [...ZERO_SPENDINGS]
+                spendings: [...ZERO_SPENDINGS],
+                // Free credits (app/utils/credits.ts): a NEW account's sign-up credit is
+                // decided on its first page load, once the browser is known (ensureCredits).
+                // An account without this marker is from before credits and gets the amount.
+                signupCreditStatus: SIGNUP_CREDIT_PENDING,
+                ...(handleStem(user.email) ? { handleStem: handleStem(user.email) } : {}),
             });
             console.log(`New user created for ${user.name}`);
             return true;
@@ -126,6 +134,8 @@ export async function updateUserTier(userId: string, tier: UserTier): Promise<vo
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
+    // A guest (app/utils/guest.ts) stays on the free tier: its caps are the trial's budget.
+    assertNotGuest(userId, 'Sign in to change your tier.');
     try {
         const userRef = db.collection('users').doc(userId);
         await userRef.update({
@@ -156,6 +166,8 @@ export async function getUser(userId: string): Promise<User> {
             ...(userData?.dailySpend ? { dailySpend: userData.dailySpend } : {}),
             voiceProvider: userData?.voiceProvider || getDefaultVoiceProvider(),
             balance: userData?.balance || 0,
+            ...(typeof userData?.credits === 'number' ? { credits: userData.credits } : {}),
+            ...(userData?.madeOwnGame === true ? { madeOwnGame: true } : {}),
             stripeCustomerId: userData?.stripeCustomerId
         } as User;
     } catch (error: any) {
@@ -270,12 +282,43 @@ export async function assertFreeSpendWithinLimit(userId: string, timestamp: numb
         return;
     }
     const limits = await getFreeTierLimits();
+    // Free credits (app/utils/credits.ts): an account plays on a one-time amount, not on a
+    // daily and monthly refill. A guest keeps its own trial caps below.
+    const onCredits = !!limits.creditsOn && userData.guest !== true;
 
     // Three ceilings, cheapest read first. The per-account verdicts come free with the
     // user doc we already have; the global and device ledgers each cost one more read, so
     // they are only fetched while the account itself is still inside its own caps.
     let scope: SpendLimitScope = 'account';
-    let refused = firstRefusal(freeSpendVerdicts(userData, limits, timestamp));
+    let refused: BudgetVerdict | undefined;
+    if (onCredits) {
+        // Decided here when the first page load did not get to it (ensureCredits is idempotent).
+        const credits = typeof userData.credits === 'number' ? userData.credits : await ensureCredits(userId) ?? 0;
+        if (!(credits > 0)) {
+            const granted = Number(userData.signupCreditInfo?.amountUSD) || limits.signupCreditUSD;
+            // The window is nominal: credits do not reset.
+            refused = { allowed: false, window: 'month', limitUSD: granted, spentUSD: granted, remainingUSD: 0, resetsAt: 0 };
+            scope = 'credits';
+        }
+    } else {
+        refused = firstRefusal(freeSpendVerdicts(userData, limits, timestamp));
+    }
+
+    // A guest (app/utils/guest.ts) is held to two more ceilings, checked first: what one
+    // guest may spend in total, and what all guests together may spend in a day.
+    if (userData.guest === true) {
+        const own = guestSpendVerdict(guestTotalSpend(userData.spendings), limits, timestamp);
+        if (own && !own.allowed) {
+            refused = own;
+            scope = 'guest';
+        } else {
+            const shared = guestGlobalSpendVerdict(await readGuestDailySpend(), limits, timestamp);
+            if (shared && !shared.allowed) {
+                refused = shared;
+                scope = 'guest-global';
+            }
+        }
+    }
 
     if (!refused) {
         const verdict = globalSpendVerdict(await readGlobalDailySpend(), limits, timestamp);
@@ -285,7 +328,9 @@ export async function assertFreeSpendWithinLimit(userId: string, timestamp: numb
         }
     }
 
-    if (!refused) {
+    // The per-browser daily budget shared the daily cap between accounts on one browser.
+    // Under credits each account has its own one-time amount, so it does not apply.
+    if (!refused && !onCredits) {
         // Metered on the device the user was last seen from, stamped by registerDevice.
         // Absent for a browser that blocks both cookies and localStorage, in which case
         // the per-account and global caps stand alone rather than refusing a real user.
@@ -319,7 +364,8 @@ export async function assertFreeSpendWithinLimit(userId: string, timestamp: numb
     // the app logger (not console) so it reaches Better Stack: a refusal with a device scope
     // is the strongest multi-account signal there is, and Marlow's log watch reads it from
     // there. Until 2026-10-23 this was console.warn and lived only in Vercel's 5-minute tail.
-    logger.warn(`FREE_SPEND_LIMIT: refused ${userId} — ${scope} ${refused.window} cap $${refused.limitUSD} reached ($${refused.spentUSD} spent, hit #${counted.limitHits}, resets ${new Date(refused.resetsAt).toISOString()})`, {
+    const what = scope === 'credits' ? 'free credits used up' : `${scope} ${refused.window} cap $${refused.limitUSD} reached`;
+    logger.warn(`FREE_SPEND_LIMIT: refused ${userId} — ${what} ($${refused.spentUSD} spent, hit #${counted.limitHits}, resets ${new Date(refused.resetsAt).toISOString()})`, {
         userEmail: userId,
         scope,
         window: refused.window,

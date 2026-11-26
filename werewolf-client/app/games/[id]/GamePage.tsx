@@ -1,6 +1,8 @@
 'use client';
 
 import { providerDisplayName } from "@/app/api/provider-blocks";
+import { isGuestEmail } from "@/app/utils/guest";
+import { useLoginDialog } from "@/app/providers/LoginDialogProvider";
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getGame, updateBotModel, updateGameMasterModel, updateCharacterVoice, clearGameErrorState, setGameErrorState, afterGameDiscussion, retryWithModelOverride, reassignProviderModels } from "@/app/api/game-actions";
 import { isHiddenRoleRetry } from "@/app/api/retry-model";
@@ -31,6 +33,8 @@ import { DiscordIcon } from "@/app/components/ui-icons";
 import { DISCORD_URL } from "@/app/config/external-links";
 import { checkGameEndConditions } from "@/app/utils/game-utils";
 import { isTierMismatchError } from '@/app/api/errors';
+import { starterIntroKey } from '@/app/utils/starter-games';
+import Link from 'next/link';
 import { UIControlsProvider, useUIControls } from './context/UIControlsContext';
 import React from 'react';
 
@@ -101,8 +105,27 @@ function GamePageContent({
     // Introduce the player to their secret role the first time a freshly
     // created game (still in WELCOME) is opened. Dismissal is remembered per
     // game in localStorage; storage failures (private mode) just skip the card.
+    // A starter game is created past WELCOME (its introductions come with the
+    // template), so there the card shows on the first open of day 1 instead.
+    const isFreshStarterGame = !!initialGame.starterTemplateId
+        && initialGame.currentDay === 1
+        && initialGame.gameState === GAME_STATES.DAY_DISCUSSION;
+    // Set when the role card of a fresh starter game is closed: the chat then
+    // opens cinematic mode on the opening story with voices on (see GameChat).
+    const [playStarterIntro, setPlayStarterIntro] = useState(false);
     useEffect(() => {
-        if (initialGame.gameState !== GAME_STATES.WELCOME) return;
+        if (initialGame.gameState !== GAME_STATES.WELCOME && !isFreshStarterGame) return;
+        // A starter game dealt a moment ago: the player read this card on the start
+        // screen while the game was created (StarterGames), so open on the story.
+        if (isFreshStarterGame) {
+            try {
+                if (sessionStorage.getItem(starterIntroKey(initialGame.id))) {
+                    sessionStorage.removeItem(starterIntroKey(initialGame.id));
+                    setPlayStarterIntro(true);
+                    return;
+                }
+            } catch { /* storage unavailable: the card shows here instead */ }
+        }
         try {
             if (!localStorage.getItem(`roleCardSeen:${initialGame.id}`)) setRoleCardFor({ role: initialGame.humanPlayerRole, own: true });
         } catch { /* storage unavailable — skip the card */ }
@@ -110,6 +133,7 @@ function GamePageContent({
     }, []);
 
     const closeRoleCard = () => {
+        if (roleCardFor?.own && isFreshStarterGame) setPlayStarterIntro(true);
         setRoleCardFor(null);
         try { localStorage.setItem(`roleCardSeen:${game.id}`, '1'); } catch { /* ignore */ }
     };
@@ -170,7 +194,13 @@ function GamePageContent({
     const redrawsLeft = isPaidGame
         ? Infinity
         : Math.max(0, FREE_TIER_AVATAR_REGENS - (game.avatarRegenCount ?? 0));
-    const canRedraw = isOwner && game.avatarsStatus === 'ready';
+    // A starter game (app/utils/starter-limits.ts) keeps its pre-drawn portraits, has no
+    // rewinds and offers only the cheapest model group; the server enforces all three.
+    const isStarterGame = !!game.starterTemplateId;
+    // A visitor playing without an account (app/utils/guest.ts).
+    const isGuestPlayer = isGuestEmail(session?.user?.email);
+    const {openLoginDialog} = useLoginDialog();
+    const canRedraw = isOwner && game.avatarsStatus === 'ready' && !isStarterGame;
     const redrawPortraits = async () => {
         if (redrawing || redrawsLeft <= 0) return;
         setRedrawing(true);
@@ -989,6 +1019,17 @@ function GamePageContent({
                 Exit Game
             </button>
         );
+        // The game is over: the next game is one click away, next to Exit. A ready-made
+        // story leads to the other stories first; a guest has no next game without an account.
+        const gameOverActions = isGuestPlayer ? exitButton : (
+            <>
+                {exitButton}
+                {isStarterGame && <Link href="/games/start" className={btnFlowSecondary}>Another story</Link>}
+                <Link href="/games/newgame" className={btnFlowPrimary} style={btnFlowPrimaryStyle}>
+                    {isStarterGame ? 'Create your own game' : 'New game'}
+                </Link>
+            </>
+        );
         const gameOverButton = (
             <button
                 className={btnFlowDanger}
@@ -1008,11 +1049,11 @@ function GamePageContent({
 
         if (game.gameState === GAME_STATES.AFTER_GAME_DISCUSSION) {
             if (game.gameStateProcessQueue.length > 0 || isKeepGoingLoading) return null;
-            return { tone: 'danger', label: 'Game over · discussion', actions: exitButton };
+            return { tone: 'danger', label: 'Game over · discussion', actions: gameOverActions };
         }
 
         if (isGameOver) {
-            return { tone: 'danger', label: 'Game over', actions: exitButton };
+            return { tone: 'danger', label: 'Game over', actions: gameOverActions };
         }
 
         if (game.gameState === GAME_STATES.VOTE_RESULTS) {
@@ -1044,11 +1085,11 @@ function GamePageContent({
             return {
                 tone: showNightGameOverCTA ? 'danger' : 'good',
                 label: 'Night complete',
-                note: showNightGameOverCTA ? pendingGameOverReason : undefined,
+                note: showNightGameOverCTA ? pendingGameOverReason : isGuestPlayer ? 'Your free game ends here. Sign in to keep playing: your game is saved.' : undefined,
                 actions: (
                     <>
                         {/* A replay re-runs the whole night (all paid LLM calls), so it is paid-tier only. */}
-                        {isPaidGame && (
+                        {isPaidGame && !isStarterGame && (
                             <button
                                 className={btnFlowSecondary}
                                 disabled={!areControlsEnabled}
@@ -1066,7 +1107,19 @@ function GamePageContent({
                                 Replay Night
                             </button>
                         )}
-                        {showNightGameOverCTA ? gameOverButton : (
+                        {showNightGameOverCTA ? gameOverButton : isGuestPlayer ? (
+                            // A guest's game stops at the morning of day 2 (app/utils/guest.ts):
+                            // signing in moves it to the account and comes back to this page.
+                            <button
+                                className={btnFlowPrimary}
+                                style={btnFlowPrimaryStyle}
+                                onClick={() => openLoginDialog(`/games/${game.id}`)}
+                                title="Your game is saved. Sign in to play day 2: it is free."
+                            >
+                                <SunriseIcon />
+                                Sign in to play Day 2
+                            </button>
+                        ) : (
                             <button
                                 className={btnFlowPrimary}
                                 style={btnFlowPrimaryStyle}
@@ -1503,6 +1556,7 @@ function GamePageContent({
                     isOwner={isOwner}
                     onGameChange={patch => setGame(prev => ({ ...prev, ...patch }))}
                     onUpdateVoice={updateCharacterVoice}
+                    playIntro={playStarterIntro}
                     runGameAction={runGameAction}
                     onGameStateChange={applyActionResult}
                     pendingMessages={pendingMessages}
@@ -1620,6 +1674,7 @@ function GamePageContent({
                 botName={selectedBot?.name || ''}
                 gameTier={game.createdWithTier}
                 usageCounts={modelUsageCounts}
+                starterGame={isStarterGame}
             />
 
             {/* Bot Selection Dialog */}

@@ -2,7 +2,7 @@ import { applyDailySpend, deviceSpendVerdict, freeSpendVerdicts, getFreeDailySpe
 
 // 2026-09-11T15:30Z
 const T = Date.UTC(2026, 8, 11, 15, 30, 0);
-const LIMITS = { gamesPerDay: 5, dailySpendUSD: 5, monthlySpendUSD: 20, globalDailySpendUSD: 40, deviceDailySpendUSD: 5 };
+const LIMITS = { gamesPerDay: 5, dailySpendUSD: 5, monthlySpendUSD: 20, globalDailySpendUSD: 40, deviceDailySpendUSD: 5, guestSpendUSD: 1, guestGlobalDailySpendUSD: 5, guestOncePerDevice: 1, creditsOn: 1, signupCreditUSD: 5, discordCreditUSD: 5 };
 
 describe('formatPeriod', () => {
     it('is the UTC YYYY-MM key', () => {

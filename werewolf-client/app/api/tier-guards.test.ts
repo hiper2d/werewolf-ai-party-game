@@ -43,6 +43,18 @@ describe('ensureUserCanAccessGame', () => {
         });
     });
 
+    // A player whose free credits ran out tops up (the account moves to Paid) and must be
+    // able to go on with the game they were in.
+    it('allows a paid user into a free game', async () => {
+        setupGameDoc({ createdWithTier: 'free', ownerEmail: USER });
+        mockGetUserTier.mockResolvedValue('paid');
+
+        await expect(ensureUserCanAccessGame('game-1', USER)).resolves.toEqual({
+            gameTier: 'free',
+            userTier: 'paid',
+        });
+    });
+
     it('throws TierMismatchError when a free user opens a paid game', async () => {
         setupGameDoc({ createdWithTier: 'paid', ownerEmail: USER });
         mockGetUserTier.mockResolvedValue('free');

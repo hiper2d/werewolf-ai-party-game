@@ -25,6 +25,7 @@
  */
 
 import { AgentLoggingConfig, ApiKeyMap } from "@/app/api/game-models";
+import { isGuestEmail } from "@/app/utils/guest";
 import { askJev, getJevApiKey, JEV_API_KEY_NAME, JEV_MODEL, JevNoulQuestion, JevResult, JevScoreQuestion } from "@/app/ai/jev-client";
 import { askOpenAiDecisions, OPENAI_DECISIONS_API_KEY_NAME, OPENAI_DECISIONS_MODEL } from "@/app/ai/openai-decisions-client";
 import { recordScreenSpend } from "@/app/api/cost-tracking";
@@ -331,10 +332,13 @@ export async function screenHumanInput(input: ScreenInput): Promise<ScreenOutcom
     if (judges.length === 0) {
         return { verdict: 'skipped', reason: null, mode: 'off', blocked: false, imageUnsafe: false };
     }
-    const mode = await getJevScreenMode();
-    if (mode === 'off') {
-        return { verdict: 'skipped', reason: null, mode, blocked: false, imageUnsafe: false };
+    const configuredMode = await getJevScreenMode();
+    if (configuredMode === 'off') {
+        return { verdict: 'skipped', reason: null, mode: configuredMode, blocked: false, imageUnsafe: false };
     }
+    // A guest (app/utils/guest.ts) is always screened in enforce mode: an anonymous visitor
+    // costs nothing to be, so they are the one who would use the platform keys to probe.
+    const mode: JevScreenMode = isGuestEmail(input.userEmail) ? 'enforce' : configuredMode;
     const text = input.text.trim();
     if (!text) {
         return { verdict: 'skipped', reason: null, mode, blocked: false, imageUnsafe: false };

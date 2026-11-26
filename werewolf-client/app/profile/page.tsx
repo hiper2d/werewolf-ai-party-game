@@ -9,10 +9,13 @@ import { formatLimitUSD } from '@/app/api/errors';
 import { getFreeTierModels } from '@/app/ai/ai-models';
 import LocalTime from './components/LocalTime';
 import { auth } from '@/auth';
+import { isGuestEmail } from '@/app/utils/guest';
 import { GoogleIcon, GithubIcon } from '@/app/components/ui-icons';
 import ProfileTierCards from './components/ProfileTierCards';
 import BalanceTopUp from './components/BalanceTopUp';
 import { getCheckoutStatus, CheckoutStatus } from '@/app/api/stripe-actions';
+import { getCreditStatus, getDiscordClaimCode, CreditStatus } from '@/app/api/credit-actions';
+import DiscordCredits from '@/app/components/DiscordCredits';
 
 interface PageProps {
     searchParams: Promise<{ payment?: string; session_id?: string }>;
@@ -50,6 +53,10 @@ export default async function UserProfilePage({ searchParams }: PageProps) {
 
     const params = await searchParams;
     const email = session.user?.email!;
+    // A guest (app/utils/guest.ts) has no profile yet: signing in makes one.
+    if (isGuestEmail(email)) {
+        redirect('/?login=true&callbackUrl=%2Fprofile');
+    }
     const checkoutStatus: CheckoutStatus | null = params.payment === 'success'
         ? (params.session_id ? await getCheckoutStatus(params.session_id) : { status: 'unknown' })
         : null;
@@ -106,6 +113,28 @@ export default async function UserProfilePage({ searchParams }: PageProps) {
             gamesToday = 0;
         }
     }
+    // Free credits (app/utils/credits.ts): what is left of the one-time amount, and the
+    // personal code for the one-time Discord claim. A failed read hides the tiles' numbers,
+    // never the page.
+    let credit: CreditStatus | null = null;
+    let claimCode: string | null = null;
+    try {
+        credit = await getCreditStatus();
+        if (credit?.on) {
+            limits = await getFreeTierLimits();
+            if (!credit.discordClaimed) {
+                claimCode = await getDiscordClaimCode();
+            }
+        }
+    } catch (error) {
+        console.error('Error fetching credit status:', error);
+    }
+    const onCredits = !!credit?.on;
+    const creditsLeft = credit?.credits ?? 0;
+    // What the account was ever given, so the bar has a full length.
+    const creditsGiven = Math.max(creditsLeft, (credit?.signupUSD ?? 0) + (credit?.discordClaimed ? credit.discordUSD : 0));
+    const creditsLow = creditsLeft < Math.max(0.5, creditsGiven * 0.2);
+
     const gamesPerDay = limits.gamesPerDay;
     const gamesLeft = Math.max(0, gamesPerDay - gamesToday);
     const meter = (spent: number, limit: number) => {
@@ -215,7 +244,7 @@ export default async function UserProfilePage({ searchParams }: PageProps) {
             <section className="mt-11">
                 <div className="flex items-baseline justify-between gap-4 mb-[18px] flex-wrap">
                     <h2 className="m-0 font-mono text-[13px] font-semibold tracking-[0.08em] uppercase text-[var(--fg-2)]">
-                        {isPaid ? 'Balance & usage' : 'Your free allowance'}
+                        {isPaid ? 'Balance & usage' : onCredits ? 'Your free credits' : 'Your free allowance'}
                     </h2>
                 </div>
 
@@ -225,6 +254,9 @@ export default async function UserProfilePage({ searchParams }: PageProps) {
                             <div className={statLabel}><span>Balance</span><span className={miniBadgeGood}>Active</span></div>
                             <div className={statValue}>{formatCurrency(balance)}</div>
                             <div className={statSub}>Every action is billed at <b>cost + 15%</b> and deducted here. Games start while the balance stays above zero.</div>
+                            {onCredits && creditsLeft > 0 && (
+                                <div className={statSub}>You also have <b>{formatCurrency(creditsLeft)}</b> of free credits. They are used when you play on the Free tier.</div>
+                            )}
                             <div className="mt-0.5">
                                 <a href="#add-balance" className="inline-flex items-center justify-center w-full font-semibold text-[13px] px-4 py-2.5 rounded-[var(--radius-md)] bg-[var(--accent)] text-[var(--accent-fg)] border border-transparent shadow-[var(--shadow-1)] hover:bg-[var(--accent-strong)] transition-all duration-[120ms]">
                                     Top up balance
@@ -240,6 +272,36 @@ export default async function UserProfilePage({ searchParams }: PageProps) {
                             <div className={statLabel}><span>Models</span></div>
                             <div className={statValue}>Full<span className={statUnit}>catalog</span></div>
                             <div className={statSub}>Every model unlocked with <b>no per-game caps</b>. Voices billed to balance.</div>
+                        </div>
+                    </div>
+                ) : onCredits ? (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+                        <div className={statCard}>
+                            <div className={statLabel}><span>Free credits</span><span className={creditsLeft <= 0 ? miniBadgeWarn : creditsLow ? miniBadgeWarn : miniBadgeGood}>{creditsLeft <= 0 ? 'Used up' : creditsLow ? 'Running low' : 'No charge'}</span></div>
+                            <div className={statValue}>{formatCurrency(creditsLeft)}<span className={statUnit}>left</span></div>
+                            <div className="h-[7px] rounded-full bg-[var(--bg-3)] overflow-hidden border border-[var(--line-1)]">
+                                <div className={`h-full rounded-full ${creditsLow ? 'bg-[var(--warn-fg)]' : 'bg-[var(--accent)]'}`} style={{ width: `${creditsGiven > 0 ? Math.min(100, (creditsLeft / creditsGiven) * 100) : 0}%` }} />
+                            </div>
+                            <div className={statSub}>
+                                {credit?.signupDenied
+                                    ? <>This device already had an account that got the sign-up credits, so this one started without them. The Discord credits are still yours to claim.</>
+                                    : <>A one-time amount of AI on us. Turns, previews, portraits, illustrations and voices all count. <b>It does not refill</b>.</>}
+                            </div>
+                            <div className={statSub}>Games today <b>{gamesToday} / {gamesPerDay}</b> · {gamesLeft} left</div>
+                        </div>
+                        <div className={statCard}>
+                            <div className={statLabel}><span>More free credits</span></div>
+                            <DiscordCredits code={claimCode} amountUSD={credit?.discordUSD ?? 0} claimed={!!credit?.discordClaimed} />
+                        </div>
+                        <div className={statCard}>
+                            <div className={statLabel}><span>Models available</span></div>
+                            <div className={statValue}>{freeModelCount}<span className={statUnit}>on Free</span></div>
+                            <div className={statSub}>A price-banded subset, each with a per-game bot cap. A top-up opens the full catalog.</div>
+                            <div className="mt-0.5">
+                                <a href="#add-balance" className="inline-flex items-center justify-center w-full font-semibold text-[13px] px-4 py-2.5 rounded-[var(--radius-md)] bg-transparent text-[var(--fg-0)] border border-[var(--line-2)] hover:bg-[var(--bg-2)] transition-all duration-[120ms]">
+                                    Add funds
+                                </a>
+                            </div>
                         </div>
                     </div>
                 ) : (
@@ -273,7 +335,7 @@ export default async function UserProfilePage({ searchParams }: PageProps) {
             </section>
 
             {/* Add balance (paid) — preserves the Stripe top-up flow */}
-            {isPaid && (
+            {(isPaid || onCredits) && (
                 <section id="add-balance" className="mt-11 scroll-mt-20">
                     <div className="flex items-baseline justify-between gap-4 mb-[18px] flex-wrap">
                         <h2 className="m-0 font-mono text-[13px] font-semibold tracking-[0.08em] uppercase text-[var(--fg-2)]">Add balance</h2>
@@ -281,6 +343,7 @@ export default async function UserProfilePage({ searchParams }: PageProps) {
                     <div className="border border-[var(--line-1)] rounded-[var(--radius-xl)] bg-[var(--bg-1)] p-6 sm:p-7">
                         <p className="m-0 mb-4 text-[13.5px] text-[var(--fg-2)] leading-[1.55]">
                             Top up your prepaid balance. Each AI call is billed at the model&apos;s base price + 15% (covers hosting and beer for devs).
+                            {!isPaid && <> A top-up moves your account to the Paid tier: every model opens, and the games you have going continue.</>}
                         </p>
                         <BalanceTopUp />
                     </div>

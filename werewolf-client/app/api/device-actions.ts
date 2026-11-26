@@ -1,11 +1,12 @@
 'use server';
 
-import {randomUUID} from "crypto";
+import {createHash, randomUUID} from "crypto";
 import {cookies, headers} from "next/headers";
 import {FieldValue} from "firebase-admin/firestore";
 import {db} from "@/firebase/server";
 import {appendCapped, appendSighting, canonicalDeviceId, pickLinkedDevice} from "@/app/utils/device-utils";
 import {logger} from "@/app/utils/logger";
+import {fullSignalKey, isWeakSignalVector, machineSignalKey, mergeFingerprint, sanitizeBrowserSignals, StoredFingerprint} from "@/app/utils/browser-signals";
 
 /**
  * Browser identity: one id per browser profile, used to meter free-tier spend per DEVICE
@@ -46,12 +47,21 @@ const DEVICE_COOKIE_MAX_AGE = 60 * 60 * 24 * 730; // 2 years
 // non-function export silently voids every export in the file at build time.
 const DEVICES = 'devices';
 const IPS = 'ips';
+const FINGERPRINTS = 'fingerprints';
 
 /** Keep the clustering arrays bounded; a farm is visible in a handful of entries. */
 const DEVICE_USER_CAP = 20;
 const DEVICE_IP_CAP = 10;
 const IP_DEVICE_CAP = 10;
 const DEVICE_LINK_CAP = 10;
+/** Distinct signal vectors kept per device: a browser update must not erase the history. */
+const DEVICE_FINGERPRINT_CAP = 5;
+/** Devices listed per machine fingerprint. */
+const FINGERPRINT_DEVICE_CAP = 20;
+
+function sha256(text: string): string {
+    return createHash('sha256').update(text).digest('hex');
+}
 
 /** Firestore document ids may not contain '/'; IPv4 and IPv6 are otherwise safe as ids. */
 function ipDocId(ip: string): string {
@@ -173,7 +183,7 @@ export async function getRequestDeviceId(): Promise<string | undefined> {
  * Best effort throughout: this must never break a page load, so every failure returns an
  * id (or undefined) rather than throwing.
  */
-export async function registerDevice(clientDeviceId?: string, userEmail?: string): Promise<string | undefined> {
+export async function registerDevice(clientDeviceId?: string, userEmail?: string, browserSignals?: unknown): Promise<string | undefined> {
     let deviceId: string;
     // Set only when this request inherited an id through the IP rule, so the link is
     // recorded once, at the moment it was made.
@@ -213,7 +223,7 @@ export async function registerDevice(clientDeviceId?: string, userEmail?: string
     // Record-keeping is best effort and deliberately after the cookie is set: a Firestore
     // hiccup must not cost us the id itself.
     try {
-        await touchDevice(deviceId, userEmail, linkedFromIp);
+        await touchDevice(deviceId, userEmail, linkedFromIp, browserSignals);
     } catch (error: any) {
         console.error(`registerDevice: could not record device ${deviceId}: ${error?.message ?? error}`);
     }
@@ -229,7 +239,7 @@ export async function registerDevice(clientDeviceId?: string, userEmail?: string
  * family or library machine would accumulate an unbounded array on a hot document; the
  * pattern a farm makes is visible in a handful of entries anyway.
  */
-async function touchDevice(deviceId: string, userEmail?: string, linkedFromIp?: string): Promise<void> {
+async function touchDevice(deviceId: string, userEmail?: string, linkedFromIp?: string, browserSignals?: unknown): Promise<void> {
     if (!db) {
         return;
     }
@@ -263,7 +273,38 @@ async function touchDevice(deviceId: string, userEmail?: string, linkedFromIp?: 
         const links = Array.isArray(existing.ipLinks) ? existing.ipLinks : [];
         update.ipLinks = [...links, { via: 'ip', ip: linkedFromIp, ...(userEmail ? { userEmail } : {}), at: now }].slice(-DEVICE_LINK_CAP);
     }
+    // Browser signals (browser-signals.ts), MONITOR ONLY: stored here and indexed by machine
+    // below; nothing is linked or refused on them yet. Client-supplied, so sanitized first.
+    const signals = sanitizeBrowserSignals(browserSignals);
+    let fingerprint: StoredFingerprint | undefined;
+    if (signals) {
+        fingerprint = {
+            hash: sha256(fullSignalKey(signals)),
+            machineHash: sha256(machineSignalKey(signals)),
+            signals,
+            ...(geo.city ? { geoCity: geo.city } : {}),
+            ...(geo.timezone ? { ipTimezone: geo.timezone } : {}),
+            firstSeenAt: now,
+            seenAt: now,
+        };
+        update.fingerprints = mergeFingerprint(existing.fingerprints, fingerprint, DEVICE_FINGERPRINT_CAP);
+    }
     await ref.set(update, {merge: true});
+
+    // The machine's own record of the devices seen with it: what a keyless browser would be
+    // matched against, and what the analysis reads to see how often two cookie ids share a
+    // machine. Vectors too thin to tell machines apart are not indexed.
+    if (fingerprint && signals && !isWeakSignalVector(signals)) {
+        const fpRef = db.collection(FINGERPRINTS).doc(fingerprint.machineHash);
+        const fpSnap = await fpRef.get();
+        await fpRef.set({
+            machineHash: fingerprint.machineHash,
+            signals,
+            ...(fpSnap.exists ? {} : { createdAt: FieldValue.serverTimestamp() }),
+            lastSeenAt: FieldValue.serverTimestamp(),
+            devices: appendSighting(fpSnap.data()?.devices, { deviceId, at: now, ...(geo.city ? { city: geo.city } : {}) }, FINGERPRINT_DEVICE_CAP),
+        }, {merge: true});
+    }
 
     // The IP's own record of devices, which is what a keyless browser inherits from.
     if (ip) {

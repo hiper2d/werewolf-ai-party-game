@@ -8,6 +8,8 @@ import {FREE_TIER_LIMITS, FreeTierLimits} from "@/app/api/game-models";
  *
  *   { freeDailySpendUSD: 5, freeMonthlySpendUSD: 20, freeGamesPerDay: 5,
  *     freeGlobalDailySpendUSD: 40, freeDeviceDailySpendUSD: 5,
+ *     guestSpendUSD: 1, guestGlobalDailySpendUSD: 5, guestOncePerDevice: 1,
+ *     creditsOn: 1, signupCreditUSD: 5, discordCreditUSD: 5,
  *     jevScreenMode: 'monitor' }
  *
  * `jevScreenMode` is the switch of the Jev content screen (app/api/jev-screen.ts):
@@ -31,6 +33,12 @@ export const DEFAULT_FREE_TIER_LIMITS: FreeTierLimits = {
     monthlySpendUSD: FREE_TIER_LIMITS.MONTHLY_SPEND_USD,
     globalDailySpendUSD: FREE_TIER_LIMITS.GLOBAL_DAILY_SPEND_USD,
     deviceDailySpendUSD: FREE_TIER_LIMITS.DEVICE_DAILY_SPEND_USD,
+    guestSpendUSD: FREE_TIER_LIMITS.GUEST_SPEND_USD,
+    guestGlobalDailySpendUSD: FREE_TIER_LIMITS.GUEST_GLOBAL_DAILY_SPEND_USD,
+    guestOncePerDevice: FREE_TIER_LIMITS.GUEST_ONCE_PER_DEVICE,
+    creditsOn: FREE_TIER_LIMITS.CREDITS_ON,
+    signupCreditUSD: FREE_TIER_LIMITS.SIGNUP_CREDIT_USD,
+    discordCreditUSD: FREE_TIER_LIMITS.DISCORD_CREDIT_USD,
 };
 
 export type JevScreenMode = 'off' | 'monitor' | 'enforce';
@@ -54,6 +62,12 @@ export function limitsFromConfig(data: Record<string, any> | undefined | null): 
         monthlySpendUSD: numberOr(data?.freeMonthlySpendUSD, DEFAULT_FREE_TIER_LIMITS.monthlySpendUSD),
         globalDailySpendUSD: numberOr(data?.freeGlobalDailySpendUSD, DEFAULT_FREE_TIER_LIMITS.globalDailySpendUSD),
         deviceDailySpendUSD: numberOr(data?.freeDeviceDailySpendUSD, DEFAULT_FREE_TIER_LIMITS.deviceDailySpendUSD),
+        guestSpendUSD: numberOr(data?.guestSpendUSD, DEFAULT_FREE_TIER_LIMITS.guestSpendUSD),
+        guestGlobalDailySpendUSD: numberOr(data?.guestGlobalDailySpendUSD, DEFAULT_FREE_TIER_LIMITS.guestGlobalDailySpendUSD),
+        guestOncePerDevice: numberOr(data?.guestOncePerDevice, DEFAULT_FREE_TIER_LIMITS.guestOncePerDevice),
+        creditsOn: numberOr(data?.creditsOn, DEFAULT_FREE_TIER_LIMITS.creditsOn),
+        signupCreditUSD: numberOr(data?.signupCreditUSD, DEFAULT_FREE_TIER_LIMITS.signupCreditUSD),
+        discordCreditUSD: numberOr(data?.discordCreditUSD, DEFAULT_FREE_TIER_LIMITS.discordCreditUSD),
     };
 }
 

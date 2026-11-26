@@ -3,6 +3,7 @@ import { getGame } from "@/app/api/game-actions";
 import GamePage from "./GamePage";
 import { auth } from "@/auth";
 import { getUserTier } from "@/app/api/user-actions";
+import { canOpenGameOnTier } from "@/app/utils/tier-access";
 
 export async function generateMetadata(props: any) {
     const params = await props.params;
@@ -43,7 +44,7 @@ export default async function Page(props: any) {
     }
 
     const userTier = await getUserTier(session.user.email);
-    if (game.createdWithTier !== userTier) {
+    if (!canOpenGameOnTier(game.createdWithTier, userTier)) {
         const searchParams = new URLSearchParams({
             error: 'tier_mismatch',
             blocked: params.id,
