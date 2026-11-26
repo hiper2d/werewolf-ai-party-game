@@ -6,7 +6,9 @@ import {useSession} from 'next-auth/react';
 import {useLoginDialog} from '@/app/providers/LoginDialogProvider';
 import {GUEST_DEVICE_LIMIT_MESSAGE} from '@/app/utils/guest';
 import {createStarterGame} from '@/app/api/starter-game-actions';
-import type {StarterCard} from '@/app/utils/starter-games';
+import {starterIntroKey, starterTableLine, type StarterCard} from '@/app/utils/starter-games';
+import RoleCard from '@/app/games/[id]/components/RoleCard';
+import {GAME_ROLES} from '@/app/api/game-models';
 import {INPUT_LIMITS} from '@/app/utils/input-limits';
 import {validatePlayerName} from '@/app/utils/name-utils';
 import {DEFAULT_GAME_LANGUAGE, GAME_LANGUAGES} from '@/app/ai/game-language';
@@ -28,6 +30,11 @@ export default function StarterGames({cards, defaultName, guest = false}: {cards
     const [name, setName] = useState(defaultName);
     const [startingId, setStartingId] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    // A NEW game takes a few seconds to deal. The player spends them on the card they
+    // would read first anyway: their role (always a villager in a starter game) over the
+    // story's picture. `gameId` arrives when the game exists; `begun` is the button pressed
+    // before that, in which case the game opens the moment it is ready.
+    const [intro, setIntro] = useState<{templateId: string; gameId?: string; begun?: boolean} | null>(null);
 
     // The languages the stories can be played in (a story without a translation is dealt
     // in its own language: the server decides). The picker shows only with a real choice.
@@ -58,6 +65,7 @@ export default function StarterGames({cards, defaultName, guest = false}: {cards
         const onPageShow = (event: PageTransitionEvent) => {
             if (event.persisted) {
                 setStartingId(null);
+                setIntro(null);
                 router.refresh();
             }
         };
@@ -79,23 +87,48 @@ export default function StarterGames({cards, defaultName, guest = false}: {cards
         }
         setError(null);
         setStartingId(templateId);
+        if (!resuming) setIntro({templateId});
         try {
             const result = await createStarterGame(templateId, name, {forceNew, language});
             if (result.ok) {
                 // A visitor became a guest inside that call: tell the session hooks (navbar,
                 // device record) before the game page opens. Best effort.
                 if (guest) await refreshSession().catch(() => null);
-                router.push(`/games/${result.gameId}`);
-                return; // keep the button busy until the game page takes over
+                if (resuming || result.existing) {
+                    // An old game (also when a stale card said Play): no card, just open it.
+                    setIntro(null);
+                    router.push(`/games/${result.gameId}`);
+                } else {
+                    router.prefetch(`/games/${result.gameId}`);
+                    setIntro(current => current ? {...current, gameId: result.gameId} : current);
+                }
+                return; // keep the buttons busy until the game page takes over
             }
+            setIntro(null);
             setError(result.error);
             // A known device is asked to sign in, not offered another free game.
             if (result.error === GUEST_DEVICE_LIMIT_MESSAGE) openLoginDialog('/games');
         } catch {
+            setIntro(null);
             setError('Could not start the game. Please try again.');
         }
         setStartingId(null);
     };
+
+    // The role card's button. The game page is told the card has been read, so it opens
+    // straight on the story (GamePage reads both keys). Storage failures only mean the
+    // game shows its own card once more.
+    const introGameId = intro?.gameId;
+    const introBegun = intro?.begun === true;
+    useEffect(() => {
+        if (!introGameId || !introBegun) return;
+        try {
+            localStorage.setItem(`roleCardSeen:${introGameId}`, '1');
+            sessionStorage.setItem(starterIntroKey(introGameId), '1');
+        } catch { /* private mode */ }
+        router.push(`/games/${introGameId}`);
+    }, [introGameId, introBegun, router]);
+    const introCard = intro ? cards.find(card => card.id === intro.templateId) : undefined;
 
     return (
         <div className="w-full">
@@ -131,7 +164,20 @@ export default function StarterGames({cards, defaultName, guest = false}: {cards
                 </div>
             )}
 
-            {startingId && (
+            {intro && introCard && (
+                <RoleCard
+                    role={GAME_ROLES.VILLAGER}
+                    own
+                    locked
+                    backdropSrc={`/api/starter-games/${introCard.id}/scene`}
+                    note={<>{introCard.title}. {starterTableLine(introCard.playerCount, introCard.werewolfCount, introCard.specialRoles)}</>}
+                    actionLabel={!intro.begun ? 'Begin' : intro.gameId ? 'Opening…' : 'Setting the table…'}
+                    actionDisabled={intro.begun === true}
+                    onClose={() => setIntro(current => current ? {...current, begun: true} : current)}
+                />
+            )}
+
+            {startingId && !intro && (
                 <div role="status" className="mb-4 px-4 py-3 text-[13px] text-[var(--fg-1)] border border-[var(--line-2)] bg-[var(--bg-1)] rounded-[var(--radius-lg)]">
                     Setting the table… your game opens in a moment.
                 </div>

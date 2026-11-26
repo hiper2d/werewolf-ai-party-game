@@ -11,6 +11,14 @@ interface RoleCardProps {
     // Overrides the /roles/<role>.jpg static asset. Only for rendering outside
     // the app (the design kit, previews) where that path can't resolve.
     imageSrc?: string;
+    // The start screen shows this card WHILE a starter game is being created
+    // (app/games/components/StarterGames.tsx): over the story's picture, with a
+    // line about the table, and with a button that is the only way on.
+    backdropSrc?: string; // a full-screen picture behind the card
+    note?: React.ReactNode; // a line above the rules text
+    actionLabel?: string; // the button's text ("Got it" by default)
+    actionDisabled?: boolean;
+    locked?: boolean; // no X, and Escape / a click outside do nothing
 }
 
 // GAME_ROLES values → the written rules entry on /rules (same wording, one source).
@@ -28,12 +36,13 @@ const ROLE_DETAIL_BY_ROLE: Record<string, RoleDetail | undefined> = {
  * Shown once when a freshly created game is opened (see GamePage).
  * @category Game
  */
-export default function RoleCard({ role, own = false, onClose, imageSrc }: RoleCardProps) {
+export default function RoleCard({ role, own = false, onClose, imageSrc, backdropSrc, note, actionLabel, actionDisabled = false, locked = false }: RoleCardProps) {
     useEffect(() => {
+        if (locked) return;
         const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
         document.addEventListener('keydown', onKey);
         return () => document.removeEventListener('keydown', onKey);
-    }, [onClose]);
+    }, [onClose, locked]);
 
     const detail = ROLE_DETAIL_BY_ROLE[role];
     if (!detail) return null;
@@ -47,11 +56,18 @@ export default function RoleCard({ role, own = false, onClose, imageSrc }: RoleC
 
     return (
         <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay)] backdrop-blur-[2px]"
-            onClick={onClose}
+            className={`fixed inset-0 z-50 flex items-center justify-center ${backdropSrc ? 'bg-black' : 'bg-[var(--overlay)] backdrop-blur-[2px]'}`}
+            onClick={locked ? undefined : onClose}
         >
+            {backdropSrc && (
+                <>
+                    {/* eslint-disable-next-line @next/next/no-img-element -- already in the browser's cache from the story card */}
+                    <img src={backdropSrc} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-black/55" />
+                </>
+            )}
             <div
-                className="w-[340px] max-w-[calc(100vw-32px)] max-h-[calc(100vh-32px)] overflow-y-auto rounded-2xl bg-[var(--bg-1)] border border-[var(--line-2)] shadow-2xl"
+                className="relative w-[340px] max-w-[calc(100vw-32px)] max-h-[calc(100vh-32px)] overflow-y-auto rounded-2xl bg-[var(--bg-1)] border border-[var(--line-2)] shadow-2xl"
                 onClick={e => e.stopPropagation()}
             >
                 <div className="relative">
@@ -62,7 +78,7 @@ export default function RoleCard({ role, own = false, onClose, imageSrc }: RoleC
                     <div className="absolute left-4 bottom-2 card-plate-name text-[24px] font-bold">
                         {own ? `You are the ${detail.name}` : detail.name}
                     </div>
-                    <button
+                    {!locked && <button
                         onClick={onClose}
                         className="absolute top-2.5 right-2.5 w-7 h-7 flex items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
                         aria-label="Close"
@@ -70,7 +86,7 @@ export default function RoleCard({ role, own = false, onClose, imageSrc }: RoleC
                         <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                             <path d="M2 2l10 10M12 2L2 12" />
                         </svg>
-                    </button>
+                    </button>}
                 </div>
                 <div className="p-4 flex flex-col gap-2.5">
                     <div className="flex gap-1.5 flex-wrap">
@@ -82,6 +98,7 @@ export default function RoleCard({ role, own = false, onClose, imageSrc }: RoleC
                             {isWerewolfTeam ? 'Wins with the werewolves' : 'Wins with the village'}
                         </span>
                     </div>
+                    {note && <div className="text-[13px] leading-relaxed font-medium text-[var(--fg-0)]">{note}</div>}
                     {detail.nightOrder && (
                         <div className="text-[12px] text-[var(--fg-2)]">{detail.nightOrder}</div>
                     )}
@@ -93,9 +110,12 @@ export default function RoleCard({ role, own = false, onClose, imageSrc }: RoleC
                     )}
                     <button
                         onClick={onClose}
-                        className="mt-1 w-full py-2 rounded-lg bg-[var(--bg-3)] hover:bg-[var(--bg-4)] border border-[var(--line-2)] text-[13px] font-semibold text-[var(--fg-0)] transition-colors"
+                        disabled={actionDisabled}
+                        className={actionLabel
+                            ? "mt-1 w-full py-2.5 rounded-lg bg-[var(--accent)] text-[var(--accent-fg)] hover:brightness-110 disabled:opacity-70 disabled:cursor-progress text-[13px] font-semibold transition-all"
+                            : "mt-1 w-full py-2 rounded-lg bg-[var(--bg-3)] hover:bg-[var(--bg-4)] border border-[var(--line-2)] text-[13px] font-semibold text-[var(--fg-0)] transition-colors"}
                     >
-                        Got it
+                        {actionLabel ?? 'Got it'}
                     </button>
                 </div>
             </div>

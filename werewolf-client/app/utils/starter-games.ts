@@ -229,6 +229,9 @@ export interface StarterCard {
     title: string;
     hook: string;
     playerCount: number;
+    /** The table, for the role card shown while the game is created. */
+    werewolfCount: number;
+    specialRoles: string[];
     language: string;
     /** Every language the story can be started in, the template's own first. */
     languages: string[];
@@ -451,4 +454,20 @@ export function guestStarterGame<T extends {id: string; starterTemplateId?: stri
     return games
         .filter(game => !!game.starterTemplateId)
         .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0))[0];
+}
+
+/** sessionStorage key: this game's role card was read on the start screen, open the story. */
+export const starterIntroKey = (gameId: string) => `starterIntro:${gameId}`;
+
+/**
+ * The table in one line, for the role card a starter game shows while it is created:
+ * "9 at the table. Among them: 2 werewolves, a doctor and a detective."
+ */
+export function starterTableLine(playerCount: number, werewolfCount: number, specialRoles: string[]): string {
+    const hidden = [
+        werewolfCount === 1 ? 'a werewolf' : `${werewolfCount} werewolves`,
+        ...specialRoles.map(role => `a ${role}`),
+    ];
+    const list = hidden.length === 1 ? hidden[0] : `${hidden.slice(0, -1).join(', ')} and ${hidden[hidden.length - 1]}`;
+    return `${playerCount} at the table. Among them: ${list}.`;
 }

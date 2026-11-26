@@ -33,6 +33,7 @@ import { DiscordIcon } from "@/app/components/ui-icons";
 import { DISCORD_URL } from "@/app/config/external-links";
 import { checkGameEndConditions } from "@/app/utils/game-utils";
 import { isTierMismatchError } from '@/app/api/errors';
+import { starterIntroKey } from '@/app/utils/starter-games';
 import { UIControlsProvider, useUIControls } from './context/UIControlsContext';
 import React from 'react';
 
@@ -113,6 +114,17 @@ function GamePageContent({
     const [playStarterIntro, setPlayStarterIntro] = useState(false);
     useEffect(() => {
         if (initialGame.gameState !== GAME_STATES.WELCOME && !isFreshStarterGame) return;
+        // A starter game dealt a moment ago: the player read this card on the start
+        // screen while the game was created (StarterGames), so open on the story.
+        if (isFreshStarterGame) {
+            try {
+                if (sessionStorage.getItem(starterIntroKey(initialGame.id))) {
+                    sessionStorage.removeItem(starterIntroKey(initialGame.id));
+                    setPlayStarterIntro(true);
+                    return;
+                }
+            } catch { /* storage unavailable: the card shows here instead */ }
+        }
         try {
             if (!localStorage.getItem(`roleCardSeen:${initialGame.id}`)) setRoleCardFor({ role: initialGame.humanPlayerRole, own: true });
         } catch { /* storage unavailable — skip the card */ }

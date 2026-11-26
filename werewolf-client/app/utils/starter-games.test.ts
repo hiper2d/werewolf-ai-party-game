@@ -356,3 +356,13 @@ describe('starter translations', () => {
         expect(starterCardLanguages({language: 'en'})).toEqual(['en']);
     });
 });
+
+describe('starterTableLine', () => {
+    const {starterTableLine} = jest.requireActual('@/app/utils/starter-games');
+    it('names the hidden roles in one sentence', () => {
+        expect(starterTableLine(8, 2, [GAME_ROLES.DOCTOR, GAME_ROLES.DETECTIVE])).toBe('8 at the table. Among them: 2 werewolves, a doctor and a detective.');
+    });
+    it('handles one werewolf and no special roles', () => {
+        expect(starterTableLine(6, 1, [])).toBe('6 at the table. Among them: a werewolf.');
+    });
+});

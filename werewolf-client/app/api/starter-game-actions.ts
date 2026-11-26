@@ -62,7 +62,8 @@ import {isGameLanguage, normalizeGameLanguage} from "@/app/ai/game-language";
 import {DEFAULT_GAME_MODE} from "@/app/api/game-models";
 import {logger} from "@/app/utils/logger";
 
-export type StarterGameResult = { ok: true; gameId: string } | { ok: false; error: string };
+/** `existing`: the player's unfinished game from this story was opened, nothing was created. */
+export type StarterGameResult = { ok: true; gameId: string; existing?: true } | { ok: false; error: string };
 
 const GAME_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -124,6 +125,8 @@ export async function listStarterGames(): Promise<StarterCard[]> {
             title: t.title,
             hook: t.hook,
             playerCount: t.bots.length + 1,
+            werewolfCount: t.werewolfCount,
+            specialRoles: t.specialRoles ?? [],
             language: t.language,
             languages: starterCardLanguages(t),
         };
@@ -144,7 +147,7 @@ export async function listStarterGames(): Promise<StarterCard[]> {
  */
 export async function createStarterGame(templateId: string, playerName: string, options: { forceNew?: boolean; language?: string } = {}): Promise<StarterGameResult> {
     try {
-        return { ok: true, gameId: await createStarterGameImpl(templateId, playerName, options.forceNew === true, options.language) };
+        return { ok: true, ...(await createStarterGameImpl(templateId, playerName, options.forceNew === true, options.language)) };
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         const playerWall = isInsufficientBalanceError(message) || isFreeSpendLimitError(message);
@@ -177,7 +180,7 @@ async function resolveStarterOwner(): Promise<string> {
     return guest.email;
 }
 
-async function createStarterGameImpl(templateId: string, playerName: string, forceNew: boolean, requestedLanguage?: string): Promise<string> {
+async function createStarterGameImpl(templateId: string, playerName: string, forceNew: boolean, requestedLanguage?: string): Promise<{gameId: string; existing?: true}> {
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
@@ -206,7 +209,7 @@ async function createStarterGameImpl(templateId: string, playerName: string, for
             if (existing.starterTemplateId !== templateId) {
                 throw new Error(GUEST_ONE_GAME_MESSAGE);
             }
-            return existing.id;
+            return {gameId: existing.id, existing: true};
         }
     }
 
@@ -217,7 +220,7 @@ async function createStarterGameImpl(templateId: string, playerName: string, for
         const own = await db.collection('games').where('ownerEmail', '==', ownerEmail).select('starterTemplateId', 'gameState', 'createdAt').get();
         const existing = resumableStarterGames(own.docs.map(doc => ({id: doc.id, ...(doc.data() as {starterTemplateId?: string; gameState?: string; createdAt?: number})})))[templateId];
         if (existing) {
-            return existing;
+            return {gameId: existing, existing: true};
         }
     }
 
@@ -497,5 +500,5 @@ async function createStarterGameImpl(templateId: string, playerName: string, for
         await copyLogged();
     }
 
-    return gameId;
+    return {gameId};
 }
