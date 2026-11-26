@@ -19,11 +19,8 @@ export const metadata: Metadata = {
     alternates: { canonical: "/" },
 };
 
-// One per model family, the strongest of each, in the order of the intro line above.
-const MODELS = [
-  'Claude Fable 5.2', 'GPT-6.2 Astra', 'Gemini 4 Neon', 'Meta Muse Wonder 1.0', 'Grok 4.7', 'DeepSeek V4 Pro',
-  'GLM-5.3', 'MiniMax M3.1 Flash', 'Qwen4 Max', 'Mistral Large 4', 'Kimi K3.1 Pro', 'Sakana Fugu Max',
-];
+// The model families, by name only (versions change monthly), in the order of the intro line.
+const MODELS = ['Claude', 'GPT', 'Gemini', 'Meta Muse', 'Grok', 'DeepSeek', 'GLM', 'MiniMax', 'Qwen', 'Mistral', 'Kimi', 'Fugu'];
 
 // Real plans: Free (platform-paid, capped) vs Paid (pay-as-you-go, no subscription).
 // The free caps come from config, so the copy is built per render.
@@ -228,6 +225,16 @@ export default async function Home() {
             <p className="m-0 text-[14px] text-[var(--fg-2)] leading-[1.6] [text-wrap:pretty]">
               Mix models from 12 providers in the same game. Watch them argue, deceive, and form alliances against each other — and you.
             </p>
+            <div className="flex flex-wrap gap-[7px] mt-1">
+              {MODELS.map((m) => (
+                <span
+                  key={m}
+                  className="font-mono text-[11.5px] tracking-[0.01em] px-2.5 py-1 rounded-full bg-[var(--accent-soft)] border border-[var(--accent-line)] text-[var(--accent-text)] whitespace-nowrap"
+                >
+                  {m}
+                </span>
+              ))}
+            </div>
           </article>
 
           <article className="border border-[var(--line-1)] rounded-[var(--radius-lg)] bg-[var(--bg-0)] px-[26px] pt-7 pb-[30px] flex flex-col gap-3.5 transition-[border-color,transform,box-shadow] duration-[140ms] hover:border-[var(--line-3)] hover:-translate-y-0.5 hover:shadow-[var(--shadow-2)]">
@@ -241,18 +248,6 @@ export default async function Home() {
           </article>
         </div>
 
-        {/* One model per family, under the three cards: twelve chips inside the middle
-            card made it twice the height of its neighbours. */}
-        <div className="flex flex-wrap justify-center gap-[7px] mt-6 sm:mt-8 max-w-[900px] mx-auto">
-          {MODELS.map((m) => (
-            <span
-              key={m}
-              className="font-mono text-[11.5px] tracking-[0.01em] px-2.5 py-1 rounded-full bg-[var(--accent-soft)] border border-[var(--accent-line)] text-[var(--accent-text)] whitespace-nowrap"
-            >
-              {m}
-            </span>
-          ))}
-        </div>
       </section>
 
       {/* About */}
