@@ -261,6 +261,17 @@ describe('generateGamePreview', () => {
             .rejects.toThrow('did not return a character sheet for Bot1');
     });
 
+    it('matches a sheet whose name carries a gender tag or an added surname', async () => {
+        const cast = castOf(4);
+        const altered = (name: string, i: number) => (i % 2 === 0 ? `${name} (male)` : `${name} Shahar`);
+        const { createAgent } = fakeAgents(cast, {
+            sheetsFor: (names) => names.map((name, i) => ({ name: altered(name, i), story: `story of ${name}`, playStyle: 'normal', voice: 'm1', voiceStyle: 'x', visualDescription: 'v' })),
+        });
+        const preview = await generateGamePreview(createAgent, input(4));
+        expect(preview.players.map(p => p.name)).toEqual(cast.map(c => c.name));
+        expect(preview.players.map(p => p.story)).toEqual(cast.map(c => `story of ${c.name}`));
+    });
+
     it('propagates a failed batch call — no retries', async () => {
         const cast = castOf(8);
         const { createAgent } = fakeAgents(cast);
