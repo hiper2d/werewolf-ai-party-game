@@ -165,7 +165,7 @@ export async function generateGamePreview(
     const players: GeneratedCharacter[] = [];
     for (const {batch, sheets} of batchResults) {
         for (const member of batch) {
-            const sheet = sheets.find(s => nameKey(s.name) === nameKey(member.name));
+            const sheet = findSheetFor(sheets, member.name);
             if (!sheet) {
                 throw new Error(`The AI did not return a character sheet for ${member.name}. Please try again.`);
             }
@@ -229,6 +229,24 @@ function userMessage(content: string): AIMessage {
  * re-case or re-space a name they were told to copy verbatim. */
 function nameKey(name: string): string {
     return name.normalize('NFC').toLowerCase().replace(/[^\p{L}\p{N}\p{M}]/gu, '');
+}
+
+/** The sheet written for a cast member. Exact name first; then the two ways models
+ * were seen to alter it in production (2026-11-24..26, Haiku and Mistral Small):
+ * copying the prompt's gender tag ("Quang (male)") and adding a surname
+ * ("Shamsiel Shahar"). Each failure cost the player the whole preview. */
+function findSheetFor<T extends {name: string}>(sheets: T[], name: string): T | undefined {
+    const key = nameKey(name);
+    const variants = [
+        (n: string) => n,
+        (n: string) => n.replace(/\s*[(（[].*$/u, ''),
+        (n: string) => n.trim().split(/\s+/)[0] ?? '',
+    ];
+    for (const variant of variants) {
+        const sheet = sheets.find(s => nameKey(variant(s.name)) === key);
+        if (sheet) return sheet;
+    }
+    return undefined;
 }
 
 function normalizeCast(raw: {name: string; gender: string}[], expected: number): CastEntry[] {
