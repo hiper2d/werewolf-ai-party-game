@@ -209,7 +209,7 @@ export default async function Home() {
           </h2>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-stretch">
           <article className="border border-[var(--line-1)] rounded-[var(--radius-lg)] bg-[var(--bg-0)] px-[26px] pt-7 pb-[30px] flex flex-col gap-3.5 transition-[border-color,transform,box-shadow] duration-[140ms] hover:border-[var(--line-3)] hover:-translate-y-0.5 hover:shadow-[var(--shadow-2)]">
             <div className="w-11 h-11 rounded-[var(--radius-lg)] bg-[var(--accent-soft)] border border-[var(--accent-line)] text-[var(--accent-text)] grid place-items-center">
               <PlayersIcon className="w-[22px] h-[22px]" />
@@ -228,16 +228,6 @@ export default async function Home() {
             <p className="m-0 text-[14px] text-[var(--fg-2)] leading-[1.6] [text-wrap:pretty]">
               Mix models from 12 providers in the same game. Watch them argue, deceive, and form alliances against each other — and you.
             </p>
-            <div className="flex flex-wrap gap-[7px] mt-1">
-              {MODELS.map((m) => (
-                <span
-                  key={m}
-                  className="font-mono text-[11.5px] tracking-[0.01em] px-2.5 py-1 rounded-full bg-[var(--accent-soft)] border border-[var(--accent-line)] text-[var(--accent-text)] whitespace-nowrap"
-                >
-                  {m}
-                </span>
-              ))}
-            </div>
           </article>
 
           <article className="border border-[var(--line-1)] rounded-[var(--radius-lg)] bg-[var(--bg-0)] px-[26px] pt-7 pb-[30px] flex flex-col gap-3.5 transition-[border-color,transform,box-shadow] duration-[140ms] hover:border-[var(--line-3)] hover:-translate-y-0.5 hover:shadow-[var(--shadow-2)]">
@@ -249,6 +239,19 @@ export default async function Home() {
               Test how well the latest models handle deduction, bluffing, and social reasoning. See which AI is the best liar — and which one you can fool.
             </p>
           </article>
+        </div>
+
+        {/* One model per family, under the three cards: twelve chips inside the middle
+            card made it twice the height of its neighbours. */}
+        <div className="flex flex-wrap justify-center gap-[7px] mt-6 sm:mt-8 max-w-[900px] mx-auto">
+          {MODELS.map((m) => (
+            <span
+              key={m}
+              className="font-mono text-[11.5px] tracking-[0.01em] px-2.5 py-1 rounded-full bg-[var(--accent-soft)] border border-[var(--accent-line)] text-[var(--accent-text)] whitespace-nowrap"
+            >
+              {m}
+            </span>
+          ))}
         </div>
       </section>
 
