@@ -255,15 +255,17 @@ async function createStarterGameImpl(templateId: string, playerName: string, for
         await assertFreeSpendWithinLimit(ownerEmail);
     }
 
-    const screen = await screenHumanInput({
+    // Asked now, read just before the first write: the two judges take a second or more
+    // between them, and the template's pictures are read in that time. The no-op catch
+    // keeps a failure from surfacing as an unhandled rejection if something below throws
+    // first; the await further down still sees it.
+    const screening = screenHumanInput({
         source: 'preview',
         text: `Player name: ${humanPlayerName}`,
         userEmail: ownerEmail,
         apiKeys,
     });
-    if (screen.blocked) {
-        throw new Error(screen.message);
-    }
+    screening.catch(() => undefined);
 
     // Dealt per game: roles and models. The template fixes neither.
     const botRoles = dealStarterRoles(template.bots.length, template.werewolfCount, template.specialRoles);
@@ -449,8 +451,13 @@ async function createStarterGameImpl(templateId: string, playerName: string, for
         });
     }
 
-    // Avatars first, the game doc last: a game that exists is a game that is complete.
-    await commitChunked(writes);
+    const screen = await screening;
+    if (screen.blocked) {
+        throw new Error(screen.message);
+    }
+
+    // The pictures and the messages go out side by side, the game doc alone and last: a
+    // game that exists is a game that is complete.
     const batch = db.batch();
     messages.forEach((message, index) => {
         const counter = index + 1;
@@ -461,8 +468,9 @@ async function createStarterGameImpl(templateId: string, playerName: string, for
             expireAt,
         });
     });
-    batch.set(gameRef, game);
-    await batch.commit();
+    const half = Math.ceil(writes.length / 2);
+    await Promise.all([commitChunked(writes.slice(0, half)), commitChunked(writes.slice(half)), batch.commit()]);
+    await gameRef.set(game);
 
     logger.info(`Starter game created: ${gameId}`, { templateId, owner: ownerEmail, language: game.language });
     await recordFeatureEvent({
