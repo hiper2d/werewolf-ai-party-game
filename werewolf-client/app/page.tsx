@@ -19,9 +19,10 @@ export const metadata: Metadata = {
     alternates: { canonical: "/" },
 };
 
+// One per model family, the strongest of each, in the order of the intro line above.
 const MODELS = [
-  'Claude 5.5 Opus', 'GPT-6.2 Sol', 'GLM-5.3', 'Kimi K3.1 Pro', 'Grok 4.7', 'Qwen4 Max',
-  'DeepSeek V4 Pro', 'Gemini 4 Argon', 'Meta Muse Wonder 1.0', 'Mistral 4 Small', 'MiniMax M3.1 Flash',
+  'Claude Fable 5.2', 'GPT-6.2 Astra', 'Gemini 4 Neon', 'Meta Muse Wonder 1.0', 'Grok 4.7', 'DeepSeek V4 Pro',
+  'GLM-5.3', 'MiniMax M3.1 Flash', 'Qwen4 Max', 'Mistral Large 4', 'Kimi K3.1 Pro', 'Sakana Fugu Max',
 ];
 
 // Real plans: Free (platform-paid, capped) vs Paid (pay-as-you-go, no subscription).
@@ -145,7 +146,7 @@ export default async function Home() {
             </p>
 
             <p className="m-0 text-[15px] text-[var(--fg-2)] leading-[1.65] max-w-[62ch] [text-wrap:pretty]">
-              Put <strong className="text-[var(--fg-1)] font-medium">Claude</strong>, <strong className="text-[var(--fg-1)] font-medium">GPT</strong>, <strong className="text-[var(--fg-1)] font-medium">Gemini</strong>, <strong className="text-[var(--fg-1)] font-medium">Meta Muse</strong>, <strong className="text-[var(--fg-1)] font-medium">Grok</strong>, <strong className="text-[var(--fg-1)] font-medium">DeepSeek</strong>, <strong className="text-[var(--fg-1)] font-medium">GLM</strong>, <strong className="text-[var(--fg-1)] font-medium">MiniMax</strong>, <strong className="text-[var(--fg-1)] font-medium">Qwen</strong>, and <strong className="text-[var(--fg-1)] font-medium">Mistral</strong> at the same table. Each bot has its own personality, goals, and strategy. You&apos;re the only human — can you outsmart them all?
+              Put <strong className="text-[var(--fg-1)] font-medium">Claude</strong>, <strong className="text-[var(--fg-1)] font-medium">GPT</strong>, <strong className="text-[var(--fg-1)] font-medium">Gemini</strong>, <strong className="text-[var(--fg-1)] font-medium">Meta Muse</strong>, <strong className="text-[var(--fg-1)] font-medium">Grok</strong>, <strong className="text-[var(--fg-1)] font-medium">DeepSeek</strong>, <strong className="text-[var(--fg-1)] font-medium">GLM</strong>, <strong className="text-[var(--fg-1)] font-medium">MiniMax</strong>, <strong className="text-[var(--fg-1)] font-medium">Qwen</strong>, <strong className="text-[var(--fg-1)] font-medium">Mistral</strong>, <strong className="text-[var(--fg-1)] font-medium">Kimi</strong>, and <strong className="text-[var(--fg-1)] font-medium">Fugu</strong> at the same table. Each bot has its own personality, goals, and strategy. You&apos;re the only human — can you outsmart them all?
             </p>
 
             <div className="flex gap-3 flex-wrap justify-center">
