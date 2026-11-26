@@ -201,6 +201,10 @@ until their language has templates.
 
 ### Helper mode (hints on screen)
 
+**Built 2026-11-26 as a first version:** a hint strip above the composer, not callouts anchored to
+elements; not shown inside cinematic mode. The table below is the design; the live wording is in
+`app/games/[id]/helper-hints.ts`. The funnel report (Marlow's digest, `_funnel`) was built the same day.
+
 A hint layer that says what the player can and should do right now. On for every starter
 game (`game.helperMode: true`), off for games made with the form, with a "Hide hints"
 switch in the game menu (saved per browser). Hints are UI chrome, so English only, like the

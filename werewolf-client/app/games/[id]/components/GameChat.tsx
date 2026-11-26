@@ -23,6 +23,9 @@ const CINEMATIC_ENABLED_KEY = 'autoPlay';
 // once so a browser that had turned voices off keeps them off.
 const LEGACY_AUTO_VOICE_KEY = 'cinematicAutoVoice';
 const VOICE_MUTED_KEY = 'voiceMuted';
+import HelperHints from "./HelperHints";
+import type { HelperHintState } from "@/app/games/[id]/helper-hints";
+import { isGuestEmail } from "@/app/utils/guest";
 import { LoadingRail, PhaseBar, StreamPill, stripChromeClass, stripChromeStyle, type LoadingRailProps, type PhaseTone, type RailActor } from "./PhaseStrip";
 import { ttsService } from "@/app/services/tts-service";
 import { sttService } from "@/app/services/stt-service";
@@ -1989,6 +1992,16 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
 
     const showComposer = isInputEnabled() || isRecording || isTranscribing;
     const artInProgress = game.avatarsStatus === 'pending' || game.avatarsStatus === 'generating';
+    // Helper mode (helper-hints.ts): what the hint strip needs to know about this moment.
+    const helperHintState: HelperHintState | null = game.helperMode ? {
+        gameState: game.gameState,
+        currentDay: game.currentDay,
+        humanAlive: game.humanPlayerIsAlive !== false,
+        humanMessagesToday: messages.filter(m => m.messageType === MessageType.HUMAN_PLAYER_MESSAGE && m.day === game.currentDay).length,
+        werewolfCount: game.werewolfCount,
+        isGuest: isGuestEmail(game.ownerEmail),
+        busy: isProcessing || !!isExternalLoading || game.gameStateProcessQueue.length > 0,
+    } : null;
 
     return (
         <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
@@ -2529,6 +2542,9 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                     tone="accent"
                     className="border-b border-[var(--line-1)]"
                 />
+            )}
+            {helperHintState && isCurrentDaySelected && !cinematicOpen && (
+                <HelperHints gameId={gameId} state={helperHintState} />
             )}
             {/* A waiting flow action while the composer is still open (after-game
                 discussion's Exit Game) sits above the composer. */}
