@@ -10,7 +10,7 @@ import {isGuestEmail} from '@/app/utils/guest';
  * Quick start: ready-made stories a player starts with one click. With no live starter
  * template there is nothing to show, so the page hands over to the setup form.
  */
-export default async function StartPage() {
+export default async function StartPage({searchParams}: {searchParams?: Promise<{welcome?: string}>}) {
     const session = await auth();
     if (!session?.user?.email) {
         redirect('/?login=true&callbackUrl=%2Fgames%2Fstart');
@@ -20,7 +20,9 @@ export default async function StartPage() {
     }
     const cards = await listStarterGames();
     if (cards.length === 0) {
-        redirect('/games/newgame');
+        // A first sign-in is sent here (auth.ts): with no story to offer, the rules page is
+        // the first screen, as it was before the stories existed.
+        redirect((await searchParams)?.welcome === '1' ? '/rules?welcome=1' : '/games/newgame');
     }
 
     return (

@@ -913,6 +913,10 @@ export async function createGame(gamePreview: GamePreviewWithGeneratedBots): Pro
 
         await addMessageToChatAndSaveToDb(gameStoryMessage, customGameId);
         logger.info(`Game created: ${customGameId}`, { theme: gamePreview.theme, owner: session.user.email, language: gamePreview.language ?? DEFAULT_GAME_LANGUAGE });
+        // The account is past the ready-made stories: the lobby stops offering them
+        // (app/games/page.tsx). On the user doc because games expire after 30 days.
+        await db.collection('users').doc(session.user.email).set({madeOwnGame: true}, {merge: true})
+            .catch(error => logger.warn(`Could not mark ${customGameId}'s owner as past the starter stories`, {error: error?.message}));
         // The choices made on the form, as one feature-use row: the game doc
         // holds them too, but it expires in 30 days and this survives 180.
         await recordFeatureEvent({

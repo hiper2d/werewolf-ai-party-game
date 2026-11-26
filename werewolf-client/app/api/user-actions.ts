@@ -167,6 +167,7 @@ export async function getUser(userId: string): Promise<User> {
             voiceProvider: userData?.voiceProvider || getDefaultVoiceProvider(),
             balance: userData?.balance || 0,
             ...(typeof userData?.credits === 'number' ? { credits: userData.credits } : {}),
+            ...(userData?.madeOwnGame === true ? { madeOwnGame: true } : {}),
             stripeCustomerId: userData?.stripeCustomerId
         } as User;
     } catch (error: any) {

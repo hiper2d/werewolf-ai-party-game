@@ -34,6 +34,7 @@ import { DISCORD_URL } from "@/app/config/external-links";
 import { checkGameEndConditions } from "@/app/utils/game-utils";
 import { isTierMismatchError } from '@/app/api/errors';
 import { starterIntroKey } from '@/app/utils/starter-games';
+import Link from 'next/link';
 import { UIControlsProvider, useUIControls } from './context/UIControlsContext';
 import React from 'react';
 
@@ -1018,6 +1019,17 @@ function GamePageContent({
                 Exit Game
             </button>
         );
+        // The game is over: the next game is one click away, next to Exit. A ready-made
+        // story leads to the other stories first; a guest has no next game without an account.
+        const gameOverActions = isGuestPlayer ? exitButton : (
+            <>
+                {exitButton}
+                {isStarterGame && <Link href="/games/start" className={btnFlowSecondary}>Another story</Link>}
+                <Link href="/games/newgame" className={btnFlowPrimary} style={btnFlowPrimaryStyle}>
+                    {isStarterGame ? 'Create your own game' : 'New game'}
+                </Link>
+            </>
+        );
         const gameOverButton = (
             <button
                 className={btnFlowDanger}
@@ -1037,11 +1049,11 @@ function GamePageContent({
 
         if (game.gameState === GAME_STATES.AFTER_GAME_DISCUSSION) {
             if (game.gameStateProcessQueue.length > 0 || isKeepGoingLoading) return null;
-            return { tone: 'danger', label: 'Game over · discussion', actions: exitButton };
+            return { tone: 'danger', label: 'Game over · discussion', actions: gameOverActions };
         }
 
         if (isGameOver) {
-            return { tone: 'danger', label: 'Game over', actions: exitButton };
+            return { tone: 'danger', label: 'Game over', actions: gameOverActions };
         }
 
         if (game.gameState === GAME_STATES.VOTE_RESULTS) {

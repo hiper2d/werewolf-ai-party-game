@@ -38,6 +38,8 @@ export interface User {
     balance?: number; // USD balance for paid tier users
     /** Free credits left, USD (app/utils/credits.ts). Absent until the sign-up credit is decided. */
     credits?: number;
+    /** Set the first time the account creates a game with the form: the lobby then stops offering the ready-made stories. */
+    madeOwnGame?: boolean;
     stripeCustomerId?: string; // Stripe customer ID for paid tier users
 }
 

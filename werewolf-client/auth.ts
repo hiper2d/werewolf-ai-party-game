@@ -7,8 +7,9 @@ import {upsertUser} from "@/app/api/user-actions"
 import {claimGuest, clearGuestCookie, findGuest, readGuestCookie} from "@/app/api/guest-accounts"
 import {GUEST_PROVIDER_ID} from "@/app/utils/guest"
 
-// Set on a user's very first sign-in so the redirect callback can send them to the rules
-// page once, instead of the default game list. Consumed and cleared in the same request.
+// Set on a user's very first sign-in so the redirect callback can send them to the start
+// screen once (the ready-made stories; it falls back to the rules page when no story is
+// live), instead of the default game list. Consumed and cleared in the same request.
 const NEW_USER_COOKIE = "ww_new_user"
 
 export const { auth, handlers, signIn, signOut } = NextAuth({
@@ -72,12 +73,12 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
             return true
         },
         async redirect({ url, baseUrl }) {
-            // First-time users land on the rules page; the flag is one-shot.
+            // First-time users land on the start screen; the flag is one-shot.
             try {
                 const cookieStore = await cookies();
                 if (cookieStore.get(NEW_USER_COOKIE)) {
                     cookieStore.delete(NEW_USER_COOKIE);
-                    return `${baseUrl}/rules`;
+                    return `${baseUrl}/games/start?welcome=1`;
                 }
             } catch (error) {
                 console.error("Failed to read onboarding cookie:", error);

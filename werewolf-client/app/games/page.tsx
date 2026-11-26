@@ -5,7 +5,7 @@ import GameThumbnail from "@/app/games/components/GameThumbnail";
 import {redirect} from "next/navigation";
 import {Game} from "@/app/api/game-models";
 import { auth } from "@/auth";
-import { getUserTier } from "@/app/api/user-actions";
+import { getUser, getUserTier } from "@/app/api/user-actions";
 import { listStarterGames } from "@/app/api/starter-game-actions";
 import StarterGames from "@/app/games/components/StarterGames";
 import { starterDefaultName } from "@/app/utils/starter-games";
@@ -44,8 +44,14 @@ const GamePages = async ({searchParams}: {searchParams?: Promise<{error?: string
 
     const userTier = await getUserTier(userEmail);
     const games: Game[] = await getAllGames(userEmail);
-    // Ready-made first games (app/utils/starter-games.ts). A failed read must not take the list down.
-    const starterCards = await listStarterGames().catch(() => []);
+    // Ready-made first games (app/utils/starter-games.ts) are for beginners: once the player
+    // has created a game with the form they are gone from the lobby, and the games started
+    // from them stay in the list like any other. The mark is on the account (`madeOwnGame`,
+    // set by createGame); a form game still in the list counts too, for accounts older than
+    // the mark. A failed read must not take the list down.
+    const madeOwnGame = games.some(game => !game.starterTemplateId)
+        || await getUser(userEmail).then(user => user.madeOwnGame === true).catch(() => false);
+    const starterCards = madeOwnGame ? [] : await listStarterGames().catch(() => []);
     const resolvedSearchParams = await searchParams;
     const errorCode = resolvedSearchParams?.error;
     const blockedGameId = resolvedSearchParams?.blocked;
@@ -80,8 +86,7 @@ const GamePages = async ({searchParams}: {searchParams?: Promise<{error?: string
 
             {starterCards.length > 0 ? (
                 <div className="flex-grow overflow-auto">
-                    {/* The ready-made stories stay in the lobby for every player: a card opens the
-                        player's unfinished game from that story, or deals a new one. */}
+                    {/* A card opens the player's unfinished game from that story, or deals a new one. */}
                     <h2 className="m-0 text-[18px] font-semibold text-[var(--fg-0)] mb-1">
                         {games.length === 0 ? 'Play your first game' : 'Ready-made stories'}
                     </h2>
