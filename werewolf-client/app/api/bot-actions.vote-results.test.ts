@@ -235,7 +235,9 @@ describe('vote: bot vote accumulation', () => {
             messageType: MessageType.VOTE_MESSAGE,
             msg: expect.objectContaining({ who: 'Bob', why: 'too quiet' }),
         });
-        expect(result.messages).toHaveLength(2);
+        // Both are saved; the browser gets only the answer, not the command to the bot.
+        expect(result.messages).toHaveLength(1);
+        expect(result.messages[0].recipientName).toBe('ALL');
         expect(setGameErrorState).not.toHaveBeenCalled();
     });
 

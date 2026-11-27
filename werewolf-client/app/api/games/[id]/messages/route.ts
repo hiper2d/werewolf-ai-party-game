@@ -5,7 +5,8 @@ import {db} from '@/firebase/server';
 import {auth} from '@/auth';
 import {ensureUserCanAccessGame} from '@/app/api/tier-guards';
 import {getGame} from '@/app/api/game-actions';
-import {GameMessage, RECIPIENT_ALL, RECIPIENT_WEREWOLVES, RECIPIENT_DOCTOR, RECIPIENT_DETECTIVE, RECIPIENT_MANIAC, GAME_ROLES} from '@/app/api/game-models';
+import {GameMessage} from '@/app/api/game-models';
+import {messagesForSession} from '@/app/api/game-session-view';
 
 export async function GET(request: NextRequest, {params}: {params: Promise<{id: string}>}) {
     const session = await auth();
@@ -34,33 +35,14 @@ export async function GET(request: NextRequest, {params}: {params: Promise<{id: 
         return NextResponse.json({ error: 'Game not found' }, { status: 404 });
     }
 
-    // Build recipient list based on user's role
-    const allowedRecipients = [RECIPIENT_ALL];
-    
-    // Add personal and role-specific messages for authenticated user
-    allowedRecipients.push(game.humanPlayerName);
-    
-    // Add role-specific recipients
-    const humanPlayerRole = game.humanPlayerRole;
-    if (humanPlayerRole === GAME_ROLES.WEREWOLF) {
-        allowedRecipients.push(RECIPIENT_WEREWOLVES);
-    } else if (humanPlayerRole === GAME_ROLES.DOCTOR) {
-        allowedRecipients.push(RECIPIENT_DOCTOR);
-    } else if (humanPlayerRole === GAME_ROLES.DETECTIVE) {
-        allowedRecipients.push(RECIPIENT_DETECTIVE);
-    } else if (humanPlayerRole === GAME_ROLES.MANIAC) {
-        allowedRecipients.push(RECIPIENT_MANIAC);
-    }
-
     try {
-        // Query all messages visible to the user using the existing index (recipientName + timestamp)
-        // We filter by day in memory to avoid needing a complex composite index (day + recipientName + timestamp)
+        // One day's messages, whoever they were for; who may read which is decided by the
+        // same rule as everywhere else (messagesForSession), not by a second list here.
         const snapshot = await db
             .collection('games')
             .doc(gameId)
             .collection('messages')
-            .where('recipientName', 'in', allowedRecipients)
-            .orderBy('timestamp', 'asc')
+            .where('day', '==', day)
             .get();
 
         const messages: GameMessage[] = snapshot.docs
@@ -77,10 +59,9 @@ export async function GET(request: NextRequest, {params}: {params: Promise<{id: 
                     cost: data.cost
                 } as GameMessage;
             })
-            // Filter by day in memory
-            .filter(msg => msg.day === day);
+            .sort((a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0));
 
-        return NextResponse.json(messages);
+        return NextResponse.json(await messagesForSession(game, messages));
     } catch (error) {
         console.error('Failed to fetch messages for day', day, error);
         return NextResponse.json({ error: 'Failed to fetch messages' }, { status: 500 });

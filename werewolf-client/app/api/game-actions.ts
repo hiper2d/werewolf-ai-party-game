@@ -68,7 +68,7 @@ import {
 } from "@/app/ai/model-limit-utils";
 import {AbstractAgent} from '@hiper2d/ai-agents';
 import {ensureUserCanAccessGame} from "@/app/api/tier-guards";
-import {gameForSession} from "@/app/api/game-session-view";
+import {gameForSession, responseForSession} from "@/app/api/game-session-view";
 import type {LlmRetryNotice} from "@/app/api/game-models";
 import { assertProviderNotBlocked, providerDisplayName, providerKeyOf } from '@/app/api/provider-blocks';
 import { retryModelPatch } from '@/app/api/retry-model';
@@ -1670,7 +1670,7 @@ export async function afterGameDiscussion(gameId: string): Promise<GameActionRes
 
         // Return the updated game with messages
         const updatedGame = await getGame(gameId) as Game;
-        return { game: await gameForSession(updatedGame), messages: [savedMessage] };
+        return responseForSession({ game: updatedGame, messages: [savedMessage] });
     } catch (error: any) {
         logger.error("Error moving to after game discussion: ", { error: error.message, gameId });
         throw new Error(`Failed to move to after game discussion: ${error.message}`);

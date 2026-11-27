@@ -1,5 +1,5 @@
-import {Bot, Game, GAME_ROLES, GAME_STATES} from '@/app/api/game-models';
-import {HIDDEN_ROLE, viewGameAs} from './game-view';
+import {Bot, Game, GAME_ROLES, GAME_STATES, GameMessage, MessageType} from '@/app/api/game-models';
+import {HIDDEN_ROLE, viewGameAs, viewMessagesAs} from './game-view';
 
 const bot = (name: string, role: string, isAlive = true): Bot => ({
     name, role, isAlive, story: '', aiType: 'x', gender: 'male', voice: 'v', playStyle: 'p',
@@ -167,5 +167,49 @@ describe('the night, as one player sees it', () => {
         expect(doctor.previousNightResults).toEqual({doctor: {target: 'Alex'}});
         expect(doctor.oneTimeAbilitiesUsed).toEqual({doctorKill: true});
         expect(doctor.nightResults).toEqual({});
+    });
+});
+
+describe('viewMessagesAs', () => {
+    const message = (recipientName: string, msg: any = 'text', extra: Partial<GameMessage> = {}): GameMessage => ({
+        id: `m-${recipientName}`, recipientName, authorName: 'Game Master', msg,
+        messageType: MessageType.GM_COMMAND, day: 1, timestamp: 1, ...extra,
+    });
+    const all = [
+        message('ALL'), message('Alex'), message('Doc'), message('WEREWOLVES'), message('DOCTOR'),
+        message('DETECTIVE'), message('MANIAC'), message('NONE'),
+    ];
+    const recipients = (g: Game, viewer: typeof me | null) => viewMessagesAs(g, viewer, all).map(m => m.recipientName);
+
+    it('a villager reads the table and what is addressed to them', () => {
+        expect(recipients(game(), me)).toEqual(['ALL', 'Alex']);
+    });
+
+    it('each role also reads its own channel, and only its own', () => {
+        expect(recipients(game({humanPlayerRole: GAME_ROLES.WEREWOLF}), me)).toEqual(['ALL', 'Alex', 'WEREWOLVES']);
+        expect(recipients(game({humanPlayerRole: GAME_ROLES.DOCTOR}), me)).toEqual(['ALL', 'Alex', 'DOCTOR']);
+        expect(recipients(game({humanPlayerRole: GAME_ROLES.DETECTIVE}), me)).toEqual(['ALL', 'Alex', 'DETECTIVE']);
+        expect(recipients(game({humanPlayerRole: GAME_ROLES.MANIAC}), me)).toEqual(['ALL', 'Alex', 'MANIAC']);
+    });
+
+    it('somebody without a seat reads only the table', () => {
+        expect(recipients(game({humanPlayerRole: GAME_ROLES.WEREWOLF}), null)).toEqual(['ALL']);
+    });
+
+    it('drops the model\'s thinking and the provider signatures, keeps the answer', () => {
+        const answer = message('ALL', {
+            reply: 'I say it was Vil.', thinking: 'As a werewolf I should blame Vil.',
+            anthropicThinkingSignature: 'sig', openaiEncryptedReasoning: 'enc',
+        }, {messageType: MessageType.BOT_ANSWER, turnTail: 'You are a werewolf.'});
+        const [shown] = viewMessagesAs(game(), me, [answer]);
+        expect(shown.msg).toEqual({reply: 'I say it was Vil.'});
+        expect(JSON.stringify(shown)).not.toContain('werewolf');
+        expect(answer.msg.thinking).toBeTruthy(); // the stored message is not touched
+    });
+
+    it('keeps a night action\'s own reasoning for the role that may read it', () => {
+        const action = message('DOCTOR', {reasoning: 'Det looks exposed.', target: 'Det', thinking: 'hidden'});
+        const [shown] = viewMessagesAs(game({humanPlayerRole: GAME_ROLES.DOCTOR}), me, [action]);
+        expect(shown.msg).toEqual({reasoning: 'Det looks exposed.', target: 'Det'});
     });
 });

@@ -4,7 +4,7 @@ import { invalidJsonExplanation, isResponseFormatFailure } from '@/app/api/retry
 import { isTierMismatchError, refusalOf } from '@/app/api/errors';
 import { isProviderBlockedError } from '@/app/api/provider-blocks';
 import { logger } from '@/app/utils/logger';
-import { gameForSession } from '@/app/api/game-session-view';
+import { gameForSession, responseForSession } from '@/app/api/game-session-view';
 
 /**
  * Best-effort resolution of which bot/model made the failing call, plus the
@@ -87,10 +87,9 @@ export function withErrorHandling<T extends any[]>(
     try {
       const result = await fn(...args);
       const withPictures = await withRecentIllustrations(result, gameIdExtractor(...args));
-      // The action worked on the whole game; the browser gets the player's view of it.
-      return withPictures?.game
-        ? { ...withPictures, game: await gameForSession(withPictures.game) }
-        : withPictures;
+      // The action worked on the whole game and returns every message it created; the
+      // browser gets the player's view of the game and the messages meant for them.
+      return await responseForSession(withPictures);
     } catch (error) {
       if (isTierMismatchError(error)) {
         throw error;

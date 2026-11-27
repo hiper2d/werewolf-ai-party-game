@@ -280,7 +280,9 @@ describe('welcome (WELCOME state, gameStateParamQueue)', () => {
             messageType: MessageType.BOT_WELCOME,
             msg: expect.objectContaining({ reply: 'Hello, I am Alice' }),
         });
-        expect(result.messages).toHaveLength(2);
+        // Both are saved; the browser gets only the answer, not the command to the bot.
+        expect(result.messages).toHaveLength(1);
+        expect(result.messages[0].recipientName).toBe('ALL');
         expect(setGameErrorState).not.toHaveBeenCalled();
     });
 
@@ -365,7 +367,9 @@ describe('talkToAll (DAY_DISCUSSION, processing the bot queue)', () => {
             messageType: MessageType.BOT_ANSWER,
             msg: expect.objectContaining({ reply: 'Alice discussion reply' }),
         });
-        expect(result.messages).toHaveLength(2);
+        // Both are saved; the browser gets only the answer, not the command to the bot.
+        expect(result.messages).toHaveLength(1);
+        expect(result.messages[0].recipientName).toBe('ALL');
         expect(setGameErrorState).not.toHaveBeenCalled();
     });
 

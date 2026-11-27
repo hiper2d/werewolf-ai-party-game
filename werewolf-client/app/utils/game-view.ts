@@ -1,4 +1,7 @@
-import {Bot, Game, GAME_ROLES, GAME_STATES, ROLE_CONFIGS} from '@/app/api/game-models';
+import {
+    Bot, Game, GAME_ROLES, GAME_STATES, GameMessage, RECIPIENT_ALL, RECIPIENT_DETECTIVE, RECIPIENT_DOCTOR,
+    RECIPIENT_MANIAC, RECIPIENT_WEREWOLVES, ROLE_CONFIGS,
+} from '@/app/api/game-models';
 import {checkGameEndConditions} from '@/app/utils/game-utils';
 
 /**
@@ -159,4 +162,46 @@ export function viewGameAs(game: Game, viewer: GameViewer | null, seal: NightSea
         pendingGameOver: pendingGameOver(game),
         nightRoleTotal: nightRoleTotal(game),
     };
+}
+
+/** The private channel of each role that has one. */
+const ROLE_CHANNEL: Record<string, string> = {
+    [GAME_ROLES.WEREWOLF]: RECIPIENT_WEREWOLVES,
+    [GAME_ROLES.DOCTOR]: RECIPIENT_DOCTOR,
+    [GAME_ROLES.DETECTIVE]: RECIPIENT_DETECTIVE,
+    [GAME_ROLES.MANIAC]: RECIPIENT_MANIAC,
+};
+
+/**
+ * Parts of a stored answer that are the model's, not the table's: what it thought before
+ * answering, and the provider's signature over that thought (needed to replay the history
+ * to the same provider). No screen shows them, and a bot's thinking names its role.
+ */
+const MODEL_ONLY_FIELDS = new Set([
+    'thinking', 'anthropicThinkingSignature', 'googleThoughtSignature', 'grokEncryptedReasoning',
+    'metaEncryptedReasoning', 'openaiEncryptedReasoning',
+]);
+
+function viewMessage(message: GameMessage): GameMessage {
+    // `turnTail` is the prompt tail stored on a Game Master command: alive lists, role status.
+    const {turnTail, ...shown} = message;
+    void turnTail;
+    const body = shown.msg;
+    if (!body || typeof body !== 'object' || Array.isArray(body)) return shown;
+    return {...shown, msg: Object.fromEntries(Object.entries(body).filter(([key]) => !MODEL_ONLY_FIELDS.has(key)))};
+}
+
+/**
+ * The messages a viewer may read: what was said to the whole table, what was addressed to
+ * them by name, and their own role's private channel (the pack's night chat, the
+ * detective's findings). A Game Master command to a bot, another role's night action and
+ * the hidden debug messages stay on the server. Until 2026-11-27 actions returned every
+ * message they created and the page dropped the ones not meant for the player.
+ */
+export function viewMessagesAs(game: Game, viewer: GameViewer | null, messages: GameMessage[]): GameMessage[] {
+    const allowed = new Set<string>([RECIPIENT_ALL]);
+    if (viewer) allowed.add(viewer.name);
+    const channel = ROLE_CHANNEL[roleOf(game, viewer) ?? ''];
+    if (channel) allowed.add(channel);
+    return (messages || []).filter(m => m && allowed.has(m.recipientName)).map(viewMessage);
 }

@@ -1,7 +1,7 @@
 import {createHmac, randomBytes} from 'crypto';
 import {auth} from '@/auth';
-import {Game} from '@/app/api/game-models';
-import {GameViewer, viewGameAs} from '@/app/utils/game-view';
+import {Game, GameActionResponse, GameMessage} from '@/app/api/game-models';
+import {GameViewer, viewGameAs, viewMessagesAs} from '@/app/utils/game-view';
 
 /**
  * The game as the signed-in player's browser may see it (rules in app/utils/game-view.ts).
@@ -15,6 +15,28 @@ import {GameViewer, viewGameAs} from '@/app/utils/game-view';
 export async function gameForSession(game: Game): Promise<Game> {
     const session = await auth();
     return viewGameAs(game, viewerOf(game, session?.user?.email), sealNightPosition);
+}
+
+/**
+ * The messages of a game as the session's player may read them. `game` must be the FULL
+ * game (from `getGame`), never a view: the private channel is chosen by the real role.
+ */
+export async function messagesForSession(game: Game, messages: GameMessage[]): Promise<GameMessage[]> {
+    const session = await auth();
+    return viewMessagesAs(game, viewerOf(game, session?.user?.email), messages);
+}
+
+/** An action's whole answer, cut for the session's player. `response.game` is the full game. */
+export async function responseForSession(response: GameActionResponse): Promise<GameActionResponse> {
+    // The stub of a deleted game (or a failed action's fallback) has no cast to judge by.
+    if (!response?.game || !Array.isArray(response.game.bots)) return response;
+    const session = await auth();
+    const viewer = viewerOf(response.game, session?.user?.email);
+    return {
+        ...response,
+        game: viewGameAs(response.game, viewer, sealNightPosition),
+        messages: viewMessagesAs(response.game, viewer, response.messages),
+    };
 }
 
 /**

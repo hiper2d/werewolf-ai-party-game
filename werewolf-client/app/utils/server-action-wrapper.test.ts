@@ -17,7 +17,7 @@ import { ModelRefusalError } from '@hiper2d/ai-agents';
 import { setGameErrorState, getGame, recordProviderBlock, getRecentIllustrationMessages } from '@/app/api/game-actions';
 import { ProviderBlockedError } from '@/app/api/provider-blocks';
 import { logger } from '@/app/utils/logger';
-import { gameForSession } from '@/app/api/game-session-view';
+import { responseForSession } from '@/app/api/game-session-view';
 
 jest.mock('@/app/api/game-actions', () => ({
   setGameErrorState: jest.fn(),
@@ -30,6 +30,7 @@ jest.mock('@/app/api/game-actions', () => ({
 // marker, so these tests can tell that every response went through it.
 jest.mock('@/app/api/game-session-view', () => ({
   gameForSession: jest.fn(async (game: any) => game),
+  responseForSession: jest.fn(async (response: any) => response),
 }));
 
 jest.mock('@/app/utils/logger', () => ({
@@ -97,9 +98,9 @@ describe('withErrorHandling', () => {
 
       const actual = await wrapped(GAME_ID);
 
-      // Same messages and game, and the game went through the player's-view cut.
+      // Same messages and game, and the answer went through the player's-view cut.
       expect(actual).toEqual(result);
-      expect(gameForSession).toHaveBeenCalledWith(result.game);
+      expect(responseForSession).toHaveBeenCalledWith(result);
       expect(fn).toHaveBeenCalledWith(GAME_ID);
       expect(mockSetGameErrorState).not.toHaveBeenCalled();
       expect(mockGetGame).not.toHaveBeenCalled();
