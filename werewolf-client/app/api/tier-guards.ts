@@ -10,6 +10,8 @@ import {seatFor} from '@/app/api/game-seats';
 interface EnsureOptions {
     gameTier?: UserTier;
     userTier?: UserTier;
+    /** The action is the host's alone: the models, the phases, the retry after an error. */
+    hostOnly?: boolean;
 }
 
 export async function ensureUserCanAccessGame(
@@ -40,6 +42,9 @@ export async function ensureUserCanAccessGame(
     }, userEmail);
     if (!seat) {
         throw new Error('You do not have access to this game');
+    }
+    if (options.hostOnly && !seat.host) {
+        throw new Error('Only the host of this game can do that');
     }
 
     if (!canOpenGameOnTier(storedTier, currentUserTier)) {

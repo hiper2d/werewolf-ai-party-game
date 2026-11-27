@@ -75,3 +75,30 @@ describe('ensureUserCanAccessGame', () => {
         });
     });
 });
+
+describe('ensureUserCanAccessGame in a shared game', () => {
+    const FRIEND = 'friend@example.com';
+    const shared = {
+        createdWithTier: 'free', ownerEmail: USER, humanPlayerName: 'Ann',
+        seats: {
+            u1: { email: USER, character: 'Ann', payer: true, joinedAt: 1 },
+            u2: { email: FRIEND, character: 'Bo', payer: true, joinedAt: 2 },
+        },
+    };
+    beforeEach(() => {
+        jest.clearAllMocks();
+        mockGetUserTier.mockResolvedValue('free');
+    });
+
+    it('lets in anybody with a seat and nobody else', async () => {
+        setupGameDoc(shared);
+        await expect(ensureUserCanAccessGame('game-1', FRIEND)).resolves.toBeTruthy();
+        await expect(ensureUserCanAccessGame('game-1', 'stranger@example.com')).rejects.toThrow('do not have access');
+    });
+
+    it('keeps the host\'s controls for the host', async () => {
+        setupGameDoc(shared);
+        await expect(ensureUserCanAccessGame('game-1', USER, { hostOnly: true })).resolves.toBeTruthy();
+        await expect(ensureUserCanAccessGame('game-1', FRIEND, { hostOnly: true })).rejects.toThrow('Only the host');
+    });
+});

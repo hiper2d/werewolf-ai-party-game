@@ -1102,7 +1102,7 @@ export async function updateBotModel(gameId: string, botName: string, newAiType:
         }
         
         const gameData = gameSnap.data();
-        const {gameTier} = await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: (gameData?.createdWithTier ?? 'free') });
+        const {gameTier} = await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: (gameData?.createdWithTier ?? 'free'), hostOnly: true });
         const gameMasterAiType = gameData?.gameMasterAiType;
         if (typeof gameMasterAiType !== 'string' || !gameMasterAiType) {
             throw new Error('Game is missing a valid Game Master AI configuration.');
@@ -1165,6 +1165,11 @@ export async function updateCharacterVoice(gameId: string, name: string, patch: 
         }
         const gameData = gameSnap.data();
         await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: (gameData?.createdWithTier ?? 'free') });
+        // The host directs every voice; any other player only their own character's.
+        const voiceSeat = seatFor({ ownerEmail: gameData?.ownerEmail || '', humanPlayerName: gameData?.humanPlayerName, seats: gameData?.seats }, session.user.email);
+        if (!voiceSeat?.host && voiceSeat?.character !== name) {
+            throw new Error('Only the host can change another character\'s voice.');
+        }
 
         // The direction is pasted into every speech call for this character: screened like
         // any other typed text (skipped when blank).
@@ -1218,7 +1223,7 @@ export async function updateGameMasterModel(gameId: string, newAiType: string): 
         }
         
         const gameData = gameSnap.data();
-        const {gameTier} = await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: (gameData?.createdWithTier ?? 'free') });
+        const {gameTier} = await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: (gameData?.createdWithTier ?? 'free'), hostOnly: true });
 
         const bots = (gameData?.bots || []) as Bot[];
         assertProviderNotBlocked({ providerBlocks: gameData?.providerBlocks }, newAiType);
@@ -1441,7 +1446,7 @@ export async function clearGameErrorState(gameId: string): Promise<Game> {
         }
         
         const gameData = gameSnap.data();
-        await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: (gameData?.createdWithTier ?? 'free') });
+        await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: (gameData?.createdWithTier ?? 'free'), hostOnly: true });
         
         // Plain Retry: carry the explanation recorded at the throw site into the rebuilt prompt, so
         // the model is not replayed byte-identical context it already got wrong. Failures with
@@ -1522,7 +1527,7 @@ export async function retryWithModelOverride(gameId: string, model: string, enab
     }
 
     const gameData = gameSnap.data();
-    const {gameTier} = await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: (gameData?.createdWithTier ?? 'free') });
+    const {gameTier} = await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: (gameData?.createdWithTier ?? 'free'), hostOnly: true });
     const game = gameFromFirestore(gameId, gameData);
 
     // Stale call (double click / second tab already handled it): nothing to retry.
@@ -1623,7 +1628,7 @@ export async function afterGameDiscussion(gameId: string): Promise<GameActionRes
         const gameData = gameSnap.data();
         const game = gameFromFirestore(gameId, gameData);
 
-        await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: (gameData?.createdWithTier ?? 'free') });
+        await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: (gameData?.createdWithTier ?? 'free'), hostOnly: true });
 
         // Create Game Master message explaining the after-game discussion phase
         const allPlayerRoles = [
@@ -1861,7 +1866,7 @@ export async function reassignProviderModels(gameId: string, providerKey: string
         throw new Error('Game not found');
     }
     const gameData = gameSnap.data();
-    const {gameTier} = await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: (gameData?.createdWithTier ?? 'free') });
+    const {gameTier} = await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: (gameData?.createdWithTier ?? 'free'), hostOnly: true });
     assertProviderNotBlocked({ providerBlocks: gameData?.providerBlocks }, newModel);
 
     const bots = (gameData?.bots || []) as Bot[];
