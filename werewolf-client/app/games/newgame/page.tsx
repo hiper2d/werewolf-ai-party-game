@@ -8,6 +8,8 @@ import {useSession} from 'next-auth/react';
 import {isGuestEmail} from '@/app/utils/guest';
 import {createGame, getPreviewProgress, previewGameAction} from '@/app/api/game-actions';
 import {generateDraftIllustrations, getAvatarDraft, reframeDraftAvatar} from '@/app/api/avatar-draft-actions';
+import {deletePreviewDraft, getPreviewDraft, savePreviewDraft} from '@/app/api/preview-draft-actions';
+import {PreviewDraftPayload} from '@/app/utils/preview-drafts';
 import type {PreviewProgress} from '@/app/ai/preview-generation';
 import {AVATAR_DRAFT_IN_PROGRESS, AVATAR_GM_KEY, AvatarDraftState, AvatarFraming, avatarSheetKey, DEFAULT_GAME_MODE, GAME_MODES, GAME_ROLES, GameMode, GamePreview, GamePreviewWithGeneratedBots, getRandomVoiceForGender, RANDOM_ROLE, UserTier, USER_TIERS, maxWerewolvesFor, MIN_WEREWOLVES} from "@/app/api/game-models";
 import {duplicateNameErrors, sanitizePlayerName, validatePlayerName} from "@/app/utils/name-utils";
@@ -29,6 +31,9 @@ import {getVoiceConfig, getDefaultVoiceProvider, SUPPORTED_VOICE_PROVIDERS, VOIC
 import {DEFAULT_GAME_LANGUAGE, GAME_LANGUAGES} from "@/app/ai/game-language";
 import {previewEdits} from '@/app/games/newgame/preview-edits';
 
+// Marks `lastSavedDraftRef` right after a saved preview was opened: the form's first state
+// is what the server already has.
+const RESTORED_DRAFT = '\u0000restored';
 const RANDOM_NAMES = ['Bob', 'John', 'Alex', 'Sam', 'Max', 'Leo', 'Kai', 'Finn'];
 const RANDOM_THEMES = ['Dracula', 'Sherlock Holmes', 'Cthulhu Mythos', 'Treasure Island', 'Spaceship Crew', 'Wild West Town'];
 
@@ -170,6 +175,15 @@ export default function CreateNewGamePage() {
     // the sheet it was cut from.
     const [reframeEntry, setReframeEntry] = useState<CastEntry | null>(null);
     const hasInitializedPlayerModels = useRef(false);
+    // Saved preview (app/utils/preview-drafts.ts): the draft this form writes to, the text
+    // it last wrote, the write in flight, and whether Create has taken over.
+    const previewDraftIdRef = useRef<string | null>(null);
+    const lastSavedDraftRef = useRef<string | null>(null);
+    const draftSaveInFlightRef = useRef<Promise<unknown> | null>(null);
+    const gameCreatedRef = useRef(false);
+    const draftRestoreStartedRef = useRef(false);
+    const [draftSaveState, setDraftSaveState] = useState<'saving' | 'saved' | 'failed' | null>(null);
+    const [draftRestoreError, setDraftRestoreError] = useState<string | null>(null);
     const playerOptions = useMemo(() => {
         // 8–16 players. 12 was a leftover of the API-tier removal; a full table is 16.
         const minPlayers = 8, maxPlayers = 16;
@@ -484,6 +498,104 @@ export default function CreateNewGamePage() {
             });
     }, [userTier, previewUsageCounts]);
 
+    // Open a saved preview: /games/newgame?draft=<id> puts the form and the preview back as
+    // they were left. After the tier is known, so the tier's own defaults do not overwrite
+    // what the draft restores. The address is read from `window` on purpose: useSearchParams
+    // would need a Suspense boundary around this whole page.
+    useEffect(() => {
+        if (status !== 'authenticated' || !isTierLoaded || draftRestoreStartedRef.current) return;
+        draftRestoreStartedRef.current = true;
+        const draftId = new URLSearchParams(window.location.search).get('draft');
+        if (!draftId) return;
+        let cancelled = false;
+        (async () => {
+            try {
+                const saved = await getPreviewDraft(draftId);
+                if (cancelled) return;
+                if (!saved) {
+                    setDraftRestoreError('This draft no longer exists. You can start a new game below.');
+                    window.history.replaceState(window.history.state, '', '/games/newgame');
+                    return;
+                }
+                const {form, preview, baseline} = saved;
+                setName(form.name);
+                setTheme(form.theme);
+                setDescription(form.description ?? '');
+                if (typeof form.language === 'string') setLanguage(form.language);
+                setArtStyle(form.artStyle ?? '');
+                if (Number.isFinite(form.playerCount)) setPlayerCount(form.playerCount);
+                if (Number.isFinite(form.werewolfCount)) setWerewolfCount(form.werewolfCount);
+                if (Array.isArray(form.specialRoles)) setSpecialRoles(form.specialRoles);
+                if (typeof form.humanPlayerRole === 'string') setHumanPlayerRole(form.humanPlayerRole);
+                setLongReplies(form.longReplies === true);
+                if ((Object.values(GAME_MODES) as string[]).includes(form.gameMode)) setGameMode(form.gameMode as GameMode);
+                if (typeof form.gameMasterAiType === 'string') setGameMasterAiType(form.gameMasterAiType);
+                if ((SUPPORTED_VOICE_PROVIDERS as readonly string[]).includes(form.voiceProvider)) setVoiceProvider(form.voiceProvider as VoiceProvider);
+                if (Array.isArray(form.playersAiType) && form.playersAiType.length > 0) setSelectedPlayerAiTypes(form.playersAiType);
+                setGameData(preview);
+                previewBaselineRef.current = baseline ?? preview;
+                setBotNameErrors(botNameErrorsFor(preview.name, preview.bots.map(bot => bot.name)));
+                previewDraftIdRef.current = draftId;
+                // The first save after a restore would write back what was just read.
+                lastSavedDraftRef.current = RESTORED_DRAFT;
+                setDraftSaveState('saved');
+                // Illustrations drawn for this cast, when the account's set is still that one.
+                const drawn = await getAvatarDraft().catch(() => null);
+                if (!cancelled && drawn) setDraft(drawn);
+            } catch (err) {
+                console.error('Could not open the saved preview', err);
+                if (!cancelled) setDraftRestoreError('Could not open this draft. Reload the page to try again.');
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [status, isTierLoaded]);
+
+    // Save the preview as a draft the moment it exists, and again a little after every edit.
+    useEffect(() => {
+        if (!gameData || isPreviewing || gameCreatedRef.current) return;
+        const payload: PreviewDraftPayload = {
+            form: {
+                name, theme, description, language, artStyle, playerCount, werewolfCount, specialRoles,
+                humanPlayerRole, longReplies, gameMode, gameMasterAiType, voiceProvider,
+                playersAiType: selectedPlayerAiTypes,
+            },
+            preview: gameData,
+            baseline: previewBaselineRef.current,
+        };
+        const json = JSON.stringify(payload);
+        if (lastSavedDraftRef.current === RESTORED_DRAFT) {
+            lastSavedDraftRef.current = json;
+            return;
+        }
+        if (json === lastSavedDraftRef.current) return;
+        // A new preview is saved at once; an edit waits for the typing to stop.
+        const timer = setTimeout(() => {
+            if (gameCreatedRef.current) return;
+            setDraftSaveState('saving');
+            const run = (async () => {
+                // One write at a time: the first save is what gives the draft its id.
+                await draftSaveInFlightRef.current?.catch(() => undefined);
+                if (gameCreatedRef.current) return;
+                const result = await savePreviewDraft(previewDraftIdRef.current, payload);
+                if (result.ok) {
+                    lastSavedDraftRef.current = json;
+                    if (previewDraftIdRef.current !== result.id) {
+                        previewDraftIdRef.current = result.id;
+                        window.history.replaceState(window.history.state, '', `/games/newgame?draft=${result.id}`);
+                    }
+                    setDraftSaveState('saved');
+                } else {
+                    // Removed elsewhere: the next edit starts a new draft.
+                    if (result.error === 'Draft not found') previewDraftIdRef.current = null;
+                    setDraftSaveState('failed');
+                }
+            })();
+            draftSaveInFlightRef.current = run;
+        }, previewDraftIdRef.current ? 2500 : 0);
+        return () => clearTimeout(timer);
+    }, [gameData, isPreviewing, name, theme, description, language, artStyle, playerCount, werewolfCount, specialRoles,
+        humanPlayerRole, longReplies, gameMode, gameMasterAiType, voiceProvider, selectedPlayerAiTypes]);
+
     // If the selected role becomes unavailable (its special role was unchecked), fall back to Random.
     // Must run before any conditional returns to keep hook order stable.
     useEffect(() => {
@@ -670,6 +782,8 @@ export default function CreateNewGamePage() {
 
         setIsLoading(true);
         setError(null);
+        // From here the draft is Create's: no more saves, and it is removed once the game exists.
+        gameCreatedRef.current = true;
         try {
             // Attach the preview's illustrations when they were drawn for this
             // exact cast: a ready set by version, a set still being drawn by
@@ -686,12 +800,17 @@ export default function CreateNewGamePage() {
                 edits: previewEdits(previewBaselineRef.current, gameData),
                 ...(avatarDraftVersion !== undefined ? { avatarDraftVersion } : {}),
             });
+            await draftSaveInFlightRef.current?.catch(() => undefined);
+            if (previewDraftIdRef.current) {
+                await deletePreviewDraft(previewDraftIdRef.current);
+            }
             if (newGameId) {
                 router.push(`/games/${newGameId}`);
             } else {
                 router.push("/games");
             }
         } catch (err: any) {
+            gameCreatedRef.current = false;
             setError(err.message);
             console.error("Error creating game:", err);
         } finally {
@@ -1052,12 +1171,23 @@ export default function CreateNewGamePage() {
                 );
             })()}
 
+            {draftRestoreError && (
+                <div className="p-4 border rounded-[var(--radius-lg)] bg-[var(--warn-soft)] border-[var(--warn-line)] text-[13px] text-[var(--fg-1)]">
+                    {draftRestoreError}
+                </div>
+            )}
+
             {/* Preview */}
             {gameData && (
                 <div className="flex flex-col gap-[22px]">
                     <div className="flex items-center gap-3 flex-wrap">
                         <h2 className="m-0 text-[20px] font-semibold tracking-[-0.01em] text-[var(--fg-0)]">Preview</h2>
-                        <span className={monoMeta}>story · {gameData.bots.length} characters · ready to start</span>
+                        <span className={monoMeta}>
+                            story · {gameData.bots.length} characters · ready to start
+                            {draftSaveState === 'saved' && ' · saved as a draft in your game list'}
+                            {draftSaveState === 'saving' && ' · saving the draft…'}
+                            {draftSaveState === 'failed' && ' · draft not saved'}
+                        </span>
                         <span className="flex-1" />
                         <button type="button" className={secondaryButton} onClick={handleGeneratePreview} disabled={!isFormValid || isLoading}>
                             {isLoading ? 'Generating…' : 'Regenerate'}

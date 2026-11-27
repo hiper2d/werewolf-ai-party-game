@@ -11,6 +11,9 @@ import StarterGames from "@/app/games/components/StarterGames";
 import { starterDefaultName } from "@/app/utils/starter-games";
 import { isGuestEmail } from "@/app/utils/guest";
 import { canOpenGameOnTier } from "@/app/utils/tier-access";
+import { listPreviewDrafts } from "@/app/api/preview-draft-actions";
+import { PreviewDraftSummary } from "@/app/utils/preview-drafts";
+import RemoveDraft from "@/app/games/components/RemoveDraft";
 
 function formatCreationDate(timestamp?: number): string {
     if (!timestamp) return '';
@@ -52,6 +55,8 @@ const GamePages = async ({searchParams}: {searchParams?: Promise<{error?: string
     const madeOwnGame = games.some(game => !game.starterTemplateId)
         || await getUser(userEmail).then(user => user.madeOwnGame === true).catch(() => false);
     const starterCards = madeOwnGame ? [] : await listStarterGames().catch(() => []);
+    // Previews generated on the form and not yet made into games (app/utils/preview-drafts.ts).
+    const drafts = await listPreviewDrafts().catch(() => []);
     const resolvedSearchParams = await searchParams;
     const errorCode = resolvedSearchParams?.error;
     const blockedGameId = resolvedSearchParams?.blocked;
@@ -98,6 +103,12 @@ const GamePages = async ({searchParams}: {searchParams?: Promise<{error?: string
                         {' '}with any theme and cast.
                     </p>
                     <StarterGames cards={starterCards} defaultName={starterDefaultName(session.user?.name)} />
+                    {drafts.length > 0 && (
+                        <>
+                            <h2 className="m-0 mt-8 mb-3 text-[18px] font-semibold text-[var(--fg-0)]">Drafts</h2>
+                            <DraftList drafts={drafts} />
+                        </>
+                    )}
                     {games.length > 0 && (
                         <>
                             <h2 className="m-0 mt-8 mb-3 text-[18px] font-semibold text-[var(--fg-0)]">Your games</h2>
@@ -105,7 +116,7 @@ const GamePages = async ({searchParams}: {searchParams?: Promise<{error?: string
                         </>
                     )}
                 </div>
-            ) : games.length === 0 ? (
+            ) : games.length === 0 && drafts.length === 0 ? (
                 <div className="flex-grow flex items-start justify-center pt-[16vh]">
                     <div className="text-center max-w-[420px] mx-auto px-6">
                         <div className="mx-auto w-14 h-14 rounded-full grid place-items-center border border-[var(--line-2)] bg-[var(--bg-2)] shadow-[var(--shadow-1)] mb-5">
@@ -136,6 +147,11 @@ const GamePages = async ({searchParams}: {searchParams?: Promise<{error?: string
                 </div>
             ) : (
             <div className="flex-grow overflow-auto">
+                {drafts.length > 0 && (
+                    <div className="mb-3">
+                        <DraftList drafts={drafts} />
+                    </div>
+                )}
                 <GameList games={games} userTier={userTier} userEmail={userEmail} />
             </div>
             )}
@@ -144,6 +160,42 @@ const GamePages = async ({searchParams}: {searchParams?: Promise<{error?: string
 }
 
 export default GamePages;
+
+/** Saved previews: a row opens the form with the cast and the story as they were left. */
+function DraftList({drafts}: {drafts: PreviewDraftSummary[]}) {
+    return (
+        <ul className="space-y-3">
+            {drafts.map(draft => (
+                <li
+                    key={draft.id}
+                    className="bg-[var(--bg-1)] border border-dashed border-[var(--line-2)] rounded-[var(--radius-lg)] px-4 py-4 transition-all duration-[120ms] hover:border-[var(--line-3)]"
+                >
+                    <div className="flex justify-between items-start gap-2">
+                        <Link href={`/games/newgame?draft=${draft.id}`} className="flex-grow min-w-0">
+                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-4">
+                                <h2 className="text-[16px] capitalize text-[var(--fg-0)] font-semibold truncate">
+                                    {draft.theme}
+                                    {draft.name && (
+                                        <span className="text-[13px] font-normal text-[var(--fg-2)] ml-2">as {draft.name}</span>
+                                    )}
+                                </h2>
+                                <div className="flex flex-wrap items-center gap-x-2 text-[11px] font-mono text-[var(--fg-2)]">
+                                    <span>{formatCreationDate(draft.updatedAt)}</span>
+                                    <span className="hidden sm:inline text-[var(--line-3)]">&middot;</span>
+                                    <span className="font-medium text-[var(--fg-1)] uppercase tracking-[0.04em]">Draft &middot; not started</span>
+                                </div>
+                            </div>
+                            <p className="mt-1.5 text-[13px] text-[var(--fg-1)] leading-relaxed">
+                                {draft.players} players. The cast and the story are ready: open it to edit them or create the game.
+                            </p>
+                        </Link>
+                        <RemoveDraft draftId={draft.id} />
+                    </div>
+                </li>
+            ))}
+        </ul>
+    );
+}
 
 function GameList({games, userTier, userEmail}: {games: Game[]; userTier: string; userEmail: string}) {
     return (

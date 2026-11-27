@@ -456,8 +456,51 @@ composer while bots talk, deliberately).
 
 ## Open questions
 
-- Phase-step buttons in shared games (start night, start new day): host-only (plan), or
-  any alive player, or a ready-toggle like Vote?
+- Settled 2026-11-26: phase-step buttons in shared games (start night, start new day) are
+  host-only. Also confirmed that day: shared games are for signed-in accounts only (a
+  guest account, `app/utils/guest.ts`, cannot host or join), and "guest" in this document
+  means a joined player, not a guest account.
+- DECISION 2 REVERSED (Alex, 2026-11-26): friends join the PREVIEW, before Create, not a
+  lobby after it. The preview is saved on the server once the host shares it; each joined
+  player claims a bot's place and writes their own name, story and voice; portraits stay
+  the host's; chat is never locked while bots talk (decision 5 stands). Design §2-3 and
+  rollout step 4 still describe the lobby and must be rewritten before that step is built.
+- MORE DECISIONS (Alex, 2026-11-26), not yet worked into the Design section:
+  - Every preview is saved on the server as soon as something is generated, solo too, and
+    shows in the game list as a draft.
+  - DECISION 4 REVERSED: players can join after Start. The host makes a link for one bot's
+    place and the player who opens it takes that character over.
+  - Preview links are of two kinds: a general one (the joiner gets a random free place) and
+    one per character (the joiner gets exactly that place).
+  - The host can remove a player; the character goes on as a bot, its history rebuilt from
+    the message log by author name (`convertToAIMessages`), without private notes for the
+    days the human played.
+  - If the host goes inactive, another player can take the host role and then remove the
+    former host. How "inactive" is detected and who pays afterwards: open.
+- DECISION 13 REPLACED (Alex, 2026-11-26). Billing assumes ONE kind of account with one
+  balance (the tiers are merged before this step is built):
+  - Every AI call of a shared game is divided equally among its PAYERS at that moment:
+    the living, active human players the host has left checked in a "who splits the bill"
+    menu. Everyone is checked on joining, mid-game joiners too; the host can uncheck
+    anyone but themselves. An unchecked player plays free and the rest cover the share.
+  - Dead players watch, cannot act and do not pay.
+  - A player who closes the game becomes INACTIVE. An inactive payer is not charged and the
+    game is blocked until they return or the host unchecks them. A payer with no money
+    left blocks it the same way.
+  - A player who deletes the game from their list leaves it: the character goes on as a
+    bot. A player the host removes loses the game from their list and needs a new invite
+    to come back.
+  - The joiner sees the expected cost per player before joining; a model change by the
+    host mid-game is a line in chat.
+  - Personal calls (own dictation, own auto-generated answer) are charged to the person;
+    preview generation and portrait draws to the host.
+  - "Inactive" = no heartbeat from the browser for about 2 minutes (accepted: the player
+    is charged during that delay); deleting the game is a server action and takes effect
+    at once. A change of the payer list is a line in chat.
+  - When every human player is dead, a shared game ends for everybody.
+  - Proposed, not confirmed: when living players remain but none is a checked payer, the
+    host pays.
+- Whether ready-made stories can be shared in the first version.
 
 ## Out of scope
 
