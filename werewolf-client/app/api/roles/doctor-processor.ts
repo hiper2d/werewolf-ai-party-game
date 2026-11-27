@@ -165,7 +165,7 @@ export class DoctorProcessor extends BaseRoleProcessor {
             // Get all living players for protection
             const allLivePlayers = [
                 ...this.game.bots.filter(bot => bot.isAlive).map(bot => bot.name),
-                this.game.humanPlayerName
+                ...(this.game.humanPlayerIsAlive !== false ? [this.game.humanPlayerName] : [])
             ];
 
             // Check who was protected last night (cannot protect same target twice in a row)

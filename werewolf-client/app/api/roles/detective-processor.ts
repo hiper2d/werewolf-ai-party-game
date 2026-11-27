@@ -229,7 +229,7 @@ export class DetectiveProcessor extends BaseRoleProcessor {
             // Get all living players except the detective for investigation
             const allLivePlayers = [
                 ...this.game.bots.filter(bot => bot.isAlive && bot.name !== detectiveBot.name).map(bot => bot.name),
-                this.game.humanPlayerName
+                ...(this.game.humanPlayerIsAlive !== false ? [this.game.humanPlayerName] : [])
             ];
             const targetNames = allLivePlayers.join(', ');
 

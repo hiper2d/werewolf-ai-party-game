@@ -11,7 +11,7 @@
  * Math.random and Date.now are pinned for determinism.
  */
 
-import { performNightAction, summarizePastDay, selectDayResponders } from './night-actions';
+import { performNightAction, summarizePastDay, selectDayResponders, humanPlayerTalkWerewolves } from './night-actions';
 import { db } from '@/firebase/server';
 import { auth } from '@/auth';
 import { AgentFactory } from '@/app/ai/agent-factory';
@@ -546,5 +546,65 @@ describe('selectDayResponders', () => {
         expect(result.game).toMatchObject({ id: game.id, gameState: game.gameState });
         expect(mockUpdate).not.toHaveBeenCalled();
         expect(setGameErrorState).not.toHaveBeenCalled();
+    });
+});
+
+// ---------------------------------------------------------------------------
+// A shared game: the bot 'Wolf2' / 'Doc' is played by a second person
+// ---------------------------------------------------------------------------
+
+describe('the night with a second human at the table', () => {
+    const FRIEND_EMAIL = 'friend@example.com';
+    const shared = (character: string, overrides: Partial<Game> = {}) => makeGame({
+        seats: {
+            u_host: { email: USER_EMAIL, character: HUMAN_NAME, payer: true, joinedAt: 1 },
+            u_friend: { email: FRIEND_EMAIL, character, payer: true, joinedAt: 2 },
+        },
+        ...overrides,
+    });
+
+    test('a person at the head is waited for, whichever seat they hold', async () => {
+        (getGame as jest.Mock).mockResolvedValue(shared('Doc', {
+            gameStateProcessQueue: [GAME_ROLES.DOCTOR],
+            gameStateParamQueue: ['Doc'],
+        }));
+
+        await performNightAction(GAME_ID);
+
+        expect(mockUpdate).not.toHaveBeenCalled();
+        expect(AgentFactory.createAgent).not.toHaveBeenCalled();
+        expect(setGameErrorState).not.toHaveBeenCalled();
+    });
+
+    test('only the host\'s screen runs the night', async () => {
+        (getGame as jest.Mock).mockResolvedValue(shared('Vil', {
+            gameStateProcessQueue: [GAME_ROLES.DOCTOR],
+            gameStateParamQueue: ['Doc'],
+        }));
+        (auth as jest.Mock).mockResolvedValue({ user: { email: FRIEND_EMAIL } });
+
+        await performNightAction(GAME_ID);
+
+        expect(mockUpdate).not.toHaveBeenCalled();
+        expect(AgentFactory.createAgent).not.toHaveBeenCalled();
+    });
+
+    test('a werewolf speaks in the pack chat as their own character, at their own turn', async () => {
+        const game = shared('Wolf2', {
+            bots: [makeBot('Wolf', { role: GAME_ROLES.WEREWOLF }), makeBot('Wolf2', { role: GAME_ROLES.WEREWOLF }), makeBot('Vil')],
+            gameStateProcessQueue: [GAME_ROLES.WEREWOLF],
+            gameStateParamQueue: ['Wolf2', 'Wolf', 'Wolf2', 'Wolf'],
+        });
+        (getGame as jest.Mock).mockResolvedValue(game);
+
+        // The host is a villager: the pack chat is not theirs to write in.
+        await humanPlayerTalkWerewolves(GAME_ID, 'let me in');
+        expect(savedMessages()).toEqual([]);
+
+        (auth as jest.Mock).mockResolvedValue({ user: { email: FRIEND_EMAIL } });
+        await humanPlayerTalkWerewolves(GAME_ID, 'Vil tonight?');
+
+        expect(savedMessages()).toEqual([expect.objectContaining({ authorName: 'Wolf2', msg: { reply: 'Vil tonight?' } })]);
+        expect(mockUpdate).toHaveBeenCalledWith({ gameStateParamQueue: ['Wolf', 'Wolf2', 'Wolf'] });
     });
 });

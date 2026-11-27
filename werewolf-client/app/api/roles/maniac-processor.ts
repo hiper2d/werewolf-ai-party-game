@@ -104,7 +104,7 @@ export class ManiacProcessor extends BaseRoleProcessor {
             // Get all living players except the maniac for abduction
             const allLivePlayers = [
                 ...this.game.bots.filter(bot => bot.isAlive && bot.name !== maniacBot.name).map(bot => bot.name),
-                this.game.humanPlayerName
+                ...(this.game.humanPlayerIsAlive !== false ? [this.game.humanPlayerName] : [])
             ];
 
             // Check who was abducted last night (cannot abduct same target twice in a row)

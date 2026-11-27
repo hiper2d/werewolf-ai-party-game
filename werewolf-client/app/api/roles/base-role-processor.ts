@@ -1,6 +1,7 @@
 import { Game, Bot, GAME_MASTER, GameMessage, MessageType, RECIPIENT_ALL, RECIPIENT_WEREWOLVES, ROLE_CONFIGS, GAME_ROLES } from "@/app/api/game-models";
 import { addMessageToChatAndSaveToDb } from "@/app/api/game-actions";
 import { gameText, nightTurnText } from "@/app/ai/game-text";
+import { humanCastNames, isSharedGame } from "@/app/utils/cast";
 
 /**
  * Result of a night action processing
@@ -229,15 +230,18 @@ export abstract class BaseRoleProcessor {
         // Find all alive bots with this role
         const bots = this.game.bots.filter(bot => bot.isAlive && bot.role === this.roleName);
 
-        // Check if human player has this role
-        const hasHumanPlayer = this.game.humanPlayerRole === this.roleName;
-        const humanPlayerName = hasHumanPlayer ? this.game.humanPlayerName : undefined;
+        // The first human holds this role and is alive (always alive in a running solo game)
+        const firstHumanHasRole = this.game.humanPlayerRole === this.roleName && this.game.humanPlayerIsAlive !== false;
+        const humanPlayerName = firstHumanHasRole ? this.game.humanPlayerName : undefined;
+        // Any other person is an entry in the cast (app/utils/cast.ts)
+        const castHumans = humanCastNames(this.game);
 
         // Combine all players
         const allPlayers = [
-            ...bots.map(bot => ({ name: bot.name, isHuman: false, isAlive: bot.isAlive, bot })),
-            ...(hasHumanPlayer ? [{ name: this.game.humanPlayerName, isHuman: true, isAlive: true }] : [])
+            ...bots.map(bot => ({ name: bot.name, isHuman: castHumans.has(bot.name), isAlive: bot.isAlive, bot })),
+            ...(firstHumanHasRole ? [{ name: this.game.humanPlayerName, isHuman: true, isAlive: true }] : [])
         ];
+        const hasHumanPlayer = allPlayers.some(player => player.isHuman);
 
         return {
             allPlayers,
@@ -299,8 +303,11 @@ export abstract class BaseRoleProcessor {
         // The human werewolf still needs to see who their packmates are. That goes out
         // on the werewolves-only channel, which no villager can read.
         if (isWerewolfTurn && playersInfo.hasHumanPlayer) {
+            // "(You)" marks the one person reading; with several people the note is the
+            // same for all of them, so it names nobody.
+            const markYou = !isSharedGame(this.game);
             const werewolfRoster = playersInfo.allPlayers
-                .map(player => player.isHuman ? `${player.name} ${gameText(this.game, 'pack_you')}` : player.name)
+                .map(player => player.isHuman && markYou ? `${player.name} ${gameText(this.game, 'pack_you')}` : player.name)
                 .join(', ');
             const packNote = gameText(this.game, hasMultiplePlayers ? 'pack_note_many' : 'pack_note_alone', { roster: werewolfRoster });
             await this.sendMessage(packNote, MessageType.GM_COMMAND, RECIPIENT_WEREWOLVES);
@@ -329,7 +336,7 @@ export abstract class BaseRoleProcessor {
             .forEach(bot => targets.push({ name: bot.name, isHuman: false, bot }));
 
         // Add human player if alive and not same role
-        if (!excludeSameRole || this.game.humanPlayerRole !== this.roleName) {
+        if (this.game.humanPlayerIsAlive !== false && (!excludeSameRole || this.game.humanPlayerRole !== this.roleName)) {
             targets.push({ name: this.game.humanPlayerName, isHuman: true });
         }
 
@@ -342,7 +349,8 @@ export abstract class BaseRoleProcessor {
     protected isValidTarget(playerName: string): boolean {
         // Check if it's the human player
         if (playerName === this.game.humanPlayerName) {
-            return true; // Human player is always alive unless game is over
+            // Always alive in a running solo game; in a shared one the game can go on without them
+            return this.game.humanPlayerIsAlive !== false;
         }
 
         // Check if it's an alive bot

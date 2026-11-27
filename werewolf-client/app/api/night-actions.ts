@@ -54,6 +54,8 @@ import { getProviderSignatureFields, SUMMARY_REQUEST_TIMEOUT_MS } from "@/app/ai
 import { GameEndChecker } from "@/app/utils/game-end-checker";
 import { recordBotTokenUsage, recordGameMasterTokenUsage } from "@/app/api/cost-tracking";
 import { ensureUserCanAccessGame } from "@/app/api/tier-guards";
+import { actingSeat } from "@/app/api/game-seats";
+import { aiBots, alivePlayerNames, isHumanName, playerRole } from "@/app/utils/cast";
 import { logger } from "@/app/utils/logger";
 import { clampUserText, INPUT_LIMITS } from "@/app/utils/input-limits";
 import { screenHumanInput } from "@/app/api/jev-screen";
@@ -101,10 +103,7 @@ async function endNightWithResults(gameId: string, game: Game): Promise<GameActi
 
     // Create GM system prompt with game context
     const gmSystemPrompt = format(GM_NIGHT_RESULTS_SYSTEM_PROMPT, {
-        players_names: [
-            ...game.bots.filter(bot => bot.isAlive).map(bot => bot.name),
-            game.humanPlayerName
-        ].join(", "),
+        players_names: alivePlayerNames(game).join(", "),
         dead_players_names_with_roles: game.bots
             .filter(bot => !bot.isAlive)
             .map(bot => `${bot.name} (${bot.role})`)
@@ -357,6 +356,12 @@ async function performNightActionImpl(gameId: string): Promise<GameActionRespons
     // exactly the request being retried and nothing after it.
     await consumeModelOverride(gameId, game);
 
+    // The host's screen runs the night: starting it, asking each bot, ending it. From any
+    // other seat this call changes nothing (a person acts with their own night action).
+    if (!actingSeat(game, session.user.email).host) {
+        return staleActionNoOp('performNightAction', 'only the host runs the night', game);
+    }
+
     // Handle different game states
     if (game.gameState === GAME_STATES.VOTE_RESULTS) {
         // Initialize night: set up role queues, transition to NIGHT, return
@@ -399,6 +404,11 @@ async function beginNightImpl(gameId: string): Promise<GameActionResponse> {
 
     await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: game.createdWithTier });
 
+    // The host's screen moves the game from phase to phase.
+    if (!actingSeat(game, session.user.email).host) {
+        return staleActionNoOp('beginNight', 'only the host moves the game on', game);
+    }
+
     // Stale call (e.g. double-clicked "Start Night" — the first click already
     // moved VOTE_RESULTS → NIGHT): re-sync the client, don't error.
     if (game.gameState !== GAME_STATES.VOTE_RESULTS) {
@@ -417,7 +427,7 @@ async function beginNightImpl(gameId: string): Promise<GameActionResponse> {
             });
 
         // Check human player for night actions
-        if (ROLE_CONFIGS[game.humanPlayerRole]) {
+        if (ROLE_CONFIGS[game.humanPlayerRole] && game.humanPlayerIsAlive !== false) {
             activeNightRoles.add(game.humanPlayerRole);
         }
 
@@ -547,6 +557,11 @@ async function replayNightImpl(gameId: string): Promise<GameActionResponse> {
     }
 
     await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: game.createdWithTier });
+
+    // The host's screen moves the game from phase to phase.
+    if (!actingSeat(game, session.user.email).host) {
+        return staleActionNoOp('replayNight', 'only the host moves the game on', game);
+    }
     assertNoStarterRewind(game);
 
     // A replay re-runs every night action from scratch, so it is a paid-tier feature.
@@ -726,8 +741,9 @@ async function processNightQueue(gameId: string, game: Game): Promise<GameAction
 
         console.log(`🌙 PROCESS NIGHT QUEUE: Role=${currentRole}, Player=${currentPlayer}, ParamQueue=[${game.gameStateParamQueue.join(', ')}]`);
 
-        // Check if current player is human
-        if (currentPlayer === game.humanPlayerName) {
+        // A person at the head (the first human or a cast entry somebody plays): their
+        // own screen shows the night action form
+        if (isHumanName(game, currentPlayer)) {
             // Pre-resolve night state up to the current role to check if
             // the human player is dead or abducted — if so, skip their turn
             const preState = RoleProcessorFactory.resolveNightState(gameId, game, currentRole);
@@ -878,7 +894,9 @@ async function humanPlayerTalkWerewolvesImpl(gameId: string, message: string): P
         return staleActionNoOp('humanPlayerTalkWerewolves', 'not currently the werewolf phase', game);
     }
 
-    if (game.humanPlayerRole !== GAME_ROLES.WEREWOLF || currentPlayer !== game.humanPlayerName) {
+    // The message is the caller's own character's (app/api/game-seats.ts)
+    const speaker = actingSeat(game, session.user.email).character;
+    if (playerRole(game, speaker) !== GAME_ROLES.WEREWOLF || currentPlayer !== speaker) {
         return staleActionNoOp('humanPlayerTalkWerewolves', 'not the human player\'s werewolf turn', game);
     }
 
@@ -904,7 +922,7 @@ async function humanPlayerTalkWerewolvesImpl(gameId: string, message: string): P
         const werewolfMessage: GameMessage = {
             id: null,
             recipientName: RECIPIENT_WEREWOLVES,
-            authorName: game.humanPlayerName,
+            authorName: speaker,
             msg: { reply: message },
             messageType: MessageType.BOT_ANSWER,
             day: game.currentDay,
@@ -951,7 +969,7 @@ async function humanPlayerTalkWerewolvesImpl(gameId: string, message: string): P
         // Update game state
         await db.collection('games').doc(gameId).update(finalUpdates);
 
-        logger.info(`Human player ${game.humanPlayerName} participated in werewolf discussion`, { gameId });
+        logger.info(`Human player ${speaker} participated in werewolf discussion`, { gameId });
 
         // Return updated game state
         const updatedGame = await getGame(gameId) as Game;
@@ -987,6 +1005,11 @@ async function startNewDayImpl(gameId: string): Promise<GameActionResponse> {
         const currentGame = { id: gameId, ...gameData } as Game;
 
         await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: currentGame.createdWithTier });
+
+    // The host's screen moves the game from phase to phase.
+    if (!actingSeat(currentGame, session.user.email).host) {
+        return staleActionNoOp('startNewDay', 'only the host moves the game on', currentGame);
+    }
 
         // A guest's game stops here, with the night's story told: day 2 needs a sign-in,
         // which moves the game to the account (app/utils/guest.ts). Returned, not thrown:
@@ -1140,8 +1163,8 @@ async function startNewDayImpl(gameId: string): Promise<GameActionResponse> {
             });
         }
 
-        // Get all alive bot names for the processing queue
-        const aliveBotNames = updatedBots.filter(bot => bot.isAlive).map(bot => bot.name);
+        // The living bots write their end-of-day notes; a person's character has none
+        const aliveBotNames = aiBots({ ...currentGame, bots: updatedBots }).filter(bot => bot.isAlive).map(bot => bot.name);
 
         // The human is not in game.bots — fold their night death into the persisted
         // alive flag so the game ends if the human was killed.
@@ -1231,6 +1254,11 @@ async function summarizePastDayImpl(gameId: string): Promise<GameActionResponse>
         // re-sync the client, don't error.
         if (gameData?.gameState !== GAME_STATES.NEW_DAY_BOT_SUMMARIES) {
             return staleActionNoOp('summarizePastDay', `game is in ${gameData?.gameState}, not NEW_DAY_BOT_SUMMARIES`, currentGame);
+        }
+
+        // The host's screen runs the end-of-day notes.
+        if (!actingSeat(currentGame, (await auth())?.user?.email).host) {
+            return staleActionNoOp('summarizePastDay', 'only the host moves the game on', currentGame);
         }
 
         // One-shot "Retry with different model" override: consume it now so it applies
@@ -1549,6 +1577,11 @@ async function selectDayRespondersImpl(gameId: string): Promise<GameActionRespon
     }
 
     await ensureUserCanAccessGame(gameId, session.user.email, { gameTier: game.createdWithTier });
+
+    // The host's screen moves the game from phase to phase.
+    if (!actingSeat(game, session.user.email).host) {
+        return staleActionNoOp('selectDayResponders', 'only the host moves the game on', game);
+    }
 
     // Tolerant of double-fire: if we're no longer in NIGHT_IMPRESSION, the work was
     // already done by a prior call — just return the current game unchanged.

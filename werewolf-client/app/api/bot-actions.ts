@@ -73,7 +73,7 @@ import {selectEliminatedPlayer} from "@/app/api/vote-utils";
 import { RoleProcessorFactory } from "./roles";
 import {logger} from "@/app/utils/logger";
 import {actingSeat} from "@/app/api/game-seats";
-import {aiBots, alivePlayerNames, humanNames, isHumanName, isPlayerAlive, isSharedGame, livingHumanNames} from "@/app/utils/cast";
+import {aiBots, alivePlayerNames, humanNames, isHumanName, isPlayerAlive, isSharedGame, livingHumanNames, playerRole} from "@/app/utils/cast";
 
 /**
  * Parse a vote-tally / individual-votes blob from gameStateParamQueue.
@@ -1489,7 +1489,9 @@ async function performHumanPlayerNightActionImpl(gameId: string, targetPlayer: s
     const currentRole = game.gameStateProcessQueue[0];
     const currentPlayer = game.gameStateParamQueue[0];
 
-    if (currentRole !== game.humanPlayerRole || currentPlayer !== game.humanPlayerName) {
+    // The action is the caller's own character's (app/api/game-seats.ts)
+    const actorName = actingSeat(game, session.user.email).character;
+    if (currentRole !== playerRole(game, actorName) || currentPlayer !== actorName) {
         return staleActionNoOp('performHumanPlayerNightAction', 'not the human player\'s turn for a night action', game);
     }
 
@@ -1499,21 +1501,20 @@ async function performHumanPlayerNightActionImpl(gameId: string, targetPlayer: s
     }
 
     // Validate target player based on role-specific rules
-    const allPlayers = [
-        { name: game.humanPlayerName, isAlive: true },
-        ...game.bots.map(bot => ({ name: bot.name, isAlive: bot.isAlive }))
+    const aliveNames = [
+        ...(game.humanPlayerIsAlive !== false ? [game.humanPlayerName] : []),
+        ...game.bots.filter(bot => bot.isAlive).map(bot => bot.name)
     ];
-    const alivePlayerNames = allPlayers.filter(p => p.isAlive).map(p => p.name);
     
     // Role-specific target validation
     if (currentRole === GAME_ROLES.WEREWOLF) {
         // Werewolves cannot target other werewolves
         const werewolfNames = [
-            game.humanPlayerRole === GAME_ROLES.WEREWOLF ? game.humanPlayerName : null,
+            game.humanPlayerRole === GAME_ROLES.WEREWOLF && game.humanPlayerIsAlive !== false ? game.humanPlayerName : null,
             ...game.bots.filter(bot => bot.isAlive && bot.role === GAME_ROLES.WEREWOLF).map(bot => bot.name)
         ].filter(name => name !== null);
         
-        const validTargets = alivePlayerNames.filter(name => !werewolfNames.includes(name));
+        const validTargets = aliveNames.filter(name => !werewolfNames.includes(name));
         if (!validTargets.includes(targetPlayer)) {
             throw new Error(`Invalid werewolf target. Available targets: ${validTargets.join(', ')}`);
         }
@@ -1521,8 +1522,8 @@ async function performHumanPlayerNightActionImpl(gameId: string, targetPlayer: s
         // Doctor cannot protect the same player two nights in a row
         const previousProtectedTarget = game.previousNightResults?.doctor?.target || null;
         const validTargets = previousProtectedTarget 
-            ? alivePlayerNames.filter(name => name !== previousProtectedTarget)
-            : alivePlayerNames;
+            ? aliveNames.filter(name => name !== previousProtectedTarget)
+            : aliveNames;
             
         if (!validTargets.includes(targetPlayer)) {
             if (targetPlayer === previousProtectedTarget) {
@@ -1533,8 +1534,8 @@ async function performHumanPlayerNightActionImpl(gameId: string, targetPlayer: s
         }
     } else {
         // Detective and other roles can target any alive player
-        if (!alivePlayerNames.includes(targetPlayer)) {
-            throw new Error(`Invalid target. Available targets: ${alivePlayerNames.join(', ')}`);
+        if (!aliveNames.includes(targetPlayer)) {
+            throw new Error(`Invalid target. Available targets: ${aliveNames.join(', ')}`);
         }
     }
 
@@ -1575,7 +1576,7 @@ async function performHumanPlayerNightActionImpl(gameId: string, targetPlayer: s
         const nightActionMessage: GameMessage = {
             id: null,
             recipientName: recipient,
-            authorName: game.humanPlayerName,
+            authorName: actorName,
             msg: { target: targetPlayer, reasoning: message, ...((currentRole === GAME_ROLES.DOCTOR || currentRole === GAME_ROLES.DETECTIVE) && actionType ? { action_type: actionType } : {}) },
             messageType: messageType,
             day: game.currentDay,
@@ -1642,7 +1643,7 @@ async function performHumanPlayerNightActionImpl(gameId: string, targetPlayer: s
                     .forEach(bot => playersWithRole.push(bot.name));
                 
                 // Check human player for next role
-                if (game.humanPlayerRole === nextRole) {
+                if (game.humanPlayerRole === nextRole && game.humanPlayerIsAlive !== false) {
                     playersWithRole.push(game.humanPlayerName);
                 }
                 
@@ -1675,7 +1676,7 @@ async function performHumanPlayerNightActionImpl(gameId: string, targetPlayer: s
         // Update game state
         await db.collection('games').doc(gameId).update(finalUpdates);
         
-        logger.info(`Successfully processed final night action for human player ${game.humanPlayerName} targeting ${targetPlayer}`, { gameId, role: currentRole, target: targetPlayer });
+        logger.info(`Successfully processed final night action for human player ${actorName} targeting ${targetPlayer}`, { gameId, role: currentRole, target: targetPlayer });
         
         // Return updated game state
         return { game: await getGame(gameId) as Game, messages: [savedNightActionMessage] };
@@ -1722,7 +1723,7 @@ async function getSuggestionImpl(gameId: string): Promise<string> {
 
         // Create prompt with game context
         const suggestionPrompt = format(HUMAN_SUGGESTION_PROMPT, {
-            player_name: game.humanPlayerName,
+            player_name: actingSeat(game, session.user.email).character,
             players_names: getAlivePlayerNames(game),
             dead_players_names_with_roles: game.bots
                 .filter(b => !b.isAlive)
