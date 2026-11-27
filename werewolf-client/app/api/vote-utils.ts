@@ -17,7 +17,7 @@
  */
 export function selectEliminatedPlayer(
     votingResults: Record<string, number>,
-    humanPlayerName: string,
+    humanPlayerName: string | string[],
     random: () => number = Math.random
 ): string | null {
     const entries = Object.entries(votingResults);
@@ -34,7 +34,9 @@ export function selectEliminatedPlayer(
         return topPlayers[0];
     }
 
-    const nonHumanTiedPlayers = topPlayers.filter(name => name !== humanPlayerName);
+    // Every person at the table is spared by a tie-break, not only the first.
+    const humans = new Set(Array.isArray(humanPlayerName) ? humanPlayerName : [humanPlayerName]);
+    const nonHumanTiedPlayers = topPlayers.filter(name => !humans.has(name));
     if (nonHumanTiedPlayers.length > 0) {
         return nonHumanTiedPlayers[Math.floor(random() * nonHumanTiedPlayers.length)];
     }

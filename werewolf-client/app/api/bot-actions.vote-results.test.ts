@@ -516,6 +516,27 @@ describe('vote: VOTE_RESULTS transition and elimination', () => {
         expect(setGameErrorState).not.toHaveBeenCalled();
     });
 
+    test('the first human voted out while another person plays on: the death is recorded and the game goes on', async () => {
+        const game = setupDrainedVote([
+            JSON.stringify({ [HUMAN_NAME]: 2, Alice: 1 }),
+            JSON.stringify([]),
+        ]);
+        const friend = game.bots.find(b => b.role !== GAME_ROLES.WEREWOLF)!.name;
+        game.seats = {
+            u_host: { email: USER_EMAIL, character: HUMAN_NAME, payer: true, joinedAt: 1 },
+            u_friend: { email: 'friend@example.com', character: friend, payer: true, joinedAt: 2 },
+        };
+
+        await vote(GAME_ID);
+
+        expect(mockUpdate).toHaveBeenCalledWith({
+            humanPlayerIsAlive: false,
+            votingHistory: [expect.objectContaining({ eliminatedPlayer: HUMAN_NAME })],
+        });
+        expect(updatesWith('gameState').map(u => u.gameState)).toEqual([GAME_STATES.VOTE_RESULTS]);
+        expect(setGameErrorState).not.toHaveBeenCalled();
+    });
+
     test('eliminating the last werewolf triggers the villagers-win game end (extra GAME_OVER update + story)', async () => {
         setupDrainedVote([JSON.stringify({ Wolf: 3 }), JSON.stringify([])]);
 

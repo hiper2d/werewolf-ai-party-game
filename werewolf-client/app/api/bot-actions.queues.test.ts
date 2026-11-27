@@ -1062,3 +1062,72 @@ describe('talkToAll with a second human at the table', () => {
         expectErrorState('do not have access');
     });
 });
+
+describe('voting with a second human at the table', () => {
+    const FRIEND_EMAIL = 'friend@example.com';
+    const sharedVote = (queue: string[], overrides: Partial<Game> = {}) => makeGame({
+        gameState: GAME_STATES.VOTE,
+        gameStateProcessQueue: queue,
+        seats: {
+            u_host: { email: USER_EMAIL, character: HUMAN_NAME, payer: true, joinedAt: 1 },
+            u_friend: { email: FRIEND_EMAIL, character: 'Bob', payer: true, joinedAt: 2 },
+        },
+        ...overrides,
+    });
+
+    test('a person at the head of the queue is waited for, not asked', async () => {
+        (getGame as jest.Mock).mockResolvedValue(sharedVote(['Bob', 'Alice']));
+
+        await vote(GAME_ID);
+
+        expect(AgentFactory.createAgent).not.toHaveBeenCalled();
+        expect(mockUpdate).not.toHaveBeenCalled();
+    });
+
+    test('each person votes as their own character, at their own turn', async () => {
+        const game = sharedVote(['Bob', HUMAN_NAME]);
+        (getGame as jest.Mock).mockResolvedValue(game);
+
+        // The host's turn has not come: nothing is written.
+        await humanPlayerVote(GAME_ID, 'Alice', 'sus');
+        expect(addMessageToChatAndSaveToDb).not.toHaveBeenCalled();
+
+        (auth as jest.Mock).mockResolvedValue({ user: { email: FRIEND_EMAIL } });
+        await humanPlayerVote(GAME_ID, HUMAN_NAME, 'the quiet one');
+
+        expect(addMessageToChatAndSaveToDb).toHaveBeenCalledWith(
+            expect.objectContaining({ authorName: 'Bob', msg: { who: HUMAN_NAME, why: 'the quiet one' } }),
+            GAME_ID,
+        );
+        expect(updatesWith('gameStateProcessQueue')[0].gameStateProcessQueue).toEqual([HUMAN_NAME]);
+    });
+
+    test('nobody votes for themselves', async () => {
+        (getGame as jest.Mock).mockResolvedValue(sharedVote(['Bob']));
+        (auth as jest.Mock).mockResolvedValue({ user: { email: FRIEND_EMAIL } });
+
+        await humanPlayerVote(GAME_ID, 'Bob', 'me');
+
+        expect(addMessageToChatAndSaveToDb).not.toHaveBeenCalled();
+        expectErrorState('Invalid target player');
+    });
+
+    test('from a seat that is not the host\'s, the vote cannot be started or run', async () => {
+        (auth as jest.Mock).mockResolvedValue({ user: { email: FRIEND_EMAIL } });
+        (getGame as jest.Mock).mockResolvedValue(sharedVote([], { gameState: GAME_STATES.DAY_DISCUSSION }));
+        await vote(GAME_ID);
+        (getGame as jest.Mock).mockResolvedValue(sharedVote(['Alice']));
+        await vote(GAME_ID);
+
+        expect(mockUpdate).not.toHaveBeenCalled();
+        expect(AgentFactory.createAgent).not.toHaveBeenCalled();
+    });
+
+    test('the vote queue holds everybody alive, people included', async () => {
+        (getGame as jest.Mock).mockResolvedValue(sharedVote([], { gameState: GAME_STATES.DAY_DISCUSSION }));
+
+        await vote(GAME_ID);
+
+        expect(updatesWith('gameStateProcessQueue')[0].gameStateProcessQueue.sort()).toEqual(['Alice', 'Bob', HUMAN_NAME].sort());
+    });
+});

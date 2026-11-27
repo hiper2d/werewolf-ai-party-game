@@ -1,3 +1,4 @@
+import {livingHumanNames} from '@/app/utils/cast';
 import { Game, GAME_ROLES } from '@/app/api/game-models';
 import { gameText, GameTextKey, roleName } from '@/app/ai/game-text';
 
@@ -69,9 +70,9 @@ class HumanEliminatedChecker implements WinConditionChecker {
         // The human is not mirrored into game.bots — their alive status lives on the
         // game itself (set on day-vote and night-kill). Legacy games without the
         // field default to alive.
-        const humanIsAlive = game.humanPlayerIsAlive ?? true;
-
-        if (!humanIsAlive) {
+        // A shared game goes on while any person is alive (app/utils/cast.ts); a solo
+        // game has one.
+        if (livingHumanNames(game).length === 0) {
             return {
                 isEnded: true,
                 winner: undefined,

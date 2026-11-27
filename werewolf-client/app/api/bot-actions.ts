@@ -73,7 +73,7 @@ import {selectEliminatedPlayer} from "@/app/api/vote-utils";
 import { RoleProcessorFactory } from "./roles";
 import {logger} from "@/app/utils/logger";
 import {actingSeat} from "@/app/api/game-seats";
-import {aiBots, alivePlayerNames, isHumanName, isPlayerAlive, isSharedGame} from "@/app/utils/cast";
+import {aiBots, alivePlayerNames, humanNames, isHumanName, isPlayerAlive, isSharedGame, livingHumanNames} from "@/app/utils/cast";
 
 /**
  * Parse a vote-tally / individual-votes blob from gameStateParamQueue.
@@ -858,6 +858,12 @@ async function voteImpl(gameId: string): Promise<GameActionResponse> {
     });
 
     try {
+        // The host's screen runs the vote: starting it, asking each bot, closing it. From
+        // any other seat this call changes nothing (a person votes with humanPlayerVote).
+        if (!actingSeat(game, session.user.email).host) {
+            return staleActionNoOp('vote', 'only the host runs the vote', game);
+        }
+
         // Mode 1: DAY_DISCUSSION state - Initialize voting
         if (game.gameState === GAME_STATES.DAY_DISCUSSION) {
             // Bots still queued to speak: starting the vote now would wipe their
@@ -871,11 +877,8 @@ async function voteImpl(gameId: string): Promise<GameActionResponse> {
             const gameStateProcessQueue: string[] = [];
             const gameStateParamQueue: string[] = [];
             
-            // Get all alive bot players
-            const aliveBots = game.bots.filter(bot => bot.isAlive).map(bot => bot.name);
-            
-            // Add human player name
-            const allPlayers = [...aliveBots, game.humanPlayerName];
+            // Everybody alive votes, humans and bots
+            const allPlayers = alivePlayerNames(game);
             
             // Shuffle the list
             const shuffledPlayers = [...allPlayers].sort(() => Math.random() - 0.5);
@@ -939,7 +942,7 @@ async function voteImpl(gameId: string): Promise<GameActionResponse> {
                 
                 // ELIMINATION LOGIC: Process elimination after everyone has voted
                 if (Object.keys(votingResults).length > 0) {
-                    const eliminatedPlayer = selectEliminatedPlayer(votingResults, updatedGame.humanPlayerName)!;
+                    const eliminatedPlayer = selectEliminatedPlayer(votingResults, humanNames(updatedGame))!;
                     let eliminatedRole: string;
                     let isHumanEliminated = false;
 
@@ -991,7 +994,32 @@ async function voteImpl(gameId: string): Promise<GameActionResponse> {
                     voteResultMessages.push(await addMessageToChatAndSaveToDb(eliminationGmMessage, gameId));
 
                     // Update game state based on elimination
-                    if (isHumanEliminated) {
+                    const otherHumansLive = livingHumanNames(updatedGame).some(name => name !== eliminatedPlayer);
+                    if (isHumanEliminated && otherHumansLive) {
+                        // The first human is out and other people play on: record the
+                        // death, then see whether it decided the game.
+                        await db.collection('games').doc(gameId).update({
+                            humanPlayerIsAlive: false,
+                            votingHistory: updatedVotingHistory
+                        });
+                        const tempGame = { ...updatedGame, humanPlayerIsAlive: false, votingHistory: updatedVotingHistory };
+                        const endCheck = checkGameEndConditions(tempGame);
+                        if (endCheck.isEnded) {
+                            const gameEndMessage: GameMessage = {
+                                id: null,
+                                recipientName: RECIPIENT_ALL,
+                                authorName: GAME_MASTER,
+                                msg: { story: endCheck.reason || 'Game has ended!' },
+                                messageType: MessageType.GAME_STORY,
+                                day: updatedGame.currentDay,
+                                timestamp: Date.now(),
+                            };
+                            voteResultMessages.push(await addMessageToChatAndSaveToDb(gameEndMessage, gameId));
+                            await db.collection('games').doc(gameId).update({
+                                gameState: GAME_STATES.GAME_OVER
+                            });
+                        }
+                    } else if (isHumanEliminated) {
                         // Human eliminated: record the death and set game state to GAME_OVER
                         await db.collection('games').doc(gameId).update({
                             gameState: GAME_STATES.GAME_OVER,
@@ -1051,8 +1079,8 @@ async function voteImpl(gameId: string): Promise<GameActionResponse> {
             // Get the first name from queue
             const currentVoter = game.gameStateProcessQueue[0];
             
-            // If it's the human player, return to UI (UI will handle human voting)
-            if (currentVoter === game.humanPlayerName) {
+            // A person at the head: their own screen shows the vote form (humanPlayerVote)
+            if (isHumanName(game, currentVoter)) {
                 return { game, messages: [] };
             }
             
@@ -1086,12 +1114,9 @@ async function voteImpl(gameId: string): Promise<GameActionResponse> {
 
 
             // Get all alive players for voting options
-            const alivePlayerNames = [
-                ...currentGame.bots.filter(b => b.isAlive && b.name !== bot.name).map(b => b.name),
-                currentGame.humanPlayerName
-            ];
+            const voteTargets = alivePlayerNames(currentGame).filter(name => name !== bot.name);
             
-            if (alivePlayerNames.length === 0) {
+            if (voteTargets.length === 0) {
                 throw new Error('No valid voting targets available');
             }
             
@@ -1102,7 +1127,7 @@ async function voteImpl(gameId: string): Promise<GameActionResponse> {
 
             // Build the strict candidate list and (for werewolves) a teammate reminder
             // injected directly into the vote command so the bot copies a name verbatim.
-            const validTargetsList = alivePlayerNames.map(n => `- ${n}`).join("\n");
+            const validTargetsList = voteTargets.map(n => `- ${n}`).join("\n");
             const aliveWerewolfTeammates = bot.role === GAME_ROLES.WEREWOLF
                 ? [
                     ...currentGame.bots
@@ -1123,7 +1148,7 @@ async function voteImpl(gameId: string): Promise<GameActionResponse> {
             agent.userId = session.user!.email!;
 
             // Compute voting position info
-            const totalVoters = currentGame.bots.filter(b => b.isAlive).length + 1; // +1 for human
+            const totalVoters = alivePlayerNames(currentGame).length;
             const votePosition = totalVoters - currentGame.gameStateProcessQueue.length + 1;
 
             // One-shot hint from a user-triggered Retry explaining why the previous vote was
@@ -1185,20 +1210,20 @@ async function voteImpl(gameId: string): Promise<GameActionResponse> {
             }
             
             // Repair a name that starts right and trails into garbage (see target-resolution.ts).
-            voteResponse.who = normalizeTargetName(voteResponse.who, alivePlayerNames, {
+            voteResponse.who = normalizeTargetName(voteResponse.who, voteTargets, {
                 gameId, botName: bot.name, model: bot.aiType, action: 'vote'
             });
 
             // Validate the vote target is alive and valid
-            if (!alivePlayerNames.includes(voteResponse.who)) {
+            if (!voteTargets.includes(voteResponse.who)) {
                 // Voting for yourself is never legal, so it gets its own explanation — the generic
                 // "not on the list" wording reads as a typo and doesn't state the actual rule.
                 const explanation = voteResponse.who === bot.name
-                    ? selfSelectionExplanation('vote for', alivePlayerNames)
-                    : invalidTargetExplanation(voteResponse.who, alivePlayerNames);
+                    ? selfSelectionExplanation('vote for', voteTargets)
+                    : invalidTargetExplanation(voteResponse.who, voteTargets);
                 throw new BotResponseError(
                     `Invalid vote target: ${voteResponse.who}`,
-                    `Bot ${bot.name} attempted to vote for an invalid target. Valid targets: ${alivePlayerNames.join(', ')}`,
+                    `Bot ${bot.name} attempted to vote for an invalid target. Valid targets: ${voteTargets.join(', ')}`,
                     { botName: bot.name, aiType: bot.aiType, action: 'vote', invalidTarget: voteResponse.who },
                     true,
                     explanation
@@ -1323,13 +1348,14 @@ async function humanPlayerVoteImpl(gameId: string, targetPlayer: string, reason:
     }
 
     // Check if it's the human player's turn to vote
-    if (game.gameStateProcessQueue.length === 0 || game.gameStateProcessQueue[0] !== game.humanPlayerName) {
+    // The vote is the caller's own character's (app/api/game-seats.ts)
+    const voterName = actingSeat(game, session.user.email).character;
+    if (game.gameStateProcessQueue.length === 0 || game.gameStateProcessQueue[0] !== voterName) {
         return staleActionNoOp('humanPlayerVote', 'not the human player\'s turn to vote', game);
     }
 
-    // Validate target player is alive and not the human player
-    const alivePlayerNames = game.bots.filter(b => b.isAlive).map(b => b.name);
-    if (!alivePlayerNames.includes(targetPlayer)) {
+    // Validate target player is alive and not the voter
+    if (targetPlayer === voterName || !alivePlayerNames(game).includes(targetPlayer)) {
         throw new Error('Invalid target player');
     }
 
@@ -1344,7 +1370,7 @@ async function humanPlayerVoteImpl(gameId: string, targetPlayer: string, reason:
     }
 
     try {
-        logger.info(`Processing vote for human player ${game.humanPlayerName}`, { gameId, player: game.humanPlayerName, target: targetPlayer });
+        logger.info(`Processing vote for human player ${voterName}`, { gameId, player: voterName, target: targetPlayer });
         
         // Re-read current game state to ensure consistency
         const currentGame = await getGame(gameId);
@@ -1354,7 +1380,7 @@ async function humanPlayerVoteImpl(gameId: string, targetPlayer: string, reason:
         
         // Already voted (double-submit): the first request persisted the vote,
         // so this one is an idempotent no-op.
-        if (!currentGame.gameStateProcessQueue.includes(currentGame.humanPlayerName)) {
+        if (!currentGame.gameStateProcessQueue.includes(voterName)) {
             return staleActionNoOp('humanPlayerVote', 'human player already voted', currentGame);
         }
 
@@ -1378,7 +1404,7 @@ async function humanPlayerVoteImpl(gameId: string, targetPlayer: string, reason:
         // Add this vote
         votingResults[targetPlayer] = (votingResults[targetPlayer] || 0) + 1;
         individualVotes.push({
-            voter: currentGame.humanPlayerName,
+            voter: voterName,
             target: targetPlayer,
             reason: reason,
             order: individualVotes.length + 1
@@ -1388,7 +1414,7 @@ async function humanPlayerVoteImpl(gameId: string, targetPlayer: string, reason:
         const voteMessage: GameMessage = {
             id: null,
             recipientName: RECIPIENT_ALL,
-            authorName: currentGame.humanPlayerName,
+            authorName: voterName,
             msg: {
                 who: targetPlayer,
                 why: reason
@@ -1410,7 +1436,7 @@ async function humanPlayerVoteImpl(gameId: string, targetPlayer: string, reason:
             gameStateParamQueue: [JSON.stringify(votingResults), JSON.stringify(individualVotes)]
         });
         
-        logger.info(`Successfully processed vote for human player ${currentGame.humanPlayerName}, removed from queue`, { gameId });
+        logger.info(`Successfully processed vote for human player ${voterName}, removed from queue`, { gameId });
         
         // Return updated game state. Echo back BOTH blobs exactly as persisted to
         // Firestore (tally + individual votes) so the returned game matches storage.
