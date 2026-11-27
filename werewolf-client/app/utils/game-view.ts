@@ -23,6 +23,11 @@ export const HIDDEN_ROLE = '';
 /** Who is looking. `null` is somebody with no seat at the table: they learn no role at all. */
 export interface GameViewer {
     name: string;
+    /**
+     * The host runs the game: picks the models, sees what it costs and reads the full error
+     * when a model call fails. Everybody else gets the table without the machinery.
+     */
+    host: boolean;
 }
 
 const isOver = (game: Game) =>
@@ -146,13 +151,45 @@ function viewNightRecords(game: Game, viewer: GameViewer | null): Pick<Game, 'ni
     };
 }
 
+/**
+ * The machinery of a game, for the host only: which model plays whom, what it has cost,
+ * and the technical side of a failure (which model, the provider's message, the stack).
+ * A player who is not the host learns that the game is stopped and whether it can be
+ * retried, which is all they can act on: they wait for the host.
+ */
+function withoutHostData(view: Game): Game {
+    return {
+        ...view,
+        bots: view.bots.map(bot => {
+            const {tokenUsage, enableThinking, ...shown} = bot;
+            void tokenUsage; void enableThinking;
+            return {...shown, aiType: ''};
+        }),
+        gameMasterAiType: '',
+        gameMasterTokenUsage: undefined,
+        totalGameCost: 0,
+        totalImagesCost: 0,
+        modelOverride: null,
+        retryHint: null,
+        providerBlocks: {},
+        ownerEmail: '',
+        errorState: view.errorState ? {
+            error: 'The game has stopped on an error. The host can retry.',
+            details: '',
+            context: {},
+            recoverable: view.errorState.recoverable,
+            timestamp: view.errorState.timestamp,
+        } : null,
+    };
+}
+
 export function viewGameAs(game: Game, viewer: GameViewer | null, seal: NightSeal): Game {
     // A stub (the game was deleted mid-action) has nothing to hide and nothing to count.
     if (!game || !Array.isArray(game.bots)) return game;
     // A view has blanks where roles were: cutting it again would count sides wrongly.
     if (game.isView) return game;
     const ownRole = roleOf(game, viewer);
-    return {
+    const view: Game = {
         ...game,
         isView: true,
         bots: game.bots.map(bot => viewBot(game, viewer, bot)),
@@ -162,6 +199,7 @@ export function viewGameAs(game: Game, viewer: GameViewer | null, seal: NightSea
         pendingGameOver: pendingGameOver(game),
         nightRoleTotal: nightRoleTotal(game),
     };
+    return viewer?.host ? view : withoutHostData(view);
 }
 
 /** The private channel of each role that has one. */
@@ -203,5 +241,11 @@ export function viewMessagesAs(game: Game, viewer: GameViewer | null, messages: 
     if (viewer) allowed.add(viewer.name);
     const channel = ROLE_CHANNEL[roleOf(game, viewer) ?? ''];
     if (channel) allowed.add(channel);
-    return (messages || []).filter(m => m && allowed.has(m.recipientName)).map(viewMessage);
+    return (messages || []).filter(m => m && allowed.has(m.recipientName)).map(viewMessage).map(m => {
+        if (viewer?.host) return m;
+        // What a line cost is the host's business, like the models.
+        const {cost, ...shown} = m;
+        void cost;
+        return shown;
+    });
 }

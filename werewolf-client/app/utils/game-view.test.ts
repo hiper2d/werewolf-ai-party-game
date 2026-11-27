@@ -20,7 +20,8 @@ const game = (over: Partial<Game> = {}): Game => ({
 } as Game);
 
 const roles = (g: Game) => Object.fromEntries(g.bots.map(b => [b.name, b.role]));
-const me = {name: 'Alex'};
+const me = {name: 'Alex', host: true};
+const guestSeat = {name: 'Alex', host: false};
 // The real seal is a keyed hash; here it only has to change when the position does.
 const sealed = new Map<string, string>();
 const seal = (position: string) => sealed.get(position) ?? sealed.set(position, `t${sealed.size}`).get(position)!;
@@ -211,5 +212,43 @@ describe('viewMessagesAs', () => {
         const action = message('DOCTOR', {reasoning: 'Det looks exposed.', target: 'Det', thinking: 'hidden'});
         const [shown] = viewMessagesAs(game({humanPlayerRole: GAME_ROLES.DOCTOR}), me, [action]);
         expect(shown.msg).toEqual({reasoning: 'Det looks exposed.', target: 'Det'});
+    });
+});
+
+describe('what only the host sees', () => {
+    const running = () => game({
+        gameMasterAiType: 'gpt-luna', totalGameCost: 1.25, totalImagesCost: 0.3,
+        gameMasterTokenUsage: {inputTokens: 1} as any,
+        providerBlocks: {google: {reason: 'refusal'}} as any,
+        errorState: {error: 'Gemini refused', details: 'stack…', context: {model: 'gemini-flash', botName: 'Doc'}, recoverable: true, timestamp: 5},
+        bots: [{...bot('Doc', GAME_ROLES.DOCTOR), aiType: 'gemini-flash', tokenUsage: {inputTokens: 9} as any}],
+    });
+
+    it('the host keeps models, costs and the full error', () => {
+        const view = viewGameAs(running(), me, seal);
+        expect(view.bots[0].aiType).toBe('gemini-flash');
+        expect(view.totalGameCost).toBe(1.25);
+        expect(view.errorState?.context.model).toBe('gemini-flash');
+        expect(view.ownerEmail).toBe('a@b.c');
+    });
+
+    it('another player gets the table without the machinery', () => {
+        const view = viewGameAs(running(), guestSeat, seal);
+        const text = JSON.stringify(view);
+        for (const secret of ['gemini-flash', 'gpt-luna', 'Gemini refused', 'stack…', 'a@b.c', '1.25']) expect(text).not.toContain(secret);
+        expect(view.bots[0]).not.toHaveProperty('tokenUsage');
+        // They still learn the game is stopped and whether a retry can help.
+        expect(view.errorState).toMatchObject({recoverable: true, timestamp: 5});
+        expect(view.bots[0].name).toBe('Doc');
+    });
+
+    it('a healthy game has no error for anybody', () => {
+        expect(viewGameAs(game(), guestSeat, seal).errorState).toBeNull();
+    });
+
+    it('a line\'s cost goes to the host only', () => {
+        const line = {id: 'm', recipientName: 'ALL', authorName: 'Doc', msg: 'hi', messageType: MessageType.BOT_ANSWER, day: 1, timestamp: 1, cost: 0.02} as GameMessage;
+        expect(viewMessagesAs(game(), me, [line])[0].cost).toBe(0.02);
+        expect(viewMessagesAs(game(), guestSeat, [line])[0]).not.toHaveProperty('cost');
     });
 });

@@ -40,12 +40,12 @@ export async function responseForSession(response: GameActionResponse): Promise<
 }
 
 /**
- * Whose seat an account holds. One human seat today, the owner's; a game from before
+ * Whose seat an account holds. One human seat today, the owner's, who is also the host; a game from before
  * owners were stored belongs to whoever can open it. Anybody else has no seat.
  */
 export function viewerOf(game: Game, email: string | null | undefined): GameViewer | null {
     if (!email || !game) return null;
-    if (!game.ownerEmail || game.ownerEmail === email) return {name: game.humanPlayerName};
+    if (!game.ownerEmail || game.ownerEmail === email) return {name: game.humanPlayerName, host: true};
     return null;
 }
 
