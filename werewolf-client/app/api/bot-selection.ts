@@ -24,6 +24,7 @@ import { after } from "next/server";
 import { midGameImagesEnabled, runDayIllustration } from "@/app/utils/illustration-generation";
 import { convertMessageContent } from "@/app/utils/message-utils";
 import { getJevApiKey } from "@/app/ai/jev-client";
+import { aiBots } from "@/app/utils/cast";
 import { JEV_JUDGE, JevRouterUnavailableError, OPENAI_DECISIONS_JUDGE, RouterJudge, selectRespondingBotsWithJev } from "@/app/api/jev-router";
 
 /**
@@ -33,7 +34,8 @@ import { JEV_JUDGE, JevRouterUnavailableError, OPENAI_DECISIONS_JUDGE, RouterJud
  */
 export function formatDayActivityData(game: Game): string {
     const activityCounter = game.dayActivityCounter || {};
-    const aliveBots = game.bots.filter(bot => bot.isAlive);
+    // Only the characters a model plays are routed to (app/utils/cast.ts).
+    const aliveBots = aiBots(game).filter(bot => bot.isAlive);
 
     if (aliveBots.length === 0) {
         return "No alive bots to track activity.";
@@ -66,7 +68,7 @@ export function formatDayActivityData(game: Game): string {
  * keep the game from looking stuck waiting for the human.
  */
 export async function selectRandomDayOpeningBots(game: Game): Promise<string[]> {
-    const aliveBotNames = game.bots.filter(b => b.isAlive).map(b => b.name);
+    const aliveBotNames = aiBots(game).filter(b => b.isAlive).map(b => b.name);
     if (aliveBotNames.length === 0) {
         return [];
     }
@@ -124,7 +126,8 @@ export async function selectRespondingBots(
 
     // For after-game discussion, include ALL bots (dead + alive)
     // For regular discussion, only include alive bots
-    const availableBots = isAfterGameDiscussion ? game.bots : game.bots.filter(b => b.isAlive);
+    // A character a person plays is never asked to reply (app/utils/cast.ts).
+    const availableBots = isAfterGameDiscussion ? aiBots(game) : aiBots(game).filter(b => b.isAlive);
 
     const gmPrompt = format(GM_ROUTER_SYSTEM_PROMPT, {
         alive_players_with_roles: [

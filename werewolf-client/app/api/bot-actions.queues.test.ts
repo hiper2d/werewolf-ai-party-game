@@ -198,6 +198,11 @@ beforeEach(() => {
         collection: jest.fn(),
     }));
     (db!.collection as jest.Mock).mockReturnValue({ doc: mockDoc });
+    // A transaction reads the stored game and writes through the same update mock.
+    (db!.runTransaction as jest.Mock).mockImplementation(async (run: any) => run({
+        get: async () => ({ exists: true, data: () => dbDocGame }),
+        update: (_ref: unknown, data: unknown) => mockUpdate(data),
+    }));
 
     // Stub agent: every created agent shares one askWithZodSchema/askText mock pair.
     mockAskWithZodSchema = jest.fn();
@@ -954,5 +959,106 @@ describe('humanPlayerVote (stale-call guards)', () => {
 
         expectErrorState('Invalid target player');
         expect(result.game.errorState).toBeTruthy();
+    });
+});
+
+// ---------------------------------------------------------------------------
+// A shared game: Bob is played by a second person
+// ---------------------------------------------------------------------------
+
+describe('talkToAll with a second human at the table', () => {
+    const FRIEND_EMAIL = 'friend@example.com';
+    const sharedGame = (overrides: Partial<Game> = {}) => makeGame({
+        seats: {
+            u_host: { email: USER_EMAIL, character: HUMAN_NAME, payer: true, joinedAt: 1 },
+            u_friend: { email: FRIEND_EMAIL, character: 'Bob', payer: true, joinedAt: 2 },
+        },
+        ...overrides,
+    });
+    const savedMessages = () => (addMessageToChatAndSaveToDb as jest.Mock).mock.calls.map(([m]) => m);
+
+    test('a message is written under the caller\'s own character', async () => {
+        const game = sharedGame();
+        (getGame as jest.Mock).mockResolvedValue(game);
+        dbDocGame = game;
+        (auth as jest.Mock).mockResolvedValue({ user: { email: FRIEND_EMAIL } });
+        gmSelects(['Alice']);
+
+        await talkToAll(GAME_ID, 'Hello from Bob');
+
+        expect(savedMessages().find(m => m.msg === 'Hello from Bob')).toMatchObject({ authorName: 'Bob' });
+    });
+
+    test('a person is never picked to answer: the queue holds bots only', async () => {
+        const game = sharedGame();
+        (getGame as jest.Mock).mockResolvedValue(game);
+        dbDocGame = game;
+        gmSelects(['Bob', 'Alice']);
+
+        await talkToAll(GAME_ID, 'Hello table');
+
+        const queue = updatesWith('gameStateProcessQueue')[0].gameStateProcessQueue;
+        expect(queue).toEqual(['Alice']);
+    });
+
+    test('a message sent while bots are talking is saved and nobody is asked', async () => {
+        const game = sharedGame({ gameStateProcessQueue: ['Alice'] });
+        (getGame as jest.Mock).mockResolvedValue(game);
+        dbDocGame = game;
+        (auth as jest.Mock).mockResolvedValue({ user: { email: FRIEND_EMAIL } });
+
+        await talkToAll(GAME_ID, 'One more thing');
+
+        expect(savedMessages().map(m => m.msg)).toEqual(['One more thing']);
+        expect(updatesWith('gameStateProcessQueue')).toEqual([]);
+        expect(AgentFactory.createAgent).not.toHaveBeenCalled();
+    });
+
+    test('only the host\'s screen runs the bots', async () => {
+        const game = sharedGame({ gameStateProcessQueue: ['Alice'] });
+        (getGame as jest.Mock).mockResolvedValue(game);
+        dbDocGame = game;
+        (auth as jest.Mock).mockResolvedValue({ user: { email: FRIEND_EMAIL } });
+
+        await talkToAll(GAME_ID, '');
+
+        expect(AgentFactory.createAgent).not.toHaveBeenCalled();
+        expect(updatesWith('gameStateProcessQueue')).toEqual([]);
+        expect(setGameErrorState).not.toHaveBeenCalled();
+    });
+
+    test('a second selection that lands on a filled queue is dropped', async () => {
+        const game = sharedGame();
+        (getGame as jest.Mock).mockResolvedValue(game);
+        // Somebody else's message filled the queue while this one was being routed.
+        dbDocGame = sharedGame({ gameStateProcessQueue: ['Alice'] });
+        gmSelects(['Alice']);
+
+        await talkToAll(GAME_ID, 'Me too');
+
+        expect(savedMessages().some(m => m.msg === 'Me too')).toBe(true);
+        expect(updatesWith('gameStateProcessQueue')).toEqual([]);
+    });
+
+    test('the dead do not speak during the day', async () => {
+        const game = sharedGame({ bots: [makeBot('Alice'), makeBot('Bob', { isAlive: false, eliminationDay: 1 })] });
+        (getGame as jest.Mock).mockResolvedValue(game);
+        dbDocGame = game;
+        (auth as jest.Mock).mockResolvedValue({ user: { email: FRIEND_EMAIL } });
+
+        await talkToAll(GAME_ID, 'Boo');
+
+        expect(savedMessages()).toEqual([]);
+    });
+
+    test('somebody without a seat is refused', async () => {
+        const game = sharedGame();
+        (getGame as jest.Mock).mockResolvedValue(game);
+        (auth as jest.Mock).mockResolvedValue({ user: { email: 'stranger@example.com' } });
+
+        await talkToAll(GAME_ID, 'Hi');
+
+        expect(savedMessages()).toEqual([]);
+        expectErrorState('do not have access');
     });
 });

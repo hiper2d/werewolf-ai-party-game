@@ -56,3 +56,14 @@ export function seatFor(game: Seated, email: string | null | undefined): SeatOfG
     }
     return seats.find(seat => sameAccount(seat.email, email)) ?? null;
 }
+
+/**
+ * The seat an action is taken from. Every action a PERSON takes (a message, a vote, a
+ * night action) is taken as the caller's own character, never as "the human player":
+ * with several people at the table that is whoever asked.
+ */
+export function actingSeat(game: Seated, email: string | null | undefined): SeatOfGame {
+    const seat = seatFor(game, email);
+    if (!seat) throw new Error('You do not have access to this game');
+    return seat;
+}

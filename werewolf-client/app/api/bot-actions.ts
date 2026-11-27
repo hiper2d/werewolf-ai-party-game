@@ -72,6 +72,8 @@ import {ensureUserCanAccessGame} from "@/app/api/tier-guards";
 import {selectEliminatedPlayer} from "@/app/api/vote-utils";
 import { RoleProcessorFactory } from "./roles";
 import {logger} from "@/app/utils/logger";
+import {actingSeat} from "@/app/api/game-seats";
+import {aiBots, alivePlayerNames, isHumanName, isPlayerAlive, isSharedGame} from "@/app/utils/cast";
 
 /**
  * Parse a vote-tally / individual-votes blob from gameStateParamQueue.
@@ -226,9 +228,8 @@ async function ensureDayActivityCounter(gameId: string): Promise<void> {
  * Based on number of alive players multiplied by a coefficient
  */
 function calculateAutoVoteThreshold(game: Game): number {
-    const aliveBotsCount = game.bots.filter(bot => bot.isAlive).length;
-    const totalAlivePlayers = aliveBotsCount + 1; // +1 for human player
-    return totalAlivePlayers * AUTO_VOTE_COEFFICIENT;
+    // Everybody alive, humans and bots (one human in a solo game).
+    return alivePlayerNames(game).length * AUTO_VOTE_COEFFICIENT;
 }
 
 /**
@@ -258,7 +259,7 @@ function shouldTriggerAutoVote(game: Game): boolean {
         const threshold = calculateAutoVoteThreshold(game);
         const currentMessages = getTotalDayMessages(game);
     
-        logger.debug(`🗳️ AUTO-VOTE CHECK: ${currentMessages}/${threshold} messages (threshold = ${game.bots.filter(b => b.isAlive).length + 1} players × ${AUTO_VOTE_COEFFICIENT})`, { gameId: game.id, currentMessages, threshold });
+        logger.debug(`🗳️ AUTO-VOTE CHECK: ${currentMessages}/${threshold} messages (threshold = ${alivePlayerNames(game).length} players × ${AUTO_VOTE_COEFFICIENT})`, { gameId: game.id, currentMessages, threshold });
     
         return currentMessages >= threshold;
     }
@@ -445,17 +446,32 @@ function shouldTriggerAutoVote(game: Game): boolean {
         try {
             let newMessages: GameMessage[] = [];
 
-            // Case 1: Human player initiates discussion
-            if (userMessage && game.gameStateProcessQueue.length === 0) {
-                const handled = await handleHumanPlayerMessage(gameId, game, userMessage, session.user.email);
+            // The caller's own character (app/api/game-seats.ts). In a solo game that is
+            // the human player and the host, as it always was.
+            const seat = actingSeat(game, session.user.email);
+            const shared = isSharedGame(game);
+            const queueBusy = game.gameStateProcessQueue.length > 0;
+
+            // Case 1: a person says something. With an empty queue the message also picks
+            // the bots that answer. In a shared game the chat is never locked: a message
+            // sent while bots are talking is saved and read by the bots still to come.
+            if (userMessage && (!queueBusy || shared)) {
+                if (shared && !isAfterGameDiscussion && !isPlayerAlive(game, seat.character)) {
+                    return staleActionNoOp('talkToAll', `${seat.character} is dead and cannot speak`, game);
+                }
+                const handled = await handleHumanPlayerMessage(gameId, game, userMessage, session.user.email, seat.character, !queueBusy);
                 if (handled.rejected) {
                     // Nothing was saved and no bot was queued: the game is exactly as it was.
                     return { game, messages: [], rejected: handled.rejected };
                 }
                 newMessages = handled.messages;
             }
-            // Case 2: Process next bot in queue
-            else if (game.gameStateProcessQueue.length > 0) {
+            // Case 2: Process next bot in queue. The host's screen runs the table; a
+            // second screen asking would make the same bot answer twice.
+            else if (queueBusy) {
+                if (!seat.host) {
+                    return staleActionNoOp('talkToAll', 'only the host runs the bots', game);
+                }
                 newMessages = await processNextBotInQueue(gameId, game, session.user.email);
             }
 
@@ -466,8 +482,7 @@ function shouldTriggerAutoVote(game: Game): boolean {
             if (!isAfterGameDiscussion && shouldTriggerAutoVote(updatedGame)) {
                 logger.info('🗳️ AUTO-VOTE TRIGGERED: Message threshold reached, starting voting phase', { gameId });
                 // Trigger voting by transitioning to VOTE state
-                const aliveBots = updatedGame.bots.filter(bot => bot.isAlive).map(bot => bot.name);
-                const allPlayers = [...aliveBots, updatedGame.humanPlayerName];
+                const allPlayers = alivePlayerNames(updatedGame);
                 const shuffledPlayers = [...allPlayers].sort(() => Math.random() - 0.5);
 
                 await db.collection('games').doc(gameId).update({
@@ -528,8 +543,7 @@ async function keepBotsGoingImpl(gameId: string): Promise<GameActionResponse> {
     if (!isAfterGameDiscussion && shouldTriggerAutoVote(game)) {
         console.log('🗳️ AUTO-VOTE TRIGGERED in keepBotsGoing: Message threshold reached, starting voting phase');
         // Trigger voting by transitioning to VOTE state
-        const aliveBots = game.bots.filter(bot => bot.isAlive).map(bot => bot.name);
-        const allPlayers = [...aliveBots, game.humanPlayerName];
+        const allPlayers = alivePlayerNames(game);
         const shuffledPlayers = [...allPlayers].sort(() => Math.random() - 0.5);
 
         await db.collection('games').doc(gameId).update({
@@ -603,9 +617,9 @@ async function manualSelectBotsImpl(gameId: string, selectedBots: string[]): Pro
     }
 
     // Validate that all selected names are valid alive bots (not human, not dead)
-    const aliveBotNames = game.bots.filter(b => b.isAlive).map(b => b.name);
+    const aliveBotNames = aiBots(game).filter(b => b.isAlive).map(b => b.name);
     for (const name of selectedBots) {
-        if (name === game.humanPlayerName) {
+        if (isHumanName(game, name)) {
             throw new Error('Cannot select human player');
         }
         if (!aliveBotNames.includes(name)) {
@@ -632,7 +646,9 @@ async function handleHumanPlayerMessage(
     gameId: string,
     game: Game,
     userMessage: string,
-    userEmail: string
+    userEmail: string,
+    authorName: string,
+    selectBots: boolean,
 ): Promise<{ messages: GameMessage[]; rejected?: GameActionResponse['rejected'] }> {
     const apiKeys = await getApiKeysForUser(userEmail);
 
@@ -650,7 +666,7 @@ async function handleHumanPlayerMessage(
     const userChatMessage: GameMessage = {
         id: null,
         recipientName: RECIPIENT_ALL,
-        authorName: game.humanPlayerName,
+        authorName,
         msg: userMessage,
         messageType: MessageType.HUMAN_PLAYER_MESSAGE,
         day: game.currentDay,
@@ -661,6 +677,10 @@ async function handleHumanPlayerMessage(
     // it was only saved after validation, so any selection failure forced the user
     // to retype their message.
     const savedUserMessage = await addMessageToChatAndSaveToDb(userChatMessage, gameId);
+    if (!selectBots) {
+        // Bots are already talking: the message is plain chat for those still to come.
+        return { messages: [savedUserMessage] };
+    }
 
     // Ensure day activity counter is initialized for backward compatibility
     await ensureDayActivityCounter(gameId);
@@ -674,8 +694,13 @@ async function handleHumanPlayerMessage(
     if (!db) {
         throw new Error('Firestore is not initialized');
     }
-    await db.collection('games').doc(gameId).update({
-        gameStateProcessQueue: selectedBots
+    // Two people can send at the same moment: only the first selection fills the queue,
+    // the other message stays plain chat (one routing call spent for nothing).
+    const gameRef = db.collection('games').doc(gameId);
+    await db.runTransaction(async tx => {
+        const queue = (await tx.get(gameRef)).data()?.gameStateProcessQueue;
+        if (Array.isArray(queue) && queue.length > 0) return;
+        tx.update(gameRef, { gameStateProcessQueue: selectedBots });
     });
 
     // Return the human player message (selection message is hidden/debug, not shown in chat)
@@ -694,7 +719,8 @@ async function processNextBotInQueue(
     // Get the first bot from queue
     const botName = game.gameStateProcessQueue[0];
     const newQueue = game.gameStateProcessQueue.slice(1);
-    if (botName === game.humanPlayerName) {
+    if (isHumanName(game, botName)) {
+        // A person is never asked by the table: drop the name and go on
         // Update queue
         if (!db) {
             throw new Error('Firestore is not initialized');

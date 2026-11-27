@@ -51,6 +51,23 @@ export function isPlayerAlive(game: Cast, name: string): boolean {
     return game.bots.find(bot => bot.name === name)?.isAlive === true;
 }
 
+/**
+ * Everybody alive at the table, humans and bots: who votes, who can be voted for, how
+ * large the table is. The cast in its order, then the first human (as the vote queue
+ * has always been built).
+ */
+export function alivePlayerNames(game: Cast): string[] {
+    return [
+        ...game.bots.filter(bot => bot.isAlive).map(bot => bot.name),
+        ...(game.humanPlayerIsAlive !== false ? [game.humanPlayerName] : []),
+    ];
+}
+
+/** More than one person plays this game. */
+export function isSharedGame(game: Pick<Game, 'seats' | 'humanPlayerName'>): boolean {
+    return humanCastNames(game).size > 0;
+}
+
 /** The humans still alive. A shared game ends for everybody when this is empty. */
 export function livingHumanNames(game: Cast): string[] {
     return humanNames(game).filter(name => isPlayerAlive(game, name));
