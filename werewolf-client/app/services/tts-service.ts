@@ -1,4 +1,5 @@
 import { generateSpeechAction } from "@/app/api/tts-actions";
+import { speakGameLine } from "@/app/api/game-speech-actions";
 import { VoiceProvider } from "@/app/ai/voice-config/voice-config";
 import { getDefaultVoiceProvider } from "@/app/ai/voice-config";
 import type { SpeechSource } from "@/app/api/feature-events";
@@ -9,6 +10,11 @@ export interface TTSOptions {
   voiceProvider?: VoiceProvider;  // TTS provider (defaults to user's preference)
   gameId?: string;
   source?: SpeechSource;          // Where the line was asked for (feature-use metrics)
+  // The game message this line is (with `gameId`): the server then reads it in the
+  // author's voice from its stored recording, or records it once for everybody
+  // (app/api/game-speech-actions.ts). Without it the line is generated for this listener
+  // only, as a voice audition on a character card is.
+  messageId?: string;
   // A stored recording of exactly this line in this voice (a starter game's opening story
   // and introductions): played instead of calling the voice model. If it cannot be
   // fetched, the line is generated live as usual.
@@ -226,16 +232,19 @@ export class TTSService {
     const voiceProvider = options.voiceProvider || getDefaultVoiceProvider();
     // The action reports failure as a value (a thrown error loses its message in
     // production); rethrow here so callers keep seeing one rejected promise.
-    const requestPromise = generateSpeechAction(
-      text,
-      {
-        voice: options.voice,
-        voiceStyle: options.voiceStyle,
-        gameId: options.gameId,
-        source: options.source,
-      },
-      voiceProvider
-    )
+    const request = options.gameId && options.messageId
+      ? speakGameLine(options.gameId, options.messageId, text, options.source)
+      : generateSpeechAction(
+        text,
+        {
+          voice: options.voice,
+          voiceStyle: options.voiceStyle,
+          gameId: options.gameId,
+          source: options.source,
+        },
+        voiceProvider
+      );
+    const requestPromise = request
       .then(result => {
         if (!result.ok) {
           throw new Error(result.error);

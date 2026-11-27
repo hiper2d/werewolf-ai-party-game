@@ -150,7 +150,7 @@ export async function removeGameById(id: string, ownerEmail: string) {
 
     // Delete generated avatars/scenes and the portrait candidates behind them
     // (subcollections aren't removed with the parent doc)
-    for (const collection of ['avatars', AVATAR_VARIANTS_COLLECTION]) {
+    for (const collection of ['avatars', AVATAR_VARIANTS_COLLECTION, 'audio']) {
         const snapshot = await db.collection('games').doc(id).collection(collection).get();
         await Promise.all(snapshot.docs.map((doc: any) => doc.ref.delete()));
     }

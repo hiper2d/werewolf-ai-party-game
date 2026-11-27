@@ -28,6 +28,7 @@ import { discussionProgress } from "@/app/utils/discussion-progress";
 import type { HelperHintState } from "@/app/games/[id]/helper-hints";
 import { LoadingRail, PhaseBar, StreamPill, stripChromeClass, stripChromeStyle, type LoadingRailProps, type PhaseTone, type RailActor } from "./PhaseStrip";
 import { ttsService } from "@/app/services/tts-service";
+import { voiceForAuthor } from "@/app/utils/game-voice";
 import { sttService } from "@/app/services/stt-service";
 import { getVoiceConfig, LEGACY_VOICE_PROVIDER } from "@/app/ai/voice-config";
 import { getModelDisplayName, getModelProviderName } from "@/app/ai/ai-models";
@@ -1567,38 +1568,11 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                 setPausedMessageId(null);
             }
 
-            // The game's voice set (fixed at creation; legacy games read as the default)
-            const voiceProvider = game.voiceProvider || LEGACY_VOICE_PROVIDER;
-
             // Find the message to get the author name
             const message = messages.find(msg => msg.id === messageId);
-
-            // The player has no assigned voice: they read in the provider's first
-            // voice no character uses, so their lines never sound like a bot's
-            // (and the fallback is a real voice of this game's provider).
-            const providerVoices = getVoiceConfig(voiceProvider).getVoices().map(v => v.id);
-            const takenVoices = new Set([game.gameMasterVoice, ...game.bots.map(b => b.voice)]);
-            const fallbackVoice = providerVoices.find(id => !takenVoices.has(id)) ?? providerVoices[0];
-
-            // Map author to their assigned voice and style
-            let voice = fallbackVoice;
-            let voiceStyle: string | undefined;
-
-            if (!message) {
-                console.error('Message not found for voice mapping:', messageId);
-                voice = game.gameMasterVoice || fallbackVoice;
-            } else if (message.authorName === GAME_MASTER) {
-                // Use Game Master voice
-                voice = game.gameMasterVoice || fallbackVoice;
-                voiceStyle = game.gameMasterVoiceStyle;
-            } else {
-                // Find the bot with matching name
-                const bot = game.bots.find(b => b.name === message.authorName);
-                if (bot) {
-                    voice = bot.voice || fallbackVoice;
-                    voiceStyle = bot.voiceStyle;
-                }
-            }
+            if (!message) console.error('Message not found for voice mapping:', messageId);
+            // The same rule the server records the line by (app/utils/game-voice.ts).
+            const { voiceProvider, voice, voiceStyle } = voiceForAuthor(game, message?.authorName);
 
             // Show loading state
             setLoadingMessageId(messageId);
@@ -1612,6 +1586,8 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
 
             const started = await ttsService.speakText(text, {
                 voice, voiceStyle, voiceProvider, gameId, prerecordedUrl,
+                // A message of the game is recorded once on the server and shared.
+                messageId: message ? messageId : undefined,
                 // Auto-read lines are nobody's click; the metrics keep them apart.
                 source: opts?.silent ? 'cinematic_auto' : (opts?.source ?? 'chat'),
                 // Playback failures (autoplay policy, codec) fire after this await
