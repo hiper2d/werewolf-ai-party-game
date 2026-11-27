@@ -85,6 +85,146 @@ no longer locking while bots talk.
     for humans; the ghostwriter suggestion becomes a private advisor. Details in
     Design §12.
 
+## Current design (2026-11-27)
+
+This section is the design to build from. It replaces §1 Transport, §2 Data model, §3 Lobby
+and §8 Billing below, and decisions 2, 4 and 13 above; those are kept for the reasoning.
+§4 Queues, §5 Voting, §6 Night, §7 Permissions and §9 to §12 still stand except where
+this section says otherwise.
+
+### A. What is built
+
+1. **Saved previews** (`gamePreviews/{id}`): every generated preview is a draft on the
+   server, listed in the game list, reopened with `?draft=`.
+2. **One player's view.** The stored game keeps every secret in one document, as before;
+   there are no `private/state` or `seats/{uid}` documents. `viewGameAs(game, viewer)`
+   (`app/utils/game-view.ts`) cuts what one seat may see: roles, the night queues and
+   records, messages by channel, model thinking, and for anybody but the host the models,
+   costs and error details. Every path to a browser ends in it.
+3. **Live updates.** The server writes each seat's cut view to
+   `gameViews/{gameId}__{uid}` at the end of every action; the browser listens to its own
+   document only (Firebase custom token, rules) and never reads a game. A screen that sees
+   a change it did not make stops running the automatic loops (`driving`), so one screen
+   runs the game.
+4. **Spoken lines recorded once** (`games/{id}/audio`, `speakGameLine`).
+
+What this changes in the older sections: action responses still carry the caller's view
+and new messages (not `ok | waiting`), `stepCounter` and `dayQueueLength` are not needed
+(the view carries the queues, masked at night), and `audience` on messages is not needed
+(the server filters by recipient and role).
+
+### B. Seats
+
+A SEAT is a human's place at the table: an account, the character it plays, and whether it
+is the host.
+
+```
+game.seats: Record<uid, {
+    email: string            // the account (server only, never in another seat's view)
+    character: string        // the character's name
+    host: boolean            // exactly one
+    payer: boolean           // checked in the host's "who splits the bill" menu
+    joinedAt: number
+    lastSeenAt: number       // heartbeat, see F
+    lastMessageAt: number    // send cooldown
+}>
+```
+
+- Signed-in accounts only. A guest account (`app/utils/guest.ts`) cannot host or join.
+- `humanPlayerName / Role / IsAlive` describe the one human of a solo game today. With
+  seats, each human character is an entry in the cast with its own role and alive flag,
+  and `controller: 'bot' | uid`. A game with one seat reads and plays exactly as now;
+  `gameFromFirestore` gives a legacy game one seat for its owner.
+- `viewerOf` and `seatsOf` (`app/api/game-session-view.ts`) are the two functions that
+  change: who is asking, and whom to publish to. Everything downstream already takes a
+  viewer.
+- Server guards: every action resolves the caller's seat (`ensureSeat`) instead of
+  comparing with `ownerEmail`.
+
+### C. Joining at the preview
+
+Friends join BEFORE the game is created, in the saved preview.
+
+- The host shares a preview from the new-game form. Sharing makes two kinds of link:
+  a GENERAL link (the joiner gets a random free place) and one link PER CHARACTER (the
+  joiner gets exactly that place). Links carry a random token stored on the draft; the
+  host can make new ones.
+- A joiner signs in, sees the cast and the expected cost per player (G), and claims a
+  place. A claim is a Firestore transaction on the draft: the first one wins, the second
+  is told the place is taken (general link: gets another free place).
+- A joined player writes their own NAME, STORY and VOICE for their character. Portraits
+  stay the host's. Play style and model do not apply to a human.
+- The host can still edit the form and regenerate. Regeneration replaces only UNCLAIMED
+  characters; a claimed character keeps its player's name, story and voice.
+- A rename replaces the old name across the other stories in the same write (names are
+  identifiers and stories mention each other).
+- The host can remove a joined player from the preview (the place is free again, the link
+  that brought them stops working).
+- Create makes the game with one seat per claim. The preview's own live updates use the
+  same mechanism as a game's: a cut view per joined account.
+- A solo player never sees any of this: no share, no seats, Create as today.
+
+### D. Joining a running game, leaving, being removed
+
+- The host can make a link for one BOT's place in a running game. Whoever opens it (signed
+  in) takes that character over: its role, its alive state, the chat so far. They are a
+  payer from that moment unless the host unchecks them.
+- A player who deletes the game from their list LEAVES it. A player the host removes loses
+  the game from their list and needs a new link to come back. In both cases the character
+  goes on as a bot: its history is rebuilt from the message log by author name
+  (`convertToAIMessages`), with no private notes for the days the human played, and the
+  host picks its model.
+- When every human player is dead, a shared game ends for everybody.
+- Phase-step buttons (Start Night, Next Day) are the host's.
+
+### E. Who runs the game
+
+- The host's screen runs the automatic loops. Other seats never do: for them `driving`
+  is false by seat, not by the 90 s rule.
+- Any living player can start a bot round (a message, Go on, Select Bots) while the queue
+  is empty. While bots are talking nobody can start another round; the chat itself is
+  never locked.
+- HOST TAKEOVER: when the queue is non-empty and has not moved for 2 minutes, every other
+  player sees "Take over as host". The first to press it becomes the host (a
+  transaction); the former host stays a player and can be removed like any other.
+
+### F. Active and inactive
+
+- A page with the game open sends a heartbeat (a server action, about once a minute, only
+  while the tab is visible) that stamps `lastSeenAt`. No heartbeat for about 2 minutes =
+  INACTIVE. The delay is accepted: a player who closed the tab is still counted for up to
+  two minutes. Deleting the game takes effect at once.
+- This is the one periodic server call in the design. One call a minute per open seat is
+  small next to the game's own calls; it is not sent in a solo game.
+
+### G. Billing (after the tiers are merged into one kind of account)
+
+- Every AI call of a shared game is divided equally among its PAYERS at that moment: the
+  living, active players with `payer` checked. Everyone is checked on joining, mid-game
+  joiners too. The host can uncheck anyone but themselves; an unchecked player plays free
+  and the rest cover the share.
+- Dead players watch, cannot act and do not pay.
+- An INACTIVE payer, or a payer with no money left, BLOCKS the game: no AI call is made
+  until they return, top up, or the host unchecks them. The banner names who.
+- A change of the payer list is a line in the chat. So is a model change by the host.
+- A joiner sees the expected cost per player before joining.
+- Personal calls (own dictation, own suggested answer) are charged to the person. Preview
+  generation and portrait draws are the host's. A spoken line is paid by whoever asked
+  for it first (it is recorded once).
+- `recordSpend` becomes one transaction over the payers' accounts with one `requestStats`
+  row carrying the split.
+
+### H. Build order from here
+
+1. Seats in the data model with one seat per game (no behaviour change): `seats`,
+   `ensureSeat`, `viewerOf` / `seatsOf` by seat, human characters in the cast.
+2. Shared preview: links, claiming, own name / story / voice, live view of the draft,
+   Create with several seats.
+3. Play with several humans: host-run loop by seat, open chat with the send cooldown,
+   voting (§5) and night (§6) with several humans, dead players read-only.
+4. Join a running game, leave, remove, bot takeover of a character, host takeover.
+5. Merge the tiers, then billing (G) with heartbeat (F).
+
 ## Context: what the code does today
 
 - One human is baked in: `humanPlayerName`, `humanPlayerRole`, `humanPlayerIsAlive` on the
@@ -128,6 +268,8 @@ no longer locking while bots talk.
 
 ### 1. Transport: Firestore listeners
 
+> Superseded by "Current design (2026-11-27)" above. Kept for the reasoning.
+
 - Server action `getFirebaseClientToken()` mints a custom token
   (`admin.auth().createCustomToken(uid)`) from the NextAuth session; uid = a stable hash
   of the email (or the user doc id). The client signs in once with
@@ -146,6 +288,8 @@ no longer locking while bots talk.
   flag and the "action response is the only feed" model.
 
 ### 2. Data model
+
+> Superseded by "Current design (2026-11-27)" above. Kept for the reasoning.
 
 #### 2.1 Game doc (public projection, readable by all seats)
 
@@ -215,6 +359,8 @@ werewolf-chat and role-private messages so a rule can filter without knowing rol
 seat doc (rules can `get()` it). `ALL` messages carry no audience.
 
 ### 3. Lobby
+
+> Superseded by "Current design (2026-11-27)" above. Kept for the reasoning.
 
 ```
 new-game form (unchanged) → createGame → LOBBY → host presses Start → WELCOME
@@ -343,6 +489,8 @@ whether it is the host; the tier mismatch check applies to host-only actions onl
 
 ### 8. Billing
 
+> Superseded by "Current design (2026-11-27)" above. Kept for the reasoning.
+
 - Payer set for a call: `splitPaidCost ? paidSeats : [host]`. Free seats are always
   debited the full amount as allowance. Who drives the queue never matters for billing.
 - Pre-call guard: every free seat's daily/monthly allowance, every payer's balance.
@@ -432,6 +580,9 @@ Mechanical, to include in the steps above:
 
 ## Rollout order
 
+> Steps 1 and 2 are built (differently in places, see "Current design", A). The order from
+> here is "Current design", H.
+
 Each step is shippable on its own and does not change solo play (step 3 unlocks the solo
 composer while bots talk, deliberately).
 
@@ -456,55 +607,18 @@ composer while bots talk, deliberately).
 
 ## Open questions
 
-- Settled 2026-11-26: phase-step buttons in shared games (start night, start new day) are
-  host-only. Also confirmed that day: shared games are for signed-in accounts only (a
-  guest account, `app/utils/guest.ts`, cannot host or join), and "guest" in this document
-  means a joined player, not a guest account.
-- DECISION 2 REVERSED (Alex, 2026-11-26): friends join the PREVIEW, before Create, not a
-  lobby after it. The preview is saved on the server once the host shares it; each joined
-  player claims a bot's place and writes their own name, story and voice; portraits stay
-  the host's; chat is never locked while bots talk (decision 5 stands). Design §2-3 and
-  rollout step 4 still describe the lobby and must be rewritten before that step is built.
-- MORE DECISIONS (Alex, 2026-11-26), not yet worked into the Design section:
-  - Every preview is saved on the server as soon as something is generated, solo too, and
-    shows in the game list as a draft.
-  - DECISION 4 REVERSED: players can join after Start. The host makes a link for one bot's
-    place and the player who opens it takes that character over.
-  - Preview links are of two kinds: a general one (the joiner gets a random free place) and
-    one per character (the joiner gets exactly that place).
-  - The host can remove a player; the character goes on as a bot, its history rebuilt from
-    the message log by author name (`convertToAIMessages`), without private notes for the
-    days the human played.
-  - If the host goes inactive, another player can take the host role and then remove the
-    former host. How "inactive" is detected and who pays afterwards: open.
-- DECISION 13 REPLACED (Alex, 2026-11-26). Billing assumes ONE kind of account with one
-  balance (the tiers are merged before this step is built):
-  - Every AI call of a shared game is divided equally among its PAYERS at that moment:
-    the living, active human players the host has left checked in a "who splits the bill"
-    menu. Everyone is checked on joining, mid-game joiners too; the host can uncheck
-    anyone but themselves. An unchecked player plays free and the rest cover the share.
-  - Dead players watch, cannot act and do not pay.
-  - A player who closes the game becomes INACTIVE. An inactive payer is not charged and the
-    game is blocked until they return or the host unchecks them. A payer with no money
-    left blocks it the same way.
-  - A player who deletes the game from their list leaves it: the character goes on as a
-    bot. A player the host removes loses the game from their list and needs a new invite
-    to come back.
-  - The joiner sees the expected cost per player before joining; a model change by the
-    host mid-game is a line in chat.
-  - Personal calls (own dictation, own auto-generated answer) are charged to the person;
-    preview generation and portrait draws to the host.
-  - "Inactive" = no heartbeat from the browser for about 2 minutes (accepted: the player
-    is charged during that delay); deleting the game is a server action and takes effect
-    at once. A change of the payer list is a line in chat.
-  - When every human player is dead, a shared game ends for everybody.
-  - Proposed, not confirmed: when living players remain but none is a checked payer, the
-    host pays.
-- Whether ready-made stories can be shared in the first version.
+The decisions of 2026-11-26 are worked into "Current design" above. Still open:
+
+- When living players remain but none is a checked payer (the host died, everyone else
+  is unchecked): proposed, the host pays. Not confirmed.
+- Whether a ready-made story (starter game) can be shared in the first version, or only
+  games made with the form.
+- Who pays for the calls made while a takeover is pending (a stalled host is inactive, so
+  by rule G the game is blocked if they are a payer; the new host would have to uncheck
+  them). Probably fine as it falls out; confirm when building step 4.
 
 ## Out of scope
 
-- Hot-join into a started game.
 - Public lobbies, matchmaking, strangers: this is friends-on-a-call multiplayer.
 - Server-driven games with timers and no browser open.
 - A shared or collaborative new-game form.
