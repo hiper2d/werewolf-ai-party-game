@@ -83,7 +83,67 @@ export function nightRoleTotal(game: Game): number {
     return [...roles].filter(role => ROLE_CONFIGS[role]?.hasNightAction).length;
 }
 
-export function viewGameAs(game: Game, viewer: GameViewer | null): Game {
+/**
+ * Turns a description of the night's position into a token that changes whenever the
+ * position does and says nothing about it. Supplied by the caller (a keyed hash on the
+ * server): a plain hash could be reversed by trying the few possible queues.
+ */
+export type NightSeal = (position: string) => string;
+
+/**
+ * The night's two queues as the viewer may see them. On the server the process queue is
+ * the roles still to act, in order, and the param queue the players of the role acting
+ * now: together they say which roles are alive and who holds them. The page needs only
+ * three things: is it my turn, how far along is the night, and "something changed, ask
+ * the server for the next step".
+ *  - The viewer's own role is acting: the head and its players are shown (a werewolf sees
+ *    the pack's order, which the pack chat needs; any other role is one player).
+ *  - Otherwise: every role is blank and the param queue is one sealed token, so the
+ *    page sees the queues change without learning what they hold.
+ * The lengths stay true: the progress bar counts roles done out of `nightRoleTotal`.
+ */
+function viewNightQueues(game: Game, viewer: GameViewer | null, seal: NightSeal): Pick<Game, 'gameStateProcessQueue' | 'gameStateParamQueue'> {
+    const roles = game.gameStateProcessQueue || [];
+    const players = game.gameStateParamQueue || [];
+    if (game.gameState !== GAME_STATES.NIGHT || roles.length === 0) {
+        return {gameStateProcessQueue: roles, gameStateParamQueue: players};
+    }
+    const ownRole = roleOf(game, viewer);
+    if (ownRole && roles[0] === ownRole) {
+        return {
+            gameStateProcessQueue: [ownRole, ...roles.slice(1).map(() => HIDDEN_ROLE)],
+            gameStateParamQueue: players,
+        };
+    }
+    return {
+        gameStateProcessQueue: roles.map(() => HIDDEN_ROLE),
+        // '#' cannot be in a player's name, so the token is never taken for one.
+        gameStateParamQueue: ['#' + seal(JSON.stringify([game.id, game.currentDay, roles, players]))],
+    };
+}
+
+/**
+ * What the night has done so far, cut to the viewer's own role: tonight's choices and the
+ * resolved outcome stay on the server (the story tells the outcome), last night's choice
+ * and the one-time abilities are kept for the viewer's own role only, where the night
+ * action form reads them ("not the same target again", "the kill is used up").
+ */
+function viewNightRecords(game: Game, viewer: GameViewer | null): Pick<Game, 'nightResults' | 'previousNightResults' | 'resolvedNightState' | 'oneTimeAbilitiesUsed'> {
+    const ownRole = roleOf(game, viewer);
+    const previous = ownRole ? game.previousNightResults?.[ownRole] : undefined;
+    const used = game.oneTimeAbilitiesUsed || {};
+    return {
+        nightResults: {},
+        previousNightResults: ownRole && previous ? {[ownRole]: previous} : {},
+        resolvedNightState: null,
+        oneTimeAbilitiesUsed: {
+            ...(ownRole === GAME_ROLES.DOCTOR && used.doctorKill ? {doctorKill: true} : {}),
+            ...(ownRole === GAME_ROLES.DETECTIVE && used.detectiveKill ? {detectiveKill: true} : {}),
+        },
+    };
+}
+
+export function viewGameAs(game: Game, viewer: GameViewer | null, seal: NightSeal): Game {
     // A stub (the game was deleted mid-action) has nothing to hide and nothing to count.
     if (!game || !Array.isArray(game.bots)) return game;
     // A view has blanks where roles were: cutting it again would count sides wrongly.
@@ -94,6 +154,8 @@ export function viewGameAs(game: Game, viewer: GameViewer | null): Game {
         isView: true,
         bots: game.bots.map(bot => viewBot(game, viewer, bot)),
         humanPlayerRole: ownRole ?? (isOver(game) ? game.humanPlayerRole : HIDDEN_ROLE),
+        ...viewNightQueues(game, viewer, seal),
+        ...viewNightRecords(game, viewer),
         pendingGameOver: pendingGameOver(game),
         nightRoleTotal: nightRoleTotal(game),
     };

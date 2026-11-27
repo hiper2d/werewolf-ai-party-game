@@ -1852,6 +1852,9 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                     return "Coordinate with other werewolves...";
                 }
 
+                // Another role's turn: the server does not say whose.
+                if (!currentRole) return "Night phase in progress...";
+
                 // Capitalize the role name for display
                 const displayRole = currentRole.charAt(0).toUpperCase() + currentRole.slice(1);
                 return `Night phase: ${displayRole} is taking action...`;
@@ -1936,12 +1939,17 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
                 if (queue.length > 0) {
                     const role = queue[0];
                     const you = role === game.humanPlayerRole && params[0] === game.humanPlayerName;
+                    const progress = { done: Math.max(0, nightRoleTotal - queue.length), total: nightRoleTotal, unit: 'roles' };
+                    // Which role is acting is known only when it is the player's own.
+                    if (!role) {
+                        return { actor: { kind: 'moon' }, subject: 'Night in progress', dots: true, progress };
+                    }
                     return {
                         actor: { kind: 'moon' },
                         subject: you ? 'You' : nightSubject(role),
                         verb: nightVerb(role, you),
                         dots: true,
-                        progress: { done: Math.max(0, nightRoleTotal - queue.length), total: nightRoleTotal, unit: 'roles' },
+                        progress,
                     };
                 }
                 return { actor: { kind: 'moon' }, subject: 'Night in progress' };
