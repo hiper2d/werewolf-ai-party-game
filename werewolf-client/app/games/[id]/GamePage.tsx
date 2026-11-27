@@ -4,7 +4,7 @@ import { providerDisplayName } from "@/app/api/provider-blocks";
 import { isGuestEmail } from "@/app/utils/guest";
 import { useLoginDialog } from "@/app/providers/LoginDialogProvider";
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { getGame, updateBotModel, updateGameMasterModel, updateCharacterVoice, clearGameErrorState, setGameErrorState, afterGameDiscussion, retryWithModelOverride, reassignProviderModels } from "@/app/api/game-actions";
+import { getGameForPlayer, updateBotModel, updateGameMasterModel, updateCharacterVoice, clearGameErrorState, setGameErrorState, afterGameDiscussion, retryWithModelOverride, reassignProviderModels } from "@/app/api/game-actions";
 import { isHiddenRoleRetry } from "@/app/api/retry-model";
 import { ttsService } from "@/app/services/tts-service";
 import { startNewDay, summarizePastDay, selectDayResponders } from "@/app/api/night-actions";
@@ -172,7 +172,7 @@ function GamePageContent({
                 // up permanently even after the themed art arrives.
                 for (let i = 0; i < 100 && !cancelled; i++) {
                     await new Promise(resolve => setTimeout(resolve, 3000));
-                    const fresh = await getGame(game.id);
+                    const fresh = await getGameForPlayer(game.id);
                     if (cancelled || !fresh) return;
                     if (fresh.avatarsStatus === 'ready' || fresh.avatarsStatus === 'failed') {
                         setGame(prev => ({ ...prev, avatarsStatus: fresh.avatarsStatus }));
@@ -213,7 +213,7 @@ function GamePageContent({
             if (!result) {
                 // Not claimable: another tab is drawing, or the allowance went
                 // in another tab. Pull the doc so the header reflects it.
-                const fresh = await getGame(game.id);
+                const fresh = await getGameForPlayer(game.id);
                 if (fresh) {
                     setGame(prev => ({
                         ...prev,

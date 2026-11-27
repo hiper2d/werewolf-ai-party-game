@@ -120,6 +120,13 @@ export async function removeGameById(id: string, ownerEmail: string) {
         throw new Error('Firestore is not initialized');
     }
 
+    // The owner is the session's, never the caller's word for it: this action is called
+    // from the browser, and an email passed as an argument proves nothing.
+    const session = await auth();
+    if (!session?.user?.email || session.user.email !== ownerEmail) {
+        throw new Error('You do not own this game');
+    }
+
     // Verify ownership before deleting
     const gameRef = db.collection('games').doc(id);
     const gameSnap = await gameRef.get();
@@ -165,6 +172,28 @@ export async function getGame(gameId: string): Promise<Game | null> {
     } else {
         return null;
     }
+}
+
+/**
+ * The game as the signed-in player's browser may read it: null unless the session owns it.
+ * This is the ONLY game reader a client component may call. `getGame` above checks nothing
+ * (server code calls it from places with no session, and each action that uses it has made
+ * its own ownership check first), so it must not be imported by browser code: a server
+ * action a client imports can be called by anyone with any game id, and the document
+ * carries the owner's email and every role. It is also the seam where a seat's view of a
+ * shared game will be cut (docs/plan-multiplayer.md, decision 7).
+ */
+export async function getGameForPlayer(gameId: string): Promise<Game | null> {
+    const session = await auth();
+    const email = session?.user?.email;
+    if (!email || typeof gameId !== 'string' || !gameId) {
+        return null;
+    }
+    const game = await getGame(gameId);
+    if (!game || (game.ownerEmail && game.ownerEmail !== email)) {
+        return null;
+    }
+    return game;
 }
 
 // A notice older than this cannot belong to a running ask (the longest calls time out at

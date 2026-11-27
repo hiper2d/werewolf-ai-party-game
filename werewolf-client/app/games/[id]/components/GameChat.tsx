@@ -1329,8 +1329,8 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
             if (onGameStateChange) {
                 try {
                     console.log('🔄 REFRESHING GAME STATE after message deletion...');
-                    const { getGame } = await import("@/app/api/game-actions");
-                    const updatedGame = await getGame(gameId);
+                    const { getGameForPlayer } = await import("@/app/api/game-actions");
+                    const updatedGame = await getGameForPlayer(gameId);
                     if (updatedGame) {
                         const aliveBots = updatedGame.bots.filter(bot => bot.isAlive).map(bot => bot.name);
                         console.log('✅ GAME STATE REFRESHED - Alive bots:', aliveBots);
@@ -1391,8 +1391,8 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
             if (onGameStateChange) {
                 try {
                     console.log('🔄 REFRESHING GAME STATE after message deletion...');
-                    const { getGame } = await import("@/app/api/game-actions");
-                    const updatedGame = await getGame(gameId);
+                    const { getGameForPlayer } = await import("@/app/api/game-actions");
+                    const updatedGame = await getGameForPlayer(gameId);
                     if (updatedGame) {
                         const aliveBots = updatedGame.bots.filter(bot => bot.isAlive).map(bot => bot.name);
                         console.log('✅ GAME STATE REFRESHED - Alive bots:', aliveBots);
