@@ -1,6 +1,7 @@
 'use server'
 
 import {db} from "@/firebase/server";
+import {seatFor} from "@/app/api/game-seats";
 import {assertNotGuest} from "@/app/utils/guest";
 import {insufficientBalanceMessage, isFreeSpendLimitError, isInsufficientBalanceError} from "@/app/api/errors";
 import {firestore} from "firebase-admin";
@@ -193,7 +194,7 @@ export async function getGameForPlayer(gameId: string): Promise<Game | null> {
         return null;
     }
     const game = await getGame(gameId);
-    if (!game || (game.ownerEmail && game.ownerEmail !== email)) {
+    if (!game || !seatFor(game, email)) {
         return null;
     }
     return gameForSession(game);
@@ -219,11 +220,11 @@ export async function getLlmRetryNotice(gameId: string): Promise<LlmRetryNotice 
     }
     const snapshot = await db.collection('games')
         .where(firestore.FieldPath.documentId(), '==', gameId)
-        .select('llmRetry', 'ownerEmail')
+        .select('llmRetry', 'ownerEmail', 'humanPlayerName', 'seats')
         .limit(1)
         .get();
     const data = snapshot.docs[0]?.data();
-    if (!data || (data.ownerEmail && data.ownerEmail !== session.user.email)) {
+    if (!data || !seatFor({ownerEmail: data.ownerEmail || '', humanPlayerName: data.humanPlayerName, seats: data.seats}, session.user.email)) {
         return null;
     }
     const notice = data.llmRetry as LlmRetryNotice | undefined;
@@ -1784,6 +1785,7 @@ function gameFromFirestore(id: string, data: any): Game {
         gameMasterTokenUsage: data.gameMasterTokenUsage || data.tokenUsage?.gameMasterUsage || null,
         // Stray legacy values (e.g. the retired 'api' tier) read as free so the game stays openable.
         createdWithTier: data.createdWithTier === 'paid' ? 'paid' : 'free',
+        ...(data.seats ? {seats: data.seats} : {}),
         ...(data.starterTemplateId ? {starterTemplateId: data.starterTemplateId} : {}),
         ...(data.starterClips ? {starterClips: data.starterClips} : {}),
         ...(data.helperMode ? {helperMode: true} : {}),

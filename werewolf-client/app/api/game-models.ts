@@ -310,6 +310,14 @@ export interface StoryChapter {
     summary: string;
 }
 
+/** A human's place at the table (docs/plan-multiplayer.md, "B. Seats"). */
+export interface GameSeat {
+    email: string;       // the account
+    character: string;   // the character it plays
+    payer: boolean;      // checked in the host's "who splits the bill" list
+    joinedAt: number;
+}
+
 export interface Game {
     id: string;
     description: string;
@@ -371,7 +379,11 @@ export interface Game {
     totalImagesCost?: number; // Portion of totalGameCost spent on image generation (avatars, scenes, mid-game illustrations)
     createdAt?: number; // UTC timestamp when the game was created
     expireAt?: any; // Firestore Timestamp for TTL auto-deletion (30 days after creation)
-    ownerEmail: string; // Email of the user who created this game
+    ownerEmail: string; // Email of the user who created this game; in a shared game, the HOST's account
+    // The human places of a SHARED game, keyed by the account's Firebase uid. Absent on a
+    // solo game, which has one seat derived from `ownerEmail` (app/api/game-seats.ts).
+    // Server only: carries emails, and `viewGameAs` drops it.
+    seats?: Record<string, GameSeat>;
     createdWithTier: UserTier; // Store the user's tier at the time the game was created
     // Set on a game created from a starter template (app/utils/starter-games.ts): the
     // pre-built first game. Such a game is held to the cheapest model group, has no rewinds

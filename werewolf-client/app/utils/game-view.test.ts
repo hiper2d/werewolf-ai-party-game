@@ -55,6 +55,13 @@ describe('viewGameAs', () => {
         expect(view.humanPlayerRole).toBe(HIDDEN_ROLE);
     });
 
+    it('never sends the list of seats: it carries the players\' accounts', () => {
+        const seats = {u_1: {email: 'friend@example.com', character: 'Bo', payer: true, joinedAt: 1}};
+        const view = viewGameAs(game({seats}), me, seal);
+        expect(view.seats).toBeUndefined();
+        expect(JSON.stringify(view)).not.toContain('friend@example.com');
+    });
+
     it('never sends a bot\'s private notes, even when the role is known', () => {
         const view = viewGameAs(game({gameState: GAME_STATES.GAME_OVER}), me, seal);
         for (const b of view.bots) {

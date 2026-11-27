@@ -1,3 +1,4 @@
+import {seatFor} from '@/app/api/game-seats';
 import { redirect } from "next/navigation";
 import { getGame } from "@/app/api/game-actions";
 import GamePage from "./GamePage";
@@ -39,8 +40,8 @@ export default async function Page(props: any) {
         redirect(`/?login=true&callbackUrl=${encodeURIComponent(`/games/${params.id}`)}`);
     }
 
-    // Check ownership — redirect if this game belongs to another user
-    if (game.ownerEmail && game.ownerEmail !== session.user.email) {
+    // Only somebody with a seat at this table may open it
+    if (!seatFor(game, session.user.email)) {
         redirect('/games');
     }
 

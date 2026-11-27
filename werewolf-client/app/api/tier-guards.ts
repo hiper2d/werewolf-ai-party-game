@@ -5,11 +5,11 @@ import {getUserTier} from '@/app/api/user-actions';
 import {TierMismatchError} from '@/app/api/errors';
 import {canOpenGameOnTier} from '@/app/utils/tier-access';
 import type {UserTier} from '@/app/api/game-models';
+import {seatFor} from '@/app/api/game-seats';
 
 interface EnsureOptions {
     gameTier?: UserTier;
     userTier?: UserTier;
-    ownerEmail?: string;
 }
 
 export async function ensureUserCanAccessGame(
@@ -23,22 +23,22 @@ export async function ensureUserCanAccessGame(
 
     const currentUserTier = options.userTier ?? await getUserTier(userEmail);
 
-    let storedTier: UserTier | undefined = options.gameTier;
-    let gameOwnerEmail: string | undefined = options.ownerEmail;
-    if (!storedTier || !gameOwnerEmail) {
-        const gameDoc = await db.collection('games').doc(gameId).get();
-        if (!gameDoc.exists) {
-            throw new Error('Game not found');
-        }
-        const gameData = gameDoc.data();
-        // Coerce rather than cast: a stray legacy value (e.g. the retired 'api' tier)
-        // must compare as 'free', not throw an unresolvable TierMismatchError.
-        storedTier = storedTier ?? (gameData?.createdWithTier === 'paid' ? 'paid' : 'free');
-        gameOwnerEmail = gameOwnerEmail ?? gameData?.ownerEmail;
+    const gameDoc = await db.collection('games').doc(gameId).get();
+    if (!gameDoc.exists) {
+        throw new Error('Game not found');
     }
+    const gameData = gameDoc.data();
+    // Coerce rather than cast: a stray legacy value (e.g. the retired 'api' tier)
+    // must compare as 'free', not throw an unresolvable TierMismatchError.
+    const storedTier: UserTier = options.gameTier ?? (gameData?.createdWithTier === 'paid' ? 'paid' : 'free');
 
-    // Verify ownership if the game has an owner
-    if (gameOwnerEmail && gameOwnerEmail !== userEmail) {
+    // The caller must hold a seat at this table (app/api/game-seats.ts).
+    const seat = seatFor({
+        ownerEmail: gameData?.ownerEmail || '',
+        humanPlayerName: gameData?.humanPlayerName,
+        seats: gameData?.seats,
+    }, userEmail);
+    if (!seat) {
         throw new Error('You do not have access to this game');
     }
 

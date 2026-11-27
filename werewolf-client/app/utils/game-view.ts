@@ -192,6 +192,8 @@ export function viewGameAs(game: Game, viewer: GameViewer | null, seal: NightSea
     const view: Game = {
         ...game,
         isView: true,
+        // Accounts' emails, keyed by a hash of them: no browser gets the list.
+        seats: undefined,
         bots: game.bots.map(bot => viewBot(game, viewer, bot)),
         humanPlayerRole: ownRole ?? (isOver(game) ? game.humanPlayerRole : HIDDEN_ROLE),
         ...viewNightQueues(game, viewer, seal),

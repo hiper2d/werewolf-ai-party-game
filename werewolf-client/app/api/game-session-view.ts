@@ -3,7 +3,7 @@ import {auth} from '@/auth';
 import {Game, GameActionResponse, GameMessage} from '@/app/api/game-models';
 import {GameViewer, viewGameAs, viewMessagesAs} from '@/app/utils/game-view';
 import {writeSeatViews} from '@/app/api/game-live';
-import {firebaseUidForEmail} from '@/app/utils/firebase-uid';
+import {seatFor, seatsOfGame} from '@/app/api/game-seats';
 
 /**
  * The game as the signed-in player's browser may see it (rules in app/utils/game-view.ts).
@@ -21,12 +21,10 @@ export async function gameForSession(game: Game): Promise<Game> {
 
 /**
  * Every seat of a game: the Firebase uid that may listen and what that player may see.
- * One seat today, the owner's (a game from before owners were stored has none to publish to).
+ * A game from before owners were stored has none to publish to.
  */
 function seatsOf(game: Game): Array<{uid: string; viewer: GameViewer}> {
-    return game.ownerEmail
-        ? [{uid: firebaseUidForEmail(game.ownerEmail), viewer: {name: game.humanPlayerName, host: true}}]
-        : [];
+    return seatsOfGame(game).map(seat => ({uid: seat.uid, viewer: {name: seat.character, host: seat.host}}));
 }
 
 /**
@@ -81,13 +79,11 @@ export async function responseForSession(response: GameActionResponse): Promise<
 }
 
 /**
- * Whose seat an account holds. One human seat today, the owner's, who is also the host; a game from before
- * owners were stored belongs to whoever can open it. Anybody else has no seat.
+ * Who is looking, by the seat their account holds (app/api/game-seats.ts); null without one.
  */
 export function viewerOf(game: Game, email: string | null | undefined): GameViewer | null {
-    if (!email || !game) return null;
-    if (!game.ownerEmail || game.ownerEmail === email) return {name: game.humanPlayerName, host: true};
-    return null;
+    const seat = seatFor(game, email);
+    return seat ? {name: seat.character, host: seat.host} : null;
 }
 
 // Without a configured secret the key lives as long as the process: a token then differs
