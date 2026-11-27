@@ -37,7 +37,7 @@ export const GUEST_LAST_DAY = 1;
 export const GUEST_WALL_MESSAGE = 'Sign in to play day 2. Your game is saved and continues from here.';
 export const GUEST_ONLY_STARTER_MESSAGE = 'Sign in to create your own games.';
 export const GUEST_ONE_GAME_MESSAGE = 'Sign in to play another story. Your first game stays yours.';
-export const GUEST_DEVICE_LIMIT_MESSAGE = 'You have played here before. Sign in to keep playing: it is free.';
+export const GUEST_DEVICE_LIMIT_MESSAGE = 'This device already has an account or has used its free game. Sign in to keep playing: it is free.';
 export const GUEST_BUDGET_MESSAGE = 'Your free trial of AI is used up. Sign in to keep playing: your game is saved.';
 export const GUEST_PAUSED_MESSAGE = 'Free trial play is paused for today. Sign in to keep playing (your game is saved), or come back tomorrow.';
 /**
