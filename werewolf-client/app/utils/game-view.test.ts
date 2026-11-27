@@ -184,7 +184,7 @@ describe('viewMessagesAs', () => {
         messageType: MessageType.GM_COMMAND, day: 1, timestamp: 1, ...extra,
     });
     const all = [
-        message('ALL'), message('Alex'), message('Doc'), message('WEREWOLVES'), message('DOCTOR'),
+        message('ALL'), message('Alex', 'text', {messageType: MessageType.GAME_STORY}), message('Doc'), message('WEREWOLVES'), message('DOCTOR'),
         message('DETECTIVE'), message('MANIAC'), message('NONE'),
     ];
     const recipients = (g: Game, viewer: typeof me | null) => viewMessagesAs(g, viewer, all).map(m => m.recipientName);
@@ -312,7 +312,10 @@ describe('a second human at the table', () => {
     it('reads their own role\'s channel and what is addressed to them, not the first human\'s', () => {
         const message = (recipientName: string) => ({id: recipientName, recipientName, authorName: 'GM', msg: 'x', messageType: MessageType.GM_COMMAND, day: 1, timestamp: 1} as GameMessage);
         const all = ['ALL', 'WEREWOLVES', 'DOCTOR', 'Wolf2', 'Alex', 'Wolf1'].map(message);
-        expect(viewMessagesAs(shared(), wolf2, all).map(m => m.recipientName)).toEqual(['ALL', 'WEREWOLVES', 'Wolf2']);
+        // The command to 'Wolf2' was a prompt to the bot they took over: not theirs to read.
+        expect(viewMessagesAs(shared(), wolf2, all).map(m => m.recipientName)).toEqual(['ALL', 'WEREWOLVES']);
+        const note = {...message('Wolf2'), messageType: MessageType.GAME_STORY};
+        expect(viewMessagesAs(shared(), wolf2, [note])).toHaveLength(1);
         expect(viewMessagesAs(shared(), doc, all).map(m => m.recipientName)).toEqual(['ALL', 'DOCTOR']);
     });
 

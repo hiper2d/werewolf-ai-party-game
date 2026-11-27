@@ -1,9 +1,9 @@
 import {
-    Bot, Game, GAME_ROLES, GAME_STATES, GameMessage, RECIPIENT_ALL, RECIPIENT_DETECTIVE, RECIPIENT_DOCTOR,
+    Bot, Game, GAME_ROLES, GAME_STATES, GameMessage, MessageType, RECIPIENT_ALL, RECIPIENT_DETECTIVE, RECIPIENT_DOCTOR,
     RECIPIENT_MANIAC, RECIPIENT_WEREWOLVES, ROLE_CONFIGS,
 } from '@/app/api/game-models';
 import {checkGameEndConditions} from '@/app/utils/game-utils';
-import {humanCastNames, isPlayerAlive, playerRole} from '@/app/utils/cast';
+import {humanCastNames, isPlayerAlive, isSharedGame, playerRole} from '@/app/utils/cast';
 
 /**
  * What one player's browser may know about a game (docs/plan-multiplayer.md, "strict per-seat
@@ -227,6 +227,7 @@ export function viewGameAs(game: Game, viewer: GameViewer | null, seal: NightSea
         isView: true,
         // Accounts' emails, keyed by a hash of them: no browser gets the list.
         seats: undefined,
+        table: {shared: isSharedGame(game), host: viewer?.host === true},
         bots: cast,
         humanPlayerRole: ownRole ?? (isOver(game) ? game.humanPlayerRole : HIDDEN_ROLE),
         ...(fromCastSeat ? viewFromCastSeat(game, viewer!, cast) : {}),
@@ -277,7 +278,11 @@ export function viewMessagesAs(game: Game, viewer: GameViewer | null, messages: 
     if (viewer) allowed.add(viewer.name);
     const channel = ROLE_CHANNEL[roleOf(game, viewer) ?? ''];
     if (channel) allowed.add(channel);
-    return (messages || []).filter(m => m && allowed.has(m.recipientName)).map(viewMessage).map(m => {
+    // A Game Master command by name is a prompt to a BOT. A person who took a bot's
+    // place would otherwise read the instructions it was given before they sat down.
+    const readable = (m: GameMessage) => allowed.has(m.recipientName)
+        && !(m.messageType === MessageType.GM_COMMAND && m.recipientName === viewer?.name);
+    return (messages || []).filter(m => m && readable(m)).map(viewMessage).map(m => {
         if (viewer?.host) return m;
         // What a line cost is the host's business, like the models.
         const {cost, ...shown} = m;

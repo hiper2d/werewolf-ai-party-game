@@ -260,7 +260,10 @@ function GamePageContent({
     // twice. It drives again when the player does something here, or after
     // FOLLOW_TIMEOUT_MS without a pulse (the other screen was closed mid-round).
     const [followingSince, setFollowingSince] = useState<number | null>(null);
-    const driving = followingSince === null;
+    // In a game several people play, the host's screen runs the table and nobody
+    // else's does, whoever acted last (docs/plan-multiplayer.md, "E. Who runs the game").
+    const joinedPlayer = !!game.table?.shared && !game.table.host;
+    const driving = game.table?.shared ? game.table.host : followingSince === null;
     const ownPulseRef = useRef(0);      // the newest pulse this page has already accounted for
     const missedPulseRef = useRef<GamePulse | null>(null); // a change that arrived while an action of ours was in flight
 
@@ -978,7 +981,12 @@ function GamePageContent({
     const queueInfo = getQueueInfo();
 
     // Build game controls JSX to pass to GameChat
-    const flowControlsElement = buildFlowControls();
+    const hostFlowControls = buildFlowControls();
+    // Moving the game from phase to phase is the host's: a joined player sees where the
+    // game is and waits.
+    const flowControlsElement: PhaseControls | null = hostFlowControls && joinedPlayer
+        ? {...hostFlowControls, actions: <span className="text-[12px] text-[var(--fg-2)]">The host moves the game on</span>}
+        : hostFlowControls;
     const chatControlsElement = buildChatControls();
 
     // Cancel sits at the right end of the chat's loading rail, after 10s of bot processing
@@ -1025,7 +1033,8 @@ function GamePageContent({
             game.gameStateProcessQueue.length === 0 && !isKeepGoingLoading) {
             return (
                 <>
-                    <button
+                    {/* Starting the vote is the host's */}
+                    {!joinedPlayer && <button
                         className={`${voteUrgency.isUrgent ? btnDanger + ' animate-pulse' : voteUrgency.isWarning ? btnWarn : btnGhost} ${!areControlsEnabled || !voteUrgency.canVote ? 'opacity-50 cursor-not-allowed' : ''}`}
                         disabled={!areControlsEnabled || !voteUrgency.canVote}
                         onClick={() => setVoteConfirmOpen(true)}
@@ -1034,7 +1043,7 @@ function GamePageContent({
                         Vote
                         <span className="ml-1.5 text-[11px] tabular-nums opacity-60">{voteUrgency.progressPct}%</span>
                         {(voteUrgency.isUrgent || voteUrgency.isWarning) && ' \u26A0\uFE0F'}
-                    </button>
+                    </button>}
                     <button
                         className={`${btnGhost} ${!areControlsEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                         disabled={!areControlsEnabled}
@@ -1512,7 +1521,7 @@ function GamePageContent({
                         </svg>
                         Select Bots Automatically
                     </button>
-                    {game.gameState === GAME_STATES.DAY_DISCUSSION && (
+                    {game.gameState === GAME_STATES.DAY_DISCUSSION && !joinedPlayer && (
                         <button
                             data-hint="vote"
                             className={`w-full mt-2 px-3 py-2 text-[13px] font-medium rounded-[var(--radius-md)] border transition-all duration-[120ms] flex items-center justify-center gap-2 ${

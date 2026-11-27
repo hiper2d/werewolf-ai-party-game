@@ -226,6 +226,13 @@ Friends join BEFORE the game is created, in the saved preview.
 
 ### H. Build order from here
 
+Done on 2026-11-27 (ahead of the shared preview, because a seat written by script was the
+cheapest way to test them): seats and the cast rules (step 1) and the server and page
+rules for playing with several humans (most of step 3: day discussion, vote, night,
+host-only phases and controls). Left from step 3: the send cooldown, dead players
+read-only on the page, the skip-absent-player and replace-with-bot buttons, the error
+banner for a joined player, and a day with a dead first human played through.
+
 1. Seats in the data model with one seat per game (no behaviour change): `seats`,
    `ensureSeat`, `viewerOf` / `seatsOf` by seat, human characters in the cast.
 2. Shared preview: links, claiming, own name / story / voice, live view of the draft,

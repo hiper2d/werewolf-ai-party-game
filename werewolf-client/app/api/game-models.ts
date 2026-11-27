@@ -387,6 +387,9 @@ export interface Game {
     // solo game, which has one seat derived from `ownerEmail` (app/api/game-seats.ts).
     // Server only: carries emails, and `viewGameAs` drops it.
     seats?: Record<string, GameSeat>;
+    // VIEW ONLY (app/utils/game-view.ts): is this game played by several people, and is
+    // the viewer its host? The host's screen runs the table; the others' never do.
+    table?: { shared: boolean; host: boolean };
     createdWithTier: UserTier; // Store the user's tier at the time the game was created
     // Set on a game created from a starter template (app/utils/starter-games.ts): the
     // pre-built first game. Such a game is held to the cheapest model group, has no rewinds
