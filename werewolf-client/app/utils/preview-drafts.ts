@@ -1,4 +1,5 @@
-import {GamePreviewWithGeneratedBots} from "@/app/api/game-models";
+import {AVATAR_GM_KEY, GamePreviewWithGeneratedBots} from "@/app/api/game-models";
+import {sanitizePlayerName} from "@/app/utils/name-utils";
 
 /**
  * Saved previews (docs/plan-multiplayer.md, step 1). A generated preview used to live only
@@ -47,6 +48,11 @@ export interface PreviewDraftSummary {
     players: number;
     language: string;
     updatedAt: number;
+    /** The welcome scene drawn for this cast on the preview page, when the account's
+     * illustration set (one per account, `avatarDrafts`) is this draft's. */
+    sceneUrl?: string;
+    /** That set is being drawn right now. */
+    drawing?: boolean;
 }
 
 /** A player keeps this many drafts; saving one more removes the oldest. */
@@ -98,9 +104,23 @@ function isPreviewDraftPayload(value: unknown): value is PreviewDraftPayload {
         && typeof preview.scene === 'string' && Array.isArray(preview.bots) && preview.bots.length > 0;
 }
 
+/**
+ * One string for a cast: the portrait keys an illustration set is drawn for (the bots, the
+ * player, the Game Master), sorted. A drawn set belongs to a draft when the two are equal,
+ * the same test the form makes (`draftMatchesNames`).
+ */
+export function castKeyOf(keys: string[]): string {
+    return [...keys].sort().join('|');
+}
+
+export function previewCastKey(preview: {name: string; bots: Array<{name: string}>}): string {
+    return castKeyOf([...preview.bots.map(bot => sanitizePlayerName(bot.name)), sanitizePlayerName(preview.name), AVATAR_GM_KEY]);
+}
+
 /** The list row for a payload. */
-export function previewDraftSummaryFields(payload: PreviewDraftPayload): Omit<PreviewDraftSummary, 'id' | 'updatedAt'> {
+export function previewDraftSummaryFields(payload: PreviewDraftPayload): Omit<PreviewDraftSummary, 'id' | 'updatedAt'> & {castKey: string} {
     return {
+        castKey: previewCastKey(payload.preview),
         theme: String(payload.preview.theme ?? payload.form.theme).slice(0, 200),
         name: String(payload.preview.name ?? payload.form.name).slice(0, 60),
         players: payload.preview.bots.length + 1,

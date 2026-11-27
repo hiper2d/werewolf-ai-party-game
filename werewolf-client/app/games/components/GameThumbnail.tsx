@@ -11,9 +11,13 @@ import { getSceneUrl } from '@/app/utils/avatar-utils';
  * card then keeps its text-only layout.
  */
 export default function GameThumbnail({ game, locked = false }: { game: Game; locked?: boolean }) {
+    return <SceneThumbnail src={getSceneUrl(game, 'welcome')} alt={`${game.theme} scene`} locked={locked} />;
+}
+
+/** The picture itself: also the thumbnail of a saved preview (app/utils/preview-drafts.ts). */
+export function SceneThumbnail({ src, alt, locked = false }: { src?: string | null; alt: string; locked?: boolean }) {
     const [failed, setFailed] = useState(false);
     const [loaded, setLoaded] = useState(false);
-    const src = getSceneUrl(game, 'welcome');
 
     // A cached image can finish (or fail) before hydration attaches the
     // onLoad/onError handlers — the load event then never reaches React and
@@ -33,7 +37,7 @@ export default function GameThumbnail({ game, locked = false }: { game: Game; lo
             <img
                 ref={imgRef}
                 src={src}
-                alt={`${game.theme} scene`}
+                alt={alt}
                 loading="lazy"
                 className={`w-full h-full object-cover transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
                 onLoad={() => setLoaded(true)}

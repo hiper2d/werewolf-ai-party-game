@@ -1,4 +1,4 @@
-import {MAX_PREVIEW_DRAFT_CHARS, parsePreviewDraft, previewDraftSummaryFields, previewDraftsToEvict, serializePreviewDraft} from './preview-drafts';
+import {MAX_PREVIEW_DRAFT_CHARS, castKeyOf, parsePreviewDraft, previewCastKey, previewDraftSummaryFields, previewDraftsToEvict, serializePreviewDraft} from './preview-drafts';
 
 const payload = () => ({
     form: {name: 'Alex', theme: 'Tavern', description: '', language: 'en', artStyle: '', playerCount: 3, werewolfCount: 1,
@@ -35,7 +35,11 @@ describe('preview drafts', () => {
     });
 
     it('builds the list row from the preview', () => {
-        expect(previewDraftSummaryFields(payload())).toEqual({theme: 'Tavern', name: 'Alex', players: 3, language: 'ja'});
+        expect(previewDraftSummaryFields(payload())).toEqual({castKey: 'Alex|Mira|Odo|game-master', theme: 'Tavern', name: 'Alex', players: 3, language: 'ja'});
+    });
+
+    it('gives one cast key whatever the order', () => {
+        expect(castKeyOf(['Odo', 'game-master', 'Alex', 'Mira'])).toBe(previewCastKey(payload().preview));
     });
 
     it('evicts the oldest drafts past the limit', () => {

@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import {getAllGames} from "@/app/api/game-actions";
 import RemoveGame from "@/app/games/components/RemoveGame";
-import GameThumbnail from "@/app/games/components/GameThumbnail";
+import GameThumbnail, { SceneThumbnail } from "@/app/games/components/GameThumbnail";
 import {redirect} from "next/navigation";
 import {Game} from "@/app/api/game-models";
 import { auth } from "@/auth";
@@ -171,23 +171,32 @@ function DraftList({drafts}: {drafts: PreviewDraftSummary[]}) {
                     className="bg-[var(--bg-1)] border border-dashed border-[var(--line-2)] rounded-[var(--radius-lg)] px-4 py-4 transition-all duration-[120ms] hover:border-[var(--line-3)]"
                 >
                     <div className="flex justify-between items-start gap-2">
-                        <Link href={`/games/newgame?draft=${draft.id}`} className="flex-grow min-w-0">
-                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-4">
-                                <h2 className="text-[16px] capitalize text-[var(--fg-0)] font-semibold truncate">
-                                    {draft.theme}
-                                    {draft.name && (
-                                        <span className="text-[13px] font-normal text-[var(--fg-2)] ml-2">as {draft.name}</span>
-                                    )}
-                                </h2>
-                                <div className="flex flex-wrap items-center gap-x-2 text-[11px] font-mono text-[var(--fg-2)]">
-                                    <span>{formatCreationDate(draft.updatedAt)}</span>
-                                    <span className="hidden sm:inline text-[var(--line-3)]">&middot;</span>
-                                    <span className="font-medium text-[var(--fg-1)] uppercase tracking-[0.04em]">Draft &middot; not started</span>
+                        <Link href={`/games/newgame?draft=${draft.id}`} className="flex-grow min-w-0 flex items-start gap-3.5">
+                            {draft.sceneUrl ? (
+                                <SceneThumbnail src={draft.sceneUrl} alt={`${draft.theme} scene`} />
+                            ) : draft.drawing ? (
+                                <div className="flex-none w-24 h-16 sm:w-36 sm:h-24 rounded-[var(--radius-md)] border border-[var(--line-1)] bg-[var(--bg-3)] animate-pulse grid place-items-center text-[11px] font-mono text-[var(--fg-2)]">
+                                    drawing…
                                 </div>
+                            ) : null}
+                            <div className="flex flex-col gap-1.5 min-w-0 flex-grow">
+                                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-4">
+                                    <h2 className="text-[16px] capitalize text-[var(--fg-0)] font-semibold truncate">
+                                        {draft.theme}
+                                        {draft.name && (
+                                            <span className="text-[13px] font-normal text-[var(--fg-2)] ml-2">as {draft.name}</span>
+                                        )}
+                                    </h2>
+                                    <div className="flex flex-wrap items-center gap-x-2 text-[11px] font-mono text-[var(--fg-2)]">
+                                        <span>{formatCreationDate(draft.updatedAt)}</span>
+                                        <span className="hidden sm:inline text-[var(--line-3)]">&middot;</span>
+                                        <span className="font-medium text-[var(--fg-1)] uppercase tracking-[0.04em]">Draft &middot; not started</span>
+                                    </div>
+                                </div>
+                                <p className="text-[13px] text-[var(--fg-1)] leading-relaxed">
+                                    {draft.players} players. The cast and the story are ready: open it to edit them or create the game.
+                                </p>
                             </div>
-                            <p className="mt-1.5 text-[13px] text-[var(--fg-1)] leading-relaxed">
-                                {draft.players} players. The cast and the story are ready: open it to edit them or create the game.
-                            </p>
                         </Link>
                         <RemoveDraft draftId={draft.id} />
                     </div>

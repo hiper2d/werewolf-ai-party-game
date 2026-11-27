@@ -4,8 +4,12 @@ import {auth} from "@/auth";
 import {db} from "@/firebase/server";
 import {isGuestEmail} from "@/app/utils/guest";
 import {logger} from "@/app/utils/logger";
+import {getDraftState} from "@/app/utils/avatar-drafts";
+import {SCENE_WELCOME_KEY} from "@/app/api/game-models";
 import {
+    castKeyOf,
     parsePreviewDraft,
+    previewCastKey,
     PREVIEW_DRAFT_TTL_MS,
     PreviewDraftPayload,
     previewDraftsToEvict,
@@ -84,11 +88,21 @@ export async function listPreviewDrafts(): Promise<PreviewDraftSummary[]> {
         return [];
     }
     // One equality filter and a local sort: no composite index to deploy.
-    const snap = await db.collection(COLLECTION).where('ownerEmail', '==', email).get();
+    const [snap, drawn] = await Promise.all([
+        db.collection(COLLECTION).where('ownerEmail', '==', email).get(),
+        // The account's one illustration set; a failed read only costs the thumbnails.
+        getDraftState(email).catch(() => null),
+    ]);
+    const drawnCastKey = drawn ? castKeyOf(drawn.keys) : null;
     const cutoff = Date.now() - PREVIEW_DRAFT_TTL_MS;
     return snap.docs
         .map(doc => {
             const data = doc.data();
+            // Drafts saved before the cast key was stored: read it from the preview.
+            const castKey = typeof data.castKey === 'string'
+                ? data.castKey
+                : (() => { const saved = parsePreviewDraft(data.data); return saved ? previewCastKey(saved.preview) : ''; })();
+            const mine = !!drawn && castKey !== '' && castKey === drawnCastKey;
             return {
                 id: doc.id,
                 theme: String(data.theme ?? ''),
@@ -96,6 +110,9 @@ export async function listPreviewDrafts(): Promise<PreviewDraftSummary[]> {
                 players: Number(data.players) || 0,
                 language: String(data.language ?? 'en'),
                 updatedAt: Number(data.updatedAt) || 0,
+                ...(mine && drawn!.status === 'ready' && drawn!.hasScene
+                    ? {sceneUrl: `/api/avatar-drafts/${SCENE_WELCOME_KEY}?v=${drawn!.version}`} : {}),
+                ...(mine && drawn!.status === 'generating' ? {drawing: true} : {}),
             };
         })
         .filter(draft => draft.updatedAt > cutoff)
