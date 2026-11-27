@@ -166,6 +166,9 @@ Friends join BEFORE the game is created, in the saved preview.
 
 ### D. Joining a running game, leaving, being removed
 
+- A READY-MADE STORY (starter game) has no preview, so this is how it is shared (Alex,
+  2026-11-27): the host starts it alone and invites friends by bot links. Signed-in
+  accounts only, as everywhere.
 - The host can make a link for one BOT's place in a running game. Whoever opens it (signed
   in) takes that character over: its role, its alive state, the chat so far. They are a
   payer from that moment unless the host unchecks them.
@@ -203,9 +206,16 @@ Friends join BEFORE the game is created, in the saved preview.
   living, active players with `payer` checked. Everyone is checked on joining, mid-game
   joiners too. The host can uncheck anyone but themselves; an unchecked player plays free
   and the rest cover the share.
-- Dead players watch, cannot act and do not pay.
+- A killed player is unchecked automatically: dead players watch, cannot act and do not
+  pay. THE HOST IS THE EXCEPTION (Alex, 2026-11-27): the host is always checked and always
+  pays, alive or dead; the only question is with whom the bill is shared. So there is
+  always at least one payer.
 - An INACTIVE payer, or a payer with no money left, BLOCKS the game: no AI call is made
   until they return, top up, or the host unchecks them. The banner names who.
+- With no ACTIVE HOST the game is PAUSED (Alex, 2026-11-27): no AI call, so nobody pays
+  while a takeover is pending. The player who takes over becomes the always-checked payer;
+  the former host becomes an ordinary player and, being inactive, is unchecked by the
+  takeover (proposal: otherwise the new host's first act is always to uncheck them).
 - A change of the payer list is a line in the chat. So is a model change by the host.
 - A joiner sees the expected cost per player before joining.
 - Personal calls (own dictation, own suggested answer) are charged to the person. Preview
@@ -607,15 +617,9 @@ composer while bots talk, deliberately).
 
 ## Open questions
 
-The decisions of 2026-11-26 are worked into "Current design" above. Still open:
-
-- When living players remain but none is a checked payer (the host died, everyone else
-  is unchecked): proposed, the host pays. Not confirmed.
-- Whether a ready-made story (starter game) can be shared in the first version, or only
-  games made with the form.
-- Who pays for the calls made while a takeover is pending (a stalled host is inactive, so
-  by rule G the game is blocked if they are a payer; the new host would have to uncheck
-  them). Probably fine as it falls out; confirm when building step 4.
+The decisions of 2026-11-26 are worked into "Current design" above, and the three
+questions left on 2026-11-27 were answered the same day (host always pays: G; ready-made
+stories are shared by bot links: D; no active host = paused: G). Nothing is open.
 
 ## Out of scope
 
