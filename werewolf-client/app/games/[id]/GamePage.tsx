@@ -39,6 +39,11 @@ import { discussionProgress } from '@/app/utils/discussion-progress';
 import Link from 'next/link';
 import { UIControlsProvider, useUIControls } from './context/UIControlsContext';
 import React from 'react';
+import { useGamePulse } from './use-game-pulse';
+
+// How long a screen that follows another one waits for the next change before it takes the
+// game back. Longer than a model call may take (60 s), so a slow turn is not taken for silence.
+const FOLLOW_TIMEOUT_MS = 90_000;
 
 interface Participant {
     name: string;
@@ -246,6 +251,19 @@ function GamePageContent({
     // `summarizePastDay` calls that left a recoverable error mid-summary).
     const inFlightRef = useRef(false);
 
+    // LIVE UPDATES (app/api/game-pulse.ts). The server stamps a pulse whenever the game
+    // changes; this page listens to it. A pulse this page's own action returned is its own
+    // change and needs nothing. Any other pulse means the game moved on another screen (a
+    // second tab, a phone, later another player): the page fetches its view again and stops
+    // DRIVING, that is, it no longer runs the game's automatic loops (introductions, bot
+    // replies, votes, the night), because two screens running them would ask every bot
+    // twice. It drives again when the player does something here, or after
+    // FOLLOW_TIMEOUT_MS without a pulse (the other screen was closed mid-round).
+    const [followingSince, setFollowingSince] = useState<number | null>(null);
+    const driving = followingSince === null;
+    const ownPulseRef = useRef(0);      // the newest pulse this page has already accounted for
+    const missedPulseRef = useRef(0);   // a pulse that arrived while an action of ours was in flight
+
     const applyActionResult = useCallback((result: GameActionResponse) => {
         setGame(prev => {
             // If queue was locally cleared by cancel, don't restore it from a stale in-flight result
@@ -378,6 +396,44 @@ function GamePageContent({
 
     // Shared with GameChat via prop so chat sends and page buttons (Vote,
     // Go on, night flow) can never dispatch concurrently from this tab.
+    /** Fetch this player's view again after a change made elsewhere. */
+    const syncFromServer = useCallback(async (pulse: number, follow: boolean) => {
+        ownPulseRef.current = Math.max(ownPulseRef.current, pulse);
+        if (follow) setFollowingSince(Date.now());
+        try {
+            const fresh = await getGameForPlayer(initialGame.id);
+            // Null: the game was deleted elsewhere. A newer pulse or an action of ours that
+            // started meanwhile brings a newer state than this one.
+            if (!fresh || ownPulseRef.current !== pulse || inFlightRef.current) return;
+            setGame(fresh);
+            const response = await fetch(`/api/games/${initialGame.id}/messages?day=${fresh.currentDay}`);
+            if (response.ok) {
+                const dayMessages: GameMessage[] = await response.json();
+                // The chat keeps only the ones it does not have yet.
+                setPendingMessages(prev => [...prev, ...dayMessages]);
+            }
+        } catch (error) {
+            console.warn('Could not refresh the game after a change elsewhere', error);
+        }
+    }, [initialGame.id]);
+
+    useGamePulse(initialGame.id, ({v, side}) => {
+        if (v <= ownPulseRef.current) return;
+        if (inFlightRef.current) {
+            // Most likely our own action's stamp arriving before its answer; settled when it returns.
+            if (!side) missedPulseRef.current = Math.max(missedPulseRef.current, v);
+            return;
+        }
+        syncFromServer(v, !side);
+    });
+
+    // The screen we were following went quiet: take the game back.
+    useEffect(() => {
+        if (followingSince === null) return;
+        const timer = setTimeout(() => setFollowingSince(null), FOLLOW_TIMEOUT_MS);
+        return () => clearTimeout(timer);
+    }, [followingSince]);
+
     const runGameAction = useCallback(async <T,>(action: () => Promise<T>): Promise<T | undefined> => {
         // Skip duplicate/concurrent dispatch — only one game action runs at a time.
         if (inFlightRef.current) {
@@ -385,11 +441,17 @@ function GamePageContent({
             return undefined;
         }
         inFlightRef.current = true;
+        // Acting here makes this the screen that runs the game.
+        setFollowingSince(null);
         // The action returns nothing until the model answered, so the only way the rail can
         // explain a turn that runs long is to poll the re-send notice from inside the wait.
         const stopWatching = watchLlmRetryNotice(initialGame.id, setRetryNotice);
         try {
-            return await action();
+            const result = await action();
+            // The stamp our own change left: pulses up to it are ours.
+            const stamped = (result as any)?.game?.pulse ?? (result as any)?.pulse;
+            if (typeof stamped === 'number') ownPulseRef.current = Math.max(ownPulseRef.current, stamped);
+            return result;
         } catch (error) {
             if (isTierMismatchError(error) || (error instanceof Error && error.message === 'TIER_MISMATCH')) {
                 window.location.href = `/games?error=tier_mismatch&blocked=${encodeURIComponent(initialGame.id)}`;
@@ -399,11 +461,17 @@ function GamePageContent({
         } finally {
             inFlightRef.current = false;
             stopWatching();
+            // A pulse newer than our own stamp came in while we were busy: another screen moved after us.
+            const missed = missedPulseRef.current;
+            missedPulseRef.current = 0;
+            if (missed > ownPulseRef.current) syncFromServer(missed, true);
         }
-    }, [initialGame.id]);
+    }, [initialGame.id, syncFromServer]);
 
     // Handle welcome state
     useEffect(() => {
+        // A screen that follows somebody else's moves does not run the game's loops.
+        if (!driving) return;
         const handleWelcome = async () => {
             if (game.gameState === GAME_STATES.WELCOME && !game.errorState) {
                 if (game.gameStateParamQueue.length > 0) {
@@ -427,10 +495,12 @@ function GamePageContent({
         };
 
         handleWelcome();
-    }, [game.gameState, game.id, game.gameStateParamQueue, game.errorState]);
+    }, [game.gameState, game.id, game.gameStateParamQueue, game.errorState, driving]);
 
     // Handle vote state
     useEffect(() => {
+        // A screen that follows somebody else's moves does not run the game's loops.
+        if (!driving) return;
         if (game.gameState !== GAME_STATES.VOTE || game.errorState) {
             return;
         }
@@ -472,10 +542,12 @@ function GamePageContent({
         };
 
         handleVote();
-    }, [game.gameState, game.gameStateProcessQueue.length, game.gameStateProcessQueue.join(','), game.id, game.errorState]);
+    }, [game.gameState, game.gameStateProcessQueue.length, game.gameStateProcessQueue.join(','), game.id, game.errorState, driving]);
 
     // Handle NIGHT state
     useEffect(() => {
+        // A screen that follows somebody else's moves does not run the game's loops.
+        if (!driving) return;
         const handleNightAction = async () => {
             if (game.gameState === GAME_STATES.NIGHT && !game.errorState) {
                 if (game.gameStateProcessQueue.length === 0) {
@@ -532,10 +604,12 @@ function GamePageContent({
         };
 
         handleNightAction();
-    }, [game.gameState, game.gameStateProcessQueue.length, game.gameStateProcessQueue.join(','), game.gameStateParamQueue.length, game.gameStateParamQueue.join(','), game.humanPlayerRole, game.humanPlayerName, game.id, game.errorState]);
+    }, [game.gameState, game.gameStateProcessQueue.length, game.gameStateProcessQueue.join(','), game.gameStateParamQueue.length, game.gameStateParamQueue.join(','), game.humanPlayerRole, game.humanPlayerName, game.id, game.errorState, driving]);
 
     // Handle NEW_DAY_BOT_SUMMARIES state
     useEffect(() => {
+        // A screen that follows somebody else's moves does not run the game's loops.
+        if (!driving) return;
         const handleSummaryGeneration = async () => {
             if (game.gameState === GAME_STATES.NEW_DAY_BOT_SUMMARIES &&
                 !game.errorState) {
@@ -584,11 +658,13 @@ function GamePageContent({
         };
 
         handleSummaryGeneration();
-    }, [game.gameState, game.gameStateProcessQueue.length, game.gameStateProcessQueue.join(','), game.id, game.errorState]);
+    }, [game.gameState, game.gameStateProcessQueue.length, game.gameStateProcessQueue.join(','), game.id, game.errorState, driving]);
 
     // Handle NIGHT_IMPRESSION state: auto-select a few bots to open the new day,
     // then transition to DAY_DISCUSSION (mirrors the WELCOME auto-processing pattern).
     useEffect(() => {
+        // A screen that follows somebody else's moves does not run the game's loops.
+        if (!driving) return;
         const handleSelectDayResponders = async () => {
             if (game.gameState === GAME_STATES.NIGHT_IMPRESSION && !game.errorState) {
                 console.log('🌅 GAMEPAGE: AUTO-PROCESS DAY RESPONDERS:', {
@@ -632,7 +708,7 @@ function GamePageContent({
         };
 
         handleSelectDayResponders();
-    }, [game.gameState, game.id, game.errorState]);
+    }, [game.gameState, game.id, game.errorState, driving]);
 
 
     // Handle state changes logging
@@ -1538,6 +1614,7 @@ function GamePageContent({
                     gameId={game.id}
                     game={game}
                     onAvatarClick={setCharacterCardFor}
+                    driving={driving}
                     isOwner={isOwner}
                     onGameChange={patch => setGame(prev => ({ ...prev, ...patch }))}
                     onUpdateVoice={isGuestPlayer ? undefined : updateCharacterVoice}

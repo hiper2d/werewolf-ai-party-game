@@ -1,11 +1,19 @@
 rules_version = '2';
 
-// Browsers read nothing and write nothing directly: every read and write goes through the
-// server (firebase-admin, which these rules do not apply to). The per-seat read rules for
-// live game updates (docs/plan-multiplayer.md, Design §1-2) are added here when the
-// listeners are built; until then a signed-in browser (firebase/client.ts) is refused too.
+// Browsers read ONE kind of document directly and write nothing: a game's pulse, which says
+// only "this game changed at v" (werewolf-client/app/api/game-pulse.ts). Everything else,
+// the games above all (a game holds every role), goes through the server (firebase-admin,
+// which these rules do not apply to), where one player's view is cut.
 service cloud.firestore {
   match /databases/{database}/documents {
+    // A single-document listener is a `get`. A player with a seat may listen; so may a
+    // signed-in browser while the pulse does not exist yet (a game nobody has moved in
+    // since pulses began), otherwise the listener would be refused before the first move.
+    match /gamePulse/{gameId} {
+      allow get: if request.auth != null
+                 && (resource == null || request.auth.uid in resource.data.members);
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

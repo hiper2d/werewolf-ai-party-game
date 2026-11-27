@@ -68,7 +68,8 @@ import {
 } from "@/app/ai/model-limit-utils";
 import {AbstractAgent} from '@hiper2d/ai-agents';
 import {ensureUserCanAccessGame} from "@/app/api/tier-guards";
-import {gameForSession, responseForSession} from "@/app/api/game-session-view";
+import {changedGameForSession, gameForSession, responseForSession} from "@/app/api/game-session-view";
+import {bumpGamePulse, deleteGamePulse} from "@/app/api/game-pulse";
 import type {LlmRetryNotice} from "@/app/api/game-models";
 import { assertProviderNotBlocked, providerDisplayName, providerKeyOf } from '@/app/api/provider-blocks';
 import { retryModelPatch } from '@/app/api/retry-model';
@@ -156,6 +157,7 @@ export async function removeGameById(id: string, ownerEmail: string) {
 
     // Delete the game
     await gameRef.delete();
+    await deleteGamePulse(id);
 
     return "ok";
 }
@@ -1052,6 +1054,12 @@ export async function addMessageToChatAndSaveToDb(gameMessage: GameMessage, game
         };
         await messageRef.set(messageData);
 
+        // A picture is drawn after the action's response has gone out, so no response
+        // carries it: the pulse is what tells the open pages to fetch it.
+        if (gameMessage.messageType === MessageType.GM_ILLUSTRATION) {
+            await bumpGamePulse({ id: gameId, ownerEmail: gameData?.ownerEmail || '' }, { side: true });
+        }
+
         // The stored turn tail is the bot's private state (role findings); callers hand the
         // returned message to the browser, so it stays behind.
         const { turnTail: _turnTail, ...publicMessage } = gameMessage;
@@ -1117,7 +1125,7 @@ export async function updateBotModel(gameId: string, botName: string, newAiType:
         await gameRef.update({ bots: updatedBots });
         
         // Return the updated game
-        return gameForSession(gameFromFirestore(gameId, { ...gameData, bots: updatedBots }));
+        return changedGameForSession(gameFromFirestore(gameId, { ...gameData, bots: updatedBots }));
     } catch (error: any) {
         console.error("Error updating bot model: ", error);
         throw new Error(`Failed to update bot model: ${error.message}`);
@@ -1183,7 +1191,7 @@ export async function updateCharacterVoice(gameId: string, name: string, patch: 
             };
         }
         await gameRef.update(update);
-        return gameForSession(gameFromFirestore(gameId, { ...gameData, ...update }));
+        return changedGameForSession(gameFromFirestore(gameId, { ...gameData, ...update }));
     } catch (error: any) {
         logger.error("Error updating character voice", { error: error.message, gameId, name });
         throw new Error(`Failed to update voice: ${error.message}`);
@@ -1225,7 +1233,7 @@ export async function updateGameMasterModel(gameId: string, newAiType: string): 
             ...gameData, 
             gameMasterAiType: newAiType
         };
-        return gameForSession(gameFromFirestore(gameId, updatedGameData));
+        return changedGameForSession(gameFromFirestore(gameId, updatedGameData));
     } catch (error: any) {
         logger.error("Error updating Game Master model: ", { error: error.message, gameId, newAiType });
         throw new Error(`Failed to update Game Master model: ${error.message}`);
@@ -1403,7 +1411,7 @@ export async function setGameErrorState(gameId: string, errorState: SystemErrorM
         await gameRef.update({ errorState: errorState });
         
         // Return the updated game
-        return gameForSession(gameFromFirestore(gameId, { ...gameData, errorState: errorState }));
+        return changedGameForSession(gameFromFirestore(gameId, { ...gameData, errorState: errorState }));
     } catch (error: any) {
         logger.error("Error setting game error state: ", { error: error.message, gameId, errorState });
         throw new Error(`Failed to set game error state: ${error.message}`);
@@ -1449,7 +1457,7 @@ export async function clearGameErrorState(gameId: string): Promise<Game> {
         await gameRef.update({ errorState: null, retryHint });
 
         // Return the updated game
-        return gameForSession(gameFromFirestore(gameId, { ...gameData, errorState: null, retryHint }));
+        return changedGameForSession(gameFromFirestore(gameId, { ...gameData, errorState: null, retryHint }));
     } catch (error: any) {
         logger.error("Error clearing game error state: ", { error: error.message, gameId });
         throw new Error(`Failed to clear game error state: ${error.message}`);
@@ -1544,7 +1552,7 @@ export async function retryWithModelOverride(gameId: string, model: string, enab
     logger.info(permanent ? 'Model switched for retry' : 'One-shot model override set for retry (hidden role)',
         { gameId, model, target: permanent ? target : undefined, gameState: game.gameState });
 
-    return gameForSession(gameFromFirestore(gameId, { ...gameData, ...patch }));
+    return changedGameForSession(gameFromFirestore(gameId, { ...gameData, ...patch }));
 }
 
 /**
@@ -1863,5 +1871,5 @@ export async function reassignProviderModels(gameId: string, providerKey: string
 
     await gameRef.update({ bots: updatedBots, gameMasterAiType });
     logger.info(`Reassigned ${providerKey} players to ${newModel}`, { gameId, providerKey, newModel, count: updatedBots.filter((b, i) => b !== bots[i]).length });
-    return gameForSession(gameFromFirestore(gameId, { ...gameData, bots: updatedBots, gameMasterAiType }));
+    return changedGameForSession(gameFromFirestore(gameId, { ...gameData, bots: updatedBots, gameMasterAiType }));
 }

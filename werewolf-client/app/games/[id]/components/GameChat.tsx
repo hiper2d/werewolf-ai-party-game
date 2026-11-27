@@ -48,6 +48,8 @@ interface GameChatProps {
     runGameAction?: <T>(action: () => Promise<T>) => Promise<T | undefined>;
     onGameStateChange?: (response: GameActionResponse) => void;
     pendingMessages?: GameMessage[];
+    /** False while this screen follows moves made on another one: it then runs no bot turns itself (GamePage). */
+    driving?: boolean;
     onPendingMessagesConsumed?: () => void;
     clearNightMessages?: boolean;
     onErrorHandled?: () => void;
@@ -543,7 +545,7 @@ function retryNoteFor(gameState: string, notice: LlmRetryNotice): string {
     return `${who} ${what}, asking again`;
 }
 
-export default function GameChat({ gameId, game, runGameAction, onGameStateChange, pendingMessages, onPendingMessagesConsumed, clearNightMessages, onErrorHandled, onRetryWithModel, onReassignProvider, onRetryBotSelection, isExternalLoading, retryNotice, phaseControls, chatControls, onBeforeAction, cancelButton, onAvatarClick, isOwner, onGameChange, onUpdateVoice, playIntro }: GameChatProps) {
+export default function GameChat({ gameId, game, runGameAction, onGameStateChange, pendingMessages, onPendingMessagesConsumed, clearNightMessages, onErrorHandled, onRetryWithModel, onReassignProvider, onRetryBotSelection, isExternalLoading, retryNotice, phaseControls, chatControls, onBeforeAction, cancelButton, onAvatarClick, isOwner, onGameChange, onUpdateVoice, playIntro, driving = true }: GameChatProps) {
     // Without a parent-provided lock, run actions directly (standalone use).
     const runAction = useMemo(
         () => runGameAction ?? (<T,>(action: () => Promise<T>) => action()),
@@ -1014,6 +1016,7 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
         if ((game.gameState === GAME_STATES.DAY_DISCUSSION || game.gameState === GAME_STATES.AFTER_GAME_DISCUSSION) &&
             game.gameStateProcessQueue.length > 0 &&
             !isProcessing &&
+            driving &&
             !game.errorState) {
             console.log('🚨 CALLING TALK_TO_ALL API', {
                 gameId,
@@ -1045,7 +1048,7 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
 
         // Night processing is handled exclusively by GamePage's useEffect to avoid
         // duplicate calls. GameChat only handles human player modals for night actions.
-    }, [game.gameState, game.gameStateProcessQueue, game.gameStateParamQueue, game.humanPlayerRole, game.humanPlayerName, gameId, isProcessing, game.errorState, onGameStateChange, addMessages, runAction]);
+    }, [game.gameState, game.gameStateProcessQueue, game.gameStateParamQueue, game.humanPlayerRole, game.humanPlayerName, gameId, isProcessing, game.errorState, onGameStateChange, addMessages, runAction, driving]);
 
     // Check if it's human player's turn to vote
     useEffect(() => {
@@ -1267,8 +1270,9 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
         // Clear the persistent error state in the database
         try {
             console.log('🔄 CLEARING GAME ERROR STATE and refreshing...');
-            const updatedGame = await clearGameErrorState(gameId);
-            if (onGameStateChange) {
+            // Through the shared runner, so the page knows this change is its own.
+            const updatedGame = await runAction(() => clearGameErrorState(gameId));
+            if (updatedGame && onGameStateChange) {
                 onGameStateChange({ game: updatedGame, messages: [] });
             }
             console.log('✅ GAME ERROR STATE CLEARED and game state refreshed');
