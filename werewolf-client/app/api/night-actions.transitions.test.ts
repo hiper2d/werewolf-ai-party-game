@@ -236,7 +236,8 @@ describe('performNightAction dispatch', () => {
 
         const result = await performNightAction(GAME_ID);
 
-        expect(result.game).toBe(game);
+        // The browser gets the player's view of the game, not the object itself.
+        expect(result.game).toMatchObject({ id: game.id, gameState: game.gameState });
         expect(result.messages).toEqual([]);
         expect(mockUpdate).not.toHaveBeenCalled();
         expect(setGameErrorState).not.toHaveBeenCalled();
@@ -447,7 +448,8 @@ describe('human player night turns', () => {
 
         const result = await performNightAction(GAME_ID);
 
-        expect(result.game).toBe(game);
+        // The browser gets the player's view of the game, not the object itself.
+        expect(result.game).toMatchObject({ id: game.id, gameState: game.gameState });
         expect(mockUpdate).not.toHaveBeenCalled();
         expect(AgentFactory.createAgent).not.toHaveBeenCalled();
         expect(setGameErrorState).not.toHaveBeenCalled();
@@ -540,7 +542,8 @@ describe('selectDayResponders', () => {
 
         const result = await selectDayResponders(GAME_ID);
 
-        expect(result.game).toBe(game);
+        // The browser gets the player's view of the game, not the object itself.
+        expect(result.game).toMatchObject({ id: game.id, gameState: game.gameState });
         expect(mockUpdate).not.toHaveBeenCalled();
         expect(setGameErrorState).not.toHaveBeenCalled();
     });

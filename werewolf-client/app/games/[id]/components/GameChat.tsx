@@ -1889,14 +1889,8 @@ export default function GameChat({ gameId, game, runGameAction, onGameStateChang
         return { reflexive: 'themself', possessive: 'their' };
     };
     const aliveBotCount = game.bots.filter(b => b.isAlive).length;
-    // Mirrors the server's night-role set (night-actions.ts): roles with a night
-    // action among alive bots, plus the human's role.
-    const nightRoleTotal = (() => {
-        const roles = new Set<string>();
-        game.bots.filter(b => b.isAlive && ROLE_CONFIGS[b.role]).forEach(b => roles.add(b.role));
-        if (ROLE_CONFIGS[game.humanPlayerRole]) roles.add(game.humanPlayerRole);
-        return roles.size;
-    })();
+    // How many roles act tonight is counted on the server (it needs every role).
+    const nightRoleTotal = game.nightRoleTotal ?? 0;
     const nightVerb = (role: string, you: boolean) => {
         switch (role) {
             case GAME_ROLES.WEREWOLF: return you ? 'are choosing your prey' : 'are choosing their prey';

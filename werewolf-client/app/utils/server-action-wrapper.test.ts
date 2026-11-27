@@ -17,12 +17,19 @@ import { ModelRefusalError } from '@hiper2d/ai-agents';
 import { setGameErrorState, getGame, recordProviderBlock, getRecentIllustrationMessages } from '@/app/api/game-actions';
 import { ProviderBlockedError } from '@/app/api/provider-blocks';
 import { logger } from '@/app/utils/logger';
+import { gameForSession } from '@/app/api/game-session-view';
 
 jest.mock('@/app/api/game-actions', () => ({
   setGameErrorState: jest.fn(),
   getGame: jest.fn(),
   recordProviderBlock: jest.fn(),
   getRecentIllustrationMessages: jest.fn(async () => []),
+}));
+
+// What a browser may see of a game is tested in game-view.test.ts; here the cut is a
+// marker, so these tests can tell that every response went through it.
+jest.mock('@/app/api/game-session-view', () => ({
+  gameForSession: jest.fn(async (game: any) => game),
 }));
 
 jest.mock('@/app/utils/logger', () => ({
@@ -90,7 +97,9 @@ describe('withErrorHandling', () => {
 
       const actual = await wrapped(GAME_ID);
 
-      expect(actual).toBe(result); // same reference, untouched
+      // Same messages and game, and the game went through the player's-view cut.
+      expect(actual).toEqual(result);
+      expect(gameForSession).toHaveBeenCalledWith(result.game);
       expect(fn).toHaveBeenCalledWith(GAME_ID);
       expect(mockSetGameErrorState).not.toHaveBeenCalled();
       expect(mockGetGame).not.toHaveBeenCalled();
@@ -589,7 +598,7 @@ describe('withGameErrorHandling', () => {
     const result: GameActionResponse = { game: makeGame(), messages: [] };
     const wrapped = withGameErrorHandling(async (_gameId: string) => result);
 
-    await expect(wrapped(GAME_ID)).resolves.toBe(result);
+    await expect(wrapped(GAME_ID)).resolves.toEqual(result);
     expect(mockSetGameErrorState).not.toHaveBeenCalled();
   });
 });

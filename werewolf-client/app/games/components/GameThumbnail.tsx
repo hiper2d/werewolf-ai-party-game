@@ -1,20 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { Game } from '@/app/api/game-models';
-import { getSceneUrl } from '@/app/utils/avatar-utils';
 
 /**
- * The game's day (welcome) scene as a list thumbnail. Renders nothing for
- * games without generated art (legacy games, generation pending/failed) or
- * when the image 404s (avatars succeeded but the scene pair failed) — the
- * card then keeps its text-only layout.
+ * A scene as a list thumbnail: a game's day (welcome) scene, or a saved preview's
+ * (app/utils/preview-drafts.ts). The caller passes the address, never the game: this is a
+ * client component, and a prop is sent to the browser whole. Renders nothing when there is
+ * no picture (legacy games, generation pending or failed) or the image 404s; the card then
+ * keeps its text-only layout.
  */
-export default function GameThumbnail({ game, locked = false }: { game: Game; locked?: boolean }) {
-    return <SceneThumbnail src={getSceneUrl(game, 'welcome')} alt={`${game.theme} scene`} locked={locked} />;
-}
-
-/** The picture itself: also the thumbnail of a saved preview (app/utils/preview-drafts.ts). */
 export function SceneThumbnail({ src, alt, locked = false }: { src?: string | null; alt: string; locked?: boolean }) {
     const [failed, setFailed] = useState(false);
     const [loaded, setLoaded] = useState(false);

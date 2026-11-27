@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import {getAllGames} from "@/app/api/game-actions";
 import RemoveGame from "@/app/games/components/RemoveGame";
-import GameThumbnail, { SceneThumbnail } from "@/app/games/components/GameThumbnail";
+import { SceneThumbnail } from "@/app/games/components/GameThumbnail";
+import { getSceneUrl } from "@/app/utils/avatar-utils";
 import {redirect} from "next/navigation";
 import {Game} from "@/app/api/game-models";
 import { auth } from "@/auth";
@@ -250,7 +251,9 @@ function GameListEntryContent({
     const stateLabel = game.gameState.toLowerCase().replace(/_/g, ' ');
     return (
         <div className={`flex items-start gap-3.5 ${locked ? 'pointer-events-none' : ''}`}>
-            <GameThumbnail game={game} locked={locked} />
+            {/* Only the picture's address crosses to the browser: a whole game as a client
+                component's prop would put every role in the page source. */}
+            <SceneThumbnail src={getSceneUrl(game, 'welcome')} alt={`${game.theme} scene`} locked={locked} />
             <div className="flex flex-col gap-1.5 min-w-0 flex-grow">
             {/* Top row: Theme and Date/Status */}
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-4">

@@ -4,6 +4,7 @@ import GamePage from "./GamePage";
 import { auth } from "@/auth";
 import { getUserTier } from "@/app/api/user-actions";
 import { canOpenGameOnTier } from "@/app/utils/tier-access";
+import { gameForSession } from "@/app/api/game-session-view";
 
 export async function generateMetadata(props: any) {
     const params = await props.params;
@@ -52,5 +53,6 @@ export default async function Page(props: any) {
         redirect(`/games?${searchParams.toString()}`);
     }
 
-    return <GamePage initialGame={game} session={session} />;
+    // The page is a client component: it gets the player's view, not the stored game.
+    return <GamePage initialGame={await gameForSession(game)} session={session} />;
 }

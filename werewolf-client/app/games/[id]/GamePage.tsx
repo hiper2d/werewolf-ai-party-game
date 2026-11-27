@@ -31,7 +31,6 @@ import { generateGameAvatars, reframeAvatar, regenerateGameAvatars, selectAvatar
 import { getAvatarView, getSceneUrl } from "@/app/utils/avatar-utils";
 import { DiscordIcon } from "@/app/components/ui-icons";
 import { DISCORD_URL } from "@/app/config/external-links";
-import { checkGameEndConditions } from "@/app/utils/game-utils";
 import { isTierMismatchError } from '@/app/api/errors';
 import { starterIntroKey } from '@/app/utils/starter-games';
 import { HINT_TALK_WITHOUT_TYPING } from '@/app/games/[id]/helper-hints';
@@ -284,36 +283,12 @@ function GamePageContent({
         return counts;
     }, [game]);
 
-    // Helper function to simulate game state after applying night results
-    const simulateNightResults = useMemo(() => {
-        if (game.gameState !== GAME_STATES.NIGHT_RESULTS || !game.resolvedNightState) {
-            return game;
-        }
-
-        const deaths = game.resolvedNightState.deaths || [];
-        const deadNames = new Set(deaths.map(d => d.player));
-
-        // Mark killed bots as dead
-        let simulatedBots = game.bots.map(bot =>
-            deadNames.has(bot.name) ? { ...bot, isAlive: false } : bot
-        );
-
-        // If the human player died, add them as a pseudo-bot entry
-        if (deadNames.has(game.humanPlayerName)) {
-            simulatedBots = [
-                ...simulatedBots,
-                { name: game.humanPlayerName, role: game.humanPlayerRole, isAlive: false } as any
-            ];
-        }
-
-        return { ...game, bots: simulatedBots };
-    }, [game]);
-
-    const gameEndStatus = useMemo(() => checkGameEndConditions(game), [game]);
-    const nightResultsEndStatus = useMemo(() => checkGameEndConditions(simulateNightResults), [simulateNightResults]);
-    const showVoteGameOverCTA = !isGameOver && gameEndStatus.isEnded && game.gameState === GAME_STATES.VOTE_RESULTS;
-    const showNightGameOverCTA = !isGameOver && nightResultsEndStatus.isEnded && game.gameState === GAME_STATES.NIGHT_RESULTS;
-    const pendingGameOverReason = (showVoteGameOverCTA || showNightGameOverCTA) ? (game.gameState === GAME_STATES.NIGHT_RESULTS ? nightResultsEndStatus.reason : gameEndStatus.reason) : undefined;
+    // Whether the result on screen decides the game is the server's answer: counting the
+    // sides needs every role, and the browser only knows the ones this player may know.
+    const pendingEnd = game.pendingGameOver ?? null;
+    const showVoteGameOverCTA = !isGameOver && !!pendingEnd && game.gameState === GAME_STATES.VOTE_RESULTS;
+    const showNightGameOverCTA = !isGameOver && !!pendingEnd && game.gameState === GAME_STATES.NIGHT_RESULTS;
+    const pendingGameOverReason = (showVoteGameOverCTA || showNightGameOverCTA) ? pendingEnd?.reason : undefined;
 
     // Calculate vote urgency based on message count vs threshold
     const voteUrgency = useMemo(() => {
@@ -1289,7 +1264,7 @@ function GamePageContent({
                                         </span>
                                     )}
                                     {/* Inline role tag: click opens the role explainer card */}
-                                    {(isHuman || isDead || isGameOver || (game.humanPlayerRole === GAME_ROLES.WEREWOLF && participant.role === GAME_ROLES.WEREWOLF)) && !participant.isGameMaster && (
+                                    {(isHuman || isDead || isGameOver || (game.humanPlayerRole === GAME_ROLES.WEREWOLF && participant.role === GAME_ROLES.WEREWOLF)) && !participant.isGameMaster && !!participant.role && (
                                         <button
                                             type="button"
                                             onClick={() => setRoleCardFor({ role: participant.role!, own: participant.isHuman })}

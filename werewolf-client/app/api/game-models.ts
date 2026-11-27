@@ -434,6 +434,14 @@ export interface Game {
         detectiveResult: { target: string; isEvil: boolean; success: boolean } | null;
         actionsPrevented: Array<{ role: string; reason: 'abduction' | 'death' | 'doctor_save'; player: string | null; }>;
     } | null;
+    // The three below exist only on a game cut for a browser (app/utils/game-view.ts); the
+    // stored game and the game server code works on never carry them.
+    /** This is one player's view: roles they may not know are blank. Never view it again. */
+    isView?: true;
+    /** The result on screen has decided the game (the page offers to end it). */
+    pendingGameOver?: { reason?: string } | null;
+    /** How many roles act at night: the progress bar's total. */
+    nightRoleTotal?: number;
 }
 
 export const GAME_ROLES = {
