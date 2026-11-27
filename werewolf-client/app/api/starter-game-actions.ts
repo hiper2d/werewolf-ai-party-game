@@ -5,7 +5,7 @@ import {firestore} from "firebase-admin";
 import {after} from "next/server";
 import {auth, signIn} from "@/auth";
 import {findGuest, readGuestCookie, resolveGuestForRequest} from "@/app/api/guest-accounts";
-import {GUEST_FULL_TODAY_MESSAGE, GUEST_ONE_GAME_MESSAGE, GUEST_PROVIDER_ID, guestWallReached, isGuestEmail} from "@/app/utils/guest";
+import {GUEST_FULL_TODAY_MESSAGE, GUEST_ONE_GAME_MESSAGE, GUEST_PROVIDER_ID, guestWallReached, isGuestEmail, isGuestRefusal} from "@/app/utils/guest";
 import {guestGlobalSpendVerdict} from "@/app/utils/spending-utils";
 import {readGuestDailySpend} from "@/app/api/spend-ledgers";
 import {
@@ -152,7 +152,7 @@ export async function createStarterGame(templateId: string, playerName: string, 
         return { ok: true, ...(await createStarterGameImpl(templateId, playerName, options.forceNew === true, options.language)) };
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        const playerWall = isInsufficientBalanceError(message) || isFreeSpendLimitError(message);
+        const playerWall = isInsufficientBalanceError(message) || isFreeSpendLimitError(message) || isGuestRefusal(message);
         logger[playerWall ? 'warn' : 'error'](`Starter game ${playerWall ? 'refused' : 'failed'}: ${message}`, {
             function: 'createStarterGame',
             templateId,

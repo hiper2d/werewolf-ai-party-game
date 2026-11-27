@@ -46,6 +46,18 @@ export const GUEST_PAUSED_MESSAGE = 'Free trial play is paused for today. Sign i
  */
 export const GUEST_FULL_TODAY_MESSAGE = 'Today\u2019s free guest games are all taken. Try again tomorrow (a new day starts at 00:00 UTC), or sign in to play now.';
 
+/**
+ * A refusal a guest is meant to get: one of the sign-in prompts above. The player sees the
+ * message as written; in the logs it is a warning, not an error (an error pages Alex).
+ */
+const GUEST_REFUSALS = () => [
+    GUEST_WALL_MESSAGE, GUEST_ONLY_STARTER_MESSAGE, GUEST_ONE_GAME_MESSAGE, GUEST_DEVICE_LIMIT_MESSAGE,
+    GUEST_BUDGET_MESSAGE, GUEST_PAUSED_MESSAGE, GUEST_FULL_TODAY_MESSAGE,
+];
+export function isGuestRefusal(text: string | undefined | null): boolean {
+    return !!text && GUEST_REFUSALS().some(message => text.includes(message));
+}
+
 export function isGuestWallError(text: string | undefined | null): boolean {
     return !!text && text.includes(GUEST_WALL_MESSAGE);
 }

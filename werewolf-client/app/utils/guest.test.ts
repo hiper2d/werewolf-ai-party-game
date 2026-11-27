@@ -60,3 +60,14 @@ describe('guestTotalSpend', () => {
         expect(guestTotalSpend(undefined)).toBe(0);
     });
 });
+
+describe('isGuestRefusal', () => {
+    it('knows the sign-in prompts and nothing else', () => {
+        const {isGuestRefusal, GUEST_DEVICE_LIMIT_MESSAGE, GUEST_ONE_GAME_MESSAGE, GUEST_FULL_TODAY_MESSAGE} = require('./guest');
+        expect(isGuestRefusal(GUEST_DEVICE_LIMIT_MESSAGE)).toBe(true);
+        expect(isGuestRefusal(`Error: ${GUEST_ONE_GAME_MESSAGE}`)).toBe(true);
+        expect(isGuestRefusal(GUEST_FULL_TODAY_MESSAGE)).toBe(true);
+        expect(isGuestRefusal('Firestore is not initialized')).toBe(false);
+        expect(isGuestRefusal(undefined)).toBe(false);
+    });
+});
