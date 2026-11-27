@@ -2,7 +2,8 @@ import {createHmac, randomBytes} from 'crypto';
 import {auth} from '@/auth';
 import {Game, GameActionResponse, GameMessage} from '@/app/api/game-models';
 import {GameViewer, viewGameAs, viewMessagesAs} from '@/app/utils/game-view';
-import {bumpGamePulse} from '@/app/api/game-pulse';
+import {writeSeatViews} from '@/app/api/game-live';
+import {firebaseUidForEmail} from '@/app/utils/firebase-uid';
 
 /**
  * The game as the signed-in player's browser may see it (rules in app/utils/game-view.ts).
@@ -19,12 +20,38 @@ export async function gameForSession(game: Game): Promise<Game> {
 }
 
 /**
- * For an action that has just CHANGED the game: stamps the game's pulse (app/api/game-pulse.ts),
- * so every other screen showing this game asks for its view again, and returns the caller's
- * view carrying that stamp, so the caller's own page knows the change was its own.
+ * Every seat of a game: the Firebase uid that may listen and what that player may see.
+ * One seat today, the owner's (a game from before owners were stored has none to publish to).
+ */
+function seatsOf(game: Game): Array<{uid: string; viewer: GameViewer}> {
+    return game.ownerEmail
+        ? [{uid: firebaseUidForEmail(game.ownerEmail), viewer: {name: game.humanPlayerName, host: true}}]
+        : [];
+}
+
+/**
+ * The game changed: writes every seat's live view (app/api/game-live.ts), each cut for
+ * that seat, with the messages this change added for them. Returns the stamp, which the
+ * acting page gets back on its own answer so it knows the change was its own; null when
+ * nothing was written.
+ */
+export async function publishGame(game: Game, newMessages: GameMessage[] = [], options: {side?: boolean} = {}): Promise<number | null> {
+    if (!game?.id || !Array.isArray(game.bots)) return null;
+    const v = Date.now();
+    const views = seatsOf(game).map(({uid, viewer}) => ({
+        uid,
+        game: JSON.stringify({...viewGameAs(game, viewer, sealNightPosition), pulse: v}),
+        messages: JSON.stringify(viewMessagesAs(game, viewer, newMessages)),
+    }));
+    return await writeSeatViews(game.id, v, views, options.side === true) ? v : null;
+}
+
+/**
+ * For an action that has just CHANGED the game: publishes it to every seat and returns the
+ * caller's view carrying the stamp.
  */
 export async function changedGameForSession(game: Game): Promise<Game> {
-    const [pulse, view] = await Promise.all([bumpGamePulse(game), gameForSession(game)]);
+    const [pulse, view] = await Promise.all([publishGame(game), gameForSession(game)]);
     return pulse ? {...view, pulse} : view;
 }
 
@@ -38,13 +65,13 @@ export async function messagesForSession(game: Game, messages: GameMessage[]): P
 }
 
 /**
- * An action's whole answer, cut for the session's player, with the game's pulse stamped
+ * An action's whole answer, cut for the session's player, and published to every seat
  * (an action's answer means the game may have changed). `response.game` is the full game.
  */
 export async function responseForSession(response: GameActionResponse): Promise<GameActionResponse> {
     // The stub of a deleted game (or a failed action's fallback) has no cast to judge by.
     if (!response?.game || !Array.isArray(response.game.bots)) return response;
-    const [pulse, session] = await Promise.all([bumpGamePulse(response.game), auth()]);
+    const [pulse, session] = await Promise.all([publishGame(response.game, response.messages), auth()]);
     const viewer = viewerOf(response.game, session?.user?.email);
     return {
         ...response,

@@ -39,7 +39,7 @@ import { discussionProgress } from '@/app/utils/discussion-progress';
 import Link from 'next/link';
 import { UIControlsProvider, useUIControls } from './context/UIControlsContext';
 import React from 'react';
-import { useGamePulse } from './use-game-pulse';
+import { useGamePulse, type GamePulse } from './use-game-pulse';
 
 // How long a screen that follows another one waits for the next change before it takes the
 // game back. Longer than a model call may take (60 s), so a slow turn is not taken for silence.
@@ -251,10 +251,10 @@ function GamePageContent({
     // `summarizePastDay` calls that left a recoverable error mid-summary).
     const inFlightRef = useRef(false);
 
-    // LIVE UPDATES (app/api/game-pulse.ts). The server stamps a pulse whenever the game
-    // changes; this page listens to it. A pulse this page's own action returned is its own
+    // LIVE UPDATES (app/api/game-live.ts). The server writes this player's view whenever the
+    // game changes; this page listens to it. A pulse this page's own action returned is its own
     // change and needs nothing. Any other pulse means the game moved on another screen (a
-    // second tab, a phone, later another player): the page fetches its view again and stops
+    // second tab, a phone, later another player): the page shows the view that came with it and stops
     // DRIVING, that is, it no longer runs the game's automatic loops (introductions, bot
     // replies, votes, the night), because two screens running them would ask every bot
     // twice. It drives again when the player does something here, or after
@@ -262,7 +262,7 @@ function GamePageContent({
     const [followingSince, setFollowingSince] = useState<number | null>(null);
     const driving = followingSince === null;
     const ownPulseRef = useRef(0);      // the newest pulse this page has already accounted for
-    const missedPulseRef = useRef(0);   // a pulse that arrived while an action of ours was in flight
+    const missedPulseRef = useRef<GamePulse | null>(null); // a change that arrived while an action of ours was in flight
 
     const applyActionResult = useCallback((result: GameActionResponse) => {
         setGame(prev => {
@@ -396,35 +396,36 @@ function GamePageContent({
 
     // Shared with GameChat via prop so chat sends and page buttons (Vote,
     // Go on, night flow) can never dispatch concurrently from this tab.
-    /** Fetch this player's view again after a change made elsewhere. */
-    const syncFromServer = useCallback(async (pulse: number, follow: boolean) => {
-        ownPulseRef.current = Math.max(ownPulseRef.current, pulse);
+    /** Show a change made on another screen: the view and the new messages came with it. */
+    const applyLiveView = useCallback(async (pulse: GamePulse, follow: boolean) => {
+        ownPulseRef.current = Math.max(ownPulseRef.current, pulse.v);
         if (follow) setFollowingSince(Date.now());
+        // A late picture's view was cut when the picture was saved, and the game may have
+        // moved since: take its message, not its state.
+        if (!pulse.side) setGame(pulse.game);
+        if (pulse.messages.length > 0) setPendingMessages(prev => [...prev, ...pulse.messages]);
+        if (!pulse.missed) return;
+        // A change in between never reached this page: fetch the day once. The chat keeps
+        // only the messages it does not have yet.
         try {
-            const fresh = await getGameForPlayer(initialGame.id);
-            // Null: the game was deleted elsewhere. A newer pulse or an action of ours that
-            // started meanwhile brings a newer state than this one.
-            if (!fresh || ownPulseRef.current !== pulse || inFlightRef.current) return;
-            setGame(fresh);
-            const response = await fetch(`/api/games/${initialGame.id}/messages?day=${fresh.currentDay}`);
+            const response = await fetch(`/api/games/${initialGame.id}/messages?day=${pulse.game.currentDay}`);
             if (response.ok) {
                 const dayMessages: GameMessage[] = await response.json();
-                // The chat keeps only the ones it does not have yet.
                 setPendingMessages(prev => [...prev, ...dayMessages]);
             }
         } catch (error) {
-            console.warn('Could not refresh the game after a change elsewhere', error);
+            console.warn('Could not fetch the messages missed while following', error);
         }
     }, [initialGame.id]);
 
-    useGamePulse(initialGame.id, ({v, side}) => {
-        if (v <= ownPulseRef.current) return;
+    useGamePulse(initialGame.id, pulse => {
+        if (pulse.v <= ownPulseRef.current) return;
         if (inFlightRef.current) {
-            // Most likely our own action's stamp arriving before its answer; settled when it returns.
-            if (!side) missedPulseRef.current = Math.max(missedPulseRef.current, v);
+            // Most likely our own action's change arriving before its answer; settled when it returns.
+            if (!pulse.side) missedPulseRef.current = pulse;
             return;
         }
-        syncFromServer(v, !side);
+        applyLiveView(pulse, !pulse.side);
     });
 
     // The screen we were following went quiet: take the game back.
@@ -463,10 +464,11 @@ function GamePageContent({
             stopWatching();
             // A pulse newer than our own stamp came in while we were busy: another screen moved after us.
             const missed = missedPulseRef.current;
-            missedPulseRef.current = 0;
-            if (missed > ownPulseRef.current) syncFromServer(missed, true);
+            missedPulseRef.current = null;
+            // Queued behind this action's own state update, so the newer view lands last.
+            if (missed && missed.v > ownPulseRef.current) setTimeout(() => applyLiveView({...missed, missed: true}, true), 0);
         }
-    }, [initialGame.id, syncFromServer]);
+    }, [initialGame.id, applyLiveView]);
 
     // Handle welcome state
     useEffect(() => {

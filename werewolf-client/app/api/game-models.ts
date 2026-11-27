@@ -442,7 +442,7 @@ export interface Game {
     pendingGameOver?: { reason?: string } | null;
     /** How many roles act at night: the progress bar's total. */
     nightRoleTotal?: number;
-    /** The pulse this action stamped (app/api/game-pulse.ts): the page's own change, not somebody else's. */
+    /** The stamp of the change this view shows (app/api/game-live.ts): a page knows its own change by it. */
     pulse?: number;
 }
 

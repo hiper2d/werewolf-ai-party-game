@@ -1,14 +1,25 @@
 rules_version = '2';
 
-// Browsers read ONE kind of document directly and write nothing: a game's pulse, which says
-// only "this game changed at v" (werewolf-client/app/api/game-pulse.ts). Everything else,
-// the games above all (a game holds every role), goes through the server (firebase-admin,
-// which these rules do not apply to), where one player's view is cut.
+// Browsers read ONE kind of document directly and write nothing: a seat's live view of a
+// game, already cut on the server to what that player may see
+// (werewolf-client/app/api/game-live.ts). Everything else, the games above all (a game
+// holds every role), is read only by the server (firebase-admin, which these rules do not
+// apply to).
 service cloud.firestore {
   match /databases/{database}/documents {
-    // A single-document listener is a `get`. A player with a seat may listen; so may a
-    // signed-in browser while the pulse does not exist yet (a game nobody has moved in
-    // since pulses began), otherwise the listener would be refused before the first move.
+    // A single-document listener is a `get`. A view carries the uid it was cut for; a
+    // signed-in browser may also listen while its view does not exist yet (a game nobody
+    // has moved in since views began), otherwise the listener would be refused before the
+    // first move. The document id is `{gameId}__{uid}` (a game id has
+    // single hyphens only), so nobody can wait on another's view.
+    match /gameViews/{viewId} {
+      allow get: if request.auth != null
+                 && viewId.split('__')[1] == request.auth.uid
+                 && (resource == null || resource.data.uid == request.auth.uid);
+    }
+
+    // The first version of live updates (a bare "changed" marker), still read by pages
+    // opened before the stored views shipped. Remove with the next rules change.
     match /gamePulse/{gameId} {
       allow get: if request.auth != null
                  && (resource == null || request.auth.uid in resource.data.members);

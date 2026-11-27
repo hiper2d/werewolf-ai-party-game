@@ -68,8 +68,8 @@ import {
 } from "@/app/ai/model-limit-utils";
 import {AbstractAgent} from '@hiper2d/ai-agents';
 import {ensureUserCanAccessGame} from "@/app/api/tier-guards";
-import {changedGameForSession, gameForSession, responseForSession} from "@/app/api/game-session-view";
-import {bumpGamePulse, deleteGamePulse} from "@/app/api/game-pulse";
+import {changedGameForSession, gameForSession, publishGame, responseForSession} from "@/app/api/game-session-view";
+import {deleteSeatViews} from "@/app/api/game-live";
 import type {LlmRetryNotice} from "@/app/api/game-models";
 import { assertProviderNotBlocked, providerDisplayName, providerKeyOf } from '@/app/api/provider-blocks';
 import { retryModelPatch } from '@/app/api/retry-model';
@@ -157,7 +157,7 @@ export async function removeGameById(id: string, ownerEmail: string) {
 
     // Delete the game
     await gameRef.delete();
-    await deleteGamePulse(id);
+    await deleteSeatViews(id);
 
     return "ok";
 }
@@ -1054,16 +1054,17 @@ export async function addMessageToChatAndSaveToDb(gameMessage: GameMessage, game
         };
         await messageRef.set(messageData);
 
-        // A picture is drawn after the action's response has gone out, so no response
-        // carries it: the pulse is what tells the open pages to fetch it.
-        if (gameMessage.messageType === MessageType.GM_ILLUSTRATION) {
-            await bumpGamePulse({ id: gameId, ownerEmail: gameData?.ownerEmail || '' }, { side: true });
-        }
-
         // The stored turn tail is the bot's private state (role findings); callers hand the
         // returned message to the browser, so it stays behind.
         const { turnTail: _turnTail, ...publicMessage } = gameMessage;
-        return { ...publicMessage, id: customId, timestamp };
+        const saved = { ...publicMessage, id: customId, timestamp };
+
+        // A picture is drawn after the action's response has gone out, so no response
+        // carries it: the live view is what brings it to the open pages.
+        if (gameMessage.messageType === MessageType.GM_ILLUSTRATION) {
+            await publishGame(gameFromFirestore(gameId, { ...gameData, messageCounter: newCounter }), [saved], { side: true });
+        }
+        return saved;
     } catch (error: any) {
         logger.error("Error adding message to chat: ", { error: error.message, gameId, author: gameMessage.authorName });
         throw new Error(`Failed to add message: ${error.message}`);
