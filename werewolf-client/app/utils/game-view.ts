@@ -3,6 +3,7 @@ import {
     RECIPIENT_MANIAC, RECIPIENT_WEREWOLVES, ROLE_CONFIGS,
 } from '@/app/api/game-models';
 import {checkGameEndConditions} from '@/app/utils/game-utils';
+import {humanCastNames, isPlayerAlive, playerRole} from '@/app/utils/cast';
 
 /**
  * What one player's browser may know about a game (docs/plan-multiplayer.md, "strict per-seat
@@ -33,17 +34,21 @@ export interface GameViewer {
 const isOver = (game: Game) =>
     game.gameState === GAME_STATES.GAME_OVER || game.gameState === GAME_STATES.AFTER_GAME_DISCUSSION;
 
-/** The viewer's own role; null for somebody without a seat. One human seat today. */
+/**
+ * The viewer's own role; null for somebody without a seat. A viewer is the first human or
+ * a cast entry a person plays (app/utils/cast.ts); a bot's name gives nobody its role.
+ */
 function roleOf(game: Game, viewer: GameViewer | null): string | null {
     if (!viewer) return null;
-    return viewer.name === game.humanPlayerName ? game.humanPlayerRole : null;
+    if (viewer.name === game.humanPlayerName) return game.humanPlayerRole;
+    return humanCastNames(game).has(viewer.name) ? playerRole(game, viewer.name) : null;
 }
 
 /**
  * May the viewer know this bot's role? The rules of the table: the dead are revealed,
  * werewolves know each other, and everything is open once the game is over.
  */
-export function mayKnowRole(game: Game, viewer: GameViewer | null, bot: Bot): boolean {
+export function mayKnowRole(game: Game, viewer: GameViewer | null, bot: Pick<Bot, 'role' | 'isAlive'>): boolean {
     if (isOver(game) || !bot.isAlive) return true;
     return roleOf(game, viewer) === GAME_ROLES.WEREWOLF && bot.role === GAME_ROLES.WEREWOLF;
 }
@@ -54,7 +59,33 @@ function viewBot(game: Game, viewer: GameViewer | null, bot: Bot): Bot {
     // doctor I…"), so they give the role away on their own. No screen shows them.
     const {personalSummaries, summary, daySummaries, roleKnowledge, ...shown} = bot;
     void personalSummaries; void summary; void daySummaries; void roleKnowledge;
-    return mayKnowRole(game, viewer, bot) ? shown : {...shown, role: HIDDEN_ROLE};
+    const seen = mayKnowRole(game, viewer, bot) ? shown : {...shown, role: HIDDEN_ROLE};
+    // A character a person plays has no model at the table, for the host's view too.
+    return humanCastNames(game).has(bot.name) ? {...seen, human: true, aiType: '', tokenUsage: undefined} : seen;
+}
+
+/**
+ * The table from a seat that is not the first human's. Every screen is written for "the
+ * human player plus a cast of others", so the view keeps that shape and changes who is
+ * who: the viewer's own character leaves the cast and becomes the human player, and the
+ * first human joins the cast as one more character played by a person.
+ */
+function viewFromCastSeat(game: Game, viewer: GameViewer, cast: Bot[]): Pick<Game, 'bots' | 'humanPlayerName' | 'humanPlayerRole' | 'humanPlayerIsAlive'> {
+    const first = {role: game.humanPlayerRole, isAlive: game.humanPlayerIsAlive !== false};
+    const firstHuman = {
+        name: game.humanPlayerName,
+        role: mayKnowRole(game, viewer, first) ? first.role : HIDDEN_ROLE,
+        isAlive: first.isAlive,
+        human: true,
+        // The first human has no character sheet: no story, voice or model on the game.
+        story: '', aiType: '', gender: 'male', voice: '', playStyle: '',
+    } as Bot;
+    return {
+        bots: [firstHuman, ...cast.filter(bot => bot.name !== viewer.name)],
+        humanPlayerName: viewer.name,
+        humanPlayerRole: playerRole(game, viewer.name) ?? HIDDEN_ROLE,
+        humanPlayerIsAlive: isPlayerAlive(game, viewer.name),
+    };
 }
 
 /**
@@ -189,13 +220,16 @@ export function viewGameAs(game: Game, viewer: GameViewer | null, seal: NightSea
     // A view has blanks where roles were: cutting it again would count sides wrongly.
     if (game.isView) return game;
     const ownRole = roleOf(game, viewer);
+    const cast = game.bots.map(bot => viewBot(game, viewer, bot));
+    const fromCastSeat = !!viewer && viewer.name !== game.humanPlayerName && humanCastNames(game).has(viewer.name);
     const view: Game = {
         ...game,
         isView: true,
         // Accounts' emails, keyed by a hash of them: no browser gets the list.
         seats: undefined,
-        bots: game.bots.map(bot => viewBot(game, viewer, bot)),
+        bots: cast,
         humanPlayerRole: ownRole ?? (isOver(game) ? game.humanPlayerRole : HIDDEN_ROLE),
+        ...(fromCastSeat ? viewFromCastSeat(game, viewer!, cast) : {}),
         ...viewNightQueues(game, viewer, seal),
         ...viewNightRecords(game, viewer),
         pendingGameOver: pendingGameOver(game),

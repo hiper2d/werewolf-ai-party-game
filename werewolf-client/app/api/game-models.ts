@@ -269,6 +269,9 @@ export interface Bot {
     enableThinking?: boolean;
     tokenUsage?: TokenUsage; // Track token usage for this bot
     roleKnowledge?: RoleKnowledge; // Structured role-specific knowledge (investigations, protections, etc.)
+    // VIEW ONLY (app/utils/game-view.ts): this character is played by a person. On the
+    // stored game that is said by `game.seats` alone (app/utils/cast.ts).
+    human?: boolean;
 }
 
 export interface IndividualVote {

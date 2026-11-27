@@ -259,3 +259,79 @@ describe('what only the host sees', () => {
         expect(viewMessagesAs(game(), guestSeat, [line])[0]).not.toHaveProperty('cost');
     });
 });
+
+describe('a second human at the table', () => {
+    const seats = {
+        u1: {email: 'a@b.c', character: 'Alex', payer: true, joinedAt: 1},
+        u2: {email: 'friend@b.c', character: 'Wolf2', payer: true, joinedAt: 2},
+        u3: {email: 'third@b.c', character: 'Doc', payer: true, joinedAt: 3},
+    };
+    const shared = (over: Partial<Game> = {}) => game({seats, ...over});
+    const wolf2 = {name: 'Wolf2', host: false};
+    const doc = {name: 'Doc', host: false};
+
+    it('sees the table from their own seat: they are the human player, the first human is in the cast', () => {
+        const view = viewGameAs(shared(), wolf2, seal);
+        expect(view.humanPlayerName).toBe('Wolf2');
+        expect(view.humanPlayerRole).toBe(GAME_ROLES.WEREWOLF);
+        expect(view.humanPlayerIsAlive).toBe(true);
+        expect(view.bots.map(b => b.name)).toEqual(['Alex', 'Wolf1', 'Doc', 'Det', 'Vil', 'Gone']);
+        expect(view.bots.find(b => b.name === 'Alex')).toMatchObject({human: true, role: HIDDEN_ROLE, isAlive: true});
+    });
+
+    it('learns roles by the same rules as anybody: the pack and the dead', () => {
+        expect(roles(viewGameAs(shared(), wolf2, seal))).toEqual({
+            Alex: HIDDEN_ROLE, Wolf1: GAME_ROLES.WEREWOLF, Doc: HIDDEN_ROLE, Det: HIDDEN_ROLE, Vil: HIDDEN_ROLE, Gone: GAME_ROLES.VILLAGER,
+        });
+        const asDoc = viewGameAs(shared(), doc, seal);
+        expect(asDoc.humanPlayerRole).toBe(GAME_ROLES.DOCTOR);
+        expect(roles(asDoc).Wolf2).toBe(HIDDEN_ROLE);
+        // Two human werewolves know each other, whichever of them is the first human.
+        const pack = viewGameAs(shared({humanPlayerRole: GAME_ROLES.WEREWOLF}), wolf2, seal);
+        expect(roles(pack).Alex).toBe(GAME_ROLES.WEREWOLF);
+    });
+
+    it('is shown as a person to everybody, without a model, and their role stays hidden from the host', () => {
+        const view = viewGameAs(shared(), me, seal);
+        expect(view.humanPlayerName).toBe('Alex');
+        expect(view.bots.find(b => b.name === 'Wolf2')).toMatchObject({human: true, aiType: '', role: HIDDEN_ROLE});
+        expect(view.bots.find(b => b.name === 'Wolf1')).toMatchObject({aiType: 'x'});
+        expect(view.bots.find(b => b.name === 'Wolf1')?.human).toBeUndefined();
+    });
+
+    it('carries their own death, and the first human\'s', () => {
+        const dead = shared({
+            humanPlayerIsAlive: false,
+            bots: game().bots.map(b => b.name === 'Doc' ? {...b, isAlive: false} : b),
+        });
+        const asDoc = viewGameAs(dead, doc, seal);
+        expect(asDoc.humanPlayerIsAlive).toBe(false);
+        expect(asDoc.bots.find(b => b.name === 'Alex')).toMatchObject({isAlive: false, role: GAME_ROLES.VILLAGER});
+    });
+
+    it('reads their own role\'s channel and what is addressed to them, not the first human\'s', () => {
+        const message = (recipientName: string) => ({id: recipientName, recipientName, authorName: 'GM', msg: 'x', messageType: MessageType.GM_COMMAND, day: 1, timestamp: 1} as GameMessage);
+        const all = ['ALL', 'WEREWOLVES', 'DOCTOR', 'Wolf2', 'Alex', 'Wolf1'].map(message);
+        expect(viewMessagesAs(shared(), wolf2, all).map(m => m.recipientName)).toEqual(['ALL', 'WEREWOLVES', 'Wolf2']);
+        expect(viewMessagesAs(shared(), doc, all).map(m => m.recipientName)).toEqual(['ALL', 'DOCTOR']);
+    });
+
+    it('sees the night queue only while their own role acts', () => {
+        const night = shared({
+            gameState: GAME_STATES.NIGHT,
+            gameStateProcessQueue: [GAME_ROLES.WEREWOLF, GAME_ROLES.DOCTOR],
+            gameStateParamQueue: ['Wolf1', 'Wolf2'],
+        });
+        expect(viewGameAs(night, wolf2, seal).gameStateParamQueue).toEqual(['Wolf1', 'Wolf2']);
+        const asDoc = viewGameAs(night, doc, seal);
+        expect(asDoc.gameStateProcessQueue).toEqual([HIDDEN_ROLE, HIDDEN_ROLE]);
+        expect(asDoc.gameStateParamQueue[0].startsWith('#')).toBe(true);
+    });
+
+    it('a bot\'s name gives nobody its seat', () => {
+        const view = viewGameAs(shared(), {name: 'Wolf1', host: false}, seal);
+        expect(view.humanPlayerName).toBe('Alex');
+        expect(view.humanPlayerRole).toBe(HIDDEN_ROLE);
+        expect(roles(view).Wolf2).toBe(HIDDEN_ROLE);
+    });
+});
