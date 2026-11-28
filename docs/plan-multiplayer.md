@@ -232,6 +232,14 @@ Friends join BEFORE the game is created, in the saved preview.
 After multiplayer, before anything else new: finish the helper hints
 (`docs/plan-growth-roadmap.md`, "Helper mode").
 
+Later, not scheduled (Alex, 2026-11-27): EMAIL. Invite links sent by email, and reminders
+(finish your game, and the like). Through a sending service, never our own mail server.
+To settle when it comes up: invites to typed addresses are an abuse door (limit them, or
+email only people who already have an account); players' addresses would go to an outside
+company (privacy text, Alex's call); reminders need consent, an unsubscribe link and a
+scheduler (Vercel's free plan runs scheduled jobs daily only; Marlow can trigger);
+GitHub sign-ins may have no reachable address.
+
 Done on 2026-11-27 (ahead of the shared preview, because a seat written by script was the
 cheapest way to test them): seats and the cast rules (step 1) and the server and page
 rules for playing with several humans (most of step 3: day discussion, vote, night,
