@@ -15,6 +15,7 @@ import { canOpenGameOnTier } from "@/app/utils/tier-access";
 import { listPreviewDrafts } from "@/app/api/preview-draft-actions";
 import { PreviewDraftSummary } from "@/app/utils/preview-drafts";
 import RemoveDraft from "@/app/games/components/RemoveDraft";
+import { seatFor } from "@/app/api/game-seats";
 
 function formatCreationDate(timestamp?: number): string {
     if (!timestamp) return '';
@@ -53,7 +54,7 @@ const GamePages = async ({searchParams}: {searchParams?: Promise<{error?: string
     // from them stay in the list like any other. The mark is on the account (`madeOwnGame`,
     // set by createGame); a form game still in the list counts too, for accounts older than
     // the mark. A failed read must not take the list down.
-    const madeOwnGame = games.some(game => !game.starterTemplateId)
+    const madeOwnGame = games.some(game => !game.starterTemplateId && game.ownerEmail === userEmail)
         || await getUser(userEmail).then(user => user.madeOwnGame === true).catch(() => false);
     const starterCards = madeOwnGame ? [] : await listStarterGames().catch(() => []);
     // Previews generated on the form and not yet made into games (app/utils/preview-drafts.ts).
@@ -211,7 +212,10 @@ function GameList({games, userTier, userEmail}: {games: Game[]; userTier: string
     return (
         <ul className="space-y-3">
             {games.map((game) => {
-                const isSameTier = canOpenGameOnTier(game.createdWithTier, userTier);
+                // A game somebody else hosts: this account plays one character in it and is
+                // not held to its tier (the host's account carries the game).
+                const joinedAs = game.ownerEmail && game.ownerEmail !== userEmail ? seatFor(game, userEmail)?.character : undefined;
+                const isSameTier = !!joinedAs || canOpenGameOnTier(game.createdWithTier, userTier);
                 return (
                 <li
                     key={game.id}
@@ -222,7 +226,7 @@ function GameList({games, userTier, userEmail}: {games: Game[]; userTier: string
                     <div className="flex justify-between items-start gap-2">
                         {isSameTier ? (
                             <Link href={`/games/${game.id}`} className="flex-grow">
-                                <GameListEntryContent game={game} />
+                                <GameListEntryContent game={game} playAs={joinedAs} />
                             </Link>
                         ) : (
                             <div className="flex-grow cursor-not-allowed">
@@ -232,7 +236,7 @@ function GameList({games, userTier, userEmail}: {games: Game[]; userTier: string
                                 </p>
                             </div>
                         )}
-                        <RemoveGame gameId={game.id} ownerEmail={userEmail} />
+                        <RemoveGame gameId={game.id} ownerEmail={userEmail} leaveAs={joinedAs} />
                     </div>
                 </li>
                 );
@@ -244,9 +248,12 @@ function GameList({games, userTier, userEmail}: {games: Game[]; userTier: string
 function GameListEntryContent({
     game,
     locked = false,
+    playAs,
 }: {
     game: Game;
     locked?: boolean;
+    // The account's own character in a game somebody else hosts.
+    playAs?: string;
 }) {
     const stateLabel = game.gameState.toLowerCase().replace(/_/g, ' ');
     return (
@@ -259,8 +266,8 @@ function GameListEntryContent({
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-4">
                 <h2 className="text-[16px] capitalize text-[var(--fg-0)] font-semibold truncate">
                     {game.theme}
-                    {game.humanPlayerName && (
-                        <span className="text-[13px] font-normal text-[var(--fg-2)] ml-2">as {game.humanPlayerName}</span>
+                    {(playAs || game.humanPlayerName) && (
+                        <span className="text-[13px] font-normal text-[var(--fg-2)] ml-2">as {playAs || game.humanPlayerName}{playAs ? ' · joined' : ''}</span>
                     )}
                 </h2>
                 <div className="flex flex-wrap items-center gap-x-2 text-[11px] font-mono text-[var(--fg-2)]">

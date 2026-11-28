@@ -114,8 +114,15 @@ export async function getAllGames(ownerEmail?: string): Promise<Game[]> {
     }
     
     const snapshot = await collectionRef.get();
+    const games: Game[] = snapshot.docs.map((doc: any) => gameFromFirestore(doc.id, doc.data()));
+    if (!ownerEmail) return games;
 
-    return snapshot.docs.map((doc: any) => gameFromFirestore(doc.id, doc.data()));
+    // Games somebody else hosts in which this account has a seat (`seatEmails` is
+    // written with `seats`, app/api/seat-actions.ts).
+    const joined = await db.collection('games').where('seatEmails', 'array-contains', ownerEmail).get();
+    const own = new Set(games.map(game => game.id));
+    joined.docs.forEach((doc: any) => { if (!own.has(doc.id)) games.push(gameFromFirestore(doc.id, doc.data())); });
+    return games;
 }
 
 export async function removeGameById(id: string, ownerEmail: string) {
@@ -1791,6 +1798,7 @@ function gameFromFirestore(id: string, data: any): Game {
         // Stray legacy values (e.g. the retired 'api' tier) read as free so the game stays openable.
         createdWithTier: data.createdWithTier === 'paid' ? 'paid' : 'free',
         ...(data.seats ? {seats: data.seats} : {}),
+        ...(data.seatInvites ? {seatInvites: data.seatInvites} : {}),
         ...(data.starterTemplateId ? {starterTemplateId: data.starterTemplateId} : {}),
         ...(data.starterClips ? {starterClips: data.starterClips} : {}),
         ...(data.helperMode ? {helperMode: true} : {}),

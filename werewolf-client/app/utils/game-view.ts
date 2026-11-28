@@ -196,6 +196,7 @@ function withoutHostData(view: Game): Game {
             void tokenUsage; void enableThinking;
             return {...shown, aiType: ''};
         }),
+        seatInvites: undefined,
         gameMasterAiType: '',
         gameMasterTokenUsage: undefined,
         totalGameCost: 0,

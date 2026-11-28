@@ -1389,8 +1389,9 @@ async function summarizePastDayImpl(gameId: string): Promise<GameActionResponse>
         const botName = nextInQueue;
         const bot = currentGame.bots.find(b => b.name === botName);
 
-        if (!bot || !bot.isAlive) {
-            // Bot not found or not alive, skip and continue with next
+        if (!bot || !bot.isAlive || isHumanName(currentGame, botName)) {
+            // Bot not found or not alive (or a person took the character over while
+            // it waited in this queue: a person writes no notes), skip and continue with next
             await gameRef.update({
                 gameStateProcessQueue: processQueue
             });
@@ -1539,6 +1540,7 @@ function gameFromFirestore(id: string, data: any): Game {
         // Stray legacy values (e.g. the retired 'api' tier) read as free so the game stays openable.
         createdWithTier: data.createdWithTier === 'paid' ? 'paid' : 'free',
         ...(data.seats ? {seats: data.seats} : {}),
+        ...(data.seatInvites ? {seatInvites: data.seatInvites} : {}),
         ...(data.starterTemplateId ? {starterTemplateId: data.starterTemplateId} : {}),
         ...(data.starterClips ? {starterClips: data.starterClips} : {}),
         ...(data.helperMode ? {helperMode: true} : {}),

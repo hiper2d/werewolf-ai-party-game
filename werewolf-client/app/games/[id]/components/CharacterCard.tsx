@@ -43,6 +43,8 @@ interface CharacterCardProps {
     // pipeline, injected so this component stays free of the audio singleton).
     onSpeakSample?: (text: string, selection: VoiceSelection) => Promise<void>;
     onStopSample?: () => void;
+    // Shown under the card (the host's invite / remove controls, built by the page).
+    footer?: React.ReactNode;
 }
 
 /**
@@ -53,7 +55,7 @@ interface CharacterCardProps {
  * same wherever the player meets them.
  * @category Game
  */
-export default function CharacterCard({ game, name, onClose, isOwner = false, onGameChange, onSelectVariant, onReframe, avatarUrl: avatarUrlOverride, onUpdateVoice, onSpeakSample, onStopSample }: CharacterCardProps) {
+export default function CharacterCard({ game, name, onClose, isOwner = false, onGameChange, onSelectVariant, onReframe, avatarUrl: avatarUrlOverride, onUpdateVoice, onSpeakSample, onStopSample, footer }: CharacterCardProps) {
     // The reframe editor sits over the card; Escape closes the editor first.
     const [reframing, setReframing] = useState(false);
     useEffect(() => {
@@ -258,6 +260,7 @@ export default function CharacterCard({ game, name, onClose, isOwner = false, on
                         onStopSample={onStopSample}
                     />
                 )}
+                {footer}
             </div>
             {reframing && reframeSource && (
                 <div onClick={e => e.stopPropagation()}>

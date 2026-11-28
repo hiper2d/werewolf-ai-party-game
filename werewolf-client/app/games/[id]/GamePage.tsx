@@ -9,6 +9,7 @@ import { isHiddenRoleRetry } from "@/app/api/retry-model";
 import { ttsService } from "@/app/services/tts-service";
 import { startNewDay, summarizePastDay, selectDayResponders } from "@/app/api/night-actions";
 import GameChat, { type PhaseControls } from "@/app/games/[id]/components/GameChat";
+import SeatPanel from "@/app/games/[id]/components/SeatPanel";
 import { btnFlowPrimary, btnFlowPrimaryStyle, btnFlowDanger, btnFlowSecondary, btnRailCancel, MoonIcon, SunriseIcon, ReplayIcon, MaskIcon, ExitIcon } from "@/app/games/[id]/components/PhaseStrip";
 import ModelSelectionDialog from "@/app/games/[id]/components/ModelSelectionDialog";
 const btnGhost = "px-3 py-1.5 text-[13px] font-medium rounded-[var(--radius-md)] bg-[var(--bg-3)] border border-[var(--line-3)] text-[var(--fg-0)] hover:bg-[var(--bg-4)] transition-all duration-[120ms]";
@@ -472,6 +473,13 @@ function GamePageContent({
             if (missed && missed.v > ownPulseRef.current) setTimeout(() => applyLiveView({...missed, missed: true}, true), 0);
         }
     }, [initialGame.id, applyLiveView]);
+
+    // A link made or a player removed from a character card: the action's own answer,
+    // taken like any other own change (its stamp marks the pulse as ours).
+    const applySeatChange = useCallback((changed: Game) => {
+        if (typeof changed.pulse === 'number') ownPulseRef.current = Math.max(ownPulseRef.current, changed.pulse);
+        setGame(changed);
+    }, []);
 
     // Handle welcome state
     useEffect(() => {
@@ -1716,6 +1724,9 @@ function GamePageContent({
                     onUpdateVoice={isGuestPlayer ? undefined : updateCharacterVoice}
                     onSpeakSample={async (text, sel) => { await ttsService.speakText(text, { voice: sel.voice, voiceStyle: sel.voiceStyle || undefined, voiceProvider: game.voiceProvider, gameId: game.id, source: 'audition' }); }}
                     onStopSample={() => ttsService.stopSpeaking()}
+                    // Inviting a friend into a bot's place, or removing one, is the host's;
+                    // a guest account cannot share a game.
+                    footer={isOwner && !isGuestPlayer ? <SeatPanel game={game} name={characterCardFor} onGame={applySeatChange} /> : undefined}
                 />
             )}
 

@@ -29,11 +29,11 @@ export function getCharacterIdentity(game: Game, name: string) {
     );
     const story = isGM
         ? 'The omniscient narrator of this story — keeper of every secret at the table.'
-        : isHuman ? 'The only human at the table.' : bot?.story;
+        : isHuman ? (game.table?.shared ? 'A player at this table.' : 'The only human at the table.') : bot?.story;
     return {
         isGM, isHuman, bot, isDead, role, roleVisible, story,
         exists: isGM || isHuman || !!bot,
-        modelName: isHuman ? 'Human' : getModelDisplayName(isGM ? game.gameMasterAiType : bot?.aiType ?? ''),
+        modelName: isHuman || bot?.human ? 'Human' : getModelDisplayName(isGM ? game.gameMasterAiType : bot?.aiType ?? ''),
         playStyleName: bot ? (PLAY_STYLE_CONFIGS[bot.playStyle]?.name ?? bot.playStyle) : null,
     };
 }

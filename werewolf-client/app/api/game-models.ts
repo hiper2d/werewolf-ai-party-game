@@ -387,6 +387,9 @@ export interface Game {
     // solo game, which has one seat derived from `ownerEmail` (app/api/game-seats.ts).
     // Server only: carries emails, and `viewGameAs` drops it.
     seats?: Record<string, GameSeat>;
+    // Links the host made for a bot's place, by token (app/api/seat-actions.ts). In a view:
+    // the host's only.
+    seatInvites?: Record<string, { character: string; createdAt: number }>;
     // VIEW ONLY (app/utils/game-view.ts): is this game played by several people, and is
     // the viewer its host? The host's screen runs the table; the others' never do.
     table?: { shared: boolean; host: boolean };

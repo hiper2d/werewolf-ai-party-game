@@ -55,6 +55,15 @@ export async function writeSeatViews(gameId: string, v: number, views: SeatViewW
     }
 }
 
+/** One player left the table: their view goes with them. */
+export async function deleteSeatView(gameId: string, uid: string): Promise<void> {
+    try {
+        await db?.collection(GAME_VIEWS_COLLECTION).doc(gameViewDocId(gameId, uid)).delete();
+    } catch (error: any) {
+        logger.warn('Could not delete a live view', {gameId, error: error?.message});
+    }
+}
+
 /** The game is gone: nothing to listen to. */
 export async function deleteSeatViews(gameId: string): Promise<void> {
     try {

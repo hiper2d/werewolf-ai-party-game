@@ -41,12 +41,14 @@ export default async function Page(props: any) {
     }
 
     // Only somebody with a seat at this table may open it
-    if (!seatFor(game, session.user.email)) {
+    const seat = seatFor(game, session.user.email);
+    if (!seat) {
         redirect('/games');
     }
 
     const userTier = await getUserTier(session.user.email);
-    if (!canOpenGameOnTier(game.createdWithTier, userTier)) {
+    // A joined player is not held to the game's tier: the host's account carries the game.
+    if (seat.host && !canOpenGameOnTier(game.createdWithTier, userTier)) {
         const searchParams = new URLSearchParams({
             error: 'tier_mismatch',
             blocked: params.id,

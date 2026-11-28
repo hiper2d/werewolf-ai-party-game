@@ -47,7 +47,9 @@ export async function ensureUserCanAccessGame(
         throw new Error('Only the host of this game can do that');
     }
 
-    if (!canOpenGameOnTier(storedTier, currentUserTier)) {
+    // The host's account carries the game (its tier, its bill) until the bill is shared:
+    // a joined player is not held to the game's tier.
+    if (seat.host && !canOpenGameOnTier(storedTier, currentUserTier)) {
         throw new TierMismatchError(gameId, storedTier, currentUserTier);
     }
 
