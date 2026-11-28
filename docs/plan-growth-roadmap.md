@@ -201,6 +201,11 @@ until their language has templates.
 
 ### Helper mode (hints on screen)
 
+**Not finished (Alex, 2026-11-27): comes back AFTER multiplayer.** Built so far: the six
+day-discussion hints and the "?" tour. Not built: the hints for the vote, the night and
+the rest of a game. They are added one step at a time, each dictated by Alex after he
+plays a game; none is invented ahead of him.
+
 **Built 2026-11-26 as a first version:** a hint strip above the composer, not callouts anchored to
 elements; not shown inside cinematic mode. The table below is the design; the live wording is in
 `app/games/[id]/helper-hints.ts`. The funnel report (Marlow's digest, `_funnel`) was built the same day.

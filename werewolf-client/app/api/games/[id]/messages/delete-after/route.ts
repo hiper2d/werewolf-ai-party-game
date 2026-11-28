@@ -4,6 +4,7 @@ import {GAME_STATES, Bot, Game} from "@/app/api/game-models";
 import {recalculateDayActivity} from "@/app/api/bot-actions";
 import {auth} from "@/auth";
 import {isStarterGame, STARTER_GAME_REWIND_MESSAGE} from "@/app/utils/starter-limits";
+import {isSharedGame, SHARED_GAME_REWIND_MESSAGE} from "@/app/utils/cast";
 
 export async function DELETE(
     request: NextRequest,
@@ -80,6 +81,10 @@ export async function DELETE(
         // A starter game has no rewinds (app/utils/starter-limits.ts).
         if (isStarterGame(gameData)) {
             return NextResponse.json({ error: STARTER_GAME_REWIND_MESSAGE }, { status: 403 });
+        }
+        // Nor has a game several people play (app/utils/cast.ts).
+        if (isSharedGame(gameData as any)) {
+            return NextResponse.json({ error: SHARED_GAME_REWIND_MESSAGE }, { status: 403 });
         }
 
         const currentDay = gameData.currentDay;

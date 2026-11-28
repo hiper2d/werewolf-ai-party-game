@@ -1159,7 +1159,7 @@ function GamePageContent({
                 actions: (
                     <>
                         {/* A replay re-runs the whole night (all paid LLM calls), so it is paid-tier only. */}
-                        {isPaidGame && !isStarterGame && (
+                        {isPaidGame && !isStarterGame && !game.table?.shared && (
                             <button
                                 className={btnFlowSecondary}
                                 disabled={!areControlsEnabled}

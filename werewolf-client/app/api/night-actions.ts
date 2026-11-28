@@ -55,7 +55,7 @@ import { GameEndChecker } from "@/app/utils/game-end-checker";
 import { recordBotTokenUsage, recordGameMasterTokenUsage } from "@/app/api/cost-tracking";
 import { ensureUserCanAccessGame } from "@/app/api/tier-guards";
 import { actingSeat } from "@/app/api/game-seats";
-import { aiBots, alivePlayerNames, isHumanName, playerRole } from "@/app/utils/cast";
+import { aiBots, alivePlayerNames, isHumanName, isSharedGame, playerRole, SHARED_GAME_REWIND_MESSAGE } from "@/app/utils/cast";
 import { logger } from "@/app/utils/logger";
 import { clampUserText, INPUT_LIMITS } from "@/app/utils/input-limits";
 import { screenHumanInput } from "@/app/api/jev-screen";
@@ -563,6 +563,7 @@ async function replayNightImpl(gameId: string): Promise<GameActionResponse> {
         return staleActionNoOp('replayNight', 'only the host moves the game on', game);
     }
     assertNoStarterRewind(game);
+    if (isSharedGame(game)) throw new Error(SHARED_GAME_REWIND_MESSAGE);
 
     // A replay re-runs every night action from scratch, so it is a paid-tier feature.
     if (game.createdWithTier !== USER_TIERS.PAID) {

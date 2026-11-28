@@ -178,7 +178,10 @@ Friends join BEFORE the game is created, in the saved preview.
   (`convertToAIMessages`), with no private notes for the days the human played, and the
   host picks its model.
 - When every human player is dead, a shared game ends for everybody.
-- Phase-step buttons (Start Night, Next Day) are the host's.
+- Phase-step buttons (Start Night, Next Day) are the host's. So is starting the vote
+  (Alex, 2026-11-27).
+- No rewinds in a shared game (Alex, 2026-11-27): deleting messages and replaying a night
+  are for solo games only. The buttons are hidden and the server refuses.
 
 ### E. Who runs the game
 
@@ -225,6 +228,9 @@ Friends join BEFORE the game is created, in the saved preview.
   row carrying the split.
 
 ### H. Build order from here
+
+After multiplayer, before anything else new: finish the helper hints
+(`docs/plan-growth-roadmap.md`, "Helper mode").
 
 Done on 2026-11-27 (ahead of the shared preview, because a seat written by script was the
 cheapest way to test them): seats and the cast rules (step 1) and the server and page

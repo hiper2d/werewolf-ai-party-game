@@ -36,3 +36,12 @@ describe('cast', () => {
         expect(livingHumanNames({...shared, humanPlayerIsAlive: false} as Game)).toEqual(['Cy']);
     });
 });
+
+describe('rewinds', () => {
+    it('are for solo games: a game with a second person is shared', () => {
+        const {isSharedGame} = require('./cast');
+        expect(isSharedGame(solo)).toBe(false);
+        expect(isSharedGame({...solo, seats: {u1: seat('Ann')}})).toBe(false);
+        expect(isSharedGame(shared)).toBe(true);
+    });
+});

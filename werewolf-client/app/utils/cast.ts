@@ -68,6 +68,13 @@ export function isSharedGame(game: Pick<Game, 'seats' | 'humanPlayerName'>): boo
     return humanCastNames(game).size > 0;
 }
 
+/**
+ * A shared game has no rewinds (Alex, 2026-11-27): deleting or trimming messages and
+ * replaying the night undo what other people at the table did and saw. Solo games only.
+ */
+export const SHARED_GAME_REWIND_MESSAGE =
+    'Rewinds are not available in a game played with other people: messages cannot be deleted and a night cannot be replayed.';
+
 /** The humans still alive. A shared game ends for everybody when this is empty. */
 export function livingHumanNames(game: Cast): string[] {
     return humanNames(game).filter(name => isPlayerAlive(game, name));
